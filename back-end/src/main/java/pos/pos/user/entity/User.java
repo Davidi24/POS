@@ -30,6 +30,18 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Column(name = "pin_hash")
+    private String pinHash;
+
+    @Column(name = "pin_enabled", nullable = false)
+    private Boolean pinEnabled = false;
+
+    @Column(name = "pin_attempts", nullable = false)
+    private Integer pinAttempts = 0;
+
+    @Column(name = "pin_locked_until", columnDefinition = "timestamptz")
+    private OffsetDateTime pinLockedUntil;
+
     @Column(name = "first_name")
     private String firstName;
 
