@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface UserSessionRepository extends JpaRepository<UserSession, UUID> {
 
-    Optional<UserSession> findByRefreshTokenHash(String refreshTokenHash);
+    Optional<UserSession> findByRefreshTokenHashAndRevokedFalse(String refreshTokenHash);
 
     List<UserSession> findByUserId(UUID userId);
 

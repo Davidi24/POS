@@ -12,6 +12,8 @@ import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserSessionRepository;
 
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -52,5 +54,67 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresIn(jwtService.getAccessTokenExpiration())
                 .build();
+    }
+
+    public LoginResponse refresh(String refreshToken) {
+
+        if (!jwtService.isValid(refreshToken)) {
+            throw new RuntimeException("Invalid refresh token");
+        }
+
+        UUID userId = jwtService.extractUserId(refreshToken);
+
+        List<UserSession> sessions = userSessionRepository.findByUserId(userId);
+
+        UserSession session = sessions.stream()
+                .filter(s -> !Boolean.TRUE.equals(s.getRevoked()))
+                .filter(s -> passwordService.matches(refreshToken, s.getRefreshTokenHash()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Invalid refresh token"));
+
+        if (session.getExpiresAt().isBefore(OffsetDateTime.now())) {
+            throw new RuntimeException("Refresh token expired");
+        }
+
+        String newAccessToken = jwtService.generateAccessToken(userId);
+        String newRefreshToken = jwtService.generateRefreshToken(userId);
+
+        session.setRefreshTokenHash(passwordService.hash(newRefreshToken));
+        session.setLastUsedAt(OffsetDateTime.now());
+
+        userSessionRepository.save(session);
+
+        return LoginResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .tokenType("Bearer")
+                .expiresIn(jwtService.getAccessTokenExpiration())
+                .build();
+    }
+
+    public void logout(String refreshToken) {
+
+        if (!jwtService.isValid(refreshToken)) {
+            return;
+        }
+
+        UUID userId = jwtService.extractUserId(refreshToken);
+
+        List<UserSession> sessions = userSessionRepository.findByUserId(userId);
+
+        UserSession session = sessions.stream()
+                .filter(s -> !Boolean.TRUE.equals(s.getRevoked()))
+                .filter(s -> passwordService.matches(refreshToken, s.getRefreshTokenHash()))
+                .findFirst()
+                .orElse(null);
+
+        if (session == null) {
+            return;
+        }
+
+        session.setRevoked(true);
+        session.setLastUsedAt(OffsetDateTime.now());
+
+        userSessionRepository.save(session);
     }
 }
