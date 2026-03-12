@@ -10,6 +10,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pos.pos.security.service.JwtService;
+import pos.pos.user.entity.User;
+import pos.pos.user.repository.UserRepository;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -20,6 +22,7 @@ import java.util.UUID;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -44,8 +47,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         UUID userId = jwtService.extractUserId(token);
 
+        User user = userRepository.findById(userId).orElse(null);
+
+        if (user == null || !Boolean.TRUE.equals(user.getIsActive())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
+                new UsernamePasswordAuthenticationToken(
+                        user,
+                        null,
+                        Collections.emptyList()
+                );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
