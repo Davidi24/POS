@@ -230,5 +230,23 @@ public class AuthService {
         // here you would normally send the token via email
     }
 
+    public void resetPassword(ResetPasswordRequest request) {
+
+        if (!jwtService.isValid(request.getToken())) {
+            throw new RuntimeException("Invalid reset token");
+        }
+
+        UUID userId = jwtService.extractUserId(request.getToken());
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String newPasswordHash = passwordService.hash(request.getNewPassword());
+
+        user.setPasswordHash(newPasswordHash);
+
+        userRepository.save(user);
+    }
+
 
 }
