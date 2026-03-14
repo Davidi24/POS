@@ -1,5 +1,6 @@
 package pos.pos.auth.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 @Getter
@@ -9,6 +10,7 @@ import lombok.*;
 @AllArgsConstructor
 public class RefreshTokenRequest {
 
+    @NotBlank
     private String refreshToken;
 
 }

@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.dto.LoginResponse;
+import pos.pos.auth.dto.RegisterRequest;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
+import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserSession;
 import pos.pos.user.repository.UserRepository;
@@ -117,4 +119,76 @@ public class AuthService {
 
         userSessionRepository.save(session);
     }
+
+    public void logoutAll(UUID userId) {
+
+        List<UserSession> sessions = userSessionRepository.findByUserId(userId);
+
+        if (sessions.isEmpty()) {
+            return;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+
+        sessions.forEach(session -> {
+            session.setRevoked(true);
+            session.setLastUsedAt(now);
+        });
+
+        userSessionRepository.saveAll(sessions);
+    }
+
+    public UserResponse me(String token) {
+
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        String jwt = token.substring(7);
+
+        if (!jwtService.isValid(jwt)) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        UUID userId = jwtService.extractUserId(jwt);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
+    }
+
+    public UserResponse register(RegisterRequest request) {
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email already in use");
+        }
+
+        String passwordHash = passwordService.hash(request.getPassword());
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .email(request.getEmail())
+                .passwordHash(passwordHash)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .createdAt(OffsetDateTime.now())
+                .build();
+
+        userRepository.save(user);
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
+    }
+
+
 }
