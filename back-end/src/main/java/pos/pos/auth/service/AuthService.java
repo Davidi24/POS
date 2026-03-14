@@ -2,6 +2,7 @@ package pos.pos.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import pos.pos.auth.dto.ChangePasswordRequest;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.dto.LoginResponse;
 import pos.pos.auth.dto.RegisterRequest;
@@ -188,6 +189,22 @@ public class AuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .build();
+    }
+
+    public void changePassword(ChangePasswordRequest request, UUID userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!passwordService.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Current password is incorrect");
+        }
+
+        String newPasswordHash = passwordService.hash(request.getNewPassword());
+
+        user.setPasswordHash(newPasswordHash);
+
+        userRepository.save(user);
     }
 
 
