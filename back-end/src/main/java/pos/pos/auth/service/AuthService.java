@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.dto.LoginResponse;
+import pos.pos.auth.dto.RegisterRequest;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.UserResponse;
@@ -161,5 +162,33 @@ public class AuthService {
                 .lastName(user.getLastName())
                 .build();
     }
+
+    public UserResponse register(RegisterRequest request) {
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email already in use");
+        }
+
+        String passwordHash = passwordService.hash(request.getPassword());
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .email(request.getEmail())
+                .passwordHash(passwordHash)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .createdAt(OffsetDateTime.now())
+                .build();
+
+        userRepository.save(user);
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
+    }
+
 
 }
