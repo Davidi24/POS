@@ -191,7 +191,19 @@ public class AuthService {
                 .build();
     }
 
-    public void changePassword(ChangePasswordRequest request, UUID userId) {
+    public void changePassword(String token, ChangePasswordRequest request) {
+
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        String jwt = token.substring(7);
+
+        if (!jwtService.isValid(jwt)) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        UUID userId = jwtService.extractUserId(jwt);
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
