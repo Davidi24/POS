@@ -6,6 +6,7 @@ import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.dto.LoginResponse;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
+import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserSession;
 import pos.pos.user.repository.UserRepository;
@@ -134,6 +135,31 @@ public class AuthService {
         });
 
         userSessionRepository.saveAll(sessions);
+    }
+
+    public UserResponse me(String token) {
+
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        String jwt = token.substring(7);
+
+        if (!jwtService.isValid(jwt)) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        UUID userId = jwtService.extractUserId(jwt);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
     }
 
 }
