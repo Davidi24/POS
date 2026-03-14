@@ -117,4 +117,23 @@ public class AuthService {
 
         userSessionRepository.save(session);
     }
+
+    public void logoutAll(UUID userId) {
+
+        List<UserSession> sessions = userSessionRepository.findByUserId(userId);
+
+        if (sessions.isEmpty()) {
+            return;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+
+        sessions.forEach(session -> {
+            session.setRevoked(true);
+            session.setLastUsedAt(now);
+        });
+
+        userSessionRepository.saveAll(sessions);
+    }
+
 }
