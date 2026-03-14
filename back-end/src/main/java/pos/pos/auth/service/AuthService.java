@@ -2,10 +2,7 @@ package pos.pos.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pos.pos.auth.dto.ChangePasswordRequest;
-import pos.pos.auth.dto.LoginRequest;
-import pos.pos.auth.dto.LoginResponse;
-import pos.pos.auth.dto.RegisterRequest;
+import pos.pos.auth.dto.*;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.UserResponse;
@@ -217,6 +214,20 @@ public class AuthService {
         user.setPasswordHash(newPasswordHash);
 
         userRepository.save(user);
+    }
+
+    public void forgotPassword(ForgotPasswordRequest request) {
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElse(null);
+
+        if (user == null) {
+            return;
+        }
+
+//        String token = jwtService.generatePasswordResetToken(user.getId());
+
+        // here you would normally send the token via email
     }
 
 
