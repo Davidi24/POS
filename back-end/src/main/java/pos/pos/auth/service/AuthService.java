@@ -2,9 +2,7 @@ package pos.pos.auth.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pos.pos.auth.dto.LoginRequest;
-import pos.pos.auth.dto.LoginResponse;
-import pos.pos.auth.dto.RegisterRequest;
+import pos.pos.auth.dto.*;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.UserResponse;
@@ -188,6 +186,66 @@ public class AuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .build();
+    }
+
+    public void changePassword(String token, ChangePasswordRequest request) {
+
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        String jwt = token.substring(7);
+
+        if (!jwtService.isValid(jwt)) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        UUID userId = jwtService.extractUserId(jwt);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!passwordService.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Current password is incorrect");
+        }
+
+        String newPasswordHash = passwordService.hash(request.getNewPassword());
+
+        user.setPasswordHash(newPasswordHash);
+
+        userRepository.save(user);
+    }
+
+    public void forgotPassword(ForgotPasswordRequest request) {
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElse(null);
+
+        if (user == null) {
+            return;
+        }
+
+//        String token = jwtService.generatePasswordResetToken(user.getId());
+
+        // here you would normally send the token via email
+    }
+
+    public void resetPassword(ResetPasswordRequest request) {
+
+        if (!jwtService.isValid(request.getToken())) {
+            throw new RuntimeException("Invalid reset token");
+        }
+
+        UUID userId = jwtService.extractUserId(request.getToken());
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String newPasswordHash = passwordService.hash(request.getNewPassword());
+
+        user.setPasswordHash(newPasswordHash);
+
+        userRepository.save(user);
     }
 
 
