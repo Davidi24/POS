@@ -17,7 +17,8 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<UserResponse> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
+        System.out.println("REGISTER CONTROLLER HIT");
         return ResponseEntity.ok(authService.register(request));
     }
 
@@ -75,13 +76,13 @@ public class AuthController {
 
     @PostMapping("/verify-email")
     public ResponseEntity<Void> verifyEmail(@RequestBody VerifyEmailRequest request) {
-        authService.verifyEmail(request);
+//        authService.verifyEmail(request);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/resend-verification")
     public ResponseEntity<Void> resendVerification(@RequestBody ResendVerificationRequest request) {
-        authService.resendVerification(request);
+//        authService.resendVerification(request);
         return ResponseEntity.ok().build();
     }
 }

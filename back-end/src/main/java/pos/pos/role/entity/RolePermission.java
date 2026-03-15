@@ -38,9 +38,13 @@ public class RolePermission {
     private OffsetDateTime assignedAt;
 
     @PrePersist
-    public void generateId() {
+    public void prePersist() {
         if (id == null) {
             id = UuidCreator.getTimeOrdered();
+        }
+
+        if (assignedAt == null) {
+            assignedAt = OffsetDateTime.now();
         }
     }
 }

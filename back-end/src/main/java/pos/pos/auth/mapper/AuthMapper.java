@@ -30,6 +30,8 @@ public class AuthMapper {
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
+                .phone(user.getPhone())
+                .isActive(user.getIsActive())
                 .build();
     }
 }

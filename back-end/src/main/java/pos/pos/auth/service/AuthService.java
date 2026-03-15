@@ -3,6 +3,7 @@ package pos.pos.auth.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pos.pos.auth.dto.*;
+import pos.pos.auth.mapper.AuthMapper;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.UserResponse;
@@ -23,6 +24,7 @@ public class AuthService {
     private final UserSessionRepository userSessionRepository;
     private final PasswordService passwordService;
     private final JwtService jwtService;
+    private final AuthMapper authMapper;
 
 
     public UserResponse register(RegisterRequest request) {
@@ -33,23 +35,11 @@ public class AuthService {
 
         String passwordHash = passwordService.hash(request.getPassword());
 
-        User user = User.builder()
-                .id(UUID.randomUUID())
-                .email(request.getEmail())
-                .passwordHash(passwordHash)
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .createdAt(OffsetDateTime.now())
-                .build();
+        User user = authMapper.toUser(request, passwordHash);
 
         userRepository.save(user);
 
-        return UserResponse.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .build();
+        return authMapper.toUserResponse(user);
     }
 
     public LoginResponse login(LoginRequest request) {
