@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pos.pos.auth.dto.*;
 import pos.pos.auth.mapper.AuthMapper;
+import pos.pos.exception.auth.EmailAlreadyExistsException;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.UserResponse;
@@ -30,7 +31,7 @@ public class AuthService {
     public UserResponse register(RegisterRequest request) {
 
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already in use");
+            throw new EmailAlreadyExistsException();
         }
 
         String passwordHash = passwordService.hash(request.getPassword());

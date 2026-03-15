@@ -1,4 +1,4 @@
-package pos.pos.exception;
+package pos.pos.exception.auth;
 
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
@@ -12,5 +12,4 @@ public class AuthException extends RuntimeException {
         super(message);
         this.status = status;
     }
-
 }
