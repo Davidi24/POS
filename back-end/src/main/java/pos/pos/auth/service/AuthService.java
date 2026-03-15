@@ -24,6 +24,34 @@ public class AuthService {
     private final PasswordService passwordService;
     private final JwtService jwtService;
 
+
+    public UserResponse register(RegisterRequest request) {
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email already in use");
+        }
+
+        String passwordHash = passwordService.hash(request.getPassword());
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .email(request.getEmail())
+                .passwordHash(passwordHash)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .createdAt(OffsetDateTime.now())
+                .build();
+
+        userRepository.save(user);
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
+    }
+
     public LoginResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
@@ -161,32 +189,6 @@ public class AuthService {
                 .build();
     }
 
-    public UserResponse register(RegisterRequest request) {
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already in use");
-        }
-
-        String passwordHash = passwordService.hash(request.getPassword());
-
-        User user = User.builder()
-                .id(UUID.randomUUID())
-                .email(request.getEmail())
-                .passwordHash(passwordHash)
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .createdAt(OffsetDateTime.now())
-                .build();
-
-        userRepository.save(user);
-
-        return UserResponse.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .build();
-    }
 
     public void changePassword(String token, ChangePasswordRequest request) {
 
