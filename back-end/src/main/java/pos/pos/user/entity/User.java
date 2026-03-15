@@ -33,9 +33,11 @@ public class User {
     @Column(name = "pin_hash")
     private String pinHash;
 
+    @Builder.Default
     @Column(name = "pin_enabled", nullable = false)
     private Boolean pinEnabled = false;
 
+    @Builder.Default
     @Column(name = "pin_attempts", nullable = false)
     private Integer pinAttempts = 0;
 
@@ -50,6 +52,7 @@ public class User {
 
     private String phone;
 
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
@@ -72,9 +75,24 @@ public class User {
     private OffsetDateTime updatedAt;
 
     @PrePersist
-    public void generateId() {
+    public void prePersist() {
         if (id == null) {
             id = UuidCreator.getTimeOrdered();
         }
+
+        OffsetDateTime now = OffsetDateTime.now();
+
+        if (createdAt == null) {
+            createdAt = now;
+        }
+
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = OffsetDateTime.now();
     }
 }

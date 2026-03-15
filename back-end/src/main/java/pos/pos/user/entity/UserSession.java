@@ -44,6 +44,7 @@ public class UserSession {
     @Column(name = "expires_at", nullable = false, columnDefinition = "timestamptz")
     private OffsetDateTime expiresAt;
 
+    @Builder.Default
     @Column(nullable = false)
     private Boolean revoked = false;
 
@@ -51,9 +52,13 @@ public class UserSession {
     private OffsetDateTime createdAt;
 
     @PrePersist
-    public void generateId() {
+    public void prePersist() {
         if (id == null) {
             id = UuidCreator.getTimeOrdered();
+        }
+
+        if (createdAt == null) {
+            createdAt = OffsetDateTime.now();
         }
     }
 }

@@ -36,9 +36,24 @@ public class Role {
     private OffsetDateTime updatedAt;
 
     @PrePersist
-    public void generateId() {
+    public void prePersist() {
         if (id == null) {
             id = UuidCreator.getTimeOrdered();
         }
+
+        OffsetDateTime now = OffsetDateTime.now();
+
+        if (createdAt == null) {
+            createdAt = now;
+        }
+
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        updatedAt = OffsetDateTime.now();
     }
 }
