@@ -9,7 +9,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pos.pos.auth.dto.RegisterRequest;
 import pos.pos.auth.mapper.AuthMapper;
 import pos.pos.exception.auth.EmailAlreadyExistsException;
-import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
