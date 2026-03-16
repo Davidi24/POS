@@ -27,7 +27,6 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuthMapper authMapper;
 
-
     public UserResponse register(RegisterRequest request) {
 
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -77,7 +76,7 @@ public class AuthService {
 
     public LoginResponse refresh(String refreshToken) {
 
-        if (!jwtService.isValid(refreshToken)) {
+        if (jwtService.isValid(refreshToken)) {
             throw new RuntimeException("Invalid refresh token");
         }
 
@@ -113,7 +112,7 @@ public class AuthService {
 
     public void logout(String refreshToken) {
 
-        if (!jwtService.isValid(refreshToken)) {
+        if (jwtService.isValid(refreshToken)) {
             return;
         }
 
@@ -163,7 +162,7 @@ public class AuthService {
 
         String jwt = token.substring(7);
 
-        if (!jwtService.isValid(jwt)) {
+        if (jwtService.isValid(jwt)) {
             throw new RuntimeException("Invalid token");
         }
 
@@ -180,7 +179,6 @@ public class AuthService {
                 .build();
     }
 
-
     public void changePassword(String token, ChangePasswordRequest request) {
 
         if (token == null || !token.startsWith("Bearer ")) {
@@ -189,7 +187,7 @@ public class AuthService {
 
         String jwt = token.substring(7);
 
-        if (!jwtService.isValid(jwt)) {
+        if (jwtService.isValid(jwt)) {
             throw new RuntimeException("Invalid token");
         }
 
@@ -218,14 +216,12 @@ public class AuthService {
             return;
         }
 
-//        String token = jwtService.generatePasswordResetToken(user.getId());
-
         // here you would normally send the token via email
     }
 
     public void resetPassword(ResetPasswordRequest request) {
 
-        if (!jwtService.isValid(request.getToken())) {
+        if (jwtService.isValid(request.getToken())) {
             throw new RuntimeException("Invalid reset token");
         }
 
@@ -240,6 +236,4 @@ public class AuthService {
 
         userRepository.save(user);
     }
-
-
 }
