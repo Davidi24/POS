@@ -17,11 +17,11 @@ class UserRepositoryTest {
     @Autowired
     private UserRepository userRepository;
 
-    private User createUser(String email) {
+    private User createUser() {
         OffsetDateTime now = OffsetDateTime.now();
 
         return User.builder()
-                .email(email)
+                .email("test@test.com")
                 .passwordHash("hash")
                 .firstName("John")
                 .lastName("Doe")
@@ -34,7 +34,7 @@ class UserRepositoryTest {
     @DisplayName("existsByEmail returns true when email exists")
     void existsByEmail_shouldReturnTrue_whenEmailExists() {
 
-        User user = createUser("test@test.com");
+        User user = createUser();
         userRepository.save(user);
 
         boolean exists = userRepository.existsByEmail("test@test.com");
@@ -55,7 +55,7 @@ class UserRepositoryTest {
     @DisplayName("findByEmail returns user when email exists")
     void findByEmail_shouldReturnUser_whenEmailExists() {
 
-        User user = createUser("test@test.com");
+        User user = createUser();
         userRepository.save(user);
 
         Optional<User> result = userRepository.findByEmail("test@test.com");

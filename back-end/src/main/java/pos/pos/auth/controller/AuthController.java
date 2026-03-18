@@ -1,5 +1,6 @@
 package pos.pos.auth.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,8 +23,20 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<LoginResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String ipAddress = httpRequest.getRemoteAddr();
+
+        String forwarded = httpRequest.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            ipAddress = forwarded.split(",")[0].trim();
+        }
+
+        String userAgent = httpRequest.getHeader("User-Agent");
+
+        return ResponseEntity.ok(authService.login(request, ipAddress, userAgent));
     }
 
     @PostMapping("/refresh")
