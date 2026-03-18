@@ -76,6 +76,32 @@ public class AuthService {
                 .build();
     }
 
+    public UserResponse me(String token) {
+
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        String jwt = token.substring(7);
+
+        if (jwtService.isValid(jwt)) {
+            throw new RuntimeException("Invalid token");
+        }
+
+        UUID userId = jwtService.extractUserId(jwt);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .build();
+    }
+
+
     public LoginResponse refresh(String refreshToken) {
 
         if (jwtService.isValid(refreshToken)) {
@@ -154,31 +180,6 @@ public class AuthService {
         });
 
         userSessionRepository.saveAll(sessions);
-    }
-
-    public UserResponse me(String token) {
-
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Invalid token");
-        }
-
-        String jwt = token.substring(7);
-
-        if (jwtService.isValid(jwt)) {
-            throw new RuntimeException("Invalid token");
-        }
-
-        UUID userId = jwtService.extractUserId(jwt);
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        return UserResponse.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .build();
     }
 
     public void changePassword(String token, ChangePasswordRequest request) {

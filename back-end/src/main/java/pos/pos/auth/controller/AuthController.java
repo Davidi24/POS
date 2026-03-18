@@ -4,11 +4,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import pos.pos.auth.dto.*;
 import pos.pos.auth.service.AuthService;
 import pos.pos.user.dto.UserResponse;
+import pos.pos.user.entity.User;
 
 @RestController
 @RequestMapping("/auth")
@@ -39,6 +41,14 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request, ipAddress, userAgent));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> me(Authentication authentication) {
+
+        User user = (User) authentication.getPrincipal();
+
+        return ResponseEntity.ok(authService.me(user.getId()));
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(@RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(authService.refresh(request.getRefreshToken()));
@@ -56,10 +66,6 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/me")
-    public ResponseEntity<UserResponse> me(@RequestHeader("Authorization") String token) {
-        return ResponseEntity.ok(authService.me(token));
-    }
 
 
 
