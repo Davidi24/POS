@@ -4,12 +4,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pos.pos.auth.dto.*;
 import pos.pos.auth.mapper.AuthMapper;
+import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.exception.auth.EmailAlreadyExistsException;
+import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.exception.user.UserNotFoundException;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserSession;
+import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserSessionRepository;
 
@@ -26,6 +30,8 @@ public class AuthService {
     private final PasswordService passwordService;
     private final JwtService jwtService;
     private final AuthMapper authMapper;
+    private final UserMapper userMapper;
+    private final UserSessionMapper userSessionMapper;
 
     public UserResponse register(RegisterRequest request) {
 
@@ -39,16 +45,16 @@ public class AuthService {
 
         userRepository.save(user);
 
-        return authMapper.toUserResponse(user);
+        return userMapper.toUserResponse(user);
     }
 
-    public LoginResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+                .orElse(null);
 
-        if (!passwordService.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Invalid credentials");
+        if (user == null || !passwordService.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new InvalidCredentialsException();
         }
 
         String accessToken = jwtService.generateAccessToken(user.getId());
@@ -56,13 +62,12 @@ public class AuthService {
 
         String refreshTokenHash = passwordService.hash(refreshToken);
 
-        UserSession session = UserSession.builder()
-                .userId(user.getId())
-                .refreshTokenHash(refreshTokenHash)
-                .createdAt(OffsetDateTime.now())
-                .expiresAt(OffsetDateTime.now().plusDays(30))
-                .revoked(false)
-                .build();
+        UserSession session = userSessionMapper.toSession(
+                user.getId(),
+                refreshTokenHash,
+                ipAddress,
+                userAgent
+        );
 
         userSessionRepository.save(session);
 
@@ -73,6 +78,15 @@ public class AuthService {
                 .expiresIn(jwtService.getAccessTokenExpiration())
                 .build();
     }
+
+    public UserResponse me(UUID userId) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
+
+        return userMapper.toUserResponse(user);
+    }
+
 
     public LoginResponse refresh(String refreshToken) {
 
@@ -152,31 +166,6 @@ public class AuthService {
         });
 
         userSessionRepository.saveAll(sessions);
-    }
-
-    public UserResponse me(String token) {
-
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Invalid token");
-        }
-
-        String jwt = token.substring(7);
-
-        if (jwtService.isValid(jwt)) {
-            throw new RuntimeException("Invalid token");
-        }
-
-        UUID userId = jwtService.extractUserId(jwt);
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        return UserResponse.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .build();
     }
 
     public void changePassword(String token, ChangePasswordRequest request) {

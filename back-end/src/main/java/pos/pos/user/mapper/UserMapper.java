@@ -1,11 +1,13 @@
 package pos.pos.user.mapper;
 
+import org.springframework.stereotype.Component;
 import pos.pos.user.entity.User;
 import pos.pos.user.dto.UserResponse;
 
+@Component
 public class UserMapper {
 
-    public static UserResponse toResponse(User user) {
+    public UserResponse toUserResponse(User user) {
         if (user == null) return null;
 
         return UserResponse.builder()

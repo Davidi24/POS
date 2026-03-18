@@ -32,7 +32,7 @@ public class UserSession {
     @Column(name = "refresh_token_hash", nullable = false)
     private String refreshTokenHash;
 
-    @Column(name = "ip_address", columnDefinition = "inet")
+    @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
     @Column(name = "user_agent")
