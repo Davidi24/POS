@@ -7,11 +7,13 @@ import pos.pos.auth.mapper.AuthMapper;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.exception.auth.EmailAlreadyExistsException;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.exception.user.UserNotFoundException;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserSession;
+import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserSessionRepository;
 
@@ -28,6 +30,7 @@ public class AuthService {
     private final PasswordService passwordService;
     private final JwtService jwtService;
     private final AuthMapper authMapper;
+    private final UserMapper userMapper;
     private final UserSessionMapper userSessionMapper;
 
     public UserResponse register(RegisterRequest request) {
@@ -42,7 +45,7 @@ public class AuthService {
 
         userRepository.save(user);
 
-        return authMapper.toUserResponse(user);
+        return userMapper.toUserResponse(user);
     }
 
     public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
@@ -76,29 +79,12 @@ public class AuthService {
                 .build();
     }
 
-    public UserResponse me(String token) {
-
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Invalid token");
-        }
-
-        String jwt = token.substring(7);
-
-        if (jwtService.isValid(jwt)) {
-            throw new RuntimeException("Invalid token");
-        }
-
-        UUID userId = jwtService.extractUserId(jwt);
+    public UserResponse me(UUID userId) {
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(UserNotFoundException::new);
 
-        return UserResponse.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .build();
+        return userMapper.toUserResponse(user);
     }
 
 
