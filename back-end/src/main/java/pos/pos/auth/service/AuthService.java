@@ -1,5 +1,6 @@
 package pos.pos.auth.service;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import pos.pos.auth.dto.*;
@@ -7,6 +8,7 @@ import pos.pos.auth.mapper.AuthMapper;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.exception.auth.EmailAlreadyExistsException;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.exception.auth.InvalidTokenException;
 import pos.pos.exception.user.UserNotFoundException;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
@@ -88,10 +90,11 @@ public class AuthService {
     }
 
 
+    @Transactional
     public LoginResponse refresh(String refreshToken) {
 
-        if (jwtService.isValid(refreshToken)) {
-            throw new RuntimeException("Invalid refresh token");
+        if (refreshToken == null || refreshToken.isBlank() || !jwtService.isValid(refreshToken)) {
+            throw new InvalidTokenException();
         }
 
         UUID userId = jwtService.extractUserId(refreshToken);
@@ -102,19 +105,22 @@ public class AuthService {
                 .filter(s -> !Boolean.TRUE.equals(s.getRevoked()))
                 .filter(s -> passwordService.matches(refreshToken, s.getRefreshTokenHash()))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Invalid refresh token"));
+                .orElseThrow(InvalidTokenException::new);
 
         if (session.getExpiresAt().isBefore(OffsetDateTime.now())) {
-            throw new RuntimeException("Refresh token expired");
+            throw new InvalidTokenException();
         }
 
-        String newAccessToken = jwtService.generateAccessToken(userId);
+        session.setRevoked(true);
+
         String newRefreshToken = jwtService.generateRefreshToken(userId);
+        String newRefreshTokenHash = passwordService.hash(newRefreshToken);
 
-        session.setRefreshTokenHash(passwordService.hash(newRefreshToken));
-        session.setLastUsedAt(OffsetDateTime.now());
+        UserSession newSession = createRotatedSession(session, newRefreshTokenHash);
 
-        userSessionRepository.save(session);
+        userSessionRepository.save(newSession);
+
+        String newAccessToken = jwtService.generateAccessToken(userId);
 
         return LoginResponse.builder()
                 .accessToken(newAccessToken)
@@ -224,5 +230,15 @@ public class AuthService {
         user.setPasswordHash(newPasswordHash);
 
         userRepository.save(user);
+    }
+
+    private UserSession createRotatedSession(UserSession oldSession, String newHash) {
+        return UserSession.builder()
+                .userId(oldSession.getUserId())
+                .refreshTokenHash(newHash)
+                .ipAddress(oldSession.getIpAddress())
+                .userAgent(oldSession.getUserAgent())
+                .expiresAt(OffsetDateTime.now().plusDays(7))
+                .build();
     }
 }
