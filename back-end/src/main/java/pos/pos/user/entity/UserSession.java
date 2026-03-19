@@ -12,7 +12,8 @@ import com.github.f4b6a3.uuid.UuidCreator;
         indexes = {
                 @Index(name = "user_sessions_user_idx", columnList = "user_id"),
                 @Index(name = "user_sessions_expires_idx", columnList = "expires_at"),
-                @Index(name = "user_sessions_refresh_token_idx", columnList = "refresh_token_hash")
+                @Index(name = "user_sessions_refresh_token_idx", columnList = "refresh_token_hash"),
+                @Index(name = "user_sessions_token_id_idx", columnList = "token_id")
         }
 )
 @Getter
@@ -28,6 +29,9 @@ public class UserSession {
 
     @Column(name = "user_id", nullable = false, columnDefinition = "uuid")
     private UUID userId;
+
+    @Column(name = "token_id", nullable = false, columnDefinition = "uuid", unique = true)
+    private UUID tokenId;
 
     @Column(name = "refresh_token_hash", nullable = false)
     private String refreshTokenHash;

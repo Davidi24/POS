@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Date;
 import java.util.UUID;
 
@@ -21,10 +22,10 @@ public class JwtService {
 
     @Getter
     @Value("${security.jwt.access-expiration}")
-    private long accessTokenExpiration;
+    private Duration accessTokenExpiration;
 
     @Value("${security.jwt.refresh-expiration}")
-    private long refreshTokenExpiration;
+    private Duration refreshTokenExpiration;
 
     private SecretKey key;
 
@@ -37,16 +38,17 @@ public class JwtService {
         return Jwts.builder()
                 .subject(userId.toString())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
+                .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration.toMillis()))
                 .signWith(key)
                 .compact();
     }
 
-    public String generateRefreshToken(UUID userId) {
+    public String generateRefreshToken(UUID userId, UUID tokenId) {
         return Jwts.builder()
                 .subject(userId.toString())
+                .id(tokenId.toString())
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
+                .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration.toMillis()))
                 .signWith(key)
                 .compact();
     }
@@ -54,6 +56,11 @@ public class JwtService {
     public UUID extractUserId(String token) {
         Claims claims = parse(token);
         return UUID.fromString(claims.getSubject());
+    }
+
+    public UUID extractTokenId(String token) {
+        Claims claims = parse(token);
+        return UUID.fromString(claims.getId());
     }
 
     public boolean isValid(String token) {
@@ -72,5 +79,4 @@ public class JwtService {
                 .parseSignedClaims(token)
                 .getPayload();
     }
-
 }
