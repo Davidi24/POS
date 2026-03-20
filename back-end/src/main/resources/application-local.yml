@@ -1,0 +1,3 @@
+security:
+  jwt:
+    secret: local-dev-secret-key-for-hs256-minimum-32b

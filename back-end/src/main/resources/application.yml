@@ -1,6 +1,11 @@
 spring:
   application:
     name: Pos
+<<<<<<< HEAD
+=======
+  profiles:
+    default: local
+>>>>>>> aa30a167fdbeae06fe8d876424b31a2a1fa72f99
 
   datasource:
     url: jdbc:postgresql://localhost:5432/pos
@@ -20,6 +25,7 @@ spring:
 security:
   jwt:
     secret: ${JWT_SECRET}
+<<<<<<< HEAD
     access-expiration: 900000
     refresh-expiration: 2592000000
 
@@ -28,3 +34,7 @@ app:
     from: ${MAIL_FROM:${spring.mail.username:no-reply@pos.local}}
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+=======
+    access-expiration: 15m
+    refresh-expiration: 30d
+>>>>>>> aa30a167fdbeae06fe8d876424b31a2a1fa72f99
