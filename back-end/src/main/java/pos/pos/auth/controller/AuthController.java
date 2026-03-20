@@ -16,8 +16,6 @@ import pos.pos.security.util.CookieService;
 import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
 
-import java.time.Duration;
-
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -27,6 +25,8 @@ public class AuthController {
     private final ClientInfoExtractor clientInfoExtractor;
     private final CookieService cookieService;
 
+    private static final String CLIENT_WEB = "web";
+
     @PostMapping("/register")
     public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
@@ -35,6 +35,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest request,
+            @RequestHeader(value = "X-Client-Type", required = false) String clientType,
             HttpServletRequest httpRequest,
             HttpServletResponse response
     ) {
@@ -43,19 +44,12 @@ public class AuthController {
 
         LoginResponse loginResponse = authService.login(request, ipAddress, userAgent);
 
-        cookieService.addRefreshToken(
-                response,
-                loginResponse.getRefreshToken(),
-                Duration.ofDays(30).getSeconds()
-        );
+        if (isWeb(clientType)) {
+            setRefreshCookie(response, loginResponse.getRefreshToken());
+            return ResponseEntity.ok(buildAccessResponse(loginResponse));
+        }
 
-        return ResponseEntity.ok(
-                LoginResponse.builder()
-                        .accessToken(loginResponse.getAccessToken())
-                        .tokenType(loginResponse.getTokenType())
-                        .expiresIn(loginResponse.getExpiresIn())
-                        .build()
-        );
+        return ResponseEntity.ok(loginResponse);
     }
 
     @GetMapping("/me")
@@ -66,40 +60,39 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(
-            @CookieValue(name = "refreshToken", required = false) String refreshToken,
+            @RequestHeader(value = "X-Client-Type", required = false) String clientType,
+            @CookieValue(name = "refreshToken", required = false) String cookieRefreshToken,
+            @RequestBody(required = false) RefreshTokenRequest body,
             HttpServletResponse response
     ) {
-        if (refreshToken == null) {
-            throw new InvalidTokenException();
-        }
+        String refreshToken = extractRefreshToken(clientType, cookieRefreshToken, body);
 
         LoginResponse loginResponse = authService.refresh(refreshToken);
 
-        cookieService.addRefreshToken(
-                response,
-                loginResponse.getRefreshToken(),
-                Duration.ofDays(30).getSeconds()
-        );
+        if (isWeb(clientType)) {
+            setRefreshCookie(response, loginResponse.getRefreshToken());
+            return ResponseEntity.ok(buildAccessResponse(loginResponse));
+        }
 
-        return ResponseEntity.ok(
-                LoginResponse.builder()
-                        .accessToken(loginResponse.getAccessToken())
-                        .tokenType(loginResponse.getTokenType())
-                        .expiresIn(loginResponse.getExpiresIn())
-                        .build()
-        );
+        return ResponseEntity.ok(loginResponse);
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-            @CookieValue(name = "refreshToken", required = false) String refreshToken,
+            @RequestHeader(value = "X-Client-Type", required = false) String clientType,
+            @CookieValue(name = "refreshToken", required = false) String cookieRefreshToken,
+            @RequestBody(required = false) RefreshTokenRequest body,
             HttpServletResponse response
     ) {
+        String refreshToken = tryExtractRefreshToken(clientType, cookieRefreshToken, body);
+
         if (refreshToken != null) {
             authService.logout(refreshToken);
         }
 
-        cookieService.clearRefreshToken(response);
+        if (isWeb(clientType)) {
+            cookieService.clearRefreshToken(response);
+        }
 
         return ResponseEntity.ok().build();
     }
@@ -111,40 +104,97 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> changePassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        User user = (User) authentication.getPrincipal();
+        authService.changePassword(user.getId(), request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request
+    ) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request
+    ) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Void> verifyEmail(
+            @Valid @RequestBody VerifyEmailRequest request
+    ) {
+        authService.verifyEmail(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Void> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest request
+    ) {
+        authService.resendVerification(request);
+        return ResponseEntity.ok().build();
+    }
 
 
+    private boolean isWeb(String clientType) {
+        return CLIENT_WEB.equalsIgnoreCase(clientType);
+    }
 
+    private void setRefreshCookie(HttpServletResponse response, String refreshToken) {
+        cookieService.addRefreshToken(
+                response,
+                refreshToken,
+                authService.getRefreshTokenMaxAgeSeconds()
+        );
+    }
 
-//    @PostMapping("/change-password")
-//    public ResponseEntity<Void> changePassword(
-//            @RequestHeader("Authorization") String token,
-//            @Valid @RequestBody ChangePasswordRequest request
-//    ) {
-//        authService.changePassword(token, request);
-//        return ResponseEntity.ok().build();
-//    }
-//
-//    @PostMapping("/forgot-password")
-//    public ResponseEntity<Void> forgotPassword(@RequestBody ForgotPasswordRequest request) {
-//        authService.forgotPassword(request);
-//        return ResponseEntity.ok().build();
-//    }
-//
-//    @PostMapping("/reset-password")
-//    public ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordRequest request) {
-//        authService.resetPassword(request);
-//        return ResponseEntity.ok().build();
-//    }
-//
-//    @PostMapping("/verify-email")
-//    public ResponseEntity<Void> verifyEmail(@RequestBody VerifyEmailRequest request) {
-////        authService.verifyEmail(request);
-//        return ResponseEntity.ok().build();
-//    }
-//
-//    @PostMapping("/resend-verification")
-//    public ResponseEntity<Void> resendVerification(@RequestBody ResendVerificationRequest request) {
-////        authService.resendVerification(request);
-//        return ResponseEntity.ok().build();
-//    }
+    private LoginResponse buildAccessResponse(LoginResponse loginResponse) {
+        return LoginResponse.builder()
+                .accessToken(loginResponse.getAccessToken())
+                .tokenType(loginResponse.getTokenType())
+                .expiresIn(loginResponse.getExpiresIn())
+                .build();
+    }
+
+    private String extractRefreshToken(
+            String clientType,
+            String cookieRefreshToken,
+            RefreshTokenRequest body
+    ) {
+        if (isWeb(clientType)) {
+            if (cookieRefreshToken == null) {
+                throw new InvalidTokenException();
+            }
+            return cookieRefreshToken;
+        }
+
+        if (body == null || body.getRefreshToken() == null) {
+            throw new InvalidTokenException();
+        }
+
+        return body.getRefreshToken();
+    }
+
+    private String tryExtractRefreshToken(
+            String clientType,
+            String cookieRefreshToken,
+            RefreshTokenRequest body
+    ) {
+        if (isWeb(clientType)) {
+            return cookieRefreshToken;
+        }
+
+        return body != null ? body.getRefreshToken() : null;
+    }
 }

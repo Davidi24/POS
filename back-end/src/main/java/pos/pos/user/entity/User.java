@@ -74,6 +74,17 @@ public class User {
     @Column(name = "updated_at", nullable = false, columnDefinition = "timestamptz")
     private OffsetDateTime updatedAt;
 
+    @Builder.Default
+    @Column(name = "email_verified", nullable = false)
+    private Boolean emailVerified = false;
+
+    @Builder.Default
+    @Column(name = "failed_login_attempts", nullable = false)
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "locked_until", columnDefinition = "timestamptz")
+    private OffsetDateTime lockedUntil;
+
     @PrePersist
     public void prePersist() {
         if (id == null) {

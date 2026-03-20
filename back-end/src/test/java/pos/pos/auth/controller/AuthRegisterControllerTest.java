@@ -14,6 +14,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import pos.pos.auth.dto.RegisterRequest;
 import pos.pos.auth.service.AuthService;
 import pos.pos.security.filter.JwtAuthenticationFilter;
+import pos.pos.security.util.ClientInfoExtractor;
+import pos.pos.security.util.CookieService;
 import pos.pos.user.dto.UserResponse;
 
 import java.util.UUID;
@@ -37,6 +39,12 @@ class AuthRegisterControllerTest {
 
     @MockBean
     private AuthService authService;
+
+    @MockBean
+    private ClientInfoExtractor clientInfoExtractor;
+
+    @MockBean
+    private CookieService cookieService;
 
     @Autowired
     private ObjectMapper objectMapper;
