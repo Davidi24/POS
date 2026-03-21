@@ -27,10 +27,7 @@ public class AuthController {
 
     private static final String CLIENT_WEB = "web";
 
-    @PostMapping("/register")
-    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(authService.register(request));
-    }
+
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(

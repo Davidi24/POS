@@ -7,9 +7,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import pos.pos.auth.dto.*;
-import pos.pos.auth.mapper.AuthMapper;
 import pos.pos.auth.mapper.UserSessionMapper;
-import pos.pos.exception.auth.EmailAlreadyExistsException;
 import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.exception.auth.InvalidTokenException;
 import pos.pos.exception.user.UserNotFoundException;
@@ -34,7 +32,6 @@ public class AuthService {
     private final UserSessionRepository userSessionRepository;
     private final PasswordService passwordService;
     private final JwtService jwtService;
-    private final AuthMapper authMapper;
     private final UserMapper userMapper;
     private final UserSessionMapper userSessionMapper;
     private final JwtProperties jwtProperties;
@@ -46,20 +43,7 @@ public class AuthService {
     @Value("${app.frontend.base-url:http://localhost:3000}")
     private String frontendBaseUrl;
 
-    public UserResponse register(RegisterRequest request) {
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new EmailAlreadyExistsException();
-        }
-
-        String passwordHash = passwordService.hash(request.getPassword());
-
-        User user = authMapper.toUser(request, passwordHash);
-        userRepository.save(user);
-        sendVerificationEmail(user);
-
-        return userMapper.toUserResponse(user);
-    }
 
     public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
 
