@@ -3,7 +3,6 @@ package pos.pos.security.config;
 public class SecurityPaths {
 
     public static final String[] PUBLIC = {
-            "/auth/register",
             "/auth/login",
             "/auth/refresh",
             "/auth/forgot-password",
