@@ -26,7 +26,15 @@ security:
     refresh-expiration: 30d
 
 app:
+  bootstrap:
+    super-admin:
+      email: ${BOOTSTRAP_SUPER_ADMIN_EMAIL:admin@pos.local}
+      password: ${BOOTSTRAP_SUPER_ADMIN_PASSWORD:ChangeMe123!}
+      first-name: ${BOOTSTRAP_SUPER_ADMIN_FIRST_NAME:Super}
+      last-name: ${BOOTSTRAP_SUPER_ADMIN_LAST_NAME:Admin}
+
   mail:
     from: ${MAIL_FROM:${spring.mail.username:no-reply@pos.local}}
+
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
