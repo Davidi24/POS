@@ -1,31 +1,36 @@
 package pos.pos.user.entity;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
-import com.github.f4b6a3.uuid.UuidCreator;
 
 @Entity
 @Table(
         name = "user_roles",
         uniqueConstraints = {
-                @UniqueConstraint(name = "user_role_uq", columnNames = {"user_id", "role_id"})
+                @UniqueConstraint(name = "uk_user_roles_user_role", columnNames = {"user_id", "role_id"})
         },
         indexes = {
-                @Index(name = "user_roles_user_idx", columnList = "user_id"),
-                @Index(name = "user_roles_role_idx", columnList = "role_id")
+                @Index(name = "idx_user_roles_user_id", columnList = "user_id"),
+                @Index(name = "idx_user_roles_role_id", columnList = "role_id"),
+                @Index(name = "idx_user_roles_assigned_by", columnList = "assigned_by")
         }
 )
 @Getter
 @Setter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class UserRole {
 
     @Id
-    @Column(columnDefinition = "uuid")
+    @EqualsAndHashCode.Include
+    @Column(name = "id", nullable = false, updatable = false, columnDefinition = "uuid")
     private UUID id;
 
     @Column(name = "user_id", nullable = false, columnDefinition = "uuid")
@@ -37,6 +42,9 @@ public class UserRole {
     @Column(name = "assigned_at", nullable = false, columnDefinition = "timestamptz")
     private OffsetDateTime assignedAt;
 
+    @Column(name = "assigned_by", columnDefinition = "uuid")
+    private UUID assignedBy;
+
     @PrePersist
     public void prePersist() {
         if (id == null) {
@@ -44,7 +52,7 @@ public class UserRole {
         }
 
         if (assignedAt == null) {
-            assignedAt = OffsetDateTime.now();
+            assignedAt = OffsetDateTime.now(ZoneOffset.UTC);
         }
     }
 }
