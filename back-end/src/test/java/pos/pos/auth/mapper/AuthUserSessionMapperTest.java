@@ -2,7 +2,7 @@ package pos.pos.auth.mapper;
 
 import org.junit.jupiter.api.Test;
 import pos.pos.security.config.JwtProperties;
-import pos.pos.user.entity.UserSession;
+import pos.pos.auth.entity.UserSession;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;

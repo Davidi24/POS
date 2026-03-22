@@ -3,7 +3,7 @@ package pos.pos.auth.mapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import pos.pos.security.config.JwtProperties;
-import pos.pos.user.entity.UserSession;
+import pos.pos.auth.entity.UserSession;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

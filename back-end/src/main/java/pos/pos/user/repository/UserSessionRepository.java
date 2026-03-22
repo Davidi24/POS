@@ -1,7 +1,7 @@
 package pos.pos.user.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import pos.pos.user.entity.UserSession;
+import pos.pos.auth.entity.UserSession;
 
 import java.util.List;
 import java.util.Optional;

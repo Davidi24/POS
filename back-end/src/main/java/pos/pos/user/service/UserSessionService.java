@@ -2,7 +2,7 @@ package pos.pos.user.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import pos.pos.user.entity.UserSession;
+import pos.pos.auth.entity.UserSession;
 import pos.pos.user.repository.UserSessionRepository;
 import com.github.f4b6a3.uuid.UuidCreator;
 

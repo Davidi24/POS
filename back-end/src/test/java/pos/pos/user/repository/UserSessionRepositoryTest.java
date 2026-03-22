@@ -6,7 +6,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
 import pos.pos.support.AuthTestDataFactory;
-import pos.pos.user.entity.UserSession;
+import pos.pos.auth.entity.UserSession;
 
 import java.util.List;
 import java.util.Optional;

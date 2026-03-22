@@ -1,4 +1,4 @@
-package pos.pos.user.entity;
+package pos.pos.auth.entity;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
