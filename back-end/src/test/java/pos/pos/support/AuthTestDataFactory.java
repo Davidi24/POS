@@ -4,7 +4,7 @@ import pos.pos.auth.dto.*;
 import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserRole;
-import pos.pos.user.entity.UserSession;
+import pos.pos.auth.entity.UserSession;
 import pos.pos.role.entity.Role;
 
 import java.time.OffsetDateTime;

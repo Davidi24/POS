@@ -22,7 +22,7 @@ import pos.pos.security.service.PasswordService;
 import pos.pos.support.AuthTestDataFactory;
 import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
-import pos.pos.user.entity.UserSession;
+import pos.pos.auth.entity.UserSession;
 import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserSessionRepository;
