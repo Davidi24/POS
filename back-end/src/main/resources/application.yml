@@ -3,6 +3,9 @@ spring:
     name: Pos
   profiles:
     default: local
+  sql:
+    init:
+      mode: always
 
   datasource:
     url: jdbc:postgresql://localhost:5432/pos
@@ -12,7 +15,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     show-sql: true
     properties:
       hibernate:
@@ -21,7 +24,7 @@ spring:
 
 security:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:change-this-local-dev-secret-key-please-1234567890}
     access-expiration: 15m
     refresh-expiration: 30d
 

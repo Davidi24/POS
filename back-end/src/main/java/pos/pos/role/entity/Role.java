@@ -1,12 +1,12 @@
 package pos.pos.role.entity;
 
-import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
+import pos.pos.utils.AuditedEntityLifecycle;
+import pos.pos.utils.EntityLifecycleUtils;
+import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.Locale;
 import java.util.UUID;
 
 @Entity
@@ -23,7 +23,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class Role {
+public class Role implements AuditedEntityLifecycle {
 
     @Id
     @EqualsAndHashCode.Include
@@ -56,44 +56,22 @@ public class Role {
     @PrePersist
     public void prePersist() {
         normalizeFields();
-
-        if (id == null) {
-            id = UuidCreator.getTimeOrdered();
-        }
-
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-
-        if (createdAt == null) {
-            createdAt = now;
-        }
-
-        if (updatedAt == null) {
-            updatedAt = now;
-        }
+        EntityLifecycleUtils.initializeAuditedEntity(this);
     }
 
     @PreUpdate
     public void preUpdate() {
         normalizeFields();
-        updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        EntityLifecycleUtils.touch(this);
     }
 
     private void normalizeFields() {
-        code = normalizeUpper(code);
-        name = normalize(name);
-        description = normalize(description);
-    }
-
-    private String normalize(String value) {
-        if (value == null) {
-            return null;
+        if (code == null && name != null) {
+            code = name.replaceAll("[^A-Za-z0-9]+", "_");
         }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
 
-    private String normalizeUpper(String value) {
-        String normalized = normalize(value);
-        return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
+        code = NormalizationUtils.normalizeUpper(code);
+        name = NormalizationUtils.normalize(name);
+        description = NormalizationUtils.normalize(description);
     }
 }

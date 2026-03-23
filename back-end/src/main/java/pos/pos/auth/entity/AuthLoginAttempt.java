@@ -10,7 +10,7 @@ import java.util.UUID;
 
 @Entity
 @Table(
-        name = "auth-login-attempts",
+        name = "auth_login_attempts",
         indexes = {
                 @Index(name = "idx_auth_login_attempts_email", columnList = "email"),
                 @Index(name = "idx_auth_login_attempts_ip_address", columnList = "ip_address"),
@@ -38,7 +38,7 @@ public class AuthLoginAttempt {
     @Column(name = "email", length = 150)
     private String email;
 
-    @Column(name = "ip_address", columnDefinition = "inet")
+    @Column(name = "ip_address")
     private String ipAddress;
 
     @Column(name = "user_agent", columnDefinition = "text")

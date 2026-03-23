@@ -2,7 +2,6 @@ package pos.pos.auth.mapper;
 
 import org.springframework.stereotype.Component;
 import pos.pos.auth.dto.RegisterRequest;
-import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
 
 import java.time.OffsetDateTime;

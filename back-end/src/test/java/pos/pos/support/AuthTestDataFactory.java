@@ -99,7 +99,7 @@ public final class AuthTestDataFactory {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .phone(user.getPhone())
-                .isActive(user.getIsActive())
+                .isActive(user.isActive())
                 .build();
     }
 
@@ -143,6 +143,7 @@ public final class AuthTestDataFactory {
 
         return Role.builder()
                 .id(UUID.randomUUID())
+                .code(name)
                 .name(name)
                 .description(name + " role")
                 .createdAt(now)

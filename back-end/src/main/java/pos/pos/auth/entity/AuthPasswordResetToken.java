@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Entity
 @Table(
-        name = "auth-password-reset-tokens",
+        name = "auth_password_reset_tokens",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_auth_password_reset_tokens_token_hash", columnNames = "token_hash")
         },

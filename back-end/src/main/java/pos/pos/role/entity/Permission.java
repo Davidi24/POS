@@ -3,10 +3,10 @@ package pos.pos.role.entity;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
+import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Locale;
 import java.util.UUID;
 
 @Entity
@@ -66,28 +66,10 @@ public class Permission {
     }
 
     private void normalizeFields() {
-        code = normalizeUpper(code);
-        name = normalize(name);
-        description = normalize(description);
-        resource = normalizeLower(resource);
-        action = normalizeLower(action);
-    }
-
-    private String normalize(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private String normalizeUpper(String value) {
-        String normalized = normalize(value);
-        return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
-    }
-
-    private String normalizeLower(String value) {
-        String normalized = normalize(value);
-        return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
+        code = NormalizationUtils.normalizeUpper(code);
+        name = NormalizationUtils.normalize(name);
+        description = NormalizationUtils.normalize(description);
+        resource = NormalizationUtils.normalizeLower(resource);
+        action = NormalizationUtils.normalizeLower(action);
     }
 }
