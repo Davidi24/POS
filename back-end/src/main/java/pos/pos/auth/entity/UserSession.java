@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Entity
 @Table(
-        name = "\"user-sessions\"",
+        name = "user_sessions",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_user_sessions_token_id", columnNames = "token_id")
         },
@@ -52,7 +52,7 @@ public class UserSession {
     @Column(name = "refresh_token_hash", nullable = false, columnDefinition = "text")
     private String refreshTokenHash;
 
-    @Column(name = "ip_address", columnDefinition = "inet")
+    @Column(name = "ip_address")
     private String ipAddress;
 
     @Column(name = "user_agent", columnDefinition = "text")

@@ -66,6 +66,7 @@ class JwtAuthenticationFilterTest {
         List<UserRole> userRoles = List.of(AuthTestDataFactory.userRole(user.getId(), roleId));
 
         when(jwtService.isValid("token")).thenReturn(true);
+        when(jwtService.isAccessToken("token")).thenReturn(true);
         when(jwtService.extractUserId("token")).thenReturn(user.getId());
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRoleRepository.findByUserId(user.getId())).thenReturn(userRoles);

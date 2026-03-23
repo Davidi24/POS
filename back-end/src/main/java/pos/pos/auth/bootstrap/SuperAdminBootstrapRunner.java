@@ -3,6 +3,7 @@ package pos.pos.auth.bootstrap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import pos.pos.config.properties.BootstrapSuperAdminProperties;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
@@ -11,12 +12,14 @@ import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserRole;
 import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserRoleRepository;
+import pos.pos.utils.NormalizationUtils;
 
 @Component
 @RequiredArgsConstructor
 public class SuperAdminBootstrapRunner implements CommandLineRunner {
 
-    private static final String SUPER_ADMIN_ROLE = "SUPER_ADMIN";
+    private static final String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
+    private static final String SUPER_ADMIN_ROLE_NAME = "Super Admin";
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -25,6 +28,7 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
     private final BootstrapSuperAdminProperties properties;
 
     @Override
+    @Transactional
     public void run(String... args) {
         Role superAdminRole = getOrCreateSuperAdminRole();
         User superAdminUser = getOrCreateSuperAdminUser();
@@ -32,23 +36,33 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
     }
 
     private Role getOrCreateSuperAdminRole() {
-        return roleRepository.findByName(SUPER_ADMIN_ROLE)
+        return roleRepository.findByCode(SUPER_ADMIN_ROLE_CODE)
                 .orElseGet(() -> roleRepository.save(
                         Role.builder()
-                                .name(SUPER_ADMIN_ROLE)
+                                .code(SUPER_ADMIN_ROLE_CODE)
+                                .name(SUPER_ADMIN_ROLE_NAME)
                                 .description("System super administrator")
+                                .isSystem(true)
+                                .isActive(true)
                                 .build()
                 ));
     }
 
     private User getOrCreateSuperAdminUser() {
-        return userRepository.findByEmail(properties.getEmail())
+        String normalizedEmail = NormalizationUtils.normalizeLower(properties.getEmail());
+
+        if (normalizedEmail == null) {
+            throw new IllegalStateException("app.bootstrap.super-admin.email must not be blank");
+        }
+
+        return userRepository.findByEmailAndDeletedAtIsNull(normalizedEmail)
                 .orElseGet(() -> userRepository.save(
                         User.builder()
-                                .email(properties.getEmail())
+                                .email(normalizedEmail)
                                 .passwordHash(passwordService.hash(properties.getPassword()))
                                 .firstName(properties.getFirstName())
                                 .lastName(properties.getLastName())
+                                .status("ACTIVE")
                                 .isActive(true)
                                 .emailVerified(true)
                                 .failedLoginAttempts(0)

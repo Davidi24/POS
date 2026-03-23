@@ -1,6 +1,7 @@
 package pos.pos.user.dto;
 
 import lombok.*;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -16,5 +17,6 @@ public class UserResponse {
     private String lastName;
     private String phone;
     private Boolean isActive;
+    private List<String> roles;
 
 }

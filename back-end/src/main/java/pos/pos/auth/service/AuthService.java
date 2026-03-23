@@ -1,299 +1,204 @@
 package pos.pos.auth.service;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
-import pos.pos.auth.dto.*;
+import org.springframework.transaction.annotation.Transactional;
+import pos.pos.auth.dto.AuthTokensResponse;
+import pos.pos.auth.dto.LoginRequest;
+import pos.pos.auth.entity.AuthLoginAttempt;
 import pos.pos.auth.mapper.UserSessionMapper;
+import pos.pos.auth.repository.AuthLoginAttemptRepository;
+import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
-import pos.pos.exception.auth.InvalidTokenException;
-import pos.pos.exception.user.UserNotFoundException;
+import pos.pos.role.entity.Role;
+import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
-import pos.pos.user.dto.UserResponse;
+import pos.pos.security.util.ClientInfo;
 import pos.pos.user.entity.User;
-import pos.pos.auth.entity.UserSession;
+import pos.pos.user.entity.UserRole;
 import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
-import pos.pos.user.repository.UserSessionRepository;
+import pos.pos.user.repository.UserRoleRepository;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
+    private static final String TOKEN_TYPE = "Bearer";
+
     private final UserRepository userRepository;
-    private final UserSessionRepository userSessionRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final RoleRepository roleRepository;
     private final PasswordService passwordService;
     private final JwtService jwtService;
-    private final UserMapper userMapper;
-    private final UserSessionMapper userSessionMapper;
     private final JwtProperties jwtProperties;
-    private final JavaMailSender mailSender;
+    private final UserSessionRepository userSessionRepository;
+    private final AuthLoginAttemptRepository authLoginAttemptRepository;
+    private final UserSessionMapper userSessionMapper;
+    private final UserMapper userMapper;
 
-    @Value("${app.mail.from:${spring.mail.username:no-reply@pos.local}}")
-    private String mailFrom;
+    @Value("${app.security.login.max-failed-attempts:5}")
+    private int maxFailedAttempts;
 
-    @Value("${app.frontend.base-url:http://localhost:3000}")
-    private String frontendBaseUrl;
+    @Value("${app.security.login.lock-duration-minutes:15}")
+    private long lockDurationMinutes;
 
+    @Transactional
+    public AuthTokensResponse login(LoginRequest request, ClientInfo clientInfo) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        String normalizedEmail = normalizeEmail(request.getEmail());
 
+        User user = userRepository.findByEmailAndDeletedAtIsNull(normalizedEmail)
+                .orElseThrow(() -> {
+                    saveLoginAttempt(null, normalizedEmail, clientInfo, false, "INVALID_CREDENTIALS", now);
+                    return new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+                });
 
-    public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
-
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(InvalidCredentialsException::new);
+        validateUserCanLogin(user, now, normalizedEmail, clientInfo);
 
         if (!passwordService.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new InvalidCredentialsException();
+            handleFailedLogin(user, normalizedEmail, clientInfo, now);
+            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
+
+        List<String> roles = loadRoleCodes(user.getId());
+
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
+        user.setLastLoginAt(now);
+        user.setLastLoginIp(clientInfo.ipAddress());
+        userRepository.save(user);
 
         UUID tokenId = UUID.randomUUID();
-
-        String accessToken = jwtService.generateAccessToken(user.getId());
+        String accessToken = jwtService.generateAccessToken(user.getId(), roles, tokenId);
         String refreshToken = jwtService.generateRefreshToken(user.getId(), tokenId);
 
-        String refreshTokenHash = passwordService.hash(refreshToken);
-
-        UserSession session = userSessionMapper.toSession(
-                user.getId(),
-                tokenId,
-                refreshTokenHash,
-                ipAddress,
-                userAgent
+        userSessionRepository.save(
+                userSessionMapper.toSession(
+                        user.getId(),
+                        tokenId,
+                        "PASSWORD",
+                        extractDeviceName(clientInfo != null ? clientInfo.userAgent() : null),
+                        sha256(refreshToken),
+                        clientInfo
+                )
         );
 
-        userSessionRepository.save(session);
+        saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, true, null, now);
 
-        return LoginResponse.builder()
+        return AuthTokensResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .tokenType("Bearer")
-                .expiresIn(jwtService.getAccessTokenExpiration().toMillis())
+                .tokenType(TOKEN_TYPE)
+                .expiresIn(jwtProperties.getAccessExpiration().getSeconds())
+                .user(userMapper.toUserResponse(user, roles))
                 .build();
     }
 
-    public UserResponse me(UUID userId) {
+    private void validateUserCanLogin(
+            User user,
+            OffsetDateTime now,
+            String normalizedEmail,
+            ClientInfo clientInfo
+    ) {
+        if (!user.isActive() || user.getDeletedAt() != null || !"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, "ACCOUNT_INACTIVE", now);
+            throw new InvalidCredentialsException("User account is inactive");
+        }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        return userMapper.toUserResponse(user);
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
+            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, "ACCOUNT_LOCKED", now);
+            throw new InvalidCredentialsException("User account is temporarily locked");
+        }
     }
 
-    @Transactional
-    public LoginResponse refresh(String refreshToken) {
+    private void handleFailedLogin(
+            User user,
+            String normalizedEmail,
+            ClientInfo clientInfo,
+            OffsetDateTime now
+    ) {
+        int attempts = user.getFailedLoginAttempts() + 1;
+        user.setFailedLoginAttempts(attempts);
 
-        validateToken(refreshToken);
+        if (attempts >= maxFailedAttempts) {
+            user.setLockedUntil(now.plusMinutes(lockDurationMinutes));
+        }
 
-        UUID userId = jwtService.extractUserId(refreshToken);
-        UUID tokenId = jwtService.extractTokenId(refreshToken);
+        userRepository.save(user);
+        saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, "INVALID_CREDENTIALS", now);
+    }
 
-        UserSession session = userSessionRepository
-                .findByTokenIdAndRevokedFalse(tokenId)
-                .orElseThrow(InvalidTokenException::new);
+    private List<String> loadRoleCodes(UUID userId) {
+        List<UUID> roleIds = userRoleRepository.findByUserId(userId).stream()
+                .map(UserRole::getRoleId)
+                .distinct()
+                .toList();
 
-        validateSession(session, userId);
+        if (roleIds.isEmpty()) {
+            return List.of();
+        }
 
-        session.setRevoked(true);
+        return roleRepository.findByIdIn(roleIds).stream()
+                .filter(Role::isActive)
+                .map(Role::getCode)
+                .toList();
+    }
 
-        UUID newTokenId = UUID.randomUUID();
-
-        String newRefreshToken = jwtService.generateRefreshToken(userId, newTokenId);
-        String newRefreshTokenHash = passwordService.hash(newRefreshToken);
-
-        UserSession newSession = createRotatedSession(session, newTokenId, newRefreshTokenHash);
-
-        userSessionRepository.save(newSession);
-
-        String newAccessToken = jwtService.generateAccessToken(userId);
-
-        return LoginResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(newRefreshToken)
-                .tokenType("Bearer")
-                .expiresIn(jwtService.getAccessTokenExpiration().toMillis())
+    private void saveLoginAttempt(
+            UUID userId,
+            String email,
+            ClientInfo clientInfo,
+            boolean success,
+            String failureReason,
+            OffsetDateTime attemptedAt
+    ) {
+        AuthLoginAttempt attempt = AuthLoginAttempt.builder()
+                .userId(userId)
+                .email(email)
+                .ipAddress(clientInfo != null ? clientInfo.ipAddress() : null)
+                .userAgent(clientInfo != null ? clientInfo.userAgent() : null)
+                .success(success)
+                .failureReason(failureReason)
+                .attemptedAt(attemptedAt)
                 .build();
+
+        authLoginAttemptRepository.save(attempt);
     }
 
-    public void logout(String refreshToken) {
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
+    }
 
-        if (refreshToken == null || !jwtService.isValid(refreshToken)) {
-            return;
+    private String extractDeviceName(String userAgent) {
+        if (userAgent == null || userAgent.isBlank()) {
+            return null;
         }
 
-        UUID tokenId = jwtService.extractTokenId(refreshToken);
-
-        userSessionRepository
-                .findByTokenIdAndRevokedFalse(tokenId)
-                .ifPresent(session -> {
-                    session.setRevoked(true);
-                    session.setLastUsedAt(OffsetDateTime.now());
-                    userSessionRepository.save(session);
-                });
+        String trimmed = userAgent.trim();
+        return trimmed.length() <= 100 ? trimmed : trimmed.substring(0, 100);
     }
 
-    @Transactional
-    public void logoutAll(UUID userId) {
-
-        OffsetDateTime now = OffsetDateTime.now();
-
-        userSessionRepository.findByUserId(userId)
-                .forEach(session -> {
-                    session.setRevoked(true);
-                    session.setLastUsedAt(now);
-                });
-    }
-
-    @Transactional
-    public void changePassword(UUID userId, ChangePasswordRequest request) {
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        if (!passwordService.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-            throw new InvalidCredentialsException();
+    private String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Failed to hash refresh token", e);
         }
-
-        user.setPasswordHash(passwordService.hash(request.getNewPassword()));
-        userRepository.save(user);
-
-        logoutAll(userId);
-    }
-
-    public void forgotPassword(ForgotPasswordRequest request) {
-
-        userRepository.findByEmail(request.getEmail())
-                .ifPresent(user -> {
-                    String resetToken = jwtService.generateAccessToken(user.getId());
-                    sendPasswordResetEmail(user, resetToken);
-                });
-    }
-
-    @Transactional
-    public void resetPassword(ResetPasswordRequest request) {
-
-        validateToken(request.getToken());
-
-        UUID userId = jwtService.extractUserId(request.getToken());
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        user.setPasswordHash(passwordService.hash(request.getNewPassword()));
-        userRepository.save(user);
-
-        logoutAll(userId);
-    }
-
-    @Transactional
-    public void verifyEmail(VerifyEmailRequest request) {
-
-        validateToken(request.getToken());
-
-        UUID userId = jwtService.extractUserId(request.getToken());
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
-
-        if (Boolean.TRUE.equals(user.getEmailVerified())) {
-            return;
-        }
-
-        user.setEmailVerified(true);
-        userRepository.save(user);
-    }
-
-    public void resendVerification(ResendVerificationRequest request) {
-
-        userRepository.findByEmail(request.getEmail())
-                .ifPresent(user -> {
-                    if (Boolean.TRUE.equals(user.getEmailVerified())) {
-                        return;
-                    }
-
-                    String token = jwtService.generateAccessToken(user.getId());
-                    sendVerificationEmail(user, token);
-                });
-    }
-
-    public long getRefreshTokenMaxAgeSeconds() {
-        return jwtProperties.getRefreshExpiration().getSeconds();
-    }
-
-    // ================= HELPERS =================
-
-    private void validateToken(String token) {
-        if (token == null || token.isBlank() || !jwtService.isValid(token)) {
-            throw new InvalidTokenException();
-        }
-    }
-
-    private void validateSession(UserSession session, UUID userId) {
-        if (!session.getUserId().equals(userId)) {
-            throw new InvalidTokenException();
-        }
-
-        if (session.getExpiresAt().isBefore(OffsetDateTime.now())) {
-            throw new InvalidTokenException();
-        }
-    }
-
-    private UserSession createRotatedSession(UserSession oldSession, UUID newTokenId, String newHash) {
-        OffsetDateTime now = OffsetDateTime.now();
-
-        return UserSession.builder()
-                .userId(oldSession.getUserId())
-                .tokenId(newTokenId)
-                .refreshTokenHash(newHash)
-                .ipAddress(oldSession.getIpAddress())
-                .userAgent(oldSession.getUserAgent())
-                .lastUsedAt(now)
-                .expiresAt(now.plusSeconds(jwtProperties.getRefreshExpiration().getSeconds()))
-                .createdAt(now)
-                .revoked(false)
-                .build();
-    }
-
-    private void sendVerificationEmail(User user) {
-        String token = jwtService.generateAccessToken(user.getId());
-        sendVerificationEmail(user, token);
-    }
-
-    private void sendVerificationEmail(User user, String token) {
-        String verificationUrl = buildFrontendUrl("/verify-email", token);
-        sendEmail(
-                user.getEmail(),
-                "Verify your email",
-                "Welcome to POS.\n\nVerify your email using this link:\n" + verificationUrl
-        );
-    }
-
-    private void sendPasswordResetEmail(User user, String token) {
-        String resetUrl = buildFrontendUrl("/reset-password", token);
-        sendEmail(
-                user.getEmail(),
-                "Reset your password",
-                "We received a password reset request.\n\nReset your password using this link:\n" + resetUrl
-        );
-    }
-
-    private String buildFrontendUrl(String path, String token) {
-        return frontendBaseUrl + path + "?token=" + token;
-    }
-
-    private void sendEmail(String to, String subject, String text) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailFrom);
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(text);
-        mailSender.send(message);
     }
 }

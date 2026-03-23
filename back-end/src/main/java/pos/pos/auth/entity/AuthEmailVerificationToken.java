@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Entity
 @Table(
-        name = "auth-email-verification-tokens",
+        name = "auth_email_verification_tokens",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_auth_email_verification_tokens_token_hash", columnNames = "token_hash")
         },
