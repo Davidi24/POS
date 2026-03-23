@@ -147,4 +147,61 @@ class AuthControllerLoginTest {
         assertEquals("refresh-token-123", refreshTokenCaptor.getValue());
     }
 
+    @Test
+    @DisplayName("POST /auth/login should return 400 when request body is invalid")
+    void login_shouldReturnBadRequest_whenBodyIsInvalid() throws Exception {
+        String invalidRequest = """
+                {
+                  "email": "",
+                  "password": ""
+                }
+                """;
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidRequest))
+                .andExpect(status().isBadRequest());
+
+        verify(clientInfoExtractor, never()).extract(any(HttpServletRequest.class));
+        verify(authService, never()).login(any(LoginRequest.class), any(ClientInfo.class));
+        verify(cookieService, never()).addRefreshTokenCookie(any(HttpServletResponse.class), any(String.class));
+    }
+
+    @Test
+    @DisplayName("POST /auth/login should return 400 when required fields are missing")
+    void login_shouldReturnBadRequest_whenRequiredFieldsAreMissing() throws Exception {
+        String invalidRequest = """
+                {
+                }
+                """;
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidRequest))
+                .andExpect(status().isBadRequest());
+
+        verify(clientInfoExtractor, never()).extract(any(HttpServletRequest.class));
+        verify(authService, never()).login(any(LoginRequest.class), any(ClientInfo.class));
+        verify(cookieService, never()).addRefreshTokenCookie(any(HttpServletResponse.class), any(String.class));
+    }
+
+    @Test
+    @DisplayName("POST /auth/login should return 400 when JSON is malformed")
+    void login_shouldReturnBadRequest_whenJsonIsMalformed() throws Exception {
+        String malformedJson = """
+                {
+                  "email": "test@example.com",
+                  "password": "Password123!"
+                """;
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(malformedJson))
+                .andExpect(status().isBadRequest());
+
+        verify(clientInfoExtractor, never()).extract(any(HttpServletRequest.class));
+        verify(authService, never()).login(any(LoginRequest.class), any(ClientInfo.class));
+        verify(cookieService, never()).addRefreshTokenCookie(any(HttpServletResponse.class), any(String.class));
+    }
+
 }
