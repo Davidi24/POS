@@ -204,4 +204,51 @@ class AuthControllerLoginTest {
         verify(cookieService, never()).addRefreshTokenCookie(any(HttpServletResponse.class), any(String.class));
     }
 
+    @Test
+    @DisplayName("POST /auth/login should return response matching LoginResponse contract")
+    void login_shouldReturnExpectedLoginResponseShape() throws Exception {
+        LoginRequest request = LoginRequest.builder()
+                .email("test@example.com")
+                .password("Password123!")
+                .build();
+
+        ClientInfo clientInfo = new ClientInfo("10.0.0.1", "Browser");
+        UUID userId = UUID.randomUUID();
+
+        UserResponse user = UserResponse.builder()
+                .id(userId)
+                .email("test@example.com")
+                .firstName("Era")
+                .lastName("Test")
+                .build();
+
+        AuthTokensResponse authResult = AuthTokensResponse.builder()
+                .accessToken("jwt-access")
+                .refreshToken("jwt-refresh")
+                .tokenType("Bearer")
+                .expiresIn(3600L)
+                .user(user)
+                .build();
+
+        when(clientInfoExtractor.extract(any(HttpServletRequest.class))).thenReturn(clientInfo);
+        when(authService.login(any(LoginRequest.class), any(ClientInfo.class))).thenReturn(authResult);
+
+        String json = mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        LoginResponse response = objectMapper.readValue(json, LoginResponse.class);
+
+        assertEquals("jwt-access", response.getAccessToken());
+        assertEquals("Bearer", response.getTokenType());
+        assertEquals(3600L, response.getExpiresIn());
+        assertEquals(userId, response.getUser().getId());
+        assertEquals("test@example.com", response.getUser().getEmail());
+        assertEquals("Era", response.getUser().getFirstName());
+        assertEquals("Test", response.getUser().getLastName());
+    }
 }
