@@ -9,17 +9,6 @@ spring:
   sql:
     init:
       mode: always
-  app:
-    security:
-      trusted-proxies:
-        - 127.0.0.1
-        - ::1
-
-      login:
-        max-failed-attempts: 5
-        lock-duration-minutes: 15
-        max-attempts-per-ip: 10
-        window-minutes: 5
 
   datasource:
     url: jdbc:postgresql://localhost:5432/pos
@@ -29,7 +18,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     show-sql: true
     properties:
       hibernate:
@@ -43,6 +32,23 @@ security:
     refresh-expiration: 30d
 
 app:
+  security:
+    trusted-proxies:
+      - 127.0.0.1
+      - ::1
+
+    login:
+      max-failed-attempts: 5
+      lock-duration-minutes: 15
+      max-attempts-per-ip: 20
+      window-minutes: 5
+
+    session:
+      max-active-sessions: 3
+
+    refresh-token:
+      pepper: ${REFRESH_TOKEN_PEPPER}
+
   bootstrap:
     super-admin:
       email: ${BOOTSTRAP_SUPER_ADMIN_EMAIL:admin@pos.local}

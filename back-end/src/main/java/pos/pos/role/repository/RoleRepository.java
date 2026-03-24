@@ -1,6 +1,7 @@
 package pos.pos.role.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import pos.pos.role.entity.Role;
 
 import java.util.List;
@@ -18,4 +19,13 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
     boolean existsByCode(String code);
 
     boolean existsByName(String name);
+
+    @Query("""
+    SELECT r.code
+    FROM UserRole ur
+    JOIN Role r ON ur.roleId = r.id
+    WHERE ur.userId = :userId
+      AND r.isActive = true
+""")
+    List<String> findActiveRoleCodesByUserId(UUID userId);
 }

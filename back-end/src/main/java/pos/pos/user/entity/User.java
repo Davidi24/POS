@@ -40,6 +40,9 @@ public class User implements AuditedEntityLifecycle {
     @Column(name = "id", nullable = false, updatable = false, columnDefinition = "uuid")
     private UUID id;
 
+    @Version
+    private Long version;
+
     @Column(name = "restaurant_id", columnDefinition = "uuid")
     private UUID restaurantId;
 

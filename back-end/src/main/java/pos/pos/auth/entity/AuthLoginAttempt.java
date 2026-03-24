@@ -3,22 +3,43 @@ package pos.pos.auth.entity;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
+import pos.pos.auth.enums.LoginFailureReason;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
+/**
+ * ENTITY PURPOSE:
+ *
+ * This entity records every login attempt made to the system.
+ *
+ * It is used for:
+ * - Security monitoring (detect brute-force attacks, suspicious activity)
+ * - Account protection (tracking failed attempts and lock conditions)
+ * - Auditing (who attempted to log in, from where, and when)
+ * - Debugging authentication issues
+ *
+ * WHAT IS STORED:
+ * - userId: the user (if exists), otherwise null
+ * - email: the email entered during login
+ * - ipAddress: source IP of the request
+ * - userAgent: device/browser information
+ * - success: whether login was successful
+ * - failureReason: reason for failure (if any)
+ * - attemptedAt: timestamp of the attempt (UTC)
+ *
+ * NOTES:
+ * - Email is stored even if the user does not exist (important for security tracking)
+ * - IP and User-Agent come from ClientInfo (proxy-aware extraction)
+ * - This entity should NEVER be exposed directly via API
+ *
+ * PRODUCTION IMPORTANCE:
+ * This is a critical security component for tracking authentication behavior
+ * and detecting potential attacks or misuse of the system.
+ */
 @Entity
-@Table(
-        name = "auth_login_attempts",
-        indexes = {
-                @Index(name = "idx_auth_login_attempts_email", columnList = "email"),
-                @Index(name = "idx_auth_login_attempts_ip_address", columnList = "ip_address"),
-                @Index(name = "idx_auth_login_attempts_attempted_at", columnList = "attempted_at"),
-                @Index(name = "idx_auth_login_attempts_success", columnList = "success"),
-                @Index(name = "idx_auth_login_attempts_user_id", columnList = "user_id")
-        }
-)
+@Table(name = "auth_login_attempts", indexes = {@Index(name = "idx_auth_login_attempts_email", columnList = "email"), @Index(name = "idx_auth_login_attempts_ip_address", columnList = "ip_address"), @Index(name = "idx_auth_login_attempts_attempted_at", columnList = "attempted_at"), @Index(name = "idx_auth_login_attempts_success", columnList = "success"), @Index(name = "idx_auth_login_attempts_user_id", columnList = "user_id")})
 @Getter
 @Setter
 @Builder(toBuilder = true)
@@ -48,8 +69,9 @@ public class AuthLoginAttempt {
     @Column(name = "success", nullable = false)
     private boolean success = false;
 
-    @Column(name = "failure_reason", length = 100)
-    private String failureReason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "failure_reason", length = 50)
+    private LoginFailureReason failureReason;
 
     @Column(name = "attempted_at", nullable = false, updatable = false, columnDefinition = "timestamptz")
     private OffsetDateTime attemptedAt;
@@ -59,7 +81,6 @@ public class AuthLoginAttempt {
         if (id == null) {
             id = UuidCreator.getTimeOrdered();
         }
-
         if (attemptedAt == null) {
             attemptedAt = OffsetDateTime.now(ZoneOffset.UTC);
         }
