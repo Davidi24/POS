@@ -50,22 +50,34 @@ public class AuthService {
     private final UserSessionMapper userSessionMapper;
     private final UserMapper userMapper;
 
-    @Value("${app.security.login.max-failed-attempts:5}")
+    @Value("${app.security.login.max-failed-attempts}")
     private int maxFailedAttempts;
 
-    @Value("${app.security.login.lock-duration-minutes:15}")
+    @Value("${app.security.login.lock-duration-minutes}")
     private long lockDurationMinutes;
+
+    @Value("${app.security.login.max-attempts-per-ip}")
+    private int maxAttemptsPerIp;
+
+    @Value("${app.security.login.window-minutes}")
+    private long windowMinutes;
+
+    private static final String DUMMY_PASSWORD_HASH =
+            "$2a$10$7EqJtq98hPqEX7fNZaFWoOePaWxn96p36aH8uY7f9ZC2w5Q5f5e7a";
 
     @Transactional
     public AuthTokensResponse login(LoginRequest request, ClientInfo clientInfo) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        checkIpRateLimit(clientInfo != null ? clientInfo.ipAddress() : null, now);
+
         String normalizedEmail = normalizeEmail(request.getEmail());
 
-        User user = userRepository.findByEmailAndDeletedAtIsNull(normalizedEmail)
-                .orElseThrow(() -> {
-                    saveLoginAttempt(null, normalizedEmail, clientInfo, false, "INVALID_CREDENTIALS", now);
-                    return new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
-                });
+        User user = userRepository.findByEmailAndDeletedAtIsNull(normalizedEmail).orElse(null);
+        if (user == null) {
+            passwordService.matches(request.getPassword(), DUMMY_PASSWORD_HASH);
+            saveLoginAttempt(null, normalizedEmail, clientInfo, false, "INVALID_CREDENTIALS", now);
+            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+        }
 
         validateUserCanLogin(user, now, normalizedEmail, clientInfo);
 
@@ -91,7 +103,7 @@ public class AuthService {
                         user.getId(),
                         tokenId,
                         "PASSWORD",
-                        extractDeviceName(clientInfo != null ? clientInfo.userAgent() : null),
+                        extractDeviceName(clientInfo.userAgent()),
                         sha256(refreshToken),
                         clientInfo
                 )
@@ -199,6 +211,19 @@ public class AuthService {
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("Failed to hash refresh token", e);
+        }
+    }
+
+    private void checkIpRateLimit(String ip, OffsetDateTime now) {
+        if (ip == null) return;
+
+        OffsetDateTime windowStart = now.minusMinutes(windowMinutes);
+
+        long attempts = authLoginAttemptRepository
+                .countByIpAddressAndAttemptedAtAfter(ip, windowStart);
+
+        if (attempts >= maxAttemptsPerIp) {
+            throw new InvalidCredentialsException("Too many login attempts. Try again later.");
         }
     }
 }
