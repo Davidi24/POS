@@ -7,21 +7,20 @@ import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.dto.AuthTokensResponse;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.entity.AuthLoginAttempt;
+import pos.pos.auth.enums.LoginFailureReason;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
-import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.user.entity.User;
-import pos.pos.user.entity.UserRole;
 import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
-import pos.pos.user.repository.UserRoleRepository;
+import pos.pos.utils.NormalizationUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -37,10 +36,13 @@ import java.util.UUID;
 public class AuthService {
 
     private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
+    private static final String TOO_MANY_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
     private static final String TOKEN_TYPE = "Bearer";
 
+    private static final String DUMMY_PASSWORD_HASH =
+            "$2a$10$7EqJtq98hPqEX7fNZaFWoOePaWxn96p36aH8uY7f9ZC2w5Q5f5e7a";
+
     private final UserRepository userRepository;
-    private final UserRoleRepository userRoleRepository;
     private final RoleRepository roleRepository;
     private final PasswordService passwordService;
     private final JwtService jwtService;
@@ -62,36 +64,46 @@ public class AuthService {
     @Value("${app.security.login.window-minutes}")
     private long windowMinutes;
 
-    private static final String DUMMY_PASSWORD_HASH =
-            "$2a$10$7EqJtq98hPqEX7fNZaFWoOePaWxn96p36aH8uY7f9ZC2w5Q5f5e7a";
+    @Value("${app.security.session.max-active-sessions}")
+    private int maxActiveSessions;
+
+    @Value("${app.security.refresh-token.pepper}")
+    private String refreshTokenPepper;
 
     @Transactional
     public AuthTokensResponse login(LoginRequest request, ClientInfo clientInfo) {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        checkIpRateLimit(clientInfo != null ? clientInfo.ipAddress() : null, now);
 
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         String normalizedEmail = normalizeEmail(request.getEmail());
 
+        // ✅ normalize ONCE
+        ClientInfo normalizedClientInfo = normalizeClientInfo(clientInfo);
+
+        checkIpRateLimit(normalizedEmail, normalizedClientInfo, now);
+
         User user = userRepository.findByEmailAndDeletedAtIsNull(normalizedEmail).orElse(null);
+
         if (user == null) {
             passwordService.matches(request.getPassword(), DUMMY_PASSWORD_HASH);
-            saveLoginAttempt(null, normalizedEmail, clientInfo, false, "INVALID_CREDENTIALS", now);
+            saveLoginAttempt(null, normalizedEmail, normalizedClientInfo, false, LoginFailureReason.INVALID_CREDENTIALS, now);
             throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
-        validateUserCanLogin(user, now, normalizedEmail, clientInfo);
+        validateUserCanLogin(user, now, normalizedEmail, normalizedClientInfo);
 
         if (!passwordService.matches(request.getPassword(), user.getPasswordHash())) {
-            handleFailedLogin(user, normalizedEmail, clientInfo, now);
+            handleFailedLogin(user, normalizedEmail, normalizedClientInfo, now);
             throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
+
+        enforceSessionLimit(user.getId(), now);
 
         List<String> roles = loadRoleCodes(user.getId());
 
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
         user.setLastLoginAt(now);
-        user.setLastLoginIp(clientInfo.ipAddress());
+        user.setLastLoginIp(normalizedClientInfo != null ? normalizedClientInfo.ipAddress() : null);
         userRepository.save(user);
 
         UUID tokenId = UUID.randomUUID();
@@ -103,13 +115,12 @@ public class AuthService {
                         user.getId(),
                         tokenId,
                         "PASSWORD",
-                        extractDeviceName(clientInfo.userAgent()),
-                        sha256(refreshToken),
-                        clientInfo
+                        hashRefreshToken(refreshToken),
+                        normalizedClientInfo
                 )
         );
 
-        saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, true, null, now);
+        saveLoginAttempt(user.getId(), normalizedEmail, normalizedClientInfo, true, null, now);
 
         return AuthTokensResponse.builder()
                 .accessToken(accessToken)
@@ -126,14 +137,21 @@ public class AuthService {
             String normalizedEmail,
             ClientInfo clientInfo
     ) {
-        if (!user.isActive() || user.getDeletedAt() != null || !"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, "ACCOUNT_INACTIVE", now);
-            throw new InvalidCredentialsException("User account is inactive");
+        if (!Boolean.TRUE.equals(user.isActive())
+                || user.getDeletedAt() != null
+                || !"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, LoginFailureReason.ACCOUNT_INACTIVE, now);
+            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+        }
+
+        if (!Boolean.TRUE.equals(user.isEmailVerified())) {
+            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, LoginFailureReason.EMAIL_NOT_VERIFIED, now);
+            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
-            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, "ACCOUNT_LOCKED", now);
-            throw new InvalidCredentialsException("User account is temporarily locked");
+            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, LoginFailureReason.ACCOUNT_LOCKED, now);
+            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
     }
 
@@ -151,23 +169,11 @@ public class AuthService {
         }
 
         userRepository.save(user);
-        saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, "INVALID_CREDENTIALS", now);
+        saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, LoginFailureReason.INVALID_CREDENTIALS, now);
     }
 
     private List<String> loadRoleCodes(UUID userId) {
-        List<UUID> roleIds = userRoleRepository.findByUserId(userId).stream()
-                .map(UserRole::getRoleId)
-                .distinct()
-                .toList();
-
-        if (roleIds.isEmpty()) {
-            return List.of();
-        }
-
-        return roleRepository.findByIdIn(roleIds).stream()
-                .filter(Role::isActive)
-                .map(Role::getCode)
-                .toList();
+        return roleRepository.findActiveRoleCodesByUserId(userId);
     }
 
     private void saveLoginAttempt(
@@ -175,7 +181,7 @@ public class AuthService {
             String email,
             ClientInfo clientInfo,
             boolean success,
-            String failureReason,
+            LoginFailureReason failureReason,
             OffsetDateTime attemptedAt
     ) {
         AuthLoginAttempt attempt = AuthLoginAttempt.builder()
@@ -191,39 +197,58 @@ public class AuthService {
         authLoginAttemptRepository.save(attempt);
     }
 
-    private String normalizeEmail(String email) {
-        return email == null ? null : email.trim().toLowerCase();
-    }
-
-    private String extractDeviceName(String userAgent) {
-        if (userAgent == null || userAgent.isBlank()) {
-            return null;
-        }
-
-        String trimmed = userAgent.trim();
-        return trimmed.length() <= 100 ? trimmed : trimmed.substring(0, 100);
-    }
-
-    private String sha256(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Failed to hash refresh token", e);
-        }
-    }
-
-    private void checkIpRateLimit(String ip, OffsetDateTime now) {
+    private void checkIpRateLimit(String normalizedEmail, ClientInfo clientInfo, OffsetDateTime now) {
+        String ip = clientInfo != null ? clientInfo.ipAddress() : null;
         if (ip == null) return;
 
         OffsetDateTime windowStart = now.minusMinutes(windowMinutes);
-
-        long attempts = authLoginAttemptRepository
-                .countByIpAddressAndAttemptedAtAfter(ip, windowStart);
+        long attempts = authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(ip, windowStart);
 
         if (attempts >= maxAttemptsPerIp) {
-            throw new InvalidCredentialsException("Too many login attempts. Try again later.");
+            saveLoginAttempt(null, normalizedEmail, clientInfo, false, LoginFailureReason.IP_RATE_LIMITED, now);
+            throw new InvalidCredentialsException(TOO_MANY_ATTEMPTS_MESSAGE);
+        }
+    }
+
+    private void enforceSessionLimit(UUID userId, OffsetDateTime now) {
+        long activeSessions = userSessionRepository
+                .countByUserIdAndRevokedFalseAndExpiresAtAfter(userId, now);
+
+        if (activeSessions >= maxActiveSessions) {
+            userSessionRepository.revokeOldestSession(userId, now);
+        }
+    }
+
+    private String normalizeEmail(String email) {
+        return NormalizationUtils.normalizeLower(email);
+    }
+
+    private String normalizeIpAddress(String ipAddress) {
+        if (ipAddress == null || ipAddress.isBlank()) return null;
+        return ipAddress.trim();
+    }
+
+    private String normalizeUserAgent(String userAgent) {
+        if (userAgent == null || userAgent.isBlank()) return null;
+        return userAgent.trim();
+    }
+
+    private ClientInfo normalizeClientInfo(ClientInfo clientInfo) {
+        if (clientInfo == null) return null;
+
+        return new ClientInfo(
+                normalizeIpAddress(clientInfo.ipAddress()),
+                normalizeUserAgent(clientInfo.userAgent())
+        );
+    }
+
+    private String hashRefreshToken(String refreshToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest((refreshToken + refreshTokenPepper).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Failed to hash refresh token", e);
         }
     }
 }
