@@ -19,6 +19,9 @@ import pos.pos.security.util.CookieService;
 @RequiredArgsConstructor
 public class AuthController {
 
+    private static final String CLIENT_TYPE_HEADER = "X-Client-Type";
+    private static final String WEB_CLIENT = "web";
+
     private final AuthService authService;
     private final ClientInfoExtractor clientInfoExtractor;
     private final CookieService cookieService;
@@ -27,13 +30,18 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse
+            HttpServletResponse httpResponse,
+            @RequestHeader(value = CLIENT_TYPE_HEADER, required = false) String clientType
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
 
         AuthTokensResponse authResult = authService.login(request, clientInfo);
 
-        cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
+        boolean isWebClient = WEB_CLIENT.equalsIgnoreCase(clientType);
+
+        if (isWebClient) {
+            cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
+        }
 
         LoginResponse response = LoginResponse.builder()
                 .accessToken(authResult.getAccessToken())
