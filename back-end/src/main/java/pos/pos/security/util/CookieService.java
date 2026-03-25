@@ -5,38 +5,45 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
+import pos.pos.security.config.AuthCookieProperties;
 import pos.pos.security.config.JwtProperties;
 
 @Component
 @RequiredArgsConstructor
 public class CookieService {
 
-    private static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
-    private static final String REFRESH_TOKEN_COOKIE_PATH = "/auth";
-
     private final JwtProperties jwtProperties;
+    private final AuthCookieProperties authCookieProperties;
 
     public void addRefreshTokenCookie(HttpServletResponse response, String token) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, token)
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
+                .from(authCookieProperties.getRefreshTokenName(), token)
                 .httpOnly(true)
-                .secure(false)
-                .path(REFRESH_TOKEN_COOKIE_PATH)
-                .sameSite("Strict")
-                .maxAge(jwtProperties.getRefreshExpiration())
-                .build();
+                .secure(authCookieProperties.isSecure())
+                .path(authCookieProperties.getRefreshTokenPath())
+                .sameSite(authCookieProperties.getSameSite())
+                .maxAge(jwtProperties.getRefreshExpiration());
 
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        if (authCookieProperties.getDomain() != null && !authCookieProperties.getDomain().isBlank()) {
+            builder.domain(authCookieProperties.getDomain().trim());
+        }
+
+        response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
     }
 
     public void clearRefreshTokenCookie(HttpServletResponse response) {
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, "")
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
+                .from(authCookieProperties.getRefreshTokenName(), "")
                 .httpOnly(true)
-                .secure(false)
-                .path(REFRESH_TOKEN_COOKIE_PATH)
-                .sameSite("Strict")
-                .maxAge(0)
-                .build();
+                .secure(authCookieProperties.isSecure())
+                .path(authCookieProperties.getRefreshTokenPath())
+                .sameSite(authCookieProperties.getSameSite())
+                .maxAge(0);
 
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        if (authCookieProperties.getDomain() != null && !authCookieProperties.getDomain().isBlank()) {
+            builder.domain(authCookieProperties.getDomain().trim());
+        }
+
+        response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
     }
 }

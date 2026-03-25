@@ -49,6 +49,13 @@ app:
     refresh-token:
       pepper: ${REFRESH_TOKEN_PEPPER}
 
+    cookie:
+      refresh-token-name: refreshToken
+      refresh-token-path: /auth
+      same-site: Lax
+      secure: true
+      domain:
+
   bootstrap:
     super-admin:
       email: ${BOOTSTRAP_SUPER_ADMIN_EMAIL:admin@pos.local}
