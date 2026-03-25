@@ -5,10 +5,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
-import pos.pos.auth.dto.AuthTokensResponse;
-import pos.pos.auth.dto.LoginRequest;
-import pos.pos.auth.dto.LoginResponse;
+import org.springframework.web.util.WebUtils;
+import pos.pos.auth.dto.*;
 import pos.pos.auth.service.AuthService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoExtractor;
@@ -51,5 +51,54 @@ public class AuthController {
                 .build();
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshResponse> refresh(
+            @Valid @RequestBody(required = false) RefreshRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse,
+            @RequestHeader(value = CLIENT_TYPE_HEADER, required = false) String clientType
+    ) {
+        ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
+        boolean isWebClient = WEB_CLIENT.equalsIgnoreCase(clientType);
+
+        String refreshToken = isWebClient
+                ? extractRefreshTokenFromCookie(httpRequest)
+                : extractRefreshTokenFromRequest(request);
+
+        AuthTokensResponse authResult = authService.refresh(refreshToken, clientInfo);
+
+        if (isWebClient) {
+            cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
+        }
+
+        RefreshResponse response = RefreshResponse.builder()
+                .accessToken(authResult.getAccessToken())
+                .refreshToken(isWebClient ? null : authResult.getRefreshToken())
+                .tokenType(authResult.getTokenType())
+                .expiresIn(authResult.getExpiresIn())
+                .user(authResult.getUser())
+                .build();
+
+        return ResponseEntity.ok(response);
+    }
+
+    private String extractRefreshTokenFromCookie(HttpServletRequest request) {
+        var cookie = WebUtils.getCookie(request, cookieService.getRefreshTokenCookieName());
+
+        if (cookie == null || !StringUtils.hasText(cookie.getValue())) {
+            throw new IllegalArgumentException("Refresh token is missing");
+        }
+
+        return cookie.getValue().trim();
+    }
+
+    private String extractRefreshTokenFromRequest(RefreshRequest request) {
+        if (request == null || !StringUtils.hasText(request.getRefreshToken())) {
+            throw new IllegalArgumentException("Refresh token is required");
+        }
+
+        return request.getRefreshToken().trim();
     }
 }

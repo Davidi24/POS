@@ -1,5 +1,6 @@
 package pos.pos.auth.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 @Getter
@@ -7,11 +8,8 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RefreshTokenResponse {
+public class RefreshRequest {
 
-    private String accessToken;
+    @NotBlank(message = "Refresh token is required")
     private String refreshToken;
-    private String tokenType;
-    private Long expiresIn;
-
 }
