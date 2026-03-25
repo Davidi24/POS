@@ -33,7 +33,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class AuthService {
+public class AuthLoginService {
 
     private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
     private static final String TOO_MANY_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
@@ -76,7 +76,6 @@ public class AuthService {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         String normalizedEmail = normalizeEmail(request.getEmail());
 
-        // ✅ normalize ONCE
         ClientInfo normalizedClientInfo = normalizeClientInfo(clientInfo);
 
         checkIpRateLimit(normalizedEmail, normalizedClientInfo, now);

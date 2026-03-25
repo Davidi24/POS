@@ -46,4 +46,8 @@ public class CookieService {
 
         response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
     }
+
+    public String getRefreshTokenCookieName() {
+        return authCookieProperties.getRefreshTokenName();
+    }
 }

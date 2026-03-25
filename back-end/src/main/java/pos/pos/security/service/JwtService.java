@@ -101,4 +101,12 @@ public class JwtService {
                 .parseSignedClaims(token)
                 .getPayload();
     }
+
+    public boolean isRefreshToken(String token) {
+        try {
+            return REFRESH_TOKEN_TYPE.equals(parse(token).get(TOKEN_TYPE_CLAIM, String.class));
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }
