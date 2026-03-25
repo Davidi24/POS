@@ -9,7 +9,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.WebUtils;
 import pos.pos.auth.dto.*;
-import pos.pos.auth.service.AuthService;
+import pos.pos.auth.service.AuthLoginService;
+import pos.pos.auth.service.AuthRefreshService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoExtractor;
 import pos.pos.security.util.CookieService;
@@ -22,9 +23,10 @@ public class AuthController {
     private static final String CLIENT_TYPE_HEADER = "X-Client-Type";
     private static final String WEB_CLIENT = "web";
 
-    private final AuthService authService;
+    private final AuthLoginService authLoginService;
     private final ClientInfoExtractor clientInfoExtractor;
     private final CookieService cookieService;
+    private final AuthRefreshService authRefreshService;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
@@ -35,7 +37,7 @@ public class AuthController {
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
 
-        AuthTokensResponse authResult = authService.login(request, clientInfo);
+        AuthTokensResponse authResult = authLoginService.login(request, clientInfo);
 
         boolean isWebClient = WEB_CLIENT.equalsIgnoreCase(clientType);
 
@@ -67,7 +69,7 @@ public class AuthController {
                 ? extractRefreshTokenFromCookie(httpRequest)
                 : extractRefreshTokenFromRequest(request);
 
-        AuthTokensResponse authResult = authService.refresh(refreshToken, clientInfo);
+        AuthTokensResponse authResult =  authRefreshService.refresh(refreshToken, clientInfo);
 
         if (isWebClient) {
             cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
