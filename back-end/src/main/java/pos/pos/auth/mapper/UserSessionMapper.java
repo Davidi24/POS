@@ -48,11 +48,11 @@ public class UserSessionMapper {
             return "UNKNOWN";
         }
 
+        if (userAgent.contains("Android")) return "Android";
+        if (userAgent.contains("iPhone")) return "iPhone";
         if (userAgent.contains("Windows")) return "Windows";
         if (userAgent.contains("Mac")) return "Mac";
         if (userAgent.contains("Linux")) return "Linux";
-        if (userAgent.contains("Android")) return "Android";
-        if (userAgent.contains("iPhone")) return "iPhone";
 
         return "Device";
     }
