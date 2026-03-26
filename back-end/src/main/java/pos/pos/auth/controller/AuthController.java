@@ -11,6 +11,7 @@ import org.springframework.web.util.WebUtils;
 import pos.pos.auth.dto.*;
 import pos.pos.auth.service.AuthLoginService;
 import pos.pos.auth.service.AuthRefreshService;
+import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoExtractor;
 import pos.pos.security.util.CookieService;
@@ -22,6 +23,7 @@ public class AuthController {
 
     private static final String CLIENT_TYPE_HEADER = "X-Client-Type";
     private static final String WEB_CLIENT = "web";
+    private static final String INVALID_REFRESH_TOKEN_MESSAGE = "Invalid refresh token";
 
     private final AuthLoginService authLoginService;
     private final ClientInfoExtractor clientInfoExtractor;
@@ -40,7 +42,6 @@ public class AuthController {
         AuthTokensResponse authResult = authLoginService.login(request, clientInfo);
 
         boolean isWebClient = WEB_CLIENT.equalsIgnoreCase(clientType);
-
         if (isWebClient) {
             cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
         }
@@ -65,11 +66,20 @@ public class AuthController {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
         boolean isWebClient = WEB_CLIENT.equalsIgnoreCase(clientType);
 
-        String refreshToken = isWebClient
-                ? extractRefreshTokenFromCookie(httpRequest)
-                : extractRefreshTokenFromRequest(request);
+        AuthTokensResponse authResult;
 
-        AuthTokensResponse authResult =  authRefreshService.refresh(refreshToken, clientInfo);
+        try {
+            String refreshToken = isWebClient
+                    ? extractRefreshTokenFromCookie(httpRequest)
+                    : extractRefreshTokenFromRequest(request);
+
+            authResult = authRefreshService.refresh(refreshToken, clientInfo);
+        } catch (InvalidCredentialsException ex) {
+            if (isWebClient) {
+                cookieService.clearRefreshTokenCookie(httpResponse);
+            }
+            throw ex;
+        }
 
         if (isWebClient) {
             cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
@@ -90,7 +100,7 @@ public class AuthController {
         var cookie = WebUtils.getCookie(request, cookieService.getRefreshTokenCookieName());
 
         if (cookie == null || !StringUtils.hasText(cookie.getValue())) {
-            throw new IllegalArgumentException("Refresh token is missing");
+            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
         return cookie.getValue().trim();
@@ -98,7 +108,7 @@ public class AuthController {
 
     private String extractRefreshTokenFromRequest(RefreshRequest request) {
         if (request == null || !StringUtils.hasText(request.getRefreshToken())) {
-            throw new IllegalArgumentException("Refresh token is required");
+            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
         return request.getRefreshToken().trim();
