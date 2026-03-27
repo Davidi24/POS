@@ -10,7 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class AuthCookieProperties {
 
     private String refreshTokenName = "refreshToken";
-    private String refreshTokenPath = "/auth";
+    private String refreshTokenPath = "/auth/web";
     private String sameSite = "Lax";
     private boolean secure = true;
     private String domain;
