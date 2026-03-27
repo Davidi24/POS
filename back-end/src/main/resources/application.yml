@@ -51,7 +51,7 @@ app:
 
     cookie:
       refresh-token-name: refreshToken
-      refresh-token-path: /auth
+      refresh-token-path: /auth/web
       same-site: Lax
       secure: true
       domain:
