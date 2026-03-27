@@ -1,5 +1,7 @@
 package pos.pos.auth.repository;
 
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,7 +14,18 @@ import java.util.UUID;
 
 public interface UserSessionRepository extends JpaRepository<UserSession, UUID> {
 
+    Optional<UserSession> findByTokenId(UUID tokenId);
+
     Optional<UserSession> findByTokenIdAndRevokedFalse(UUID tokenId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT s
+        FROM UserSession s
+        WHERE s.tokenId = :tokenId
+          AND s.revoked = false
+    """)
+    Optional<UserSession> findByTokenIdAndRevokedFalseForUpdate(UUID tokenId);
 
     long countByUserIdAndRevokedFalseAndExpiresAtAfter(UUID userId, OffsetDateTime now);
 
@@ -28,7 +41,8 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     @Query(value = """
         UPDATE user_sessions
         SET revoked = true,
-            revoked_at = :now
+            revoked_at = :now,
+            revoked_reason = :reason
         WHERE id = (
             SELECT id
             FROM user_sessions
@@ -39,7 +53,7 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
             LIMIT 1
         )
     """, nativeQuery = true)
-    int revokeOldestSession(UUID userId, OffsetDateTime now);
+    int revokeOldestSession(UUID userId, OffsetDateTime now, String reason);
 
     List<UserSession> findByUserId(UUID userId);
 

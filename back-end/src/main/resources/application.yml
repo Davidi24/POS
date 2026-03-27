@@ -41,6 +41,7 @@ app:
       max-failed-attempts: 5
       lock-duration-minutes: 15
       max-attempts-per-ip: 20
+      max-attempts-per-account: 5
       window-minutes: 5
 
     session:

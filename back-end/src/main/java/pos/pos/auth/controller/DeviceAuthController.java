@@ -54,7 +54,7 @@ public class DeviceAuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<DeviceRefreshResponse> refresh(
-            @Valid @RequestBody RefreshRequest request,
+            @RequestBody(required = false) RefreshRequest request,
             HttpServletRequest httpRequest
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
@@ -74,14 +74,18 @@ public class DeviceAuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
-        String refreshToken = extractRefreshTokenFromRequest(request);
+    public ResponseEntity<Void> logout(@RequestBody(required = false) RefreshRequest request) {
+        String refreshToken = extractOptionalRefreshTokenFromRequest(request);
+        if (refreshToken == null) {
+            return ResponseEntity.noContent().build();
+        }
+
         authLogoutService.logout(refreshToken);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout-all")
-    public ResponseEntity<Void> logoutAll(@Valid @RequestBody RefreshRequest request) {
+    public ResponseEntity<Void> logoutAll(@RequestBody(required = false) RefreshRequest request) {
         String refreshToken = extractRefreshTokenFromRequest(request);
         authLogoutService.logoutAll(refreshToken);
         return ResponseEntity.noContent().build();
@@ -90,6 +94,14 @@ public class DeviceAuthController {
     private String extractRefreshTokenFromRequest(RefreshRequest request) {
         if (request == null || !StringUtils.hasText(request.getRefreshToken())) {
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
+        }
+
+        return request.getRefreshToken().trim();
+    }
+
+    private String extractOptionalRefreshTokenFromRequest(RefreshRequest request) {
+        if (request == null || !StringUtils.hasText(request.getRefreshToken())) {
+            return null;
         }
 
         return request.getRefreshToken().trim();

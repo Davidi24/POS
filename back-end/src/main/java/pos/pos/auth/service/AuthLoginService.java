@@ -1,11 +1,14 @@
 package pos.pos.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.dto.AuthTokensResponse;
 import pos.pos.auth.dto.LoginRequest;
+import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.entity.AuthLoginAttempt;
 import pos.pos.auth.enums.LoginFailureReason;
 import pos.pos.auth.mapper.UserSessionMapper;
@@ -16,18 +19,15 @@ import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
+import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.user.entity.User;
 import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 import pos.pos.utils.NormalizationUtils;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,6 +35,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthLoginService {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthLoginService.class);
     private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
     private static final String TOO_MANY_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
     private static final String TOKEN_TYPE = "Bearer";
@@ -61,14 +62,16 @@ public class AuthLoginService {
     @Value("${app.security.login.max-attempts-per-ip}")
     private int maxAttemptsPerIp;
 
+    @Value("${app.security.login.max-attempts-per-account:${app.security.login.max-failed-attempts}}")
+    private int maxAttemptsPerAccount;
+
     @Value("${app.security.login.window-minutes}")
     private long windowMinutes;
 
     @Value("${app.security.session.max-active-sessions}")
     private int maxActiveSessions;
 
-    @Value("${app.security.refresh-token.pepper}")
-    private String refreshTokenPepper;
+    private final RefreshTokenSecurityService refreshTokenSecurityService;
 
     @Transactional
     public AuthTokensResponse login(LoginRequest request, ClientInfo clientInfo) {
@@ -77,10 +80,11 @@ public class AuthLoginService {
         String normalizedEmail = normalizeEmail(request.getEmail());
 
         ClientInfo normalizedClientInfo = normalizeClientInfo(clientInfo);
-
-        checkIpRateLimit(normalizedEmail, normalizedClientInfo, now);
-
         User user = userRepository.findByEmailAndDeletedAtIsNull(normalizedEmail).orElse(null);
+        UUID userId = user != null ? user.getId() : null;
+
+        checkIpRateLimit(userId, normalizedEmail, normalizedClientInfo, now);
+        checkAccountRateLimit(userId, normalizedEmail, normalizedClientInfo, now);
 
         if (user == null) {
             passwordService.matches(request.getPassword(), DUMMY_PASSWORD_HASH);
@@ -114,7 +118,7 @@ public class AuthLoginService {
                         user.getId(),
                         tokenId,
                         "PASSWORD",
-                        hashRefreshToken(refreshToken),
+                        refreshTokenSecurityService.hash(refreshToken),
                         normalizedClientInfo
                 )
         );
@@ -196,15 +200,39 @@ public class AuthLoginService {
         authLoginAttemptRepository.save(attempt);
     }
 
-    private void checkIpRateLimit(String normalizedEmail, ClientInfo clientInfo, OffsetDateTime now) {
+    private void checkIpRateLimit(UUID userId, String normalizedEmail, ClientInfo clientInfo, OffsetDateTime now) {
         String ip = clientInfo != null ? clientInfo.ipAddress() : null;
-        if (ip == null) return;
+        if (ip == null) {
+            return;
+        }
 
         OffsetDateTime windowStart = now.minusMinutes(windowMinutes);
         long attempts = authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(ip, windowStart);
 
         if (attempts >= maxAttemptsPerIp) {
-            saveLoginAttempt(null, normalizedEmail, clientInfo, false, LoginFailureReason.IP_RATE_LIMITED, now);
+            saveLoginAttempt(userId, normalizedEmail, clientInfo, false, LoginFailureReason.IP_RATE_LIMITED, now);
+            throw new InvalidCredentialsException(TOO_MANY_ATTEMPTS_MESSAGE);
+        }
+    }
+
+    private void checkAccountRateLimit(
+            UUID userId,
+            String normalizedEmail,
+            ClientInfo clientInfo,
+            OffsetDateTime now
+    ) {
+        if (normalizedEmail == null) {
+            return;
+        }
+
+        OffsetDateTime windowStart = now.minusMinutes(windowMinutes);
+        long attempts = authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(
+                normalizedEmail,
+                windowStart
+        );
+
+        if (attempts >= maxAttemptsPerAccount) {
+            saveLoginAttempt(userId, normalizedEmail, clientInfo, false, LoginFailureReason.ACCOUNT_RATE_LIMITED, now);
             throw new InvalidCredentialsException(TOO_MANY_ATTEMPTS_MESSAGE);
         }
     }
@@ -214,7 +242,18 @@ public class AuthLoginService {
                 .countByUserIdAndRevokedFalseAndExpiresAtAfter(userId, now);
 
         if (activeSessions >= maxActiveSessions) {
-            userSessionRepository.revokeOldestSession(userId, now);
+            int revokedSessions = userSessionRepository.revokeOldestSession(
+                    userId,
+                    now,
+                    SessionRevocationReason.SESSION_LIMIT.name()
+            );
+            if (revokedSessions > 0) {
+                logger.info(
+                        "Revoked oldest active session for user {} because the session limit of {} was reached",
+                        userId,
+                        maxActiveSessions
+                );
+            }
         }
     }
 
@@ -239,15 +278,5 @@ public class AuthLoginService {
                 normalizeIpAddress(clientInfo.ipAddress()),
                 normalizeUserAgent(clientInfo.userAgent())
         );
-    }
-
-    private String hashRefreshToken(String refreshToken) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest((refreshToken + refreshTokenPepper).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Failed to hash refresh token", e);
-        }
     }
 }
