@@ -42,4 +42,16 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     int revokeOldestSession(UUID userId, OffsetDateTime now);
 
     List<UserSession> findByUserId(UUID userId);
+
+    @Modifying
+    @Query("""
+    UPDATE UserSession s
+    SET s.revoked = true,
+        s.revokedAt = :now,
+        s.revokedReason = :reason
+    WHERE s.userId = :userId
+      AND s.revoked = false
+      AND s.expiresAt > :now
+""")
+    int revokeAllActiveSessionsByUserId(UUID userId, OffsetDateTime now, String reason);
 }
