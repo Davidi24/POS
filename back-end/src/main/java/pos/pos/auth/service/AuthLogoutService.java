@@ -3,79 +3,93 @@ package pos.pos.auth.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
-import pos.pos.security.service.JwtService;
+import pos.pos.security.service.RefreshTokenSecurityService;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class AuthLogoutService {
 
     private static final String INVALID_REFRESH_TOKEN_MESSAGE = "Invalid refresh token";
-    private static final String LOGOUT_REASON = "LOGOUT";
-    private static final String LOGOUT_ALL_REASON = "LOGOUT_ALL";
 
     private final UserSessionRepository userSessionRepository;
-    private final JwtService jwtService;
+    private final RefreshTokenSecurityService refreshTokenSecurityService;
 
     @Transactional
     public void logout(String refreshToken) {
-        String normalizedRefreshToken = normalizeRefreshToken(refreshToken);
-
-        validateRefreshToken(normalizedRefreshToken);
-
-        UUID tokenId = jwtService.extractTokenId(normalizedRefreshToken);
+        RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                refreshTokenSecurityService.validate(refreshToken);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        UserSession session = userSessionRepository.findByTokenIdAndRevokedFalse(tokenId)
-                .orElseThrow(() -> new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE));
+        UserSession session = userSessionRepository.findByTokenId(validatedRefreshToken.tokenId()).orElse(null);
+        if (session == null) {
+            return;
+        }
 
-        revokeSession(session, now, LOGOUT_REASON);
+        validateSession(session, validatedRefreshToken);
+
+        if (session.isRevoked()) {
+            return;
+        }
+
+        if (session.getExpiresAt() == null || !session.getExpiresAt().isAfter(now)) {
+            revokeSession(session, now, SessionRevocationReason.EXPIRED);
+            return;
+        }
+
+        revokeSession(session, now, SessionRevocationReason.LOGOUT);
     }
 
     @Transactional
     public void logoutAll(String refreshToken)  {
-        String normalizedRefreshToken = normalizeRefreshToken(refreshToken);
-
-        validateRefreshToken(normalizedRefreshToken);
-
-        UUID tokenId = jwtService.extractTokenId(normalizedRefreshToken);
-        UUID userId = jwtService.extractUserId(normalizedRefreshToken);
+        RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                refreshTokenSecurityService.validate(refreshToken);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        UserSession currentSession = userSessionRepository.findByTokenIdAndRevokedFalse(tokenId)
-                .orElseThrow(() -> new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE));
+        UserSession currentSession = userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(validatedRefreshToken.tokenId())
+                .orElseThrow(this::invalidRefreshToken);
 
-        if (!currentSession.getUserId().equals(userId)) {
-            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
+        if (currentSession.getExpiresAt() == null || !currentSession.getExpiresAt().isAfter(now)) {
+            revokeSession(currentSession, now, SessionRevocationReason.EXPIRED);
+            throw invalidRefreshToken();
         }
 
-        userSessionRepository.revokeAllActiveSessionsByUserId(userId, now, LOGOUT_ALL_REASON);
+        validateSession(currentSession, validatedRefreshToken);
+
+        userSessionRepository.revokeAllActiveSessionsByUserId(
+                validatedRefreshToken.userId(),
+                now,
+                SessionRevocationReason.LOGOUT_ALL.name()
+        );
     }
 
-    private String normalizeRefreshToken(String refreshToken) {
-        if (refreshToken == null || refreshToken.isBlank()) {
-            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
+    private void validateSession(
+            UserSession session,
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken
+    ) {
+        if (!session.getUserId().equals(validatedRefreshToken.userId())) {
+            throw invalidRefreshToken();
         }
 
-        return refreshToken.trim();
-    }
-
-    private void validateRefreshToken(String refreshToken) {
-        if (!jwtService.isValid(refreshToken) || !jwtService.isRefreshToken(refreshToken)) {
-            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
+        if (!refreshTokenSecurityService.matchesHash(validatedRefreshToken, session.getRefreshTokenHash())) {
+            throw invalidRefreshToken();
         }
     }
 
-    private void revokeSession(UserSession session, OffsetDateTime now, String reason) {
+    private InvalidCredentialsException invalidRefreshToken() {
+        return new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
+    }
+
+    private void revokeSession(UserSession session, OffsetDateTime now, SessionRevocationReason reason) {
         session.setRevoked(true);
         session.setRevokedAt(now);
-        session.setRevokedReason(reason);
+        session.setRevokedReason(reason.name());
         userSessionRepository.save(session);
     }
 }

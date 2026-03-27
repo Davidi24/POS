@@ -8,4 +8,6 @@ import java.util.UUID;
 
 public interface AuthLoginAttemptRepository extends JpaRepository<AuthLoginAttempt, UUID> {
     long countByIpAddressAndAttemptedAtAfter(String ipAddress, OffsetDateTime after);
+
+    long countByEmailAndAttemptedAtAfterAndSuccessFalse(String email, OffsetDateTime after);
 }

@@ -1,27 +1,24 @@
 package pos.pos.auth.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.dto.AuthTokensResponse;
+import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
+import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.user.entity.User;
 import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,56 +35,39 @@ public class AuthRefreshService {
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
     private final UserMapper userMapper;
-
-    @Value("${app.security.refresh-token.pepper}")
-    private String refreshTokenPepper;
+    private final RefreshTokenSecurityService refreshTokenSecurityService;
 
     @Transactional
     public AuthTokensResponse refresh(String refreshToken, ClientInfo clientInfo) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         ClientInfo normalizedClientInfo = normalizeClientInfo(clientInfo);
+        RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                refreshTokenSecurityService.validate(refreshToken);
 
-        if (refreshToken == null || refreshToken.isBlank()) {
-            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
-        }
-
-        String normalizedRefreshToken = refreshToken.trim();
-
-        if (!jwtService.isValid(normalizedRefreshToken) || !jwtService.isRefreshToken(normalizedRefreshToken)) {
-            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
-        }
-
-        UUID tokenId = jwtService.extractTokenId(normalizedRefreshToken);
-        UUID userId = jwtService.extractUserId(normalizedRefreshToken);
-
-        UserSession session = userSessionRepository.findByTokenIdAndRevokedFalse(tokenId)
+        UserSession session = userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(validatedRefreshToken.tokenId())
                 .orElseThrow(() -> new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE));
 
         if (session.getExpiresAt() == null || !session.getExpiresAt().isAfter(now)) {
-            revokeSession(session, now, "EXPIRED");
+            revokeSession(session, now, SessionRevocationReason.EXPIRED);
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
-        if (!session.getUserId().equals(userId)) {
-            revokeSession(session, now, "TOKEN_USER_MISMATCH");
+        if (!session.getUserId().equals(validatedRefreshToken.userId())) {
+            revokeSession(session, now, SessionRevocationReason.TOKEN_USER_MISMATCH);
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
-        String presentedTokenHash = hashRefreshToken(normalizedRefreshToken);
-
-        if (!presentedTokenHash.equals(session.getRefreshTokenHash())) {
-            revokeSession(session, now, "REUSE_DETECTED");
+        if (!refreshTokenSecurityService.matchesHash(validatedRefreshToken, session.getRefreshTokenHash())) {
+            revokeSession(session, now, SessionRevocationReason.REUSE_DETECTED);
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
-        User user = userRepository.findById(session.getUserId())
-                .orElseThrow(() -> new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE));
+        User user = userRepository.findActiveById(session.getUserId()).orElse(null);
 
-        if (!user.isActive()
-                || user.getDeletedAt() != null
+        if (user == null
                 || !"ACTIVE".equalsIgnoreCase(user.getStatus())
                 || !user.isEmailVerified()) {
-            revokeSession(session, now, "USER_NOT_ALLOWED");
+            revokeSession(session, now, SessionRevocationReason.USER_NOT_ALLOWED);
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
@@ -98,7 +78,7 @@ public class AuthRefreshService {
         String newRefreshToken = jwtService.generateRefreshToken(user.getId(), newTokenId);
 
         session.setTokenId(newTokenId);
-        session.setRefreshTokenHash(hashRefreshToken(newRefreshToken));
+        session.setRefreshTokenHash(refreshTokenSecurityService.hash(newRefreshToken));
         session.setLastUsedAt(now);
         session.setIpAddress(normalizedClientInfo != null ? normalizedClientInfo.ipAddress() : null);
         session.setUserAgent(normalizedClientInfo != null ? normalizedClientInfo.userAgent() : null);
@@ -114,10 +94,10 @@ public class AuthRefreshService {
                 .build();
     }
 
-    private void revokeSession(UserSession session, OffsetDateTime now, String reason) {
+    private void revokeSession(UserSession session, OffsetDateTime now, SessionRevocationReason reason) {
         session.setRevoked(true);
         session.setRevokedAt(now);
-        session.setRevokedReason(reason);
+        session.setRevokedReason(reason.name());
         userSessionRepository.save(session);
     }
 
@@ -144,15 +124,5 @@ public class AuthRefreshService {
             return null;
         }
         return userAgent.trim();
-    }
-
-    private String hashRefreshToken(String refreshToken) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest((refreshToken + refreshTokenPepper).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("Failed to hash refresh token", e);
-        }
     }
 }

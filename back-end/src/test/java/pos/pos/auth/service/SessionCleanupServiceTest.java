@@ -1,0 +1,38 @@
+package pos.pos.auth.service;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import pos.pos.auth.repository.AuthEmailVerificationTokenRepository;
+import pos.pos.auth.repository.AuthPasswordResetTokenRepository;
+import pos.pos.auth.repository.UserSessionRepository;
+
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class SessionCleanupServiceTest {
+
+    @Mock
+    private UserSessionRepository userSessionRepository;
+
+    @Mock
+    private AuthPasswordResetTokenRepository authPasswordResetTokenRepository;
+
+    @Mock
+    private AuthEmailVerificationTokenRepository authEmailVerificationTokenRepository;
+
+    @InjectMocks
+    private SessionCleanupService sessionCleanupService;
+
+    @Test
+    void cleanup_shouldDeleteExpiredSessionsAndAuthTokens() {
+        sessionCleanupService.cleanup();
+
+        verify(userSessionRepository).deleteExpiredOrRevokedSessions(any());
+        verify(authPasswordResetTokenRepository).deleteExpiredTokens(any());
+        verify(authEmailVerificationTokenRepository).deleteExpiredTokens(any());
+    }
+}
