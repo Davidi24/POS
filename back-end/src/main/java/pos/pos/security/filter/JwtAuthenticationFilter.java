@@ -17,6 +17,7 @@ import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.security.config.SecurityPaths;
 import pos.pos.security.service.JwtService;
 import pos.pos.role.entity.Role;
+import pos.pos.role.repository.PermissionRepository;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserRole;
 import pos.pos.role.repository.RoleRepository;
@@ -26,6 +27,7 @@ import pos.pos.user.repository.UserRoleRepository;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,6 +38,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
     private final RoleRepository roleRepository;
+    private final PermissionRepository permissionRepository;
     private final UserSessionRepository userSessionRepository;
 
     private final AntPathMatcher matcher = new AntPathMatcher();
@@ -46,12 +49,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UserRepository userRepository,
             UserRoleRepository userRoleRepository,
             RoleRepository roleRepository,
+            PermissionRepository permissionRepository,
             UserSessionRepository userSessionRepository
     ) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.userRoleRepository = userRoleRepository;
         this.roleRepository = roleRepository;
+        this.permissionRepository = permissionRepository;
         this.userSessionRepository = userSessionRepository;
     }
 
@@ -115,12 +120,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .map(UserRole::getRoleId)
                 .toList();
 
-        List<SimpleGrantedAuthority> authorities = roleRepository.findByIdIn(roleIds)
+        List<SimpleGrantedAuthority> roleAuthorities = roleRepository.findByIdIn(roleIds)
                 .stream()
                 .filter(Role::isActive)
                 .map(Role::getCode)
                 .map(code -> new SimpleGrantedAuthority("ROLE_" + code))
                 .toList();
+
+        List<SimpleGrantedAuthority> permissionAuthorities = permissionRepository
+                .findCodesByRoleIds(roleIds)
+                .stream()
+                .map(SimpleGrantedAuthority::new)
+                .toList();
+
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.addAll(roleAuthorities);
+        authorities.addAll(permissionAuthorities);
 
         SecurityContextHolder.clearContext();
 
