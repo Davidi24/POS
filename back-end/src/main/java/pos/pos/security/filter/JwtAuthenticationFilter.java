@@ -55,15 +55,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.userSessionRepository = userSessionRepository;
     }
 
-    JwtAuthenticationFilter(
-            JwtService jwtService,
-            UserRepository userRepository,
-            UserRoleRepository userRoleRepository,
-            RoleRepository roleRepository
-    ) {
-        this(jwtService, userRepository, userRoleRepository, roleRepository, null);
-    }
-
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -104,13 +95,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (userSessionRepository != null) {
-            UserSession session = userSessionRepository.findByTokenIdAndRevokedFalse(tokenId).orElse(null);
+        UserSession session = userSessionRepository.findByTokenIdAndRevokedFalse(tokenId).orElse(null);
 
-            if (session == null || session.getExpiresAt().isBefore(OffsetDateTime.now(ZoneOffset.UTC))) {
-                filterChain.doFilter(request, response);
-                return;
-            }
+        if (session == null || session.getExpiresAt().isBefore(OffsetDateTime.now(ZoneOffset.UTC))) {
+            filterChain.doFilter(request, response);
+            return;
         }
 
         User user = userRepository.findById(userId).orElse(null);

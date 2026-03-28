@@ -11,7 +11,7 @@ public class AuthCookieProperties {
 
     private String refreshTokenName = "refreshToken";
     private String refreshTokenPath = "/auth/web";
-    private String sameSite = "Lax";
+    private String sameSite = "Strict";
     private boolean secure = true;
     private String domain;
 }
