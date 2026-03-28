@@ -1,5 +1,5 @@
 server:
-  forward-headers-strategy: framework
+  forward-headers-strategy: none
 
 spring:
   application:
@@ -49,11 +49,14 @@ app:
 
     refresh-token:
       pepper: ${REFRESH_TOKEN_PEPPER}
+      rate-limit:
+        max-attempts-per-ip: 20
+        window-minutes: 1
 
     cookie:
       refresh-token-name: refreshToken
       refresh-token-path: /auth/web
-       same-site: Strict
+      same-site: Strict
       secure: true
       domain:
 
