@@ -1,6 +1,8 @@
 package pos.pos.auth.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import pos.pos.auth.entity.AuthLoginAttempt;
 
 import java.time.OffsetDateTime;
@@ -10,4 +12,8 @@ public interface AuthLoginAttemptRepository extends JpaRepository<AuthLoginAttem
     long countByIpAddressAndAttemptedAtAfter(String ipAddress, OffsetDateTime after);
 
     long countByEmailAndAttemptedAtAfterAndSuccessFalse(String email, OffsetDateTime after);
+
+    @Modifying
+    @Query("DELETE FROM AuthLoginAttempt a WHERE a.attemptedAt < :cutoff")
+    int deleteOlderThan(OffsetDateTime cutoff);
 }

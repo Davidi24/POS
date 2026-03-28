@@ -43,6 +43,7 @@ app:
       max-attempts-per-ip: 20
       max-attempts-per-account: 5
       window-minutes: 5
+      attempt-retention-days: 90
 
     session:
       max-active-sessions: 3
