@@ -20,6 +20,8 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
 
     boolean existsByName(String name);
 
+    List<Role> findByIsActiveTrue();
+
     @Query("""
     SELECT r.code
     FROM UserRole ur
