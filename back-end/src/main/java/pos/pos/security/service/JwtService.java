@@ -52,10 +52,6 @@ public class JwtService {
                 .compact();
     }
 
-    public String generateAccessToken(UUID userId) {
-        return generateAccessToken(userId, List.of(), UUID.randomUUID());
-    }
-
     public String generateRefreshToken(UUID userId, UUID tokenId) {
         return Jwts.builder()
                 .subject(userId.toString())
