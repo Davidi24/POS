@@ -42,7 +42,13 @@ public class RefreshTokenSecurityService {
     }
 
     public boolean matchesHash(ValidatedRefreshToken refreshToken, String storedHash) {
-        return storedHash != null && storedHash.equals(refreshToken.tokenHash());
+        if (storedHash == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                storedHash.getBytes(StandardCharsets.UTF_8),
+                refreshToken.tokenHash().getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     private String normalize(String refreshToken) {

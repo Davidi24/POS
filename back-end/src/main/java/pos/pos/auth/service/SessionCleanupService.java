@@ -1,10 +1,12 @@
 package pos.pos.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.repository.AuthEmailVerificationTokenRepository;
+import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.AuthPasswordResetTokenRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 
@@ -18,6 +20,10 @@ public class SessionCleanupService {
     private final UserSessionRepository userSessionRepository;
     private final AuthPasswordResetTokenRepository authPasswordResetTokenRepository;
     private final AuthEmailVerificationTokenRepository authEmailVerificationTokenRepository;
+    private final AuthLoginAttemptRepository authLoginAttemptRepository;
+
+    @Value("${app.security.login.attempt-retention-days:90}")
+    private int attemptRetentionDays;
 
     @Scheduled(cron = "0 0 * * * *") // every hour
     @Transactional
@@ -26,5 +32,6 @@ public class SessionCleanupService {
         userSessionRepository.deleteExpiredOrRevokedSessions(now);
         authPasswordResetTokenRepository.deleteExpiredTokens(now);
         authEmailVerificationTokenRepository.deleteExpiredTokens(now);
+        authLoginAttemptRepository.deleteOlderThan(now.minusDays(attemptRetentionDays));
     }
 }

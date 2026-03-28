@@ -1,12 +1,11 @@
 package pos.pos.exception.user;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import pos.pos.exception.auth.AuthException;
 
-@ResponseStatus(HttpStatus.NOT_FOUND)
-public class UserNotFoundException extends RuntimeException {
+public class UserNotFoundException extends AuthException {
 
     public UserNotFoundException() {
-        super("User not found");
+        super("User not found", HttpStatus.NOT_FOUND);
     }
 }

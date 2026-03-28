@@ -11,6 +11,7 @@ import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
+import pos.pos.security.service.RefreshRateLimiter;
 import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.user.entity.User;
@@ -36,11 +37,13 @@ public class AuthRefreshService {
     private final JwtProperties jwtProperties;
     private final UserMapper userMapper;
     private final RefreshTokenSecurityService refreshTokenSecurityService;
+    private final RefreshRateLimiter refreshRateLimiter;
 
     @Transactional
     public AuthTokensResponse refresh(String refreshToken, ClientInfo clientInfo) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         ClientInfo normalizedClientInfo = normalizeClientInfo(clientInfo);
+        refreshRateLimiter.check(normalizedClientInfo != null ? normalizedClientInfo.ipAddress() : null);
         RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
                 refreshTokenSecurityService.validate(refreshToken);
 

@@ -1,5 +1,5 @@
 server:
-  forward-headers-strategy: framework
+  forward-headers-strategy: none
 
 spring:
   application:
@@ -43,17 +43,21 @@ app:
       max-attempts-per-ip: 20
       max-attempts-per-account: 5
       window-minutes: 5
+      attempt-retention-days: 90
 
     session:
       max-active-sessions: 3
 
     refresh-token:
       pepper: ${REFRESH_TOKEN_PEPPER}
+      rate-limit:
+        max-attempts-per-ip: 20
+        window-minutes: 1
 
     cookie:
       refresh-token-name: refreshToken
       refresh-token-path: /auth/web
-      same-site: Lax
+      same-site: Strict
       secure: true
       domain:
 
