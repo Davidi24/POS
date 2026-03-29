@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import pos.pos.security.config.AppSecurityProperties;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * NOTE (Proxy & IP Handling):
@@ -38,6 +39,28 @@ import java.util.List;
 @Component
 public class ClientInfoExtractor {
 
+    private static final Pattern IPV4 = Pattern.compile(
+            "^((25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(25[0-5]|2[0-4]\\d|[01]?\\d\\d?)$"
+    );
+
+    private static final Pattern IPV6 = Pattern.compile(
+            "^(" +
+                    "([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|" +                          // 1:2:3:4:5:6:7:8
+                    "([0-9a-fA-F]{1,4}:){1,7}:|" +                                         // 1::
+                    "([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|" +                        // 1::8
+                    "([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|" +                // 1::7:8
+                    "([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|" +                // 1::6:7:8
+                    "([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|" +                // 1::5:6:7:8
+                    "([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|" +                // 1::4:5:6:7:8
+                    "[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|" +                      // 1::3:4:5:6:7:8
+                    ":((:[0-9a-fA-F]{1,4}){1,7}|:)|" +                                     // ::1 or ::
+                    "::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}" +
+                    "(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|" +                          // ::ffff:0:255.255.255.255
+                    "([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\\.){3}" +
+                    "(25[0-5]|(2[0-4]|1?[0-9])?[0-9])" +                           // 2001:db8::255.255.255.255
+                    ")$"
+    );
+
     private final List<String> trustedProxies;
 
     @Autowired
@@ -66,14 +89,14 @@ public class ClientInfoExtractor {
 
             String xForwardedFor = firstHeaderValue(request, "X-Forwarded-For");
             if (isPresent(xForwardedFor) && !"unknown".equalsIgnoreCase(xForwardedFor)) {
-                String forwardedIp = firstIpFromList(xForwardedFor);
+                String forwardedIp = lastIpFromList(xForwardedFor);
                 if (isPresent(forwardedIp)) {
                     return forwardedIp;
                 }
             }
 
             String xRealIp = firstHeaderValue(request, "X-Real-IP");
-            if (isPresent(xRealIp) && !"unknown".equalsIgnoreCase(xRealIp)) {
+            if (isPresent(xRealIp) && !"unknown".equalsIgnoreCase(xRealIp) && isValidIp(xRealIp)) {
                 return xRealIp;
             }
         }
@@ -95,15 +118,25 @@ public class ClientInfoExtractor {
         return normalize(value);
     }
 
-    private String firstIpFromList(String headerValue) {
+    private String lastIpFromList(String headerValue) {
         String[] parts = headerValue.split(",");
-        for (String part : parts) {
-            String ip = normalize(part);
-            if (isPresent(ip) && !"unknown".equalsIgnoreCase(ip)) {
+        for (int i = parts.length - 1; i >= 0; i--) {
+            String ip = normalize(parts[i]);
+            if (isPresent(ip) && !"unknown".equalsIgnoreCase(ip) && isValidIp(ip)) {
                 return ip;
             }
         }
         return null;
+    }
+
+    static boolean isValidIp(String ip) {
+        if (ip == null || ip.length() > 45) {
+            return false;
+        }
+        if (IPV4.matcher(ip).matches()) {
+            return true;
+        }
+        return IPV6.matcher(ip).matches();
     }
 
     private String normalize(String value) {

@@ -34,6 +34,10 @@ security:
 app:
   security:
     trusted-proxies:
+      # LOCAL DEV ONLY — must be overridden in production with the real proxy IP(s)
+      # (e.g. your NGINX / load-balancer IP as seen by the app)
+      # Failure to update this will cause all requests to fall back to the proxy IP
+      # instead of the real client IP, breaking rate limiting and audit logs.
       - 127.0.0.1
       - ::1
 
