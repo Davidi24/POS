@@ -12,6 +12,7 @@ import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
+import pos.pos.security.service.RefreshRateLimiter;
 import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.user.dto.UserResponse;
@@ -54,6 +55,9 @@ class AuthRefreshServiceTest {
 
     @Mock
     private RefreshTokenSecurityService refreshTokenSecurityService;
+
+    @Mock
+    private RefreshRateLimiter refreshRateLimiter;
 
     @InjectMocks
     private AuthRefreshService authRefreshService;

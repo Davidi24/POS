@@ -15,7 +15,7 @@ class ClientInfoExtractorTest {
     private static final String UNTRUSTED_REMOTE = "192.168.1.10";
 
     private final ClientInfoExtractor extractor =
-            new ClientInfoExtractor(List.of(TRUSTED_PROXY, "::1"));
+            new ClientInfoExtractor(List.of(TRUSTED_PROXY, "::1"), 512);
 
     /*
      * =========================================
@@ -31,7 +31,7 @@ class ClientInfoExtractorTest {
         @DisplayName("Should throw when trusted proxies list is empty")
         void shouldThrow_whenTrustedProxiesEmpty() {
             assertThrows(IllegalStateException.class,
-                    () -> new ClientInfoExtractor(List.of()));
+                    () -> new ClientInfoExtractor(List.of(), 512));
         }
     }
 
@@ -46,12 +46,30 @@ class ClientInfoExtractorTest {
     class TrustedProxyTests {
 
         @Test
-        @DisplayName("Should extract first valid IP from X-Forwarded-For")
-        void shouldUseFirstForwardedIp() {
+        @DisplayName("Should extract last valid IP from X-Forwarded-For to prevent client spoofing")
+        void shouldUseLastForwardedIp() {
             MockHttpServletRequest request = trustedProxyRequest();
             request.addHeader("X-Forwarded-For", "10.0.0.1, 10.0.0.2");
 
+            assertEquals("10.0.0.2", extractor.extractIp(request));
+        }
+
+        @Test
+        @DisplayName("Should reject malformed IP in X-Forwarded-For and fall back")
+        void shouldRejectMalformedIp() {
+            MockHttpServletRequest request = trustedProxyRequest();
+            request.addHeader("X-Forwarded-For", "<script>alert(1)</script>, 10.0.0.1");
+
             assertEquals("10.0.0.1", extractor.extractIp(request));
+        }
+
+        @Test
+        @DisplayName("Should reject malformed X-Real-IP and fall back to remote address")
+        void shouldRejectMalformedRealIp() {
+            MockHttpServletRequest request = trustedProxyRequest();
+            request.addHeader("X-Real-IP", "not-an-ip");
+
+            assertEquals(TRUSTED_PROXY, extractor.extractIp(request));
         }
 
         @Test
@@ -150,6 +168,59 @@ class ClientInfoExtractorTest {
             request.setRemoteAddr(null);
 
             assertNull(extractor.extractIp(request));
+        }
+    }
+
+    /*
+     * =========================================
+     * IP Validation
+     * =========================================
+     */
+
+    @Nested
+    @DisplayName("IP validation")
+    class IpValidationTests {
+
+        @Test
+        @DisplayName("Should accept valid IPv4")
+        void shouldAcceptIpv4() {
+            assertTrue(ClientInfoExtractor.isValidIp("192.168.1.1"));
+        }
+
+        @Test
+        @DisplayName("Should accept valid IPv6")
+        void shouldAcceptIpv6() {
+            assertTrue(ClientInfoExtractor.isValidIp("::1"));
+        }
+
+        @Test
+        @DisplayName("Should reject hostname")
+        void shouldRejectHostname() {
+            assertFalse(ClientInfoExtractor.isValidIp("evil.com"));
+        }
+
+        @Test
+        @DisplayName("Should reject script injection")
+        void shouldRejectScriptInjection() {
+            assertFalse(ClientInfoExtractor.isValidIp("<script>alert(1)</script>"));
+        }
+
+        @Test
+        @DisplayName("Should reject out-of-range IPv4 octet")
+        void shouldRejectOutOfRangeOctet() {
+            assertFalse(ClientInfoExtractor.isValidIp("999.999.999.999"));
+        }
+
+        @Test
+        @DisplayName("Should reject string exceeding 45 characters")
+        void shouldRejectTooLongString() {
+            assertFalse(ClientInfoExtractor.isValidIp("1".repeat(46)));
+        }
+
+        @Test
+        @DisplayName("Should reject null")
+        void shouldRejectNull() {
+            assertFalse(ClientInfoExtractor.isValidIp(null));
         }
     }
 

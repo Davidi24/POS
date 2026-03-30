@@ -33,6 +33,8 @@ security:
 
 app:
   security:
+    max-user-agent-length: 512
+
     trusted-proxies:
       # LOCAL DEV ONLY — must be overridden in production with the real proxy IP(s)
       # (e.g. your NGINX / load-balancer IP as seen by the app)
