@@ -3,7 +3,7 @@ package pos.pos.auth.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import pos.pos.auth.dto.AuthTokensResponse;
+import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.UserSessionRepository;
@@ -40,7 +40,7 @@ public class AuthRefreshService {
     private final RefreshRateLimiter refreshRateLimiter;
 
     @Transactional
-    public AuthTokensResponse refresh(String refreshToken, ClientInfo clientInfo) {
+    public AuthenticationResponse refresh(String refreshToken, ClientInfo clientInfo) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         ClientInfo normalizedClientInfo = normalizeClientInfo(clientInfo);
         refreshRateLimiter.check(normalizedClientInfo != null ? normalizedClientInfo.ipAddress() : null);
@@ -88,7 +88,7 @@ public class AuthRefreshService {
 
         userSessionRepository.save(session);
 
-        return AuthTokensResponse.builder()
+        return AuthenticationResponse.builder()
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .tokenType(TOKEN_TYPE)

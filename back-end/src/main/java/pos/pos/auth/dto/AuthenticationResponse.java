@@ -6,9 +6,10 @@ import pos.pos.user.dto.UserResponse;
 
 @Getter
 @Builder
-public class WebRefreshResponse {
+public class AuthenticationResponse {
 
     private final String accessToken;
+    private final String refreshToken;
     private final String tokenType;
     private final Long expiresIn;
     private final UserResponse user;

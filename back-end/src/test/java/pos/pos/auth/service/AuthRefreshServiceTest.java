@@ -6,7 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import pos.pos.auth.dto.AuthTokensResponse;
+import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.role.repository.RoleRepository;
@@ -103,7 +103,7 @@ class AuthRefreshServiceTest {
         when(refreshTokenSecurityService.hash("new-refresh-token")).thenReturn("new-refresh-hash");
         when(userMapper.toUserResponse(user, List.of("ADMIN"))).thenReturn(userResponse);
 
-        AuthTokensResponse response = authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit"));
+        AuthenticationResponse response = authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit"));
 
         assertThat(response.getAccessToken()).isEqualTo("new-access-token");
         assertThat(response.getRefreshToken()).isEqualTo("new-refresh-token");

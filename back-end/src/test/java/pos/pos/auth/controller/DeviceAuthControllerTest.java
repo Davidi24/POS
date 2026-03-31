@@ -15,7 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
-import pos.pos.auth.dto.AuthTokensResponse;
+import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.dto.RefreshRequest;
 import pos.pos.auth.service.AuthLoginService;
@@ -70,7 +70,7 @@ class DeviceAuthControllerTest {
             .roles(List.of("CASHIER"))
             .build();
 
-    private static final AuthTokensResponse AUTH_TOKENS = AuthTokensResponse.builder()
+    private static final AuthenticationResponse AUTH_TOKENS = AuthenticationResponse.builder()
             .accessToken("access.token.here")
             .refreshToken("refresh.token.here")
             .tokenType("Bearer")

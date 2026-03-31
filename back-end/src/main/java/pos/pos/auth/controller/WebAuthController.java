@@ -11,10 +11,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.WebUtils;
-import pos.pos.auth.dto.AuthTokensResponse;
+import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.dto.LoginRequest;
-import pos.pos.auth.dto.WebLoginResponse;
-import pos.pos.auth.dto.WebRefreshResponse;
+import pos.pos.auth.dto.WebAuthenticationResponse;
 import pos.pos.auth.service.AuthLoginService;
 import pos.pos.auth.service.AuthLogoutService;
 import pos.pos.auth.service.AuthRefreshService;
@@ -37,17 +36,17 @@ public class WebAuthController {
     private final CookieService cookieService;
 
     @PostMapping("/login")
-    public ResponseEntity<WebLoginResponse> login(
+    public ResponseEntity<WebAuthenticationResponse> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
-        AuthTokensResponse authResult = authLoginService.login(request, clientInfo);
+        AuthenticationResponse authResult = authLoginService.login(request, clientInfo);
 
         cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
 
-        WebLoginResponse response = WebLoginResponse.builder()
+        WebAuthenticationResponse response = WebAuthenticationResponse.builder()
                 .accessToken(authResult.getAccessToken())
                 .tokenType(authResult.getTokenType())
                 .expiresIn(authResult.getExpiresIn())
@@ -58,7 +57,7 @@ public class WebAuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<WebRefreshResponse> refresh(
+    public ResponseEntity<WebAuthenticationResponse> refresh(
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse
     ) {
@@ -66,11 +65,11 @@ public class WebAuthController {
 
         try {
             String refreshToken = extractRefreshTokenFromCookie(httpRequest);
-            AuthTokensResponse authResult = authRefreshService.refresh(refreshToken, clientInfo);
+            AuthenticationResponse authResult = authRefreshService.refresh(refreshToken, clientInfo);
 
             cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
 
-            WebRefreshResponse response = WebRefreshResponse.builder()
+            WebAuthenticationResponse response = WebAuthenticationResponse.builder()
                     .accessToken(authResult.getAccessToken())
                     .tokenType(authResult.getTokenType())
                     .expiresIn(authResult.getExpiresIn())

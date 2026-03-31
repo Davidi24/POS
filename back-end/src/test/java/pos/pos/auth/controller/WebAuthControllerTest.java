@@ -16,7 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
-import pos.pos.auth.dto.AuthTokensResponse;
+import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.service.AuthLoginService;
 import pos.pos.auth.service.AuthLogoutService;
@@ -38,8 +38,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -78,7 +77,7 @@ class WebAuthControllerTest {
             .roles(List.of("CASHIER"))
             .build();
 
-    private static final AuthTokensResponse AUTH_TOKENS = AuthTokensResponse.builder()
+    private static final AuthenticationResponse AUTH_TOKENS = AuthenticationResponse.builder()
             .accessToken("access.token.here")
             .refreshToken(REFRESH_TOKEN)
             .tokenType("Bearer")
