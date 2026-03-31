@@ -9,9 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import pos.pos.auth.dto.AuthTokensResponse;
-import pos.pos.auth.dto.DeviceLoginResponse;
-import pos.pos.auth.dto.DeviceRefreshResponse;
+import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.dto.RefreshRequest;
 import pos.pos.auth.service.AuthLoginService;
@@ -34,43 +32,25 @@ public class DeviceAuthController {
     private final ClientInfoExtractor clientInfoExtractor;
 
     @PostMapping("/login")
-    public ResponseEntity<DeviceLoginResponse> login(
+    public ResponseEntity<AuthenticationResponse> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
-        AuthTokensResponse authResult = authLoginService.login(request, clientInfo);
-
-        DeviceLoginResponse response = DeviceLoginResponse.builder()
-                .accessToken(authResult.getAccessToken())
-                .refreshToken(authResult.getRefreshToken())
-                .tokenType(authResult.getTokenType())
-                .expiresIn(authResult.getExpiresIn())
-                .user(authResult.getUser())
-                .build();
-
-        return ResponseEntity.ok(response);
+        AuthenticationResponse authResult = authLoginService.login(request, clientInfo);
+        return ResponseEntity.ok(authResult);
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<DeviceRefreshResponse> refresh(
+    public ResponseEntity<AuthenticationResponse> refresh(
             @RequestBody(required = false) RefreshRequest request,
             HttpServletRequest httpRequest
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
         String refreshToken = extractRefreshTokenFromRequest(request);
 
-        AuthTokensResponse authResult = authRefreshService.refresh(refreshToken, clientInfo);
-
-        DeviceRefreshResponse response = DeviceRefreshResponse.builder()
-                .accessToken(authResult.getAccessToken())
-                .refreshToken(authResult.getRefreshToken())
-                .tokenType(authResult.getTokenType())
-                .expiresIn(authResult.getExpiresIn())
-                .user(authResult.getUser())
-                .build();
-
-        return ResponseEntity.ok(response);
+        AuthenticationResponse authResult = authRefreshService.refresh(refreshToken, clientInfo);
+        return ResponseEntity.ok(authResult);
     }
 
     @PostMapping("/logout")

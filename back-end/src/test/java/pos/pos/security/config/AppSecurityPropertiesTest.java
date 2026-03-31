@@ -8,15 +8,26 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
+import org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AppSecurityPropertiesTest {
 
     private static Validator validator;
+    private static final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(
+                    ConfigurationPropertiesAutoConfiguration.class,
+                    ValidationAutoConfiguration.class
+            ))
+            .withUserConfiguration(AppSecurityProperties.class);
 
     @BeforeAll
     static void setup() {
@@ -104,6 +115,67 @@ class AppSecurityPropertiesTest {
         }
     }
 
+    @Nested
+    @DisplayName("Spring binding")
+    class SpringBindingTests {
+
+        @Test
+        @DisplayName("Should bind valid app.security properties")
+        void shouldBindValidProperties() {
+            contextRunner
+                    .withPropertyValues(
+                            "app.security.trusted-proxies[0]=127.0.0.1",
+                            "app.security.trusted-proxies[1]=::1",
+                            "app.security.max-user-agent-length=512"
+                    )
+                    .run(context -> {
+                        assertThat(context).hasNotFailed();
+                        AppSecurityProperties properties = context.getBean(AppSecurityProperties.class);
+                        assertThat(properties.getTrustedProxies()).containsExactly("127.0.0.1", "::1");
+                        assertThat(properties.getMaxUserAgentLength()).isEqualTo(512);
+                    });
+        }
+
+        @Test
+        @DisplayName("Should fail startup when trusted proxies are missing")
+        void shouldFailStartupWhenTrustedProxiesMissing() {
+            contextRunner
+                    .withPropertyValues("app.security.max-user-agent-length=512")
+                    .run(context -> {
+                        assertThat(context).hasFailed();
+                        assertTrue(causeMessagesContain(context.getStartupFailure(), "trustedProxies"));
+                    });
+        }
+
+        @Test
+        @DisplayName("Should fail startup when max User-Agent length is below minimum")
+        void shouldFailStartupWhenMaxUserAgentTooLow() {
+            contextRunner
+                    .withPropertyValues(
+                            "app.security.trusted-proxies[0]=127.0.0.1",
+                            "app.security.max-user-agent-length=49"
+                    )
+                    .run(context -> {
+                        assertThat(context).hasFailed();
+                        assertTrue(causeMessagesContain(context.getStartupFailure(), "maxUserAgentLength"));
+                    });
+        }
+
+        @Test
+        @DisplayName("Should fail startup when max User-Agent length is above maximum")
+        void shouldFailStartupWhenMaxUserAgentTooHigh() {
+            contextRunner
+                    .withPropertyValues(
+                            "app.security.trusted-proxies[0]=127.0.0.1",
+                            "app.security.max-user-agent-length=2049"
+                    )
+                    .run(context -> {
+                        assertThat(context).hasFailed();
+                        assertTrue(causeMessagesContain(context.getStartupFailure(), "maxUserAgentLength"));
+                    });
+        }
+    }
+
     private AppSecurityProperties properties(List<String> trustedProxies, int maxUserAgentLength) {
         AppSecurityProperties properties = new AppSecurityProperties();
         properties.setTrustedProxies(trustedProxies);
@@ -114,5 +186,16 @@ class AppSecurityPropertiesTest {
     private boolean hasViolation(Set<ConstraintViolation<AppSecurityProperties>> violations, String field) {
         return violations.stream()
                 .anyMatch(v -> v.getPropertyPath().toString().equals(field));
+    }
+
+    private boolean causeMessagesContain(Throwable throwable, String expectedText) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current.getMessage() != null && current.getMessage().contains(expectedText)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

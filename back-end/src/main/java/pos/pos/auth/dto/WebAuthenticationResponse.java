@@ -6,7 +6,7 @@ import pos.pos.user.dto.UserResponse;
 
 @Getter
 @Builder
-public class WebLoginResponse {
+public class WebAuthenticationResponse {
 
     private final String accessToken;
     private final String tokenType;
