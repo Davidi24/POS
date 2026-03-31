@@ -2,6 +2,33 @@ package pos.pos.utils;
 
 import java.util.Locale;
 
+/**
+ * Utility class for safe string normalization.
+ * <p>
+ * normalize(value):
+ * - removes leading and trailing spaces
+ * - returns null if the result is empty
+ * - returns null if input is null
+ * <p>
+ * Example:
+ * "  test  " → "test"
+ * "   " → null
+ * null → null
+ * <p>
+ * normalizeLower(value):
+ * - first cleans the value using normalize()
+ * - then converts it to lowercase (safe for all languages)
+ * <p>
+ * Example:
+ * "  TEST  " → "test"
+ * <p>
+ * normalizeUpper(value):
+ * - first cleans the value using normalize()
+ * - then converts it to uppercase (safe for all languages)
+ * <p>
+ * Example:
+ * "  test  " → "TEST"
+ */
 public final class NormalizationUtils {
 
     private NormalizationUtils() {
