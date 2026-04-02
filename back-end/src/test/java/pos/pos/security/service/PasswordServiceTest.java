@@ -1,63 +1,69 @@
 package pos.pos.security.service;
 
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class PasswordServiceTest {
 
-    private PasswordService passwordService;
+    private final PasswordService passwordService = new PasswordService(new BCryptPasswordEncoder(12));
 
-    @BeforeEach
-    void setup() {
-        PasswordEncoder encoder = new BCryptPasswordEncoder();
-        passwordService = new PasswordService(encoder);
+    @Nested
+    @DisplayName("hash")
+    class HashTests {
+
+        @Test
+        @DisplayName("Should hash password without storing the raw value")
+        void shouldHashPasswordWithoutStoringRawValue() {
+            String rawPassword = "SecurePass123!";
+
+            String hashedPassword = passwordService.hash(rawPassword);
+
+            assertThat(hashedPassword).isNotBlank();
+            assertThat(hashedPassword).isNotEqualTo(rawPassword);
+            assertThat(passwordService.matches(rawPassword, hashedPassword)).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should generate different hashes for the same password")
+        void shouldGenerateDifferentHashesForSamePassword() {
+            String rawPassword = "SecurePass123!";
+
+            String firstHash = passwordService.hash(rawPassword);
+            String secondHash = passwordService.hash(rawPassword);
+
+            assertThat(firstHash).isNotEqualTo(secondHash);
+            assertThat(passwordService.matches(rawPassword, firstHash)).isTrue();
+            assertThat(passwordService.matches(rawPassword, secondHash)).isTrue();
+        }
     }
 
-    @Test
-    void hash_shouldReturnHashedPassword() {
+    @Nested
+    @DisplayName("matches")
+    class MatchesTests {
 
-        String raw = "Password123";
+        @Test
+        @DisplayName("Should return true for matching password and hash")
+        void shouldReturnTrueForMatchingPasswordAndHash() {
+            String rawPassword = "SecurePass123!";
+            String hashedPassword = passwordService.hash(rawPassword);
 
-        String hashed = passwordService.hash(raw);
+            boolean matches = passwordService.matches(rawPassword, hashedPassword);
 
-        assertNotNull(hashed);
-        assertNotEquals(raw, hashed);
-    }
+            assertThat(matches).isTrue();
+        }
 
-    @Test
-    void matches_shouldReturnTrue_whenPasswordCorrect() {
+        @Test
+        @DisplayName("Should return false for wrong password")
+        void shouldReturnFalseForWrongPassword() {
+            String hashedPassword = passwordService.hash("SecurePass123!");
 
-        String raw = "Password123";
-        String hashed = passwordService.hash(raw);
+            boolean matches = passwordService.matches("WrongPass123!", hashedPassword);
 
-        boolean result = passwordService.matches(raw, hashed);
-
-        assertTrue(result);
-    }
-
-    @Test
-    void matches_shouldReturnFalse_whenPasswordIncorrect() {
-
-        String raw = "Password123";
-        String hashed = passwordService.hash(raw);
-
-        boolean result = passwordService.matches("WrongPassword", hashed);
-
-        assertFalse(result);
-    }
-
-    @Test
-    void hash_shouldGenerateDifferentHashes_forSamePassword() {
-
-        String raw = "Password123";
-
-        String hash1 = passwordService.hash(raw);
-        String hash2 = passwordService.hash(raw);
-
-        assertNotEquals(hash1, hash2);
+            assertThat(matches).isFalse();
+        }
     }
 }

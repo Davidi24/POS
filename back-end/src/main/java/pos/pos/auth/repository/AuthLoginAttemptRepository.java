@@ -15,5 +15,5 @@ public interface AuthLoginAttemptRepository extends JpaRepository<AuthLoginAttem
 
     @Modifying
     @Query("DELETE FROM AuthLoginAttempt a WHERE a.attemptedAt < :cutoff")
-    int deleteOlderThan(OffsetDateTime cutoff);
+    void deleteOlderThan(OffsetDateTime cutoff);
 }

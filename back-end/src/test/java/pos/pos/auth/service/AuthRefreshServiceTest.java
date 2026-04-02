@@ -1,14 +1,18 @@
 package pos.pos.auth.service;
 
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.entity.UserSession;
+import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.repository.UserSessionRepository;
+import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
@@ -27,13 +31,18 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("AuthRefreshService")
 class AuthRefreshServiceTest {
+
+    private static final String INVALID_REFRESH_TOKEN_MESSAGE = "Invalid refresh token";
 
     @Mock
     private UserSessionRepository userSessionRepository;
@@ -62,52 +71,259 @@ class AuthRefreshServiceTest {
     @InjectMocks
     private AuthRefreshService authRefreshService;
 
-    @BeforeEach
-    void setUp() {
-        when(jwtProperties.getAccessExpiration()).thenReturn(Duration.ofMinutes(15));
+    @Nested
+    @DisplayName("refresh()")
+    class Refresh {
+
+        @Test
+        @DisplayName("Should rotate tokens and persist normalized client info on success")
+        void shouldRotateTokensAndPersistNormalizedClientInfo_onSuccess() {
+            UUID oldTokenId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            List<String> roles = List.of("ADMIN");
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", oldTokenId, userId);
+            UserSession session = activeSession(userId, oldTokenId, OffsetDateTime.now().plusMinutes(5));
+            User user = activeUser(userId, "owner@pos.local");
+            UserResponse userResponse = UserResponse.builder()
+                    .id(userId)
+                    .email("owner@pos.local")
+                    .roles(roles)
+                    .build();
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(oldTokenId)).thenReturn(Optional.of(session));
+            when(refreshTokenSecurityService.matchesHash(validatedRefreshToken, "stored-hash")).thenReturn(true);
+            when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+            when(roleRepository.findActiveRoleCodesByUserId(userId)).thenReturn(roles);
+            when(jwtProperties.getAccessExpiration()).thenReturn(Duration.ofMinutes(15));
+            when(jwtService.generateAccessToken(eq(userId), eq(roles), any(UUID.class))).thenReturn("new-access-token");
+            when(jwtService.generateRefreshToken(eq(userId), any(UUID.class))).thenReturn("new-refresh-token");
+            when(refreshTokenSecurityService.hash("new-refresh-token")).thenReturn("new-refresh-hash");
+            when(userMapper.toUserResponse(user, roles)).thenReturn(userResponse);
+
+            AuthenticationResponse response = authRefreshService.refresh(
+                    "token",
+                    new ClientInfo(" 127.0.0.1 ", " JUnit/5 ")
+            );
+
+            assertThat(response.getAccessToken()).isEqualTo("new-access-token");
+            assertThat(response.getRefreshToken()).isEqualTo("new-refresh-token");
+            assertThat(response.getTokenType()).isEqualTo("Bearer");
+            assertThat(response.getExpiresIn()).isEqualTo(900L);
+            assertThat(response.getUser()).isEqualTo(userResponse);
+
+            ArgumentCaptor<UUID> accessTokenIdCaptor = ArgumentCaptor.forClass(UUID.class);
+            ArgumentCaptor<UUID> refreshTokenIdCaptor = ArgumentCaptor.forClass(UUID.class);
+            verify(jwtService).generateAccessToken(eq(userId), eq(roles), accessTokenIdCaptor.capture());
+            verify(jwtService).generateRefreshToken(eq(userId), refreshTokenIdCaptor.capture());
+            assertThat(refreshTokenIdCaptor.getValue()).isEqualTo(accessTokenIdCaptor.getValue());
+
+            ArgumentCaptor<UserSession> sessionCaptor = ArgumentCaptor.forClass(UserSession.class);
+            verify(userSessionRepository).save(sessionCaptor.capture());
+            UserSession savedSession = sessionCaptor.getValue();
+            assertThat(savedSession.getTokenId()).isEqualTo(accessTokenIdCaptor.getValue());
+            assertThat(savedSession.getRefreshTokenHash()).isEqualTo("new-refresh-hash");
+            assertThat(savedSession.getIpAddress()).isEqualTo("127.0.0.1");
+            assertThat(savedSession.getUserAgent()).isEqualTo("JUnit/5");
+            assertThat(savedSession.getLastUsedAt()).isNotNull();
+            assertThat(savedSession.isRevoked()).isFalse();
+            assertThat(savedSession.getRevokedAt()).isNull();
+            assertThat(savedSession.getRevokedReason()).isNull();
+
+            verify(userSessionRepository).findByTokenIdAndRevokedFalseForUpdate(oldTokenId);
+            verify(userRepository).findActiveById(userId);
+        }
+
+        @Test
+        @DisplayName("Should throw when the session does not exist")
+        void shouldThrow_whenSessionDoesNotExist() {
+            UUID tokenId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", tokenId, userId);
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            verify(userRepository, never()).findActiveById(any(UUID.class));
+            verify(userSessionRepository, never()).save(any(UserSession.class));
+        }
+
+        @Test
+        @DisplayName("Should revoke the session when it is expired")
+        void shouldRevokeSession_whenExpired() {
+            UUID tokenId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", tokenId, userId);
+            UserSession session = activeSession(userId, tokenId, OffsetDateTime.now().minusMinutes(1));
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.of(session));
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            assertRevokedWithReason(SessionRevocationReason.EXPIRED);
+            verify(refreshTokenSecurityService, never()).matchesHash(any(), any());
+            verify(userRepository, never()).findActiveById(any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("Should revoke the session when the token user does not match the session user")
+        void shouldRevokeSession_whenTokenUserDoesNotMatchSessionUser() {
+            UUID tokenId = UUID.randomUUID();
+            UUID tokenUserId = UUID.randomUUID();
+            UUID sessionUserId = UUID.randomUUID();
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", tokenId, tokenUserId);
+            UserSession session = activeSession(sessionUserId, tokenId, OffsetDateTime.now().plusMinutes(5));
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.of(session));
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            assertRevokedWithReason(SessionRevocationReason.TOKEN_USER_MISMATCH);
+            verify(refreshTokenSecurityService, never()).matchesHash(any(), any());
+            verify(userRepository, never()).findActiveById(any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("Should revoke the session when the refresh token hash does not match")
+        void shouldRevokeSession_whenRefreshTokenHashDoesNotMatch() {
+            UUID tokenId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", tokenId, userId);
+            UserSession session = activeSession(userId, tokenId, OffsetDateTime.now().plusMinutes(5));
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.of(session));
+            when(refreshTokenSecurityService.matchesHash(validatedRefreshToken, "stored-hash")).thenReturn(false);
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            assertRevokedWithReason(SessionRevocationReason.REUSE_DETECTED);
+            verify(userRepository, never()).findActiveById(any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("Should revoke the session when the user no longer exists")
+        void shouldRevokeSession_whenUserDoesNotExist() {
+            UUID tokenId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", tokenId, userId);
+            UserSession session = activeSession(userId, tokenId, OffsetDateTime.now().plusMinutes(5));
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.of(session));
+            when(refreshTokenSecurityService.matchesHash(validatedRefreshToken, "stored-hash")).thenReturn(true);
+            when(userRepository.findActiveById(userId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            assertRevokedWithReason(SessionRevocationReason.USER_NOT_ALLOWED);
+            verify(jwtService, never()).generateAccessToken(any(UUID.class), any(), any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("Should revoke the session when the user status is not active")
+        void shouldRevokeSession_whenUserStatusIsNotActive() {
+            UUID tokenId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", tokenId, userId);
+            UserSession session = activeSession(userId, tokenId, OffsetDateTime.now().plusMinutes(5));
+            User user = activeUser(userId, "owner@pos.local");
+            user.setStatus("SUSPENDED");
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.of(session));
+            when(refreshTokenSecurityService.matchesHash(validatedRefreshToken, "stored-hash")).thenReturn(true);
+            when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            assertRevokedWithReason(SessionRevocationReason.USER_NOT_ALLOWED);
+            verify(jwtService, never()).generateAccessToken(any(UUID.class), any(), any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("Should revoke the session when the email is not verified")
+        void shouldRevokeSession_whenEmailIsNotVerified() {
+            UUID tokenId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", tokenId, userId);
+            UserSession session = activeSession(userId, tokenId, OffsetDateTime.now().plusMinutes(5));
+            User user = activeUser(userId, "owner@pos.local");
+            user.setEmailVerified(false);
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.of(session));
+            when(refreshTokenSecurityService.matchesHash(validatedRefreshToken, "stored-hash")).thenReturn(true);
+            when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            assertRevokedWithReason(SessionRevocationReason.USER_NOT_ALLOWED);
+            verify(jwtService, never()).generateAccessToken(any(UUID.class), any(), any(UUID.class));
+        }
     }
 
-    @Test
-    void refresh_shouldUseLockedSessionLookupAndActiveUserLookup() {
-        UUID oldTokenId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
-                new RefreshTokenSecurityService.ValidatedRefreshToken("token", "old-hash", oldTokenId, userId);
-        UserSession session = UserSession.builder()
+    private void assertRevokedWithReason(SessionRevocationReason reason) {
+        ArgumentCaptor<UserSession> sessionCaptor = ArgumentCaptor.forClass(UserSession.class);
+        verify(userSessionRepository).save(sessionCaptor.capture());
+        UserSession savedSession = sessionCaptor.getValue();
+        assertThat(savedSession.isRevoked()).isTrue();
+        assertThat(savedSession.getRevokedAt()).isNotNull();
+        assertThat(savedSession.getRevokedReason()).isEqualTo(reason.name());
+    }
+
+    private RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken(
+            String token,
+            String tokenHash,
+            UUID tokenId,
+            UUID userId
+    ) {
+        return new RefreshTokenSecurityService.ValidatedRefreshToken(token, tokenHash, tokenId, userId);
+    }
+
+    private UserSession activeSession(UUID userId, UUID tokenId, OffsetDateTime expiresAt) {
+        return UserSession.builder()
                 .userId(userId)
-                .tokenId(oldTokenId)
+                .tokenId(tokenId)
                 .refreshTokenHash("stored-hash")
-                .expiresAt(OffsetDateTime.now().plusMinutes(5))
+                .expiresAt(expiresAt)
                 .revoked(false)
                 .build();
-        User user = User.builder()
+    }
+
+    private User activeUser(UUID userId, String email) {
+        return User.builder()
                 .id(userId)
-                .email("owner@pos.local")
+                .email(email)
                 .status("ACTIVE")
                 .isActive(true)
                 .emailVerified(true)
                 .build();
-        UserResponse userResponse = UserResponse.builder()
-                .id(userId)
-                .email("owner@pos.local")
-                .roles(List.of("ADMIN"))
-                .build();
-
-        when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
-        when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(oldTokenId)).thenReturn(Optional.of(session));
-        when(refreshTokenSecurityService.matchesHash(validatedRefreshToken, "stored-hash")).thenReturn(true);
-        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
-        when(roleRepository.findActiveRoleCodesByUserId(userId)).thenReturn(List.of("ADMIN"));
-        when(jwtService.generateAccessToken(eq(userId), eq(List.of("ADMIN")), any(UUID.class))).thenReturn("new-access-token");
-        when(jwtService.generateRefreshToken(eq(userId), any(UUID.class))).thenReturn("new-refresh-token");
-        when(refreshTokenSecurityService.hash("new-refresh-token")).thenReturn("new-refresh-hash");
-        when(userMapper.toUserResponse(user, List.of("ADMIN"))).thenReturn(userResponse);
-
-        AuthenticationResponse response = authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit"));
-
-        assertThat(response.getAccessToken()).isEqualTo("new-access-token");
-        assertThat(response.getRefreshToken()).isEqualTo("new-refresh-token");
-        verify(userSessionRepository).findByTokenIdAndRevokedFalseForUpdate(oldTokenId);
-        verify(userRepository).findActiveById(userId);
     }
 }

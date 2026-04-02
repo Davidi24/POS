@@ -8,7 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 import pos.pos.auth.entity.UserSession;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,6 +17,7 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 
     Optional<UserSession> findByTokenIdAndRevokedFalse(UUID tokenId);
 
+    //Fetches a non-revoked session by tokenId and locks it so no one else can modify it concurrently.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT s
@@ -55,7 +55,6 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     """, nativeQuery = true)
     int revokeOldestSession(UUID userId, OffsetDateTime now, String reason);
 
-    List<UserSession> findByUserId(UUID userId);
 
     @Modifying
     @Query("""
@@ -67,5 +66,5 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
       AND s.revoked = false
       AND s.expiresAt > :now
 """)
-    int revokeAllActiveSessionsByUserId(UUID userId, OffsetDateTime now, String reason);
+    void revokeAllActiveSessionsByUserId(UUID userId, OffsetDateTime now, String reason);
 }
