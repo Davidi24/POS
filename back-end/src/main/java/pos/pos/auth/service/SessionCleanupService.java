@@ -25,13 +25,18 @@ public class SessionCleanupService {
     @Value("${app.security.login.attempt-retention-days:90}")
     private int attemptRetentionDays;
 
+    // Runs every hour at minute 0 and second 0
     @Scheduled(cron = "0 0 * * * *") // every hour
     @Transactional
     public void cleanup() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        // Deletes expired or revoked sessions every hour
         userSessionRepository.deleteExpiredOrRevokedSessions(now);
+        // Removes expired password reset tokens that are no longer valid for resetting passwords
         authPasswordResetTokenRepository.deleteExpiredTokens(now);
+        // Deletes expired email verification tokens that are no longer usable for account activation
         authEmailVerificationTokenRepository.deleteExpiredTokens(now);
+        // Deletes login attempt records older than the configured retention period (e.g. 90 days)
         authLoginAttemptRepository.deleteOlderThan(now.minusDays(attemptRetentionDays));
     }
 }

@@ -31,6 +31,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
+//checked
 @Service
 @RequiredArgsConstructor
 public class AuthLoginService {
