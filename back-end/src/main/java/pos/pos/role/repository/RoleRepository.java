@@ -14,11 +14,6 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
 
     Optional<Role> findByCode(String code);
 
-    Optional<Role> findByName(String name);
-
-    boolean existsByCode(String code);
-
-    boolean existsByName(String name);
 
     List<Role> findByIsActiveTrue();
 

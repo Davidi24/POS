@@ -142,8 +142,6 @@ public class AuthLoginService {
     }
 
 
-
-
     /**
      * Ensures the user does not exceed the maximum number of active sessions.
      * - Counts current active (not revoked and not expired) sessions for the user.
