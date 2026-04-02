@@ -17,7 +17,7 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 
     Optional<UserSession> findByTokenIdAndRevokedFalse(UUID tokenId);
 
-    //Fetches a non-revoked session by tokenId and locks it so no one else can modify it concurrently.
+    //Fetches a non-revoked session by tokenId and locks it so no one else can modify it concurrently, so it locks in the db so no one uses that row.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT s

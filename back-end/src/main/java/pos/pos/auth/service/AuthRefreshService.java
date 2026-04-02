@@ -23,6 +23,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
+// checked
 @Service
 @RequiredArgsConstructor
 public class AuthRefreshService {
@@ -48,24 +49,31 @@ public class AuthRefreshService {
                 refreshTokenSecurityService.validate(refreshToken);
         refreshRateLimiter.checkByTokenId(validatedRefreshToken.tokenId());
 
+        // Fetches the active session by tokenId and locks the database row, orUpdate => (SELECT FOR UPDATE)
+        // to prevent concurrent access or reuse of the same refresh token
         UserSession session = userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(validatedRefreshToken.tokenId())
                 .orElseThrow(() -> new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE));
 
+        // if session is expired it revokes it
         if (session.getExpiresAt() == null || !session.getExpiresAt().isAfter(now)) {
             revokeSession(session, now, SessionRevocationReason.EXPIRED);
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
+        // Ensures that the session userID is same as the user who send the request, so userID that came from refresh token
+        // So the session belongs to this user not another user
         if (!session.getUserId().equals(validatedRefreshToken.userId())) {
             revokeSession(session, now, SessionRevocationReason.TOKEN_USER_MISMATCH);
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
+        // Verifies the provided refresh token matches the stored hash to detect reuse or tampering (unauthorized modification or falsification of a token)
         if (!refreshTokenSecurityService.matchesHash(validatedRefreshToken, session.getRefreshTokenHash())) {
             revokeSession(session, now, SessionRevocationReason.REUSE_DETECTED);
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
+        // after all checks now it checks if user exist
         User user = userRepository.findActiveById(session.getUserId()).orElse(null);
 
         if (user == null
@@ -98,6 +106,7 @@ public class AuthRefreshService {
                 .build();
     }
 
+    //revoke the session so it can be used anymore
     private void revokeSession(UserSession session, OffsetDateTime now, SessionRevocationReason reason) {
         session.setRevoked(true);
         session.setRevokedAt(now);

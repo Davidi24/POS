@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pos.pos.auth.dto.AuthenticationResponse;
@@ -13,6 +14,7 @@ import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.exception.auth.TooManyRequestsException;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
@@ -34,6 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,6 +47,7 @@ import static org.mockito.Mockito.when;
 class AuthRefreshServiceTest {
 
     private static final String INVALID_REFRESH_TOKEN_MESSAGE = "Invalid refresh token";
+    private static final String TOO_MANY_REQUESTS_MESSAGE = "Too many refresh attempts. Try again later.";
 
     @Mock
     private UserSessionRepository userSessionRepository;
@@ -131,8 +136,50 @@ class AuthRefreshServiceTest {
             assertThat(savedSession.getRevokedAt()).isNull();
             assertThat(savedSession.getRevokedReason()).isNull();
 
+            InOrder inOrder = inOrder(refreshRateLimiter, refreshTokenSecurityService, userSessionRepository);
+            inOrder.verify(refreshRateLimiter).check("127.0.0.1");
+            inOrder.verify(refreshTokenSecurityService).validate("token");
+            inOrder.verify(refreshRateLimiter).checkByTokenId(oldTokenId);
+            inOrder.verify(userSessionRepository).findByTokenIdAndRevokedFalseForUpdate(oldTokenId);
+
             verify(userSessionRepository).findByTokenIdAndRevokedFalseForUpdate(oldTokenId);
             verify(userRepository).findActiveById(userId);
+        }
+
+        @Test
+        @DisplayName("Should stop before token validation when the IP limiter blocks the request")
+        void shouldStopBeforeTokenValidation_whenIpLimiterBlocksRequest() {
+            doThrow(new TooManyRequestsException(TOO_MANY_REQUESTS_MESSAGE))
+                    .when(refreshRateLimiter).check("127.0.0.1");
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(TooManyRequestsException.class)
+                    .hasMessage(TOO_MANY_REQUESTS_MESSAGE);
+
+            verify(refreshTokenSecurityService, never()).validate(any());
+            verify(refreshRateLimiter, never()).checkByTokenId(any(UUID.class));
+            verify(userSessionRepository, never()).findByTokenIdAndRevokedFalseForUpdate(any(UUID.class));
+        }
+
+        @Test
+        @DisplayName("Should stop before session lookup when the token limiter blocks the request")
+        void shouldStopBeforeSessionLookup_whenTokenLimiterBlocksRequest() {
+            UUID tokenId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", tokenId, userId);
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            doThrow(new TooManyRequestsException(TOO_MANY_REQUESTS_MESSAGE))
+                    .when(refreshRateLimiter).checkByTokenId(tokenId);
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(TooManyRequestsException.class)
+                    .hasMessage(TOO_MANY_REQUESTS_MESSAGE);
+
+            verify(refreshRateLimiter).check("127.0.0.1");
+            verify(refreshTokenSecurityService).validate("token");
+            verify(userSessionRepository, never()).findByTokenIdAndRevokedFalseForUpdate(any(UUID.class));
         }
 
         @Test
@@ -152,6 +199,25 @@ class AuthRefreshServiceTest {
 
             verify(userRepository, never()).findActiveById(any(UUID.class));
             verify(userSessionRepository, never()).save(any(UserSession.class));
+        }
+
+        @Test
+        @DisplayName("Should pass null IP to the limiter when client info is missing")
+        void shouldPassNullIpToLimiter_whenClientInfoIsMissing() {
+            UUID tokenId = UUID.randomUUID();
+            UUID userId = UUID.randomUUID();
+            RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
+                    validatedRefreshToken("token", "old-hash", tokenId, userId);
+
+            when(refreshTokenSecurityService.validate("token")).thenReturn(validatedRefreshToken);
+            when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", null))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            verify(refreshRateLimiter).check(null);
+            verify(refreshRateLimiter).checkByTokenId(tokenId);
         }
 
         @Test
