@@ -13,6 +13,7 @@ import pos.pos.auth.repository.UserSessionRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
+//checked
 @Service
 @RequiredArgsConstructor
 public class SessionCleanupService {
