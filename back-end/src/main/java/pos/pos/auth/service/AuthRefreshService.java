@@ -46,6 +46,7 @@ public class AuthRefreshService {
         refreshRateLimiter.check(normalizedClientInfo != null ? normalizedClientInfo.ipAddress() : null);
         RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
                 refreshTokenSecurityService.validate(refreshToken);
+        refreshRateLimiter.checkByTokenId(validatedRefreshToken.tokenId());
 
         UserSession session = userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(validatedRefreshToken.tokenId())
                 .orElseThrow(() -> new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE));
