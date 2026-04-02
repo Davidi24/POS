@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.security.util.ClientInfo;
+import pos.pos.security.util.ClientInfoNormalizer;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -24,8 +25,9 @@ public class UserSessionMapper {
             ClientInfo clientInfo
     ) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        ClientInfo normalizedClientInfo = ClientInfoNormalizer.normalize(clientInfo);
 
-        String userAgent = normalizeUserAgent(clientInfo != null ? clientInfo.userAgent() : null);
+        String userAgent = normalizedClientInfo != null ? normalizedClientInfo.userAgent() : null;
         String finalDeviceName = extractDeviceName(userAgent);
 
         return UserSession.builder()
@@ -34,7 +36,7 @@ public class UserSessionMapper {
                 .sessionType(sessionType)
                 .deviceName(finalDeviceName)
                 .refreshTokenHash(refreshTokenHash)
-                .ipAddress(normalizeIp(clientInfo != null ? clientInfo.ipAddress() : null))
+                .ipAddress(normalizedClientInfo != null ? normalizedClientInfo.ipAddress() : null)
                 .userAgent(userAgent)
                 .lastUsedAt(now)
                 .expiresAt(now.plusSeconds(jwtProperties.getRefreshExpiration().getSeconds()))
@@ -55,19 +57,5 @@ public class UserSessionMapper {
         if (userAgent.contains("Linux")) return "Linux";
 
         return "Device";
-    }
-
-    private String normalizeUserAgent(String userAgent) {
-        if (userAgent == null || userAgent.isBlank()) {
-            return null;
-        }
-        return userAgent.trim();
-    }
-
-    private String normalizeIp(String ip) {
-        if (ip == null || ip.isBlank()) {
-            return null;
-        }
-        return ip.trim();
     }
 }
