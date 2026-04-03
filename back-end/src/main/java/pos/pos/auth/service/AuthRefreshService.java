@@ -14,6 +14,7 @@ import pos.pos.security.service.JwtService;
 import pos.pos.security.service.RefreshRateLimiter;
 import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
+import pos.pos.security.util.ClientInfoNormalizer;
 import pos.pos.user.entity.User;
 import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
@@ -43,7 +44,7 @@ public class AuthRefreshService {
     @Transactional
     public AuthenticationResponse refresh(String refreshToken, ClientInfo clientInfo) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        ClientInfo normalizedClientInfo = normalizeClientInfo(clientInfo);
+        ClientInfo normalizedClientInfo = ClientInfoNormalizer.normalize(clientInfo);
         refreshRateLimiter.check(normalizedClientInfo != null ? normalizedClientInfo.ipAddress() : null);
         RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
                 refreshTokenSecurityService.validate(refreshToken);
@@ -112,30 +113,5 @@ public class AuthRefreshService {
         session.setRevokedAt(now);
         session.setRevokedReason(reason.name());
         userSessionRepository.save(session);
-    }
-
-    private ClientInfo normalizeClientInfo(ClientInfo clientInfo) {
-        if (clientInfo == null) {
-            return null;
-        }
-
-        return new ClientInfo(
-                normalizeIpAddress(clientInfo.ipAddress()),
-                normalizeUserAgent(clientInfo.userAgent())
-        );
-    }
-
-    private String normalizeIpAddress(String ipAddress) {
-        if (ipAddress == null || ipAddress.isBlank()) {
-            return null;
-        }
-        return ipAddress.trim();
-    }
-
-    private String normalizeUserAgent(String userAgent) {
-        if (userAgent == null || userAgent.isBlank()) {
-            return null;
-        }
-        return userAgent.trim();
     }
 }
