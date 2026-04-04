@@ -6,9 +6,20 @@ import org.springframework.data.jpa.repository.Query;
 import pos.pos.auth.entity.AuthEmailVerificationToken;
 
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface AuthEmailVerificationTokenRepository extends JpaRepository<AuthEmailVerificationToken, UUID> {
+
+    Optional<AuthEmailVerificationToken> findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(
+            String tokenHash,
+            OffsetDateTime now
+    );
+
+    boolean existsByUserIdAndCreatedAtAfter(UUID userId, OffsetDateTime cutoff);
+
+    @Modifying
+    void deleteByUserId(UUID userId);
 
     @Modifying
     @Query("""
