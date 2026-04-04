@@ -4,6 +4,7 @@ public enum SessionRevocationReason {
     EXPIRED,
     LOGOUT,
     LOGOUT_ALL,
+    PASSWORD_RESET,
     REUSE_DETECTED,
     SESSION_LIMIT,
     TOKEN_USER_MISMATCH,
