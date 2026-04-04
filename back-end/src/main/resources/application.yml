@@ -16,6 +16,21 @@ spring:
     password: pos_pass
     driver-class-name: org.postgresql.Driver
 
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+          connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT_MS:5000}
+          timeout: ${MAIL_SMTP_TIMEOUT_MS:5000}
+          writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT_MS:5000}
+
   jpa:
     hibernate:
       ddl-auto: create
@@ -73,6 +88,21 @@ app:
       password: ${BOOTSTRAP_SUPER_ADMIN_PASSWORD:ChangeMe123!}
       first-name: ${BOOTSTRAP_SUPER_ADMIN_FIRST_NAME:Super}
       last-name: ${BOOTSTRAP_SUPER_ADMIN_LAST_NAME:Admin}
+
+  auth:
+    password-reset:
+      token-ttl: ${PASSWORD_RESET_TOKEN_TTL:30m}
+      request-cooldown: ${PASSWORD_RESET_REQUEST_COOLDOWN:2m}
+      token-pepper: ${PASSWORD_RESET_TOKEN_PEPPER:change-this-local-dev-password-reset-pepper}
+      reset-path: ${PASSWORD_RESET_FRONTEND_PATH:/reset-password}
+      subject: ${PASSWORD_RESET_EMAIL_SUBJECT:Reset your POS password}
+
+    email-verification:
+      token-ttl: ${EMAIL_VERIFICATION_TOKEN_TTL:24h}
+      request-cooldown: ${EMAIL_VERIFICATION_REQUEST_COOLDOWN:5m}
+      token-pepper: ${EMAIL_VERIFICATION_TOKEN_PEPPER:change-this-local-dev-email-verification-pepper}
+      verify-path: ${EMAIL_VERIFICATION_FRONTEND_PATH:/verify-email}
+      subject: ${EMAIL_VERIFICATION_EMAIL_SUBJECT:Verify your POS email}
 
   mail:
     from: ${MAIL_FROM:${spring.mail.username:no-reply@pos.local}}
