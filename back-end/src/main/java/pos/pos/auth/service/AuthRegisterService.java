@@ -1,12 +1,14 @@
 package pos.pos.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.EmailAlreadyExistsException;
 import pos.pos.exception.role.RoleNotFoundException;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.CreateUserRequest;
 import pos.pos.user.dto.UserResponse;
@@ -31,9 +33,13 @@ public class AuthRegisterService {
     private final UserRoleRepository userRoleRepository;
     private final PasswordService passwordService;
     private final UserMapper userMapper;
+    private final RoleHierarchyService roleHierarchyService;
 
     @Transactional
-    public UserResponse register(CreateUserRequest request, UUID createdByUserId) {
+    public UserResponse register(CreateUserRequest request, Authentication authentication) {
+        User caller = (User) authentication.getPrincipal();
+        UUID createdByUserId = caller.getId();
+
         String normalizedEmail = NormalizationUtils.normalizeLower(request.getEmail());
 
         if (userRepository.existsByEmailAndDeletedAtIsNull(normalizedEmail)) {
@@ -43,6 +49,8 @@ public class AuthRegisterService {
         Role role = roleRepository.findById(request.getRoleId())
                 .filter(Role::isActive)
                 .orElseThrow(RoleNotFoundException::new);
+
+        roleHierarchyService.assertCanAssignRole(createdByUserId, role);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 

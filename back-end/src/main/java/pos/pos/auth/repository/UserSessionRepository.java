@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import pos.pos.auth.entity.UserSession;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -67,4 +68,28 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
       AND s.expiresAt > :now
 """)
     void revokeAllActiveSessionsByUserId(UUID userId, OffsetDateTime now, String reason);
+
+    @Query("""
+        SELECT s FROM UserSession s
+        WHERE s.userId = :userId
+          AND s.revoked = false
+          AND s.expiresAt > :now
+        ORDER BY s.lastUsedAt DESC
+    """)
+    List<UserSession> findActiveSessionsByUserId(UUID userId, OffsetDateTime now);
+
+    Optional<UserSession> findByIdAndUserIdAndRevokedFalse(UUID id, UUID userId);
+
+    @Modifying
+    @Query("""
+        UPDATE UserSession s
+        SET s.revoked = true,
+            s.revokedAt = :now,
+            s.revokedReason = :reason
+        WHERE s.userId = :userId
+          AND s.id != :excludeSessionId
+          AND s.revoked = false
+          AND s.expiresAt > :now
+    """)
+    void revokeAllActiveSessionsByUserIdExcept(UUID userId, UUID excludeSessionId, OffsetDateTime now, String reason);
 }

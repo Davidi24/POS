@@ -12,6 +12,7 @@ import pos.pos.auth.entity.UserSession;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -266,6 +267,144 @@ class UserSessionRepositoryTest {
             assertThat(repository.findById(expired.getId())).get().extracting(UserSession::isRevoked).isEqualTo(false);
             assertThat(repository.findById(otherUser.getId())).get().extracting(UserSession::isRevoked).isEqualTo(false);
         }
+    }
+
+    @Nested
+    @DisplayName("findActiveSessionsByUserId")
+    class FindActiveSessionsByUserIdTests {
+
+        @Test
+        @DisplayName("Should return only active non-expired sessions ordered by lastUsedAt DESC")
+        void shouldReturnActiveSessionsOrderedByLastUsedAt() {
+            UUID userId = UUID.randomUUID();
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+            UserSession oldest = repository.save(sessionWithLastUsedAt(userId, UUID.randomUUID(), false, now.plusDays(7), now.minusDays(3)));
+            UserSession newest = repository.save(sessionWithLastUsedAt(userId, UUID.randomUUID(), false, now.plusDays(7), now.minusDays(1)));
+            repository.save(sessionWithLastUsedAt(userId, UUID.randomUUID(), true, now.plusDays(7), now.minusDays(2)));
+            repository.save(sessionWithLastUsedAt(userId, UUID.randomUUID(), false, now.minusDays(1), now.minusDays(2)));
+            repository.save(sessionWithLastUsedAt(UUID.randomUUID(), UUID.randomUUID(), false, now.plusDays(7), now.minusDays(1)));
+            repository.flush();
+            entityManager.clear();
+
+            List<UserSession> result = repository.findActiveSessionsByUserId(userId, now);
+
+            assertThat(result).hasSize(2);
+            assertThat(result.get(0).getId()).isEqualTo(newest.getId());
+            assertThat(result.get(1).getId()).isEqualTo(oldest.getId());
+        }
+
+        @Test
+        @DisplayName("Should return empty list when user has no active sessions")
+        void shouldReturnEmptyWhenNoActiveSessions() {
+            UUID userId = UUID.randomUUID();
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            repository.flush();
+
+            List<UserSession> result = repository.findActiveSessionsByUserId(userId, now);
+
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("findByIdAndUserIdAndRevokedFalse")
+    class FindByIdAndUserIdAndRevokedFalseTests {
+
+        @Test
+        @DisplayName("Should return session when id, userId match and not revoked")
+        void shouldReturnSessionWhenOwned() {
+            UUID userId = UUID.randomUUID();
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+            UserSession session = repository.save(session(userId, UUID.randomUUID(), false, null, now.plusDays(7), now.minusDays(1)));
+            repository.flush();
+            entityManager.clear();
+
+            Optional<UserSession> result = repository.findByIdAndUserIdAndRevokedFalse(session.getId(), userId);
+
+            assertThat(result).isPresent();
+            assertThat(result.get().getId()).isEqualTo(session.getId());
+        }
+
+        @Test
+        @DisplayName("Should return empty when session belongs to different user")
+        void shouldReturnEmptyForWrongUser() {
+            UUID userId = UUID.randomUUID();
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+            UserSession session = repository.save(session(UUID.randomUUID(), UUID.randomUUID(), false, null, now.plusDays(7), now.minusDays(1)));
+            repository.flush();
+            entityManager.clear();
+
+            Optional<UserSession> result = repository.findByIdAndUserIdAndRevokedFalse(session.getId(), userId);
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should return empty when session is revoked")
+        void shouldReturnEmptyWhenRevoked() {
+            UUID userId = UUID.randomUUID();
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+            UserSession session = repository.save(session(userId, UUID.randomUUID(), true, now.minusHours(1), now.plusDays(7), now.minusDays(1)));
+            repository.flush();
+            entityManager.clear();
+
+            Optional<UserSession> result = repository.findByIdAndUserIdAndRevokedFalse(session.getId(), userId);
+
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("revokeAllActiveSessionsByUserIdExcept")
+    class RevokeAllActiveSessionsByUserIdExceptTests {
+
+        @Test
+        @DisplayName("Should revoke all active sessions except the excluded one")
+        void shouldRevokeAllExceptExcluded() {
+            UUID userId = UUID.randomUUID();
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+            UserSession current = repository.save(session(userId, UUID.randomUUID(), false, null, now.plusDays(7), now.minusDays(1)));
+            UserSession other1 = repository.save(session(userId, UUID.randomUUID(), false, null, now.plusDays(7), now.minusDays(2)));
+            UserSession other2 = repository.save(session(userId, UUID.randomUUID(), false, null, now.plusDays(7), now.minusDays(3)));
+            UserSession expired = repository.save(session(userId, UUID.randomUUID(), false, null, now.minusDays(1), now.minusDays(4)));
+            UserSession otherUser = repository.save(session(UUID.randomUUID(), UUID.randomUUID(), false, null, now.plusDays(7), now.minusDays(1)));
+            repository.flush();
+
+            repository.revokeAllActiveSessionsByUserIdExcept(userId, current.getId(), now, "SESSION_REVOKED");
+            entityManager.flush();
+            entityManager.clear();
+
+            assertThat(repository.findById(current.getId())).get().extracting(UserSession::isRevoked).isEqualTo(false);
+            assertThat(repository.findById(other1.getId())).get().extracting(UserSession::isRevoked).isEqualTo(true);
+            assertThat(repository.findById(other1.getId())).get().extracting(UserSession::getRevokedReason).isEqualTo("SESSION_REVOKED");
+            assertThat(repository.findById(other2.getId())).get().extracting(UserSession::isRevoked).isEqualTo(true);
+            assertThat(repository.findById(expired.getId())).get().extracting(UserSession::isRevoked).isEqualTo(false);
+            assertThat(repository.findById(otherUser.getId())).get().extracting(UserSession::isRevoked).isEqualTo(false);
+        }
+    }
+
+    private UserSession sessionWithLastUsedAt(UUID userId, UUID tokenId, boolean revoked, OffsetDateTime expiresAt, OffsetDateTime lastUsedAt) {
+        return UserSession.builder()
+                .id(UUID.randomUUID())
+                .userId(userId)
+                .tokenId(tokenId)
+                .sessionType("PASSWORD")
+                .deviceName("Device")
+                .refreshTokenHash("hash-" + tokenId)
+                .ipAddress("127.0.0.1")
+                .userAgent("JUnit")
+                .lastUsedAt(lastUsedAt)
+                .expiresAt(expiresAt)
+                .revoked(revoked)
+                .revokedAt(revoked ? lastUsedAt : null)
+                .revokedReason(revoked ? "REVOKED" : null)
+                .createdAt(lastUsedAt)
+                .build();
     }
 
     private UserSession session(

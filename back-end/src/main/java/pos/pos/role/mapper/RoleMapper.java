@@ -10,8 +10,14 @@ public class RoleMapper {
 
         return RoleResponse.builder()
                 .id(role.getId())
+                .code(role.getCode())
                 .name(role.getName())
                 .description(role.getDescription())
+                .rank(role.getRank())
+                .isSystem(role.isSystem())
+                .isActive(role.isActive())
+                .isAssignable(role.isAssignable())
+                .isProtected(role.isProtectedRole())
                 .build();
     }
 

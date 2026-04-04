@@ -2,6 +2,7 @@ package pos.pos.role.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Check;
 import pos.pos.utils.AuditedEntityLifecycle;
 import pos.pos.utils.EntityLifecycleUtils;
 import pos.pos.utils.NormalizationUtils;
@@ -15,8 +16,13 @@ import java.util.UUID;
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_roles_code", columnNames = "code"),
                 @UniqueConstraint(name = "uk_roles_name", columnNames = "name")
+        },
+        indexes = {
+                @Index(name = "idx_roles_rank", columnList = "rank"),
+                @Index(name = "idx_roles_active_rank", columnList = "is_active, rank")
         }
 )
+@Check(constraints = "rank > 0")
 @Getter
 @Setter
 @Builder(toBuilder = true)
@@ -40,12 +46,24 @@ public class Role implements AuditedEntityLifecycle {
     private String description;
 
     @Builder.Default
+    @Column(name = "rank", nullable = false)
+    private long rank = 10_000L;
+
+    @Builder.Default
     @Column(name = "is_system", nullable = false)
     private boolean isSystem = false;
 
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
+
+    @Builder.Default
+    @Column(name = "is_assignable", nullable = false)
+    private boolean assignable = true;
+
+    @Builder.Default
+    @Column(name = "is_protected", nullable = false)
+    private boolean protectedRole = false;
 
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamptz")
     private OffsetDateTime createdAt;

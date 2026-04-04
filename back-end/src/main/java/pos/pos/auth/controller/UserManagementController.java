@@ -13,8 +13,6 @@ import org.springframework.web.bind.annotation.RestController;
 import pos.pos.auth.service.AuthRegisterService;
 import pos.pos.user.dto.CreateUserRequest;
 import pos.pos.user.dto.UserResponse;
-import pos.pos.user.entity.User;
-
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -28,8 +26,7 @@ public class UserManagementController {
             @Valid @RequestBody CreateUserRequest request,
             Authentication authentication
     ) {
-        User caller = (User) authentication.getPrincipal();
-        UserResponse response = authRegisterService.register(request, caller.getId());
+        UserResponse response = authRegisterService.register(request, authentication);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
