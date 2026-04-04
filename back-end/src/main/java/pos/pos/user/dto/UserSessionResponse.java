@@ -13,10 +13,13 @@ public class UserSessionResponse {
 
     private UUID id;
     private UUID userId;
+    private String sessionType;
+    private String deviceName;
     private String ipAddress;
     private String userAgent;
     private OffsetDateTime lastUsedAt;
     private OffsetDateTime expiresAt;
-    private Boolean revoked;
+    private OffsetDateTime createdAt;
+    private boolean current;
 
 }

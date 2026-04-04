@@ -6,6 +6,7 @@ import pos.pos.security.config.JwtProperties;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoNormalizer;
+import pos.pos.user.dto.UserSessionResponse;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -42,6 +43,21 @@ public class UserSessionMapper {
                 .expiresAt(now.plusSeconds(jwtProperties.getRefreshExpiration().getSeconds()))
                 .createdAt(now)
                 .revoked(false)
+                .build();
+    }
+
+    public UserSessionResponse toSessionResponse(UserSession session, boolean isCurrent) {
+        return UserSessionResponse.builder()
+                .id(session.getId())
+                .userId(session.getUserId())
+                .sessionType(session.getSessionType())
+                .deviceName(session.getDeviceName())
+                .ipAddress(session.getIpAddress())
+                .userAgent(session.getUserAgent())
+                .lastUsedAt(session.getLastUsedAt())
+                .expiresAt(session.getExpiresAt())
+                .createdAt(session.getCreatedAt())
+                .current(isCurrent)
                 .build();
     }
 

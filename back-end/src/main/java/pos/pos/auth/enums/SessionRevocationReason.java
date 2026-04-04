@@ -7,5 +7,6 @@ public enum SessionRevocationReason {
     REUSE_DETECTED,
     SESSION_LIMIT,
     TOKEN_USER_MISMATCH,
-    USER_NOT_ALLOWED
+    USER_NOT_ALLOWED,
+    SESSION_REVOKED
 }
