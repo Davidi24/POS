@@ -120,15 +120,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .map(UserRole::getRoleId)
                 .toList();
 
-        List<SimpleGrantedAuthority> roleAuthorities = roleRepository.findByIdIn(roleIds)
+        List<Role> activeRoles = roleRepository.findByIdIn(roleIds)
                 .stream()
                 .filter(Role::isActive)
+                .toList();
+
+        List<UUID> activeRoleIds = activeRoles.stream()
+                .map(Role::getId)
+                .toList();
+
+        List<SimpleGrantedAuthority> roleAuthorities = activeRoles.stream()
                 .map(Role::getCode)
                 .map(code -> new SimpleGrantedAuthority("ROLE_" + code))
                 .toList();
 
-        List<SimpleGrantedAuthority> permissionAuthorities = permissionRepository
-                .findCodesByRoleIds(roleIds)
+        List<SimpleGrantedAuthority> permissionAuthorities = activeRoleIds.isEmpty()
+                ? List.of()
+                : permissionRepository.findCodesByRoleIds(activeRoleIds)
                 .stream()
                 .map(SimpleGrantedAuthority::new)
                 .toList();

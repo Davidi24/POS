@@ -74,11 +74,18 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
                                         .code(appRole.name())
                                         .name(appRole.displayName())
                                         .description(appRole.description())
-                                        .isSystem(true)
-                                        .isActive(true)
                                         .build()
                         );
                     });
+
+            role.setName(appRole.displayName());
+            role.setDescription(appRole.description());
+            role.setRank(appRole.rank());
+            role.setSystem(true);
+            role.setActive(true);
+            role.setAssignable(appRole.assignable());
+            role.setProtectedRole(appRole.protectedRole());
+            roleRepository.save(role);
 
             assignPermissionsToRole(role, appRole.permissions());
         }

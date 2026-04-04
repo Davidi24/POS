@@ -1,5 +1,8 @@
 package pos.pos.security.rbac;
 
+// resource + action = permission
+// Example: a waiter can act on the "orders" resource with actions like ORDERS_CREATE or ORDERS_UPDATE
+// Each role is assigned a set of these permissions
 public enum AppPermission {
 
     USERS_CREATE("users", "create", "Create Users", "Create new user accounts"),
@@ -8,6 +11,8 @@ public enum AppPermission {
     USERS_DELETE("users", "delete", "Delete Users", "Delete user accounts"),
 
     ROLES_READ("roles", "read", "View Roles", "View available roles"),
+
+    SESSIONS_MANAGE("sessions", "manage", "Manage Sessions", "View and revoke sessions for any user"),
 
     SALES_CREATE("sales", "create", "Create Sales", "Create sales transactions"),
     SALES_READ("sales", "read", "View Sales", "View sales transactions"),
