@@ -1,3 +1,7 @@
 security:
   jwt:
     secret: local-dev-secret-key-for-hs256-minimum-32b
+
+app:
+  mail:
+    from: no-reply@pos.local

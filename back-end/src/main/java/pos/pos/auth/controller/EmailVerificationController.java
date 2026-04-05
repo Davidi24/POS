@@ -1,6 +1,7 @@
 package pos.pos.auth.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import pos.pos.auth.dto.ResendVerificationRequest;
 import pos.pos.auth.dto.VerifyEmailRequest;
 import pos.pos.auth.service.EmailVerificationService;
 
+@Tag(name = "Authentication / Email Verification")
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
