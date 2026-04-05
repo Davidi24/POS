@@ -1,6 +1,7 @@
 package pos.pos.auth.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +18,7 @@ import pos.pos.user.entity.User;
 import java.util.List;
 import java.util.UUID;
 
+@Tag(name = "Authentication / Sessions")
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor

@@ -1,5 +1,6 @@
 package pos.pos.auth.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoExtractor;
 
+@Tag(name = "Authentication / Device")
 @RestController
 @RequestMapping("/auth/device")
 @RequiredArgsConstructor

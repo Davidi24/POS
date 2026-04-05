@@ -1,5 +1,6 @@
 package pos.pos.auth.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoExtractor;
 import pos.pos.security.util.CookieService;
 
+@Tag(name = "Authentication / Web")
 @RestController
 @RequestMapping("/auth/web")
 @RequiredArgsConstructor

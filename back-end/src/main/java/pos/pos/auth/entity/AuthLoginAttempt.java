@@ -11,15 +11,15 @@ import java.util.UUID;
 
 /**
  * ENTITY PURPOSE:
- *
+ * <p>
  * This entity records every login attempt made to the system.
- *
+ * <p>
  * It is used for:
  * - Security monitoring (detect brute-force attacks, suspicious activity)
  * - Account protection (tracking failed attempts and lock conditions)
  * - Auditing (who attempted to log in, from where, and when)
  * - Debugging authentication issues
- *
+ * <p>
  * WHAT IS STORED:
  * - userId: the user (if exists), otherwise null
  * - email: the email entered during login
@@ -28,12 +28,12 @@ import java.util.UUID;
  * - success: whether login was successful
  * - failureReason: reason for failure (if any)
  * - attemptedAt: timestamp of the attempt (UTC)
- *
+ * <p>
  * NOTES:
  * - Email is stored even if the user does not exist (important for security tracking)
  * - IP and User-Agent come from ClientInfo (proxy-aware extraction)
  * - This entity should NEVER be exposed directly via API
- *
+ * <p>
  * PRODUCTION IMPORTANCE:
  * This is a critical security component for tracking authentication behavior
  * and detecting potential attacks or misuse of the system.
