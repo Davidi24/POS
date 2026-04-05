@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.dto.ChangePasswordRequest;
+import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
@@ -20,28 +21,28 @@ import java.util.UUID;
 public class ChangePasswordService {
 
     private final UserRepository userRepository;
-    private final UserSessionRepository userSessionRepository;
     private final PasswordService passwordService;
+    private final UserSessionRepository userSessionRepository;
 
     @Transactional
-    public void changePassword(User user, UUID tokenId, ChangePasswordRequest request) {
+    public void changePassword(User user, UUID currentTokenId, ChangePasswordRequest request) {
         if (!passwordService.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-            throw new InvalidCredentialsException();
+            throw new InvalidCredentialsException("Current password is incorrect");
         }
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-
         user.setPasswordHash(passwordService.hash(request.getNewPassword()));
         user.setPasswordUpdatedAt(now);
         userRepository.save(user);
 
-        userSessionRepository.findByTokenIdAndRevokedFalse(tokenId).ifPresent(currentSession ->
-                userSessionRepository.revokeAllActiveSessionsByUserIdExcept(
-                        user.getId(),
-                        currentSession.getId(),
-                        now,
-                        SessionRevocationReason.PASSWORD_RESET.name()
-                )
-        );
+        String reason = SessionRevocationReason.PASSWORD_CHANGED.name();
+        userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId)
+                .map(UserSession::getId)
+                .ifPresentOrElse(
+                        currentSessionId -> userSessionRepository.revokeAllActiveSessionsByUserIdExcept(
+                                user.getId(), currentSessionId, now, reason),
+                        () -> userSessionRepository.revokeAllActiveSessionsByUserId(
+                                user.getId(), now, reason)
+                );
     }
 }

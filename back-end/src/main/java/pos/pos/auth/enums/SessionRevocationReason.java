@@ -10,4 +10,5 @@ public enum SessionRevocationReason {
     TOKEN_USER_MISMATCH,
     USER_NOT_ALLOWED,
     SESSION_REVOKED,
+    PASSWORD_CHANGED
 }
