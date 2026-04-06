@@ -50,6 +50,10 @@ import java.util.regex.Pattern;
  *   - Support multi-proxy chain validation
  *   - Optional integration with ForwardedHeaderFilter (RFC 7239)
  */
+
+// checked
+// tested
+
 @Component
 public class ClientInfoExtractor {
 

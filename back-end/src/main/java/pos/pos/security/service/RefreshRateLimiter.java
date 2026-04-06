@@ -59,6 +59,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>
  * The same logic applies for tokenID
  */
+// checked
+// tested
 @Component
 public class RefreshRateLimiter {
 
