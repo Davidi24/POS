@@ -8,6 +8,8 @@ import pos.pos.auth.entity.AuthLoginAttempt;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+// checked
+// tested
 public interface AuthLoginAttemptRepository extends JpaRepository<AuthLoginAttempt, UUID> {
     long countByIpAddressAndAttemptedAtAfter(String ipAddress, OffsetDateTime after);
 
