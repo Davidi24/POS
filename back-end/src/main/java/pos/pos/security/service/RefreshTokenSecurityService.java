@@ -1,5 +1,6 @@
 package pos.pos.security.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -22,18 +23,38 @@ public class RefreshTokenSecurityService {
     @Value("${app.security.refresh-token.pepper}")
     private String refreshTokenPepper;
 
+    @PostConstruct
+    void validateConfiguration() {
+        if (refreshTokenPepper == null || refreshTokenPepper.isBlank()) {
+            throw new IllegalStateException("app.security.refresh-token.pepper must not be blank");
+        }
+        if (refreshTokenPepper.length() < 32) {
+            throw new IllegalStateException("app.security.refresh-token.pepper must be at least 32 characters");
+        }
+    }
+
     public ValidatedRefreshToken validate(String refreshToken) {
         String normalizedRefreshToken = normalize(refreshToken);
 
-        if (!jwtService.isValid(normalizedRefreshToken) || !jwtService.isRefreshToken(normalizedRefreshToken)) {
+        if (!jwtService.isRefreshToken(normalizedRefreshToken)) {
+            throw invalidRefreshToken();
+        }
+
+        UUID tokenId;
+        UUID userId;
+
+        try {
+            tokenId = jwtService.extractTokenId(normalizedRefreshToken);
+            userId = jwtService.extractUserId(normalizedRefreshToken);
+        } catch (RuntimeException ex) {
             throw invalidRefreshToken();
         }
 
         return new ValidatedRefreshToken(
                 normalizedRefreshToken,
                 hashNormalized(normalizedRefreshToken),
-                jwtService.extractTokenId(normalizedRefreshToken),
-                jwtService.extractUserId(normalizedRefreshToken)
+                tokenId,
+                userId
         );
     }
 
