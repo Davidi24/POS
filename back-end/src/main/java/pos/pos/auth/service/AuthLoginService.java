@@ -32,7 +32,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
-//checked
+// checked
+// tested
 @Service
 @RequiredArgsConstructor
 public class AuthLoginService {
@@ -306,9 +307,6 @@ public class AuthLoginService {
             throw new InvalidCredentialsException(TOO_MANY_ATTEMPTS_MESSAGE);
         }
     }
-
-
-
 
     private String normalizeEmail(String email) {
         return NormalizationUtils.normalizeLower(email);

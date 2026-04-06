@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+// checked
+// tested
 @Service
 @RequiredArgsConstructor
 public class PasswordService {

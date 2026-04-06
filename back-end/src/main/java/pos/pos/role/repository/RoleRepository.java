@@ -39,15 +39,6 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
     List<String> findActiveRoleCodesByUserId(UUID userId);
 
     @Query("""
-    SELECT r
-    FROM UserRole ur
-    JOIN Role r ON ur.roleId = r.id
-    WHERE ur.userId = :userId
-      AND r.isActive = true
-""")
-    List<Role> findActiveRolesByUserId(UUID userId);
-
-    @Query("""
     SELECT COALESCE(MAX(r.rank), 0)
     FROM UserRole ur
     JOIN Role r ON ur.roleId = r.id

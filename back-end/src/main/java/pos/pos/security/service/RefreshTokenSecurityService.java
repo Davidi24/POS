@@ -12,6 +12,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.UUID;
 
+// tested
+// checked
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenSecurityService {
