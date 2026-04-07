@@ -8,56 +8,12 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * This class implements a rate limiter using an in-memory data structure.
- * <p>
- * - ConcurrentHashMap:
- *   This is a thread-safe HashMap that can be accessed by multiple threads at the same time.
- *   It acts like a small database in RAM (not stored in a real database, so everything is temporary).
- *   It stores: IP → timestamps of requests for all users.
- * <p>
- * - computeIfAbsent:
- *   This checks if the IP (key) already exists in the map.
- *   If it exists → it returns the existing value.
- *   If it does not exist → it creates a new ArrayDeque and stores it.
- * <p>
- * - ArrayDeque:
- *   A queue where we can add/remove elements from both the beginning and the end.
- *   Here it stores timestamps of requests for a specific IP (computeIfAbsent) so it takes the timestamps
- *   of your ip in all users ip.
- * <p>
- * - Instant:
- *   Represents a timestamp (the exact time a request was made).
- * <p>
- * Flow:
- * <p>
- * 1. For a given IP, we get all its timestamps from the map and store them in "timestamps".
- * <p>
- * 2. synchronized(timestamps):
- *   This ensures that if multiple requests come from the SAME IP at the same time,
- *   only one thread can modify the timestamps at once.
- * <p>
- *   Without this, a race condition can happen:
- *   Example:
- *   - User 1 (IP 123) modifies timestamps
- *   - User 2 (IP 123) modifies timestamps at the same time
- *   → This can lead to incorrect data or corruption because both changes overlap.
- * <p>
- * 3. Old timestamps (outside the time window) are removed.
- * <p>
- * 4. The current timestamp is added.
- * <p>
- * 5. If the number of timestamps is greater than the allowed limit (e.g. 20),
- *    an error is thrown.
- * <p>
- * Important:
- * - This works per IP (not per user)
- * - Multiple users with the same IP share the same limit
- * - All data is stored only in memory (RAM), not in a database
- *
- * <p>
- * The same logic applies for tokenID
+ * In-memory sliding-window limiter for refresh requests, keyed by client IP and refresh token ID.
+ * Expired buckets are periodically pruned so state stays bounded even when a key is never used again.
+ * works only for single node
  */
 // checked
 // tested
@@ -65,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RefreshRateLimiter {
 
     private static final String TOO_MANY_REQUESTS_MESSAGE = "Too many refresh attempts. Try again later.";
+    private static final long SECONDS_PER_MINUTE = 60L;
 
     @Value("${app.security.refresh-token.rate-limit.max-attempts-per-ip:20}")
     private int maxAttemptsPerIp;
@@ -77,32 +34,100 @@ public class RefreshRateLimiter {
 
     private final ConcurrentHashMap<String, ArrayDeque<Instant>> ipWindow = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ArrayDeque<Instant>> tokenWindow = new ConcurrentHashMap<>();
+    // AtomicLong is a thread-safe long value that supports atomic operations (no race conditions).
+    // It behaves like a long, but: multiple threads can read/write safely, no need for synchronized
+    // saved in RAM
+    private final AtomicLong lastCleanupEpochSecond = new AtomicLong(0);
 
     public void check(String ip) {
+        Instant now = Instant.now();
+        cleanupExpiredBucketsIfNeeded(now);
         if (ip == null) {
             return;
         }
-        checkBucket(ip, ipWindow, maxAttemptsPerIp);
+        checkBucket(ip, ipWindow, maxAttemptsPerIp, now);
     }
 
     public void checkByTokenId(UUID tokenId) {
-        checkBucket(tokenId.toString(), tokenWindow, maxAttemptsPerToken);
+        Instant now = Instant.now();
+        cleanupExpiredBucketsIfNeeded(now);
+        checkBucket(tokenId.toString(), tokenWindow, maxAttemptsPerToken, now);
     }
 
-    private void checkBucket(String key, ConcurrentHashMap<String, ArrayDeque<Instant>> window, int maxAttempts) {
-        Instant now = Instant.now();
-        Instant windowStart = now.minusSeconds(windowMinutes * 60);
+    // For a given key (IP or token), this updates its request history (bucket) atomically.
+    // It gets or creates the deque of timestamps, removes expired ones (outside the window),
+    // checks if the remaining requests exceed the limit → throws exception if so,
+    // otherwise adds the current request time and stores the updated bucket back.
+    private void checkBucket(
+            String key,
+            ConcurrentHashMap<String, ArrayDeque<Instant>> window,
+            int maxAttempts,
+            Instant now
+    ) {
+        Instant windowStart = now.minusSeconds(windowSizeSeconds());
 
-        ArrayDeque<Instant> timestamps = window.computeIfAbsent(key, k -> new ArrayDeque<>());
-
-        synchronized (timestamps) {
-            while (!timestamps.isEmpty() && timestamps.peekFirst().isBefore(windowStart)) {
-                timestamps.pollFirst();
-            }
-            timestamps.addLast(now);
-            if (timestamps.size() > maxAttempts) {
+        window.compute(key, (ignored, timestamps) -> {
+            ArrayDeque<Instant> bucket = timestamps != null ? timestamps : new ArrayDeque<>();
+            pruneExpired(bucket, windowStart);
+            if (bucket.size() >= maxAttempts) {
                 throw new TooManyRequestsException(TOO_MANY_REQUESTS_MESSAGE);
             }
+            bucket.addLast(now);
+            return bucket;
+        });
+    }
+
+    private void cleanupExpiredBucketsIfNeeded(Instant now) {
+        long cleanupIntervalSeconds = windowSizeSeconds();
+        long nowEpochSecond = now.getEpochSecond();
+        long lastCleanup = lastCleanupEpochSecond.get();
+        // Has enough time passed since the last cleanup?
+        if (nowEpochSecond - lastCleanup < cleanupIntervalSeconds) {
+            return;
         }
+        // This method is called on every request, so multiple threads can reach this point at the same time.
+        // We use compareAndSet to ensure that only one thread performs the cleanup.
+        // If another thread has already updated the value (meaning it already did the cleanup),
+        // this thread skips and continues without doing it again.
+        if (!lastCleanupEpochSecond.compareAndSet(lastCleanup, nowEpochSecond)) {
+            return;
+        }
+        cleanupWindow(ipWindow, now);
+        cleanupWindow(tokenWindow, now);
+    }
+
+    // Iterates over all keys (e.g., IPs) in the in-memory map.
+    // For each key, it updates its deque of timestamps using computeIfPresent()
+    // (so only existing entries are processed, thread-safe).
+    // It calculates the window start and removes all timestamps older than that window.
+    // If after cleanup the deque is empty, it returns null → which removes the key from the map.
+    // Otherwise, it keeps the cleaned deque.
+    // for all ip or tokens
+    private void cleanupWindow(ConcurrentHashMap<String, ArrayDeque<Instant>> window, Instant now) {
+        Instant windowStart = now.minusSeconds(windowSizeSeconds());
+        for (String key : window.keySet()) {
+            window.computeIfPresent(key, (ignored, timestamps) -> {
+                pruneExpired(timestamps, windowStart);
+                return timestamps.isEmpty() ? null : timestamps;
+            });
+        }
+    }
+
+
+    // Goes through the deque from the oldest elements (front) to the newest.
+    // It checks each timestamp, and if it is before the window start,
+    // it removes it from the deque.
+    // We use pollFirst() instead of removeFirst() to avoid exceptions
+    // in case the deque becomes empty.
+    private void pruneExpired(ArrayDeque<Instant> timestamps, Instant windowStart) {
+        while (!timestamps.isEmpty() && timestamps.peekFirst().isBefore(windowStart)) {
+            timestamps.pollFirst();
+        }
+    }
+
+    // Converts the configured window from minutes to seconds,
+    // ensuring the result is at least 1 second to avoid zero or negative values
+    private long windowSizeSeconds() {
+        return Math.max(1L, windowMinutes * SECONDS_PER_MINUTE);
     }
 }

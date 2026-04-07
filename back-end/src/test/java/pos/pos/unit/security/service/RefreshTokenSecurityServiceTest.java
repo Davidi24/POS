@@ -79,6 +79,16 @@ class RefreshTokenSecurityServiceTest {
         }
 
         @Test
+        @DisplayName("Should reject null tokens before calling JwtService")
+        void shouldRejectNullToken() {
+            assertThatThrownBy(() -> refreshTokenSecurityService.validate(null))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            verifyNoInteractions(jwtService);
+        }
+
+        @Test
         @DisplayName("Should reject tokens that are not refresh tokens")
         void shouldRejectNonRefreshToken() {
             when(jwtService.isRefreshToken("access-token")).thenReturn(false);
@@ -112,6 +122,14 @@ class RefreshTokenSecurityServiceTest {
             assertThat(refreshTokenSecurityService.hash("  refresh-token  "))
                     .isEqualTo(expectedHash("refresh-token"))
                     .isEqualTo(refreshTokenSecurityService.hash("refresh-token"));
+        }
+
+        @Test
+        @DisplayName("Should reject null tokens when hashing")
+        void shouldRejectNullToken_whenHashing() {
+            assertThatThrownBy(() -> refreshTokenSecurityService.hash(null))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
         }
     }
 
