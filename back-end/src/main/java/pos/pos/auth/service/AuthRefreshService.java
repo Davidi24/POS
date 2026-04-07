@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 // checked
+// tested
 @Service
 @RequiredArgsConstructor
 public class AuthRefreshService {
