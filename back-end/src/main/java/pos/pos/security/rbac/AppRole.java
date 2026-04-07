@@ -12,7 +12,6 @@ public enum AppRole {
     SUPER_ADMIN(
             "Super Admin",
             "Full system access",
-            100_000L,
             false,
             true,
             EnumSet.allOf(AppPermission.class)
@@ -21,54 +20,39 @@ public enum AppRole {
     ADMIN(
             "Admin",
             "Store administrator - manages staff, inventory, settings and reports",
-            70_000L,
             false,
             true,
             EnumSet.of(
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
                     ROLES_READ,
-                    SESSIONS_MANAGE,
-                    SALES_CREATE, SALES_READ, SALES_REFUND,
-                    INVENTORY_CREATE, INVENTORY_READ, INVENTORY_UPDATE, INVENTORY_DELETE,
-                    REPORTS_READ,
-                    SETTINGS_READ, SETTINGS_UPDATE,
-                    SHIFTS_CREATE, SHIFTS_READ, SHIFTS_CLOSE
+                    SESSIONS_MANAGE
             )
     ),
 
     MANAGER(
             "Manager",
             "Store manager - oversees operations, inventory and staff activity",
-            40_000L,
             true,
             false,
             EnumSet.of(
                     USERS_CREATE, USERS_READ, USERS_UPDATE,
                     ROLES_READ,
-                    SESSIONS_MANAGE,
-                    SALES_CREATE, SALES_READ, SALES_REFUND,
-                    INVENTORY_CREATE, INVENTORY_READ, INVENTORY_UPDATE, INVENTORY_DELETE,
-                    REPORTS_READ,
-                    SHIFTS_CREATE, SHIFTS_READ, SHIFTS_CLOSE
+                    SESSIONS_MANAGE
             )
     ),
 
     CASHIER(
             "Cashier",
             "POS operator - processes sales and manages own shifts",
-            10_000L,
             true,
             false,
-            EnumSet.of(
-                    SALES_CREATE, SALES_READ, SALES_REFUND,
-                    INVENTORY_READ,
-                    SHIFTS_CREATE, SHIFTS_READ, SHIFTS_CLOSE
-            )
+            EnumSet.noneOf(AppPermission.class)
     );
+
+    private static final long RANK_STEP = 10_000L;
 
     private final String displayName;
     private final String description;
-    private final long rank;
     private final boolean assignable;
     private final boolean protectedRole;
     private final Set<AppPermission> permissions;
@@ -76,14 +60,12 @@ public enum AppRole {
     AppRole(
             String displayName,
             String description,
-            long rank,
             boolean assignable,
             boolean protectedRole,
             Set<AppPermission> permissions
     ) {
         this.displayName = displayName;
         this.description = description;
-        this.rank = rank;
         this.assignable = assignable;
         this.protectedRole = protectedRole;
         this.permissions = permissions;
@@ -91,7 +73,7 @@ public enum AppRole {
 
     public String displayName() { return displayName; }
     public String description() { return description; }
-    public long rank() { return rank; }
+    public long rank() { return (values().length - ordinal()) * RANK_STEP; }
     public boolean assignable() { return assignable; }
     public boolean protectedRole() { return protectedRole; }
     public Set<AppPermission> permissions() { return permissions; }

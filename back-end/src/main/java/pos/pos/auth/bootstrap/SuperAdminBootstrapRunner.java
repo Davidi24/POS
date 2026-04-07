@@ -56,8 +56,6 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
                                         .code(perm.name())
                                         .name(perm.displayName())
                                         .description(perm.description())
-                                        .resource(perm.resource())
-                                        .action(perm.action())
                                         .build()
                         );
                     });
