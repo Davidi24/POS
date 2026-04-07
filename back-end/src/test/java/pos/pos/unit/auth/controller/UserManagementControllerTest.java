@@ -142,6 +142,74 @@ class UserManagementControllerTest {
         }
 
         @Test
+        @DisplayName("Should return 400 when temporary password is missing")
+        void shouldReturn400WhenTemporaryPasswordIsMissing() throws Exception {
+            CreateUserRequest request = validRequest();
+            request.setTemporaryPassword(null);
+
+            mockMvc.perform(post("/auth/register")
+                            .principal(authentication)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value("temporaryPassword: Temporary password is required"));
+
+            verifyNoInteractions(authRegisterService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when first name is missing")
+        void shouldReturn400WhenFirstNameIsMissing() throws Exception {
+            CreateUserRequest request = validRequest();
+            request.setFirstName(null);
+
+            mockMvc.perform(post("/auth/register")
+                            .principal(authentication)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value("firstName: First name is required"));
+
+            verifyNoInteractions(authRegisterService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when last name is missing")
+        void shouldReturn400WhenLastNameIsMissing() throws Exception {
+            CreateUserRequest request = validRequest();
+            request.setLastName(null);
+
+            mockMvc.perform(post("/auth/register")
+                            .principal(authentication)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value("lastName: Last name is required"));
+
+            verifyNoInteractions(authRegisterService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when phone exceeds the maximum length")
+        void shouldReturn400WhenPhoneExceedsTheMaximumLength() throws Exception {
+            CreateUserRequest request = validRequest();
+            request.setPhone("1".repeat(31));
+
+            mockMvc.perform(post("/auth/register")
+                            .principal(authentication)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value("phone: Phone must be at most 30 characters"));
+
+            verifyNoInteractions(authRegisterService);
+        }
+
+        @Test
         @DisplayName("Should return 400 when request body is missing")
         void shouldReturn400WhenRequestBodyIsMissing() throws Exception {
             mockMvc.perform(post("/auth/register")
