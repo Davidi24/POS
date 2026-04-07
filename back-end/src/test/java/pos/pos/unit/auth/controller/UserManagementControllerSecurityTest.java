@@ -30,12 +30,17 @@ import pos.pos.auth.service.AuthRegisterService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;
 import pos.pos.user.dto.CreateUserRequest;
+import pos.pos.user.dto.UserResponse;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -49,6 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("UserManagementController security")
 class UserManagementControllerSecurityTest {
 
+    private static final UUID CREATED_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final UUID ROLE_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     @Autowired
@@ -59,6 +65,34 @@ class UserManagementControllerSecurityTest {
 
     @MockBean
     private AuthRegisterService authRegisterService;
+
+    @Test
+    @DisplayName("POST /auth/register should return 201 when authenticated with USERS_CREATE authority")
+    void shouldReturn201WhenAuthenticatedWithUsersCreateAuthority() throws Exception {
+        UserResponse response = UserResponse.builder()
+                .id(CREATED_USER_ID)
+                .email("cashier@pos.local")
+                .firstName("John")
+                .lastName("Doe")
+                .phone("+49-555-0100")
+                .isActive(true)
+                .roles(List.of("CASHIER"))
+                .build();
+
+        given(authRegisterService.register(any(CreateUserRequest.class), any())).willReturn(response);
+
+        mockMvc.perform(post("/auth/register")
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "USERS_CREATE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(CREATED_USER_ID.toString()))
+                .andExpect(jsonPath("$.email").value("cashier@pos.local"))
+                .andExpect(jsonPath("$.roles[0]").value("CASHIER"));
+
+        verify(authRegisterService).register(any(CreateUserRequest.class), any());
+    }
 
     @Test
     @DisplayName("POST /auth/register should return 401 when unauthenticated")

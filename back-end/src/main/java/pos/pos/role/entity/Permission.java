@@ -38,12 +38,6 @@ public class Permission {
     @Column(name = "description", columnDefinition = "text")
     private String description;
 
-    @Column(name = "resource", length = 100)
-    private String resource;
-
-    @Column(name = "action", length = 50)
-    private String action;
-
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamptz")
     private OffsetDateTime createdAt;
 
@@ -69,7 +63,5 @@ public class Permission {
         code = NormalizationUtils.normalizeUpper(code);
         name = NormalizationUtils.normalize(name);
         description = NormalizationUtils.normalize(description);
-        resource = NormalizationUtils.normalizeLower(resource);
-        action = NormalizationUtils.normalizeLower(action);
     }
 }

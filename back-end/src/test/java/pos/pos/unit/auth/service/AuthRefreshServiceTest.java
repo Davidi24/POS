@@ -184,6 +184,22 @@ class AuthRefreshServiceTest {
         }
 
         @Test
+        @DisplayName("Should stop before token rate limiting when refresh token validation fails")
+        void shouldStopBeforeTokenRateLimiting_whenRefreshTokenValidationFails() {
+            when(refreshTokenSecurityService.validate("token"))
+                    .thenThrow(new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE));
+
+            assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
+
+            verify(refreshRateLimiter).check("127.0.0.1");
+            verify(refreshRateLimiter, never()).checkByTokenId(any(UUID.class));
+            verify(userSessionRepository, never()).findByTokenIdAndRevokedFalseForUpdate(any(UUID.class));
+            verify(userSessionRepository, never()).save(any(UserSession.class));
+        }
+
+        @Test
         @DisplayName("Should throw when the session does not exist")
         void shouldThrow_whenSessionDoesNotExist() {
             UUID tokenId = UUID.randomUUID();
