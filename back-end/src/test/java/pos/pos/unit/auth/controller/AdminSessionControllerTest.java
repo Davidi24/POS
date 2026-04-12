@@ -16,8 +16,8 @@ import pos.pos.auth.controller.AdminSessionController;
 import pos.pos.auth.service.SessionService;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.exception.user.UserManagementNotAllowedException;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.user.dto.UserSessionResponse;
-import pos.pos.user.entity.User;
 
 import java.util.List;
 import java.util.UUID;
@@ -53,9 +53,10 @@ class AdminSessionControllerTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
 
-        User actor = User.builder()
+        AuthenticatedUser actor = AuthenticatedUser.builder()
                 .id(ACTOR_ID)
                 .email("admin@pos.local")
+                .active(true)
                 .build();
 
         authentication = new UsernamePasswordAuthenticationToken(actor, null, List.of());

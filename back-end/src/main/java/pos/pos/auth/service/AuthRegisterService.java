@@ -8,6 +8,7 @@ import pos.pos.exception.auth.EmailAlreadyExistsException;
 import pos.pos.exception.role.RoleNotFoundException;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.dto.CreateUserRequest;
@@ -37,8 +38,7 @@ public class AuthRegisterService {
 
     @Transactional
     public UserResponse register(CreateUserRequest request, Authentication authentication) {
-        User caller = (User) authentication.getPrincipal();
-        UUID createdByUserId = caller.getId();
+        UUID createdByUserId = currentUser(authentication).getId();
 
         String normalizedEmail = NormalizationUtils.normalizeLower(request.getEmail());
 
@@ -79,5 +79,9 @@ public class AuthRegisterService {
         userRoleRepository.save(userRole);
 
         return userMapper.toUserResponse(user, List.of(role.getCode()));
+    }
+
+    private AuthenticatedUser currentUser(Authentication authentication) {
+        return (AuthenticatedUser) authentication.getPrincipal();
     }
 }

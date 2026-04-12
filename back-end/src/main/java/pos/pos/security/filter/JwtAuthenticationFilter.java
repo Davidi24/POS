@@ -15,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.security.config.SecurityPaths;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.service.JwtService;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.PermissionRepository;
@@ -107,9 +108,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        User user = userRepository.findById(userId).orElse(null);
+        User user = userRepository.findActiveById(userId).orElse(null);
 
-        if (user == null || !user.isActive()) {
+        if (user == null) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -149,7 +150,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
-                        user,
+                        AuthenticatedUser.from(user),
                         null,
                         authorities
                 );

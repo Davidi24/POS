@@ -20,9 +20,9 @@ import pos.pos.auth.service.AuthRegisterService;
 import pos.pos.exception.auth.EmailAlreadyExistsException;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.exception.role.RoleAssignmentNotAllowedException;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.user.dto.CreateUserRequest;
 import pos.pos.user.dto.UserResponse;
-import pos.pos.user.entity.User;
 
 import java.util.List;
 import java.util.UUID;
@@ -65,9 +65,10 @@ class UserManagementControllerTest {
                 .setValidator(validator)
                 .build();
 
-        User actor = User.builder()
+        AuthenticatedUser actor = AuthenticatedUser.builder()
                 .id(ACTOR_ID)
                 .email("manager@pos.local")
+                .active(true)
                 .build();
 
         authentication = new UsernamePasswordAuthenticationToken(actor, null, List.of());

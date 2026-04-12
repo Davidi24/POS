@@ -15,7 +15,7 @@ import pos.pos.auth.controller.AuthProfileController;
 import pos.pos.auth.dto.MeResponse;
 import pos.pos.auth.service.AuthProfileService;
 import pos.pos.exception.handler.GlobalExceptionHandler;
-import pos.pos.user.entity.User;
+import pos.pos.security.principal.AuthenticatedUser;
 
 import java.util.List;
 import java.util.UUID;
@@ -47,9 +47,10 @@ class AuthProfileControllerTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
 
-        User user = User.builder()
+        AuthenticatedUser user = AuthenticatedUser.builder()
                 .id(USER_ID)
                 .email("manager@pos.local")
+                .active(true)
                 .build();
 
         authentication = new UsernamePasswordAuthenticationToken(user, null, List.of());

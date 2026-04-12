@@ -8,6 +8,7 @@ import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.exception.user.UserNotFoundException;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -25,7 +26,10 @@ public class ChangePasswordService {
     private final UserSessionRepository userSessionRepository;
 
     @Transactional
-    public void changePassword(User user, UUID currentTokenId, ChangePasswordRequest request) {
+    public void changePassword(UUID userId, UUID currentTokenId, ChangePasswordRequest request) {
+        User user = userRepository.findActiveById(userId)
+                .orElseThrow(UserNotFoundException::new);
+
         if (!passwordService.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new InvalidCredentialsException("Current password is incorrect");
         }
