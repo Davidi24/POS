@@ -5,8 +5,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import pos.pos.role.dto.RoleResponse;
 import pos.pos.role.mapper.RoleMapper;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.rbac.RoleHierarchyService;
-import pos.pos.user.entity.User;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,7 +26,7 @@ public class RoleCatalogService {
                 .toList();
     }
 
-    private User currentUser(Authentication authentication) {
-        return (User) authentication.getPrincipal();
+    private AuthenticatedUser currentUser(Authentication authentication) {
+        return (AuthenticatedUser) authentication.getPrincipal();
     }
 }

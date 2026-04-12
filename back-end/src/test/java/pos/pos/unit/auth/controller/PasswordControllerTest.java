@@ -24,8 +24,8 @@ import pos.pos.auth.service.PasswordResetService;
 import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.exception.auth.InvalidTokenException;
 import pos.pos.exception.handler.GlobalExceptionHandler;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.service.JwtService;
-import pos.pos.user.entity.User;
 
 import java.util.List;
 import java.util.UUID;
@@ -64,7 +64,7 @@ class PasswordControllerTest {
     private MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private Authentication authentication;
-    private User currentUser;
+    private AuthenticatedUser currentUser;
 
     @BeforeEach
     void setUp() {
@@ -76,10 +76,10 @@ class PasswordControllerTest {
                 .setValidator(validator)
                 .build();
 
-        currentUser = User.builder()
+        currentUser = AuthenticatedUser.builder()
                 .id(USER_ID)
                 .email("cashier@pos.local")
-                .passwordHash("hash")
+                .active(true)
                 .build();
 
         authentication = new UsernamePasswordAuthenticationToken(currentUser, null, List.of());
@@ -210,7 +210,7 @@ class PasswordControllerTest {
                     .andExpect(status().isNoContent());
 
             verify(jwtService).extractTokenId("jwt.token.here");
-            verify(changePasswordService).changePassword(eq(currentUser), eq(TOKEN_ID), any(ChangePasswordRequest.class));
+            verify(changePasswordService).changePassword(eq(USER_ID), eq(TOKEN_ID), any(ChangePasswordRequest.class));
         }
 
         @Test
@@ -258,7 +258,7 @@ class PasswordControllerTest {
 
             given(jwtService.extractTokenId("jwt.token.here")).willReturn(TOKEN_ID);
             willThrow(new InvalidCredentialsException("Current password is incorrect"))
-                    .given(changePasswordService).changePassword(eq(currentUser), eq(TOKEN_ID), any(ChangePasswordRequest.class));
+                    .given(changePasswordService).changePassword(eq(USER_ID), eq(TOKEN_ID), any(ChangePasswordRequest.class));
 
             mockMvc.perform(put("/auth/change-password")
                             .principal(authentication)

@@ -13,9 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.auth.service.SessionService;
 import pos.pos.exception.auth.InvalidTokenException;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.service.JwtService;
 import pos.pos.user.dto.UserSessionResponse;
-import pos.pos.user.entity.User;
 
 import java.util.List;
 import java.util.UUID;
@@ -70,8 +70,8 @@ public class SessionController {
         return ResponseEntity.noContent().build();
     }
 
-    private User currentUser(Authentication authentication) {
-        return (User) authentication.getPrincipal();
+    private AuthenticatedUser currentUser(Authentication authentication) {
+        return (AuthenticatedUser) authentication.getPrincipal();
     }
 
     private UUID extractTokenId(HttpServletRequest request) {

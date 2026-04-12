@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.auth.service.SessionService;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.user.dto.UserSessionResponse;
-import pos.pos.user.entity.User;
 
 import java.util.List;
 import java.util.UUID;
@@ -44,7 +44,7 @@ public class AdminSessionController {
         return ResponseEntity.noContent().build();
     }
 
-    private User currentUser(Authentication authentication) {
-        return (User) authentication.getPrincipal();
+    private AuthenticatedUser currentUser(Authentication authentication) {
+        return (AuthenticatedUser) authentication.getPrincipal();
     }
 }

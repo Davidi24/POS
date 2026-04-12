@@ -18,8 +18,8 @@ import pos.pos.auth.dto.ResetPasswordRequest;
 import pos.pos.auth.service.ChangePasswordService;
 import pos.pos.auth.service.PasswordResetService;
 import pos.pos.exception.auth.InvalidTokenException;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.service.JwtService;
-import pos.pos.user.entity.User;
 
 import java.util.UUID;
 
@@ -53,10 +53,13 @@ public class PasswordController {
             @Valid @RequestBody ChangePasswordRequest request,
             Authentication authentication,
             HttpServletRequest httpRequest) {
-        User user = (User) authentication.getPrincipal();
         UUID tokenId = extractTokenId(httpRequest);
-        changePasswordService.changePassword(user, tokenId, request);
+        changePasswordService.changePassword(currentUser(authentication).getId(), tokenId, request);
         return ResponseEntity.noContent().build();
+    }
+
+    private AuthenticatedUser currentUser(Authentication authentication) {
+        return (AuthenticatedUser) authentication.getPrincipal();
     }
 
     private UUID extractTokenId(HttpServletRequest request) {

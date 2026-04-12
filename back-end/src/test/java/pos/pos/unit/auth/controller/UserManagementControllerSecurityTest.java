@@ -29,6 +29,7 @@ import pos.pos.auth.controller.UserManagementController;
 import pos.pos.auth.service.AuthRegisterService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.user.dto.CreateUserRequest;
 import pos.pos.user.dto.UserResponse;
 
@@ -167,7 +168,15 @@ class UserManagementControllerSecurityTest {
                         .toList();
 
                 SecurityContextHolder.getContext().setAuthentication(
-                        new UsernamePasswordAuthenticationToken(user, null, authorities)
+                        new UsernamePasswordAuthenticationToken(
+                                AuthenticatedUser.builder()
+                                        .id(UUID.nameUUIDFromBytes(user.getBytes()))
+                                        .email(user)
+                                        .active(true)
+                                        .build(),
+                                null,
+                                authorities
+                        )
                 );
             }
 

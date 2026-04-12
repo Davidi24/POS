@@ -4,7 +4,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import pos.pos.auth.dto.MeResponse;
-import pos.pos.user.entity.User;
+import pos.pos.security.principal.AuthenticatedUser;
 
 import java.util.List;
 
@@ -12,7 +12,7 @@ import java.util.List;
 public class AuthProfileService {
 
     public MeResponse getMe(Authentication authentication) {
-        User user = (User) authentication.getPrincipal();
+        AuthenticatedUser user = currentUser(authentication);
 
         List<String> roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -35,5 +35,9 @@ public class AuthProfileService {
                 .roles(roles)
                 .permissions(permissions)
                 .build();
+    }
+
+    private AuthenticatedUser currentUser(Authentication authentication) {
+        return (AuthenticatedUser) authentication.getPrincipal();
     }
 }
