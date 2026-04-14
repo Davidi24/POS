@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.auth.service.SessionService;
-import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.user.dto.UserSessionResponse;
 
 import java.util.List;
@@ -33,18 +32,14 @@ public class AdminSessionController {
             @PathVariable UUID userId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(sessionService.getUserActiveSessions(currentUser(authentication).getId(), userId));
+        return ResponseEntity.ok(sessionService.getUserActiveSessions(authentication, userId));
     }
 
     @DeleteMapping("/{userId}/sessions")
     @PreAuthorize("hasAuthority('SESSIONS_MANAGE')")
     @Operation(summary = "Revoke all active sessions for a user")
     public ResponseEntity<Void> revokeAllUserSessions(@PathVariable UUID userId, Authentication authentication) {
-        sessionService.revokeAllUserSessions(currentUser(authentication).getId(), userId);
+        sessionService.revokeAllUserSessions(authentication, userId);
         return ResponseEntity.noContent().build();
-    }
-
-    private AuthenticatedUser currentUser(Authentication authentication) {
-        return (AuthenticatedUser) authentication.getPrincipal();
     }
 }

@@ -23,6 +23,9 @@ import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoExtractor;
 import pos.pos.security.util.CookieService;
 
+// checked
+// tested
+
 @Tag(name = "Authentication / Web")
 @RestController
 @RequestMapping("/auth/web")

@@ -20,6 +20,8 @@ import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoExtractor;
 
+// checked
+// tested
 @Tag(name = "Authentication / Device")
 @RestController
 @RequestMapping("/auth/device")

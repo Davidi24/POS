@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+// checked
+// tested
 public interface RoleRepository extends JpaRepository<Role, UUID> {
 
     List<Role> findByIdIn(List<UUID> ids);
@@ -16,8 +18,12 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
 
     List<Role> findByIsActiveTrue();
 
+    // Get all active roles, sorted from the highest power to lowest.
     List<Role> findByIsActiveTrueOrderByRankDescNameAsc();
 
+
+    // It returns all roles that a user (actor) is allowed to assign.
+    // All users that are below the rank that it takes as argument
     @Query("""
     SELECT r
     FROM Role r
@@ -38,6 +44,7 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
 """)
     List<String> findActiveRoleCodesByUserId(UUID userId);
 
+    // if a user has more than one role, find the highest role and give me the rank of it
     @Query("""
     SELECT COALESCE(MAX(r.rank), 0)
     FROM UserRole ur
@@ -47,6 +54,7 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
 """)
     long findHighestActiveRankByUserId(UUID userId);
 
+    // Does this user have at least one active protected role? If one of them is yes then return false. ”
     @Query("""
     SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END
     FROM UserRole ur

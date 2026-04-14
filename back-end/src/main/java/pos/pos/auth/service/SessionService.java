@@ -1,6 +1,7 @@
 package pos.pos.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.entity.UserSession;
@@ -74,9 +75,9 @@ public class SessionService {
         );
     }
 
-    public List<UserSessionResponse> getUserActiveSessions(UUID actorUserId, UUID userId) {
+    public List<UserSessionResponse> getUserActiveSessions(Authentication authentication, UUID userId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        roleHierarchyService.assertCanManageUser(actorUserId, userId);
+        roleHierarchyService.assertCanManageUser(authentication, userId);
 
         return userSessionRepository.findActiveSessionsByUserId(userId, now)
                 .stream()
@@ -85,9 +86,9 @@ public class SessionService {
     }
 
     @Transactional
-    public void revokeAllUserSessions(UUID actorUserId, UUID userId) {
+    public void revokeAllUserSessions(Authentication authentication, UUID userId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        roleHierarchyService.assertCanManageUser(actorUserId, userId);
+        roleHierarchyService.assertCanManageUser(authentication, userId);
 
         userSessionRepository.revokeAllActiveSessionsByUserId(
                 userId,

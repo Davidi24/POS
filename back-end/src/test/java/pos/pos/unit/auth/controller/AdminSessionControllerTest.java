@@ -22,6 +22,7 @@ import pos.pos.user.dto.UserSessionResponse;
 import java.util.List;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
@@ -76,7 +77,7 @@ class AdminSessionControllerTest {
                     .current(false)
                     .build();
 
-            given(sessionService.getUserActiveSessions(ACTOR_ID, TARGET_USER_ID)).willReturn(List.of(session));
+            given(sessionService.getUserActiveSessions(eq(authentication), eq(TARGET_USER_ID))).willReturn(List.of(session));
 
             mockMvc.perform(get("/users/{userId}/sessions", TARGET_USER_ID)
                             .principal(authentication))
@@ -86,13 +87,13 @@ class AdminSessionControllerTest {
                     .andExpect(jsonPath("$[0].deviceName").value("Chrome on Windows"))
                     .andExpect(jsonPath("$[0].current").value(false));
 
-            verify(sessionService).getUserActiveSessions(ACTOR_ID, TARGET_USER_ID);
+            verify(sessionService).getUserActiveSessions(eq(authentication), eq(TARGET_USER_ID));
         }
 
         @Test
         @DisplayName("Should return 403 when actor is not allowed to manage the target user")
         void shouldReturn403WhenActorCannotManageTarget() throws Exception {
-            given(sessionService.getUserActiveSessions(ACTOR_ID, TARGET_USER_ID))
+            given(sessionService.getUserActiveSessions(eq(authentication), eq(TARGET_USER_ID)))
                     .willThrow(new UserManagementNotAllowedException());
 
             mockMvc.perform(get("/users/{userId}/sessions", TARGET_USER_ID)
@@ -114,14 +115,14 @@ class AdminSessionControllerTest {
                             .principal(authentication))
                     .andExpect(status().isNoContent());
 
-            verify(sessionService).revokeAllUserSessions(ACTOR_ID, TARGET_USER_ID);
+            verify(sessionService).revokeAllUserSessions(eq(authentication), eq(TARGET_USER_ID));
         }
 
         @Test
         @DisplayName("Should return 403 when actor is not allowed to revoke target sessions")
         void shouldReturn403WhenActorCannotRevokeTargetSessions() throws Exception {
             willThrow(new UserManagementNotAllowedException())
-                    .given(sessionService).revokeAllUserSessions(ACTOR_ID, TARGET_USER_ID);
+                    .given(sessionService).revokeAllUserSessions(eq(authentication), eq(TARGET_USER_ID));
 
             mockMvc.perform(delete("/users/{userId}/sessions", TARGET_USER_ID)
                             .principal(authentication))

@@ -5,23 +5,44 @@ import java.util.Set;
 
 import static pos.pos.security.rbac.AppPermission.*;
 
-// Rank controls delegation power.
-// Higher rank = more privilege; non-root actors may only assign or manage lower-ranked roles/users.
 public enum AppRole {
+
+    // protected means you can not manage it (except by Super Admin)
+    // This role cannot be assigned at all (except by Super Admin)
 
     SUPER_ADMIN(
             "Super Admin",
-            "Full system access",
+            "System-level control across all tenants",
             false,
             true,
             EnumSet.allOf(AppPermission.class)
+    ),
+
+    OWNER(
+            "Owner",
+            "Business owner - full control over the restaurant",
+            false,
+            true,
+            EnumSet.allOf(AppPermission.class)
+    ),
+
+    CO_OWNER(
+            "Co-Owner",
+            "Shares ownership with limited restrictions",
+            true,
+            false,
+            EnumSet.of(
+                    USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
+                    ROLES_READ,
+                    SESSIONS_MANAGE
+            )
     ),
 
     ADMIN(
             "Admin",
             "Store administrator - manages staff, inventory, settings and reports",
             false,
-            true,
+            false,
             EnumSet.of(
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
                     ROLES_READ,
@@ -31,19 +52,18 @@ public enum AppRole {
 
     MANAGER(
             "Manager",
-            "Store manager - oversees operations, inventory and staff activity",
+            "Store manager - oversees operations and staff",
             true,
             false,
             EnumSet.of(
                     USERS_CREATE, USERS_READ, USERS_UPDATE,
-                    ROLES_READ,
-                    SESSIONS_MANAGE
+                    ROLES_READ
             )
     ),
 
-    CASHIER(
-            "Cashier",
-            "POS operator - processes sales and manages own shifts",
+    WAITER(
+            "Waiter",
+            "Handles orders and customer service",
             true,
             false,
             EnumSet.noneOf(AppPermission.class)

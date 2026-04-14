@@ -9,9 +9,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
 import pos.pos.security.config.AppSecurityProperties;
 
 import java.util.List;
@@ -28,7 +30,7 @@ class AppSecurityPropertiesTest {
                     ConfigurationPropertiesAutoConfiguration.class,
                     ValidationAutoConfiguration.class
             ))
-            .withUserConfiguration(AppSecurityProperties.class);
+            .withUserConfiguration(TestConfig.class);
 
     @BeforeAll
     static void setup() {
@@ -198,5 +200,10 @@ class AppSecurityPropertiesTest {
             current = current.getCause();
         }
         return false;
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @ConfigurationPropertiesScan(basePackageClasses = AppSecurityProperties.class)
+    static class TestConfig {
     }
 }

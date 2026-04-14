@@ -8,12 +8,15 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.SessionService;
 import pos.pos.exception.auth.SessionNotFoundException;
+import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.user.dto.UserSessionResponse;
 
@@ -236,18 +239,19 @@ class SessionServiceTest {
         @Test
         @DisplayName("Should return active sessions for the given user with current set to false")
         void shouldReturnActiveSessionsForUser() {
-            UUID actorUserId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
             UserSession session = session(UUID.randomUUID(), userId);
             UserSessionResponse response = response(session.getId());
+            Authentication authentication = authentication(UUID.randomUUID());
 
             when(userSessionRepository.findActiveSessionsByUserId(eq(userId), any()))
                     .thenReturn(List.of(session));
             when(userSessionMapper.toSessionResponse(session, false)).thenReturn(response);
 
-            List<UserSessionResponse> result = sessionService.getUserActiveSessions(actorUserId, userId);
+            List<UserSessionResponse> result = sessionService.getUserActiveSessions(authentication, userId);
 
             assertThat(result).hasSize(1);
+            verify(roleHierarchyService).assertCanManageUser(authentication, userId);
             verify(userSessionMapper).toSessionResponse(session, false);
         }
     }
@@ -259,11 +263,12 @@ class SessionServiceTest {
         @Test
         @DisplayName("Should revoke all active sessions for the given user")
         void shouldRevokeAllSessions() {
-            UUID actorUserId = UUID.randomUUID();
             UUID userId = UUID.randomUUID();
+            Authentication authentication = authentication(UUID.randomUUID());
 
-            sessionService.revokeAllUserSessions(actorUserId, userId);
+            sessionService.revokeAllUserSessions(authentication, userId);
 
+            verify(roleHierarchyService).assertCanManageUser(authentication, userId);
             verify(userSessionRepository).revokeAllActiveSessionsByUserId(
                     eq(userId),
                     any(),
@@ -293,5 +298,15 @@ class SessionServiceTest {
         return UserSessionResponse.builder()
                 .id(id)
                 .build();
+    }
+
+    private Authentication authentication(UUID userId) {
+        AuthenticatedUser user = AuthenticatedUser.builder()
+                .id(userId)
+                .email("admin@pos.local")
+                .active(true)
+                .build();
+
+        return new UsernamePasswordAuthenticationToken(user, null, List.of());
     }
 }
