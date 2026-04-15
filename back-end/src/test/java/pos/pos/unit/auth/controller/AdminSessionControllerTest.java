@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
@@ -19,9 +20,11 @@ import pos.pos.exception.user.UserManagementNotAllowedException;
 import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.user.dto.UserSessionResponse;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -129,6 +132,41 @@ class AdminSessionControllerTest {
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value(403))
                     .andExpect(jsonPath("$.message").value("You are not allowed to manage this user"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Security annotations")
+    class SecurityAnnotationTests {
+
+        @Test
+        @DisplayName("Should require SESSIONS_MANAGE authority for getUserActiveSessions")
+        void shouldRequireSessionsManageAuthorityForGetUserActiveSessions() throws NoSuchMethodException {
+            Method method = AdminSessionController.class.getMethod(
+                    "getUserActiveSessions",
+                    UUID.class,
+                    Authentication.class
+            );
+
+            PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
+
+            assertThat(annotation).isNotNull();
+            assertThat(annotation.value()).isEqualTo("hasAuthority('SESSIONS_MANAGE')");
+        }
+
+        @Test
+        @DisplayName("Should require SESSIONS_MANAGE authority for revokeAllUserSessions")
+        void shouldRequireSessionsManageAuthorityForRevokeAllUserSessions() throws NoSuchMethodException {
+            Method method = AdminSessionController.class.getMethod(
+                    "revokeAllUserSessions",
+                    UUID.class,
+                    Authentication.class
+            );
+
+            PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
+
+            assertThat(annotation).isNotNull();
+            assertThat(annotation.value()).isEqualTo("hasAuthority('SESSIONS_MANAGE')");
         }
     }
 }

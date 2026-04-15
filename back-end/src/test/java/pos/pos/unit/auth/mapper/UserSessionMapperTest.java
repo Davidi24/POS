@@ -4,6 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import pos.pos.auth.entity.UserSession;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.util.ClientInfo;
@@ -26,14 +27,14 @@ class UserSessionMapperTest {
         UserSession session = mapper.toSession(
                 userId,
                 tokenId,
-                "PASSWORD",
+                SessionType.PASSWORD,
                 "hashed-refresh-token",
                 new ClientInfo(" 127.0.0.1 ", "  Windows NT 10.0  ")
         );
 
         assertThat(session.getUserId()).isEqualTo(userId);
         assertThat(session.getTokenId()).isEqualTo(tokenId);
-        assertThat(session.getSessionType()).isEqualTo("PASSWORD");
+        assertThat(session.getSessionType()).isEqualTo(SessionType.PASSWORD);
         assertThat(session.getRefreshTokenHash()).isEqualTo("hashed-refresh-token");
         assertThat(session.getIpAddress()).isEqualTo("127.0.0.1");
         assertThat(session.getUserAgent()).isEqualTo("Windows NT 10.0");
@@ -55,7 +56,7 @@ class UserSessionMapperTest {
         UserSession session = mapper.toSession(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                "PASSWORD",
+                SessionType.PASSWORD,
                 "hashed-refresh-token",
                 null
         );
@@ -73,7 +74,7 @@ class UserSessionMapperTest {
         UserSession session = mapper.toSession(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
-                "PASSWORD",
+                SessionType.PASSWORD,
                 "hashed-refresh-token",
                 new ClientInfo("   ", "   ")
         );
@@ -133,7 +134,7 @@ class UserSessionMapperTest {
             return mapper.toSession(
                     UUID.randomUUID(),
                     UUID.randomUUID(),
-                    "PASSWORD",
+                    SessionType.PASSWORD,
                     "hashed-refresh-token",
                     new ClientInfo("127.0.0.1", userAgent)
             );

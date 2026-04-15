@@ -14,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import pos.pos.auth.entity.UserSession;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.PermissionRepository;
@@ -104,7 +105,7 @@ class JwtAuthenticationFilterTest {
                 .id(UUID.randomUUID())
                 .userId(userId)
                 .tokenId(tokenId)
-                .sessionType("PASSWORD")
+                .sessionType(SessionType.PASSWORD)
                 .refreshTokenHash("hash")
                 .expiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30))
                 .build();
@@ -168,7 +169,7 @@ class JwtAuthenticationFilterTest {
                 .id(UUID.randomUUID())
                 .userId(userId)
                 .tokenId(tokenId)
-                .sessionType("PASSWORD")
+                .sessionType(SessionType.PASSWORD)
                 .refreshTokenHash("hash")
                 .expiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30))
                 .build();

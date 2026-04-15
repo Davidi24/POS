@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pos.pos.auth.dto.ChangePasswordRequest;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionRevocationReason;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.ChangePasswordService;
 import pos.pos.exception.auth.InvalidCredentialsException;
@@ -70,7 +71,7 @@ class ChangePasswordServiceTest {
                     .id(currentSessionId)
                     .userId(userId)
                     .tokenId(tokenId)
-                    .sessionType("PASSWORD")
+                    .sessionType(SessionType.PASSWORD)
                     .refreshTokenHash("hash")
                     .expiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusDays(1))
                     .build();

@@ -17,6 +17,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
+// checked
+// tested
 @Service
 @RequiredArgsConstructor
 public class SessionService {
@@ -28,19 +30,21 @@ public class SessionService {
     public List<UserSessionResponse> getMyActiveSessions(UUID userId, UUID currentTokenId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        UUID currentSessionId = userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId)
-                .map(UserSession::getId)
-                .orElse(null);
-
         return userSessionRepository.findActiveSessionsByUserId(userId, now)
                 .stream()
-                .map(s -> userSessionMapper.toSessionResponse(s, s.getId().equals(currentSessionId)))
+                .map(s -> userSessionMapper.toSessionResponse(
+                        s,
+                        currentTokenId != null && currentTokenId.equals(s.getTokenId())
+                ))
                 .toList();
     }
 
     public UserSessionResponse getCurrentSession(UUID userId, UUID currentTokenId) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
         UserSession session = userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId)
                 .filter(s -> s.getUserId().equals(userId))
+                .filter(s -> s.getExpiresAt().isAfter(now))
                 .orElseThrow(SessionNotFoundException::new);
 
         return userSessionMapper.toSessionResponse(session, true);
@@ -51,6 +55,7 @@ public class SessionService {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
         UserSession session = userSessionRepository.findByIdAndUserIdAndRevokedFalse(sessionId, userId)
+                .filter(s -> s.getExpiresAt().isAfter(now))
                 .orElseThrow(SessionNotFoundException::new);
 
         session.setRevoked(true);
@@ -59,12 +64,14 @@ public class SessionService {
         userSessionRepository.save(session);
     }
 
+    // it revokes all other session except the one taken as argument
     @Transactional
     public void revokeOtherSessions(UUID userId, UUID currentTokenId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
         UserSession currentSession = userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId)
                 .filter(s -> s.getUserId().equals(userId))
+                .filter(s -> s.getExpiresAt().isAfter(now))
                 .orElseThrow(SessionNotFoundException::new);
 
         userSessionRepository.revokeAllActiveSessionsByUserIdExcept(

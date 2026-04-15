@@ -7,8 +7,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import pos.pos.auth.entity.UserSession;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
 
 import java.time.OffsetDateTime;
@@ -16,8 +23,14 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -29,6 +42,9 @@ class UserSessionRepositoryTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Nested
     @DisplayName("findByTokenId")
@@ -145,6 +161,122 @@ class UserSessionRepositoryTest {
             Optional<UserSession> result = repository.findByTokenIdAndRevokedFalseForUpdate(tokenId);
 
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        @DisplayName("Should block a concurrent update lookup until the first transaction releases the lock")
+        void shouldBlockConcurrentUpdateLookupUntilLockReleased() throws Exception {
+            UUID userId = UUID.randomUUID();
+            UUID tokenId = UUID.randomUUID();
+            UserSession persistedSession = inNewTransaction(() -> repository.saveAndFlush(session(
+                    userId,
+                    tokenId,
+                    false,
+                    null,
+                    OffsetDateTime.now(ZoneOffset.UTC).plusDays(7),
+                    OffsetDateTime.now(ZoneOffset.UTC).minusDays(1)
+            )));
+
+            CountDownLatch firstTransactionHoldingLock = new CountDownLatch(1);
+            CountDownLatch releaseFirstTransaction = new CountDownLatch(1);
+            CountDownLatch secondTransactionStarted = new CountDownLatch(1);
+
+            ExecutorService executorService = Executors.newFixedThreadPool(2);
+            try {
+                Future<Optional<UserSession>> firstLookup = executorService.submit(() ->
+                        inNewTransaction(() -> {
+                            Optional<UserSession> lockedSession = repository.findByTokenIdAndRevokedFalseForUpdate(tokenId);
+                            firstTransactionHoldingLock.countDown();
+
+                            try {
+                                if (!releaseFirstTransaction.await(5, TimeUnit.SECONDS)) {
+                                    throw new AssertionError("Timed out waiting to release the first transaction");
+                                }
+                            } catch (InterruptedException ex) {
+                                Thread.currentThread().interrupt();
+                                throw new AssertionError("Interrupted while waiting to release the first transaction", ex);
+                            }
+
+                            return lockedSession;
+                        })
+                );
+
+                assertThat(firstTransactionHoldingLock.await(5, TimeUnit.SECONDS)).isTrue();
+
+                Future<Optional<UserSession>> secondLookup = executorService.submit(() ->
+                        inNewTransaction(() -> {
+                            secondTransactionStarted.countDown();
+                            return repository.findByTokenIdAndRevokedFalseForUpdate(tokenId);
+                        })
+                );
+
+                assertThat(secondTransactionStarted.await(5, TimeUnit.SECONDS)).isTrue();
+                Thread.sleep(200);
+
+                assertThat(secondLookup.isDone()).isFalse();
+
+                releaseFirstTransaction.countDown();
+
+                assertThat(firstLookup.get(5, TimeUnit.SECONDS))
+                        .isPresent()
+                        .get()
+                        .extracting(UserSession::getId)
+                        .isEqualTo(persistedSession.getId());
+
+                assertThat(secondLookup.get(5, TimeUnit.SECONDS))
+                        .isPresent()
+                        .get()
+                        .extracting(UserSession::getId)
+                        .isEqualTo(persistedSession.getId());
+            } finally {
+                executorService.shutdownNow();
+                assertThat(executorService.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("database constraints")
+    class DatabaseConstraintTests {
+
+        @Test
+        @DisplayName("Should reject duplicate token ids")
+        void shouldRejectDuplicateTokenIds() {
+            UUID tokenId = UUID.randomUUID();
+
+            repository.save(session(
+                    UUID.randomUUID(),
+                    tokenId,
+                    false,
+                    null,
+                    OffsetDateTime.now(ZoneOffset.UTC).plusDays(7),
+                    OffsetDateTime.now(ZoneOffset.UTC).minusDays(2)
+            ));
+
+            assertThatThrownBy(() -> repository.saveAndFlush(session(
+                    UUID.randomUUID(),
+                    tokenId,
+                    false,
+                    null,
+                    OffsetDateTime.now(ZoneOffset.UTC).plusDays(7),
+                    OffsetDateTime.now(ZoneOffset.UTC).minusDays(1)
+            )))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+        }
+
+        @Test
+        @DisplayName("Should reject revoked sessions without revokedAt")
+        void shouldRejectRevokedSessionWithoutRevokedAt() {
+            assertThatThrownBy(() -> repository.saveAndFlush(session(
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    true,
+                    null,
+                    OffsetDateTime.now(ZoneOffset.UTC).plusDays(7),
+                    OffsetDateTime.now(ZoneOffset.UTC).minusDays(1)
+            )))
+                    .isInstanceOf(DataIntegrityViolationException.class);
         }
     }
 
@@ -394,7 +526,7 @@ class UserSessionRepositoryTest {
                 .id(UUID.randomUUID())
                 .userId(userId)
                 .tokenId(tokenId)
-                .sessionType("PASSWORD")
+                .sessionType(SessionType.PASSWORD)
                 .deviceName("Device")
                 .refreshTokenHash("hash-" + tokenId)
                 .ipAddress("127.0.0.1")
@@ -406,6 +538,19 @@ class UserSessionRepositoryTest {
                 .revokedReason(revoked ? "REVOKED" : null)
                 .createdAt(lastUsedAt)
                 .build();
+    }
+
+    private <T> T inNewTransaction(TransactionCallback<T> callback) {
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return transactionTemplate.execute(status -> callback.execute());
+    }
+
+    private void inNewTransaction(VoidTransactionCallback callback) {
+        inNewTransaction(() -> {
+            callback.execute();
+            return null;
+        });
     }
 
     private UserSession session(
@@ -420,7 +565,7 @@ class UserSessionRepositoryTest {
                 .id(UUID.randomUUID())
                 .userId(userId)
                 .tokenId(tokenId)
-                .sessionType("PASSWORD")
+                .sessionType(SessionType.PASSWORD)
                 .deviceName("Device")
                 .refreshTokenHash("hash-" + tokenId)
                 .ipAddress("127.0.0.1")
@@ -432,5 +577,15 @@ class UserSessionRepositoryTest {
                 .revokedReason(revoked ? "REVOKED" : null)
                 .createdAt(createdAt)
                 .build();
+    }
+
+    @FunctionalInterface
+    private interface TransactionCallback<T> {
+        T execute();
+    }
+
+    @FunctionalInterface
+    private interface VoidTransactionCallback {
+        void execute();
     }
 }

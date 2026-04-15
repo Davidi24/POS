@@ -16,6 +16,7 @@ import pos.pos.auth.entity.AuthLoginAttempt;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.LoginFailureReason;
 import pos.pos.auth.enums.SessionRevocationReason;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
@@ -123,7 +124,7 @@ class AuthLoginServiceTest {
             UserSession mappedSession = UserSession.builder()
                     .userId(userId)
                     .refreshTokenHash("hashed-refresh")
-                    .sessionType("PASSWORD")
+                    .sessionType(SessionType.PASSWORD)
                     .build();
 
             when(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(Optional.of(user));
@@ -142,7 +143,7 @@ class AuthLoginServiceTest {
             when(userSessionMapper.toSession(
                     eq(userId),
                     any(UUID.class),
-                    eq("PASSWORD"),
+                    eq(SessionType.PASSWORD),
                     eq("hashed-refresh"),
                     eq(new ClientInfo("127.0.0.1", "JUnit/5"))
             )).thenReturn(mappedSession);
@@ -178,7 +179,7 @@ class AuthLoginServiceTest {
             verify(userSessionMapper).toSession(
                     eq(userId),
                     eq(accessTokenIdCaptor.getValue()),
-                    eq("PASSWORD"),
+                    eq(SessionType.PASSWORD),
                     eq("hashed-refresh"),
                     eq(new ClientInfo("127.0.0.1", "JUnit/5"))
             );
@@ -421,7 +422,7 @@ class AuthLoginServiceTest {
             UserSession mappedSession = UserSession.builder()
                     .userId(userId)
                     .refreshTokenHash("hashed-refresh")
-                    .sessionType("PASSWORD")
+                    .sessionType(SessionType.PASSWORD)
                     .build();
 
             when(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(Optional.of(user));
@@ -439,7 +440,7 @@ class AuthLoginServiceTest {
             when(jwtService.generateAccessToken(eq(userId), eq(roles), any(UUID.class))).thenReturn("access-token");
             when(jwtService.generateRefreshToken(eq(userId), any(UUID.class))).thenReturn("refresh-token");
             when(refreshTokenSecurityService.hash("refresh-token")).thenReturn("hashed-refresh");
-            when(userSessionMapper.toSession(eq(userId), any(UUID.class), eq("PASSWORD"), eq("hashed-refresh"), any(ClientInfo.class)))
+            when(userSessionMapper.toSession(eq(userId), any(UUID.class), eq(SessionType.PASSWORD), eq("hashed-refresh"), any(ClientInfo.class)))
                     .thenReturn(mappedSession);
             when(userMapper.toUserResponse(eq(user), eq(roles))).thenReturn(UserResponse.builder().id(userId).roles(roles).build());
 

@@ -12,10 +12,12 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionRevocationReason;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.SessionService;
 import pos.pos.exception.auth.SessionNotFoundException;
+import pos.pos.exception.user.UserManagementNotAllowedException;
 import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.user.dto.UserSessionResponse;
@@ -29,7 +31,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -60,16 +64,13 @@ class SessionServiceTest {
             UUID userId = UUID.randomUUID();
             UUID currentTokenId = UUID.randomUUID();
             UUID currentSessionId = UUID.randomUUID();
-            UUID otherSessionId = UUID.randomUUID();
 
-            UserSession currentSession = session(currentSessionId, userId);
-            UserSession otherSession = session(otherSessionId, userId);
+            UserSession currentSession = session(currentSessionId, userId, currentTokenId);
+            UserSession otherSession = session(UUID.randomUUID(), userId, UUID.randomUUID());
 
             UserSessionResponse currentResponse = response(currentSessionId);
-            UserSessionResponse otherResponse = response(otherSessionId);
+            UserSessionResponse otherResponse = response(otherSession.getId());
 
-            when(userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId))
-                    .thenReturn(Optional.of(currentSession));
             when(userSessionRepository.findActiveSessionsByUserId(eq(userId), any()))
                     .thenReturn(List.of(currentSession, otherSession));
             when(userSessionMapper.toSessionResponse(currentSession, true)).thenReturn(currentResponse);
@@ -78,6 +79,7 @@ class SessionServiceTest {
             List<UserSessionResponse> result = sessionService.getMyActiveSessions(userId, currentTokenId);
 
             assertThat(result).hasSize(2);
+            verify(userSessionRepository, never()).findByTokenIdAndRevokedFalse(any());
             verify(userSessionMapper).toSessionResponse(currentSession, true);
             verify(userSessionMapper).toSessionResponse(otherSession, false);
         }
@@ -87,10 +89,8 @@ class SessionServiceTest {
         void shouldMarkAllAsNonCurrentWhenTokenNotFound() {
             UUID userId = UUID.randomUUID();
             UUID currentTokenId = UUID.randomUUID();
-            UserSession session = session(UUID.randomUUID(), userId);
+            UserSession session = session(UUID.randomUUID(), userId, UUID.randomUUID());
 
-            when(userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId))
-                    .thenReturn(Optional.empty());
             when(userSessionRepository.findActiveSessionsByUserId(eq(userId), any()))
                     .thenReturn(List.of(session));
             when(userSessionMapper.toSessionResponse(session, false)).thenReturn(response(session.getId()));
@@ -98,6 +98,7 @@ class SessionServiceTest {
             List<UserSessionResponse> result = sessionService.getMyActiveSessions(userId, currentTokenId);
 
             assertThat(result).hasSize(1);
+            verify(userSessionRepository, never()).findByTokenIdAndRevokedFalse(any());
             verify(userSessionMapper).toSessionResponse(session, false);
         }
     }
@@ -150,6 +151,22 @@ class SessionServiceTest {
             assertThatThrownBy(() -> sessionService.getCurrentSession(userId, tokenId))
                     .isInstanceOf(SessionNotFoundException.class);
         }
+
+        @Test
+        @DisplayName("Should throw SessionNotFoundException when session is expired")
+        void shouldThrowWhenSessionExpired() {
+            UUID userId = UUID.randomUUID();
+            UUID tokenId = UUID.randomUUID();
+            UserSession session = session(UUID.randomUUID(), userId, tokenId).toBuilder()
+                    .expiresAt(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1))
+                    .build();
+
+            when(userSessionRepository.findByTokenIdAndRevokedFalse(tokenId))
+                    .thenReturn(Optional.of(session));
+
+            assertThatThrownBy(() -> sessionService.getCurrentSession(userId, tokenId))
+                    .isInstanceOf(SessionNotFoundException.class);
+        }
     }
 
     @Nested
@@ -183,6 +200,24 @@ class SessionServiceTest {
 
             when(userSessionRepository.findByIdAndUserIdAndRevokedFalse(sessionId, userId))
                     .thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> sessionService.revokeSession(sessionId, userId))
+                    .isInstanceOf(SessionNotFoundException.class);
+
+            verify(userSessionRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should throw SessionNotFoundException when session is expired")
+        void shouldThrowWhenSessionExpired() {
+            UUID userId = UUID.randomUUID();
+            UUID sessionId = UUID.randomUUID();
+            UserSession session = session(sessionId, userId).toBuilder()
+                    .expiresAt(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1))
+                    .build();
+
+            when(userSessionRepository.findByIdAndUserIdAndRevokedFalse(sessionId, userId))
+                    .thenReturn(Optional.of(session));
 
             assertThatThrownBy(() -> sessionService.revokeSession(sessionId, userId))
                     .isInstanceOf(SessionNotFoundException.class);
@@ -230,6 +265,40 @@ class SessionServiceTest {
 
             verify(userSessionRepository, never()).revokeAllActiveSessionsByUserIdExcept(any(), any(), any(), any());
         }
+
+        @Test
+        @DisplayName("Should throw SessionNotFoundException when current session belongs to different user")
+        void shouldThrowWhenCurrentSessionBelongsToDifferentUser() {
+            UUID userId = UUID.randomUUID();
+            UUID tokenId = UUID.randomUUID();
+            UserSession currentSession = session(UUID.randomUUID(), UUID.randomUUID(), tokenId);
+
+            when(userSessionRepository.findByTokenIdAndRevokedFalse(tokenId))
+                    .thenReturn(Optional.of(currentSession));
+
+            assertThatThrownBy(() -> sessionService.revokeOtherSessions(userId, tokenId))
+                    .isInstanceOf(SessionNotFoundException.class);
+
+            verify(userSessionRepository, never()).revokeAllActiveSessionsByUserIdExcept(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("Should throw SessionNotFoundException when current session is expired")
+        void shouldThrowWhenCurrentSessionExpired() {
+            UUID userId = UUID.randomUUID();
+            UUID tokenId = UUID.randomUUID();
+            UserSession currentSession = session(UUID.randomUUID(), userId, tokenId).toBuilder()
+                    .expiresAt(OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1))
+                    .build();
+
+            when(userSessionRepository.findByTokenIdAndRevokedFalse(tokenId))
+                    .thenReturn(Optional.of(currentSession));
+
+            assertThatThrownBy(() -> sessionService.revokeOtherSessions(userId, tokenId))
+                    .isInstanceOf(SessionNotFoundException.class);
+
+            verify(userSessionRepository, never()).revokeAllActiveSessionsByUserIdExcept(any(), any(), any(), any());
+        }
     }
 
     @Nested
@@ -254,6 +323,22 @@ class SessionServiceTest {
             verify(roleHierarchyService).assertCanManageUser(authentication, userId);
             verify(userSessionMapper).toSessionResponse(session, false);
         }
+
+        @Test
+        @DisplayName("Should throw when actor is not allowed to manage the target user")
+        void shouldThrowWhenActorCannotManageTargetUser() {
+            UUID userId = UUID.randomUUID();
+            Authentication authentication = authentication(UUID.randomUUID());
+
+            doThrow(new UserManagementNotAllowedException())
+                    .when(roleHierarchyService).assertCanManageUser(authentication, userId);
+
+            assertThatThrownBy(() -> sessionService.getUserActiveSessions(authentication, userId))
+                    .isInstanceOf(UserManagementNotAllowedException.class);
+
+            verify(userSessionRepository, never()).findActiveSessionsByUserId(any(UUID.class), any(OffsetDateTime.class));
+            verify(userSessionMapper, never()).toSessionResponse(any(), anyBoolean());
+        }
     }
 
     @Nested
@@ -275,14 +360,33 @@ class SessionServiceTest {
                     eq(SessionRevocationReason.SESSION_REVOKED.name())
             );
         }
+
+        @Test
+        @DisplayName("Should throw when actor is not allowed to revoke the target user's sessions")
+        void shouldThrowWhenActorCannotRevokeTargetUserSessions() {
+            UUID userId = UUID.randomUUID();
+            Authentication authentication = authentication(UUID.randomUUID());
+
+            doThrow(new UserManagementNotAllowedException())
+                    .when(roleHierarchyService).assertCanManageUser(authentication, userId);
+
+            assertThatThrownBy(() -> sessionService.revokeAllUserSessions(authentication, userId))
+                    .isInstanceOf(UserManagementNotAllowedException.class);
+
+            verify(userSessionRepository, never()).revokeAllActiveSessionsByUserId(any(), any(), any());
+        }
     }
 
     private UserSession session(UUID id, UUID userId) {
+        return session(id, userId, UUID.randomUUID());
+    }
+
+    private UserSession session(UUID id, UUID userId, UUID tokenId) {
         return UserSession.builder()
                 .id(id)
                 .userId(userId)
-                .tokenId(UUID.randomUUID())
-                .sessionType("PASSWORD")
+                .tokenId(tokenId)
+                .sessionType(SessionType.PASSWORD)
                 .deviceName("Device")
                 .refreshTokenHash("hash")
                 .ipAddress("127.0.0.1")

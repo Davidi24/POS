@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.enums.SessionRevocationReason;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.entity.AuthLoginAttempt;
 import pos.pos.auth.enums.LoginFailureReason;
 import pos.pos.auth.mapper.UserSessionMapper;
@@ -122,7 +123,7 @@ public class AuthLoginService {
                 userSessionMapper.toSession(
                         user.getId(),
                         tokenId,
-                        "PASSWORD",
+                        SessionType.PASSWORD,
                         refreshTokenSecurityService.hash(refreshToken),
                         normalizedClientInfo
                 )
