@@ -23,6 +23,11 @@ public class OpaqueTokenService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
     }
 
+    public IssuedToken issue(String pepper) {
+        String rawToken = generate();
+        return new IssuedToken(rawToken, hash(rawToken, pepper));
+    }
+
     public String normalize(String token) {
         if (!StringUtils.hasText(token)) {
             throw new InvalidTokenException();
@@ -41,5 +46,8 @@ public class OpaqueTokenService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("Failed to hash opaque token", ex);
         }
+    }
+
+    public record IssuedToken(String rawToken, String tokenHash) {
     }
 }

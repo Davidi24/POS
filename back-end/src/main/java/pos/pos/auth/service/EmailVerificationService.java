@@ -3,7 +3,6 @@ package pos.pos.auth.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.util.UriComponentsBuilder;
 import pos.pos.auth.dto.ResendVerificationRequest;
 import pos.pos.auth.dto.VerifyEmailRequest;
 import pos.pos.auth.entity.AuthEmailVerificationToken;
@@ -14,6 +13,7 @@ import pos.pos.exception.auth.InvalidTokenException;
 import pos.pos.security.service.OpaqueTokenService;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
+import pos.pos.utils.FrontendUrlUtils;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
@@ -47,13 +47,12 @@ public class EmailVerificationService {
 
         authEmailVerificationTokenRepository.deleteByUserId(user.getId());
 
-        String rawToken = opaqueTokenService.generate();
-        String tokenHash = opaqueTokenService.hash(rawToken, emailVerificationProperties.getTokenPepper());
+        OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(emailVerificationProperties.getTokenPepper());
 
         authEmailVerificationTokenRepository.save(
                 AuthEmailVerificationToken.builder()
                         .userId(user.getId())
-                        .tokenHash(tokenHash)
+                        .tokenHash(issuedToken.tokenHash())
                         .expiresAt(now.plus(emailVerificationProperties.getTokenTtl()))
                         .build()
         );
@@ -62,7 +61,11 @@ public class EmailVerificationService {
                 user.getEmail(),
                 user.getFirstName(),
                 emailVerificationProperties.getSubject(),
-                buildVerificationUrl(rawToken),
+                FrontendUrlUtils.buildTokenUrl(
+                        frontendProperties.getBaseUrl(),
+                        emailVerificationProperties.getVerifyPath(),
+                        issuedToken.rawToken()
+                ),
                 emailVerificationProperties.getTokenTtl()
         );
     }
@@ -88,13 +91,5 @@ public class EmailVerificationService {
 
         verificationToken.setUsedAt(now);
         authEmailVerificationTokenRepository.save(verificationToken);
-    }
-
-    private String buildVerificationUrl(String rawToken) {
-        return UriComponentsBuilder.fromUriString(frontendProperties.getBaseUrl())
-                .path(emailVerificationProperties.getVerifyPath())
-                .queryParam("token", rawToken)
-                .build()
-                .toUriString();
     }
 }
