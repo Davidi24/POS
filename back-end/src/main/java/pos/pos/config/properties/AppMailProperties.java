@@ -13,5 +13,5 @@ import org.springframework.validation.annotation.Validated;
 public class AppMailProperties {
 
     @NotBlank
-    private String from = "no-reply@pos.local";
+    private String from;
 }

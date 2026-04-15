@@ -30,7 +30,13 @@ class AppSecurityPropertiesTest {
                     ConfigurationPropertiesAutoConfiguration.class,
                     ValidationAutoConfiguration.class
             ))
-            .withUserConfiguration(TestConfig.class);
+            .withUserConfiguration(TestConfig.class)
+            .withPropertyValues(
+                    "app.security.cookie.refresh-token-name=refreshToken",
+                    "app.security.cookie.refresh-token-path=/auth/web",
+                    "app.security.cookie.same-site=Strict",
+                    "app.security.cookie.secure=true"
+            );
 
     @BeforeAll
     static void setup() {

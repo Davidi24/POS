@@ -1,6 +1,7 @@
 package pos.pos.config.properties;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -14,15 +15,18 @@ import java.time.Duration;
 @Validated
 public class PasswordResetProperties {
 
-    private Duration tokenTtl = Duration.ofMinutes(30);
-    private Duration requestCooldown = Duration.ofMinutes(2);
+    @NotNull
+    private Duration tokenTtl;
+
+    @NotNull
+    private Duration requestCooldown;
 
     @NotBlank
-    private String tokenPepper = "change-this-local-dev-password-reset-pepper";
+    private String tokenPepper;
 
     @NotBlank
-    private String resetPath = "/reset-password";
+    private String resetPath;
 
     @NotBlank
-    private String subject = "Reset your POS password";
+    private String subject;
 }

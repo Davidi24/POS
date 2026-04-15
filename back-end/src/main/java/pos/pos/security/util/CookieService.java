@@ -19,7 +19,7 @@ public class CookieService {
         ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
                 .from(authCookieProperties.getRefreshTokenName(), token)
                 .httpOnly(true)
-                .secure(authCookieProperties.isSecure())
+                .secure(authCookieProperties.getSecure())
                 .path(authCookieProperties.getRefreshTokenPath())
                 .sameSite(authCookieProperties.getSameSite())
                 .maxAge(jwtProperties.getRefreshExpiration());
@@ -35,7 +35,7 @@ public class CookieService {
         ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
                 .from(authCookieProperties.getRefreshTokenName(), "")
                 .httpOnly(true)
-                .secure(authCookieProperties.isSecure())
+                .secure(authCookieProperties.getSecure())
                 .path(authCookieProperties.getRefreshTokenPath())
                 .sameSite(authCookieProperties.getSameSite())
                 .maxAge(0);

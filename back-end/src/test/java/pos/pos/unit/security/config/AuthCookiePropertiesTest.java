@@ -43,22 +43,16 @@ class AuthCookiePropertiesTest {
                         assertThat(properties.getRefreshTokenName()).isEqualTo("refresh_token");
                         assertThat(properties.getRefreshTokenPath()).isEqualTo("/auth/device");
                         assertThat(properties.getSameSite()).isEqualTo("None");
-                        assertThat(properties.isSecure()).isFalse();
+                        assertThat(properties.getSecure()).isFalse();
                         assertThat(properties.getDomain()).isEqualTo("example.com");
                     });
         }
 
         @Test
-        @DisplayName("Should expose default values when auth cookie properties are not configured")
-        void shouldExposeDefaultValuesWhenNotConfigured() {
+        @DisplayName("Should fail startup when auth cookie properties are missing")
+        void shouldFailStartupWhenNotConfigured() {
             contextRunner.run(context -> {
-                assertThat(context).hasNotFailed();
-                AuthCookieProperties properties = context.getBean(AuthCookieProperties.class);
-                assertThat(properties.getRefreshTokenName()).isEqualTo("refreshToken");
-                assertThat(properties.getRefreshTokenPath()).isEqualTo("/auth/web");
-                assertThat(properties.getSameSite()).isEqualTo("Strict");
-                assertThat(properties.isSecure()).isTrue();
-                assertThat(properties.getDomain()).isNull();
+                assertThat(context).hasFailed();
             });
         }
     }

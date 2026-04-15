@@ -13,5 +13,5 @@ import org.springframework.validation.annotation.Validated;
 public class FrontendProperties {
 
     @NotBlank
-    private String baseUrl = "http://localhost:3000";
+    private String baseUrl;
 }
