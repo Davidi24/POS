@@ -2,6 +2,7 @@ package pos.pos.auth.mapper;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.security.util.ClientInfo;
@@ -21,7 +22,7 @@ public class UserSessionMapper {
     public UserSession toSession(
             UUID userId,
             UUID tokenId,
-            String sessionType,
+            SessionType sessionType,
             String refreshTokenHash,
             ClientInfo clientInfo
     ) {
@@ -50,7 +51,7 @@ public class UserSessionMapper {
         return UserSessionResponse.builder()
                 .id(session.getId())
                 .userId(session.getUserId())
-                .sessionType(session.getSessionType())
+                .sessionType(session.getSessionType() != null ? session.getSessionType().name() : null)
                 .deviceName(session.getDeviceName())
                 .ipAddress(session.getIpAddress())
                 .userAgent(session.getUserAgent())

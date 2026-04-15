@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
@@ -19,9 +20,12 @@ import pos.pos.exception.user.UserManagementNotAllowedException;
 import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.user.dto.UserSessionResponse;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
@@ -76,7 +80,7 @@ class AdminSessionControllerTest {
                     .current(false)
                     .build();
 
-            given(sessionService.getUserActiveSessions(ACTOR_ID, TARGET_USER_ID)).willReturn(List.of(session));
+            given(sessionService.getUserActiveSessions(eq(authentication), eq(TARGET_USER_ID))).willReturn(List.of(session));
 
             mockMvc.perform(get("/users/{userId}/sessions", TARGET_USER_ID)
                             .principal(authentication))
@@ -86,13 +90,13 @@ class AdminSessionControllerTest {
                     .andExpect(jsonPath("$[0].deviceName").value("Chrome on Windows"))
                     .andExpect(jsonPath("$[0].current").value(false));
 
-            verify(sessionService).getUserActiveSessions(ACTOR_ID, TARGET_USER_ID);
+            verify(sessionService).getUserActiveSessions(eq(authentication), eq(TARGET_USER_ID));
         }
 
         @Test
         @DisplayName("Should return 403 when actor is not allowed to manage the target user")
         void shouldReturn403WhenActorCannotManageTarget() throws Exception {
-            given(sessionService.getUserActiveSessions(ACTOR_ID, TARGET_USER_ID))
+            given(sessionService.getUserActiveSessions(eq(authentication), eq(TARGET_USER_ID)))
                     .willThrow(new UserManagementNotAllowedException());
 
             mockMvc.perform(get("/users/{userId}/sessions", TARGET_USER_ID)
@@ -114,20 +118,55 @@ class AdminSessionControllerTest {
                             .principal(authentication))
                     .andExpect(status().isNoContent());
 
-            verify(sessionService).revokeAllUserSessions(ACTOR_ID, TARGET_USER_ID);
+            verify(sessionService).revokeAllUserSessions(eq(authentication), eq(TARGET_USER_ID));
         }
 
         @Test
         @DisplayName("Should return 403 when actor is not allowed to revoke target sessions")
         void shouldReturn403WhenActorCannotRevokeTargetSessions() throws Exception {
             willThrow(new UserManagementNotAllowedException())
-                    .given(sessionService).revokeAllUserSessions(ACTOR_ID, TARGET_USER_ID);
+                    .given(sessionService).revokeAllUserSessions(eq(authentication), eq(TARGET_USER_ID));
 
             mockMvc.perform(delete("/users/{userId}/sessions", TARGET_USER_ID)
                             .principal(authentication))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value(403))
                     .andExpect(jsonPath("$.message").value("You are not allowed to manage this user"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Security annotations")
+    class SecurityAnnotationTests {
+
+        @Test
+        @DisplayName("Should require SESSIONS_MANAGE authority for getUserActiveSessions")
+        void shouldRequireSessionsManageAuthorityForGetUserActiveSessions() throws NoSuchMethodException {
+            Method method = AdminSessionController.class.getMethod(
+                    "getUserActiveSessions",
+                    UUID.class,
+                    Authentication.class
+            );
+
+            PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
+
+            assertThat(annotation).isNotNull();
+            assertThat(annotation.value()).isEqualTo("hasAuthority('SESSIONS_MANAGE')");
+        }
+
+        @Test
+        @DisplayName("Should require SESSIONS_MANAGE authority for revokeAllUserSessions")
+        void shouldRequireSessionsManageAuthorityForRevokeAllUserSessions() throws NoSuchMethodException {
+            Method method = AdminSessionController.class.getMethod(
+                    "revokeAllUserSessions",
+                    UUID.class,
+                    Authentication.class
+            );
+
+            PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
+
+            assertThat(annotation).isNotNull();
+            assertThat(annotation.value()).isEqualTo("hasAuthority('SESSIONS_MANAGE')");
         }
     }
 }

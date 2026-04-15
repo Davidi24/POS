@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.entity.UserSession;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.AuthRefreshService;
 import pos.pos.exception.auth.InvalidCredentialsException;
@@ -186,7 +187,7 @@ class AuthRefreshServiceConcurrencyTest {
                 .id(UUID.randomUUID())
                 .userId(userId)
                 .tokenId(tokenId)
-                .sessionType("PASSWORD")
+                .sessionType(SessionType.PASSWORD)
                 .deviceName("Device")
                 .refreshTokenHash(refreshTokenSecurityService.hash(refreshToken))
                 .ipAddress("127.0.0.1")

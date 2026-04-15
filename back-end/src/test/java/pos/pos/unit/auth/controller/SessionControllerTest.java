@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -96,7 +97,11 @@ class SessionControllerTest {
         void shouldReturn401WhenHeaderMissing() throws Exception {
             mockMvc.perform(get("/auth/sessions")
                             .principal(authentication))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.message").value("Invalid token"));
+
+            verifyNoInteractions(jwtService, sessionService);
         }
 
         @Test
@@ -105,7 +110,26 @@ class SessionControllerTest {
             mockMvc.perform(get("/auth/sessions")
                             .header("Authorization", "InvalidHeader")
                             .principal(authentication))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.message").value("Invalid token"));
+
+            verifyNoInteractions(jwtService, sessionService);
+        }
+
+        @Test
+        @DisplayName("Should return 401 when JWT token id extraction fails")
+        void shouldReturn401WhenTokenIdExtractionFails() throws Exception {
+            given(jwtService.extractTokenId(any())).willThrow(new RuntimeException("bad token"));
+
+            mockMvc.perform(get("/auth/sessions")
+                            .header("Authorization", BEARER_TOKEN)
+                            .principal(authentication))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.message").value("Invalid token"));
+
+            verifyNoInteractions(sessionService);
         }
     }
 
@@ -143,6 +167,31 @@ class SessionControllerTest {
                             .header("Authorization", BEARER_TOKEN)
                             .principal(authentication))
                     .andExpect(status().isNotFound());
+        }
+
+        @Test
+        @DisplayName("Should return 401 when Authorization header is missing")
+        void shouldReturn401WhenHeaderMissing() throws Exception {
+            mockMvc.perform(get("/auth/sessions/current")
+                            .principal(authentication))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.message").value("Invalid token"));
+
+            verifyNoInteractions(jwtService, sessionService);
+        }
+
+        @Test
+        @DisplayName("Should return 401 when Authorization header is malformed")
+        void shouldReturn401WhenHeaderMalformed() throws Exception {
+            mockMvc.perform(get("/auth/sessions/current")
+                            .header("Authorization", "InvalidHeader")
+                            .principal(authentication))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.message").value("Invalid token"));
+
+            verifyNoInteractions(jwtService, sessionService);
         }
     }
 
@@ -207,7 +256,24 @@ class SessionControllerTest {
         void shouldReturn401WhenHeaderMissing() throws Exception {
             mockMvc.perform(delete("/auth/sessions/others")
                             .principal(authentication))
-                    .andExpect(status().isUnauthorized());
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.message").value("Invalid token"));
+
+            verifyNoInteractions(jwtService, sessionService);
+        }
+
+        @Test
+        @DisplayName("Should return 401 when Authorization header is malformed")
+        void shouldReturn401WhenHeaderMalformed() throws Exception {
+            mockMvc.perform(delete("/auth/sessions/others")
+                            .header("Authorization", "InvalidHeader")
+                            .principal(authentication))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.status").value(401))
+                    .andExpect(jsonPath("$.message").value("Invalid token"));
+
+            verifyNoInteractions(jwtService, sessionService);
         }
     }
 }

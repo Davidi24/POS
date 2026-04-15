@@ -1,6 +1,7 @@
 package pos.pos.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.entity.UserSession;
@@ -16,6 +17,8 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
+// checked
+// tested
 @Service
 @RequiredArgsConstructor
 public class SessionService {
@@ -27,19 +30,21 @@ public class SessionService {
     public List<UserSessionResponse> getMyActiveSessions(UUID userId, UUID currentTokenId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        UUID currentSessionId = userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId)
-                .map(UserSession::getId)
-                .orElse(null);
-
         return userSessionRepository.findActiveSessionsByUserId(userId, now)
                 .stream()
-                .map(s -> userSessionMapper.toSessionResponse(s, s.getId().equals(currentSessionId)))
+                .map(s -> userSessionMapper.toSessionResponse(
+                        s,
+                        currentTokenId != null && currentTokenId.equals(s.getTokenId())
+                ))
                 .toList();
     }
 
     public UserSessionResponse getCurrentSession(UUID userId, UUID currentTokenId) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
         UserSession session = userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId)
                 .filter(s -> s.getUserId().equals(userId))
+                .filter(s -> s.getExpiresAt().isAfter(now))
                 .orElseThrow(SessionNotFoundException::new);
 
         return userSessionMapper.toSessionResponse(session, true);
@@ -50,6 +55,7 @@ public class SessionService {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
         UserSession session = userSessionRepository.findByIdAndUserIdAndRevokedFalse(sessionId, userId)
+                .filter(s -> s.getExpiresAt().isAfter(now))
                 .orElseThrow(SessionNotFoundException::new);
 
         session.setRevoked(true);
@@ -58,12 +64,14 @@ public class SessionService {
         userSessionRepository.save(session);
     }
 
+    // it revokes all other session except the one taken as argument
     @Transactional
     public void revokeOtherSessions(UUID userId, UUID currentTokenId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
         UserSession currentSession = userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId)
                 .filter(s -> s.getUserId().equals(userId))
+                .filter(s -> s.getExpiresAt().isAfter(now))
                 .orElseThrow(SessionNotFoundException::new);
 
         userSessionRepository.revokeAllActiveSessionsByUserIdExcept(
@@ -74,9 +82,9 @@ public class SessionService {
         );
     }
 
-    public List<UserSessionResponse> getUserActiveSessions(UUID actorUserId, UUID userId) {
+    public List<UserSessionResponse> getUserActiveSessions(Authentication authentication, UUID userId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        roleHierarchyService.assertCanManageUser(actorUserId, userId);
+        roleHierarchyService.assertCanManageUser(authentication, userId);
 
         return userSessionRepository.findActiveSessionsByUserId(userId, now)
                 .stream()
@@ -85,9 +93,9 @@ public class SessionService {
     }
 
     @Transactional
-    public void revokeAllUserSessions(UUID actorUserId, UUID userId) {
+    public void revokeAllUserSessions(Authentication authentication, UUID userId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        roleHierarchyService.assertCanManageUser(actorUserId, userId);
+        roleHierarchyService.assertCanManageUser(authentication, userId);
 
         userSessionRepository.revokeAllActiveSessionsByUserId(
                 userId,

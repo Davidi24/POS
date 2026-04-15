@@ -3,7 +3,6 @@ package pos.pos.auth.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.util.UriComponentsBuilder;
 import pos.pos.auth.dto.ForgotPasswordRequest;
 import pos.pos.auth.dto.ResetPasswordRequest;
 import pos.pos.auth.entity.AuthPasswordResetToken;
@@ -17,6 +16,7 @@ import pos.pos.security.service.OpaqueTokenService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
+import pos.pos.utils.FrontendUrlUtils;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
@@ -52,13 +52,12 @@ public class PasswordResetService {
 
         authPasswordResetTokenRepository.deleteByUserId(user.getId());
 
-        String rawToken = opaqueTokenService.generate();
-        String tokenHash = opaqueTokenService.hash(rawToken, passwordResetProperties.getTokenPepper());
+        OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(passwordResetProperties.getTokenPepper());
 
         authPasswordResetTokenRepository.save(
                 AuthPasswordResetToken.builder()
                         .userId(user.getId())
-                        .tokenHash(tokenHash)
+                        .tokenHash(issuedToken.tokenHash())
                         .expiresAt(now.plus(passwordResetProperties.getTokenTtl()))
                         .build()
         );
@@ -67,7 +66,11 @@ public class PasswordResetService {
                 user.getEmail(),
                 user.getFirstName(),
                 passwordResetProperties.getSubject(),
-                buildResetUrl(rawToken),
+                FrontendUrlUtils.buildTokenUrl(
+                        frontendProperties.getBaseUrl(),
+                        passwordResetProperties.getResetPath(),
+                        issuedToken.rawToken()
+                ),
                 passwordResetProperties.getTokenTtl()
         );
     }
@@ -99,13 +102,5 @@ public class PasswordResetService {
                 now,
                 SessionRevocationReason.PASSWORD_RESET.name()
         );
-    }
-
-    private String buildResetUrl(String rawToken) {
-        return UriComponentsBuilder.fromUriString(frontendProperties.getBaseUrl())
-                .path(passwordResetProperties.getResetPath())
-                .queryParam("token", rawToken)
-                .build()
-                .toUriString();
     }
 }

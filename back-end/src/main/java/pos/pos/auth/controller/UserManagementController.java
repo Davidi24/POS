@@ -14,6 +14,10 @@ import org.springframework.web.bind.annotation.RestController;
 import pos.pos.auth.service.AuthRegisterService;
 import pos.pos.user.dto.CreateUserRequest;
 import pos.pos.user.dto.UserResponse;
+
+// checked
+// tested
+
 @Tag(name = "Authentication / User Management")
 @RestController
 @RequestMapping("/auth")

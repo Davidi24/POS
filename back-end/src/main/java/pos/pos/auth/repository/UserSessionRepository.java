@@ -12,11 +12,17 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+// checked
+// tested
 public interface UserSessionRepository extends JpaRepository<UserSession, UUID> {
 
     Optional<UserSession> findByTokenId(UUID tokenId);
 
     Optional<UserSession> findByTokenIdAndRevokedFalse(UUID tokenId);
+
+    long countByUserIdAndRevokedFalseAndExpiresAtAfter(UUID userId, OffsetDateTime now);
+
+    Optional<UserSession> findByIdAndUserIdAndRevokedFalse(UUID id, UUID userId);
 
     //Fetches a non-revoked session by tokenId and locks it so no one else can modify it concurrently, so it locks in the db so no one uses that row.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -28,7 +34,6 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     """)
     Optional<UserSession> findByTokenIdAndRevokedFalseForUpdate(UUID tokenId);
 
-    long countByUserIdAndRevokedFalseAndExpiresAtAfter(UUID userId, OffsetDateTime now);
 
     @Modifying
     @Query("""
@@ -38,6 +43,10 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     """)
     void deleteExpiredOrRevokedSessions(OffsetDateTime now);
 
+    // Enforces a maximum number of active sessions (e.g., 5 per user).
+    // When a new session is created and the limit is exceeded,
+    // the oldest active (non-revoked, non-expired) session is revoked
+    // to make room for the new one.
     @Modifying
     @Query(value = """
         UPDATE user_sessions
@@ -56,7 +65,7 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     """, nativeQuery = true)
     int revokeOldestSession(UUID userId, OffsetDateTime now, String reason);
 
-
+    // It removes all session for a specific user so the user is logged in no device
     @Modifying
     @Query("""
     UPDATE UserSession s
@@ -78,8 +87,7 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     """)
     List<UserSession> findActiveSessionsByUserId(UUID userId, OffsetDateTime now);
 
-    Optional<UserSession> findByIdAndUserIdAndRevokedFalse(UUID id, UUID userId);
-
+    // it does remove all session expect a specific one that is taken as argument
     @Modifying
     @Query("""
         UPDATE UserSession s

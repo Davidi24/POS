@@ -6,13 +6,10 @@ import jakarta.validation.constraints.NotEmpty;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
-import java.util.ArrayList;
 import java.util.List;
 
-@Component
 @ConfigurationProperties(prefix = "app.security")
 @Getter
 @Setter
@@ -20,9 +17,9 @@ import java.util.List;
 public class AppSecurityProperties {
 
     @NotEmpty
-    private List<String> trustedProxies = new ArrayList<>();
+    private List<String> trustedProxies;
 
     @Min(50)
     @Max(2048)
-    private int maxUserAgentLength = 512;
+    private int maxUserAgentLength;
 }

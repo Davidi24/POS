@@ -25,6 +25,9 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
+// checked
+// tested
+
 @Service
 @RequiredArgsConstructor
 public class AuthRegisterService {
@@ -50,7 +53,7 @@ public class AuthRegisterService {
                 .filter(Role::isActive)
                 .orElseThrow(RoleNotFoundException::new);
 
-        roleHierarchyService.assertCanAssignRole(createdByUserId, role);
+        roleHierarchyService.assertCanAssignRole(authentication, role);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 

@@ -79,6 +79,11 @@ public class SessionController {
         if (header == null || !header.startsWith("Bearer ")) {
             throw new InvalidTokenException();
         }
-        return jwtService.extractTokenId(header.substring(7));
+
+        try {
+            return jwtService.extractTokenId(header.substring(7));
+        } catch (RuntimeException ex) {
+            throw new InvalidTokenException();
+        }
     }
 }

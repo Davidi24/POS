@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionRevocationReason;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.exception.auth.TooManyRequestsException;
@@ -394,6 +395,7 @@ class AuthRefreshServiceTest {
         return UserSession.builder()
                 .userId(userId)
                 .tokenId(tokenId)
+                .sessionType(SessionType.PASSWORD)
                 .refreshTokenHash("stored-hash")
                 .expiresAt(expiresAt)
                 .revoked(false)

@@ -6,6 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pos.pos.auth.entity.UserSession;
+import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.AuthLogoutService;
 import pos.pos.exception.auth.InvalidCredentialsException;
@@ -58,6 +59,7 @@ class AuthLogoutServiceTest {
         UserSession session = UserSession.builder()
                 .userId(userId)
                 .tokenId(tokenId)
+                .sessionType(SessionType.PASSWORD)
                 .refreshTokenHash("stored-hash")
                 .expiresAt(OffsetDateTime.now().plusMinutes(5))
                 .revoked(false)

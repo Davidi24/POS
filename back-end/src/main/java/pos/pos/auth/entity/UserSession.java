@@ -4,6 +4,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Check;
+import pos.pos.auth.enums.SessionType;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -43,8 +44,9 @@ public class UserSession {
     @Column(name = "token_id", nullable = false, columnDefinition = "uuid")
     private UUID tokenId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "session_type", nullable = false, length = 30)
-    private String sessionType;
+    private SessionType sessionType;
 
     @Column(name = "device_name", length = 100)
     private String deviceName;
