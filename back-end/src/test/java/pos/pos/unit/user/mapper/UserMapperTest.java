@@ -31,6 +31,7 @@ class UserMapperTest {
 
             assertThat(response.getId()).isEqualTo(user.getId());
             assertThat(response.getEmail()).isEqualTo(user.getEmail());
+            assertThat(response.getUsername()).isEqualTo(user.getUsername());
             assertThat(response.getFirstName()).isEqualTo(user.getFirstName());
             assertThat(response.getLastName()).isEqualTo(user.getLastName());
             assertThat(response.getPhone()).isEqualTo(user.getPhone());
@@ -86,6 +87,7 @@ class UserMapperTest {
         return User.builder()
                 .id(UUID.fromString("00000000-0000-0000-0000-000000000001"))
                 .email("cashier@pos.local")
+                .username("cashier.one")
                 .firstName("John")
                 .lastName("Doe")
                 .phone("+49123456789")

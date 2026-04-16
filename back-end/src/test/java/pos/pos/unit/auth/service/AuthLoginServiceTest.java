@@ -22,6 +22,7 @@ import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.AuthLoginService;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.exception.auth.TooManyRequestsException;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
@@ -52,7 +53,7 @@ import static org.mockito.Mockito.when;
 @DisplayName("AuthLoginService")
 class AuthLoginServiceTest {
 
-    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
+    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid username/email or password";
     private static final String TOO_MANY_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
     private static final String DUMMY_PASSWORD_HASH =
             "$2a$10$7EqJtq98hPqEX7fNZaFWoOePaWxn96p36aH8uY7f9ZC2w5Q5f5e7a";
@@ -114,11 +115,12 @@ class AuthLoginServiceTest {
         @DisplayName("Should return tokens and persist normalized security data on success")
         void shouldReturnTokens_onSuccess() {
             UUID userId = UUID.randomUUID();
-            User user = activeUser(userId, "cashier@pos.local");
+            User user = activeUser(userId, "cashier@pos.local", "cashier.one");
             List<String> roles = List.of("ADMIN", "CASHIER");
             UserResponse userResponse = UserResponse.builder()
                     .id(userId)
                     .email("cashier@pos.local")
+                    .username("cashier.one")
                     .roles(roles)
                     .build();
             UserSession mappedSession = UserSession.builder()
@@ -130,7 +132,7 @@ class AuthLoginServiceTest {
             when(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(Optional.of(user));
             when(authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(eq("127.0.0.1"), any(OffsetDateTime.class)))
                     .thenReturn(0L);
-            when(authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(eq("cashier@pos.local"), any(OffsetDateTime.class)))
+            when(authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(eq(userId), any(OffsetDateTime.class)))
                     .thenReturn(0L);
             when(passwordService.matches("Password123!", "stored-hash")).thenReturn(true);
             when(userSessionRepository.countByUserIdAndRevokedFalseAndExpiresAtAfter(eq(userId), any(OffsetDateTime.class)))
@@ -190,7 +192,7 @@ class AuthLoginServiceTest {
             verify(authLoginAttemptRepository).save(attemptCaptor.capture());
             AuthLoginAttempt attempt = attemptCaptor.getValue();
             assertThat(attempt.getUserId()).isEqualTo(userId);
-            assertThat(attempt.getEmail()).isEqualTo("cashier@pos.local");
+            assertThat(attempt.getIdentifier()).isEqualTo("cashier@pos.local");
             assertThat(attempt.getIpAddress()).isEqualTo("127.0.0.1");
             assertThat(attempt.getUserAgent()).isEqualTo("JUnit/5");
             assertThat(attempt.isSuccess()).isTrue();
@@ -199,13 +201,40 @@ class AuthLoginServiceTest {
         }
 
         @Test
+        @DisplayName("Should find a user by username and record the submitted identifier on failure")
+        void shouldFindUserByUsername() {
+            UUID userId = UUID.randomUUID();
+            User user = activeUser(userId, "cashier@pos.local", "cashier.one");
+
+            when(userRepository.findByUsernameAndDeletedAtIsNull("cashier.one")).thenReturn(Optional.of(user));
+            when(authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(eq("10.0.0.8"), any(OffsetDateTime.class)))
+                    .thenReturn(0L);
+            when(authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(eq(userId), any(OffsetDateTime.class)))
+                    .thenReturn(0L);
+            when(passwordService.matches("WrongPassword123!", "stored-hash")).thenReturn(false);
+
+            assertThatThrownBy(() -> authLoginService.login(
+                    loginRequest("  Cashier.One ", "WrongPassword123!"),
+                    new ClientInfo(" 10.0.0.8 ", "  JUnit/5  ")
+            ))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage(INVALID_CREDENTIALS_MESSAGE);
+
+            verify(userRepository).findByUsernameAndDeletedAtIsNull("cashier.one");
+
+            ArgumentCaptor<AuthLoginAttempt> attemptCaptor = ArgumentCaptor.forClass(AuthLoginAttempt.class);
+            verify(authLoginAttemptRepository).save(attemptCaptor.capture());
+            assertThat(attemptCaptor.getValue().getIdentifier()).isEqualTo("cashier.one");
+        }
+
+        @Test
         @DisplayName("Should use dummy hash and record failed attempt when user does not exist")
-        void shouldUseDummyHash_whenUserNotFound() {
+        void shouldUseDummyHashWhenUserNotFound() {
             ClientInfo clientInfo = new ClientInfo(" 10.0.0.8 ", "  JUnit/5  ");
 
             when(authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(eq("10.0.0.8"), any(OffsetDateTime.class)))
                     .thenReturn(0L);
-            when(authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(eq("missing@pos.local"), any(OffsetDateTime.class)))
+            when(authLoginAttemptRepository.countByIdentifierAndAttemptedAtAfterAndSuccessFalse(eq("missing@pos.local"), any(OffsetDateTime.class)))
                     .thenReturn(0L);
             when(userRepository.findByEmailAndDeletedAtIsNull("missing@pos.local")).thenReturn(Optional.empty());
 
@@ -227,7 +256,7 @@ class AuthLoginServiceTest {
             verify(authLoginAttemptRepository).save(attemptCaptor.capture());
             AuthLoginAttempt attempt = attemptCaptor.getValue();
             assertThat(attempt.getUserId()).isNull();
-            assertThat(attempt.getEmail()).isEqualTo("missing@pos.local");
+            assertThat(attempt.getIdentifier()).isEqualTo("missing@pos.local");
             assertThat(attempt.getIpAddress()).isEqualTo("10.0.0.8");
             assertThat(attempt.getUserAgent()).isEqualTo("JUnit/5");
             assertThat(attempt.isSuccess()).isFalse();
@@ -238,13 +267,13 @@ class AuthLoginServiceTest {
         @DisplayName("Should lock account at threshold and record failure when password is wrong")
         void shouldLockAccount_whenPasswordWrong() {
             UUID userId = UUID.randomUUID();
-            User user = activeUser(userId, "cashier@pos.local");
+            User user = activeUser(userId, "cashier@pos.local", "cashier.one");
             user.setFailedLoginAttempts(4);
 
             when(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(Optional.of(user));
             when(authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(eq("127.0.0.1"), any(OffsetDateTime.class)))
                     .thenReturn(0L);
-            when(authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(eq("cashier@pos.local"), any(OffsetDateTime.class)))
+            when(authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(eq(userId), any(OffsetDateTime.class)))
                     .thenReturn(0L);
             when(passwordService.matches("WrongPassword123!", "stored-hash")).thenReturn(false);
 
@@ -272,6 +301,7 @@ class AuthLoginServiceTest {
             verify(authLoginAttemptRepository).save(attemptCaptor.capture());
             AuthLoginAttempt attempt = attemptCaptor.getValue();
             assertThat(attempt.isSuccess()).isFalse();
+            assertThat(attempt.getIdentifier()).isEqualTo("cashier@pos.local");
             assertThat(attempt.getFailureReason()).isEqualTo(LoginFailureReason.INVALID_CREDENTIALS);
 
             verify(jwtService, never()).generateAccessToken(any(UUID.class), any(), any(UUID.class));
@@ -282,11 +312,11 @@ class AuthLoginServiceTest {
         @DisplayName("Should reject inactive user before password verification")
         void shouldReject_whenUserInactive() {
             UUID userId = UUID.randomUUID();
-            User user = activeUser(userId, "inactive@pos.local");
+            User user = activeUser(userId, "inactive@pos.local", "inactive.user");
             user.setActive(false);
 
             when(userRepository.findByEmailAndDeletedAtIsNull("inactive@pos.local")).thenReturn(Optional.of(user));
-            when(authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(eq("inactive@pos.local"), any(OffsetDateTime.class)))
+            when(authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(eq(userId), any(OffsetDateTime.class)))
                     .thenReturn(0L);
 
             assertThatThrownBy(() -> authLoginService.login(
@@ -308,11 +338,11 @@ class AuthLoginServiceTest {
         @DisplayName("Should reject unverified user before password verification")
         void shouldReject_whenEmailNotVerified() {
             UUID userId = UUID.randomUUID();
-            User user = activeUser(userId, "unverified@pos.local");
+            User user = activeUser(userId, "unverified@pos.local", "unverified.user");
             user.setEmailVerified(false);
 
             when(userRepository.findByEmailAndDeletedAtIsNull("unverified@pos.local")).thenReturn(Optional.of(user));
-            when(authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(eq("unverified@pos.local"), any(OffsetDateTime.class)))
+            when(authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(eq(userId), any(OffsetDateTime.class)))
                     .thenReturn(0L);
 
             assertThatThrownBy(() -> authLoginService.login(
@@ -334,11 +364,11 @@ class AuthLoginServiceTest {
         @DisplayName("Should reject locked user before password verification")
         void shouldReject_whenAccountLocked() {
             UUID userId = UUID.randomUUID();
-            User user = activeUser(userId, "locked@pos.local");
+            User user = activeUser(userId, "locked@pos.local", "locked.user");
             user.setLockedUntil(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(10));
 
             when(userRepository.findByEmailAndDeletedAtIsNull("locked@pos.local")).thenReturn(Optional.of(user));
-            when(authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(eq("locked@pos.local"), any(OffsetDateTime.class)))
+            when(authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(eq(userId), any(OffsetDateTime.class)))
                     .thenReturn(0L);
 
             assertThatThrownBy(() -> authLoginService.login(
@@ -360,7 +390,7 @@ class AuthLoginServiceTest {
         @DisplayName("Should block login before password verification when IP rate limit is reached")
         void shouldBlockLogin_whenIpRateLimitReached() {
             UUID userId = UUID.randomUUID();
-            User user = activeUser(userId, "cashier@pos.local");
+            User user = activeUser(userId, "cashier@pos.local", "cashier.one");
 
             when(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(Optional.of(user));
             when(authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(eq("127.0.0.1"), any(OffsetDateTime.class)))
@@ -370,10 +400,11 @@ class AuthLoginServiceTest {
                     loginRequest("cashier@pos.local", "Password123!"),
                     new ClientInfo("127.0.0.1", "JUnit")
             ))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(TooManyRequestsException.class)
                     .hasMessage(TOO_MANY_ATTEMPTS_MESSAGE);
 
-            verify(authLoginAttemptRepository, never()).countByEmailAndAttemptedAtAfterAndSuccessFalse(any(), any());
+            verify(authLoginAttemptRepository, never()).countByUserIdAndAttemptedAtAfterAndSuccessFalse(any(UUID.class), any());
+            verify(authLoginAttemptRepository, never()).countByIdentifierAndAttemptedAtAfterAndSuccessFalse(any(), any());
             verify(passwordService, never()).matches(any(), any());
             verify(userRepository, never()).save(any(User.class));
 
@@ -388,19 +419,19 @@ class AuthLoginServiceTest {
         @DisplayName("Should block login before password verification when account rate limit is reached")
         void shouldBlockLogin_whenAccountRateLimitReached() {
             UUID userId = UUID.randomUUID();
-            User user = activeUser(userId, "cashier@pos.local");
+            User user = activeUser(userId, "cashier@pos.local", "cashier.one");
 
             when(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(Optional.of(user));
             when(authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(eq("127.0.0.1"), any(OffsetDateTime.class)))
                     .thenReturn(0L);
-            when(authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(eq("cashier@pos.local"), any(OffsetDateTime.class)))
+            when(authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(eq(userId), any(OffsetDateTime.class)))
                     .thenReturn(5L);
 
             assertThatThrownBy(() -> authLoginService.login(
                     loginRequest("cashier@pos.local", "Password123!"),
                     new ClientInfo("127.0.0.1", "JUnit")
             ))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(TooManyRequestsException.class)
                     .hasMessage(TOO_MANY_ATTEMPTS_MESSAGE);
 
             verify(passwordService, never()).matches(any(), any());
@@ -417,7 +448,7 @@ class AuthLoginServiceTest {
         @DisplayName("Should revoke oldest session when session limit is reached")
         void shouldRevokeOldestSession_whenSessionLimitReached() {
             UUID userId = UUID.randomUUID();
-            User user = activeUser(userId, "cashier@pos.local");
+            User user = activeUser(userId, "cashier@pos.local", "cashier.one");
             List<String> roles = List.of("ADMIN");
             UserSession mappedSession = UserSession.builder()
                     .userId(userId)
@@ -428,7 +459,7 @@ class AuthLoginServiceTest {
             when(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(Optional.of(user));
             when(authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(eq("127.0.0.1"), any(OffsetDateTime.class)))
                     .thenReturn(0L);
-            when(authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(eq("cashier@pos.local"), any(OffsetDateTime.class)))
+            when(authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(eq(userId), any(OffsetDateTime.class)))
                     .thenReturn(0L);
             when(passwordService.matches("Password123!", "stored-hash")).thenReturn(true);
             when(userSessionRepository.countByUserIdAndRevokedFalseAndExpiresAtAfter(eq(userId), any(OffsetDateTime.class)))
@@ -464,17 +495,18 @@ class AuthLoginServiceTest {
      * =========================================
      */
 
-    private LoginRequest loginRequest(String email, String password) {
+    private LoginRequest loginRequest(String identifier, String password) {
         return LoginRequest.builder()
-                .email(email)
+                .identifier(identifier)
                 .password(password)
                 .build();
     }
 
-    private User activeUser(UUID userId, String email) {
+    private User activeUser(UUID userId, String email, String username) {
         return User.builder()
                 .id(userId)
                 .email(email)
+                .username(username)
                 .passwordHash("stored-hash")
                 .firstName("Cash")
                 .lastName("ier")

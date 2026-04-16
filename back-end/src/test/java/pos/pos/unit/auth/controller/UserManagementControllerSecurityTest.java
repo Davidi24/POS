@@ -73,6 +73,7 @@ class UserManagementControllerSecurityTest {
         UserResponse response = UserResponse.builder()
                 .id(CREATED_USER_ID)
                 .email("cashier@pos.local")
+                .username("cashier.one")
                 .firstName("John")
                 .lastName("Doe")
                 .phone("+49-555-0100")
@@ -90,6 +91,7 @@ class UserManagementControllerSecurityTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(CREATED_USER_ID.toString()))
                 .andExpect(jsonPath("$.email").value("cashier@pos.local"))
+                .andExpect(jsonPath("$.username").value("cashier.one"))
                 .andExpect(jsonPath("$.roles[0]").value("CASHIER"));
 
         verify(authRegisterService).register(any(CreateUserRequest.class), any());
@@ -126,6 +128,7 @@ class UserManagementControllerSecurityTest {
     private CreateUserRequest validRequest() {
         CreateUserRequest request = new CreateUserRequest();
         request.setEmail("cashier@pos.local");
+        request.setUsername("cashier.one");
         request.setTemporaryPassword("SecurePass1!");
         request.setFirstName("John");
         request.setLastName("Doe");
@@ -172,6 +175,7 @@ class UserManagementControllerSecurityTest {
                                 AuthenticatedUser.builder()
                                         .id(UUID.nameUUIDFromBytes(user.getBytes()))
                                         .email(user)
+                                        .username(user.substring(0, user.indexOf('@')))
                                         .active(true)
                                         .build(),
                                 null,

@@ -101,6 +101,21 @@ class EmailVerificationControllerTest {
                     .andExpect(jsonPath("$.status").value(401))
                     .andExpect(jsonPath("$.message").value("Invalid token"));
         }
+
+        @Test
+        @DisplayName("Should return 400 on malformed JSON body")
+        void shouldReturn400OnMalformedJsonBody() throws Exception {
+            String malformedJson = "{\"token\":}";
+
+            mockMvc.perform(post("/auth/verify-email")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(malformedJson))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value("Malformed request body"));
+
+            verifyNoInteractions(emailVerificationService);
+        }
     }
 
     @Nested
@@ -147,6 +162,21 @@ class EmailVerificationControllerTest {
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value(400));
+
+            verifyNoInteractions(emailVerificationService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 on malformed JSON body")
+        void shouldReturn400OnMalformedJsonBody() throws Exception {
+            String malformedJson = "{\"email\":}";
+
+            mockMvc.perform(post("/auth/resend-verification")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(malformedJson))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value("Malformed request body"));
 
             verifyNoInteractions(emailVerificationService);
         }

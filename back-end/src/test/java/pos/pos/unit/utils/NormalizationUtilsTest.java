@@ -195,6 +195,35 @@ class NormalizationUtilsTest {
         }
     }
 
+    @Nested
+    @DisplayName("normalizePhone()")
+    class NormalizePhone {
+
+        @Test
+        @DisplayName("Should return null for null input")
+        void shouldReturnNullForNull() {
+            assertNull(NormalizationUtils.normalizePhone(null));
+        }
+
+        @Test
+        @DisplayName("Should return null for blank input")
+        void shouldReturnNullForBlank() {
+            assertNull(NormalizationUtils.normalizePhone("   "));
+        }
+
+        @Test
+        @DisplayName("Should remove spaces and common separators")
+        void shouldRemoveSpacesAndCommonSeparators() {
+            assertEquals("+495550100", NormalizationUtils.normalizePhone(" +49 (555) 01-00 "));
+        }
+
+        @Test
+        @DisplayName("Should preserve digits and a leading plus sign")
+        void shouldPreserveDigitsAndLeadingPlusSign() {
+            assertEquals("+12025550100", NormalizationUtils.normalizePhone("+1.202.555.0100"));
+        }
+    }
+
     private void withDefaultLocale(Locale locale, Runnable assertion) {
         Locale originalLocale = Locale.getDefault();
         Locale.setDefault(locale);

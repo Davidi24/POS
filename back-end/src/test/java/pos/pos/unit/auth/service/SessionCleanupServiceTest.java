@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import pos.pos.auth.repository.AuthEmailVerificationTokenRepository;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.AuthPasswordResetTokenRepository;
+import pos.pos.auth.repository.AuthSmsOtpCodeRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.SessionCleanupService;
 
@@ -27,6 +28,9 @@ class SessionCleanupServiceTest {
     private AuthEmailVerificationTokenRepository authEmailVerificationTokenRepository;
 
     @Mock
+    private AuthSmsOtpCodeRepository authSmsOtpCodeRepository;
+
+    @Mock
     private AuthLoginAttemptRepository authLoginAttemptRepository;
 
     @InjectMocks
@@ -39,6 +43,7 @@ class SessionCleanupServiceTest {
         verify(userSessionRepository).deleteExpiredOrRevokedSessions(any());
         verify(authPasswordResetTokenRepository).deleteExpiredTokens(any());
         verify(authEmailVerificationTokenRepository).deleteExpiredTokens(any());
+        verify(authSmsOtpCodeRepository).deleteExpiredCodes(any());
         verify(authLoginAttemptRepository).deleteOlderThan(any());
     }
 }

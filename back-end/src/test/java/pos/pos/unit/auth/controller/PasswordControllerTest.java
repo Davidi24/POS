@@ -19,6 +19,8 @@ import pos.pos.auth.controller.PasswordController;
 import pos.pos.auth.dto.ChangePasswordRequest;
 import pos.pos.auth.dto.ForgotPasswordRequest;
 import pos.pos.auth.dto.ResetPasswordRequest;
+import pos.pos.auth.dto.ResetPasswordWithCodeRequest;
+import pos.pos.auth.enums.RecoveryChannel;
 import pos.pos.auth.service.ChangePasswordService;
 import pos.pos.auth.service.PasswordResetService;
 import pos.pos.exception.auth.InvalidCredentialsException;
@@ -117,6 +119,21 @@ class PasswordControllerTest {
 
             verifyNoInteractions(passwordResetService);
         }
+
+        @Test
+        @DisplayName("Should return 204 when SMS reset is requested with a phone number")
+        void shouldReturn204WhenSmsResetIsRequestedWithPhone() throws Exception {
+            ForgotPasswordRequest request = new ForgotPasswordRequest();
+            request.setPhone("+49 (555) 01-00");
+            request.setChannel(RecoveryChannel.SMS);
+
+            mockMvc.perform(post("/auth/forgot-password")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNoContent());
+
+            verify(passwordResetService).requestReset(any(ForgotPasswordRequest.class));
+        }
     }
 
     @Nested
@@ -186,6 +203,44 @@ class PasswordControllerTest {
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.status").value(401))
                     .andExpect(jsonPath("$.message").value("Invalid token"));
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /auth/reset-password/code")
+    class ResetPasswordWithCodeTests {
+
+        @Test
+        @DisplayName("Should return 204 when phone, code, and new password are valid")
+        void shouldReturn204WhenPhoneCodeAndPasswordAreValid() throws Exception {
+            ResetPasswordWithCodeRequest request = new ResetPasswordWithCodeRequest();
+            request.setPhone("+49 (555) 01-00");
+            request.setCode("123456");
+            request.setNewPassword("SecurePass1!");
+
+            mockMvc.perform(post("/auth/reset-password/code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNoContent());
+
+            verify(passwordResetService).resetPasswordWithCode(any(ResetPasswordWithCodeRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should return 400 when phone is blank")
+        void shouldReturn400WhenPhoneIsBlank() throws Exception {
+            ResetPasswordWithCodeRequest request = new ResetPasswordWithCodeRequest();
+            request.setPhone(" ");
+            request.setCode("123456");
+            request.setNewPassword("SecurePass1!");
+
+            mockMvc.perform(post("/auth/reset-password/code")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400));
+
+            verifyNoInteractions(passwordResetService);
         }
     }
 

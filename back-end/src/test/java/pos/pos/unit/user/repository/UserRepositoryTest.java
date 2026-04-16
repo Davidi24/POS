@@ -36,7 +36,7 @@ class UserRepositoryTest {
         @Test
         @DisplayName("Should find active non-deleted user by normalized email")
         void shouldFindNonDeletedUserByEmail() {
-            User user = repository.save(user("  Cashier@POS.local  ", true, null));
+            User user = repository.save(user("  Cashier@POS.local  ", "cashier.one", true, null));
             repository.flush();
             entityManager.clear();
 
@@ -58,7 +58,7 @@ class UserRepositoryTest {
         @Test
         @DisplayName("Should not find soft-deleted user by email")
         void shouldNotFindDeletedUserByEmail() {
-            repository.save(user("deleted@pos.local", true, OffsetDateTime.now(ZoneOffset.UTC)));
+            repository.save(user("deleted@pos.local", "deleted.user", true, OffsetDateTime.now(ZoneOffset.UTC)));
             repository.flush();
             entityManager.clear();
 
@@ -75,7 +75,7 @@ class UserRepositoryTest {
         @Test
         @DisplayName("Should return true for existing non-deleted user")
         void shouldReturnTrueForExistingNonDeletedUser() {
-            repository.save(user("cashier@pos.local", true, null));
+            repository.save(user("cashier@pos.local", "cashier.one", true, null));
             repository.flush();
             entityManager.clear();
 
@@ -87,7 +87,7 @@ class UserRepositoryTest {
         @Test
         @DisplayName("Should return false for soft-deleted user")
         void shouldReturnFalseForDeletedUser() {
-            repository.save(user("deleted@pos.local", true, OffsetDateTime.now(ZoneOffset.UTC)));
+            repository.save(user("deleted@pos.local", "deleted.user", true, OffsetDateTime.now(ZoneOffset.UTC)));
             repository.flush();
             entityManager.clear();
 
@@ -106,13 +106,177 @@ class UserRepositoryTest {
     }
 
     @Nested
+    @DisplayName("findByUsernameAndDeletedAtIsNull")
+    class FindByUsernameTests {
+
+        @Test
+        @DisplayName("Should find active non-deleted user by normalized username")
+        void shouldFindNonDeletedUserByUsername() {
+            User user = repository.save(user("cashier@pos.local", "  Cashier.One  ", true, null));
+            repository.flush();
+            entityManager.clear();
+
+            Optional<User> result = repository.findByUsernameAndDeletedAtIsNull("cashier.one");
+
+            assertThat(result).isPresent();
+            assertThat(result.get().getId()).isEqualTo(user.getId());
+            assertThat(result.get().getUsername()).isEqualTo("cashier.one");
+        }
+
+        @Test
+        @DisplayName("Should return empty when username does not exist")
+        void shouldReturnEmptyWhenUsernameDoesNotExist() {
+            Optional<User> result = repository.findByUsernameAndDeletedAtIsNull("missing.user");
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should not find soft-deleted user by username")
+        void shouldNotFindDeletedUserByUsername() {
+            repository.save(user("deleted@pos.local", "deleted.user", true, OffsetDateTime.now(ZoneOffset.UTC)));
+            repository.flush();
+            entityManager.clear();
+
+            Optional<User> result = repository.findByUsernameAndDeletedAtIsNull("deleted.user");
+
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("existsByUsernameAndDeletedAtIsNull")
+    class ExistsByUsernameTests {
+
+        @Test
+        @DisplayName("Should return true for existing non-deleted username")
+        void shouldReturnTrueForExistingNonDeletedUsername() {
+            repository.save(user("cashier@pos.local", "cashier.one", true, null));
+            repository.flush();
+            entityManager.clear();
+
+            boolean exists = repository.existsByUsernameAndDeletedAtIsNull("cashier.one");
+
+            assertThat(exists).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should return false for soft-deleted username")
+        void shouldReturnFalseForDeletedUsername() {
+            repository.save(user("deleted@pos.local", "deleted.user", true, OffsetDateTime.now(ZoneOffset.UTC)));
+            repository.flush();
+            entityManager.clear();
+
+            boolean exists = repository.existsByUsernameAndDeletedAtIsNull("deleted.user");
+
+            assertThat(exists).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false when username does not exist")
+        void shouldReturnFalseWhenUsernameDoesNotExist() {
+            boolean exists = repository.existsByUsernameAndDeletedAtIsNull("missing.user");
+
+            assertThat(exists).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("findByNormalizedPhoneAndDeletedAtIsNull")
+    class FindByNormalizedPhoneTests {
+
+        @Test
+        @DisplayName("Should find active non-deleted user by normalized phone")
+        void shouldFindNonDeletedUserByNormalizedPhone() {
+            User user = repository.save(user("cashier@pos.local", "cashier.one", " +49 (555) 01-00 ", true, null));
+            repository.flush();
+            entityManager.clear();
+
+            Optional<User> result = repository.findByNormalizedPhoneAndDeletedAtIsNull("+495550100");
+
+            assertThat(result).isPresent();
+            assertThat(result.get().getId()).isEqualTo(user.getId());
+            assertThat(result.get().getNormalizedPhone()).isEqualTo("+495550100");
+        }
+
+        @Test
+        @DisplayName("Should return empty when normalized phone does not exist")
+        void shouldReturnEmptyWhenNormalizedPhoneDoesNotExist() {
+            Optional<User> result = repository.findByNormalizedPhoneAndDeletedAtIsNull("+495559999");
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should not find soft-deleted user by normalized phone")
+        void shouldNotFindDeletedUserByNormalizedPhone() {
+            repository.save(user(
+                    "deleted@pos.local",
+                    "deleted.user",
+                    "+49-555-0100",
+                    true,
+                    OffsetDateTime.now(ZoneOffset.UTC)
+            ));
+            repository.flush();
+            entityManager.clear();
+
+            Optional<User> result = repository.findByNormalizedPhoneAndDeletedAtIsNull("+495550100");
+
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("existsByNormalizedPhoneAndDeletedAtIsNull")
+    class ExistsByNormalizedPhoneTests {
+
+        @Test
+        @DisplayName("Should return true for existing non-deleted normalized phone")
+        void shouldReturnTrueForExistingNonDeletedNormalizedPhone() {
+            repository.save(user("cashier@pos.local", "cashier.one", "+49-555-0100", true, null));
+            repository.flush();
+            entityManager.clear();
+
+            boolean exists = repository.existsByNormalizedPhoneAndDeletedAtIsNull("+495550100");
+
+            assertThat(exists).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should return false for soft-deleted normalized phone")
+        void shouldReturnFalseForDeletedNormalizedPhone() {
+            repository.save(user(
+                    "deleted@pos.local",
+                    "deleted.user",
+                    "+49-555-0100",
+                    true,
+                    OffsetDateTime.now(ZoneOffset.UTC)
+            ));
+            repository.flush();
+            entityManager.clear();
+
+            boolean exists = repository.existsByNormalizedPhoneAndDeletedAtIsNull("+495550100");
+
+            assertThat(exists).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false when normalized phone does not exist")
+        void shouldReturnFalseWhenNormalizedPhoneDoesNotExist() {
+            boolean exists = repository.existsByNormalizedPhoneAndDeletedAtIsNull("+495559999");
+
+            assertThat(exists).isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("findActiveById")
     class FindActiveByIdTests {
 
         @Test
         @DisplayName("Should find active non-deleted user by id")
         void shouldFindActiveNonDeletedUserById() {
-            User user = repository.save(user("active@pos.local", true, null));
+            User user = repository.save(user("active@pos.local", "active.user", true, null));
             repository.flush();
             entityManager.clear();
 
@@ -125,7 +289,7 @@ class UserRepositoryTest {
         @Test
         @DisplayName("Should not find inactive user by id")
         void shouldNotFindInactiveUserById() {
-            User user = repository.save(user("inactive@pos.local", false, null));
+            User user = repository.save(user("inactive@pos.local", "inactive.user", false, null));
             repository.flush();
             entityManager.clear();
 
@@ -137,7 +301,7 @@ class UserRepositoryTest {
         @Test
         @DisplayName("Should not find soft-deleted user by id")
         void shouldNotFindDeletedUserById() {
-            User user = repository.save(user("deleted@pos.local", true, OffsetDateTime.now(ZoneOffset.UTC)));
+            User user = repository.save(user("deleted@pos.local", "deleted.user", true, OffsetDateTime.now(ZoneOffset.UTC)));
             repository.flush();
             entityManager.clear();
 
@@ -155,13 +319,19 @@ class UserRepositoryTest {
         }
     }
 
-    private User user(String email, boolean isActive, OffsetDateTime deletedAt) {
+    private User user(String email, String username, boolean isActive, OffsetDateTime deletedAt) {
+        return user(email, username, null, isActive, deletedAt);
+    }
+
+    private User user(String email, String username, String phone, boolean isActive, OffsetDateTime deletedAt) {
         return User.builder()
                 .id(UUID.randomUUID())
                 .email(email)
+                .username(username)
                 .passwordHash("stored-password-hash")
                 .firstName("John")
                 .lastName("Doe")
+                .phone(phone)
                 .status("ACTIVE")
                 .isActive(isActive)
                 .emailVerified(true)

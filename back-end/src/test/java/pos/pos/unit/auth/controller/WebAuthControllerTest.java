@@ -23,6 +23,7 @@ import pos.pos.auth.service.AuthLoginService;
 import pos.pos.auth.service.AuthLogoutService;
 import pos.pos.auth.service.AuthRefreshService;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.exception.auth.TooManyRequestsException;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoExtractor;
@@ -45,6 +46,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class WebAuthControllerTest {
+
+    private static final String TOO_MANY_LOGIN_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
 
     @Mock
     private AuthLoginService authLoginService;
@@ -73,6 +76,7 @@ class WebAuthControllerTest {
     private static final UserResponse USER = UserResponse.builder()
             .id(UUID.fromString("00000000-0000-0000-0000-000000000001"))
             .email("cashier@pos.local")
+            .username("cashier.one")
             .firstName("John")
             .lastName("Doe")
             .isActive(true)
@@ -132,28 +136,45 @@ class WebAuthControllerTest {
         }
 
         @Test
-        @DisplayName("Should return 400 when email format is invalid")
-        void shouldReturn400_onInvalidEmailFormat() throws Exception {
+        @DisplayName("Should accept a username identifier")
+        void shouldAcceptUsernameIdentifier() throws Exception {
             LoginRequest request = LoginRequest.builder()
-                    .email("not-an-email")
+                    .identifier("cashier.one")
                     .password("SecurePass1!")
                     .build();
+
+            given(authLoginService.login(any(), any())).willReturn(AUTH_TOKENS);
 
             mockMvc.perform(post("/auth/web/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.status").value(400));
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.user.username").value("cashier.one"));
 
-            verifyNoInteractions(authLoginService);
-            verifyNoInteractions(clientInfoExtractor);
+            verify(clientInfoExtractor).extract(any());
+            verify(authLoginService).login(any(), any());
         }
 
         @Test
-        @DisplayName("Should return 400 when email is blank")
-        void shouldReturn400_onBlankEmail() throws Exception {
+        @DisplayName("Should accept the legacy email field as a login alias")
+        void shouldAcceptLegacyEmailAlias() throws Exception {
+            given(authLoginService.login(any(), any())).willReturn(AUTH_TOKENS);
+
+            mockMvc.perform(post("/auth/web/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"email\":\"cashier@pos.local\",\"password\":\"SecurePass1!\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.user.email").value("cashier@pos.local"));
+
+            verify(clientInfoExtractor).extract(any());
+            verify(authLoginService).login(any(), any());
+        }
+
+        @Test
+        @DisplayName("Should return 400 when identifier is blank")
+        void shouldReturn400_onBlankIdentifier() throws Exception {
             LoginRequest request = LoginRequest.builder()
-                    .email("")
+                    .identifier("")
                     .password("SecurePass1!")
                     .build();
 
@@ -167,7 +188,7 @@ class WebAuthControllerTest {
         @DisplayName("Should return 400 when password is too short")
         void shouldReturn400_onShortPassword() throws Exception {
             LoginRequest request = LoginRequest.builder()
-                    .email("cashier@pos.local")
+                    .identifier("cashier@pos.local")
                     .password("short")
                     .build();
 
@@ -181,7 +202,7 @@ class WebAuthControllerTest {
         @DisplayName("Should return 400 when password is blank")
         void shouldReturn400_onBlankPassword() throws Exception {
             LoginRequest request = LoginRequest.builder()
-                    .email("cashier@pos.local")
+                    .identifier("cashier@pos.local")
                     .password("")
                     .build();
 
@@ -209,9 +230,23 @@ class WebAuthControllerTest {
         }
 
         @Test
+        @DisplayName("Should return 429 when login is rate limited")
+        void shouldReturn429_whenLoginIsRateLimited() throws Exception {
+            given(authLoginService.login(any(), any()))
+                    .willThrow(new TooManyRequestsException(TOO_MANY_LOGIN_ATTEMPTS_MESSAGE));
+
+            mockMvc.perform(post("/auth/web/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validLoginRequest())))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.status").value(429))
+                    .andExpect(jsonPath("$.message").value(TOO_MANY_LOGIN_ATTEMPTS_MESSAGE));
+        }
+
+        @Test
         @DisplayName("Should return 400 on malformed JSON body")
         void shouldReturn400_onMalformedJson() throws Exception {
-            String malformedJson = "{\"email\": \"test@test.com\", \"password\": }";
+            String malformedJson = "{\"identifier\": \"cashier.one\", \"password\": }";
 
             mockMvc.perform(post("/auth/web/login")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -297,6 +332,19 @@ class WebAuthControllerTest {
                     .andExpect(jsonPath("$.message").value("Token invalid or expired"));
 
             verify(cookieService).clearRefreshTokenCookie(any());
+        }
+
+        @Test
+        @DisplayName("Should return 429 when refresh is rate limited")
+        void shouldReturn429_whenRefreshIsRateLimited() throws Exception {
+            given(authRefreshService.refresh(any(), any()))
+                    .willThrow(new TooManyRequestsException("Too many refresh attempts. Try again later."));
+
+            mockMvc.perform(post("/auth/web/refresh")
+                            .cookie(new Cookie(COOKIE_NAME, REFRESH_TOKEN)))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.status").value(429))
+                    .andExpect(jsonPath("$.message").value("Too many refresh attempts. Try again later."));
         }
 
         @Test
@@ -426,7 +474,7 @@ class WebAuthControllerTest {
 
     private LoginRequest validLoginRequest() {
         return LoginRequest.builder()
-                .email("cashier@pos.local")
+                .identifier("cashier@pos.local")
                 .password("SecurePass1!")
                 .build();
     }
