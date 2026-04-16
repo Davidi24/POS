@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import pos.pos.auth.dto.ChangePasswordRequest;
 import pos.pos.auth.dto.ForgotPasswordRequest;
 import pos.pos.auth.dto.ResetPasswordRequest;
+import pos.pos.auth.dto.ResetPasswordWithCodeRequest;
 import pos.pos.auth.service.ChangePasswordService;
 import pos.pos.auth.service.PasswordResetService;
 import pos.pos.exception.auth.InvalidTokenException;
@@ -34,7 +35,7 @@ public class PasswordController {
     private final JwtService jwtService;
 
     @PostMapping("/forgot-password")
-    @Operation(summary = "Request a password reset email")
+    @Operation(summary = "Request a password reset by email link or SMS code")
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         passwordResetService.requestReset(request);
         return ResponseEntity.noContent().build();
@@ -44,6 +45,13 @@ public class PasswordController {
     @Operation(summary = "Reset password using a valid password reset token")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordResetService.resetPassword(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/reset-password/code")
+    @Operation(summary = "Reset password using a valid SMS code")
+    public ResponseEntity<Void> resetPasswordWithCode(@Valid @RequestBody ResetPasswordWithCodeRequest request) {
+        passwordResetService.resetPasswordWithCode(request);
         return ResponseEntity.noContent().build();
     }
 

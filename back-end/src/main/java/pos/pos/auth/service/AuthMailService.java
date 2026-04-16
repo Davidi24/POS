@@ -8,6 +8,9 @@ import pos.pos.config.properties.AppMailProperties;
 
 import java.time.Duration;
 
+
+// checked
+// tested
 @Service
 @RequiredArgsConstructor
 public class AuthMailService {
@@ -59,6 +62,22 @@ public class AuthMailService {
                 """.formatted(name, verificationUrl, Math.max(1, tokenTtl.toHours()));
 
         send(recipientEmail, subject, body);
+    }
+
+    public void sendPasswordChangedNotificationEmail(
+            String recipientEmail,
+            String firstName
+    ) {
+        String name = normalizeName(firstName);
+        String body = """
+                Hello %s,
+
+                Your POS password was changed successfully.
+
+                If you did not make this change, contact support immediately.
+                """.formatted(name);
+
+        send(recipientEmail, "Your POS password was changed", body);
     }
 
     private void send(String recipientEmail, String subject, String body) {

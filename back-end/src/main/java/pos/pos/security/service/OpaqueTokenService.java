@@ -11,6 +11,8 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
 
+// checked
+// tested
 @Service
 public class OpaqueTokenService {
 

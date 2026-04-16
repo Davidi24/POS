@@ -11,6 +11,7 @@ import java.util.UUID;
 
 public interface AuthEmailVerificationTokenRepository extends JpaRepository<AuthEmailVerificationToken, UUID> {
 
+    // finds the token that came from request and checks if it is used or expired
     Optional<AuthEmailVerificationToken> findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(
             String tokenHash,
             OffsetDateTime now

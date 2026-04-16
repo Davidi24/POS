@@ -13,6 +13,7 @@ public class SecurityPaths {
             "/auth/device/logout-all",
             "/auth/forgot-password",
             "/auth/reset-password",
+            "/auth/reset-password/code",
             "/auth/verify-email",
             "/auth/resend-verification",
 
