@@ -24,6 +24,7 @@ public class ChangePasswordService {
     private final UserRepository userRepository;
     private final PasswordService passwordService;
     private final UserSessionRepository userSessionRepository;
+    private final AuthMailService authMailService;
 
     @Transactional
     public void changePassword(UUID userId, UUID currentTokenId, ChangePasswordRequest request) {
@@ -40,6 +41,10 @@ public class ChangePasswordService {
         userRepository.save(user);
 
         String reason = SessionRevocationReason.PASSWORD_CHANGED.name();
+
+        //   Two cases:
+        //  - Current session found → revoke all sessions except this one
+        //  - Current session not found → revoke all sessions (no session to keep)
         userSessionRepository.findByTokenIdAndRevokedFalse(currentTokenId)
                 .map(UserSession::getId)
                 .ifPresentOrElse(
@@ -48,5 +53,7 @@ public class ChangePasswordService {
                         () -> userSessionRepository.revokeAllActiveSessionsByUserId(
                                 user.getId(), now, reason)
                 );
+
+        authMailService.sendPasswordChangedNotificationEmail(user.getEmail(), user.getFirstName());
     }
 }

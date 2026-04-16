@@ -76,12 +76,12 @@ class AuthLoginAttemptRepositoryTest {
     }
 
     @Nested
-    @DisplayName("countByEmailAndAttemptedAtAfterAndSuccessFalse")
-    class CountByEmailTests {
+    @DisplayName("countByIdentifierAndAttemptedAtAfterAndSuccessFalse")
+    class CountByIdentifierTests {
 
         @Test
-        @DisplayName("Should count only failed attempts for matching email after the cutoff")
-        void shouldCountOnlyFailedAttemptsForMatchingEmailAfterCutoff() {
+        @DisplayName("Should count only failed attempts for matching identifier after the cutoff")
+        void shouldCountOnlyFailedAttemptsForMatchingIdentifierAfterCutoff() {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             OffsetDateTime cutoff = now.minusMinutes(10);
 
@@ -91,14 +91,14 @@ class AuthLoginAttemptRepositoryTest {
             repository.save(attempt("10.0.0.1", "admin@pos.local", false, now.minusMinutes(5)));
             repository.flush();
 
-            long count = repository.countByEmailAndAttemptedAtAfterAndSuccessFalse("cashier@pos.local", cutoff);
+            long count = repository.countByIdentifierAndAttemptedAtAfterAndSuccessFalse("cashier@pos.local", cutoff);
 
             assertThat(count).isEqualTo(1);
         }
 
         @Test
-        @DisplayName("Should return 0 when all recent attempts for the email are successful")
-        void shouldReturnZero_whenAllRecentAttemptsAreSuccessful() {
+        @DisplayName("Should return 0 when all recent attempts for the identifier are successful")
+        void shouldReturnZeroWhenAllRecentAttemptsAreSuccessful() {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             OffsetDateTime cutoff = now.minusMinutes(10);
 
@@ -106,23 +106,46 @@ class AuthLoginAttemptRepositoryTest {
             repository.save(attempt("10.0.0.1", "cashier@pos.local", true, now.minusMinutes(3)));
             repository.flush();
 
-            long count = repository.countByEmailAndAttemptedAtAfterAndSuccessFalse("cashier@pos.local", cutoff);
+            long count = repository.countByIdentifierAndAttemptedAtAfterAndSuccessFalse("cashier@pos.local", cutoff);
 
             assertThat(count).isZero();
         }
 
         @Test
-        @DisplayName("Should return 0 when email does not match")
-        void shouldReturnZero_whenEmailDoesNotMatch() {
+        @DisplayName("Should return 0 when identifier does not match")
+        void shouldReturnZeroWhenIdentifierDoesNotMatch() {
             OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
             OffsetDateTime cutoff = now.minusMinutes(10);
 
             repository.save(attempt("10.0.0.1", "other@pos.local", false, now.minusMinutes(5)));
             repository.flush();
 
-            long count = repository.countByEmailAndAttemptedAtAfterAndSuccessFalse("cashier@pos.local", cutoff);
+            long count = repository.countByIdentifierAndAttemptedAtAfterAndSuccessFalse("cashier@pos.local", cutoff);
 
             assertThat(count).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("countByUserIdAndAttemptedAtAfterAndSuccessFalse")
+    class CountByUserIdTests {
+
+        @Test
+        @DisplayName("Should count failed attempts for the same user across multiple identifiers")
+        void shouldCountFailedAttemptsForSameUserAcrossIdentifiers() {
+            UUID userId = UUID.randomUUID();
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            OffsetDateTime cutoff = now.minusMinutes(10);
+
+            repository.save(attempt(userId, "10.0.0.1", "cashier.one", false, now.minusMinutes(5)));
+            repository.save(attempt(userId, "10.0.0.1", "cashier@pos.local", false, now.minusMinutes(3)));
+            repository.save(attempt(userId, "10.0.0.1", "cashier.one", true, now.minusMinutes(1)));
+            repository.save(attempt(UUID.randomUUID(), "10.0.0.1", "other.user", false, now.minusMinutes(2)));
+            repository.flush();
+
+            long count = repository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(userId, cutoff);
+
+            assertThat(count).isEqualTo(2);
         }
     }
 
@@ -186,14 +209,24 @@ class AuthLoginAttemptRepositoryTest {
 
     private AuthLoginAttempt attempt(
             String ipAddress,
-            String email,
+            String identifier,
+            boolean success,
+            OffsetDateTime attemptedAt
+    ) {
+        return attempt(UUID.randomUUID(), ipAddress, identifier, success, attemptedAt);
+    }
+
+    private AuthLoginAttempt attempt(
+            UUID userId,
+            String ipAddress,
+            String identifier,
             boolean success,
             OffsetDateTime attemptedAt
     ) {
         return AuthLoginAttempt.builder()
                 .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
-                .email(email)
+                .userId(userId)
+                .identifier(identifier)
                 .ipAddress(ipAddress)
                 .userAgent("JUnit")
                 .success(success)

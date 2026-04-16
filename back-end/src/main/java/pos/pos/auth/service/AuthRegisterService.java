@@ -5,6 +5,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.EmailAlreadyExistsException;
+import pos.pos.exception.auth.PhoneAlreadyExistsException;
+import pos.pos.exception.auth.UsernameAlreadyExistsException;
 import pos.pos.exception.role.RoleNotFoundException;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
@@ -20,14 +22,11 @@ import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserRoleRepository;
 import pos.pos.utils.NormalizationUtils;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
 // checked
 // tested
-
 @Service
 @RequiredArgsConstructor
 public class AuthRegisterService {
@@ -38,15 +37,24 @@ public class AuthRegisterService {
     private final PasswordService passwordService;
     private final UserMapper userMapper;
     private final RoleHierarchyService roleHierarchyService;
+    private final EmailVerificationService emailVerificationService;
 
     @Transactional
     public UserResponse register(CreateUserRequest request, Authentication authentication) {
         UUID createdByUserId = currentUser(authentication).getId();
 
         String normalizedEmail = NormalizationUtils.normalizeLower(request.getEmail());
+        String normalizedUsername = NormalizationUtils.normalizeLower(request.getUsername());
+        String normalizedPhone = NormalizationUtils.normalizePhone(request.getPhone());
 
         if (userRepository.existsByEmailAndDeletedAtIsNull(normalizedEmail)) {
             throw new EmailAlreadyExistsException();
+        }
+        if (userRepository.existsByUsernameAndDeletedAtIsNull(normalizedUsername)) {
+            throw new UsernameAlreadyExistsException();
+        }
+        if (normalizedPhone != null && userRepository.existsByNormalizedPhoneAndDeletedAtIsNull(normalizedPhone)) {
+            throw new PhoneAlreadyExistsException();
         }
 
         Role role = roleRepository.findById(request.getRoleId())
@@ -55,18 +63,17 @@ public class AuthRegisterService {
 
         roleHierarchyService.assertCanAssignRole(authentication, role);
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-
         User user = User.builder()
                 .email(normalizedEmail)
+                .username(normalizedUsername)
                 .passwordHash(passwordService.hash(request.getTemporaryPassword()))
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
                 .phone(request.getPhone())
                 .status("ACTIVE")
                 .isActive(true)
-                .emailVerified(true)
-                .emailVerifiedAt(now)
+                .emailVerified(false)
+                .phoneVerified(false)
                 .createdBy(createdByUserId)
                 .updatedBy(createdByUserId)
                 .build();
@@ -80,6 +87,8 @@ public class AuthRegisterService {
                 .build();
 
         userRoleRepository.save(userRole);
+
+        emailVerificationService.issueVerificationForUser(user, request.getClientTarget());
 
         return userMapper.toUserResponse(user, List.of(role.getCode()));
     }

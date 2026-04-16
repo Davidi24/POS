@@ -1,3 +1,12 @@
+DROP TABLE IF EXISTS "auth_sms_otp_codes" CASCADE;
+DROP TABLE IF EXISTS "branch-contacts" CASCADE;
+DROP TABLE IF EXISTS "branch-addresses" CASCADE;
+DROP TABLE IF EXISTS "restaurant-tax-profiles" CASCADE;
+DROP TABLE IF EXISTS "restaurant-contacts" CASCADE;
+DROP TABLE IF EXISTS "restaurant-addresses" CASCADE;
+DROP TABLE IF EXISTS "restaurant-branding" CASCADE;
+DROP TABLE IF EXISTS "branches" CASCADE;
+DROP TABLE IF EXISTS "restaurants" CASCADE;
 DROP TABLE IF EXISTS "auth-email-verification-tokens" CASCADE;
 DROP TABLE IF EXISTS "auth-login-attempts" CASCADE;
 DROP TABLE IF EXISTS "auth-password-reset-tokens" CASCADE;

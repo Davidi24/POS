@@ -18,7 +18,8 @@ import java.util.List;
 import java.util.UUID;
 
 
-
+// checked
+// tested
 @Tag(name = "Authentication / Sessions")
 @RestController
 @RequestMapping("/users")

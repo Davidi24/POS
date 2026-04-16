@@ -22,6 +22,7 @@ import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserRoleRepository;
 import pos.pos.utils.NormalizationUtils;
 
+import java.util.Objects;
 import java.util.Set;
 
 @Component
@@ -109,9 +110,13 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
 
     private void seedSuperAdminUser() {
         String normalizedEmail = NormalizationUtils.normalizeLower(properties.getEmail());
+        String normalizedUsername = NormalizationUtils.normalizeLower(properties.getUsername());
 
         if (normalizedEmail == null) {
             throw new IllegalStateException("app.bootstrap.super-admin.email must not be blank");
+        }
+        if (normalizedUsername == null) {
+            throw new IllegalStateException("app.bootstrap.super-admin.username must not be blank");
         }
 
         Role superAdminRole = roleRepository.findByCode(AppRole.SUPER_ADMIN.name())
@@ -123,6 +128,7 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
                     return userRepository.save(
                             User.builder()
                                     .email(normalizedEmail)
+                                    .username(normalizedUsername)
                                     .passwordHash(passwordService.hash(properties.getPassword()))
                                     .firstName(properties.getFirstName())
                                     .lastName(properties.getLastName())
@@ -135,6 +141,17 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
                                     .build()
                     );
                 });
+
+        userRepository.findByUsernameAndDeletedAtIsNull(normalizedUsername)
+                .filter(existingUser -> !existingUser.getId().equals(user.getId()))
+                .ifPresent(existingUser -> {
+                    throw new IllegalStateException("Super admin username is already used by another account: " + normalizedUsername);
+                });
+
+        if (!Objects.equals(user.getUsername(), normalizedUsername)) {
+            user.setUsername(normalizedUsername);
+            userRepository.save(user);
+        }
 
         if (!userRoleRepository.existsByUserIdAndRoleId(user.getId(), superAdminRole.getId())) {
             userRoleRepository.save(

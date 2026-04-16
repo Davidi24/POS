@@ -13,10 +13,13 @@ public class UserResponse {
 
     private UUID id;
     private String email;
+    private String username;
     private String firstName;
     private String lastName;
     private String phone;
     private Boolean isActive;
+    private Boolean emailVerified;
+    private Boolean phoneVerified;
     private List<String> roles;
 
 }

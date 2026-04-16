@@ -16,10 +16,12 @@ public class MeResponse {
 
     private UUID id;
     private String email;
+    private String username;
     private String firstName;
     private String lastName;
     private String phone;
-    private boolean isActive;
+    private boolean emailVerified;
+    private boolean phoneVerified;
     private List<String> roles;
     private List<String> permissions;
 }

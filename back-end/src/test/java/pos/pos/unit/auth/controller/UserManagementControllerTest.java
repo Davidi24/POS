@@ -18,6 +18,8 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import pos.pos.auth.controller.UserManagementController;
 import pos.pos.auth.service.AuthRegisterService;
 import pos.pos.exception.auth.EmailAlreadyExistsException;
+import pos.pos.exception.auth.PhoneAlreadyExistsException;
+import pos.pos.exception.auth.UsernameAlreadyExistsException;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.exception.role.RoleAssignmentNotAllowedException;
 import pos.pos.security.principal.AuthenticatedUser;
@@ -68,6 +70,7 @@ class UserManagementControllerTest {
         AuthenticatedUser actor = AuthenticatedUser.builder()
                 .id(ACTOR_ID)
                 .email("manager@pos.local")
+                .username("manager.main")
                 .active(true)
                 .build();
 
@@ -85,6 +88,7 @@ class UserManagementControllerTest {
             UserResponse response = UserResponse.builder()
                     .id(CREATED_USER_ID)
                     .email("cashier@pos.local")
+                    .username("cashier.one")
                     .firstName("John")
                     .lastName("Doe")
                     .phone("+49-555-0100")
@@ -101,6 +105,7 @@ class UserManagementControllerTest {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.id").value(CREATED_USER_ID.toString()))
                     .andExpect(jsonPath("$.email").value("cashier@pos.local"))
+                    .andExpect(jsonPath("$.username").value("cashier.one"))
                     .andExpect(jsonPath("$.firstName").value("John"))
                     .andExpect(jsonPath("$.lastName").value("Doe"))
                     .andExpect(jsonPath("$.phone").value("+49-555-0100"))
@@ -108,6 +113,23 @@ class UserManagementControllerTest {
                     .andExpect(jsonPath("$.roles[0]").value("CASHIER"));
 
             verify(authRegisterService).register(any(CreateUserRequest.class), eq(authentication));
+        }
+
+        @Test
+        @DisplayName("Should return 400 when username is missing")
+        void shouldReturn400WhenUsernameIsMissing() throws Exception {
+            CreateUserRequest request = validRequest();
+            request.setUsername(null);
+
+            mockMvc.perform(post("/auth/register")
+                            .principal(authentication)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value("username: Username is required"));
+
+            verifyNoInteractions(authRegisterService);
         }
 
         @Test
@@ -253,6 +275,40 @@ class UserManagementControllerTest {
         }
 
         @Test
+        @DisplayName("Should return 400 when username already exists")
+        void shouldReturn400WhenUsernameAlreadyExists() throws Exception {
+            given(authRegisterService.register(any(CreateUserRequest.class), eq(authentication)))
+                    .willThrow(new UsernameAlreadyExistsException());
+
+            mockMvc.perform(post("/auth/register")
+                            .principal(authentication)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validRequest())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value("Username already in use"));
+
+            verify(authRegisterService).register(any(CreateUserRequest.class), eq(authentication));
+        }
+
+        @Test
+        @DisplayName("Should return 400 when phone already exists")
+        void shouldReturn400WhenPhoneAlreadyExists() throws Exception {
+            given(authRegisterService.register(any(CreateUserRequest.class), eq(authentication)))
+                    .willThrow(new PhoneAlreadyExistsException());
+
+            mockMvc.perform(post("/auth/register")
+                            .principal(authentication)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validRequest())))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.message").value("Phone already in use"));
+
+            verify(authRegisterService).register(any(CreateUserRequest.class), eq(authentication));
+        }
+
+        @Test
         @DisplayName("Should return 403 when actor cannot assign the requested role")
         void shouldReturn403WhenActorCannotAssignRole() throws Exception {
             given(authRegisterService.register(any(CreateUserRequest.class), eq(authentication)))
@@ -273,6 +329,7 @@ class UserManagementControllerTest {
     private CreateUserRequest validRequest() {
         CreateUserRequest request = new CreateUserRequest();
         request.setEmail("cashier@pos.local");
+        request.setUsername("cashier.one");
         request.setTemporaryPassword("SecurePass1!");
         request.setFirstName("John");
         request.setLastName("Doe");

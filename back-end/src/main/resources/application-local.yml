@@ -5,3 +5,13 @@ security:
 app:
   mail:
     from: no-reply@pos.local
+
+  auth:
+    password-reset:
+      token-pepper: change-this-local-dev-password-reset-pepper
+
+    email-verification:
+      token-pepper: change-this-local-dev-email-verification-pepper
+
+    sms:
+      code-pepper: change-this-local-dev-sms-code-pepper

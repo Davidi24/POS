@@ -14,13 +14,16 @@ import java.util.UUID;
 @Table(
         name = "users",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_users_email", columnNames = "email")
+                @UniqueConstraint(name = "uk_users_email", columnNames = "email"),
+                @UniqueConstraint(name = "uk_users_username", columnNames = "username"),
+                @UniqueConstraint(name = "uk_users_normalized_phone", columnNames = "normalized_phone")
         },
         indexes = {
                 @Index(name = "idx_users_restaurant_id", columnList = "restaurant_id"),
                 @Index(name = "idx_users_default_branch_id", columnList = "default_branch_id"),
                 @Index(name = "idx_users_status", columnList = "status"),
                 @Index(name = "idx_users_email_verified", columnList = "email_verified"),
+                @Index(name = "idx_users_phone_verified", columnList = "phone_verified"),
                 @Index(name = "idx_users_locked_until", columnList = "locked_until"),
                 @Index(name = "idx_users_created_by", columnList = "created_by"),
                 @Index(name = "idx_users_updated_by", columnList = "updated_by")
@@ -52,6 +55,9 @@ public class User implements AuditedEntityLifecycle {
     @Column(name = "email", nullable = false, length = 150)
     private String email;
 
+    @Column(name = "username", length = 50)
+    private String username;
+
     @Column(name = "password_hash", nullable = false, columnDefinition = "text")
     private String passwordHash;
 
@@ -77,6 +83,16 @@ public class User implements AuditedEntityLifecycle {
 
     @Column(name = "phone", length = 50)
     private String phone;
+
+    @Column(name = "normalized_phone", length = 50)
+    private String normalizedPhone;
+
+    @Builder.Default
+    @Column(name = "phone_verified", nullable = false)
+    private boolean phoneVerified = false;
+
+    @Column(name = "phone_verified_at", columnDefinition = "timestamptz")
+    private OffsetDateTime phoneVerifiedAt;
 
     @Column(name = "avatar_url", columnDefinition = "text")
     private String avatarUrl;
@@ -141,9 +157,11 @@ public class User implements AuditedEntityLifecycle {
 
     private void normalizeFields() {
         email = NormalizationUtils.normalizeLower(email);
+        username = NormalizationUtils.normalizeLower(username);
         firstName = NormalizationUtils.normalize(firstName);
         lastName = NormalizationUtils.normalize(lastName);
         phone = NormalizationUtils.normalize(phone);
+        normalizedPhone = NormalizationUtils.normalizePhone(phone);
         avatarUrl = NormalizationUtils.normalize(avatarUrl);
         status = NormalizationUtils.normalizeUpper(status);
     }

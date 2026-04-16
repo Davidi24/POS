@@ -12,6 +12,7 @@ import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
+import pos.pos.auth.service.AuthMailService;
 import pos.pos.auth.service.ChangePasswordService;
 import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.exception.user.UserNotFoundException;
@@ -46,6 +47,9 @@ class ChangePasswordServiceTest {
     @Mock
     private UserSessionRepository userSessionRepository;
 
+    @Mock
+    private AuthMailService authMailService;
+
     @InjectMocks
     private ChangePasswordService changePasswordService;
 
@@ -63,6 +67,8 @@ class ChangePasswordServiceTest {
 
             User user = User.builder()
                     .id(userId)
+                    .email("cashier@pos.local")
+                    .firstName("Casey")
                     .passwordHash("old-hash")
                     .isActive(true)
                     .build();
@@ -92,6 +98,37 @@ class ChangePasswordServiceTest {
                     any(),
                     eq(SessionRevocationReason.PASSWORD_CHANGED.name())
             );
+            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
+        }
+
+        @Test
+        @DisplayName("Should revoke all sessions when the current session cannot be resolved")
+        void shouldRevokeAllSessionsWhenCurrentSessionCannotBeResolved() {
+            UUID userId = UUID.randomUUID();
+            UUID tokenId = UUID.randomUUID();
+            ChangePasswordRequest request = request("OldSecurePass1!", "NewSecurePass1!");
+
+            User user = User.builder()
+                    .id(userId)
+                    .email("cashier@pos.local")
+                    .firstName("Casey")
+                    .passwordHash("old-hash")
+                    .isActive(true)
+                    .build();
+
+            when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+            when(passwordService.matches("OldSecurePass1!", "old-hash")).thenReturn(true);
+            when(passwordService.hash("NewSecurePass1!")).thenReturn("new-hash");
+            when(userSessionRepository.findByTokenIdAndRevokedFalse(tokenId)).thenReturn(Optional.empty());
+
+            changePasswordService.changePassword(userId, tokenId, request);
+
+            verify(userSessionRepository).revokeAllActiveSessionsByUserId(
+                    eq(userId),
+                    any(),
+                    eq(SessionRevocationReason.PASSWORD_CHANGED.name())
+            );
+            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
         }
 
         @Test

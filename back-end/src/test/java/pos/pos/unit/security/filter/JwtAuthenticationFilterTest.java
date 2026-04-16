@@ -95,6 +95,7 @@ class JwtAuthenticationFilterTest {
         User user = User.builder()
                 .id(userId)
                 .email("manager@pos.local")
+                .username("manager.main")
                 .firstName("Maria")
                 .lastName("Manager")
                 .phone("+49-555-0101")
@@ -142,6 +143,7 @@ class JwtAuthenticationFilterTest {
         AuthenticatedUser principal = (AuthenticatedUser) authentication.getPrincipal();
         assertThat(principal.getId()).isEqualTo(userId);
         assertThat(principal.getEmail()).isEqualTo("manager@pos.local");
+        assertThat(principal.getUsername()).isEqualTo("manager.main");
         assertThat(principal.getFirstName()).isEqualTo("Maria");
         assertThat(principal.getLastName()).isEqualTo("Manager");
         assertThat(principal.getPhone()).isEqualTo("+49-555-0101");

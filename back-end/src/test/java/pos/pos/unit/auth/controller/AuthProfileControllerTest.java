@@ -50,7 +50,10 @@ class AuthProfileControllerTest {
         AuthenticatedUser user = AuthenticatedUser.builder()
                 .id(USER_ID)
                 .email("manager@pos.local")
+                .username("manager.main")
                 .active(true)
+                .emailVerified(true)
+                .phoneVerified(true)
                 .build();
 
         authentication = new UsernamePasswordAuthenticationToken(user, null, List.of());
@@ -62,10 +65,12 @@ class AuthProfileControllerTest {
         MeResponse response = MeResponse.builder()
                 .id(USER_ID)
                 .email("manager@pos.local")
+                .username("manager.main")
                 .firstName("Maria")
                 .lastName("Manager")
                 .phone("+49-555-0101")
-                .isActive(true)
+                .emailVerified(true)
+                .phoneVerified(false)
                 .roles(List.of("MANAGER"))
                 .permissions(List.of("SESSIONS_MANAGE", "USERS_CREATE"))
                 .build();
@@ -76,10 +81,12 @@ class AuthProfileControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(USER_ID.toString()))
                 .andExpect(jsonPath("$.email").value("manager@pos.local"))
+                .andExpect(jsonPath("$.username").value("manager.main"))
                 .andExpect(jsonPath("$.firstName").value("Maria"))
                 .andExpect(jsonPath("$.lastName").value("Manager"))
                 .andExpect(jsonPath("$.phone").value("+49-555-0101"))
-                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.emailVerified").value(true))
+                .andExpect(jsonPath("$.phoneVerified").value(false))
                 .andExpect(jsonPath("$.roles[0]").value("MANAGER"))
                 .andExpect(jsonPath("$.permissions[0]").value("SESSIONS_MANAGE"));
 

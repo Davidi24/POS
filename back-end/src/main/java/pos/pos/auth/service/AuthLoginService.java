@@ -16,6 +16,7 @@ import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.exception.auth.TooManyRequestsException;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
@@ -40,7 +41,7 @@ import java.util.UUID;
 public class AuthLoginService {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthLoginService.class);
-    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid email or password";
+    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid username/email or password";
     private static final String TOO_MANY_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
     private static final String TOKEN_TYPE = "Bearer";
 
@@ -81,26 +82,26 @@ public class AuthLoginService {
     public AuthenticationResponse login(LoginRequest request, ClientInfo clientInfo) {
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        String normalizedEmail = normalizeEmail(request.getEmail());
+        String normalizedIdentifier = normalizeIdentifier(request.getIdentifier());
 
         ClientInfo normalizedClientInfo = ClientInfoNormalizer.normalize(clientInfo);
-        User user = userRepository.findByEmailAndDeletedAtIsNull(normalizedEmail).orElse(null);
+        User user = findUserByIdentifier(normalizedIdentifier);
         UUID userId = user != null ? user.getId() : null;
 
-        checkIpRateLimit(userId, normalizedEmail, normalizedClientInfo, now);
-        checkAccountRateLimit(userId, normalizedEmail, normalizedClientInfo, now);
+        checkIpRateLimit(userId, normalizedIdentifier, normalizedClientInfo, now);
+        checkAccountRateLimit(userId, normalizedIdentifier, normalizedClientInfo, now);
 
         if (user == null) {
             // Always fails on purpose to prevent timing attacks by making response time the same even if the user does not exist
             passwordService.matches(request.getPassword(), DUMMY_PASSWORD_HASH);
-            saveLoginAttempt(null, normalizedEmail, normalizedClientInfo, false, LoginFailureReason.INVALID_CREDENTIALS, now);
+            saveLoginAttempt(null, normalizedIdentifier, normalizedClientInfo, false, LoginFailureReason.INVALID_CREDENTIALS, now);
             throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
-        validateUserCanLogin(user, now, normalizedEmail, normalizedClientInfo);
+        validateUserCanLogin(user, now, normalizedIdentifier, normalizedClientInfo);
 
         if (!passwordService.matches(request.getPassword(), user.getPasswordHash())) {
-            handleFailedLogin(user, normalizedEmail, normalizedClientInfo, now);
+            handleFailedLogin(user, normalizedIdentifier, normalizedClientInfo, now);
             throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
@@ -129,7 +130,7 @@ public class AuthLoginService {
                 )
         );
 
-        saveLoginAttempt(user.getId(), normalizedEmail, normalizedClientInfo, true, null, now);
+        saveLoginAttempt(user.getId(), normalizedIdentifier, normalizedClientInfo, true, null, now);
 
         return AuthenticationResponse.builder()
                 .accessToken(accessToken)
@@ -181,7 +182,7 @@ public class AuthLoginService {
      */
     private void handleFailedLogin(
             User user,
-            String normalizedEmail,
+            String normalizedIdentifier,
             ClientInfo clientInfo,
             OffsetDateTime now
     ) {
@@ -193,7 +194,7 @@ public class AuthLoginService {
         }
 
         userRepository.save(user);
-        saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, LoginFailureReason.INVALID_CREDENTIALS, now);
+        saveLoginAttempt(user.getId(), normalizedIdentifier, clientInfo, false, LoginFailureReason.INVALID_CREDENTIALS, now);
     }
 
 
@@ -207,23 +208,23 @@ public class AuthLoginService {
     private void validateUserCanLogin(
             User user,
             OffsetDateTime now,
-            String normalizedEmail,
+            String normalizedIdentifier,
             ClientInfo clientInfo
     ) {
         if (!Boolean.TRUE.equals(user.isActive())
                 || user.getDeletedAt() != null
                 || !"ACTIVE".equalsIgnoreCase(user.getStatus())) {
-            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, LoginFailureReason.ACCOUNT_INACTIVE, now);
+            saveLoginAttempt(user.getId(), normalizedIdentifier, clientInfo, false, LoginFailureReason.ACCOUNT_INACTIVE, now);
             throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
         if (!Boolean.TRUE.equals(user.isEmailVerified())) {
-            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, LoginFailureReason.EMAIL_NOT_VERIFIED, now);
+            saveLoginAttempt(user.getId(), normalizedIdentifier, clientInfo, false, LoginFailureReason.EMAIL_NOT_VERIFIED, now);
             throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
-            saveLoginAttempt(user.getId(), normalizedEmail, clientInfo, false, LoginFailureReason.ACCOUNT_LOCKED, now);
+            saveLoginAttempt(user.getId(), normalizedIdentifier, clientInfo, false, LoginFailureReason.ACCOUNT_LOCKED, now);
             throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
     }
@@ -239,7 +240,7 @@ public class AuthLoginService {
      */
     private void saveLoginAttempt(
             UUID userId,
-            String email,
+            String identifier,
             ClientInfo clientInfo,
             boolean success,
             LoginFailureReason failureReason,
@@ -247,7 +248,7 @@ public class AuthLoginService {
     ) {
         AuthLoginAttempt attempt = AuthLoginAttempt.builder()
                 .userId(userId)
-                .email(email)
+                .identifier(identifier)
                 .ipAddress(clientInfo != null ? clientInfo.ipAddress() : null)
                 .userAgent(clientInfo != null ? clientInfo.userAgent() : null)
                 .success(success)
@@ -267,23 +268,25 @@ public class AuthLoginService {
      */
     private void checkAccountRateLimit(
             UUID userId,
-            String normalizedEmail,
+            String normalizedIdentifier,
             ClientInfo clientInfo,
             OffsetDateTime now
     ) {
-        if (normalizedEmail == null) {
+        if (normalizedIdentifier == null) {
             return;
         }
 
         OffsetDateTime windowStart = now.minusMinutes(windowMinutes);
-        long attempts = authLoginAttemptRepository.countByEmailAndAttemptedAtAfterAndSuccessFalse(
-                normalizedEmail,
-                windowStart
-        );
+        long attempts = userId != null
+                ? authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(userId, windowStart)
+                : authLoginAttemptRepository.countByIdentifierAndAttemptedAtAfterAndSuccessFalse(
+                        normalizedIdentifier,
+                        windowStart
+                );
 
         if (attempts >= maxAttemptsPerAccount) {
-            saveLoginAttempt(userId, normalizedEmail, clientInfo, false, LoginFailureReason.ACCOUNT_RATE_LIMITED, now);
-            throw new InvalidCredentialsException(TOO_MANY_ATTEMPTS_MESSAGE);
+            saveLoginAttempt(userId, normalizedIdentifier, clientInfo, false, LoginFailureReason.ACCOUNT_RATE_LIMITED, now);
+            throw new TooManyRequestsException(TOO_MANY_ATTEMPTS_MESSAGE);
         }
     }
 
@@ -294,7 +297,7 @@ public class AuthLoginService {
      * - Counts how many login attempts were made from this IP within this time window.
      * - If the number is too high, saves the attempt and blocks the login.
      */
-    private void checkIpRateLimit(UUID userId, String normalizedEmail, ClientInfo clientInfo, OffsetDateTime now) {
+    private void checkIpRateLimit(UUID userId, String normalizedIdentifier, ClientInfo clientInfo, OffsetDateTime now) {
         String ip = clientInfo != null ? clientInfo.ipAddress() : null;
         if (ip == null) {
             return;
@@ -304,13 +307,25 @@ public class AuthLoginService {
         long attempts = authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(ip, windowStart);
 
         if (attempts >= maxAttemptsPerIp) {
-            saveLoginAttempt(userId, normalizedEmail, clientInfo, false, LoginFailureReason.IP_RATE_LIMITED, now);
-            throw new InvalidCredentialsException(TOO_MANY_ATTEMPTS_MESSAGE);
+            saveLoginAttempt(userId, normalizedIdentifier, clientInfo, false, LoginFailureReason.IP_RATE_LIMITED, now);
+            throw new TooManyRequestsException(TOO_MANY_ATTEMPTS_MESSAGE);
         }
     }
 
-    private String normalizeEmail(String email) {
-        return NormalizationUtils.normalizeLower(email);
+    private User findUserByIdentifier(String normalizedIdentifier) {
+        if (normalizedIdentifier == null) {
+            return null;
+        }
+
+        if (normalizedIdentifier.contains("@")) {
+            return userRepository.findByEmailAndDeletedAtIsNull(normalizedIdentifier).orElse(null);
+        }
+
+        return userRepository.findByUsernameAndDeletedAtIsNull(normalizedIdentifier).orElse(null);
+    }
+
+    private String normalizeIdentifier(String identifier) {
+        return NormalizationUtils.normalizeLower(identifier);
     }
 
 }

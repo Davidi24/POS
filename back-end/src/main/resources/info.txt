@@ -1,0 +1,107 @@
+AUTH / SECURITY REVIEW VERDICT
+
+Status: Not production-ready yet
+
+Main blockers
+
+1. Base configuration is still development-grade.
+- spring.profiles.default=local
+- spring.sql.init.mode=always
+- spring.jpa.hibernate.ddl-auto=create
+- spring.jpa.show-sql=true
+- localhost database defaults are in the base config
+
+2. Super-admin bootstrap is unsafe if environment variables are missed.
+- Default fallback values can create a predictable admin account.
+- BOOTSTRAP_SUPER_ADMIN_EMAIL defaults to admin@pos.local
+- BOOTSTRAP_SUPER_ADMIN_PASSWORD defaults to ChangeMe123!
+
+3. Mail configuration has a startup bug.
+- app.mail.from can resolve to blank when MAIL_USERNAME is not set.
+- This breaks full application startup.
+
+4. Schema management is not production-ready.
+- schema.sql is drop-only and contains stale table names.
+- The project currently depends on ddl-auto create/create-drop behavior instead of real migrations.
+
+5. The full test suite is not green end-to-end.
+- Current full run result: 438 tests, 0 failures, 2 errors
+- Error 1: PosApplicationTests fails because app.mail.from is blank
+- Error 2: SessionCleanupServiceTest fails because authSmsOtpCodeRepository is not mocked/injected
+
+Important risks
+
+1. Refresh rate limiting is in-memory only.
+- Works on a single node.
+- Will not be reliable across multiple app instances.
+
+2. Proxy/client IP handling must be overridden in production.
+- trusted-proxies defaults to loopback only
+- forward-headers-strategy is none
+- If not overridden behind a reverse proxy, rate limits and audit logs will use the proxy IP instead of the real client IP
+
+3. Swagger is public in all environments.
+- Fine for internal deployments
+- Usually not ideal for a public production environment
+
+4. Auth requests are database-heavy.
+- JWT auth filter loads session, user, roles, and permissions on each authenticated request
+
+What is already strong
+
+1. The auth foundation is solid.
+- Login, refresh, logout, password reset, email verification, phone verification, and profile flows have focused unit/controller coverage.
+
+2. Security design is generally sound.
+- Username/email login works
+- Phone uniqueness is normalized
+- Refresh tokens are hashed
+- Session revocation exists
+- Too-many-requests handling exists where it should be exposed
+
+Production readiness verdict
+
+The auth part is structurally good, but it is not ready for production deployment yet because of configuration, bootstrap, schema, and full-suite issues.
+
+Minimum work required before production
+
+1. Remove development defaults from application.yml.
+2. Move production settings to a dedicated production profile or environment variables.
+3. Replace ddl-auto=create with proper database migrations.
+4. Fix app.mail.from so startup fails only when configuration is truly invalid, not because of an empty fallback.
+5. Remove predictable super-admin fallback credentials and fail fast if they are missing.
+6. Fix the 2 failing tests and get the full suite green.
+7. Recheck proxy and cookie settings against the real deployment topology.
+
+Recommended future features
+
+1. MFA for privileged roles
+- Start with TOTP
+- Add passkeys/WebAuthn later
+
+2. Invite-based staff onboarding
+- Avoid manual credential sharing
+
+3. Session/device management UI
+- Revoke current device
+- Revoke all devices
+
+4. Security audit logging
+- Login
+- Logout all
+- Password reset
+- Email verification
+- Phone verification
+- Role changes
+
+5. Redis-backed rate limiting and session support
+- Needed if the app will run on multiple nodes
+
+6. Step-up authentication for sensitive actions
+- Owner/admin changes
+- Billing changes
+- High-risk account recovery
+
+Short summary
+
+You built a strong auth base, but production readiness is blocked mostly by configuration and deployment hygiene, not by the core auth logic itself.

@@ -22,7 +22,7 @@ import java.util.UUID;
  * <p>
  * WHAT IS STORED:
  * - userId: the user (if exists), otherwise null
- * - email: the email entered during login
+ * - identifier: the username or email entered during login
  * - ipAddress: source IP of the request
  * - userAgent: device/browser information
  * - success: whether login was successful
@@ -30,7 +30,7 @@ import java.util.UUID;
  * - attemptedAt: timestamp of the attempt (UTC)
  * <p>
  * NOTES:
- * - Email is stored even if the user does not exist (important for security tracking)
+ * - The submitted identifier is stored even if the user does not exist
  * - IP and User-Agent come from ClientInfo (proxy-aware extraction)
  * - This entity should NEVER be exposed directly via API
  * <p>
@@ -39,7 +39,7 @@ import java.util.UUID;
  * and detecting potential attacks or misuse of the system.
  */
 @Entity
-@Table(name = "auth_login_attempts", indexes = {@Index(name = "idx_auth_login_attempts_email", columnList = "email"), @Index(name = "idx_auth_login_attempts_ip_address", columnList = "ip_address"), @Index(name = "idx_auth_login_attempts_attempted_at", columnList = "attempted_at"), @Index(name = "idx_auth_login_attempts_success", columnList = "success"), @Index(name = "idx_auth_login_attempts_user_id", columnList = "user_id")})
+@Table(name = "auth_login_attempts", indexes = {@Index(name = "idx_auth_login_attempts_identifier", columnList = "identifier"), @Index(name = "idx_auth_login_attempts_ip_address", columnList = "ip_address"), @Index(name = "idx_auth_login_attempts_attempted_at", columnList = "attempted_at"), @Index(name = "idx_auth_login_attempts_success", columnList = "success"), @Index(name = "idx_auth_login_attempts_user_id", columnList = "user_id")})
 @Getter
 @Setter
 @Builder(toBuilder = true)
@@ -56,8 +56,8 @@ public class AuthLoginAttempt {
     @Column(name = "user_id", columnDefinition = "uuid")
     private UUID userId;
 
-    @Column(name = "email", length = 150)
-    private String email;
+    @Column(name = "identifier", length = 150)
+    private String identifier;
 
     @Column(name = "ip_address")
     private String ipAddress;

@@ -13,7 +13,9 @@ import java.util.UUID;
 public interface AuthLoginAttemptRepository extends JpaRepository<AuthLoginAttempt, UUID> {
     long countByIpAddressAndAttemptedAtAfter(String ipAddress, OffsetDateTime after);
 
-    long countByEmailAndAttemptedAtAfterAndSuccessFalse(String email, OffsetDateTime after);
+    long countByUserIdAndAttemptedAtAfterAndSuccessFalse(UUID userId, OffsetDateTime after);
+
+    long countByIdentifierAndAttemptedAtAfterAndSuccessFalse(String identifier, OffsetDateTime after);
 
     @Modifying
     @Query("DELETE FROM AuthLoginAttempt a WHERE a.attemptedAt < :cutoff")

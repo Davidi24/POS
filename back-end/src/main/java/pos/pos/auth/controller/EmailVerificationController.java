@@ -13,6 +13,9 @@ import pos.pos.auth.dto.ResendVerificationRequest;
 import pos.pos.auth.dto.VerifyEmailRequest;
 import pos.pos.auth.service.EmailVerificationService;
 
+
+// checked
+// tested
 @Tag(name = "Authentication / Email Verification")
 @RestController
 @RequestMapping("/auth")

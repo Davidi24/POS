@@ -42,7 +42,7 @@ spring:
 
 security:
   jwt:
-    secret: ${JWT_SECRET:change-this-local-dev-secret-key-please-1234567890}
+    secret: ${JWT_SECRET}
     access-expiration: 15m
     refresh-expiration: 30d
 
@@ -85,6 +85,7 @@ app:
   bootstrap:
     super-admin:
       email: ${BOOTSTRAP_SUPER_ADMIN_EMAIL:admin@pos.local}
+      username: ${BOOTSTRAP_SUPER_ADMIN_USERNAME:admin}
       password: ${BOOTSTRAP_SUPER_ADMIN_PASSWORD:ChangeMe123!}
       first-name: ${BOOTSTRAP_SUPER_ADMIN_FIRST_NAME:Super}
       last-name: ${BOOTSTRAP_SUPER_ADMIN_LAST_NAME:Admin}
@@ -93,19 +94,32 @@ app:
     password-reset:
       token-ttl: ${PASSWORD_RESET_TOKEN_TTL:30m}
       request-cooldown: ${PASSWORD_RESET_REQUEST_COOLDOWN:2m}
-      token-pepper: ${PASSWORD_RESET_TOKEN_PEPPER:change-this-local-dev-password-reset-pepper}
+      token-pepper: ${PASSWORD_RESET_TOKEN_PEPPER}
       reset-path: ${PASSWORD_RESET_FRONTEND_PATH:/reset-password}
       subject: ${PASSWORD_RESET_EMAIL_SUBJECT:Reset your POS password}
 
     email-verification:
       token-ttl: ${EMAIL_VERIFICATION_TOKEN_TTL:24h}
       request-cooldown: ${EMAIL_VERIFICATION_REQUEST_COOLDOWN:5m}
-      token-pepper: ${EMAIL_VERIFICATION_TOKEN_PEPPER:change-this-local-dev-email-verification-pepper}
+      token-pepper: ${EMAIL_VERIFICATION_TOKEN_PEPPER}
       verify-path: ${EMAIL_VERIFICATION_FRONTEND_PATH:/verify-email}
       subject: ${EMAIL_VERIFICATION_EMAIL_SUBJECT:Verify your POS email}
+
+    sms:
+      delivery-mode: ${SMS_DELIVERY_MODE:LOG_ONLY}
+      password-reset-code-ttl: ${SMS_PASSWORD_RESET_CODE_TTL:10m}
+      phone-verification-code-ttl: ${SMS_PHONE_VERIFICATION_CODE_TTL:10m}
+      request-cooldown: ${SMS_REQUEST_COOLDOWN:1m}
+      code-length: ${SMS_CODE_LENGTH:6}
+      max-attempts: ${SMS_MAX_ATTEMPTS:5}
+      code-pepper: ${SMS_CODE_PEPPER}
+      restricted-password-reset-role-codes: ${SMS_RESTRICTED_PASSWORD_RESET_ROLE_CODES:SUPER_ADMIN,OWNER}
 
   mail:
     from: ${MAIL_FROM:${spring.mail.username:no-reply@pos.local}}
 
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+    mobile-base-url: ${FRONTEND_MOBILE_BASE_URL:}
+    universal-base-url: ${FRONTEND_UNIVERSAL_BASE_URL:}
+    default-link-target: ${FRONTEND_DEFAULT_LINK_TARGET:UNIVERSAL}
