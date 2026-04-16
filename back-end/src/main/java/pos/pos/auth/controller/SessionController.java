@@ -20,6 +20,10 @@ import pos.pos.user.dto.UserSessionResponse;
 import java.util.List;
 import java.util.UUID;
 
+// this has only api when a user wants to manage its own session not someone else
+// to manage someone else go to AdminSessionController
+// checked
+// tested
 @Tag(name = "Authentication / Sessions")
 @RestController
 @RequestMapping("/auth")

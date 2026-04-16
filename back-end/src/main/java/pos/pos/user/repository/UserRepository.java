@@ -11,7 +11,15 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmailAndDeletedAtIsNull(String email);
 
+    Optional<User> findByUsernameAndDeletedAtIsNull(String username);
+
+    Optional<User> findByNormalizedPhoneAndDeletedAtIsNull(String normalizedPhone);
+
     boolean existsByEmailAndDeletedAtIsNull(String email);
+
+    boolean existsByUsernameAndDeletedAtIsNull(String username);
+
+    boolean existsByNormalizedPhoneAndDeletedAtIsNull(String normalizedPhone);
 
     @Query("""
         SELECT u

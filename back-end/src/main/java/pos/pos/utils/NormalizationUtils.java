@@ -52,4 +52,13 @@ public final class NormalizationUtils {
         String normalized = normalize(value);
         return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
     }
+
+    public static String normalizePhone(String value) {
+        String normalized = normalize(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        return normalized.replaceAll("[\\s().-]", "");
+    }
 }

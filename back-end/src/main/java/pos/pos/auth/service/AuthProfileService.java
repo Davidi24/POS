@@ -28,10 +28,12 @@ public class AuthProfileService {
         return MeResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
+                .username(user.getUsername())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .phone(user.getPhone())
-                .isActive(user.isActive())
+                .emailVerified(user.isEmailVerified())
+                .phoneVerified(user.isPhoneVerified())
                 .roles(roles)
                 .permissions(permissions)
                 .build();
