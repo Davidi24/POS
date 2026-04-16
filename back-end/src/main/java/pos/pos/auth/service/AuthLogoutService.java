@@ -21,6 +21,13 @@ public class AuthLogoutService {
     private final UserSessionRepository userSessionRepository;
     private final RefreshTokenSecurityService refreshTokenSecurityService;
 
+    // Logs out the current session using the refresh token.
+    // 1. Validates the refresh token signature
+    // 2. Finds the session — if not found, silently does nothing (already gone)
+    // 3. Validates the session belongs to the correct user and token hash matches
+    // 4. If already revoked — silently does nothing
+    // 5. If expired — marks it as expired and returns
+    // 6. If active — marks it as revoked with reason LOGOUT
     @Transactional
     public void logout(String refreshToken) {
         RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
@@ -46,6 +53,12 @@ public class AuthLogoutService {
         revokeSession(session, now, SessionRevocationReason.LOGOUT);
     }
 
+    // Logs out all active sessions for the user using the current refresh token.
+    // 1. Validates the refresh token signature
+    // 2. Finds the current session — throws if not found or already revoked
+    // 3. If the current session is expired — revokes it and throws an error (user does not log out cos it's not him trying to log out)
+    // 4. Validates the session belongs to the correct user and token hash matches
+    // 5. Revokes ALL active sessions for this user, including the current one
     @Transactional
     public void logoutAll(String refreshToken)  {
         RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
@@ -69,6 +82,8 @@ public class AuthLogoutService {
         );
     }
 
+    // Validates that the session belongs to the correct user and that the refresh token hash matches.
+    // Throws if either check fails — prevents one user from revoking another user's session.
     private void validateSession(
             UserSession session,
             RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken
@@ -82,10 +97,12 @@ public class AuthLogoutService {
         }
     }
 
+    // Returns a generic invalid refresh token exception — same message for all cases to avoid leaking info
     private InvalidCredentialsException invalidRefreshToken() {
         return new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
     }
 
+    // Marks a session as revoked with a timestamp and reason, then saves it to the DB
     private void revokeSession(UserSession session, OffsetDateTime now, SessionRevocationReason reason) {
         session.setRevoked(true);
         session.setRevokedAt(now);
