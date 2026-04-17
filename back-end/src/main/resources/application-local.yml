@@ -1,8 +1,39 @@
+spring:
+  sql:
+    init:
+      mode: never
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pos
+    username: pos_user
+    password: pos_pass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    baseline-on-migrate: true
+
 security:
   jwt:
     secret: local-dev-secret-key-for-hs256-minimum-32b
 
 app:
+  bootstrap:
+    super-admin:
+      enabled: true
+      email: admin@pos.local
+      username: admin
+      password: ChangeMe123!
+      first-name: Super
+      last-name: Admin
+
   mail:
     from: no-reply@pos.local
 

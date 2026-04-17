@@ -4,17 +4,6 @@ server:
 spring:
   application:
     name: Pos
-  profiles:
-    default: local
-  sql:
-    init:
-      mode: always
-
-  datasource:
-    url: jdbc:postgresql://localhost:5432/pos
-    username: pos_user
-    password: pos_pass
-    driver-class-name: org.postgresql.Driver
 
   mail:
     host: ${MAIL_HOST:}
@@ -32,12 +21,8 @@ spring:
           writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT_MS:5000}
 
   jpa:
-    hibernate:
-      ddl-auto: create
-    show-sql: true
     properties:
       hibernate:
-        format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 security:
@@ -84,11 +69,7 @@ app:
 
   bootstrap:
     super-admin:
-      email: ${BOOTSTRAP_SUPER_ADMIN_EMAIL:admin@pos.local}
-      username: ${BOOTSTRAP_SUPER_ADMIN_USERNAME:admin}
-      password: ${BOOTSTRAP_SUPER_ADMIN_PASSWORD:ChangeMe123!}
-      first-name: ${BOOTSTRAP_SUPER_ADMIN_FIRST_NAME:Super}
-      last-name: ${BOOTSTRAP_SUPER_ADMIN_LAST_NAME:Admin}
+      enabled: false
 
   auth:
     password-reset:
@@ -116,7 +97,7 @@ app:
       restricted-password-reset-role-codes: ${SMS_RESTRICTED_PASSWORD_RESET_ROLE_CODES:SUPER_ADMIN,OWNER}
 
   mail:
-    from: ${MAIL_FROM:${spring.mail.username:no-reply@pos.local}}
+    from: ${MAIL_FROM:no-reply@pos.local}
 
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}

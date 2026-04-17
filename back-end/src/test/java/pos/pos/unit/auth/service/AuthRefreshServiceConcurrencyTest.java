@@ -95,7 +95,8 @@ class AuthRefreshServiceConcurrencyTest {
         CountDownLatch allowFirstRefreshToFinish = new CountDownLatch(1);
         AtomicBoolean firstRoleLookup = new AtomicBoolean(true);
 
-        User user = userRepository.saveAndFlush(activeUser(userId, "owner@pos.local"));
+        String email = "owner+" + userId + "@pos.local";
+        User user = userRepository.saveAndFlush(activeUser(userId, email));
         String refreshToken = jwtService.generateRefreshToken(userId, oldTokenId);
         userSessionRepository.saveAndFlush(activeSession(userId, oldTokenId, refreshToken));
 
@@ -143,7 +144,10 @@ class AuthRefreshServiceConcurrencyTest {
             RefreshTokenSecurityService.ValidatedRefreshToken rotatedToken =
                     refreshTokenSecurityService.validate(firstResult.response().getRefreshToken());
 
-            assertThat(userSessionRepository.count()).isEqualTo(1);
+            assertThat(userSessionRepository.countByUserIdAndRevokedFalseAndExpiresAtAfter(
+                    userId,
+                    OffsetDateTime.now(ZoneOffset.UTC)
+            )).isEqualTo(1);
             assertThat(userSessionRepository.findByTokenIdAndRevokedFalse(oldTokenId)).isEmpty();
             assertThat(userSessionRepository.findByTokenIdAndRevokedFalse(rotatedToken.tokenId()))
                     .isPresent()

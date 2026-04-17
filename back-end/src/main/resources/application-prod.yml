@@ -1,0 +1,48 @@
+spring:
+  sql:
+    init:
+      mode: never
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+
+app:
+  security:
+    trusted-proxies: ${TRUSTED_PROXIES}
+    cookie:
+      domain: ${COOKIE_DOMAIN}
+
+  bootstrap:
+    super-admin:
+      enabled: ${BOOTSTRAP_SUPER_ADMIN_ENABLED:false}
+      email: ${BOOTSTRAP_SUPER_ADMIN_EMAIL:}
+      username: ${BOOTSTRAP_SUPER_ADMIN_USERNAME:}
+      password: ${BOOTSTRAP_SUPER_ADMIN_PASSWORD:}
+      first-name: ${BOOTSTRAP_SUPER_ADMIN_FIRST_NAME:Super}
+      last-name: ${BOOTSTRAP_SUPER_ADMIN_LAST_NAME:Admin}
+
+  mail:
+    from: ${MAIL_FROM}
+
+  frontend:
+    base-url: ${FRONTEND_BASE_URL}
+    mobile-base-url: ${FRONTEND_MOBILE_BASE_URL:}
+    universal-base-url: ${FRONTEND_UNIVERSAL_BASE_URL:}
+    default-link-target: ${FRONTEND_DEFAULT_LINK_TARGET:UNIVERSAL}

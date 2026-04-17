@@ -172,7 +172,10 @@ class JwtServiceTest {
         @DisplayName("Should reject tampered tokens")
         void shouldRejectTamperedToken() {
             String token = jwtService.generateRefreshToken(UUID.randomUUID(), UUID.randomUUID());
-            String tampered = token.substring(0, token.length() - 1) + (token.endsWith("a") ? "b" : "a");
+            String[] parts = token.split("\\.");
+            String signature = parts[2];
+            String tamperedSignature = (signature.charAt(0) == 'a' ? "b" : "a") + signature.substring(1);
+            String tampered = parts[0] + "." + parts[1] + "." + tamperedSignature;
 
             assertThat(jwtService.isValid(tampered)).isFalse();
             assertThat(jwtService.isRefreshToken(tampered)).isFalse();
