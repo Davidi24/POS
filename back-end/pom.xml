@@ -69,6 +69,12 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- Database migrations -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+
 		<!-- Lombok (fixed version) -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>

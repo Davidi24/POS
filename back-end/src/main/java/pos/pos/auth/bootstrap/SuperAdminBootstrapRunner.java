@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.config.properties.BootstrapSuperAdminProperties;
 import pos.pos.role.entity.Permission;
@@ -44,6 +45,10 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
     public void run(String... args) {
         seedPermissions();
         seedRoles();
+        if (!properties.isEnabled()) {
+            logger.info("Super admin bootstrap is disabled; skipping user creation");
+            return;
+        }
         seedSuperAdminUser();
     }
 
@@ -117,6 +122,9 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
         }
         if (normalizedUsername == null) {
             throw new IllegalStateException("app.bootstrap.super-admin.username must not be blank");
+        }
+        if (!StringUtils.hasText(properties.getPassword())) {
+            throw new IllegalStateException("app.bootstrap.super-admin.password must not be blank");
         }
 
         Role superAdminRole = roleRepository.findByCode(AppRole.SUPER_ADMIN.name())
