@@ -28,6 +28,14 @@ public class RoleHierarchyService {
         return roleRepository.findHighestActiveRankByUserId(userId);
     }
 
+    public long actorRank(Authentication authentication) {
+        if (isSuperAdmin(authentication)) {
+            return Long.MAX_VALUE;
+        }
+
+        return highestActiveRank(currentUserId(authentication));
+    }
+
     // it returns all roles that a user can assign. (for super admin it returns all roles tha are active)
     public List<Role> getAssignableRoles(Authentication authentication) {
         if (isSuperAdmin(authentication)) {
@@ -66,12 +74,12 @@ public class RoleHierarchyService {
     }
 
     // return user id from Authentication object
-    private UUID currentUserId(Authentication authentication) {
+    public UUID currentUserId(Authentication authentication) {
         return ((AuthenticatedUser) authentication.getPrincipal()).getId();
     }
 
     // take the authorities that are assigned in jwt filter and check if one of them is Super_Admin
-    private boolean isSuperAdmin(Authentication authentication) {
+    public boolean isSuperAdmin(Authentication authentication) {
         String superAdminAuthority = "ROLE_" + AppRole.SUPER_ADMIN.name();
 
         return authentication.getAuthorities().stream()

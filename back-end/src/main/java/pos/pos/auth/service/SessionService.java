@@ -103,4 +103,19 @@ public class SessionService {
                 SessionRevocationReason.SESSION_REVOKED.name()
         );
     }
+
+    @Transactional
+    public void revokeUserSession(Authentication authentication, UUID userId, UUID sessionId) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        roleHierarchyService.assertCanManageUser(authentication, userId);
+
+        UserSession session = userSessionRepository.findByIdAndUserIdAndRevokedFalse(sessionId, userId)
+                .filter(s -> s.getExpiresAt().isAfter(now))
+                .orElseThrow(SessionNotFoundException::new);
+
+        session.setRevoked(true);
+        session.setRevokedAt(now);
+        session.setRevokedReason(SessionRevocationReason.SESSION_REVOKED.name());
+        userSessionRepository.save(session);
+    }
 }

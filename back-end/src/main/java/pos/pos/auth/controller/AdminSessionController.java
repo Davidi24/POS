@@ -45,4 +45,16 @@ public class AdminSessionController {
         sessionService.revokeAllUserSessions(authentication, userId);
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/{userId}/sessions/{sessionId}")
+    @PreAuthorize("hasAuthority('SESSIONS_MANAGE')")
+    @Operation(summary = "Revoke one active session for a user")
+    public ResponseEntity<Void> revokeUserSession(
+            @PathVariable UUID userId,
+            @PathVariable UUID sessionId,
+            Authentication authentication
+    ) {
+        sessionService.revokeUserSession(authentication, userId, sessionId);
+        return ResponseEntity.noContent().build();
+    }
 }

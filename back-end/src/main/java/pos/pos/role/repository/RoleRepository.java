@@ -41,8 +41,19 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
     JOIN Role r ON ur.roleId = r.id
     WHERE ur.userId = :userId
       AND r.isActive = true
+    ORDER BY r.rank DESC, r.name ASC
 """)
     List<String> findActiveRoleCodesByUserId(UUID userId);
+
+    @Query("""
+    SELECT r
+    FROM UserRole ur
+    JOIN Role r ON ur.roleId = r.id
+    WHERE ur.userId = :userId
+      AND r.isActive = true
+    ORDER BY r.rank DESC, r.name ASC
+""")
+    List<Role> findActiveRolesByUserId(UUID userId);
 
     // if a user has more than one role, find the highest role and give me the rank of it
     @Query("""

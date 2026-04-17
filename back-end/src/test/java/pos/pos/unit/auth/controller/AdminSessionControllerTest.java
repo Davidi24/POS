@@ -136,6 +136,34 @@ class AdminSessionControllerTest {
     }
 
     @Nested
+    @DisplayName("DELETE /users/{userId}/sessions/{sessionId}")
+    class RevokeSingleUserSessionTests {
+
+        @Test
+        @DisplayName("Should return 204 when one target session is revoked")
+        void shouldReturn204WhenSingleSessionRevoked() throws Exception {
+            mockMvc.perform(delete("/users/{userId}/sessions/{sessionId}", TARGET_USER_ID, SESSION_ID)
+                            .principal(authentication))
+                    .andExpect(status().isNoContent());
+
+            verify(sessionService).revokeUserSession(eq(authentication), eq(TARGET_USER_ID), eq(SESSION_ID));
+        }
+
+        @Test
+        @DisplayName("Should return 403 when actor is not allowed to revoke the target session")
+        void shouldReturn403WhenActorCannotRevokeSingleTargetSession() throws Exception {
+            willThrow(new UserManagementNotAllowedException())
+                    .given(sessionService).revokeUserSession(eq(authentication), eq(TARGET_USER_ID), eq(SESSION_ID));
+
+            mockMvc.perform(delete("/users/{userId}/sessions/{sessionId}", TARGET_USER_ID, SESSION_ID)
+                            .principal(authentication))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.status").value(403))
+                    .andExpect(jsonPath("$.message").value("You are not allowed to manage this user"));
+        }
+    }
+
+    @Nested
     @DisplayName("Security annotations")
     class SecurityAnnotationTests {
 
@@ -159,6 +187,22 @@ class AdminSessionControllerTest {
         void shouldRequireSessionsManageAuthorityForRevokeAllUserSessions() throws NoSuchMethodException {
             Method method = AdminSessionController.class.getMethod(
                     "revokeAllUserSessions",
+                    UUID.class,
+                    Authentication.class
+            );
+
+            PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
+
+            assertThat(annotation).isNotNull();
+            assertThat(annotation.value()).isEqualTo("hasAuthority('SESSIONS_MANAGE')");
+        }
+
+        @Test
+        @DisplayName("Should require SESSIONS_MANAGE authority for revokeUserSession")
+        void shouldRequireSessionsManageAuthorityForRevokeUserSession() throws NoSuchMethodException {
+            Method method = AdminSessionController.class.getMethod(
+                    "revokeUserSession",
+                    UUID.class,
                     UUID.class,
                     Authentication.class
             );
