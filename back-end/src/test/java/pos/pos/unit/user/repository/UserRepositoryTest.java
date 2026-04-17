@@ -7,7 +7,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
+import pos.pos.role.entity.Role;
+import pos.pos.user.entity.UserRole;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
 
@@ -319,6 +323,136 @@ class UserRepositoryTest {
         }
     }
 
+    @Nested
+    @DisplayName("findByIdAndDeletedAtIsNull")
+    class FindByIdAndDeletedAtIsNullTests {
+
+        @Test
+        @DisplayName("Should return the non-deleted user")
+        void shouldReturnNonDeletedUser() {
+            User user = repository.save(user("read@pos.local", "read.user", true, null));
+            repository.flush();
+            entityManager.clear();
+
+            Optional<User> result = repository.findByIdAndDeletedAtIsNull(user.getId());
+
+            assertThat(result).isPresent();
+            assertThat(result.get().getId()).isEqualTo(user.getId());
+        }
+
+        @Test
+        @DisplayName("Should return empty for soft-deleted user")
+        void shouldReturnEmptyForDeletedUser() {
+            User user = repository.save(user("deleted@pos.local", "deleted.reader", true, OffsetDateTime.now(ZoneOffset.UTC)));
+            repository.flush();
+            entityManager.clear();
+
+            Optional<User> result = repository.findByIdAndDeletedAtIsNull(user.getId());
+
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("existsByNormalizedPhoneAndIdNotAndDeletedAtIsNull")
+    class ExistsByNormalizedPhoneAndIdNotTests {
+
+        @Test
+        @DisplayName("Should return true when another active user owns the phone")
+        void shouldReturnTrueWhenAnotherActiveUserOwnsPhone() {
+            User owner = repository.save(user(uniqueEmail("owner"), uniqueUsername("owner"), "+49-555-0100", true, null));
+            User actor = repository.save(user(uniqueEmail("actor"), uniqueUsername("actor"), "+49-555-0101", true, null));
+            repository.flush();
+            entityManager.clear();
+
+            boolean exists = repository.existsByNormalizedPhoneAndIdNotAndDeletedAtIsNull("+495550100", actor.getId());
+
+            assertThat(exists).isTrue();
+            assertThat(owner.getId()).isNotEqualTo(actor.getId());
+        }
+
+        @Test
+        @DisplayName("Should return false when the phone belongs to the same user")
+        void shouldReturnFalseWhenPhoneBelongsToSameUser() {
+            User owner = repository.save(user(uniqueEmail("owner"), uniqueUsername("owner"), "+49-555-0100", true, null));
+            repository.flush();
+            entityManager.clear();
+
+            boolean exists = repository.existsByNormalizedPhoneAndIdNotAndDeletedAtIsNull("+495550100", owner.getId());
+
+            assertThat(exists).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("searchVisibleUsers")
+    class SearchVisibleUsersTests {
+
+        @Test
+        @DisplayName("Should return only users visible to a non-super-admin with the requested filters")
+        void shouldReturnVisibleUsersForNonSuperAdmin() {
+            String managerCode = uniqueCode("MANAGER");
+            String waiterCode = uniqueCode("WAITER");
+            String protectedCode = uniqueCode("PROTECTED");
+
+            Role managerRole = persistRole(managerCode, uniqueName("Manager"), 20_000L, true, false);
+            Role waiterRole = persistRole(waiterCode, uniqueName("Waiter"), 10_000L, true, false);
+            Role protectedRole = persistRole(protectedCode, uniqueName("Protected"), 100_000L, false, true);
+
+            User visibleUser = repository.save(user(uniqueEmail("visible"), uniqueUsername("visible"), "+49-555-0100", true, null));
+            User hiddenProtectedUser = repository.save(user(uniqueEmail("protected"), uniqueUsername("protected"), "+49-555-0101", true, null));
+            User inactiveUser = repository.save(user(uniqueEmail("inactive"), uniqueUsername("inactive"), "+49-555-0102", false, null));
+            User deletedUser = repository.save(user(uniqueEmail("deleted"), uniqueUsername("deleted"), "+49-555-0103", true, OffsetDateTime.now(ZoneOffset.UTC)));
+
+            persistAssignment(visibleUser, waiterRole);
+            persistAssignment(hiddenProtectedUser, protectedRole);
+            persistAssignment(inactiveUser, waiterRole);
+            persistAssignment(deletedUser, waiterRole);
+            repository.flush();
+            entityManager.clear();
+
+            Page<User> page = repository.searchVisibleUsers(
+                    true,
+                    "%visible%",
+                    "%+495550100%",
+                    waiterCode,
+                    false,
+                    managerRole.getRank(),
+                    PageRequest.of(0, 20)
+            );
+
+            assertThat(page.getContent()).extracting(User::getId).containsExactly(visibleUser.getId());
+        }
+
+        @Test
+        @DisplayName("Should include protected higher-ranked users for super admin")
+        void shouldIncludeProtectedHigherRankedUsersForSuperAdmin() {
+            Role waiterRole = persistRole(uniqueCode("WAITER"), uniqueName("Waiter"), 10_000L, true, false);
+            Role protectedRole = persistRole(uniqueCode("PROTECTED"), uniqueName("Protected"), 100_000L, false, true);
+
+            User visibleUser = repository.save(user(uniqueEmail("visible"), uniqueUsername("visible"), "+49-555-0100", true, null));
+            User protectedUser = repository.save(user(uniqueEmail("protected"), uniqueUsername("protected"), "+49-555-0101", true, null));
+
+            persistAssignment(visibleUser, waiterRole);
+            persistAssignment(protectedUser, protectedRole);
+            repository.flush();
+            entityManager.clear();
+
+            Page<User> page = repository.searchVisibleUsers(
+                    null,
+                    null,
+                    null,
+                    null,
+                    true,
+                    Long.MAX_VALUE,
+                    PageRequest.of(0, 20)
+            );
+
+            assertThat(page.getContent()).extracting(User::getId)
+                    .contains(visibleUser.getId(), protectedUser.getId());
+        }
+    }
+
     private User user(String email, String username, boolean isActive, OffsetDateTime deletedAt) {
         return user(email, username, null, isActive, deletedAt);
     }
@@ -337,5 +471,44 @@ class UserRepositoryTest {
                 .emailVerified(true)
                 .deletedAt(deletedAt)
                 .build();
+    }
+
+    private Role persistRole(String code, String name, long rank, boolean assignable, boolean protectedRole) {
+        Role role = Role.builder()
+                .id(UUID.randomUUID())
+                .code(code)
+                .name(name)
+                .rank(rank)
+                .isActive(true)
+                .assignable(assignable)
+                .protectedRole(protectedRole)
+                .build();
+        entityManager.persist(role);
+        return role;
+    }
+
+    private void persistAssignment(User user, Role role) {
+        entityManager.persist(UserRole.builder()
+                .id(UUID.randomUUID())
+                .userId(user.getId())
+                .roleId(role.getId())
+                .assignedAt(OffsetDateTime.now(ZoneOffset.UTC))
+                .build());
+    }
+
+    private String uniqueEmail(String prefix) {
+        return prefix + "." + UUID.randomUUID() + "@pos.local";
+    }
+
+    private String uniqueUsername(String prefix) {
+        return prefix + "." + UUID.randomUUID();
+    }
+
+    private String uniqueCode(String prefix) {
+        return (prefix + "_" + UUID.randomUUID().toString().replace("-", "")).toUpperCase();
+    }
+
+    private String uniqueName(String prefix) {
+        return prefix + " " + UUID.randomUUID();
     }
 }
