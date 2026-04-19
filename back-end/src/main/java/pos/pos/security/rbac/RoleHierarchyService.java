@@ -5,6 +5,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import pos.pos.exception.role.RoleAssignmentNotAllowedException;
+import pos.pos.exception.role.RoleManagementNotAllowedException;
 import pos.pos.exception.user.UserManagementNotAllowedException;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
@@ -26,6 +27,14 @@ public class RoleHierarchyService {
     // takes the highest rank of all roles that a user has
     public long highestActiveRank(UUID userId) {
         return roleRepository.findHighestActiveRankByUserId(userId);
+    }
+
+    public long actorRank(Authentication authentication) {
+        if (isSuperAdmin(authentication)) {
+            return Long.MAX_VALUE;
+        }
+
+        return highestActiveRank(currentUserId(authentication));
     }
 
     // it returns all roles that a user can assign. (for super admin it returns all roles tha are active)
@@ -50,6 +59,17 @@ public class RoleHierarchyService {
         }
     }
 
+    public void assertCanManageRole(Authentication authentication, Role targetRole) {
+        if (isSuperAdmin(authentication)) {
+            return;
+        }
+
+        long actorRank = highestActiveRank(currentUserId(authentication));
+        if (actorRank <= targetRole.getRank() || targetRole.isProtectedRole() || targetRole.isSystem()) {
+            throw new RoleManagementNotAllowedException();
+        }
+    }
+
     // it checks if the current user can manage the user that it's targeting. if the user that is targeting
     // has at least one protected role return false.
     public void assertCanManageUser(Authentication authentication, UUID targetUserId) {
@@ -66,12 +86,12 @@ public class RoleHierarchyService {
     }
 
     // return user id from Authentication object
-    private UUID currentUserId(Authentication authentication) {
+    public UUID currentUserId(Authentication authentication) {
         return ((AuthenticatedUser) authentication.getPrincipal()).getId();
     }
 
     // take the authorities that are assigned in jwt filter and check if one of them is Super_Admin
-    private boolean isSuperAdmin(Authentication authentication) {
+    public boolean isSuperAdmin(Authentication authentication) {
         String superAdminAuthority = "ROLE_" + AppRole.SUPER_ADMIN.name();
 
         return authentication.getAuthorities().stream()

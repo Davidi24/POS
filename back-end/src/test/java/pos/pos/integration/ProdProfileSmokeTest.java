@@ -65,7 +65,7 @@ class ProdProfileSmokeTest {
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
-        registry.add("DB_URL", () -> "jdbc:postgresql://localhost:5432/pos_test?currentSchema=" + SCHEMA);
+        registry.add("DB_URL", () -> "jdbc:postgresql://localhost:5432/pos?currentSchema=" + SCHEMA);
         registry.add("DB_USERNAME", () -> "pos_user");
         registry.add("DB_PASSWORD", () -> "pos_pass");
         registry.add("JWT_SECRET", () -> "prod-smoke-secret-key-for-hs256-minimum-32b");
