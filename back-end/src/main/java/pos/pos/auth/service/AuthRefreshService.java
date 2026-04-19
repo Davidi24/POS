@@ -8,6 +8,9 @@ import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.auth.mapper.CurrentUserMapper;
+import pos.pos.role.entity.Role;
+import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
@@ -16,7 +19,6 @@ import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoNormalizer;
 import pos.pos.user.entity.User;
-import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 
 import java.time.OffsetDateTime;
@@ -36,9 +38,10 @@ public class AuthRefreshService {
     private final UserSessionRepository userSessionRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final PermissionRepository permissionRepository;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
-    private final UserMapper userMapper;
+    private final CurrentUserMapper currentUserMapper;
     private final RefreshTokenSecurityService refreshTokenSecurityService;
     private final RefreshRateLimiter refreshRateLimiter;
 
@@ -85,10 +88,12 @@ public class AuthRefreshService {
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
-        List<String> roles = roleRepository.findActiveRoleCodesByUserId(user.getId());
+        List<Role> activeRoles = roleRepository.findActiveRolesByUserId(user.getId());
+        List<String> roleCodes = activeRoles.stream().map(Role::getCode).toList();
+        List<String> permissionCodes = loadPermissionCodes(activeRoles);
 
         UUID newTokenId = UUID.randomUUID();
-        String newAccessToken = jwtService.generateAccessToken(user.getId(), roles, newTokenId);
+        String newAccessToken = jwtService.generateAccessToken(user.getId(), roleCodes, newTokenId);
         String newRefreshToken = jwtService.generateRefreshToken(user.getId(), newTokenId);
 
         session.setTokenId(newTokenId);
@@ -104,8 +109,22 @@ public class AuthRefreshService {
                 .refreshToken(newRefreshToken)
                 .tokenType(TOKEN_TYPE)
                 .expiresIn(jwtProperties.getAccessExpiration().getSeconds())
-                .user(userMapper.toUserResponse(user, roles))
+                .user(currentUserMapper.toCurrentUserResponse(user, roleCodes, permissionCodes))
                 .build();
+    }
+
+    private List<String> loadPermissionCodes(List<Role> activeRoles) {
+        List<UUID> roleIds = activeRoles.stream()
+                .map(Role::getId)
+                .toList();
+
+        if (roleIds.isEmpty()) {
+            return List.of();
+        }
+
+        return permissionRepository.findCodesByRoleIds(roleIds).stream()
+                .distinct()
+                .toList();
     }
 
     //revoke the session so it can be used anymore

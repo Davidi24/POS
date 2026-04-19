@@ -11,27 +11,29 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import pos.pos.auth.dto.AuthenticationResponse;
+import pos.pos.auth.dto.CurrentUserResponse;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.entity.AuthLoginAttempt;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.LoginFailureReason;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.enums.SessionType;
+import pos.pos.auth.mapper.CurrentUserMapper;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.AuthLoginService;
 import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.exception.auth.TooManyRequestsException;
+import pos.pos.role.entity.Role;
+import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
 import pos.pos.security.service.PasswordService;
 import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
-import pos.pos.user.dto.UserResponse;
 import pos.pos.user.entity.User;
-import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 
 import java.time.Duration;
@@ -83,7 +85,10 @@ class AuthLoginServiceTest {
     private UserSessionMapper userSessionMapper;
 
     @Mock
-    private UserMapper userMapper;
+    private PermissionRepository permissionRepository;
+
+    @Mock
+    private CurrentUserMapper currentUserMapper;
 
     @Mock
     private RefreshTokenSecurityService refreshTokenSecurityService;
@@ -116,12 +121,19 @@ class AuthLoginServiceTest {
         void shouldReturnTokens_onSuccess() {
             UUID userId = UUID.randomUUID();
             User user = activeUser(userId, "cashier@pos.local", "cashier.one");
-            List<String> roles = List.of("ADMIN", "CASHIER");
-            UserResponse userResponse = UserResponse.builder()
+            List<Role> activeRoles = List.of(
+                    role(UUID.randomUUID(), "ADMIN", 100),
+                    role(UUID.randomUUID(), "CASHIER", 10)
+            );
+            List<String> roleCodes = List.of("ADMIN", "CASHIER");
+            List<String> permissionCodes = List.of("USERS_READ", "SESSIONS_MANAGE");
+            CurrentUserResponse userResponse = CurrentUserResponse.builder()
                     .id(userId)
                     .email("cashier@pos.local")
                     .username("cashier.one")
-                    .roles(roles)
+                    .isActive(true)
+                    .roles(roleCodes)
+                    .permissions(permissionCodes)
                     .build();
             UserSession mappedSession = UserSession.builder()
                     .userId(userId)
@@ -137,9 +149,11 @@ class AuthLoginServiceTest {
             when(passwordService.matches("Password123!", "stored-hash")).thenReturn(true);
             when(userSessionRepository.countByUserIdAndRevokedFalseAndExpiresAtAfter(eq(userId), any(OffsetDateTime.class)))
                     .thenReturn(1L);
-            when(roleRepository.findActiveRoleCodesByUserId(userId)).thenReturn(roles);
+            when(roleRepository.findActiveRolesByUserId(userId)).thenReturn(activeRoles);
+            when(permissionRepository.findCodesByRoleIds(activeRoles.stream().map(Role::getId).toList()))
+                    .thenReturn(permissionCodes);
             when(jwtProperties.getAccessExpiration()).thenReturn(Duration.ofMinutes(15));
-            when(jwtService.generateAccessToken(eq(userId), eq(roles), any(UUID.class))).thenReturn("access-token");
+            when(jwtService.generateAccessToken(eq(userId), eq(roleCodes), any(UUID.class))).thenReturn("access-token");
             when(jwtService.generateRefreshToken(eq(userId), any(UUID.class))).thenReturn("refresh-token");
             when(refreshTokenSecurityService.hash("refresh-token")).thenReturn("hashed-refresh");
             when(userSessionMapper.toSession(
@@ -149,7 +163,7 @@ class AuthLoginServiceTest {
                     eq("hashed-refresh"),
                     eq(new ClientInfo("127.0.0.1", "JUnit/5"))
             )).thenReturn(mappedSession);
-            when(userMapper.toUserResponse(user, roles)).thenReturn(userResponse);
+            when(currentUserMapper.toCurrentUserResponse(user, roleCodes, permissionCodes)).thenReturn(userResponse);
 
             AuthenticationResponse response = authLoginService.login(
                     loginRequest("  Cashier@POS.local  ", "Password123!"),
@@ -161,6 +175,7 @@ class AuthLoginServiceTest {
             assertThat(response.getTokenType()).isEqualTo("Bearer");
             assertThat(response.getExpiresIn()).isEqualTo(900L);
             assertThat(response.getUser()).isEqualTo(userResponse);
+            assertThat(response.getUser().getPermissions()).containsExactly("USERS_READ", "SESSIONS_MANAGE");
 
             verify(userRepository).findByEmailAndDeletedAtIsNull("cashier@pos.local");
 
@@ -174,7 +189,7 @@ class AuthLoginServiceTest {
 
             ArgumentCaptor<UUID> accessTokenIdCaptor = ArgumentCaptor.forClass(UUID.class);
             ArgumentCaptor<UUID> refreshTokenIdCaptor = ArgumentCaptor.forClass(UUID.class);
-            verify(jwtService).generateAccessToken(eq(userId), eq(roles), accessTokenIdCaptor.capture());
+            verify(jwtService).generateAccessToken(eq(userId), eq(roleCodes), accessTokenIdCaptor.capture());
             verify(jwtService).generateRefreshToken(eq(userId), refreshTokenIdCaptor.capture());
             assertThat(refreshTokenIdCaptor.getValue()).isEqualTo(accessTokenIdCaptor.getValue());
 
@@ -249,7 +264,8 @@ class AuthLoginServiceTest {
             //this function were never called
             verify(userRepository, never()).save(any(User.class));
             verify(userSessionRepository, never()).save(any(UserSession.class));
-            verify(roleRepository, never()).findActiveRoleCodesByUserId(any(UUID.class));
+            verify(roleRepository, never()).findActiveRolesByUserId(any(UUID.class));
+            verify(permissionRepository, never()).findCodesByRoleIds(any());
 
             //capture the object pass to repository and confirm if it has these attributes values
             ArgumentCaptor<AuthLoginAttempt> attemptCaptor = ArgumentCaptor.forClass(AuthLoginAttempt.class);
@@ -449,7 +465,9 @@ class AuthLoginServiceTest {
         void shouldRevokeOldestSession_whenSessionLimitReached() {
             UUID userId = UUID.randomUUID();
             User user = activeUser(userId, "cashier@pos.local", "cashier.one");
-            List<String> roles = List.of("ADMIN");
+            List<Role> activeRoles = List.of(role(UUID.randomUUID(), "ADMIN", 100));
+            List<String> roleCodes = List.of("ADMIN");
+            List<String> permissionCodes = List.of("USERS_READ");
             UserSession mappedSession = UserSession.builder()
                     .userId(userId)
                     .refreshTokenHash("hashed-refresh")
@@ -466,14 +484,17 @@ class AuthLoginServiceTest {
                     .thenReturn(3L);
             when(userSessionRepository.revokeOldestSession(eq(userId), any(OffsetDateTime.class), eq(SessionRevocationReason.SESSION_LIMIT.name())))
                     .thenReturn(1);
-            when(roleRepository.findActiveRoleCodesByUserId(userId)).thenReturn(roles);
+            when(roleRepository.findActiveRolesByUserId(userId)).thenReturn(activeRoles);
+            when(permissionRepository.findCodesByRoleIds(activeRoles.stream().map(Role::getId).toList()))
+                    .thenReturn(permissionCodes);
             when(jwtProperties.getAccessExpiration()).thenReturn(Duration.ofMinutes(15));
-            when(jwtService.generateAccessToken(eq(userId), eq(roles), any(UUID.class))).thenReturn("access-token");
+            when(jwtService.generateAccessToken(eq(userId), eq(roleCodes), any(UUID.class))).thenReturn("access-token");
             when(jwtService.generateRefreshToken(eq(userId), any(UUID.class))).thenReturn("refresh-token");
             when(refreshTokenSecurityService.hash("refresh-token")).thenReturn("hashed-refresh");
             when(userSessionMapper.toSession(eq(userId), any(UUID.class), eq(SessionType.PASSWORD), eq("hashed-refresh"), any(ClientInfo.class)))
                     .thenReturn(mappedSession);
-            when(userMapper.toUserResponse(eq(user), eq(roles))).thenReturn(UserResponse.builder().id(userId).roles(roles).build());
+            when(currentUserMapper.toCurrentUserResponse(eq(user), eq(roleCodes), eq(permissionCodes)))
+                    .thenReturn(CurrentUserResponse.builder().id(userId).roles(roleCodes).permissions(permissionCodes).build());
 
             authLoginService.login(
                     loginRequest("cashier@pos.local", "Password123!"),
@@ -514,6 +535,16 @@ class AuthLoginServiceTest {
                 .isActive(true)
                 .emailVerified(true)
                 .failedLoginAttempts(0)
+                .build();
+    }
+
+    private Role role(UUID roleId, String code, long rank) {
+        return Role.builder()
+                .id(roleId)
+                .code(code)
+                .name(code)
+                .rank(rank)
+                .isActive(true)
                 .build();
     }
 }

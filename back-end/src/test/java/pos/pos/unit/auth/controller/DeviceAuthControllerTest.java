@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import pos.pos.auth.controller.DeviceAuthController;
 import pos.pos.auth.dto.AuthenticationResponse;
+import pos.pos.auth.dto.CurrentUserResponse;
 import pos.pos.auth.dto.LoginRequest;
 import pos.pos.auth.dto.RefreshRequest;
 import pos.pos.auth.service.AuthLoginService;
@@ -27,7 +28,6 @@ import pos.pos.exception.auth.TooManyRequestsException;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoExtractor;
-import pos.pos.user.dto.UserResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -67,7 +67,7 @@ class DeviceAuthControllerTest {
 
     private static final String REFRESH_TOKEN = "refresh.token.here";
 
-    private static final UserResponse USER = UserResponse.builder()
+    private static final CurrentUserResponse USER = CurrentUserResponse.builder()
             .id(UUID.fromString("00000000-0000-0000-0000-000000000001"))
             .email("cashier@pos.local")
             .username("cashier.one")
@@ -75,6 +75,7 @@ class DeviceAuthControllerTest {
             .lastName("Doe")
             .isActive(true)
             .roles(List.of("CASHIER"))
+            .permissions(List.of("SESSIONS_MANAGE"))
             .build();
 
     private static final AuthenticationResponse AUTH_TOKENS = AuthenticationResponse.builder()
@@ -123,7 +124,8 @@ class DeviceAuthControllerTest {
                     .andExpect(jsonPath("$.tokenType").value("Bearer"))
                     .andExpect(jsonPath("$.expiresIn").value(900))
                     .andExpect(jsonPath("$.user.email").value("cashier@pos.local"))
-                    .andExpect(jsonPath("$.user.firstName").value("John"));
+                    .andExpect(jsonPath("$.user.firstName").value("John"))
+                    .andExpect(jsonPath("$.user.permissions[0]").value("SESSIONS_MANAGE"));
 
             verify(clientInfoExtractor).extract(any());
             verify(authLoginService).login(any(), any());
