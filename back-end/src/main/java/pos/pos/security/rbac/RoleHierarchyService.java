@@ -5,6 +5,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import pos.pos.exception.role.RoleAssignmentNotAllowedException;
+import pos.pos.exception.role.RoleManagementNotAllowedException;
 import pos.pos.exception.user.UserManagementNotAllowedException;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
@@ -55,6 +56,17 @@ public class RoleHierarchyService {
         long actorRank = highestActiveRank(currentUserId(authentication));
         if (actorRank <= targetRole.getRank() || !targetRole.isAssignable() || targetRole.isProtectedRole()) {
             throw new RoleAssignmentNotAllowedException();
+        }
+    }
+
+    public void assertCanManageRole(Authentication authentication, Role targetRole) {
+        if (isSuperAdmin(authentication)) {
+            return;
+        }
+
+        long actorRank = highestActiveRank(currentUserId(authentication));
+        if (actorRank <= targetRole.getRank() || targetRole.isProtectedRole() || targetRole.isSystem()) {
+            throw new RoleManagementNotAllowedException();
         }
     }
 

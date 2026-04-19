@@ -33,7 +33,7 @@ public enum AppRole {
             false,
             EnumSet.of(
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
-                    ROLES_READ,
+                    ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE
             )
     ),
@@ -45,7 +45,7 @@ public enum AppRole {
             false,
             EnumSet.of(
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
-                    ROLES_READ,
+                    ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE
             )
     ),

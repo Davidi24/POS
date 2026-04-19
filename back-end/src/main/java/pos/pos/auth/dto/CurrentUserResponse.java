@@ -12,7 +12,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MeResponse {
+public class CurrentUserResponse {
 
     private UUID id;
     private String email;
@@ -20,6 +20,7 @@ public class MeResponse {
     private String firstName;
     private String lastName;
     private String phone;
+    private Boolean isActive;
     private boolean emailVerified;
     private boolean phoneVerified;
     private List<String> roles;

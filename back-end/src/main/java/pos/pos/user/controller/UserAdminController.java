@@ -13,6 +13,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,9 +21,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.role.dto.RoleResponse;
+import pos.pos.user.dto.AdminPasswordResetRequest;
+import pos.pos.user.dto.ClientTargetRequest;
 import pos.pos.user.dto.ReplaceUserRolesRequest;
 import pos.pos.user.dto.UpdateUserRequest;
 import pos.pos.user.dto.UserResponse;
+import pos.pos.user.service.UserAdminActionService;
 import pos.pos.user.service.UserAdminService;
 
 import java.util.List;
@@ -36,6 +40,7 @@ import java.util.UUID;
 public class UserAdminController {
 
     private final UserAdminService userAdminService;
+    private final UserAdminActionService userAdminActionService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('USERS_READ')")
@@ -104,6 +109,38 @@ public class UserAdminController {
     @Operation(summary = "Soft delete a user")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID userId, Authentication authentication) {
         userAdminService.deleteUser(authentication, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{userId}/reset-password")
+    @PreAuthorize("hasAuthority('USERS_UPDATE')")
+    @Operation(summary = "Trigger a password reset for a user")
+    public ResponseEntity<Void> resetPassword(
+            @PathVariable UUID userId,
+            @Valid @RequestBody(required = false) AdminPasswordResetRequest request,
+            Authentication authentication
+    ) {
+        userAdminActionService.requestPasswordReset(authentication, userId, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{userId}/send-verification-email")
+    @PreAuthorize("hasAuthority('USERS_UPDATE')")
+    @Operation(summary = "Send an email verification message for a user")
+    public ResponseEntity<Void> sendVerificationEmail(
+            @PathVariable UUID userId,
+            @Valid @RequestBody(required = false) ClientTargetRequest request,
+            Authentication authentication
+    ) {
+        userAdminActionService.sendVerificationEmail(authentication, userId, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{userId}/send-phone-verification")
+    @PreAuthorize("hasAuthority('USERS_UPDATE')")
+    @Operation(summary = "Send a phone verification code for a user")
+    public ResponseEntity<Void> sendPhoneVerification(@PathVariable UUID userId, Authentication authentication) {
+        userAdminActionService.sendPhoneVerification(authentication, userId);
         return ResponseEntity.noContent().build();
     }
 }

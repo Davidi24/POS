@@ -4,7 +4,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import pos.pos.auth.dto.MeResponse;
+import pos.pos.auth.dto.CurrentUserResponse;
+import pos.pos.auth.mapper.CurrentUserMapper;
 import pos.pos.auth.service.AuthProfileService;
 import pos.pos.security.principal.AuthenticatedUser;
 
@@ -18,7 +19,7 @@ class AuthProfileServiceTest {
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000011");
 
-    private final AuthProfileService authProfileService = new AuthProfileService();
+    private final AuthProfileService authProfileService = new AuthProfileService(new CurrentUserMapper());
 
     @Test
     @DisplayName("Should map authenticated user fields and split roles from permissions")
@@ -47,7 +48,7 @@ class AuthProfileServiceTest {
                         )
                 );
 
-        MeResponse response = authProfileService.getMe(authentication);
+        CurrentUserResponse response = authProfileService.getMe(authentication);
 
         assertThat(response.getId()).isEqualTo(USER_ID);
         assertThat(response.getEmail()).isEqualTo("owner@pos.local");
@@ -55,6 +56,7 @@ class AuthProfileServiceTest {
         assertThat(response.getFirstName()).isEqualTo("Olivia");
         assertThat(response.getLastName()).isEqualTo("Owner");
         assertThat(response.getPhone()).isEqualTo("+49-555-0202");
+        assertThat(response.getIsActive()).isTrue();
         assertThat(response.isEmailVerified()).isTrue();
         assertThat(response.isPhoneVerified()).isFalse();
         assertThat(response.getRoles()).containsExactly("OWNER", "MANAGER");
@@ -79,10 +81,11 @@ class AuthProfileServiceTest {
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(user, null, List.of());
 
-        MeResponse response = authProfileService.getMe(authentication);
+        CurrentUserResponse response = authProfileService.getMe(authentication);
 
         assertThat(response.getRoles()).isEmpty();
         assertThat(response.getPermissions()).isEmpty();
+        assertThat(response.getIsActive()).isTrue();
         assertThat(response.isEmailVerified()).isFalse();
         assertThat(response.isPhoneVerified()).isFalse();
     }

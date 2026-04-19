@@ -13,11 +13,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.dto.AuthenticationResponse;
+import pos.pos.auth.mapper.CurrentUserMapper;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.AuthRefreshService;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.role.entity.Role;
+import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
@@ -25,7 +28,6 @@ import pos.pos.security.service.RefreshRateLimiter;
 import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.user.entity.User;
-import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 
 import java.time.Duration;
@@ -48,7 +50,7 @@ import static org.mockito.BDDMockito.given;
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({AuthRefreshService.class, JwtService.class, RefreshTokenSecurityService.class, UserMapper.class})
+@Import({AuthRefreshService.class, JwtService.class, RefreshTokenSecurityService.class, CurrentUserMapper.class})
 @DisplayName("AuthRefreshService concurrency")
 class AuthRefreshServiceConcurrencyTest {
 
@@ -73,6 +75,9 @@ class AuthRefreshServiceConcurrencyTest {
     private RoleRepository roleRepository;
 
     @MockBean
+    private PermissionRepository permissionRepository;
+
+    @MockBean
     private JwtProperties jwtProperties;
 
     @MockBean
@@ -90,7 +95,7 @@ class AuthRefreshServiceConcurrencyTest {
 
         UUID userId = UUID.randomUUID();
         UUID oldTokenId = UUID.randomUUID();
-        List<String> roles = List.of("ADMIN");
+        List<Role> activeRoles = List.of(role(UUID.randomUUID(), "ADMIN", 100));
         CountDownLatch firstRefreshInsideTransaction = new CountDownLatch(1);
         CountDownLatch allowFirstRefreshToFinish = new CountDownLatch(1);
         AtomicBoolean firstRoleLookup = new AtomicBoolean(true);
@@ -100,15 +105,17 @@ class AuthRefreshServiceConcurrencyTest {
         String refreshToken = jwtService.generateRefreshToken(userId, oldTokenId);
         userSessionRepository.saveAndFlush(activeSession(userId, oldTokenId, refreshToken));
 
-        given(roleRepository.findActiveRoleCodesByUserId(eq(userId))).willAnswer(invocation -> {
+        given(roleRepository.findActiveRolesByUserId(eq(userId))).willAnswer(invocation -> {
             if (firstRoleLookup.compareAndSet(true, false)) {
                 firstRefreshInsideTransaction.countDown();
                 if (!allowFirstRefreshToFinish.await(5, TimeUnit.SECONDS)) {
                     throw new AssertionError("Timed out waiting to release the first refresh call");
                 }
             }
-            return roles;
+            return activeRoles;
         });
+        given(permissionRepository.findCodesByRoleIds(eq(activeRoles.stream().map(Role::getId).toList())))
+                .willReturn(List.of("USERS_READ"));
 
         ExecutorService executorService = Executors.newFixedThreadPool(2);
         try {
@@ -200,6 +207,16 @@ class AuthRefreshServiceConcurrencyTest {
                 .expiresAt(now.plusDays(7))
                 .revoked(false)
                 .createdAt(now.minusDays(1))
+                .build();
+    }
+
+    private Role role(UUID roleId, String code, long rank) {
+        return Role.builder()
+                .id(roleId)
+                .code(code)
+                .name(code)
+                .rank(rank)
+                .isActive(true)
                 .build();
     }
 

@@ -12,7 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import pos.pos.auth.controller.AuthProfileController;
-import pos.pos.auth.dto.MeResponse;
+import pos.pos.auth.dto.CurrentUserResponse;
 import pos.pos.auth.service.AuthProfileService;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.security.principal.AuthenticatedUser;
@@ -62,13 +62,14 @@ class AuthProfileControllerTest {
     @Test
     @DisplayName("GET /auth/me should return the authenticated user's profile")
     void shouldReturnAuthenticatedUserProfile() throws Exception {
-        MeResponse response = MeResponse.builder()
+        CurrentUserResponse response = CurrentUserResponse.builder()
                 .id(USER_ID)
                 .email("manager@pos.local")
                 .username("manager.main")
                 .firstName("Maria")
                 .lastName("Manager")
                 .phone("+49-555-0101")
+                .isActive(true)
                 .emailVerified(true)
                 .phoneVerified(false)
                 .roles(List.of("MANAGER"))
@@ -85,6 +86,7 @@ class AuthProfileControllerTest {
                 .andExpect(jsonPath("$.firstName").value("Maria"))
                 .andExpect(jsonPath("$.lastName").value("Manager"))
                 .andExpect(jsonPath("$.phone").value("+49-555-0101"))
+                .andExpect(jsonPath("$.isActive").value(true))
                 .andExpect(jsonPath("$.emailVerified").value(true))
                 .andExpect(jsonPath("$.phoneVerified").value(false))
                 .andExpect(jsonPath("$.roles[0]").value("MANAGER"))

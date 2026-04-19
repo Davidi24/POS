@@ -29,6 +29,7 @@ import pos.pos.config.properties.PasswordResetProperties;
 import pos.pos.config.properties.SmsAuthProperties;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.auth.InvalidTokenException;
+import pos.pos.exception.auth.TooManyRequestsException;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.service.OpaqueTokenService;
 import pos.pos.security.service.PasswordService;
@@ -235,6 +236,67 @@ class PasswordResetServiceTest {
                     smsMessageService,
                     roleRepository
             );
+        }
+    }
+
+    @Nested
+    @DisplayName("issueAdminReset()")
+    class IssueAdminResetTests {
+
+        @Test
+        @DisplayName("Should send an email reset for an active verified user")
+        void shouldSendEmailResetForActiveVerifiedUser() {
+            User user = emailUser();
+
+            when(opaqueTokenService.issue("reset-token-pepper"))
+                    .thenReturn(new OpaqueTokenService.IssuedToken("raw-reset-token", "hashed-reset-token"));
+            when(frontendProperties.resolveBaseUrl(ClientLinkTarget.MOBILE)).thenReturn("pos://reset");
+
+            passwordResetService.issueAdminReset(user, RecoveryChannel.EMAIL, ClientLinkTarget.MOBILE);
+
+            verify(authPasswordResetTokenRepository).deleteByUserId(USER_ID);
+            verify(authPasswordResetTokenRepository).save(any(AuthPasswordResetToken.class));
+            verify(authMailService).sendPasswordResetEmail(
+                    "cashier@pos.local",
+                    "Casey",
+                    "Reset your POS password",
+                    "pos://reset/reset-password?token=raw-reset-token",
+                    Duration.ofMinutes(30)
+            );
+        }
+
+        @Test
+        @DisplayName("Should reject email admin reset when the email is not verified")
+        void shouldRejectEmailAdminResetWhenEmailIsNotVerified() {
+            User user = emailUser();
+            user.setEmailVerified(false);
+
+            assertThatThrownBy(() -> passwordResetService.issueAdminReset(user, RecoveryChannel.EMAIL, ClientLinkTarget.WEB))
+                    .isInstanceOf(AuthException.class)
+                    .hasMessage("User must have a verified email before sending a password reset email");
+
+            verifyNoInteractions(authMailService);
+        }
+
+        @Test
+        @DisplayName("Should reject SMS admin reset when the cooldown is active")
+        void shouldRejectSmsAdminResetWhenCooldownIsActive() {
+            User user = phoneUser();
+
+            when(smsMessageService.isEnabled()).thenReturn(true);
+            when(roleRepository.findActiveRoleCodesByUserId(USER_ID)).thenReturn(List.of("CASHIER"));
+            when(authSmsOtpCodeRepository.existsByUserIdAndPurposeAndCreatedAtAfter(
+                    eq(USER_ID),
+                    eq(SmsOtpPurpose.PASSWORD_RESET),
+                    any(OffsetDateTime.class)
+            )).thenReturn(true);
+
+            assertThatThrownBy(() -> passwordResetService.issueAdminReset(user, RecoveryChannel.SMS, ClientLinkTarget.UNIVERSAL))
+                    .isInstanceOf(TooManyRequestsException.class)
+                    .hasMessage("Too many password reset requests. Try again later.");
+
+            verify(authSmsOtpCodeRepository, never()).deleteByUserIdAndPurpose(any(UUID.class), any(SmsOtpPurpose.class));
+            verifyNoInteractions(oneTimeCodeService);
         }
     }
 

@@ -10,6 +10,10 @@ public enum AppPermission {
     USERS_DELETE("Delete Users", "Delete user accounts"),
 
     ROLES_READ("View Roles", "View available roles"),
+    ROLES_CREATE("Create Roles", "Create custom roles"),
+    ROLES_UPDATE("Update Roles", "Update custom roles"),
+    ROLES_DELETE("Delete Roles", "Delete custom roles"),
+    ROLES_ASSIGN_PERMISSIONS("Assign Role Permissions", "Replace permissions assigned to a role"),
 
     SESSIONS_MANAGE("Manage Sessions", "View and revoke sessions for any user");
 

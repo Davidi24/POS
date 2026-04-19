@@ -10,6 +10,7 @@ public class PermissionMapper {
 
         return PermissionResponse.builder()
                 .id(permission.getId())
+                .code(permission.getCode())
                 .name(permission.getName())
                 .description(permission.getDescription())
                 .build();

@@ -30,9 +30,11 @@ import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;
 import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.user.controller.UserAdminController;
+import pos.pos.user.dto.AdminPasswordResetRequest;
 import pos.pos.user.dto.ReplaceUserRolesRequest;
 import pos.pos.user.dto.UpdateUserRequest;
 import pos.pos.user.dto.UserResponse;
+import pos.pos.user.service.UserAdminActionService;
 import pos.pos.user.service.UserAdminService;
 
 import java.io.IOException;
@@ -47,6 +49,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -70,6 +73,9 @@ class UserAdminControllerSecurityTest {
 
     @MockBean
     private UserAdminService userAdminService;
+
+    @MockBean
+    private UserAdminActionService userAdminActionService;
 
     @Test
     @DisplayName("GET /users should return 200 when authenticated with USERS_READ")
@@ -151,6 +157,31 @@ class UserAdminControllerSecurityTest {
                         .header("X-Test-User", "manager@pos.local")
                         .header("X-Test-Authorities", "USERS_DELETE"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/reset-password should return 204 when authenticated with USERS_UPDATE")
+    void shouldAllowResetPasswordWhenAuthorized() throws Exception {
+        AdminPasswordResetRequest request = new AdminPasswordResetRequest();
+
+        mockMvc.perform(post("/users/{userId}/reset-password", TARGET_USER_ID)
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "USERS_UPDATE")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/send-phone-verification should return 403 when missing USERS_UPDATE")
+    void shouldRejectSendPhoneVerificationWhenMissingUsersUpdate() throws Exception {
+        mockMvc.perform(post("/users/{userId}/send-phone-verification", TARGET_USER_ID)
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "USERS_READ"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Access denied"));
+
+        verifyNoInteractions(userAdminActionService);
     }
 
     @TestConfiguration

@@ -13,13 +13,10 @@ import java.util.UUID;
 @Entity
 @Table(
         name = "roles",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_roles_code", columnNames = "code"),
-                @UniqueConstraint(name = "uk_roles_name", columnNames = "name")
-        },
         indexes = {
                 @Index(name = "idx_roles_rank", columnList = "rank"),
-                @Index(name = "idx_roles_active_rank", columnList = "is_active, rank")
+                @Index(name = "idx_roles_active_rank", columnList = "is_active, rank"),
+                @Index(name = "idx_roles_deleted_at", columnList = "deleted_at")
         }
 )
 @Check(constraints = "rank > 0")
@@ -64,6 +61,9 @@ public class Role implements AuditedEntityLifecycle {
     @Builder.Default
     @Column(name = "is_protected", nullable = false)
     private boolean protectedRole = false;
+
+    @Column(name = "deleted_at", columnDefinition = "timestamptz")
+    private OffsetDateTime deletedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamptz")
     private OffsetDateTime createdAt;

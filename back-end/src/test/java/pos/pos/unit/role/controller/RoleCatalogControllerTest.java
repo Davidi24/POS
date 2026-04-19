@@ -26,6 +26,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pos.pos.role.controller.RoleCatalogController;
+import pos.pos.role.dto.PermissionResponse;
 import pos.pos.role.dto.RoleResponse;
 import pos.pos.role.service.RoleCatalogService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -54,6 +56,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("RoleCatalogController")
 class RoleCatalogControllerTest {
 
+    private static final UUID ROLE_ID = UUID.fromString("00000000-0000-0000-0000-000000000211");
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -61,43 +65,107 @@ class RoleCatalogControllerTest {
     private RoleCatalogService roleCatalogService;
 
     @Test
-    @DisplayName("GET /roles/assignable should return 200 when authenticated with ROLES_READ authority")
-    void shouldReturnAssignableRolesWhenAuthorized() throws Exception {
-        RoleResponse manager = RoleResponse.builder()
-                .id(UUID.randomUUID())
-                .code("MANAGER")
-                .name("Manager")
-                .description("Store manager")
-                .rank(20_000L)
-                .isAssignable(true)
-                .build();
-        RoleResponse waiter = RoleResponse.builder()
-                .id(UUID.randomUUID())
-                .code("WAITER")
-                .name("Waiter")
-                .description("Handles orders")
-                .rank(10_000L)
-                .isAssignable(true)
-                .build();
+    @DisplayName("GET /roles should return active roles when authorized")
+    void shouldReturnRolesWhenAuthorized() throws Exception {
+        given(roleCatalogService.getRoles()).willReturn(List.of(
+                RoleResponse.builder().id(ROLE_ID).code("ADMIN").name("Admin").build()
+        ));
 
-        given(roleCatalogService.getAssignableRoles(any())).willReturn(List.of(manager, waiter));
+        mockMvc.perform(get("/roles")
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "ROLES_READ")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("ADMIN"));
+
+        verify(roleCatalogService).getRoles();
+    }
+
+    @Test
+    @DisplayName("GET /permissions should return permissions when authorized")
+    void shouldReturnPermissionsWhenAuthorized() throws Exception {
+        given(roleCatalogService.getPermissions()).willReturn(List.of(
+                PermissionResponse.builder().id(UUID.randomUUID()).code("USERS_READ").name("View Users").build()
+        ));
+
+        mockMvc.perform(get("/permissions")
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "ROLES_READ")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("USERS_READ"));
+
+        verify(roleCatalogService).getPermissions();
+    }
+
+    @Test
+    @DisplayName("GET /roles/{roleId} should return one role when authorized")
+    void shouldReturnOneRoleWhenAuthorized() throws Exception {
+        given(roleCatalogService.getRole(ROLE_ID)).willReturn(
+                RoleResponse.builder().id(ROLE_ID).code("ADMIN").name("Admin").build()
+        );
+
+        mockMvc.perform(get("/roles/{roleId}", ROLE_ID)
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "ROLES_READ")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(ROLE_ID.toString()))
+                .andExpect(jsonPath("$.code").value("ADMIN"));
+    }
+
+    @Test
+    @DisplayName("GET /roles/{roleId}/permissions should return role permissions when authorized")
+    void shouldReturnRolePermissionsWhenAuthorized() throws Exception {
+        given(roleCatalogService.getRolePermissions(eq(ROLE_ID))).willReturn(List.of(
+                PermissionResponse.builder().id(UUID.randomUUID()).code("USERS_UPDATE").name("Update Users").build()
+        ));
+
+        mockMvc.perform(get("/roles/{roleId}/permissions", ROLE_ID)
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "ROLES_READ")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("USERS_UPDATE"));
+    }
+
+    @Test
+    @DisplayName("GET /roles/system should return system roles when authorized")
+    void shouldReturnSystemRolesWhenAuthorized() throws Exception {
+        given(roleCatalogService.getSystemRoles()).willReturn(List.of(
+                RoleResponse.builder().id(ROLE_ID).code("OWNER").name("Owner").isSystem(true).build()
+        ));
+
+        mockMvc.perform(get("/roles/system")
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "ROLES_READ")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("OWNER"))
+                .andExpect(jsonPath("$[0].isSystem").value(true));
+    }
+
+    @Test
+    @DisplayName("GET /roles/assignable should return assignable roles when authorized")
+    void shouldReturnAssignableRolesWhenAuthorized() throws Exception {
+        given(roleCatalogService.getAssignableRoles(any())).willReturn(List.of(
+                RoleResponse.builder().id(ROLE_ID).code("WAITER").name("Waiter").build()
+        ));
 
         mockMvc.perform(get("/roles/assignable")
                         .header("X-Test-User", "manager@pos.local")
                         .header("X-Test-Authorities", "ROLES_READ")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].code").value("MANAGER"))
-                .andExpect(jsonPath("$[1].code").value("WAITER"));
+                .andExpect(jsonPath("$[0].code").value("WAITER"));
 
         verify(roleCatalogService).getAssignableRoles(any());
     }
 
     @Test
-    @DisplayName("GET /roles/assignable should return 401 when unauthenticated")
+    @DisplayName("Read endpoints should return 401 when unauthenticated")
     void shouldReturn401WhenUnauthenticated() throws Exception {
-        mockMvc.perform(get("/roles/assignable")
-                        .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/roles").contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("Unauthorized"))
                 .andExpect(jsonPath("$.message").value("Authentication required"));
@@ -106,9 +174,9 @@ class RoleCatalogControllerTest {
     }
 
     @Test
-    @DisplayName("GET /roles/assignable should return 403 when missing ROLES_READ authority")
-    void shouldReturn403WhenMissingAuthority() throws Exception {
-        mockMvc.perform(get("/roles/assignable")
+    @DisplayName("Read endpoints should return 403 when missing ROLES_READ authority")
+    void shouldReturn403WhenMissingRolesRead() throws Exception {
+        mockMvc.perform(get("/permissions")
                         .header("X-Test-User", "manager@pos.local")
                         .header("X-Test-Authorities", "USERS_READ")
                         .contentType(MediaType.APPLICATION_JSON))

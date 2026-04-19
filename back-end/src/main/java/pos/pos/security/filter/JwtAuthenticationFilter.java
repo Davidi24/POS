@@ -121,7 +121,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .map(UserRole::getRoleId)
                 .toList();
 
-        List<Role> activeRoles = roleRepository.findByIdIn(roleIds)
+        List<Role> activeRoles = roleIds.isEmpty()
+                ? List.of()
+                : roleRepository.findByIdIn(roleIds)
                 .stream()
                 .filter(Role::isActive)
                 .toList();

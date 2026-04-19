@@ -12,11 +12,14 @@ import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.entity.AuthLoginAttempt;
 import pos.pos.auth.enums.LoginFailureReason;
+import pos.pos.auth.mapper.CurrentUserMapper;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.exception.auth.TooManyRequestsException;
+import pos.pos.role.entity.Role;
+import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.config.JwtProperties;
 import pos.pos.security.service.JwtService;
@@ -25,7 +28,6 @@ import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
 import pos.pos.security.util.ClientInfoNormalizer;
 import pos.pos.user.entity.User;
-import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 import pos.pos.utils.NormalizationUtils;
 
@@ -50,13 +52,14 @@ public class AuthLoginService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final PermissionRepository permissionRepository;
     private final PasswordService passwordService;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
     private final UserSessionRepository userSessionRepository;
     private final AuthLoginAttemptRepository authLoginAttemptRepository;
     private final UserSessionMapper userSessionMapper;
-    private final UserMapper userMapper;
+    private final CurrentUserMapper currentUserMapper;
 
     @Value("${app.security.login.max-failed-attempts}")
     private int maxFailedAttempts;
@@ -108,7 +111,9 @@ public class AuthLoginService {
         enforceSessionLimit(user.getId(), now);
 
         //here it means all the check have passed so it creates a successful login.
-        List<String> roles = loadRoleCodes(user.getId());
+        List<Role> activeRoles = loadActiveRoles(user.getId());
+        List<String> roleCodes = activeRoles.stream().map(Role::getCode).toList();
+        List<String> permissionCodes = loadPermissionCodes(activeRoles);
 
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
@@ -117,7 +122,7 @@ public class AuthLoginService {
         userRepository.save(user);
 
         UUID tokenId = UUID.randomUUID();
-        String accessToken = jwtService.generateAccessToken(user.getId(), roles, tokenId);
+        String accessToken = jwtService.generateAccessToken(user.getId(), roleCodes, tokenId);
         String refreshToken = jwtService.generateRefreshToken(user.getId(), tokenId);
 
         userSessionRepository.save(
@@ -137,13 +142,27 @@ public class AuthLoginService {
                 .refreshToken(refreshToken)
                 .tokenType(TOKEN_TYPE)
                 .expiresIn(jwtProperties.getAccessExpiration().getSeconds())
-                .user(userMapper.toUserResponse(user, roles))
+                .user(currentUserMapper.toCurrentUserResponse(user, roleCodes, permissionCodes))
                 .build();
     }
 
 
-    private List<String> loadRoleCodes(UUID userId) {
-        return roleRepository.findActiveRoleCodesByUserId(userId);
+    private List<Role> loadActiveRoles(UUID userId) {
+        return roleRepository.findActiveRolesByUserId(userId);
+    }
+
+    private List<String> loadPermissionCodes(List<Role> activeRoles) {
+        List<UUID> roleIds = activeRoles.stream()
+                .map(Role::getId)
+                .toList();
+
+        if (roleIds.isEmpty()) {
+            return List.of();
+        }
+
+        return permissionRepository.findCodesByRoleIds(roleIds).stream()
+                .distinct()
+                .toList();
     }
 
 

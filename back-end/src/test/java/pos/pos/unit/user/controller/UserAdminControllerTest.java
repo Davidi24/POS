@@ -20,9 +20,12 @@ import pos.pos.exception.user.UserManagementNotAllowedException;
 import pos.pos.role.dto.RoleResponse;
 import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.user.controller.UserAdminController;
+import pos.pos.user.dto.AdminPasswordResetRequest;
+import pos.pos.user.dto.ClientTargetRequest;
 import pos.pos.user.dto.ReplaceUserRolesRequest;
 import pos.pos.user.dto.UpdateUserRequest;
 import pos.pos.user.dto.UserResponse;
+import pos.pos.user.service.UserAdminActionService;
 import pos.pos.user.service.UserAdminService;
 
 import java.util.List;
@@ -36,6 +39,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -50,6 +54,9 @@ class UserAdminControllerTest {
 
     @Mock
     private UserAdminService userAdminService;
+
+    @Mock
+    private UserAdminActionService userAdminActionService;
 
     @InjectMocks
     private UserAdminController controller;
@@ -201,6 +208,44 @@ class UserAdminControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(userAdminService).deleteUser(authentication, TARGET_USER_ID);
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/reset-password should return 204")
+    void shouldRequestPasswordReset() throws Exception {
+        AdminPasswordResetRequest request = new AdminPasswordResetRequest();
+
+        mockMvc.perform(post("/users/{userId}/reset-password", TARGET_USER_ID)
+                        .principal(authentication)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNoContent());
+
+        verify(userAdminActionService).requestPasswordReset(eq(authentication), eq(TARGET_USER_ID), any(AdminPasswordResetRequest.class));
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/send-verification-email should return 204")
+    void shouldSendVerificationEmail() throws Exception {
+        ClientTargetRequest request = new ClientTargetRequest();
+
+        mockMvc.perform(post("/users/{userId}/send-verification-email", TARGET_USER_ID)
+                        .principal(authentication)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNoContent());
+
+        verify(userAdminActionService).sendVerificationEmail(eq(authentication), eq(TARGET_USER_ID), any(ClientTargetRequest.class));
+    }
+
+    @Test
+    @DisplayName("POST /users/{userId}/send-phone-verification should return 204")
+    void shouldSendPhoneVerification() throws Exception {
+        mockMvc.perform(post("/users/{userId}/send-phone-verification", TARGET_USER_ID)
+                        .principal(authentication))
+                .andExpect(status().isNoContent());
+
+        verify(userAdminActionService).sendPhoneVerification(authentication, TARGET_USER_ID);
     }
 
     private UserResponse userResponse() {

@@ -9,6 +9,7 @@ import pos.pos.auth.dto.ResetPasswordRequest;
 import pos.pos.auth.dto.ResetPasswordWithCodeRequest;
 import pos.pos.auth.entity.AuthPasswordResetToken;
 import pos.pos.auth.entity.AuthSmsOtpCode;
+import pos.pos.auth.enums.ClientLinkTarget;
 import pos.pos.auth.enums.RecoveryChannel;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.enums.SmsOtpPurpose;
@@ -20,6 +21,7 @@ import pos.pos.config.properties.PasswordResetProperties;
 import pos.pos.config.properties.SmsAuthProperties;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.auth.InvalidTokenException;
+import pos.pos.exception.auth.TooManyRequestsException;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.service.OpaqueTokenService;
 import pos.pos.security.service.PasswordService;
@@ -34,6 +36,9 @@ import java.time.ZoneOffset;
 @Service
 @RequiredArgsConstructor
 public class PasswordResetService {
+
+    private static final String TOO_MANY_PASSWORD_RESET_REQUESTS_MESSAGE =
+            "Too many password reset requests. Try again later.";
 
     private final UserRepository userRepository;
     private final AuthPasswordResetTokenRepository authPasswordResetTokenRepository;
@@ -59,6 +64,17 @@ public class PasswordResetService {
         }
 
         requestEmailReset(request, now);
+    }
+
+    @Transactional
+    public void issueAdminReset(User user, RecoveryChannel channel, ClientLinkTarget clientTarget) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (channel == RecoveryChannel.SMS) {
+            issueAdminSmsReset(user, now);
+            return;
+        }
+
+        issueAdminEmailReset(user, clientTarget, now);
     }
 
     // Resets the password using a token from the email reset link
@@ -162,12 +178,48 @@ public class PasswordResetService {
         );
 
         // 5. Send the reset link via email
+        sendResetEmail(user, request.getClientTarget(), issuedToken);
+    }
+
+    private void issueAdminEmailReset(User user, ClientLinkTarget clientTarget, OffsetDateTime now) {
+        if (!user.isActive() || user.getDeletedAt() != null) {
+            throw new AuthException(
+                    "User account must be active before sending a password reset email",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (!user.isEmailVerified()) {
+            throw new AuthException(
+                    "User must have a verified email before sending a password reset email",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        authPasswordResetTokenRepository.deleteByUserId(user.getId());
+        OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(passwordResetProperties.getTokenPepper());
+
+        authPasswordResetTokenRepository.save(
+                AuthPasswordResetToken.builder()
+                        .userId(user.getId())
+                        .tokenHash(issuedToken.tokenHash())
+                        .expiresAt(now.plus(passwordResetProperties.getTokenTtl()))
+                        .build()
+        );
+
+        sendResetEmail(user, clientTarget, issuedToken);
+    }
+
+    private void sendResetEmail(
+            User user,
+            ClientLinkTarget clientTarget,
+            OpaqueTokenService.IssuedToken issuedToken
+    ) {
         authMailService.sendPasswordResetEmail(
                 user.getEmail(),
                 user.getFirstName(),
                 passwordResetProperties.getSubject(),
                 FrontendUrlUtils.buildTokenUrl(
-                        frontendProperties.resolveBaseUrl(request.getClientTarget()),
+                        frontendProperties.resolveBaseUrl(clientTarget),
                         passwordResetProperties.getResetPath(),
                         issuedToken.rawToken()
                 ),
@@ -181,6 +233,47 @@ public class PasswordResetService {
         User user = userRepository.findByNormalizedPhoneAndDeletedAtIsNull(normalizedPhone).orElse(null);
         if (user == null || !user.isActive() || !user.isPhoneVerified() || !canUseSmsReset(user)) {
             return;
+        }
+
+        requestSmsReset(user, now);
+    }
+
+    private void issueAdminSmsReset(User user, OffsetDateTime now) {
+        if (!user.isActive() || user.getDeletedAt() != null) {
+            throw new AuthException(
+                    "User account must be active before sending an SMS password reset",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (!user.isPhoneVerified() || user.getPhone() == null || user.getNormalizedPhone() == null) {
+            throw new AuthException(
+                    "User must have a verified phone before sending an SMS password reset",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (!canUseSmsReset(user)) {
+            throw new AuthException(
+                    "User is not eligible for SMS password reset",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        OffsetDateTime cooldownCutoff = now.minus(smsAuthProperties.getRequestCooldown());
+        if (authSmsOtpCodeRepository.existsByUserIdAndPurposeAndCreatedAtAfter(
+                user.getId(),
+                SmsOtpPurpose.PASSWORD_RESET,
+                cooldownCutoff
+        )) {
+            throw new TooManyRequestsException(TOO_MANY_PASSWORD_RESET_REQUESTS_MESSAGE);
+        }
+
+        OffsetDateTime dailyCutoff = now.minusHours(24);
+        if (authSmsOtpCodeRepository.countByUserIdAndPurposeAndCreatedAtAfter(
+                user.getId(),
+                SmsOtpPurpose.PASSWORD_RESET,
+                dailyCutoff
+        ) >= smsAuthProperties.getDailyRequestLimit()) {
+            throw new TooManyRequestsException(TOO_MANY_PASSWORD_RESET_REQUESTS_MESSAGE);
         }
 
         requestSmsReset(user, now);

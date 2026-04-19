@@ -62,7 +62,7 @@ class UserAdminApiIntegrationTest {
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
-        registry.add("DB_URL", () -> "jdbc:postgresql://localhost:5432/pos_test?currentSchema=" + SCHEMA);
+        registry.add("DB_URL", () -> "jdbc:postgresql://localhost:5432/pos?currentSchema=" + SCHEMA);
         registry.add("DB_USERNAME", () -> "pos_user");
         registry.add("DB_PASSWORD", () -> "pos_pass");
         registry.add("JWT_SECRET", () -> "user-admin-test-secret-key-for-hs256");
@@ -222,6 +222,30 @@ class UserAdminApiIntegrationTest {
         assertThat(deletedUser.getDeletedAt()).isNotNull();
         assertThat(deletedUser.getStatus()).isEqualTo("DELETED");
         assertThat(deletedUser.isActive()).isFalse();
+
+        mockMvc.perform(post("/auth/register")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "email", TARGET_EMAIL,
+                                "username", TARGET_USERNAME,
+                                "temporaryPassword", "WaiterPass456!",
+                                "firstName", "Replacement",
+                                "lastName", "User",
+                                "phone", TARGET_PHONE,
+                                "roleId", waiterRole.getId().toString(),
+                                "clientTarget", "UNIVERSAL"
+                        ))))
+                .andExpect(status().isCreated());
+
+        User recreatedUser = userRepository.findByEmailAndDeletedAtIsNull(TARGET_EMAIL).orElseThrow();
+        assertThat(recreatedUser.getId()).isNotEqualTo(target.getId());
+        Integer duplicateEmailCount = jdbcTemplate.queryForObject(
+                "select count(*) from users where email = ?",
+                Integer.class,
+                TARGET_EMAIL
+        );
+        assertThat(duplicateEmailCount).isEqualTo(2);
     }
 
     private MvcResult webLogin(String identifier, String password) throws Exception {
