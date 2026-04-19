@@ -65,7 +65,6 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
 """)
     List<Role> findActiveSystemRoles();
 
-
     // It returns all roles that a user (actor) is allowed to assign.
     // All users that are below the rank that it takes as argument
     @Query("""
