@@ -28,7 +28,7 @@ app:
   bootstrap:
     super-admin:
       enabled: true
-      email: admin@pos.local
+      email: kecidavid22@gmail.com
       username: admin
       password: ChangeMe123!
       first-name: Super
