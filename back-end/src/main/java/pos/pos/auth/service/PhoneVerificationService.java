@@ -78,8 +78,8 @@ public class PhoneVerificationService {
         ) >= smsAuthProperties.getDailyRequestLimit()) {
             throw new TooManyRequestsException(TOO_MANY_PHONE_VERIFICATION_REQUESTS_MESSAGE);
         }
-        //Deletes all existing phone verification codes for this user before creating a new one — so only one active code exists at a time.
-        authSmsOtpCodeRepository.deleteByUserIdAndPurpose(user.getId(), SmsOtpPurpose.PHONE_VERIFICATION);
+        // Invalidate any previous active verification code so only the latest remains usable.
+        authSmsOtpCodeRepository.invalidateActiveCodes(user.getId(), SmsOtpPurpose.PHONE_VERIFICATION, now);
 
         OneTimeCodeService.IssuedCode issuedCode =
                 oneTimeCodeService.issueNumericCode(smsAuthProperties.getCodeLength(), smsAuthProperties.getCodePepper());
@@ -104,7 +104,7 @@ public class PhoneVerificationService {
     // Verifies the user's phone number using the SMS code they received.
     // The code must be unused, not expired, and the phone number must match.
     // After 5 wrong attempts the code is invalidated.
-    @Transactional
+    @Transactional(noRollbackFor = InvalidTokenException.class)
     public void verifyPhone(UUID userId, VerifyPhoneRequest request) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 

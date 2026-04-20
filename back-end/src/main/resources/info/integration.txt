@@ -7,55 +7,55 @@ How to use
 
 AUTH
 
-[ ] AUTH-001 POST /auth/web/login logs in with valid email + password
-[ ] AUTH-002 POST /auth/web/login logs in with valid username + password
-[ ] AUTH-003 POST /auth/web/login rejects wrong password
-[ ] AUTH-004 POST /auth/web/login rejects inactive or deleted user
-[ ] AUTH-005 POST /auth/web/login rejects user with unverified email
-[ ] AUTH-006 POST /auth/web/login locks account after max failed attempts
-[ ] AUTH-007 POST /auth/web/login rate-limits by identifier
-[ ] AUTH-008 POST /auth/web/login rate-limits by IP
-[ ] AUTH-009 POST /auth/web/login revokes oldest session when session limit is reached
-[ ] AUTH-010 POST /auth/web/refresh succeeds with valid refresh cookie and rotates tokens
-[ ] AUTH-011 POST /auth/web/refresh rejects missing refresh cookie
-[ ] AUTH-012 POST /auth/web/refresh rejects invalid, reused, or expired refresh token and clears cookie
-[ ] AUTH-013 POST /auth/web/logout revokes current session and clears cookie
-[ ] AUTH-014 POST /auth/web/logout safely no-ops with invalid or missing refresh cookie
-[ ] AUTH-015 POST /auth/web/logout-all revokes all sessions for current user and clears cookie
-[ ] AUTH-016 POST /auth/device/login succeeds with valid credentials
-[ ] AUTH-017 POST /auth/device/refresh succeeds with valid refresh token in request body
-[ ] AUTH-018 POST /auth/device/refresh rejects missing refresh token
-[ ] AUTH-019 POST /auth/device/refresh rejects invalid, reused, or expired refresh token
-[ ] AUTH-020 POST /auth/device/logout revokes current device session
-[ ] AUTH-021 POST /auth/device/logout safely no-ops when refresh token is omitted
-[ ] AUTH-022 POST /auth/device/logout-all revokes all device sessions for current user
-[ ] AUTH-023 GET /auth/me returns current user profile with roles and permissions
-[ ] AUTH-024 GET /auth/sessions returns current user active sessions
-[ ] AUTH-025 GET /auth/sessions/current returns current active session from bearer token
-[ ] AUTH-026 DELETE /auth/sessions/{sessionId} revokes one of my sessions
-[ ] AUTH-027 DELETE /auth/sessions/others revokes all other sessions but keeps current session
-[ ] AUTH-028 POST /auth/register creates a user with an allowed role
-[ ] AUTH-029 POST /auth/register rejects duplicate email
-[ ] AUTH-030 POST /auth/register rejects duplicate username
-[ ] AUTH-031 POST /auth/register rejects duplicate phone
-[ ] AUTH-032 POST /auth/register rejects assigning a role above actor rank or a protected role
-[ ] AUTH-033 POST /auth/forgot-password email flow issues reset token for active verified user
-[ ] AUTH-034 POST /auth/forgot-password SMS flow issues reset code for eligible verified phone user
-[ ] AUTH-035 POST /auth/forgot-password respects cooldown and daily limit rules
-[ ] AUTH-036 POST /auth/reset-password valid token resets password and revokes active sessions
-[ ] AUTH-037 POST /auth/reset-password rejects invalid or used token
-[ ] AUTH-038 POST /auth/reset-password/code valid code resets password and revokes active sessions
-[ ] AUTH-039 POST /auth/reset-password/code wrong code increments failed attempts and expires after max attempts
-[ ] AUTH-040 PUT /auth/change-password valid current password changes password and revokes other sessions
-[ ] AUTH-041 PUT /auth/change-password rejects wrong current password
-[ ] AUTH-042 POST /auth/verify-email valid token verifies email and marks token used
-[ ] AUTH-043 POST /auth/verify-email rejects invalid or used token
-[ ] AUTH-044 POST /auth/resend-verification issues new verification token for active unverified user
-[ ] AUTH-045 POST /auth/resend-verification respects resend cooldown
-[ ] AUTH-046 POST /auth/request-phone-verification issues phone verification code for current user
-[ ] AUTH-047 POST /auth/request-phone-verification respects cooldown and daily limit rules
-[ ] AUTH-048 POST /auth/verify-phone valid code verifies current phone and marks code used
-[ ] AUTH-049 POST /auth/verify-phone wrong code increments failed attempts and expires after max attempts
+[x] AUTH-001 POST /auth/web/login logs in with valid email + password
+[x] AUTH-002 POST /auth/web/login logs in with valid username + password
+[x] AUTH-003 POST /auth/web/login rejects wrong password
+[x] AUTH-004 POST /auth/web/login rejects inactive or deleted user
+[x] AUTH-005 POST /auth/web/login rejects user with unverified email
+[x] AUTH-006 POST /auth/web/login locks account after max failed attempts
+[x] AUTH-007 POST /auth/web/login rate-limits by identifier
+[x] AUTH-008 POST /auth/web/login rate-limits by IP
+[x] AUTH-009 POST /auth/web/login revokes oldest session when session limit is reached
+[x] AUTH-010 POST /auth/web/refresh succeeds with valid refresh cookie and rotates tokens
+[x] AUTH-011 POST /auth/web/refresh rejects missing refresh cookie
+[x] AUTH-012 POST /auth/web/refresh rejects invalid, reused, or expired refresh token and clears cookie
+[x] AUTH-013 POST /auth/web/logout revokes current session and clears cookie
+[x] AUTH-014 POST /auth/web/logout safely no-ops with invalid or missing refresh cookie
+[x] AUTH-015 POST /auth/web/logout-all revokes all sessions for current user and clears cookie
+[x] AUTH-016 POST /auth/device/login succeeds with valid credentials
+[x] AUTH-017 POST /auth/device/refresh succeeds with valid refresh token in request body
+[x] AUTH-018 POST /auth/device/refresh rejects missing refresh token
+[x] AUTH-019 POST /auth/device/refresh rejects invalid, reused, or expired refresh token
+[x] AUTH-020 POST /auth/device/logout revokes current device session
+[x] AUTH-021 POST /auth/device/logout safely no-ops when refresh token is omitted
+[x] AUTH-022 POST /auth/device/logout-all revokes all device sessions for current user
+[x] AUTH-023 GET /auth/me returns current user profile with roles and permissions
+[x] AUTH-024 GET /auth/sessions returns current user active sessions
+[x] AUTH-025 GET /auth/sessions/current returns current active session from bearer token
+[x] AUTH-026 DELETE /auth/sessions/{sessionId} revokes one of my sessions
+[x] AUTH-027 DELETE /auth/sessions/others revokes all other sessions but keeps current session
+[x] AUTH-028 POST /auth/register creates a user with an allowed role
+[x] AUTH-029 POST /auth/register rejects duplicate email
+[x] AUTH-030 POST /auth/register rejects duplicate username
+[x] AUTH-031 POST /auth/register rejects duplicate phone
+[x] AUTH-032 POST /auth/register rejects assigning a role above actor rank or a protected role
+[x] AUTH-033 POST /auth/forgot-password email flow issues reset token for active verified user
+[x] AUTH-034 POST /auth/forgot-password SMS flow issues reset code for eligible verified phone user
+[x] AUTH-035 POST /auth/forgot-password respects cooldown and daily limit rules
+[x] AUTH-036 POST /auth/reset-password valid token resets password and revokes active sessions
+[x] AUTH-037 POST /auth/reset-password rejects invalid or used token
+[x] AUTH-038 POST /auth/reset-password/code valid code resets password and revokes active sessions
+[x] AUTH-039 POST /auth/reset-password/code wrong code increments failed attempts and expires after max attempts
+[x] AUTH-040 PUT /auth/change-password valid current password changes password and revokes other sessions
+[x] AUTH-041 PUT /auth/change-password rejects wrong current password
+[x] AUTH-042 POST /auth/verify-email valid token verifies email and marks token used
+[x] AUTH-043 POST /auth/verify-email rejects invalid or used token
+[x] AUTH-044 POST /auth/resend-verification issues new verification token for active unverified user
+[x] AUTH-045 POST /auth/resend-verification respects resend cooldown
+[x] AUTH-046 POST /auth/request-phone-verification issues phone verification code for current user
+[x] AUTH-047 POST /auth/request-phone-verification respects cooldown and daily limit rules
+[x] AUTH-048 POST /auth/verify-phone valid code verifies current phone and marks code used
+[x] AUTH-049 POST /auth/verify-phone wrong code increments failed attempts and expires after max attempts
 
 USER
 

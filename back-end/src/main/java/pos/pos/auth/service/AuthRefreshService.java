@@ -45,7 +45,7 @@ public class AuthRefreshService {
     private final RefreshTokenSecurityService refreshTokenSecurityService;
     private final RefreshRateLimiter refreshRateLimiter;
 
-    @Transactional
+    @Transactional(noRollbackFor = InvalidCredentialsException.class)
     public AuthenticationResponse refresh(String refreshToken, ClientInfo clientInfo) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         ClientInfo normalizedClientInfo = ClientInfoNormalizer.normalize(clientInfo);

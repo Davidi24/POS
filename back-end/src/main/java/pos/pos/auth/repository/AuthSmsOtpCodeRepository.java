@@ -28,6 +28,17 @@ public interface AuthSmsOtpCodeRepository extends JpaRepository<AuthSmsOtpCode, 
 
     @Modifying
     @Query("""
+        UPDATE AuthSmsOtpCode c
+        SET c.usedAt = :now
+        WHERE c.userId = :userId
+          AND c.purpose = :purpose
+          AND c.usedAt IS NULL
+          AND c.expiresAt > :now
+    """)
+    int invalidateActiveCodes(UUID userId, SmsOtpPurpose purpose, OffsetDateTime now);
+
+    @Modifying
+    @Query("""
         DELETE FROM AuthSmsOtpCode c
         WHERE c.expiresAt < :now
     """)
