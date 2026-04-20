@@ -81,7 +81,7 @@ public class AuthLoginService {
 
     private final RefreshTokenSecurityService refreshTokenSecurityService;
 
-    @Transactional
+    @Transactional(noRollbackFor = {InvalidCredentialsException.class, TooManyRequestsException.class})
     public AuthenticationResponse login(LoginRequest request, ClientInfo clientInfo) {
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);

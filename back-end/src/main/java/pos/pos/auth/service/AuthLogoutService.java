@@ -59,7 +59,7 @@ public class AuthLogoutService {
     // 3. If the current session is expired — revokes it and throws an error (user does not log out cos it's not him trying to log out)
     // 4. Validates the session belongs to the correct user and token hash matches
     // 5. Revokes ALL active sessions for this user, including the current one
-    @Transactional
+    @Transactional(noRollbackFor = InvalidCredentialsException.class)
     public void logoutAll(String refreshToken)  {
         RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
                 refreshTokenSecurityService.validate(refreshToken);

@@ -98,7 +98,7 @@ public class PasswordResetService {
     }
 
     // Resets the password using an SMS code — user is identified by phone number
-    @Transactional
+    @Transactional(noRollbackFor = InvalidTokenException.class)
     public void resetPasswordWithCode(ResetPasswordWithCodeRequest request) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         String normalizedPhone = requiredPhone(request.getPhone());
@@ -309,8 +309,8 @@ public class PasswordResetService {
             return;
         }
 
-        // 3. Delete old reset codes
-        authSmsOtpCodeRepository.deleteByUserIdAndPurpose(user.getId(), SmsOtpPurpose.PASSWORD_RESET);
+        // 3. Invalidate any previous active reset code so only the latest remains usable
+        authSmsOtpCodeRepository.invalidateActiveCodes(user.getId(), SmsOtpPurpose.PASSWORD_RESET, now);
 
         // 4. Generate a new code and save the hash to DB
         OneTimeCodeService.IssuedCode issuedCode =
