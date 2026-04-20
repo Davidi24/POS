@@ -4,7 +4,7 @@ spring:
       mode: never
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/pos
+    url: jdbc:postgresql://localhost:5433/pos_local
     username: pos_user
     password: pos_pass
     driver-class-name: org.postgresql.Driver
@@ -25,6 +25,10 @@ security:
     secret: local-dev-secret-key-for-hs256-minimum-32b
 
 app:
+  security:
+    refresh-token:
+      pepper: change-this-local-dev-refresh-token-pepper
+
   bootstrap:
     super-admin:
       enabled: true
