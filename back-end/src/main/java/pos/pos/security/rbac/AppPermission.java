@@ -17,6 +17,7 @@ public enum AppPermission {
 
     SESSIONS_MANAGE("Manage Sessions", "View and revoke sessions for any user");
 
+
     private final String displayName;
     private final String description;
 

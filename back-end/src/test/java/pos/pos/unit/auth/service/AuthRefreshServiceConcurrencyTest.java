@@ -27,6 +27,7 @@ import pos.pos.security.service.JwtService;
 import pos.pos.security.service.RefreshRateLimiter;
 import pos.pos.security.service.RefreshTokenSecurityService;
 import pos.pos.security.util.ClientInfo;
+import pos.pos.support.AbstractTestProfilePostgresTest;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
 
@@ -52,7 +53,7 @@ import static org.mockito.BDDMockito.given;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Import({AuthRefreshService.class, JwtService.class, RefreshTokenSecurityService.class, CurrentUserMapper.class})
 @DisplayName("AuthRefreshService concurrency")
-class AuthRefreshServiceConcurrencyTest {
+class AuthRefreshServiceConcurrencyTest extends AbstractTestProfilePostgresTest {
 
     private static final String INVALID_REFRESH_TOKEN_MESSAGE = "Invalid refresh token";
 

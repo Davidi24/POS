@@ -49,7 +49,8 @@ class BootstrapSuperAdminPropertiesTest {
                     assertThat(context).hasNotFailed();
                     BootstrapSuperAdminProperties properties = context.getBean(BootstrapSuperAdminProperties.class);
                     assertThat(properties.isEnabled()).isTrue();
-                    assertThat(properties.getEmail()).isEqualTo("admin@pos.local");
+                    assertThat(properties.getEmail())
+                            .isEqualTo(context.getEnvironment().getProperty("app.bootstrap.super-admin.email"));
                     assertThat(properties.getUsername()).isEqualTo("admin");
                 });
     }

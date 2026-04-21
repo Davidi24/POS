@@ -197,7 +197,11 @@ class PasswordResetServiceTest {
             passwordResetService.requestReset(request);
 
             verify(userRepository).findByNormalizedPhoneAndDeletedAtIsNull("+495550100");
-            verify(authSmsOtpCodeRepository).deleteByUserIdAndPurpose(USER_ID, SmsOtpPurpose.PASSWORD_RESET);
+            verify(authSmsOtpCodeRepository).invalidateActiveCodes(
+                    eq(USER_ID),
+                    eq(SmsOtpPurpose.PASSWORD_RESET),
+                    any(OffsetDateTime.class)
+            );
 
             ArgumentCaptor<AuthSmsOtpCode> codeCaptor = ArgumentCaptor.forClass(AuthSmsOtpCode.class);
             verify(authSmsOtpCodeRepository).save(codeCaptor.capture());

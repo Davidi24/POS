@@ -17,6 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
+import pos.pos.support.AbstractTestProfilePostgresTest;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -35,7 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class UserSessionRepositoryTest {
+class UserSessionRepositoryTest extends AbstractTestProfilePostgresTest {
 
     @Autowired
     private UserSessionRepository repository;

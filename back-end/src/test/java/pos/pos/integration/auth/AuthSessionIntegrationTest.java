@@ -23,6 +23,7 @@ import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.AuthEmailVerificationTokenRepository;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
+import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
 
@@ -53,9 +54,7 @@ class AuthSessionIntegrationTest {
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
-        registry.add("DB_URL", () -> "jdbc:postgresql://localhost:5432/pos?currentSchema=" + SCHEMA);
-        registry.add("DB_USERNAME", () -> "pos_user");
-        registry.add("DB_PASSWORD", () -> "pos_pass");
+        TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
         registry.add("JWT_SECRET", () -> "auth-session-test-secret-key-for-hs256-123456");
         registry.add("REFRESH_TOKEN_PEPPER", () -> "auth-session-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "auth-session-password-reset-pepper");
@@ -77,9 +76,6 @@ class AuthSessionIntegrationTest {
         registry.add("BOOTSTRAP_SUPER_ADMIN_FIRST_NAME", () -> "Auth");
         registry.add("BOOTSTRAP_SUPER_ADMIN_LAST_NAME", () -> "Session");
         registry.add("SMS_DELIVERY_MODE", () -> "LOG_ONLY");
-        registry.add("spring.flyway.default-schema", () -> SCHEMA);
-        registry.add("spring.flyway.schemas[0]", () -> SCHEMA);
-        registry.add("spring.jpa.properties.hibernate.default_schema", () -> SCHEMA);
     }
 
     @Autowired

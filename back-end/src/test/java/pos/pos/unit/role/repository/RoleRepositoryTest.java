@@ -11,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.support.AbstractTestProfilePostgresTest;
 import pos.pos.user.entity.UserRole;
 
 import java.util.List;
@@ -22,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class RoleRepositoryTest {
+class RoleRepositoryTest extends AbstractTestProfilePostgresTest {
 
     @Autowired
     private RoleRepository repository;
