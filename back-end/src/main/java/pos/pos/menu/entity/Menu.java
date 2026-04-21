@@ -10,16 +10,29 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Check;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.user.entity.User;
+import pos.pos.utils.NormalizationUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Represents a restaurant menu.
+ *
+ * A menu is the top-level container for organizing food or drink offerings,
+ * such as Breakfast, Dinner, or Drinks menus.
+ *
+ * A menu contains one or more menu sections.
+ */
+
 @Getter
 @Setter
 @Entity
+@NoArgsConstructor
 @Table(
         name = "menus",
         uniqueConstraints = {
@@ -31,6 +44,11 @@ import java.util.List;
                 @Index(name = "idx_menus_updated_by", columnList = "updated_by")
         }
 )
+@Check(constraints = """
+        char_length(btrim(code)) > 0
+        AND char_length(btrim(name)) > 0
+        AND display_order >= 0
+        """)
 public class Menu extends BaseAuditEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -62,4 +80,31 @@ public class Menu extends BaseAuditEntity {
 
     @OneToMany(mappedBy = "menu")
     private List<MenuSection> sections = new ArrayList<>();
+
+    @Override
+    protected void normalizeFields() {
+        code = normalizeCode(code == null ? name : code);
+        name = NormalizationUtils.normalize(name);
+        description = NormalizationUtils.normalize(description);
+    }
+
+    @Override
+    protected void validateState() {
+        if (displayOrder != null && displayOrder < 0) {
+            throw new IllegalStateException("displayOrder must be greater than or equal to zero");
+        }
+    }
+
+    private String normalizeCode(String value) {
+        String normalized = NormalizationUtils.normalizeUpper(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        String sanitized = normalized
+                .replaceAll("[^A-Z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+
+        return sanitized.isEmpty() ? null : sanitized;
+    }
 }
