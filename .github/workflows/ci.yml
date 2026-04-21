@@ -33,7 +33,7 @@ jobs:
 
       - name: Build and test
         working-directory: back-end
-        run: ./mvnw verify
+        run: chmod +x mvnw && ./mvnw verify
 
 
 
