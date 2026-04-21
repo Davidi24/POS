@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import pos.pos.role.entity.Role;
+import pos.pos.support.AbstractTestProfilePostgresTest;
 import pos.pos.user.entity.UserRole;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -25,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class UserRepositoryTest {
+class UserRepositoryTest extends AbstractTestProfilePostgresTest {
 
     @Autowired
     private UserRepository repository;

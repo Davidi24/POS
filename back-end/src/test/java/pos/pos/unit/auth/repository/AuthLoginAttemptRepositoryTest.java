@@ -11,6 +11,7 @@ import org.springframework.test.context.ActiveProfiles;
 import pos.pos.auth.entity.AuthLoginAttempt;
 import pos.pos.auth.enums.LoginFailureReason;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
+import pos.pos.support.AbstractTestProfilePostgresTest;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @ActiveProfiles("test")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class AuthLoginAttemptRepositoryTest {
+class AuthLoginAttemptRepositoryTest extends AbstractTestProfilePostgresTest {
 
     @Autowired
     private AuthLoginAttemptRepository repository;

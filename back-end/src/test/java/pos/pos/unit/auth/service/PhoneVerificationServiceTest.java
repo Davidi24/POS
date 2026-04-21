@@ -102,7 +102,11 @@ class PhoneVerificationServiceTest {
 
             phoneVerificationService.requestPhoneVerification(USER_ID);
 
-            verify(authSmsOtpCodeRepository).deleteByUserIdAndPurpose(USER_ID, SmsOtpPurpose.PHONE_VERIFICATION);
+            verify(authSmsOtpCodeRepository).invalidateActiveCodes(
+                    eq(USER_ID),
+                    eq(SmsOtpPurpose.PHONE_VERIFICATION),
+                    any(OffsetDateTime.class)
+            );
 
             ArgumentCaptor<AuthSmsOtpCode> codeCaptor = ArgumentCaptor.forClass(AuthSmsOtpCode.class);
             verify(authSmsOtpCodeRepository).save(codeCaptor.capture());
@@ -136,7 +140,11 @@ class PhoneVerificationServiceTest {
                     .isInstanceOf(TooManyRequestsException.class)
                     .hasMessage(TOO_MANY_REQUESTS_MESSAGE);
 
-            verify(authSmsOtpCodeRepository, never()).deleteByUserIdAndPurpose(any(UUID.class), any(SmsOtpPurpose.class));
+            verify(authSmsOtpCodeRepository, never()).invalidateActiveCodes(
+                    any(UUID.class),
+                    any(SmsOtpPurpose.class),
+                    any(OffsetDateTime.class)
+            );
             verifyNoInteractions(oneTimeCodeService, smsMessageService);
         }
 
@@ -161,7 +169,11 @@ class PhoneVerificationServiceTest {
                     .isInstanceOf(TooManyRequestsException.class)
                     .hasMessage(TOO_MANY_REQUESTS_MESSAGE);
 
-            verify(authSmsOtpCodeRepository, never()).deleteByUserIdAndPurpose(any(UUID.class), any(SmsOtpPurpose.class));
+            verify(authSmsOtpCodeRepository, never()).invalidateActiveCodes(
+                    any(UUID.class),
+                    any(SmsOtpPurpose.class),
+                    any(OffsetDateTime.class)
+            );
             verifyNoInteractions(oneTimeCodeService, smsMessageService);
         }
     }
