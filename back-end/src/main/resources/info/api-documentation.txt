@@ -1,0 +1,391 @@
+AUTH + USER + ROLE API DOCUMENTATION
+
+Scope
+- This file documents the current auth, user, and role APIs in the codebase.
+- All ids are UUID values unless noted otherwise.
+
+Common auth rules
+- Protected endpoints require header: Authorization: Bearer <accessToken>
+- Web refresh/logout endpoints use the refreshToken cookie
+- Device refresh/logout endpoints use refreshToken in the JSON body
+
+Common enum values
+- ClientLinkTarget: WEB, MOBILE, UNIVERSAL
+- RecoveryChannel: EMAIL, SMS
+
+
+AUTH APIs
+
+1. POST /auth/web/login
+- Auth: public
+- Request body:
+  {
+    "identifier": "string, required, max 150",
+    "password": "string, required, 8-100"
+  }
+- Notes:
+  - "email" is accepted as an alias for "identifier"
+  - Sets the refreshToken cookie
+
+2. POST /auth/web/refresh
+- Auth: public
+- Request body: none
+- Request cookie:
+  - refreshToken cookie is required
+- Notes:
+  - Rotates access token and refresh token
+  - Writes a new refreshToken cookie
+
+3. POST /auth/web/logout
+- Auth: public
+- Request body: none
+- Request cookie:
+  - refreshToken cookie if available
+- Notes:
+  - Clears refreshToken cookie
+
+4. POST /auth/web/logout-all
+- Auth: public
+- Request body: none
+- Request cookie:
+  - refreshToken cookie is required
+- Notes:
+  - Revokes all sessions for the current user
+  - Clears refreshToken cookie
+
+5. POST /auth/device/login
+- Auth: public
+- Request body:
+  {
+    "identifier": "string, required, max 150",
+    "password": "string, required, 8-100"
+  }
+
+6. POST /auth/device/refresh
+- Auth: public
+- Request body:
+  {
+    "refreshToken": "string, required"
+  }
+
+7. POST /auth/device/logout
+- Auth: public
+- Request body:
+  {
+    "refreshToken": "string, optional"
+  }
+
+8. POST /auth/device/logout-all
+- Auth: public
+- Request body:
+  {
+    "refreshToken": "string, required"
+  }
+
+9. GET /auth/me
+- Auth: Bearer token required
+- Request body: none
+
+10. GET /auth/sessions
+- Auth: Bearer token required
+- Request body: none
+- Notes:
+  - Uses the current bearer token to identify the current session
+
+11. GET /auth/sessions/current
+- Auth: Bearer token required
+- Request body: none
+
+12. DELETE /auth/sessions/{sessionId}
+- Auth: Bearer token required
+- Path params:
+  - sessionId
+- Request body: none
+
+13. DELETE /auth/sessions/others
+- Auth: Bearer token required
+- Request body: none
+
+14. POST /auth/register
+- Auth: Bearer token required
+- Permission: USERS_CREATE
+- Request body:
+  {
+    "email": "string, required, valid email",
+    "username": "string, required, 3-50, letters/numbers/dot/underscore/hyphen only",
+    "temporaryPassword": "string, required, 8-100",
+    "firstName": "string, required, max 50",
+    "lastName": "string, required, max 50",
+    "phone": "string, optional, max 30",
+    "clientTarget": "ClientLinkTarget, optional, default UNIVERSAL",
+    "roleId": "uuid, required"
+  }
+
+15. POST /auth/forgot-password
+- Auth: public
+- Request body:
+  {
+    "email": "string, optional, valid email",
+    "phone": "string, optional, max 50",
+    "channel": "RecoveryChannel, optional, default EMAIL",
+    "clientTarget": "ClientLinkTarget, optional, default UNIVERSAL"
+  }
+- Notes:
+  - EMAIL flow uses email + clientTarget
+  - SMS flow uses phone
+
+16. POST /auth/reset-password
+- Auth: public
+- Request body:
+  {
+    "token": "string, required",
+    "newPassword": "string, required, 8-100"
+  }
+
+17. POST /auth/reset-password/code
+- Auth: public
+- Request body:
+  {
+    "phone": "string, required, max 50",
+    "code": "string, required, 4-10",
+    "newPassword": "string, required, 8-100"
+  }
+
+18. PUT /auth/change-password
+- Auth: Bearer token required
+- Request body:
+  {
+    "currentPassword": "string, required, 8-100",
+    "newPassword": "string, required, 8-100"
+  }
+
+19. POST /auth/verify-email
+- Auth: public
+- Request body:
+  {
+    "token": "string, required"
+  }
+
+20. POST /auth/resend-verification
+- Auth: public
+- Request body:
+  {
+    "email": "string, required, valid email",
+    "clientTarget": "ClientLinkTarget, optional, default UNIVERSAL"
+  }
+
+21. POST /auth/request-phone-verification
+- Auth: Bearer token required
+- Request body: none
+
+22. POST /auth/verify-phone
+- Auth: Bearer token required
+- Request body:
+  {
+    "code": "string, required, 4-10"
+  }
+
+
+USER APIs
+
+23. GET /users
+- Auth: Bearer token required
+- Permission: USERS_READ
+- Query params:
+  - search: string, optional
+  - active: boolean, optional
+  - roleCode: string, optional
+  - page: integer, optional, default 0, min 0
+  - size: integer, optional, default 20, min 1, max 100
+  - sortBy: string, optional, default createdAt
+  - direction: string, optional, default desc
+- Request body: none
+
+24. GET /users/{userId}
+- Auth: Bearer token required
+- Permission: USERS_READ
+- Path params:
+  - userId
+- Request body: none
+
+25. PUT /users/{userId}
+- Auth: Bearer token required
+- Permission: USERS_UPDATE
+- Path params:
+  - userId
+- Request body:
+  {
+    "firstName": "string, required, max 50",
+    "lastName": "string, required, max 50",
+    "phone": "string, optional, max 30",
+    "isActive": "boolean, required"
+  }
+
+26. GET /users/{userId}/roles
+- Auth: Bearer token required
+- Permission: USERS_READ
+- Path params:
+  - userId
+- Request body: none
+
+27. PUT /users/{userId}/roles
+- Auth: Bearer token required
+- Permission: USERS_UPDATE
+- Path params:
+  - userId
+- Request body:
+  {
+    "roleIds": ["uuid, required, at least one item"]
+  }
+
+28. DELETE /users/{userId}
+- Auth: Bearer token required
+- Permission: USERS_DELETE
+- Path params:
+  - userId
+- Request body: none
+
+29. POST /users/{userId}/reset-password
+- Auth: Bearer token required
+- Permission: USERS_UPDATE
+- Path params:
+  - userId
+- Request body:
+  {
+    "channel": "RecoveryChannel, optional, default EMAIL",
+    "clientTarget": "ClientLinkTarget, optional, default UNIVERSAL"
+  }
+
+30. POST /users/{userId}/send-verification-email
+- Auth: Bearer token required
+- Permission: USERS_UPDATE
+- Path params:
+  - userId
+- Request body:
+  {
+    "clientTarget": "ClientLinkTarget, optional, default UNIVERSAL"
+  }
+
+31. POST /users/{userId}/send-phone-verification
+- Auth: Bearer token required
+- Permission: USERS_UPDATE
+- Path params:
+  - userId
+- Request body: none
+
+32. GET /users/{userId}/sessions
+- Auth: Bearer token required
+- Permission: SESSIONS_MANAGE
+- Path params:
+  - userId
+- Request body: none
+
+33. DELETE /users/{userId}/sessions
+- Auth: Bearer token required
+- Permission: SESSIONS_MANAGE
+- Path params:
+  - userId
+- Request body: none
+
+34. DELETE /users/{userId}/sessions/{sessionId}
+- Auth: Bearer token required
+- Permission: SESSIONS_MANAGE
+- Path params:
+  - userId
+  - sessionId
+- Request body: none
+
+
+ROLE APIs
+
+35. GET /roles
+- Auth: Bearer token required
+- Permission: ROLES_READ
+- Request body: none
+
+36. GET /roles/system
+- Auth: Bearer token required
+- Permission: ROLES_READ
+- Request body: none
+
+37. GET /roles/{roleId}
+- Auth: Bearer token required
+- Permission: ROLES_READ
+- Path params:
+  - roleId
+- Request body: none
+
+38. GET /permissions
+- Auth: Bearer token required
+- Permission: ROLES_READ
+- Request body: none
+
+39. GET /roles/{roleId}/permissions
+- Auth: Bearer token required
+- Permission: ROLES_READ
+- Path params:
+  - roleId
+- Request body: none
+
+40. GET /roles/assignable
+- Auth: Bearer token required
+- Permission: ROLES_READ
+- Request body: none
+
+41. POST /roles
+- Auth: Bearer token required
+- Permission: ROLES_CREATE
+- Request body:
+  {
+    "name": "string, required, max 100",
+    "description": "string, optional, max 1000"
+  }
+
+42. PUT /roles/{roleId}
+- Auth: Bearer token required
+- Permission: ROLES_UPDATE
+- Path params:
+  - roleId
+- Request body:
+  {
+    "name": "string, required, max 100",
+    "description": "string, optional, max 1000"
+  }
+
+43. PUT /roles/{roleId}/permissions
+- Auth: Bearer token required
+- Permission: ROLES_ASSIGN_PERMISSIONS
+- Path params:
+  - roleId
+- Request body:
+  {
+    "permissionIds": ["uuid, required"]
+  }
+
+44. PATCH /roles/{roleId}/status
+- Auth: Bearer token required
+- Permission: ROLES_UPDATE
+- Path params:
+  - roleId
+- Request body:
+  {
+    "isActive": "boolean, required"
+  }
+
+45. DELETE /roles/{roleId}
+- Auth: Bearer token required
+- Permission: ROLES_DELETE
+- Path params:
+  - roleId
+- Request body: none
+
+46. POST /roles/{roleId}/clone
+- Auth: Bearer token required
+- Permission: ROLES_CREATE
+- Path params:
+  - roleId
+- Request body:
+  {
+    "name": "string, required, max 100",
+    "description": "string, optional, max 1000"
+  }

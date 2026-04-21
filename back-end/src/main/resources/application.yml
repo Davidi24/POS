@@ -1,0 +1,106 @@
+server:
+  forward-headers-strategy: none
+
+spring:
+  application:
+    name: Pos
+
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+          connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT_MS:5000}
+          timeout: ${MAIL_SMTP_TIMEOUT_MS:5000}
+          writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT_MS:5000}
+
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    access-expiration: 15m
+    refresh-expiration: 30d
+
+app:
+  security:
+    max-user-agent-length: 512
+
+    trusted-proxies:
+      # LOCAL DEV ONLY — must be overridden in production with the real proxy IP(s)
+      # (e.g. your NGINX / load-balancer IP as seen by the app)
+      # Failure to update this will cause all requests to fall back to the proxy IP
+      # instead of the real client IP, breaking rate limiting and audit logs.
+      - 127.0.0.1
+      - ::1
+
+    login:
+      max-failed-attempts: 5
+      lock-duration-minutes: 15
+      max-attempts-per-ip: 20
+      max-attempts-per-account: 5
+      window-minutes: 5
+      attempt-retention-days: 90
+
+    session:
+      max-active-sessions: 3
+
+    refresh-token:
+      pepper: ${REFRESH_TOKEN_PEPPER}
+      rate-limit:
+        max-attempts-per-ip: 20
+        window-minutes: 1
+
+    cookie:
+      refresh-token-name: refreshToken
+      refresh-token-path: /auth/web
+      same-site: Strict
+      secure: true
+      domain:
+
+  bootstrap:
+    super-admin:
+      enabled: false
+
+  auth:
+    password-reset:
+      token-ttl: ${PASSWORD_RESET_TOKEN_TTL:30m}
+      request-cooldown: ${PASSWORD_RESET_REQUEST_COOLDOWN:2m}
+      token-pepper: ${PASSWORD_RESET_TOKEN_PEPPER}
+      reset-path: ${PASSWORD_RESET_FRONTEND_PATH:/reset-password}
+      subject: ${PASSWORD_RESET_EMAIL_SUBJECT:Reset your POS password}
+
+    email-verification:
+      token-ttl: ${EMAIL_VERIFICATION_TOKEN_TTL:24h}
+      request-cooldown: ${EMAIL_VERIFICATION_REQUEST_COOLDOWN:5m}
+      token-pepper: ${EMAIL_VERIFICATION_TOKEN_PEPPER}
+      verify-path: ${EMAIL_VERIFICATION_FRONTEND_PATH:/verify-email}
+      subject: ${EMAIL_VERIFICATION_EMAIL_SUBJECT:Verify your POS email}
+
+    sms:
+      delivery-mode: ${SMS_DELIVERY_MODE:LOG_ONLY}
+      password-reset-code-ttl: ${SMS_PASSWORD_RESET_CODE_TTL:10m}
+      phone-verification-code-ttl: ${SMS_PHONE_VERIFICATION_CODE_TTL:10m}
+      request-cooldown: ${SMS_REQUEST_COOLDOWN:1m}
+      code-length: ${SMS_CODE_LENGTH:6}
+      max-attempts: ${SMS_MAX_ATTEMPTS:5}
+      code-pepper: ${SMS_CODE_PEPPER}
+      restricted-password-reset-role-codes: ${SMS_RESTRICTED_PASSWORD_RESET_ROLE_CODES:SUPER_ADMIN,OWNER}
+
+  mail:
+    from: ${MAIL_FROM:no-reply@pos.local}
+
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+    mobile-base-url: ${FRONTEND_MOBILE_BASE_URL:}
+    universal-base-url: ${FRONTEND_UNIVERSAL_BASE_URL:}
+    default-link-target: ${FRONTEND_DEFAULT_LINK_TARGET:UNIVERSAL}

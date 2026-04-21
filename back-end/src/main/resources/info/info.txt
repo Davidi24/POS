@@ -1,0 +1,308 @@
+AUTH / SECURITY REVIEW VERDICT
+
+Status: Not production-ready yet
+
+Main blockers
+
+1. Base configuration is still development-grade.
+- spring.profiles.default=local
+- spring.sql.init.mode=always
+- spring.jpa.hibernate.ddl-auto=create
+- spring.jpa.show-sql=true
+- localhost database defaults are in the base config
+
+2. Super-admin bootstrap is unsafe if environment variables are missed.
+- Default fallback values can create a predictable admin account.
+- BOOTSTRAP_SUPER_ADMIN_EMAIL defaults to admin@pos.local
+- BOOTSTRAP_SUPER_ADMIN_PASSWORD defaults to ChangeMe123!
+
+3. Mail configuration has a startup bug.
+- app.mail.from can resolve to blank when MAIL_USERNAME is not set.
+- This breaks full application startup.
+
+4. Schema management is not production-ready.
+- schema.sql is drop-only and contains stale table names.
+- The project currently depends on ddl-auto create/create-drop behavior instead of real migrations.
+
+5. The full test suite is not green end-to-end.
+- Current full run result: 438 tests, 0 failures, 2 errors
+- Error 1: PosApplicationTests fails because app.mail.from is blank
+- Error 2: SessionCleanupServiceTest fails because authSmsOtpCodeRepository is not mocked/injected
+
+Important risks
+
+1. Refresh rate limiting is in-memory only.
+- Works on a single node.
+- Will not be reliable across multiple app instances.
+
+2. Proxy/client IP handling must be overridden in production.
+- trusted-proxies defaults to loopback only
+- forward-headers-strategy is none
+- If not overridden behind a reverse proxy, rate limits and audit logs will use the proxy IP instead of the real client IP
+
+3. Swagger is public in all environments.
+- Fine for internal deployments
+- Usually not ideal for a public production environment
+
+4. Auth requests are database-heavy.
+- JWT auth filter loads session, user, roles, and permissions on each authenticated request
+
+What is already strong
+
+1. The auth foundation is solid.
+- Login, refresh, logout, password reset, email verification, phone verification, and profile flows have focused unit/controller coverage.
+
+2. Security design is generally sound.
+- Username/email login works
+- Phone uniqueness is normalized
+- Refresh tokens are hashed
+- Session revocation exists
+- Too-many-requests handling exists where it should be exposed
+
+Production readiness verdict
+
+The auth part is structurally good, but it is not ready for production deployment yet because of configuration, bootstrap, schema, and full-suite issues.
+
+Minimum work required before production
+
+1. Remove development defaults from application.yml.
+2. Move production settings to a dedicated production profile or environment variables.
+3. Replace ddl-auto=create with proper database migrations.
+4. Fix app.mail.from so startup fails only when configuration is truly invalid, not because of an empty fallback.
+5. Remove predictable super-admin fallback credentials and fail fast if they are missing.
+6. Fix the 2 failing tests and get the full suite green.
+7. Recheck proxy and cookie settings against the real deployment topology.
+
+Recommended future features
+
+1. MFA for privileged roles
+- Start with TOTP
+- Add passkeys/WebAuthn later
+
+2. Invite-based staff onboarding
+- Avoid manual credential sharing
+
+3. Session/device management UI
+- Revoke current device
+- Revoke all devices
+
+4. Security audit logging
+- Login
+- Logout all
+- Password reset
+- Email verification
+- Phone verification
+- Role changes
+
+5. Redis-backed rate limiting and session support
+- Needed if the app will run on multiple nodes
+
+6. Step-up authentication for sensitive actions
+- Owner/admin changes
+- Billing changes
+- High-risk account recovery
+
+Short summary
+
+You built a strong auth base, but production readiness is blocked mostly by configuration and deployment hygiene, not by the core auth logic itself.
+
+PRODUCTION READINESS FIX LIST
+
+Work through this list in order.
+
+[x] 1. Create a real production profile.
+- Add application-prod.yml
+- Keep only safe shared defaults in application.yml
+- Move production-only values to environment variables or prod config
+
+[x] 2. Remove dangerous development defaults from application.yml.
+- Remove spring.profiles.default=local
+- Remove spring.sql.init.mode=always from base config
+- Remove spring.jpa.hibernate.ddl-auto=create from base config
+- Remove spring.jpa.show-sql=true from base config
+- Remove localhost DB credentials from base config
+
+[x] 3. Introduce real database migrations.
+- Add Flyway or Liquibase
+- Create initial migration for current schema
+- Stop relying on Hibernate create/create-drop for schema creation
+- Clean up or remove the current schema.sql if it is no longer needed
+
+[x] 4. Fix mail startup configuration.
+- Make app.mail.from always resolve to a valid non-blank value
+- Decide whether startup should fail fast if mail config is missing
+- Verify test, local, and production config all bind correctly
+
+[x] 5. Secure super-admin bootstrap.
+- Remove fallback credentials like admin@pos.local and ChangeMe123!
+- Fail startup if required bootstrap values are missing in environments where bootstrap is enabled
+- Consider making bootstrap optional after first deployment
+
+[x] 6. Re-run and fix the full test suite until it is fully green.
+- Run .\mvnw.cmd -q test
+- Fix every failing test
+- Keep the suite green after each config and auth change
+
+[ ] 7. Review proxy and client IP handling against your real deployment.
+- Set trusted proxy IPs to the real reverse proxy/load balancer
+- Reconfirm forward-headers strategy for your setup
+- Verify rate limiting and audit logs record the real client IP
+
+[ ] 8. Review cookie and frontend auth settings for the real frontend topology.
+- Recheck secure=true
+- Recheck same-site policy
+- Recheck cookie path and domain
+- If frontend and backend are on different origins, define the proper cross-site strategy
+
+[ ] 9. Lock down public API surface for production.
+- Decide whether Swagger/OpenAPI should be public in production
+- If not, disable it or protect it behind auth/profile-based config
+
+[ ] 10. Replace single-node throttling if you plan horizontal scaling.
+- Move refresh/login rate limiting to Redis or another shared store
+- Make sure rate limits work across multiple app instances
+
+[ ] 11. Reduce request-time DB overhead where needed.
+- Measure JWT filter query cost
+- Consider caching role/permission lookups if traffic grows
+- Keep session validation behavior correct while optimizing
+
+[x] 12. Add a final production verification pass.
+- Start the app with production-like config only
+- Verify login, refresh, logout, logout-all, password reset, email verification, and phone verification
+- Verify bootstrap behavior
+- Verify migration startup on an empty database
+- Verify no sensitive debug logging is enabled
+- Implemented with automated prod-profile smoke coverage in src/test/java/pos/pos/integration/ProdProfileSmokeTest.java
+
+Definition of done
+
+You can consider auth production-ready when:
+- Production starts without local/default secrets
+- Schema is created through migrations
+- Full test suite passes
+- Real deployment proxy/cookie settings are verified
+- No predictable bootstrap admin can be created by mistake
+
+ROLE AND USER API BUILD PLAN
+
+This is the next backend scope after auth.
+All recommended and later APIs are included here as build-now scope.
+
+ROLE APIs
+
+Already present
+- GET /roles/assignable
+  - list roles the current user is allowed to assign
+
+Build now
+- GET /roles
+  - list all active roles
+- GET /roles/{roleId}
+  - get one role with details
+- GET /roles/{roleId}/permissions
+  - list permissions for one role
+- GET /permissions
+  - list all available permissions
+- POST /roles
+  - create a custom role
+- PUT /roles/{roleId}
+  - update role name and description
+- PUT /roles/{roleId}/permissions
+  - replace the role's permissions
+- PATCH /roles/{roleId}/status
+  - activate or deactivate a role
+- DELETE /roles/{roleId}
+  - soft delete a non-system role
+- GET /roles/system
+  - list built-in protected roles separately
+- POST /roles/{roleId}/clone
+  - clone an existing role into a custom role
+
+Role permission codes to add before role management
+- ROLES_CREATE
+- ROLES_UPDATE
+- ROLES_DELETE
+- ROLES_ASSIGN_PERMISSIONS
+
+USER APIs
+
+Already present
+- POST /auth/register
+  - create a user
+- GET /auth/me
+  - current logged-in user profile
+- GET /auth/sessions
+  - list my active sessions
+- GET /auth/sessions/current
+  - get my current active session
+- DELETE /auth/sessions/{sessionId}
+  - revoke one of my active sessions
+- DELETE /auth/sessions/others
+  - revoke all my other active sessions
+- GET /users/{userId}/sessions
+  - list a user's active sessions
+- DELETE /users/{userId}/sessions
+  - revoke all active sessions for a user
+
+Build now
+- GET /users
+  - list users with filters
+- GET /users/{userId}
+  - get one user
+- PUT /users/{userId}
+  - update first name, last name, phone, and active state
+- PATCH /users/{userId}/status
+  - activate or deactivate a user
+- GET /users/{userId}/roles
+  - list roles assigned to a user
+- PUT /users/{userId}/roles
+  - replace roles assigned to a user
+- DELETE /users/{userId}
+  - soft delete a user
+- POST /users/{userId}/reset-password
+  - admin-triggered password reset flow
+- POST /users/{userId}/send-verification-email
+  - admin-triggered email verification message
+- POST /users/{userId}/send-phone-verification
+  - admin-triggered phone verification code
+- DELETE /users/{userId}/sessions/{sessionId}
+  - revoke one specific session for another user
+
+Filters for GET /users
+- search by email
+- search by username
+- search by phone
+- search by first name or last name
+- filter by active state
+- filter by role
+- pagination
+- sorting
+
+Suggested build order
+1. GET /users
+2. GET /users/{userId}
+3. PUT /users/{userId}
+4. GET /users/{userId}/roles
+5. PUT /users/{userId}/roles
+6. DELETE /users/{userId}
+7. DELETE /users/{userId}/sessions/{sessionId}
+8. GET /roles
+9. GET /roles/{roleId}
+10. GET /permissions
+11. GET /roles/{roleId}/permissions
+12. POST /roles
+13. PUT /roles/{roleId}
+14. PUT /roles/{roleId}/permissions
+15. PATCH /roles/{roleId}/status
+16. DELETE /roles/{roleId}
+17. GET /roles/system
+18. POST /roles/{roleId}/clone
+19. POST /users/{userId}/reset-password
+20. POST /users/{userId}/send-verification-email
+21. POST /users/{userId}/send-phone-verification
+
+Structure decision
+- Keep POST /auth/register as-is for now
+- Build all other staff-management endpoints under /users
+- Build role management endpoints under /roles
