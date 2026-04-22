@@ -1,0 +1,351 @@
+package pos.pos.unit.restaurant.service;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import pos.pos.common.dto.PageResponse;
+import pos.pos.exception.auth.AuthException;
+import pos.pos.exception.restaurant.RestaurantAccessNotAllowedException;
+import pos.pos.exception.restaurant.RestaurantCodeAlreadyExistsException;
+import pos.pos.exception.restaurant.RestaurantDeletionNotAllowedException;
+import pos.pos.exception.restaurant.RestaurantManagementNotAllowedException;
+import pos.pos.exception.restaurant.RestaurantOwnershipChangeNotAllowedException;
+import pos.pos.restaurant.dto.CreateRestaurantRequest;
+import pos.pos.restaurant.dto.RestaurantResponse;
+import pos.pos.restaurant.dto.UpdateRestaurantRequest;
+import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
+import pos.pos.restaurant.entity.Restaurant;
+import pos.pos.restaurant.enums.RestaurantStatus;
+import pos.pos.restaurant.mapper.RestaurantMapper;
+import pos.pos.restaurant.repository.RestaurantRepository;
+import pos.pos.restaurant.service.RestaurantAdminService;
+import pos.pos.security.principal.AuthenticatedUser;
+import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.user.entity.User;
+import pos.pos.user.repository.UserRepository;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("RestaurantAdminService")
+class RestaurantAdminServiceTest {
+
+    private static final UUID ACTOR_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID ACTOR_RESTAURANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
+    private static final UUID TARGET_RESTAURANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000011");
+    private static final UUID OWNER_ID = UUID.fromString("00000000-0000-0000-0000-000000000012");
+
+    @Mock
+    private RestaurantRepository restaurantRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private RoleHierarchyService roleHierarchyService;
+
+    @Spy
+    private RestaurantMapper restaurantMapper = new RestaurantMapper();
+
+    @InjectMocks
+    private RestaurantAdminService restaurantAdminService;
+
+    private Authentication authentication() {
+        return new UsernamePasswordAuthenticationToken(
+                AuthenticatedUser.builder()
+                        .id(ACTOR_ID)
+                        .email("owner@pos.local")
+                        .username("owner.main")
+                        .active(true)
+                        .build(),
+                null,
+                List.of()
+        );
+    }
+
+    @Test
+    @DisplayName("getRestaurants should return a paged response with actor scope and requested sorting")
+    void shouldReturnPagedRestaurants() {
+        Authentication authentication = authentication();
+        User actor = user(ACTOR_ID, ACTOR_RESTAURANT_ID, true);
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+
+        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(false);
+        given(roleHierarchyService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(userRepository.findByIdAndDeletedAtIsNull(ACTOR_ID)).willReturn(Optional.of(actor));
+        given(restaurantRepository.searchVisibleRestaurants(
+                eq(true),
+                eq(RestaurantStatus.ACTIVE),
+                eq(OWNER_ID),
+                eq("%pos%"),
+                eq(false),
+                eq(ACTOR_ID),
+                eq(ACTOR_RESTAURANT_ID),
+                any(Pageable.class)
+        )).willReturn(new PageImpl<>(List.of(restaurant)));
+
+        PageResponse<RestaurantResponse> response = restaurantAdminService.getRestaurants(
+                authentication,
+                "pos",
+                true,
+                "ACTIVE",
+                OWNER_ID,
+                0,
+                10,
+                "name",
+                "asc"
+        );
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        then(restaurantRepository).should().searchVisibleRestaurants(
+                eq(true),
+                eq(RestaurantStatus.ACTIVE),
+                eq(OWNER_ID),
+                eq("%pos%"),
+                eq(false),
+                eq(ACTOR_ID),
+                eq(ACTOR_RESTAURANT_ID),
+                pageableCaptor.capture()
+        );
+
+        Pageable pageable = pageableCaptor.getValue();
+        assertThat(pageable.getPageNumber()).isEqualTo(0);
+        assertThat(pageable.getPageSize()).isEqualTo(10);
+        assertThat(pageable.getSort().getOrderFor("name")).isNotNull();
+        assertThat(pageable.getSort().getOrderFor("name").getDirection().name()).isEqualTo("ASC");
+        assertThat(response.getItems()).hasSize(1);
+        assertThat(response.getItems().get(0).getId()).isEqualTo(TARGET_RESTAURANT_ID);
+    }
+
+    @Test
+    @DisplayName("getRestaurants should reject unsupported sortBy values")
+    void shouldRejectUnsupportedSortBy() {
+        Authentication authentication = authentication();
+
+        assertThatThrownBy(() -> restaurantAdminService.getRestaurants(
+                authentication,
+                null,
+                null,
+                null,
+                null,
+                0,
+                20,
+                "passwordHash",
+                "desc"
+        ))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Invalid sortBy value");
+    }
+
+    @Test
+    @DisplayName("createRestaurant should create a normalized restaurant")
+    void shouldCreateNormalizedRestaurant() {
+        Authentication authentication = authentication();
+        User owner = user(OWNER_ID, null, true);
+
+        CreateRestaurantRequest request = CreateRestaurantRequest.builder()
+                .name(" POS Main ")
+                .legalName("POS Main LLC")
+                .currency("usd")
+                .timezone("Europe/Berlin")
+                .ownerUserId(OWNER_ID)
+                .build();
+
+        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(true);
+        given(roleHierarchyService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(userRepository.findByIdAndDeletedAtIsNull(OWNER_ID)).willReturn(Optional.of(owner));
+        given(restaurantRepository.existsByCodeAndDeletedAtIsNull("POS_MAIN")).willReturn(false);
+        given(restaurantRepository.existsBySlugAndDeletedAtIsNull("pos-main")).willReturn(false);
+        given(restaurantRepository.save(any(Restaurant.class))).willAnswer(invocation -> {
+            Restaurant saved = invocation.getArgument(0);
+            saved.setId(TARGET_RESTAURANT_ID);
+            saved.setCreatedAt(OffsetDateTime.parse("2026-04-22T10:15:30Z"));
+            saved.setUpdatedAt(saved.getCreatedAt());
+            return saved;
+        });
+
+        RestaurantResponse response = restaurantAdminService.createRestaurant(authentication, request);
+
+        ArgumentCaptor<Restaurant> captor = ArgumentCaptor.forClass(Restaurant.class);
+        verify(restaurantRepository).save(captor.capture());
+        Restaurant saved = captor.getValue();
+        assertThat(saved.getCode()).isEqualTo("POS_MAIN");
+        assertThat(saved.getSlug()).isEqualTo("pos-main");
+        assertThat(saved.getOwnerId()).isEqualTo(OWNER_ID);
+        assertThat(saved.getCreatedBy()).isEqualTo(ACTOR_ID);
+        assertThat(response.getId()).isEqualTo(TARGET_RESTAURANT_ID);
+        assertThat(response.getCode()).isEqualTo("POS_MAIN");
+        assertThat(response.getSlug()).isEqualTo("pos-main");
+    }
+
+    @Test
+    @DisplayName("createRestaurant should reject duplicate normalized codes")
+    void shouldRejectDuplicateCodes() {
+        Authentication authentication = authentication();
+
+        CreateRestaurantRequest request = CreateRestaurantRequest.builder()
+                .name("POS Main")
+                .legalName("POS Main LLC")
+                .currency("USD")
+                .timezone("Europe/Berlin")
+                .build();
+
+        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(true);
+        given(roleHierarchyService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantRepository.existsByCodeAndDeletedAtIsNull("POS_MAIN")).willReturn(true);
+
+        assertThatThrownBy(() -> restaurantAdminService.createRestaurant(authentication, request))
+                .isInstanceOf(RestaurantCodeAlreadyExistsException.class);
+
+        verify(restaurantRepository, never()).save(any(Restaurant.class));
+    }
+
+    @Test
+    @DisplayName("getRestaurant should reject inaccessible restaurants")
+    void shouldRejectInaccessibleRestaurant() {
+        Authentication authentication = authentication();
+        User actor = user(ACTOR_ID, ACTOR_RESTAURANT_ID, true);
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+
+        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(false);
+        given(roleHierarchyService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantRepository.findByIdAndDeletedAtIsNull(TARGET_RESTAURANT_ID)).willReturn(Optional.of(restaurant));
+        given(userRepository.findByIdAndDeletedAtIsNull(ACTOR_ID)).willReturn(Optional.of(actor));
+
+        assertThatThrownBy(() -> restaurantAdminService.getRestaurant(authentication, TARGET_RESTAURANT_ID))
+                .isInstanceOf(RestaurantAccessNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("updateRestaurant should reject ownership changes by non-super-admin actors")
+    void shouldRejectOwnershipChangesByNonSuperAdmin() {
+        Authentication authentication = authentication();
+        User actor = user(ACTOR_ID, TARGET_RESTAURANT_ID, true);
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+
+        UpdateRestaurantRequest request = UpdateRestaurantRequest.builder()
+                .name("POS Main")
+                .legalName("POS Main LLC")
+                .code("POS_MAIN")
+                .slug("pos-main")
+                .currency("USD")
+                .timezone("Europe/Berlin")
+                .ownerUserId(null)
+                .isActive(true)
+                .status(RestaurantStatus.ACTIVE)
+                .build();
+
+        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(false);
+        given(roleHierarchyService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantRepository.findByIdAndDeletedAtIsNull(TARGET_RESTAURANT_ID)).willReturn(Optional.of(restaurant));
+        given(userRepository.findByIdAndDeletedAtIsNull(ACTOR_ID)).willReturn(Optional.of(actor));
+
+        assertThatThrownBy(() -> restaurantAdminService.updateRestaurant(authentication, TARGET_RESTAURANT_ID, request))
+                .isInstanceOf(RestaurantOwnershipChangeNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("updateRestaurantStatus should validate active and status consistency")
+    void shouldValidateStatusConsistency() {
+        Authentication authentication = authentication();
+        User actor = user(ACTOR_ID, TARGET_RESTAURANT_ID, true);
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+
+        UpdateRestaurantStatusRequest request = new UpdateRestaurantStatusRequest();
+        request.setIsActive(true);
+        request.setStatus(RestaurantStatus.SUSPENDED);
+
+        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(false);
+        given(roleHierarchyService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantRepository.findByIdAndDeletedAtIsNull(TARGET_RESTAURANT_ID)).willReturn(Optional.of(restaurant));
+        given(userRepository.findByIdAndDeletedAtIsNull(ACTOR_ID)).willReturn(Optional.of(actor));
+
+        assertThatThrownBy(() -> restaurantAdminService.updateRestaurantStatus(authentication, TARGET_RESTAURANT_ID, request))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Non-active restaurant statuses must have isActive=false");
+    }
+
+    @Test
+    @DisplayName("deleteRestaurant should archive and soft delete the restaurant for super admin")
+    void shouldSoftDeleteRestaurant() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+
+        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(true);
+        given(roleHierarchyService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantRepository.findByIdAndDeletedAtIsNull(TARGET_RESTAURANT_ID)).willReturn(Optional.of(restaurant));
+
+        restaurantAdminService.deleteRestaurant(authentication, TARGET_RESTAURANT_ID);
+
+        assertThat(restaurant.isActive()).isFalse();
+        assertThat(restaurant.getStatus()).isEqualTo(RestaurantStatus.ARCHIVED);
+        assertThat(restaurant.getDeletedAt()).isNotNull();
+        assertThat(restaurant.getUpdatedBy()).isEqualTo(ACTOR_ID);
+        verify(restaurantRepository).save(restaurant);
+    }
+
+    @Test
+    @DisplayName("deleteRestaurant should reject non-super-admin actors")
+    void shouldRejectDeleteForNonSuperAdmin() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+
+        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(false);
+        given(restaurantRepository.findByIdAndDeletedAtIsNull(TARGET_RESTAURANT_ID)).willReturn(Optional.of(restaurant));
+
+        assertThatThrownBy(() -> restaurantAdminService.deleteRestaurant(authentication, TARGET_RESTAURANT_ID))
+                .isInstanceOf(RestaurantDeletionNotAllowedException.class);
+
+        verify(restaurantRepository, never()).save(any(Restaurant.class));
+    }
+
+    private User user(UUID userId, UUID restaurantId, boolean active) {
+        return User.builder()
+                .id(userId)
+                .email("owner@pos.local")
+                .username("owner")
+                .passwordHash("stored-hash")
+                .firstName("Owner")
+                .lastName("User")
+                .status("ACTIVE")
+                .isActive(active)
+                .restaurantId(restaurantId)
+                .build();
+    }
+
+    private Restaurant restaurant(UUID restaurantId, UUID ownerId) {
+        Restaurant restaurant = new Restaurant();
+        restaurant.setId(restaurantId);
+        restaurant.setName("POS Main");
+        restaurant.setLegalName("POS Main LLC");
+        restaurant.setCode("POS_MAIN");
+        restaurant.setSlug("pos-main");
+        restaurant.setCurrency("USD");
+        restaurant.setTimezone("Europe/Berlin");
+        restaurant.setActive(true);
+        restaurant.setStatus(RestaurantStatus.ACTIVE);
+        restaurant.setOwnerId(ownerId);
+        return restaurant;
+    }
+}
