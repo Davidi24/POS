@@ -5,7 +5,10 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
@@ -22,6 +25,7 @@ import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.OptionGroup;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.settings.entity.Settings;
+import pos.pos.user.entity.User;
 import pos.pos.utils.NormalizationUtils;
 
 import java.util.ArrayList;
@@ -103,9 +107,38 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "status", nullable = false, length = 30)
     private RestaurantStatus status = RestaurantStatus.ACTIVE;
 
-    // FUTURE FK: restaurants.owner_id -> users.id
     @Column(name = "owner_id", columnDefinition = "uuid")
     private UUID ownerId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "owner_id",
+            columnDefinition = "uuid",
+            insertable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_restaurants_owner_user")
+    )
+    private User owner;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "created_by",
+            columnDefinition = "uuid",
+            insertable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_restaurants_created_by_user")
+    )
+    private User createdByUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "updated_by",
+            columnDefinition = "uuid",
+            insertable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_restaurants_updated_by_user")
+    )
+    private User updatedByUser;
 
     @OneToMany(mappedBy = "restaurant")
     private List<Branch> branches = new ArrayList<>();
