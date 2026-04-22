@@ -4,7 +4,7 @@ spring:
       mode: never
 
   datasource:
-    url: jdbc:postgresql://localhost:5433/pos_local
+    url: jdbc:postgresql://localhost:5432/pos_local
     username: pos_user
     password: pos_pass
     driver-class-name: org.postgresql.Driver
@@ -15,10 +15,14 @@ spring:
     show-sql: true
     properties:
       hibernate:
+        default_schema: foundation_local
         format_sql: true
 
   flyway:
     baseline-on-migrate: true
+    create-schemas: true
+    default-schema: foundation_local
+    schemas: foundation_local
 
 security:
   jwt:

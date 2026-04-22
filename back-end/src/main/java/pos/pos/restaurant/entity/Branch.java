@@ -9,6 +9,7 @@ import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -17,9 +18,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
+import pos.pos.device.entity.Device;
 import pos.pos.restaurant.enums.BranchStatus;
+import pos.pos.settings.entity.SettingsBusinessHour;
+import pos.pos.settings.entity.SettingsReservationRule;
+import pos.pos.settings.entity.SettingsSpecialHour;
 import pos.pos.utils.NormalizationUtils;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -93,6 +101,18 @@ public class Branch extends AbstractAuditedSoftDeleteEntity {
     // FUTURE FK: branches.manager_user_id -> users.id
     @Column(name = "manager_user_id", columnDefinition = "uuid")
     private UUID managerUserId;
+
+    @OneToMany(mappedBy = "branch")
+    private List<Device> devices = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<SettingsBusinessHour> businessHours = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<SettingsSpecialHour> specialHours = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<SettingsReservationRule> reservationRules = new ArrayList<>();
 
     @Override
     protected void normalizeFields() {

@@ -4,7 +4,10 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -13,9 +16,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
+import pos.pos.device.entity.Device;
+import pos.pos.menu.entity.Menu;
+import pos.pos.menu.entity.OptionGroup;
 import pos.pos.restaurant.enums.RestaurantStatus;
+import pos.pos.settings.entity.Settings;
 import pos.pos.utils.NormalizationUtils;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -96,6 +106,21 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
     // FUTURE FK: restaurants.owner_id -> users.id
     @Column(name = "owner_id", columnDefinition = "uuid")
     private UUID ownerId;
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Branch> branches = new ArrayList<>();
+
+    @OneToOne(mappedBy = "restaurant", fetch = FetchType.LAZY)
+    private Settings settings;
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Menu> menus = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<OptionGroup> optionGroups = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Device> devices = new ArrayList<>();
 
     @Override
     protected void normalizeFields() {
