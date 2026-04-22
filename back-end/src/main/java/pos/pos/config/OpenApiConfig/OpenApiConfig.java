@@ -34,4 +34,12 @@ public class OpenApiConfig {
                 .pathsToMatch("/auth/**", "/users/**", "/roles/**")
                 .build();
     }
+
+    @Bean
+    public GroupedOpenApi menuGroup() {
+        return GroupedOpenApi.builder()
+                .group("Menus")
+                .pathsToMatch("/menus", "/menus/**")
+                .build();
+    }
 }
