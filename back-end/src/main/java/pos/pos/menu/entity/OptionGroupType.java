@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractTimestampedEntity;
 import pos.pos.utils.NormalizationUtils;
 
 /**
@@ -39,7 +40,7 @@ import pos.pos.utils.NormalizationUtils;
         char_length(btrim(code)) > 0
         AND char_length(btrim(name)) > 0
         """)
-public class OptionGroupType extends BaseAuditEntity {
+public class OptionGroupType extends AbstractTimestampedEntity {
 
     @Column(name = "code", nullable = false, length = 50)
     private String code;

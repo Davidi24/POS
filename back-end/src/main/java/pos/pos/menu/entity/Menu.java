@@ -13,8 +13,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractAuditedEntity;
+import pos.pos.menu.util.MenuCodeNormalizer;
 import pos.pos.restaurant.entity.Restaurant;
-import pos.pos.user.entity.User;
 import pos.pos.utils.NormalizationUtils;
 
 import java.util.ArrayList;
@@ -49,7 +50,7 @@ import java.util.List;
         AND char_length(btrim(name)) > 0
         AND display_order >= 0
         """)
-public class Menu extends BaseAuditEntity {
+public class Menu extends AbstractAuditedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "restaurant_id", nullable = false)
@@ -70,20 +71,12 @@ public class Menu extends BaseAuditEntity {
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
-    private User createdBy;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "updated_by")
-    private User updatedBy;
-
     @OneToMany(mappedBy = "menu")
     private List<MenuSection> sections = new ArrayList<>();
 
     @Override
     protected void normalizeFields() {
-        code = normalizeCode(code == null ? name : code);
+        code = MenuCodeNormalizer.normalize(code == null ? name : code);
         name = NormalizationUtils.normalize(name);
         description = NormalizationUtils.normalize(description);
     }
@@ -93,18 +86,5 @@ public class Menu extends BaseAuditEntity {
         if (displayOrder != null && displayOrder < 0) {
             throw new IllegalStateException("displayOrder must be greater than or equal to zero");
         }
-    }
-
-    private String normalizeCode(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
     }
 }
