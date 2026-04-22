@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: Pos
+  profiles:
+    default: local
 
   mail:
     host: ${MAIL_HOST:}

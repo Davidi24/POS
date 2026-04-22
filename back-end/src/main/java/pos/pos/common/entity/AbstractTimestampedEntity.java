@@ -1,4 +1,4 @@
-package pos.pos.restaurant.entity;
+package pos.pos.common.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Id;
@@ -20,7 +20,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public abstract class AbstractAuditedSoftDeleteEntity implements AuditedEntityLifecycle {
+public abstract class AbstractTimestampedEntity implements AuditedEntityLifecycle {
 
     @Id
     @EqualsAndHashCode.Include
@@ -32,17 +32,6 @@ public abstract class AbstractAuditedSoftDeleteEntity implements AuditedEntityLi
 
     @Column(name = "updated_at", nullable = false, columnDefinition = "timestamptz")
     private OffsetDateTime updatedAt;
-
-    @Column(name = "deleted_at", columnDefinition = "timestamptz")
-    private OffsetDateTime deletedAt;
-
-    // FUTURE FK: created_by -> users.id
-    @Column(name = "created_by", updatable = false, columnDefinition = "uuid")
-    private UUID createdBy;
-
-    // FUTURE FK: updated_by -> users.id
-    @Column(name = "updated_by", columnDefinition = "uuid")
-    private UUID updatedBy;
 
     @PrePersist
     protected void prePersist() {
