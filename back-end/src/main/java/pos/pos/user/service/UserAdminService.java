@@ -109,6 +109,13 @@ public class UserAdminService {
         return userMapper.toUserResponse(user, roleRepository.findActiveRoleCodesByUserId(userId));
     }
 
+    public UserResponse getUserByIdentifier(Authentication authentication, String identifier) {
+        User user = findExistingUserByIdentifier(identifier);
+        roleHierarchyService.assertCanManageUser(authentication, user.getId());
+
+        return userMapper.toUserResponse(user, roleRepository.findActiveRoleCodesByUserId(user.getId()));
+    }
+
     @Transactional
     public UserResponse updateUser(Authentication authentication, UUID userId, UpdateUserRequest request) {
         User user = findExistingUser(userId);
@@ -223,6 +230,24 @@ public class UserAdminService {
     private User findExistingUser(UUID userId) {
         return userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(UserNotFoundException::new);
+    }
+
+    private User findExistingUserByIdentifier(String identifier) {
+        String normalizedIdentifier = NormalizationUtils.normalizeLower(identifier);
+        if (normalizedIdentifier == null) {
+            throw new UserNotFoundException();
+        }
+
+        return findUserByIdentifier(normalizedIdentifier)
+                .orElseThrow(UserNotFoundException::new);
+    }
+
+    private java.util.Optional<User> findUserByIdentifier(String normalizedIdentifier) {
+        if (normalizedIdentifier.contains("@")) {
+            return userRepository.findByEmailAndDeletedAtIsNull(normalizedIdentifier);
+        }
+
+        return userRepository.findByUsernameAndDeletedAtIsNull(normalizedIdentifier);
     }
 
     private void revokeAllActiveSessions(UUID userId) {
