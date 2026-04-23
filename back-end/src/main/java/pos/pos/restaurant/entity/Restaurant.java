@@ -23,15 +23,15 @@ import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
 import pos.pos.device.entity.Device;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.OptionGroup;
+import pos.pos.auth.enums.ClientLinkTarget;
 import pos.pos.restaurant.enums.RestaurantStatus;
+import pos.pos.restaurant.util.RestaurantFieldNormalizer;
 import pos.pos.settings.entity.Settings;
 import pos.pos.user.entity.User;
 import pos.pos.utils.NormalizationUtils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.time.DateTimeException;
-import java.time.ZoneId;
 import java.util.UUID;
 
 /**
@@ -61,7 +61,11 @@ import java.util.UUID;
         AND char_length(btrim(code)) > 0
         AND char_length(btrim(slug)) > 0
         AND char_length(currency) = 3
-        AND status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED')
+        AND status IN ('PENDING', 'REJECTED', 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED')
+        AND (
+            pending_owner_client_target IS NULL
+            OR pending_owner_client_target IN ('WEB', 'MOBILE', 'UNIVERSAL')
+        )
         """)
 @Getter
 @Setter
@@ -109,6 +113,25 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
 
     @Column(name = "owner_id", columnDefinition = "uuid")
     private UUID ownerId;
+
+    @Column(name = "pending_owner_email", length = 150)
+    private String pendingOwnerEmail;
+
+    @Column(name = "pending_owner_username", length = 50)
+    private String pendingOwnerUsername;
+
+    @Column(name = "pending_owner_first_name", length = 100)
+    private String pendingOwnerFirstName;
+
+    @Column(name = "pending_owner_last_name", length = 100)
+    private String pendingOwnerLastName;
+
+    @Column(name = "pending_owner_phone", length = 50)
+    private String pendingOwnerPhone;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pending_owner_client_target", length = 20)
+    private ClientLinkTarget pendingOwnerClientTarget;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
@@ -159,52 +182,25 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
     protected void normalizeFields() {
         name = NormalizationUtils.normalize(name);
         legalName = NormalizationUtils.normalize(legalName);
-        code = normalizeCode(code == null ? name : code);
-        slug = normalizeSlug(slug == null ? name : slug);
+        code = RestaurantFieldNormalizer.normalizeCodeOrFallback(code, name);
+        slug = RestaurantFieldNormalizer.normalizeSlugOrFallback(slug, name);
         description = NormalizationUtils.normalize(description);
         email = NormalizationUtils.normalizeLower(email);
         phone = NormalizationUtils.normalize(phone);
         website = NormalizationUtils.normalize(website);
         currency = NormalizationUtils.normalizeUpper(currency);
-        timezone = NormalizationUtils.normalize(timezone);
+        timezone = RestaurantFieldNormalizer.normalizeTimezone(timezone);
+        pendingOwnerEmail = NormalizationUtils.normalizeLower(pendingOwnerEmail);
+        pendingOwnerUsername = NormalizationUtils.normalizeLower(pendingOwnerUsername);
+        pendingOwnerFirstName = NormalizationUtils.normalize(pendingOwnerFirstName);
+        pendingOwnerLastName = NormalizationUtils.normalize(pendingOwnerLastName);
+        pendingOwnerPhone = NormalizationUtils.normalize(pendingOwnerPhone);
     }
 
     @Override
     protected void validateState() {
-        if (timezone == null) {
-            return;
+        if (timezone != null && !RestaurantFieldNormalizer.isValidTimezone(timezone)) {
+            throw new IllegalStateException("timezone must be a valid IANA identifier");
         }
-
-        try {
-            ZoneId.of(timezone);
-        } catch (DateTimeException ex) {
-            throw new IllegalStateException("timezone must be a valid IANA identifier", ex);
-        }
-    }
-
-    private String normalizeCode(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
-    }
-
-    private String normalizeSlug(String value) {
-        String normalized = NormalizationUtils.normalizeLower(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("^-+|-+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
     }
 }

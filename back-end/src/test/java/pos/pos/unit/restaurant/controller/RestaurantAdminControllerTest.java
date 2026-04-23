@@ -18,6 +18,7 @@ import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.exception.restaurant.RestaurantManagementNotAllowedException;
 import pos.pos.restaurant.controller.RestaurantAdminController;
+import pos.pos.restaurant.dto.CreateRestaurantOwnerRequest;
 import pos.pos.restaurant.dto.CreateRestaurantRequest;
 import pos.pos.restaurant.dto.RestaurantResponse;
 import pos.pos.restaurant.dto.UpdateRestaurantRequest;
@@ -119,7 +120,12 @@ class RestaurantAdminControllerTest {
                 .legalName("POS Main LLC")
                 .currency("USD")
                 .timezone("Europe/Berlin")
-                .ownerUserId(OWNER_ID)
+                .owner(CreateRestaurantOwnerRequest.builder()
+                        .email("owner@pos.local")
+                        .username("owner.main")
+                        .firstName("Owner")
+                        .lastName("Main")
+                        .build())
                 .build();
 
         given(restaurantAdminService.createRestaurant(eq(authentication), any(CreateRestaurantRequest.class)))

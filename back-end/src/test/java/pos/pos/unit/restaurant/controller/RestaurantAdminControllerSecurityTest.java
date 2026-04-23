@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.restaurant.controller.RestaurantAdminController;
+import pos.pos.restaurant.dto.CreateRestaurantOwnerRequest;
 import pos.pos.restaurant.dto.CreateRestaurantRequest;
 import pos.pos.restaurant.dto.RestaurantResponse;
 import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
@@ -113,6 +114,12 @@ class RestaurantAdminControllerSecurityTest {
                 .legalName("POS Main LLC")
                 .currency("USD")
                 .timezone("Europe/Berlin")
+                .owner(CreateRestaurantOwnerRequest.builder()
+                        .email("owner@pos.local")
+                        .username("owner.main")
+                        .firstName("Owner")
+                        .lastName("Main")
+                        .build())
                 .build();
 
         given(restaurantAdminService.createRestaurant(any(), any()))

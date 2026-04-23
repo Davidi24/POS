@@ -21,6 +21,7 @@ import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
 import pos.pos.device.entity.Device;
 import pos.pos.restaurant.enums.BranchStatus;
+import pos.pos.restaurant.util.BranchFieldNormalizer;
 import pos.pos.settings.entity.SettingsBusinessHour;
 import pos.pos.settings.entity.SettingsReservationRule;
 import pos.pos.settings.entity.SettingsSpecialHour;
@@ -117,22 +118,9 @@ public class Branch extends AbstractAuditedSoftDeleteEntity {
     @Override
     protected void normalizeFields() {
         name = NormalizationUtils.normalize(name);
-        code = normalizeCode(code == null ? name : code);
+        code = BranchFieldNormalizer.normalizeCodeOrFallback(code, name);
         description = NormalizationUtils.normalize(description);
         email = NormalizationUtils.normalizeLower(email);
         phone = NormalizationUtils.normalize(phone);
-    }
-
-    private String normalizeCode(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
     }
 }
