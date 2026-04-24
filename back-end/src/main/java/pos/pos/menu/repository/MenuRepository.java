@@ -19,6 +19,11 @@ public interface MenuRepository extends JpaRepository<Menu, UUID> {
             FROM Menu m
             JOIN m.restaurant r
             WHERE r.deletedAt IS NULL
+              AND (
+                    :superAdmin = true
+                    OR (:actorRestaurantId IS NOT NULL AND r.id = :actorRestaurantId)
+                    OR (:ownerId IS NOT NULL AND r.ownerId = :ownerId)
+              )
               AND (:restaurantId IS NULL OR r.id = :restaurantId)
               AND (:active IS NULL OR m.active = :active)
               AND (
@@ -32,6 +37,11 @@ public interface MenuRepository extends JpaRepository<Menu, UUID> {
             FROM Menu m
             JOIN m.restaurant r
             WHERE r.deletedAt IS NULL
+              AND (
+                    :superAdmin = true
+                    OR (:actorRestaurantId IS NOT NULL AND r.id = :actorRestaurantId)
+                    OR (:ownerId IS NOT NULL AND r.ownerId = :ownerId)
+              )
               AND (:restaurantId IS NULL OR r.id = :restaurantId)
               AND (:active IS NULL OR m.active = :active)
               AND (
@@ -41,7 +51,15 @@ public interface MenuRepository extends JpaRepository<Menu, UUID> {
               )
             """
     )
-    Page<Menu> searchMenus(UUID restaurantId, Boolean active, String searchLike, Pageable pageable);
+    Page<Menu> searchVisibleMenus(
+            UUID restaurantId,
+            Boolean active,
+            String searchLike,
+            boolean superAdmin,
+            UUID actorRestaurantId,
+            UUID ownerId,
+            Pageable pageable
+    );
 
     @EntityGraph(attributePaths = "restaurant")
     Optional<Menu> findByIdAndRestaurantDeletedAtIsNull(UUID id);

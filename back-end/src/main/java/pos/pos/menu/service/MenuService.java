@@ -24,6 +24,7 @@ import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
 import pos.pos.menu.mapper.MenuMapper;
+import pos.pos.menu.policy.MenuPolicy;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.menu.repository.MenuRepository;
 import pos.pos.menu.repository.MenuSectionRepository;
@@ -31,6 +32,8 @@ import pos.pos.menu.util.MenuCodeNormalizer;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.repository.RestaurantRepository;
 import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.security.scope.ActorScope;
+import pos.pos.security.scope.ActorScopeService;
 import pos.pos.utils.NormalizationUtils;
 
 import java.util.List;
@@ -51,8 +54,11 @@ public class MenuService {
     private final RestaurantRepository restaurantRepository;
     private final MenuMapper menuMapper;
     private final RoleHierarchyService roleHierarchyService;
+    private final ActorScopeService actorScopeService;
+    private final MenuPolicy menuPolicy;
 
     public PageResponse<MenuResponse> getMenus(
+            Authentication authentication,
             UUID restaurantId,
             Boolean active,
             String search,
@@ -61,6 +67,11 @@ public class MenuService {
             String sortBy,
             String direction
     ) {
+        ActorScope scope = actorScopeService.resolve(authentication);
+        if (restaurantId != null) {
+            menuPolicy.assertCanAccess(scope, findExistingRestaurant(restaurantId));
+        }
+
         Pageable pageable = PageRequest.of(
                 page == null ? 0 : page,
                 size == null ? DEFAULT_PAGE_SIZE : size,
@@ -70,7 +81,15 @@ public class MenuService {
         String normalizedSearch = NormalizationUtils.normalizeLower(search);
         String searchLike = normalizedSearch == null ? null : "%" + normalizedSearch + "%";
 
-        Page<Menu> menusPage = menuRepository.searchMenus(restaurantId, active, searchLike, pageable);
+        Page<Menu> menusPage = menuRepository.searchVisibleMenus(
+                restaurantId,
+                active,
+                searchLike,
+                scope.superAdmin(),
+                scope.restaurantId(),
+                scope.userId(),
+                pageable
+        );
         List<MenuResponse> items = menusPage.getContent().stream()
                 .map(menuMapper::toMenuResponse)
                 .toList();
@@ -78,8 +97,10 @@ public class MenuService {
         return PageResponse.from(new PageImpl<>(items, pageable, menusPage.getTotalElements()));
     }
 
-    public MenuResponse getMenu(UUID menuId, boolean includeSections, boolean includeItems) {
+    public MenuResponse getMenu(Authentication authentication, UUID menuId, boolean includeSections, boolean includeItems) {
+        ActorScope scope = actorScopeService.resolve(authentication);
         Menu menu = findExistingMenu(menuId);
+        menuPolicy.assertCanAccess(scope, menu);
         if (!includeSections && !includeItems) {
             return menuMapper.toMenuResponse(menu);
         }
@@ -98,13 +119,14 @@ public class MenuService {
 
     @Transactional
     public MenuResponse createMenu(Authentication authentication, CreateMenuRequest request) {
-        Restaurant restaurant = restaurantRepository.findByIdAndDeletedAtIsNull(request.getRestaurantId())
-                .orElseThrow(RestaurantNotFoundException::new);
+        ActorScope scope = actorScopeService.resolve(authentication);
+        Restaurant restaurant = findExistingRestaurant(request.getRestaurantId());
+        menuPolicy.assertCanCreate(scope, restaurant);
 
         String normalizedCode = resolveCreateCode(request.getCode(), request.getName());
         assertUniqueCode(restaurant.getId(), normalizedCode, null);
 
-        UUID actorId = roleHierarchyService.currentUserId(authentication);
+        UUID actorId = scope.userId();
         Menu menu = new Menu();
         menu.setRestaurant(restaurant);
         menu.setCode(normalizedCode);
@@ -120,7 +142,9 @@ public class MenuService {
 
     @Transactional
     public MenuResponse updateMenu(Authentication authentication, UUID menuId, UpdateMenuRequest request) {
+        ActorScope scope = actorScopeService.resolve(authentication);
         Menu menu = findExistingMenu(menuId);
+        menuPolicy.assertCanManage(scope, menu);
 
         String normalizedCode = resolveUpdateCode(request.getCode(), menu.getCode());
         assertUniqueCode(menu.getRestaurant().getId(), normalizedCode, menu.getId());
@@ -137,7 +161,9 @@ public class MenuService {
 
     @Transactional
     public MenuResponse updateMenuStatus(Authentication authentication, UUID menuId, UpdateMenuStatusRequest request) {
+        ActorScope scope = actorScopeService.resolve(authentication);
         Menu menu = findExistingMenu(menuId);
+        menuPolicy.assertCanManage(scope, menu);
         menu.setActive(Boolean.TRUE.equals(request.getActive()));
         menu.setUpdatedBy(roleHierarchyService.currentUserId(authentication));
 
@@ -145,8 +171,10 @@ public class MenuService {
     }
 
     @Transactional
-    public void deleteMenu(UUID menuId) {
+    public void deleteMenu(Authentication authentication, UUID menuId) {
+        ActorScope scope = actorScopeService.resolve(authentication);
         Menu menu = findExistingMenu(menuId);
+        menuPolicy.assertCanManage(scope, menu);
         if (menuSectionRepository.existsByMenuId(menuId)) {
             throw new MenuDeletionBlockedException();
         }
@@ -157,6 +185,11 @@ public class MenuService {
     private Menu findExistingMenu(UUID menuId) {
         return menuRepository.findByIdAndRestaurantDeletedAtIsNull(menuId)
                 .orElseThrow(MenuNotFoundException::new);
+    }
+
+    private Restaurant findExistingRestaurant(UUID restaurantId) {
+        return restaurantRepository.findByIdAndDeletedAtIsNull(restaurantId)
+                .orElseThrow(RestaurantNotFoundException::new);
     }
 
     private void assertUniqueCode(UUID restaurantId, String code, UUID menuIdToExclude) {

@@ -43,6 +43,7 @@ public class MenuController {
     @PreAuthorize("hasAuthority('MENUS_READ')")
     @Operation(summary = "List menus with pagination and optional filters")
     public ResponseEntity<PageResponse<MenuResponse>> getMenus(
+            Authentication authentication,
             @RequestParam(required = false) UUID restaurantId,
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) String search,
@@ -52,7 +53,7 @@ public class MenuController {
             @RequestParam(defaultValue = "displayOrder") String sortBy,
             @RequestParam(defaultValue = "asc") String direction
     ) {
-        return ResponseEntity.ok(menuService.getMenus(restaurantId, active, search, page, size, sortBy, direction));
+        return ResponseEntity.ok(menuService.getMenus(authentication, restaurantId, active, search, page, size, sortBy, direction));
     }
 
     @PostMapping
@@ -70,11 +71,12 @@ public class MenuController {
     @PreAuthorize("hasAuthority('MENUS_READ')")
     @Operation(summary = "Get one menu by id")
     public ResponseEntity<MenuResponse> getMenu(
+            Authentication authentication,
             @PathVariable UUID menuId,
             @RequestParam(defaultValue = "false") boolean includeSections,
             @RequestParam(defaultValue = "false") boolean includeItems
     ) {
-        return ResponseEntity.ok(menuService.getMenu(menuId, includeSections, includeItems));
+        return ResponseEntity.ok(menuService.getMenu(authentication, menuId, includeSections, includeItems));
     }
 
     @PutMapping("/{menuId}")
@@ -102,8 +104,11 @@ public class MenuController {
     @DeleteMapping("/{menuId}")
     @PreAuthorize("hasAuthority('MENUS_DELETE')")
     @Operation(summary = "Delete a menu")
-    public ResponseEntity<Void> deleteMenu(@PathVariable UUID menuId) {
-        menuService.deleteMenu(menuId);
+    public ResponseEntity<Void> deleteMenu(
+            @PathVariable UUID menuId,
+            Authentication authentication
+    ) {
+        menuService.deleteMenu(authentication, menuId);
         return ResponseEntity.noContent().build();
     }
 }
