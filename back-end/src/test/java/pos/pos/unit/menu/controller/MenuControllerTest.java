@@ -98,6 +98,7 @@ class MenuControllerTest {
                 .build();
 
         mockMvc.perform(get("/menus/{menuId}", MENU_ID)
+                        .principal(authentication)
                         .param("includeSections", "true")
                         .param("includeItems", "true"))
                 .andExpect(status().isOk())
@@ -146,7 +147,7 @@ class MenuControllerTest {
         private MenuResponse statusResponse;
 
         StubMenuService() {
-            super(null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null);
         }
 
         @Override
@@ -155,7 +156,7 @@ class MenuControllerTest {
         }
 
         @Override
-        public MenuResponse getMenu(UUID menuId, boolean includeSections, boolean includeItems) {
+        public MenuResponse getMenu(Authentication authentication, UUID menuId, boolean includeSections, boolean includeItems) {
             return detailResponse;
         }
 

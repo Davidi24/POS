@@ -16,6 +16,7 @@ import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -128,11 +129,12 @@ class MenuControllerSecurityTest {
     static class StubMenuService extends MenuService {
 
         StubMenuService() {
-            super(null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null);
         }
 
         @Override
         public PageResponse<MenuResponse> getMenus(
+                Authentication authentication,
                 UUID restaurantId,
                 Boolean active,
                 String search,
@@ -153,7 +155,7 @@ class MenuControllerSecurityTest {
         }
 
         @Override
-        public void deleteMenu(UUID menuId) {
+        public void deleteMenu(Authentication authentication, UUID menuId) {
         }
     }
 

@@ -221,6 +221,8 @@ class MenuApiIntegrationTest {
         User admin = adminUser();
         User manager = createUser("manager", role("MANAGER"));
         Restaurant restaurant = createRestaurant("update", admin.getId());
+        manager.setRestaurantId(restaurant.getId());
+        userRepository.save(manager);
         Menu breakfast = createMenu(restaurant, "breakfast", "Breakfast", true, 1, admin.getId());
         Menu lunch = createMenu(restaurant, "lunch", "Lunch", true, 2, admin.getId());
 
@@ -283,6 +285,53 @@ class MenuApiIntegrationTest {
         assertThat(messageOf(duplicateCreateResult)).isEqualTo("Menu code already in use for this restaurant");
         assertThat(messageOf(duplicateUpdateResult)).isEqualTo("Menu code already in use for this restaurant");
         assertThat(menuRepository.findById(breakfast.getId()).orElseThrow().getCode()).isEqualTo("BREAKFAST");
+    }
+
+    @Test
+    @DisplayName("MENU-011 restricts menu access to the actor restaurant scope")
+    void shouldRestrictMenuAccessToActorRestaurantScope() throws Exception {
+        User admin = adminUser();
+        Restaurant alpha = createRestaurant("scope-alpha", admin.getId());
+        Restaurant beta = createRestaurant("scope-beta", admin.getId());
+        User manager = createUser("scope-manager", role("MANAGER"));
+        manager.setRestaurantId(alpha.getId());
+        userRepository.save(manager);
+
+        Menu alphaMenu = createMenu(alpha, "alpha_breakfast", "Alpha Breakfast", true, 1, admin.getId());
+        Menu betaMenu = createMenu(beta, "beta_breakfast", "Beta Breakfast", true, 1, admin.getId());
+        String accessToken = accessTokenFor(manager.getUsername(), DEFAULT_PASSWORD, "MENU-SCOPE");
+
+        MvcResult listResult = mockMvc.perform(get("/menus")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode listBody = bodyOf(listResult);
+        assertThat(listBody.get("totalElements").asInt()).isEqualTo(1);
+        assertThat(listBody.get("items")).hasSize(1);
+        assertThat(listBody.get("items").get(0).get("id").asText()).isEqualTo(alphaMenu.getId().toString());
+
+        MvcResult foreignListResult = mockMvc.perform(get("/menus")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .param("restaurantId", beta.getId().toString()))
+                .andExpect(status().isForbidden())
+                .andReturn();
+
+        MvcResult foreignDetailResult = mockMvc.perform(get("/menus/{menuId}", betaMenu.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isForbidden())
+                .andReturn();
+
+        MvcResult foreignStatusResult = mockMvc.perform(patch("/menus/{menuId}/status", betaMenu.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("active", false))))
+                .andExpect(status().isForbidden())
+                .andReturn();
+
+        assertThat(messageOf(foreignListResult)).isEqualTo("You are not allowed to access this restaurant");
+        assertThat(messageOf(foreignDetailResult)).isEqualTo("You are not allowed to access this restaurant");
+        assertThat(messageOf(foreignStatusResult)).isEqualTo("You are not allowed to manage this restaurant");
     }
 
     @Test
