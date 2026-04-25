@@ -24,6 +24,8 @@ class SecurityPathsTest {
                 "/auth/forgot-password",
                 "/auth/reset-password/code",
                 "/auth/verify-email",
+                "/public/restaurants/*/menus",
+                "/public/restaurants/*/menus/**",
                 "/swagger-ui/**",
                 "/v3/api-docs/**",
                 "/error"
