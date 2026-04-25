@@ -134,6 +134,44 @@ class MenuApiIntegrationTest {
         assertThat(paths.has("/menus")).isTrue();
         assertThat(paths.has("/menus/{menuId}")).isTrue();
         assertThat(paths.has("/menus/{menuId}/status")).isTrue();
+        assertThat(paths.has("/public/restaurants/{restaurantId}/menus")).isTrue();
+        assertThat(paths.has("/public/restaurants/{restaurantId}/menus/{menuId}")).isTrue();
+    }
+
+    @Test
+    @DisplayName("Public menu endpoints return active customer-safe data without authentication")
+    void shouldExposePublicMenuEndpointsWithoutAuthentication() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("public", admin.getId());
+        Menu breakfast = createMenu(restaurant, "breakfast", "Breakfast Menu", true, 1, admin.getId());
+        createMenu(restaurant, "hidden", "Hidden Menu", false, 2, admin.getId());
+
+        MenuSection mains = createSection(breakfast, "Mains", "Main dishes", true, 1);
+        createSection(breakfast, "Archived", "Hidden section", false, 2);
+        createItem(mains, "BRG-001", "House Burger", new BigDecimal("12.50"), true, 1);
+        createItem(mains, "BRG-002", "Sold Out Burger", new BigDecimal("13.50"), false, 2);
+
+        MvcResult listResult = mockMvc.perform(get("/public/restaurants/{restaurantId}/menus", restaurant.getId()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode listBody = bodyOf(listResult);
+        assertThat(listBody).hasSize(1);
+        assertThat(listBody.get(0).get("id").asText()).isEqualTo(breakfast.getId().toString());
+        assertThat(listBody.get(0).has("createdBy")).isFalse();
+        assertThat(listBody.get(0).has("active")).isFalse();
+
+        MvcResult detailResult = mockMvc.perform(get("/public/restaurants/{restaurantId}/menus/{menuId}", restaurant.getId(), breakfast.getId()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode detailBody = bodyOf(detailResult);
+        assertThat(detailBody.get("sections")).hasSize(1);
+        assertThat(detailBody.get("sections").get(0).get("name").asText()).isEqualTo("Mains");
+        assertThat(detailBody.get("sections").get(0).get("items")).hasSize(1);
+        assertThat(detailBody.get("sections").get(0).get("items").get(0).get("name").asText()).isEqualTo("House Burger");
+        assertThat(detailBody.has("createdBy")).isFalse();
+        assertThat(detailBody.has("updatedAt")).isFalse();
     }
 
     @Test
