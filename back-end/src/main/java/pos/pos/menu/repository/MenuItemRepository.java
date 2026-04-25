@@ -17,4 +17,15 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, UUID> {
         ORDER BY s.displayOrder ASC, s.name ASC, i.displayOrder ASC, i.name ASC
     """)
     List<MenuItem> findByMenuIdOrdered(UUID menuId);
+
+    @Query("""
+        SELECT i
+        FROM MenuItem i
+        JOIN FETCH i.section s
+        WHERE s.menu.id = :menuId
+          AND s.active = true
+          AND i.available = true
+        ORDER BY s.displayOrder ASC, s.name ASC, i.displayOrder ASC, i.name ASC
+    """)
+    List<MenuItem> findByMenuIdAndAvailableTrueOrdered(UUID menuId);
 }

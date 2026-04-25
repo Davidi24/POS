@@ -39,7 +39,7 @@ public class OpenApiConfig {
     public GroupedOpenApi menuGroup() {
         return GroupedOpenApi.builder()
                 .group("Menus")
-                .pathsToMatch("/menus", "/menus/**")
+                .pathsToMatch("/menus", "/menus/**", "/public/restaurants/*/menus", "/public/restaurants/*/menus/**")
                 .build();
     }
 }
