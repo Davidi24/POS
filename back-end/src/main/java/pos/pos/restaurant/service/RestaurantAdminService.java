@@ -2,17 +2,13 @@ package pos.pos.restaurant.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.auth.AuthException;
-import pos.pos.exception.restaurant.RestaurantOwnerNotFoundException;
-import pos.pos.exception.restaurant.RestaurantOwnershipChangeNotAllowedException;
 import pos.pos.restaurant.dto.CreateRestaurantRequest;
 import pos.pos.restaurant.dto.RestaurantResponse;
 import pos.pos.restaurant.dto.UpdateRestaurantRequest;
@@ -20,17 +16,19 @@ import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.mapper.RestaurantMapper;
+import pos.pos.restaurant.policy.RestaurantPolicy;
 import pos.pos.restaurant.repository.RestaurantRepository;
-import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.security.scope.ActorScope;
+import pos.pos.security.scope.ActorScopeService;
 import pos.pos.user.entity.User;
-import pos.pos.user.repository.UserRepository;
 import pos.pos.utils.NormalizationUtils;
+import pos.pos.utils.PageableUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Objects;
 import java.util.UUID;
 
+//checked
 @Service
 @RequiredArgsConstructor
 public class RestaurantAdminService {
@@ -40,9 +38,9 @@ public class RestaurantAdminService {
     private static final RestaurantStatus DEFAULT_STATUS = RestaurantStatus.ACTIVE;
 
     private final RestaurantRepository restaurantRepository;
-    private final UserRepository userRepository;
     private final RestaurantMapper restaurantMapper;
-    private final RoleHierarchyService roleHierarchyService;
+    private final ActorScopeService actorScopeService;
+    private final RestaurantPolicy restaurantPolicy;
     private final RestaurantValidationService restaurantValidationService;
     private final RestaurantOwnerProvisioningService restaurantOwnerProvisioningService;
     private final RestaurantScopeService restaurantScopeService;
@@ -58,26 +56,19 @@ public class RestaurantAdminService {
             String sortBy,
             String direction
     ) {
-        Pageable pageable = PageRequest.of(
-                page == null ? 0 : page,
-                size == null ? DEFAULT_PAGE_SIZE : size,
-                Sort.by(resolveDirection(direction), resolveSortProperty(sortBy))
-        );
-
-        String normalizedSearch = NormalizationUtils.normalizeLower(search);
-        String searchLike = normalizedSearch == null ? null : "%" + normalizedSearch + "%";
+        ActorScope scope = actorScopeService.resolve(authentication);
+        Pageable pageable = PageableUtils.create(page, size, direction, resolveSortProperty(sortBy), DEFAULT_PAGE_SIZE);
+        String searchLike = NormalizationUtils.normalizeLowerLike(search);
         RestaurantStatus normalizedStatus = resolveStatus(status);
-        boolean superAdmin = roleHierarchyService.isSuperAdmin(authentication);
-        User actor = superAdmin ? null : restaurantScopeService.currentActor(authentication);
 
         var restaurantsPage = restaurantRepository.searchVisibleRestaurants(
                 active,
                 normalizedStatus,
                 ownerUserId,
                 searchLike,
-                superAdmin,
-                roleHierarchyService.currentUserId(authentication),
-                actor == null ? null : actor.getRestaurantId(),
+                scope.superAdmin(),
+                scope.userId(),
+                scope.restaurantId(),
                 pageable
         );
 
@@ -94,14 +85,13 @@ public class RestaurantAdminService {
         restaurantScopeService.assertCanCreateRestaurant(authentication);
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
-        RestaurantValidationService.NormalizedRestaurantFields normalizedFields =
-                restaurantValidationService.normalizeAndValidateFields(
-                        request.getCode(),
-                        request.getSlug(),
-                        request.getName(),
-                        request.getTimezone(),
-                        null
-                );
+        var normalizedFields = restaurantValidationService.normalizeAndValidateFields(
+                request.getCode(),
+                request.getSlug(),
+                request.getName(),
+                request.getTimezone(),
+                null
+        );
 
         Restaurant restaurant = restaurantMapper.toNewEntity(
                 request,
@@ -138,24 +128,19 @@ public class RestaurantAdminService {
             UUID restaurantId,
             UpdateRestaurantRequest request
     ) {
-        Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        ActorScope scope = actorScopeService.resolve(authentication);
+        Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(scope, restaurantId);
 
-        boolean superAdmin = roleHierarchyService.isSuperAdmin(authentication);
-        if (!superAdmin && !Objects.equals(restaurant.getOwnerId(), request.getOwnerUserId())) {
-            throw new RestaurantOwnershipChangeNotAllowedException();
-        }
-
-        UUID ownerUserId = validateOwnerUser(request.getOwnerUserId(), restaurant.getId());
-        restaurantValidationService.validateManageableStatus(request.getStatus());
-        restaurantValidationService.validateStatusConsistency(request.getIsActive(), request.getStatus());
-        RestaurantValidationService.NormalizedRestaurantFields normalizedFields =
-                restaurantValidationService.normalizeAndValidateFields(
-                        request.getCode(),
-                        request.getSlug(),
-                        request.getName(),
-                        request.getTimezone(),
-                        restaurant.getId()
-                );
+        restaurantPolicy.assertCanChangeOwner(scope, restaurant, request.getOwnerUserId());
+        UUID ownerUserId = restaurantValidationService.validateOwnerUser(request.getOwnerUserId(), restaurant.getId());
+        validateStatusFields(request.getIsActive(), request.getStatus());
+        var normalizedFields = restaurantValidationService.normalizeAndValidateFields(
+                request.getCode(),
+                request.getSlug(),
+                request.getName(),
+                request.getTimezone(),
+                restaurant.getId()
+        );
 
         restaurantMapper.updateEntity(
                 restaurant,
@@ -177,8 +162,7 @@ public class RestaurantAdminService {
             UpdateRestaurantStatusRequest request
     ) {
         Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
-        restaurantValidationService.validateManageableStatus(request.getStatus());
-        restaurantValidationService.validateStatusConsistency(request.getIsActive(), request.getStatus());
+        validateStatusFields(request.getIsActive(), request.getStatus());
 
         restaurantMapper.updateStatus(
                 restaurant,
@@ -204,24 +188,10 @@ public class RestaurantAdminService {
         restaurantRepository.save(restaurant);
     }
 
-    // validates
-    private UUID validateOwnerUser(UUID ownerUserId, UUID restaurantId) {
-        if (ownerUserId == null) {
-            return null;
-        }
-
-        User owner = userRepository.findByIdAndDeletedAtIsNull(ownerUserId)
-                .orElseThrow(RestaurantOwnerNotFoundException::new);
-
-        if (!owner.isActive()) {
-            throw new AuthException("Owner user must be active", HttpStatus.BAD_REQUEST);
-        }
-
-        if (owner.getRestaurantId() != null && !Objects.equals(owner.getRestaurantId(), restaurantId)) {
-            throw new AuthException("Owner user is already assigned to another restaurant", HttpStatus.BAD_REQUEST);
-        }
-
-        return owner.getId();
+    // rejects terminal statuses (e.g. ARCHIVED) and inconsistent isActive/status pairs
+    private void validateStatusFields(Boolean isActive, RestaurantStatus status) {
+        restaurantValidationService.validateManageableStatus(status);
+        restaurantValidationService.validateStatusConsistency(isActive, status);
     }
 
     private String resolveSortProperty(String sortBy) {
@@ -239,16 +209,6 @@ public class RestaurantAdminService {
             case "status" -> "status";
             default -> throw new AuthException("Invalid sortBy value", HttpStatus.BAD_REQUEST);
         };
-    }
-
-    private Sort.Direction resolveDirection(String direction) {
-        try {
-            return Sort.Direction.fromString(
-                    NormalizationUtils.normalize(direction) == null ? "desc" : direction
-            );
-        } catch (IllegalArgumentException ex) {
-            throw new AuthException("Invalid sort direction", HttpStatus.BAD_REQUEST);
-        }
     }
 
     private RestaurantStatus resolveStatus(String status) {

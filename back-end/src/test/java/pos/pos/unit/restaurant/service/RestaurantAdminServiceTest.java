@@ -28,19 +28,20 @@ import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.mapper.RestaurantMapper;
+import pos.pos.restaurant.policy.RestaurantPolicy;
 import pos.pos.restaurant.repository.RestaurantRepository;
 import pos.pos.restaurant.service.RestaurantAdminService;
 import pos.pos.restaurant.service.RestaurantOwnerProvisioningService;
 import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.restaurant.service.RestaurantValidationService;
 import pos.pos.security.principal.AuthenticatedUser;
-import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.security.scope.ActorScope;
+import pos.pos.security.scope.ActorScopeService;
 import pos.pos.user.entity.User;
-import pos.pos.user.repository.UserRepository;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,10 +67,10 @@ class RestaurantAdminServiceTest {
     private RestaurantRepository restaurantRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private ActorScopeService actorScopeService;
 
     @Mock
-    private RoleHierarchyService roleHierarchyService;
+    private RestaurantPolicy restaurantPolicy;
 
     @Mock
     private RestaurantValidationService restaurantValidationService;
@@ -103,12 +104,9 @@ class RestaurantAdminServiceTest {
     @DisplayName("getRestaurants should return a paged response with actor scope and requested sorting")
     void shouldReturnPagedRestaurants() {
         Authentication authentication = authentication();
-        User actor = user(ACTOR_ID, ACTOR_RESTAURANT_ID, true);
         Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
 
-        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(false);
-        given(roleHierarchyService.currentUserId(authentication)).willReturn(ACTOR_ID);
-        given(restaurantScopeService.currentActor(authentication)).willReturn(actor);
+        given(actorScopeService.resolve(authentication)).willReturn(actorScope(false, ACTOR_RESTAURANT_ID));
         given(restaurantRepository.searchVisibleRestaurants(
                 eq(true),
                 eq(RestaurantStatus.ACTIVE),
@@ -317,9 +315,11 @@ class RestaurantAdminServiceTest {
                 .status(RestaurantStatus.ACTIVE)
                 .build();
 
-        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(false);
-        given(restaurantScopeService.requireManageableRestaurant(authentication, TARGET_RESTAURANT_ID))
+        given(actorScopeService.resolve(authentication)).willReturn(actorScope(false, ACTOR_RESTAURANT_ID));
+        given(restaurantScopeService.requireManageableRestaurant(any(ActorScope.class), eq(TARGET_RESTAURANT_ID)))
                 .willReturn(restaurant);
+        org.mockito.Mockito.doThrow(new RestaurantOwnershipChangeNotAllowedException())
+                .when(restaurantPolicy).assertCanChangeOwner(any(ActorScope.class), eq(restaurant), eq(null));
 
         assertThatThrownBy(() -> restaurantAdminService.updateRestaurant(authentication, TARGET_RESTAURANT_ID, request))
                 .isInstanceOf(RestaurantOwnershipChangeNotAllowedException.class);
@@ -390,6 +390,15 @@ class RestaurantAdminServiceTest {
                 .isActive(active)
                 .restaurantId(restaurantId)
                 .build();
+    }
+
+    private ActorScope actorScope(boolean superAdmin, UUID restaurantId) {
+        return new ActorScope(
+                user(ACTOR_ID, restaurantId, true),
+                superAdmin,
+                Set.of(superAdmin ? "SUPER_ADMIN" : "OWNER"),
+                Set.of("RESTAURANTS_READ", "RESTAURANTS_UPDATE")
+        );
     }
 
     private Restaurant restaurant(UUID restaurantId, UUID ownerId) {

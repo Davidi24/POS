@@ -2,9 +2,7 @@ package pos.pos.restaurant.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -21,6 +19,7 @@ import pos.pos.restaurant.enums.BranchStatus;
 import pos.pos.restaurant.mapper.BranchMapper;
 import pos.pos.restaurant.repository.BranchRepository;
 import pos.pos.utils.NormalizationUtils;
+import pos.pos.utils.PageableUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -51,14 +50,8 @@ public class BranchAdminService {
     ) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
 
-        Pageable pageable = PageRequest.of(
-                page == null ? 0 : page,
-                size == null ? DEFAULT_PAGE_SIZE : size,
-                Sort.by(resolveDirection(direction), resolveSortProperty(sortBy))
-        );
-
-        String normalizedSearch = NormalizationUtils.normalizeLower(search);
-        String searchLike = normalizedSearch == null ? null : "%" + normalizedSearch + "%";
+        Pageable pageable = PageableUtils.create(page, size, direction, resolveSortProperty(sortBy), DEFAULT_PAGE_SIZE);
+        String searchLike = NormalizationUtils.normalizeLowerLike(search);
         BranchStatus normalizedStatus = resolveStatus(status);
 
         var branchesPage = branchRepository.searchRestaurantBranches(
@@ -165,16 +158,6 @@ public class BranchAdminService {
             case "status" -> "status";
             default -> throw new AuthException("Invalid sortBy value", HttpStatus.BAD_REQUEST);
         };
-    }
-
-    private Sort.Direction resolveDirection(String direction) {
-        try {
-            return Sort.Direction.fromString(
-                    NormalizationUtils.normalize(direction) == null ? "desc" : direction
-            );
-        } catch (IllegalArgumentException ex) {
-            throw new AuthException("Invalid sort direction", HttpStatus.BAD_REQUEST);
-        }
     }
 
     private BranchStatus resolveStatus(String status) {
