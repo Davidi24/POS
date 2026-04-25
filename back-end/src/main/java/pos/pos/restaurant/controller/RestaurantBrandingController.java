@@ -20,6 +20,7 @@ import pos.pos.restaurant.service.RestaurantBrandingService;
 
 import java.util.UUID;
 
+// checked
 @Tag(name = "Restaurants")
 @Validated
 @RestController

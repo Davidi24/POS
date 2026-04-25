@@ -21,6 +21,7 @@ import pos.pos.restaurant.service.RestaurantRegistrationService;
 
 import java.util.UUID;
 
+//checked
 @Tag(name = "Restaurants")
 @RestController
 @RequestMapping("/restaurants/registrations")

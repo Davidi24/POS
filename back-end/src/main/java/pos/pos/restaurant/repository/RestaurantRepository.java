@@ -84,7 +84,7 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
      * <p>
      * Uses:
      * :searchLike  → expected format: "%value%"
-     *
+     * <p>
      * Example:
      * searchLike = "%pizza%"
      * → matches anything containing "pizza"

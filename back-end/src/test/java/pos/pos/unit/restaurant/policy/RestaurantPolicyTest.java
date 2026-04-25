@@ -3,6 +3,7 @@ package pos.pos.unit.restaurant.policy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.exception.restaurant.RestaurantOwnershipChangeNotAllowedException;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.policy.RestaurantPolicy;
 import pos.pos.security.scope.ActorScope;
@@ -21,6 +22,7 @@ class RestaurantPolicyTest {
     private static final UUID ACTOR_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID RESTAURANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID OWNER_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");
+    private static final UUID NEW_OWNER_ID = UUID.fromString("00000000-0000-0000-0000-000000000030");
 
     private final RestaurantPolicy restaurantPolicy = new RestaurantPolicy();
 
@@ -90,9 +92,38 @@ class RestaurantPolicyTest {
                 .hasMessage("You are not allowed to delete restaurants");
     }
 
+    @Test
+    @DisplayName("assertCanChangeOwner should allow non-super-admin actors when the owner is unchanged")
+    void shouldAllowUnchangedOwnerForNonSuperAdmin() {
+        assertThatCode(() -> restaurantPolicy.assertCanChangeOwner(
+                actorScope(false, RESTAURANT_ID, ACTOR_ID),
+                restaurant(OWNER_ID),
+                OWNER_ID
+        )).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("assertCanChangeOwner should allow super admin actors to change owner")
+    void shouldAllowOwnerChangeForSuperAdmin() {
+        assertThatCode(() -> restaurantPolicy.assertCanChangeOwner(
+                actorScope(true, null, ACTOR_ID),
+                restaurant(OWNER_ID),
+                NEW_OWNER_ID
+        )).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("assertCanChangeOwner should reject owner changes by non-super-admin actors")
+    void shouldRejectOwnerChangeForNonSuperAdmin() {
+        assertThatThrownBy(() -> restaurantPolicy.assertCanChangeOwner(
+                actorScope(false, RESTAURANT_ID, ACTOR_ID),
+                restaurant(OWNER_ID),
+                NEW_OWNER_ID
+        )).isInstanceOf(RestaurantOwnershipChangeNotAllowedException.class);
+    }
+
     private ActorScope actorScope(boolean superAdmin, UUID restaurantId, UUID userId) {
         return new ActorScope(
-                userId,
                 User.builder()
                         .id(userId)
                         .email("owner@pos.local")

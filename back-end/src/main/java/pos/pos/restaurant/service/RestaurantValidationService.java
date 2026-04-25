@@ -5,11 +5,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.restaurant.RestaurantCodeAlreadyExistsException;
+import pos.pos.exception.restaurant.RestaurantOwnerNotFoundException;
 import pos.pos.exception.restaurant.RestaurantSlugAlreadyExistsException;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.repository.RestaurantRepository;
 import pos.pos.restaurant.util.RestaurantFieldNormalizer;
+import pos.pos.user.entity.User;
+import pos.pos.user.repository.UserRepository;
 
+import java.util.Objects;
 import java.util.UUID;
 
 //checked
@@ -18,6 +22,7 @@ import java.util.UUID;
 public class RestaurantValidationService {
 
     private final RestaurantRepository restaurantRepository;
+    private final UserRepository userRepository;
 
     // Validates timezone, normalizes code/slug (or generates them from name), then asserts both are unique.
     // Pass restaurantId=null when creating — it checks that no other restaurant already uses this code/slug.
@@ -95,6 +100,25 @@ public class RestaurantValidationService {
         if (status == RestaurantStatus.PENDING || status == RestaurantStatus.REJECTED) {
             throw new AuthException("PENDING and REJECTED statuses are reserved for registration review", HttpStatus.BAD_REQUEST);
         }
+    }
+
+    public UUID validateOwnerUser(UUID ownerUserId, UUID restaurantId) {
+        if (ownerUserId == null) {
+            return null;
+        }
+
+        User owner = userRepository.findByIdAndDeletedAtIsNull(ownerUserId)
+                .orElseThrow(RestaurantOwnerNotFoundException::new);
+
+        if (!owner.isActive()) {
+            throw new AuthException("Owner user must be active", HttpStatus.BAD_REQUEST);
+        }
+
+        if (owner.getRestaurantId() != null && !Objects.equals(owner.getRestaurantId(), restaurantId)) {
+            throw new AuthException("Owner user is already assigned to another restaurant", HttpStatus.BAD_REQUEST);
+        }
+
+        return owner.getId();
     }
 
     // Rejects timezones that are not valid IANA identifiers (e.g. "America/New_York" is valid, "EST" is not).

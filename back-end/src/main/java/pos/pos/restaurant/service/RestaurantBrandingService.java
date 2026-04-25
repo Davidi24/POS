@@ -14,6 +14,7 @@ import pos.pos.restaurant.repository.RestaurantBrandingRepository;
 
 import java.util.UUID;
 
+// checked
 @Service
 @RequiredArgsConstructor
 public class RestaurantBrandingService {
@@ -29,6 +30,8 @@ public class RestaurantBrandingService {
         return restaurantBrandingMapper.toResponse(branding);
     }
 
+    // upsert = update + insert: if the restaurant already has branding, update it with the new data;
+    // if it has no branding yet, create it from scratch. the caller doesn't need to know which case it is.
     @Transactional
     public RestaurantBrandingResponse upsertBranding(
             Authentication authentication,

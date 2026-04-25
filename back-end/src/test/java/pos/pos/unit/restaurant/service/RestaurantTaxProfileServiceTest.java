@@ -37,6 +37,7 @@ class RestaurantTaxProfileServiceTest {
 
     private static final UUID ACTOR_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID RESTAURANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
+    private static final UUID TAX_PROFILE_ID = UUID.fromString("00000000-0000-0000-0000-000000000012");
 
     @Mock
     private RestaurantScopeService restaurantScopeService;
@@ -100,6 +101,29 @@ class RestaurantTaxProfileServiceTest {
                 .hasMessage("effectiveTo must be after effectiveFrom");
     }
 
+    @Test
+    @DisplayName("makeDefault should replace the existing default profile")
+    void shouldReplaceExistingDefaultProfile() {
+        Authentication authentication = authentication();
+        RestaurantTaxProfile existingDefault = taxProfile(UUID.fromString("00000000-0000-0000-0000-000000000020"), true);
+        RestaurantTaxProfile target = taxProfile(TAX_PROFILE_ID, false);
+
+        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant());
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantTaxProfileRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(TAX_PROFILE_ID, RESTAURANT_ID))
+                .willReturn(Optional.of(target));
+        given(restaurantTaxProfileRepository.findByRestaurantIdAndIsDefaultTrueAndDeletedAtIsNull(RESTAURANT_ID))
+                .willReturn(Optional.of(existingDefault));
+
+        RestaurantTaxProfileResponse response = restaurantTaxProfileService.makeDefault(authentication, RESTAURANT_ID, TAX_PROFILE_ID);
+
+        assertThat(existingDefault.isDefault()).isFalse();
+        assertThat(target.isDefault()).isTrue();
+        assertThat(response.getId()).isEqualTo(TAX_PROFILE_ID);
+        verify(restaurantTaxProfileRepository).save(existingDefault);
+        verify(restaurantTaxProfileRepository).save(target);
+    }
+
     private Authentication authentication() {
         return new UsernamePasswordAuthenticationToken(
                 AuthenticatedUser.builder()
@@ -118,5 +142,17 @@ class RestaurantTaxProfileServiceTest {
         restaurant.setId(RESTAURANT_ID);
         restaurant.setName("POS Main");
         return restaurant;
+    }
+
+    private RestaurantTaxProfile taxProfile(UUID taxProfileId, boolean isDefault) {
+        RestaurantTaxProfile taxProfile = new RestaurantTaxProfile();
+        taxProfile.setId(taxProfileId);
+        taxProfile.setRestaurant(restaurant());
+        taxProfile.setCountry("Albania");
+        taxProfile.setTaxNumber("TN-123");
+        taxProfile.setDefault(isDefault);
+        taxProfile.setCreatedAt(OffsetDateTime.parse("2026-04-23T10:00:00Z"));
+        taxProfile.setUpdatedAt(taxProfile.getCreatedAt());
+        return taxProfile;
     }
 }

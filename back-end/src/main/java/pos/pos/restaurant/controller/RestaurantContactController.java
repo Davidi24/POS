@@ -25,6 +25,7 @@ import pos.pos.restaurant.service.RestaurantContactService;
 import java.util.List;
 import java.util.UUID;
 
+// checked
 @Tag(name = "Restaurants")
 @Validated
 @RestController

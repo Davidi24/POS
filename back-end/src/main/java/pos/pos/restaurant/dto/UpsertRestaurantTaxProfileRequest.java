@@ -33,6 +33,8 @@ public class UpsertRestaurantTaxProfileRequest {
     @Size(max = 150, message = "taxOffice must be at most 150 characters")
     private String taxOffice;
 
+    // If a restaurant has multiple tax profiles (e.g. one for food, one for alcohol,
+    // one for delivery), the isDefault one is the fallback that gets applied automatically when no specific tax profile is explicitly chosen for an item or order.
     private Boolean isDefault;
 
     private OffsetDateTime effectiveFrom;

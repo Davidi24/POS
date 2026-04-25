@@ -36,6 +36,7 @@ class RestaurantAddressServiceTest {
 
     private static final UUID ACTOR_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID RESTAURANT_ID = UUID.fromString("00000000-0000-0000-0000-000000000010");
+    private static final UUID ADDRESS_ID = UUID.fromString("00000000-0000-0000-0000-000000000012");
 
     @Mock
     private RestaurantScopeService restaurantScopeService;
@@ -88,6 +89,29 @@ class RestaurantAddressServiceTest {
         verify(restaurantAddressRepository).save(existingPrimary);
     }
 
+    @Test
+    @DisplayName("makePrimary should replace the existing primary restaurant address")
+    void shouldReplaceExistingPrimaryAddress() {
+        Authentication authentication = authentication();
+        RestaurantAddress existingPrimary = address(UUID.fromString("00000000-0000-0000-0000-000000000020"), true);
+        RestaurantAddress target = address(ADDRESS_ID, false);
+
+        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant());
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantAddressRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(ADDRESS_ID, RESTAURANT_ID))
+                .willReturn(Optional.of(target));
+        given(restaurantAddressRepository.findByRestaurantIdAndIsPrimaryTrueAndDeletedAtIsNull(RESTAURANT_ID))
+                .willReturn(Optional.of(existingPrimary));
+
+        AddressResponse response = restaurantAddressService.makePrimary(authentication, RESTAURANT_ID, ADDRESS_ID);
+
+        assertThat(existingPrimary.isPrimary()).isFalse();
+        assertThat(target.isPrimary()).isTrue();
+        assertThat(response.getId()).isEqualTo(ADDRESS_ID);
+        verify(restaurantAddressRepository).save(existingPrimary);
+        verify(restaurantAddressRepository).save(target);
+    }
+
     private Authentication authentication() {
         return new UsernamePasswordAuthenticationToken(
                 AuthenticatedUser.builder()
@@ -106,5 +130,19 @@ class RestaurantAddressServiceTest {
         restaurant.setId(RESTAURANT_ID);
         restaurant.setName("POS Main");
         return restaurant;
+    }
+
+    private RestaurantAddress address(UUID addressId, boolean primary) {
+        RestaurantAddress address = new RestaurantAddress();
+        address.setId(addressId);
+        address.setRestaurant(restaurant());
+        address.setAddressType(AddressType.PHYSICAL);
+        address.setCountry("Albania");
+        address.setCity("Tirana");
+        address.setStreetLine1("Main Street");
+        address.setPrimary(primary);
+        address.setCreatedAt(OffsetDateTime.parse("2026-04-23T10:00:00Z"));
+        address.setUpdatedAt(address.getCreatedAt());
+        return address;
     }
 }

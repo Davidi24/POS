@@ -30,6 +30,7 @@ import pos.pos.restaurant.service.RestaurantAdminService;
 
 import java.util.UUID;
 
+// checked
 @Tag(name = "Restaurants")
 @Validated
 @RestController
@@ -43,15 +44,15 @@ public class RestaurantAdminController {
     @PreAuthorize("hasAuthority('RESTAURANTS_READ')")
     @Operation(summary = "List restaurants with pagination and optional filters")
     public ResponseEntity<PageResponse<RestaurantResponse>> getRestaurants(
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) Boolean active,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) UUID ownerUserId,
+            @RequestParam(required = false) String search,          // partial match on restaurant name, code, or slug
+            @RequestParam(required = false) Boolean active,         // filter by active/inactive flag; omit for all
+            @RequestParam(required = false) String status,          // filter by RestaurantStatus enum value; omit for all
+            @RequestParam(required = false) UUID ownerUserId,       // filter to restaurants owned by a specific user
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page must be at least 0") Integer page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "size must be at least 1")
-            @Max(value = 100, message = "size must be at most 100") Integer size,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String direction,
+            @Max(value = 100, message = "size must be at most 100") Integer size,   // max 100 per page
+            @RequestParam(defaultValue = "createdAt") String sortBy,    // field to sort by (e.g. createdAt, name)
+            @RequestParam(defaultValue = "desc") String direction,       // asc or desc
             Authentication authentication
     ) {
         return ResponseEntity.ok(restaurantAdminService.getRestaurants(

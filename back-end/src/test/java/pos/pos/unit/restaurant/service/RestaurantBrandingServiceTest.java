@@ -91,6 +91,40 @@ class RestaurantBrandingServiceTest {
         verify(restaurantBrandingRepository).save(any(RestaurantBranding.class));
     }
 
+    @Test
+    @DisplayName("upsertBranding should update existing branding in place")
+    void shouldUpdateExistingBranding() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        RestaurantBranding existing = new RestaurantBranding();
+        existing.setId(UUID.fromString("00000000-0000-0000-0000-000000000020"));
+        existing.setRestaurant(restaurant);
+        existing.setLogoUrl("https://cdn.pos.local/old-logo.png");
+        existing.setPrimaryColor("#000000");
+        existing.setSecondaryColor("#111111");
+
+        UpsertRestaurantBrandingRequest request = UpsertRestaurantBrandingRequest.builder()
+                .logoUrl("https://cdn.pos.local/new-logo.png")
+                .primaryColor("#112233")
+                .secondaryColor("#445566")
+                .receiptHeader("Updated")
+                .receiptFooter("See you again")
+                .build();
+
+        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant);
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantBrandingRepository.findByRestaurantIdAndDeletedAtIsNull(RESTAURANT_ID)).willReturn(Optional.of(existing));
+        given(restaurantBrandingRepository.save(existing)).willReturn(existing);
+
+        RestaurantBrandingResponse response = restaurantBrandingService.upsertBranding(authentication, RESTAURANT_ID, request);
+
+        assertThat(existing.getLogoUrl()).isEqualTo("https://cdn.pos.local/new-logo.png");
+        assertThat(existing.getPrimaryColor()).isEqualTo("#112233");
+        assertThat(existing.getSecondaryColor()).isEqualTo("#445566");
+        assertThat(response.getId()).isEqualTo(existing.getId());
+        verify(restaurantBrandingRepository).save(existing);
+    }
+
     private Authentication authentication() {
         return new UsernamePasswordAuthenticationToken(
                 AuthenticatedUser.builder()
