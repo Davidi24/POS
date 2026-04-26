@@ -26,6 +26,7 @@ public class RestaurantContactService {
     private final RestaurantContactRepository restaurantContactRepository;
     private final RestaurantContactMapper restaurantContactMapper;
 
+    @Transactional(readOnly = true)
     public List<ContactResponse> getContacts(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
         return restaurantContactRepository.findAllByRestaurantIdAndDeletedAtIsNullOrderByIsPrimaryDescCreatedAtAsc(restaurantId)
@@ -99,11 +100,6 @@ public class RestaurantContactService {
     }
 
     private void clearExistingPrimary(UUID restaurantId, UUID keepContactId, UUID actorId) {
-        restaurantContactRepository.findByRestaurantIdAndIsPrimaryTrueAndDeletedAtIsNull(restaurantId)
-                .filter(existing -> !existing.getId().equals(keepContactId))
-                .ifPresent(existing -> {
-                    restaurantContactMapper.updatePrimary(existing, false, actorId);
-                    restaurantContactRepository.save(existing);
-                });
+        restaurantContactRepository.clearPrimary(restaurantId, keepContactId, actorId);
     }
 }

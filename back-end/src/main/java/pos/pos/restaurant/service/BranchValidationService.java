@@ -37,6 +37,13 @@ public class BranchValidationService {
         return new NormalizedBranchFields(normalizedCode);
     }
 
+    // Guards against modifying an archived branch (ARCHIVED is terminal).
+    public void validateBranchStatusTransition(BranchStatus current, BranchStatus requested) {
+        if (current == BranchStatus.ARCHIVED) {
+            throw new AuthException("Archived branches cannot be modified", HttpStatus.BAD_REQUEST);
+        }
+    }
+
     public void validateStatusConsistency(Boolean isActive, BranchStatus status) {
         if (Boolean.TRUE.equals(isActive) && status != BranchStatus.ACTIVE) {
             throw new AuthException("Non-active branch statuses must have isActive=false", HttpStatus.BAD_REQUEST);

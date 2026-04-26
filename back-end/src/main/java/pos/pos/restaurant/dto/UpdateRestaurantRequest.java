@@ -3,6 +3,7 @@ package pos.pos.restaurant.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,7 +43,7 @@ public class UpdateRestaurantRequest {
     @Size(max = 150, message = "email must be at most 150 characters")
     private String email;
 
-    @Size(max = 50, message = "phone must be at most 50 characters")
+    @Pattern(regexp = "^\\+?[0-9\\s\\-().]{7,50}$", message = "phone must be a valid phone number")
     private String phone;
 
     @Size(max = 255, message = "website must be at most 255 characters")

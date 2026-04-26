@@ -25,6 +25,7 @@ public class BranchContactService {
     private final BranchContactRepository branchContactRepository;
     private final BranchContactMapper branchContactMapper;
 
+    @Transactional(readOnly = true)
     public List<ContactResponse> getContacts(Authentication authentication, UUID restaurantId, UUID branchId) {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         return branchContactRepository.findAllByBranchIdAndDeletedAtIsNullOrderByIsPrimaryDescCreatedAtAsc(branchId)
@@ -105,11 +106,6 @@ public class BranchContactService {
     }
 
     private void clearExistingPrimary(UUID branchId, UUID keepContactId, UUID actorId) {
-        branchContactRepository.findByBranchIdAndIsPrimaryTrueAndDeletedAtIsNull(branchId)
-                .filter(existing -> !existing.getId().equals(keepContactId))
-                .ifPresent(existing -> {
-                    branchContactMapper.updatePrimary(existing, false, actorId);
-                    branchContactRepository.save(existing);
-                });
+        branchContactRepository.clearPrimary(branchId, keepContactId, actorId);
     }
 }

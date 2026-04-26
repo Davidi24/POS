@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface RestaurantBrandingRepository extends JpaRepository<RestaurantBranding, UUID> {
 
     Optional<RestaurantBranding> findByRestaurantIdAndDeletedAtIsNull(UUID restaurantId);
+
+    boolean existsByRestaurantIdAndDeletedAtIsNull(UUID restaurantId);
 }

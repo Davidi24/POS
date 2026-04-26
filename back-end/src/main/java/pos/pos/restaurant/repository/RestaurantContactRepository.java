@@ -1,6 +1,9 @@
 package pos.pos.restaurant.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import pos.pos.restaurant.entity.RestaurantContact;
 
 import java.util.List;
@@ -13,5 +16,23 @@ public interface RestaurantContactRepository extends JpaRepository<RestaurantCon
 
     Optional<RestaurantContact> findByIdAndRestaurantIdAndDeletedAtIsNull(UUID id, UUID restaurantId);
 
+    boolean existsByRestaurantIdAndIsPrimaryTrueAndDeletedAtIsNull(UUID restaurantId);
+
     Optional<RestaurantContact> findByRestaurantIdAndIsPrimaryTrueAndDeletedAtIsNull(UUID restaurantId);
+
+    // Atomically clears the primary flag on all contacts for a restaurant, optionally keeping one.
+    @Modifying
+    @Query("""
+            UPDATE RestaurantContact c
+            SET c.isPrimary = false, c.updatedBy = :actorId
+            WHERE c.restaurant.id = :restaurantId
+              AND c.isPrimary = true
+              AND c.deletedAt IS NULL
+              AND (:excludeId IS NULL OR c.id != :excludeId)
+            """)
+    void clearPrimary(
+            @Param("restaurantId") UUID restaurantId,
+            @Param("excludeId") UUID excludeId,
+            @Param("actorId") UUID actorId
+    );
 }

@@ -23,6 +23,7 @@ public class RestaurantBrandingService {
     private final RestaurantBrandingRepository restaurantBrandingRepository;
     private final RestaurantBrandingMapper restaurantBrandingMapper;
 
+    @Transactional(readOnly = true)
     public RestaurantBrandingResponse getBranding(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
         RestaurantBranding branding = restaurantBrandingRepository.findByRestaurantIdAndDeletedAtIsNull(restaurantId)

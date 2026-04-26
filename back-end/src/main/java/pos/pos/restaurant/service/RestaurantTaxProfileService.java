@@ -27,6 +27,7 @@ public class RestaurantTaxProfileService {
     private final RestaurantTaxProfileRepository restaurantTaxProfileRepository;
     private final RestaurantTaxProfileMapper restaurantTaxProfileMapper;
 
+    @Transactional(readOnly = true)
     public List<RestaurantTaxProfileResponse> getTaxProfiles(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
         return restaurantTaxProfileRepository.findAllByRestaurantIdAndDeletedAtIsNullOrderByIsDefaultDescCreatedAtAsc(restaurantId)
@@ -106,12 +107,7 @@ public class RestaurantTaxProfileService {
     }
 
     private void clearExistingDefault(UUID restaurantId, UUID keepTaxProfileId, UUID actorId) {
-        restaurantTaxProfileRepository.findByRestaurantIdAndIsDefaultTrueAndDeletedAtIsNull(restaurantId)
-                .filter(existing -> !existing.getId().equals(keepTaxProfileId))
-                .ifPresent(existing -> {
-                    restaurantTaxProfileMapper.updateDefault(existing, false, actorId);
-                    restaurantTaxProfileRepository.save(existing);
-                });
+        restaurantTaxProfileRepository.clearDefault(restaurantId, keepTaxProfileId, actorId);
     }
 
     private void validateEffectiveRange(UpsertRestaurantTaxProfileRequest request) {

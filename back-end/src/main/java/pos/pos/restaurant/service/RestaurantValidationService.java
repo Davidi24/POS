@@ -102,6 +102,17 @@ public class RestaurantValidationService {
         }
     }
 
+    // Guards against invalid transitions: ARCHIVED is terminal and cannot be modified;
+    // PENDING/REJECTED are reserved for the registration review flow only.
+    public void validateStatusTransition(RestaurantStatus current, RestaurantStatus requested) {
+        if (current == RestaurantStatus.ARCHIVED) {
+            throw new AuthException("Archived restaurants cannot be modified", HttpStatus.BAD_REQUEST);
+        }
+        if (requested == RestaurantStatus.PENDING || requested == RestaurantStatus.REJECTED) {
+            throw new AuthException("PENDING and REJECTED statuses are reserved for registration review", HttpStatus.BAD_REQUEST);
+        }
+    }
+
     public UUID validateOwnerUser(UUID ownerUserId, UUID restaurantId) {
         if (ownerUserId == null) {
             return null;

@@ -36,6 +36,7 @@ public class BranchAdminService {
     private final RestaurantScopeService restaurantScopeService;
     private final BranchValidationService branchValidationService;
 
+    @Transactional(readOnly = true)
     public PageResponse<BranchResponse> getBranches(
             Authentication authentication,
             UUID restaurantId,
@@ -87,6 +88,7 @@ public class BranchAdminService {
         return branchMapper.toResponse(branch);
     }
 
+    @Transactional(readOnly = true)
     public BranchResponse getBranch(Authentication authentication, UUID restaurantId, UUID branchId) {
         Branch branch = restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         return branchMapper.toResponse(branch);
@@ -108,6 +110,7 @@ public class BranchAdminService {
                 branchId
         ).code();
         UUID managerUserId = branchValidationService.validateManagerUser(request.getManagerUserId(), restaurantId);
+        branchValidationService.validateBranchStatusTransition(branch.getStatus(), request.getStatus());
         branchValidationService.validateStatusConsistency(request.getIsActive(), request.getStatus());
 
         branchMapper.updateEntity(branch, request, normalizedCode, managerUserId, actorId);
@@ -123,6 +126,7 @@ public class BranchAdminService {
             UpdateBranchStatusRequest request
     ) {
         Branch branch = restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
+        branchValidationService.validateBranchStatusTransition(branch.getStatus(), request.getStatus());
         branchValidationService.validateStatusConsistency(request.getIsActive(), request.getStatus());
         branchMapper.updateStatus(
                 branch,
