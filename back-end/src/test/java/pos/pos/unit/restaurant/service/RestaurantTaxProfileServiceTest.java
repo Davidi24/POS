@@ -52,13 +52,10 @@ class RestaurantTaxProfileServiceTest {
     private RestaurantTaxProfileService restaurantTaxProfileService;
 
     @Test
-    @DisplayName("createTaxProfile should clear an existing default profile")
+    @DisplayName("createTaxProfile should call clearDefault when new profile is default")
     void shouldClearExistingDefault() {
         Authentication authentication = authentication();
         Restaurant restaurant = restaurant();
-        RestaurantTaxProfile existingDefault = new RestaurantTaxProfile();
-        existingDefault.setId(UUID.fromString("00000000-0000-0000-0000-000000000020"));
-        existingDefault.setDefault(true);
 
         UpsertRestaurantTaxProfileRequest request = UpsertRestaurantTaxProfileRequest.builder()
                 .country("Albania")
@@ -68,8 +65,6 @@ class RestaurantTaxProfileServiceTest {
 
         given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant);
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
-        given(restaurantTaxProfileRepository.findByRestaurantIdAndIsDefaultTrueAndDeletedAtIsNull(RESTAURANT_ID))
-                .willReturn(Optional.of(existingDefault));
         given(restaurantTaxProfileRepository.save(any(RestaurantTaxProfile.class))).willAnswer(invocation -> {
             RestaurantTaxProfile taxProfile = invocation.getArgument(0);
             if (taxProfile.getId() == null) {
@@ -80,10 +75,9 @@ class RestaurantTaxProfileServiceTest {
 
         RestaurantTaxProfileResponse response = restaurantTaxProfileService.createTaxProfile(authentication, RESTAURANT_ID, request);
 
-        assertThat(existingDefault.isDefault()).isFalse();
         assertThat(response.getId()).isNotNull();
         assertThat(response.getIsDefault()).isTrue();
-        verify(restaurantTaxProfileRepository).save(existingDefault);
+        verify(restaurantTaxProfileRepository).clearDefault(RESTAURANT_ID, null, ACTOR_ID);
     }
 
     @Test
@@ -102,26 +96,66 @@ class RestaurantTaxProfileServiceTest {
     }
 
     @Test
-    @DisplayName("makeDefault should replace the existing default profile")
+    @DisplayName("makeDefault should call clearDefault and set target as default")
     void shouldReplaceExistingDefaultProfile() {
         Authentication authentication = authentication();
-        RestaurantTaxProfile existingDefault = taxProfile(UUID.fromString("00000000-0000-0000-0000-000000000020"), true);
         RestaurantTaxProfile target = taxProfile(TAX_PROFILE_ID, false);
 
         given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant());
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
         given(restaurantTaxProfileRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(TAX_PROFILE_ID, RESTAURANT_ID))
                 .willReturn(Optional.of(target));
-        given(restaurantTaxProfileRepository.findByRestaurantIdAndIsDefaultTrueAndDeletedAtIsNull(RESTAURANT_ID))
-                .willReturn(Optional.of(existingDefault));
 
         RestaurantTaxProfileResponse response = restaurantTaxProfileService.makeDefault(authentication, RESTAURANT_ID, TAX_PROFILE_ID);
 
-        assertThat(existingDefault.isDefault()).isFalse();
         assertThat(target.isDefault()).isTrue();
         assertThat(response.getId()).isEqualTo(TAX_PROFILE_ID);
-        verify(restaurantTaxProfileRepository).save(existingDefault);
+        verify(restaurantTaxProfileRepository).clearDefault(RESTAURANT_ID, TAX_PROFILE_ID, ACTOR_ID);
         verify(restaurantTaxProfileRepository).save(target);
+    }
+
+    @Test
+    @DisplayName("updateTaxProfile should call clearDefault and update fields")
+    void shouldUpdateTaxProfile() {
+        Authentication authentication = authentication();
+        RestaurantTaxProfile target = taxProfile(TAX_PROFILE_ID, false);
+
+        UpsertRestaurantTaxProfileRequest request = UpsertRestaurantTaxProfileRequest.builder()
+                .country("Kosovo")
+                .taxNumber("TN-999")
+                .isDefault(true)
+                .build();
+
+        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant());
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantTaxProfileRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(TAX_PROFILE_ID, RESTAURANT_ID))
+                .willReturn(Optional.of(target));
+        given(restaurantTaxProfileRepository.save(any(RestaurantTaxProfile.class))).willAnswer(i -> i.getArgument(0));
+
+        RestaurantTaxProfileResponse response = restaurantTaxProfileService.updateTaxProfile(
+                authentication, RESTAURANT_ID, TAX_PROFILE_ID, request);
+
+        assertThat(target.isDefault()).isTrue();
+        assertThat(response.getId()).isEqualTo(TAX_PROFILE_ID);
+        verify(restaurantTaxProfileRepository).clearDefault(RESTAURANT_ID, TAX_PROFILE_ID, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("deleteTaxProfile should soft-delete an existing tax profile")
+    void shouldSoftDeleteTaxProfile() {
+        Authentication authentication = authentication();
+        RestaurantTaxProfile target = taxProfile(TAX_PROFILE_ID, false);
+
+        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant());
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantTaxProfileRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(TAX_PROFILE_ID, RESTAURANT_ID))
+                .willReturn(Optional.of(target));
+        given(restaurantTaxProfileRepository.save(target)).willReturn(target);
+
+        restaurantTaxProfileService.deleteTaxProfile(authentication, RESTAURANT_ID, TAX_PROFILE_ID);
+
+        assertThat(target.getDeletedAt()).isNotNull();
+        assertThat(target.isDefault()).isFalse();
     }
 
     private Authentication authentication() {

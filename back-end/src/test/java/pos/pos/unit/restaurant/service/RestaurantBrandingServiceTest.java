@@ -50,6 +50,28 @@ class RestaurantBrandingServiceTest {
     private RestaurantBrandingService restaurantBrandingService;
 
     @Test
+    @DisplayName("getBranding should return branding when it exists")
+    void shouldReturnExistingBranding() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        RestaurantBranding existing = new RestaurantBranding();
+        existing.setId(UUID.fromString("00000000-0000-0000-0000-000000000020"));
+        existing.setRestaurant(restaurant);
+        existing.setLogoUrl("https://cdn.pos.local/logo.png");
+        existing.setPrimaryColor("#112233");
+
+        given(restaurantScopeService.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant);
+        given(restaurantBrandingRepository.findByRestaurantIdAndDeletedAtIsNull(RESTAURANT_ID))
+                .willReturn(Optional.of(existing));
+
+        RestaurantBrandingResponse response = restaurantBrandingService.getBranding(authentication, RESTAURANT_ID);
+
+        assertThat(response.getId()).isEqualTo(existing.getId());
+        assertThat(response.getLogoUrl()).isEqualTo("https://cdn.pos.local/logo.png");
+        assertThat(response.getPrimaryColor()).isEqualTo("#112233");
+    }
+
+    @Test
     @DisplayName("getBranding should throw when branding does not exist")
     void shouldRejectMissingBranding() {
         Authentication authentication = authentication();

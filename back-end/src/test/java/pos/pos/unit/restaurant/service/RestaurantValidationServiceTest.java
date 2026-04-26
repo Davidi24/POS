@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.restaurant.RestaurantOwnerNotFoundException;
+import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.repository.RestaurantRepository;
 import pos.pos.restaurant.service.RestaurantValidationService;
 import pos.pos.user.entity.User;
@@ -18,6 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
@@ -114,6 +116,80 @@ class RestaurantValidationServiceTest {
                 .hasMessage("Owner user is already assigned to another restaurant")
                 .extracting(ex -> ((AuthException) ex).getStatus())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("validateStatusConsistency should accept isActive=true with ACTIVE status")
+    void shouldAcceptActiveTrueAndActiveStatus() {
+        assertThatCode(() -> restaurantValidationService.validateStatusConsistency(true, RestaurantStatus.ACTIVE))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateStatusConsistency should accept isActive=false with INACTIVE status")
+    void shouldAcceptActiveFalseAndInactiveStatus() {
+        assertThatCode(() -> restaurantValidationService.validateStatusConsistency(false, RestaurantStatus.INACTIVE))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateStatusConsistency should reject isActive=true with non-ACTIVE status")
+    void shouldRejectActiveTrueWithNonActiveStatus() {
+        assertThatThrownBy(() -> restaurantValidationService.validateStatusConsistency(true, RestaurantStatus.SUSPENDED))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Non-active restaurant statuses must have isActive=false")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("validateStatusConsistency should reject isActive=false with ACTIVE status")
+    void shouldRejectActiveFalseWithActiveStatus() {
+        assertThatThrownBy(() -> restaurantValidationService.validateStatusConsistency(false, RestaurantStatus.ACTIVE))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("ACTIVE restaurants must have isActive=true")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("validateStatusConsistency should pass when both values are null")
+    void shouldPassWhenBothNull() {
+        assertThatCode(() -> restaurantValidationService.validateStatusConsistency(null, null))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("validateManageableStatus should reject PENDING status")
+    void shouldRejectPendingStatus() {
+        assertThatThrownBy(() -> restaurantValidationService.validateManageableStatus(RestaurantStatus.PENDING))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("PENDING and REJECTED statuses are reserved for registration review")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("validateManageableStatus should reject REJECTED status")
+    void shouldRejectRejectedStatus() {
+        assertThatThrownBy(() -> restaurantValidationService.validateManageableStatus(RestaurantStatus.REJECTED))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("PENDING and REJECTED statuses are reserved for registration review")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("validateManageableStatus should allow non-terminal manageable statuses")
+    void shouldAllowManageableStatuses() {
+        assertThatCode(() -> restaurantValidationService.validateManageableStatus(RestaurantStatus.ACTIVE))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> restaurantValidationService.validateManageableStatus(RestaurantStatus.INACTIVE))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> restaurantValidationService.validateManageableStatus(RestaurantStatus.SUSPENDED))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> restaurantValidationService.validateManageableStatus(null))
+                .doesNotThrowAnyException();
     }
 
     private User owner(UUID ownerId, UUID restaurantId, boolean active) {

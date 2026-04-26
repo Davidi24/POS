@@ -33,6 +33,7 @@ import pos.pos.restaurant.dto.RestaurantResponse;
 import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.service.RestaurantAdminService;
+import pos.pos.restaurant.service.RestaurantSummaryService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;
 import pos.pos.security.principal.AuthenticatedUser;
@@ -71,6 +72,9 @@ class RestaurantAdminControllerSecurityTest {
 
     @MockBean
     private RestaurantAdminService restaurantAdminService;
+
+    @MockBean
+    private RestaurantSummaryService restaurantSummaryService;
 
     @Test
     @DisplayName("GET /restaurants should return 200 when authenticated with RESTAURANTS_READ")

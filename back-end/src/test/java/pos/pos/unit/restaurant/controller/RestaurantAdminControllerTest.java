@@ -25,6 +25,7 @@ import pos.pos.restaurant.dto.UpdateRestaurantRequest;
 import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.service.RestaurantAdminService;
+import pos.pos.restaurant.service.RestaurantSummaryService;
 import pos.pos.security.principal.AuthenticatedUser;
 
 import java.time.OffsetDateTime;
@@ -54,6 +55,9 @@ class RestaurantAdminControllerTest {
 
     @Mock
     private RestaurantAdminService restaurantAdminService;
+
+    @Mock
+    private RestaurantSummaryService restaurantSummaryService;
 
     @InjectMocks
     private RestaurantAdminController controller;

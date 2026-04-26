@@ -27,8 +27,10 @@ import pos.pos.restaurant.dto.UpdateRestaurantRequest;
 import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
+import pos.pos.restaurant.mapper.BranchMapper;
 import pos.pos.restaurant.mapper.RestaurantMapper;
 import pos.pos.restaurant.policy.RestaurantPolicy;
+import pos.pos.restaurant.repository.BranchRepository;
 import pos.pos.restaurant.repository.RestaurantRepository;
 import pos.pos.restaurant.service.RestaurantAdminService;
 import pos.pos.restaurant.service.RestaurantOwnerProvisioningService;
@@ -67,6 +69,9 @@ class RestaurantAdminServiceTest {
     private RestaurantRepository restaurantRepository;
 
     @Mock
+    private BranchRepository branchRepository;
+
+    @Mock
     private ActorScopeService actorScopeService;
 
     @Mock
@@ -83,6 +88,9 @@ class RestaurantAdminServiceTest {
 
     @Spy
     private RestaurantMapper restaurantMapper = new RestaurantMapper();
+
+    @Spy
+    private BranchMapper branchMapper = new BranchMapper();
 
     @InjectMocks
     private RestaurantAdminService restaurantAdminService;
@@ -362,6 +370,21 @@ class RestaurantAdminServiceTest {
         assertThat(restaurant.getStatus()).isEqualTo(RestaurantStatus.ARCHIVED);
         assertThat(restaurant.getDeletedAt()).isNotNull();
         assertThat(restaurant.getUpdatedBy()).isEqualTo(ACTOR_ID);
+        verify(restaurantRepository).save(restaurant);
+    }
+
+    @Test
+    @DisplayName("deleteRestaurant should cascade soft-delete active branches via bulk UPDATE")
+    void shouldCascadeSoftDeleteBranches() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+
+        given(restaurantScopeService.requireExistingRestaurant(TARGET_RESTAURANT_ID)).willReturn(restaurant);
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
+
+        restaurantAdminService.deleteRestaurant(authentication, TARGET_RESTAURANT_ID);
+
+        verify(branchRepository).softDeleteAllByRestaurantId(eq(TARGET_RESTAURANT_ID), any(), eq(ACTOR_ID));
         verify(restaurantRepository).save(restaurant);
     }
 
