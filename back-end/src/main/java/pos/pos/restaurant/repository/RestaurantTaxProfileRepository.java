@@ -20,7 +20,7 @@ public interface RestaurantTaxProfileRepository extends JpaRepository<Restaurant
 
     Optional<RestaurantTaxProfile> findByRestaurantIdAndIsDefaultTrueAndDeletedAtIsNull(UUID restaurantId);
 
-    // Atomically clears the default flag on all tax profiles for a restaurant, optionally keeping one.
+    // Clears all default flags for a restaurant in one UPDATE to avoid the select→update race condition.
     @Modifying
     @Query("""
             UPDATE RestaurantTaxProfile t
@@ -28,11 +28,9 @@ public interface RestaurantTaxProfileRepository extends JpaRepository<Restaurant
             WHERE t.restaurant.id = :restaurantId
               AND t.isDefault = true
               AND t.deletedAt IS NULL
-              AND (:excludeId IS NULL OR t.id != :excludeId)
             """)
-    void clearDefault(
+    void clearAllDefault(
             @Param("restaurantId") UUID restaurantId,
-            @Param("excludeId") UUID excludeId,
             @Param("actorId") UUID actorId
     );
 }

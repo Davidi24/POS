@@ -85,7 +85,7 @@ class BranchAddressServiceTest {
 
         assertThat(response.getId()).isNotNull();
         assertThat(response.getIsPrimary()).isTrue();
-        verify(branchAddressRepository).clearPrimary(BRANCH_ID, null, ACTOR_ID);
+        verify(branchAddressRepository).clearAllPrimary(BRANCH_ID, ACTOR_ID);
     }
 
     @Test
@@ -114,7 +114,7 @@ class BranchAddressServiceTest {
         AddressResponse response = branchAddressService.createAddress(authentication, RESTAURANT_ID, BRANCH_ID, request);
 
         assertThat(response.getIsPrimary()).isFalse();
-        verify(branchAddressRepository, never()).clearPrimary(any(), any(), any());
+        verify(branchAddressRepository, never()).clearAllPrimary(any(), any());
     }
 
     @Test
@@ -132,7 +132,7 @@ class BranchAddressServiceTest {
 
         assertThat(target.isPrimary()).isTrue();
         assertThat(response.getId()).isEqualTo(ADDRESS_ID);
-        verify(branchAddressRepository).clearPrimary(BRANCH_ID, ADDRESS_ID, ACTOR_ID);
+        verify(branchAddressRepository).clearAllPrimary(BRANCH_ID, ACTOR_ID);
         verify(branchAddressRepository).save(target);
     }
 
@@ -161,7 +161,7 @@ class BranchAddressServiceTest {
 
         assertThat(target.isPrimary()).isTrue();
         assertThat(response.getId()).isEqualTo(ADDRESS_ID);
-        verify(branchAddressRepository).clearPrimary(BRANCH_ID, ADDRESS_ID, ACTOR_ID);
+        verify(branchAddressRepository).clearAllPrimary(BRANCH_ID, ACTOR_ID);
         verify(branchAddressRepository).save(target);
     }
 

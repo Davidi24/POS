@@ -107,7 +107,7 @@ public class RestaurantTaxProfileService {
     }
 
     private void clearExistingDefault(UUID restaurantId, UUID keepTaxProfileId, UUID actorId) {
-        restaurantTaxProfileRepository.clearDefault(restaurantId, keepTaxProfileId, actorId);
+        restaurantTaxProfileRepository.clearAllDefault(restaurantId, actorId);
     }
 
     private void validateEffectiveRange(UpsertRestaurantTaxProfileRequest request) {

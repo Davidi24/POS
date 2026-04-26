@@ -77,7 +77,7 @@ class RestaurantTaxProfileServiceTest {
 
         assertThat(response.getId()).isNotNull();
         assertThat(response.getIsDefault()).isTrue();
-        verify(restaurantTaxProfileRepository).clearDefault(RESTAURANT_ID, null, ACTOR_ID);
+        verify(restaurantTaxProfileRepository).clearAllDefault(RESTAURANT_ID, ACTOR_ID);
     }
 
     @Test
@@ -110,7 +110,7 @@ class RestaurantTaxProfileServiceTest {
 
         assertThat(target.isDefault()).isTrue();
         assertThat(response.getId()).isEqualTo(TAX_PROFILE_ID);
-        verify(restaurantTaxProfileRepository).clearDefault(RESTAURANT_ID, TAX_PROFILE_ID, ACTOR_ID);
+        verify(restaurantTaxProfileRepository).clearAllDefault(RESTAURANT_ID, ACTOR_ID);
         verify(restaurantTaxProfileRepository).save(target);
     }
 
@@ -137,7 +137,7 @@ class RestaurantTaxProfileServiceTest {
 
         assertThat(target.isDefault()).isTrue();
         assertThat(response.getId()).isEqualTo(TAX_PROFILE_ID);
-        verify(restaurantTaxProfileRepository).clearDefault(RESTAURANT_ID, TAX_PROFILE_ID, ACTOR_ID);
+        verify(restaurantTaxProfileRepository).clearAllDefault(RESTAURANT_ID, ACTOR_ID);
     }
 
     @Test

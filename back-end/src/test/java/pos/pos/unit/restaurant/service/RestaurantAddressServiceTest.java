@@ -83,7 +83,7 @@ class RestaurantAddressServiceTest {
 
         assertThat(response.getId()).isNotNull();
         assertThat(response.getIsPrimary()).isTrue();
-        verify(restaurantAddressRepository).clearPrimary(RESTAURANT_ID, null, ACTOR_ID);
+        verify(restaurantAddressRepository).clearAllPrimary(RESTAURANT_ID, ACTOR_ID);
     }
 
     @Test
@@ -111,7 +111,7 @@ class RestaurantAddressServiceTest {
         AddressResponse response = restaurantAddressService.createAddress(authentication, RESTAURANT_ID, request);
 
         assertThat(response.getIsPrimary()).isFalse();
-        verify(restaurantAddressRepository, never()).clearPrimary(any(), any(), any());
+        verify(restaurantAddressRepository, never()).clearAllPrimary(any(), any());
     }
 
     @Test
@@ -129,7 +129,7 @@ class RestaurantAddressServiceTest {
 
         assertThat(target.isPrimary()).isTrue();
         assertThat(response.getId()).isEqualTo(ADDRESS_ID);
-        verify(restaurantAddressRepository).clearPrimary(RESTAURANT_ID, ADDRESS_ID, ACTOR_ID);
+        verify(restaurantAddressRepository).clearAllPrimary(RESTAURANT_ID, ACTOR_ID);
         verify(restaurantAddressRepository).save(target);
     }
 
@@ -157,7 +157,7 @@ class RestaurantAddressServiceTest {
 
         assertThat(target.isPrimary()).isTrue();
         assertThat(response.getId()).isEqualTo(ADDRESS_ID);
-        verify(restaurantAddressRepository).clearPrimary(RESTAURANT_ID, ADDRESS_ID, ACTOR_ID);
+        verify(restaurantAddressRepository).clearAllPrimary(RESTAURANT_ID, ACTOR_ID);
         verify(restaurantAddressRepository).save(target);
     }
 

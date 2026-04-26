@@ -18,7 +18,7 @@ public interface BranchAddressRepository extends JpaRepository<BranchAddress, UU
 
     Optional<BranchAddress> findByBranchIdAndIsPrimaryTrueAndDeletedAtIsNull(UUID branchId);
 
-    // Atomically clears the primary flag on all addresses for a branch, optionally keeping one.
+    // Clears all primary flags for a branch in one UPDATE to avoid the select→update race condition.
     @Modifying
     @Query("""
             UPDATE BranchAddress a
@@ -26,11 +26,9 @@ public interface BranchAddressRepository extends JpaRepository<BranchAddress, UU
             WHERE a.branch.id = :branchId
               AND a.isPrimary = true
               AND a.deletedAt IS NULL
-              AND (:excludeId IS NULL OR a.id != :excludeId)
             """)
-    void clearPrimary(
+    void clearAllPrimary(
             @Param("branchId") UUID branchId,
-            @Param("excludeId") UUID excludeId,
             @Param("actorId") UUID actorId
     );
 }
