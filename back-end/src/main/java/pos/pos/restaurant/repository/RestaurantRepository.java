@@ -14,6 +14,8 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
 
     Optional<Restaurant>  findByIdAndDeletedAtIsNull(UUID id);
 
+    Optional<Restaurant> findBySlugAndDeletedAtIsNull(String slug);
+
     boolean existsByCodeAndDeletedAtIsNull(String code);
 
     boolean existsByCodeAndIdNotAndDeletedAtIsNull(String code, UUID id);

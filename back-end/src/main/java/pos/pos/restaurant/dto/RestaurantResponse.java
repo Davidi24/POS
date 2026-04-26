@@ -31,6 +31,7 @@ public class RestaurantResponse {
     private Boolean isActive;
     private RestaurantStatus status;
     private UUID ownerUserId;
+    private String rejectionReason;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

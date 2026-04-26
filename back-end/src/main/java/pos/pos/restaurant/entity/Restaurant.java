@@ -133,6 +133,9 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "pending_owner_client_target", length = 20)
     private ClientLinkTarget pendingOwnerClientTarget;
 
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "owner_id",

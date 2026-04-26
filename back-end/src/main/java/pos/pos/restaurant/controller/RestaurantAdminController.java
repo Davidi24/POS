@@ -24,9 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.restaurant.dto.CreateRestaurantRequest;
 import pos.pos.restaurant.dto.RestaurantResponse;
+import pos.pos.restaurant.dto.RestaurantSummaryResponse;
 import pos.pos.restaurant.dto.UpdateRestaurantRequest;
 import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
 import pos.pos.restaurant.service.RestaurantAdminService;
+import pos.pos.restaurant.service.RestaurantSummaryService;
 
 import java.util.UUID;
 
@@ -39,6 +41,7 @@ import java.util.UUID;
 public class RestaurantAdminController {
 
     private final RestaurantAdminService restaurantAdminService;
+    private final RestaurantSummaryService restaurantSummaryService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('RESTAURANTS_READ')")
@@ -117,5 +120,25 @@ public class RestaurantAdminController {
     public ResponseEntity<Void> deleteRestaurant(@PathVariable UUID restaurantId, Authentication authentication) {
         restaurantAdminService.deleteRestaurant(authentication, restaurantId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/by-slug/{slug}")
+    @PreAuthorize("hasAuthority('RESTAURANTS_READ')")
+    @Operation(summary = "Look up a restaurant by its URL slug")
+    public ResponseEntity<RestaurantResponse> getRestaurantBySlug(
+            @PathVariable String slug,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(restaurantAdminService.getRestaurantBySlug(authentication, slug));
+    }
+
+    @GetMapping("/{restaurantId}/summary")
+    @PreAuthorize("hasAuthority('RESTAURANTS_READ')")
+    @Operation(summary = "Get restaurant summary metrics for dashboard use")
+    public ResponseEntity<RestaurantSummaryResponse> getRestaurantSummary(
+            @PathVariable UUID restaurantId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(restaurantSummaryService.getSummary(authentication, restaurantId));
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.restaurant.RestaurantNotFoundException;
 import pos.pos.exception.restaurant.RestaurantRegistrationNotPendingException;
 import pos.pos.exception.restaurant.RestaurantReviewNotAllowedException;
+import pos.pos.restaurant.dto.RestaurantRegistrationStatusResponse;
 import pos.pos.restaurant.dto.RestaurantResponse;
 import pos.pos.restaurant.dto.RestaurantRegistrationRequest;
 import pos.pos.restaurant.dto.ReviewRestaurantRegistrationRequest;
@@ -31,6 +32,19 @@ public class RestaurantRegistrationService {
     private final RestaurantOwnerProvisioningService restaurantOwnerProvisioningService;
     private final UserIdentityService userIdentityService;
     private final RoleHierarchyService roleHierarchyService;
+
+    @Transactional(readOnly = true)
+    public RestaurantRegistrationStatusResponse getRegistrationStatus(UUID restaurantId) {
+        Restaurant restaurant = restaurantRepository.findByIdAndDeletedAtIsNull(restaurantId)
+                .orElseThrow(RestaurantNotFoundException::new);
+        return new RestaurantRegistrationStatusResponse(
+                restaurant.getId(),
+                restaurant.getName(),
+                restaurant.getStatus(),
+                restaurant.getRejectionReason(),
+                restaurant.getCreatedAt()
+        );
+    }
 
     // Called when a restaurant owner submits a registration form (no auth required).
     // Validates that the owner's email/username/phone are not already taken, auto-generates a unique code+slug
@@ -84,7 +98,7 @@ public class RestaurantRegistrationService {
         UUID actorId = roleHierarchyService.currentUserId(authentication);
         // if the superadmin rejects then it will set restaurant status rejected
         if (request.getDecision() == RestaurantRegistrationDecision.REJECT) {
-            restaurantMapper.markRegistrationRejected(restaurant, actorId);
+            restaurantMapper.markRegistrationRejected(restaurant, request.getRejectionReason(), actorId);
             restaurantRepository.save(restaurant);
             return restaurantMapper.toResponse(restaurant);
         }

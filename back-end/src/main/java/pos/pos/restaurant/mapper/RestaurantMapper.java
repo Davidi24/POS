@@ -34,6 +34,7 @@ public class RestaurantMapper {
                 .isActive(restaurant.isActive())
                 .status(restaurant.getStatus())
                 .ownerUserId(restaurant.getOwnerId())
+                .rejectionReason(restaurant.getRejectionReason())
                 .createdAt(restaurant.getCreatedAt())
                 .updatedAt(restaurant.getUpdatedAt())
                 .build();
@@ -144,9 +145,10 @@ public class RestaurantMapper {
         restaurant.setUpdatedBy(actorId);
     }
 
-    public void markRegistrationRejected(Restaurant restaurant, UUID actorId) {
+    public void markRegistrationRejected(Restaurant restaurant, String rejectionReason, UUID actorId) {
         restaurant.setActive(false);
         restaurant.setStatus(RestaurantStatus.REJECTED);
+        restaurant.setRejectionReason(rejectionReason);
         restaurant.setUpdatedBy(actorId);
     }
 

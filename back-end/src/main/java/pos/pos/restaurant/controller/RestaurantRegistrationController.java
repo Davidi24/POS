@@ -8,12 +8,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import pos.pos.restaurant.dto.RestaurantRegistrationStatusResponse;
 import pos.pos.restaurant.dto.RestaurantResponse;
 import pos.pos.restaurant.dto.RestaurantRegistrationRequest;
 import pos.pos.restaurant.dto.ReviewRestaurantRegistrationRequest;
@@ -37,6 +39,14 @@ public class RestaurantRegistrationController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(restaurantRegistrationService.registerRestaurant(request));
+    }
+
+    @GetMapping("/{restaurantId}")
+    @Operation(summary = "Check the status of a registration by ID (public, no auth required)")
+    public ResponseEntity<RestaurantRegistrationStatusResponse> getRegistrationStatus(
+            @PathVariable UUID restaurantId
+    ) {
+        return ResponseEntity.ok(restaurantRegistrationService.getRegistrationStatus(restaurantId));
     }
 
     @PatchMapping("/{restaurantId}/review")

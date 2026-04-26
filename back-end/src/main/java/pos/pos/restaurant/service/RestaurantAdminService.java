@@ -9,15 +9,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.exception.restaurant.RestaurantNotFoundException;
 import pos.pos.restaurant.dto.CreateRestaurantRequest;
 import pos.pos.restaurant.dto.RestaurantResponse;
 import pos.pos.restaurant.dto.UpdateRestaurantRequest;
 import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
+import pos.pos.restaurant.repository.BranchRepository;
 import pos.pos.restaurant.mapper.RestaurantMapper;
 import pos.pos.restaurant.policy.RestaurantPolicy;
 import pos.pos.restaurant.repository.RestaurantRepository;
+import pos.pos.restaurant.util.RestaurantFieldNormalizer;
 import pos.pos.security.scope.ActorScope;
 import pos.pos.security.scope.ActorScopeService;
 import pos.pos.user.entity.User;
@@ -38,6 +41,7 @@ public class RestaurantAdminService {
     private static final RestaurantStatus DEFAULT_STATUS = RestaurantStatus.ACTIVE;
 
     private final RestaurantRepository restaurantRepository;
+    private final BranchRepository branchRepository;
     private final RestaurantMapper restaurantMapper;
     private final ActorScopeService actorScopeService;
     private final RestaurantPolicy restaurantPolicy;
@@ -45,6 +49,7 @@ public class RestaurantAdminService {
     private final RestaurantOwnerProvisioningService restaurantOwnerProvisioningService;
     private final RestaurantScopeService restaurantScopeService;
 
+    @Transactional(readOnly = true)
     public PageResponse<RestaurantResponse> getRestaurants(
             Authentication authentication,
             String search,
@@ -116,9 +121,18 @@ public class RestaurantAdminService {
         return restaurantMapper.toResponse(restaurant);
     }
 
-    //checked
+    @Transactional(readOnly = true)
     public RestaurantResponse getRestaurant(Authentication authentication, UUID restaurantId) {
         Restaurant restaurant = restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        return restaurantMapper.toResponse(restaurant);
+    }
+
+    @Transactional(readOnly = true)
+    public RestaurantResponse getRestaurantBySlug(Authentication authentication, String slug) {
+        String normalizedSlug = RestaurantFieldNormalizer.normalizeSlug(slug);
+        Restaurant restaurant = restaurantRepository.findBySlugAndDeletedAtIsNull(normalizedSlug)
+                .orElseThrow(RestaurantNotFoundException::new);
+        restaurantPolicy.assertCanAccess(actorScopeService.resolve(authentication), restaurant);
         return restaurantMapper.toResponse(restaurant);
     }
 
@@ -131,6 +145,7 @@ public class RestaurantAdminService {
         ActorScope scope = actorScopeService.resolve(authentication);
         Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(scope, restaurantId);
 
+        restaurantValidationService.validateStatusTransition(restaurant.getStatus(), request.getStatus());
         restaurantPolicy.assertCanChangeOwner(scope, restaurant, request.getOwnerUserId());
         UUID ownerUserId = restaurantValidationService.validateOwnerUser(request.getOwnerUserId(), restaurant.getId());
         validateStatusFields(request.getIsActive(), request.getStatus());
@@ -162,6 +177,7 @@ public class RestaurantAdminService {
             UpdateRestaurantStatusRequest request
     ) {
         Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        restaurantValidationService.validateStatusTransition(restaurant.getStatus(), request.getStatus());
         validateStatusFields(request.getIsActive(), request.getStatus());
 
         restaurantMapper.updateStatus(
@@ -180,11 +196,12 @@ public class RestaurantAdminService {
         restaurantScopeService.assertCanDeleteRestaurant(authentication);
         Restaurant restaurant = restaurantScopeService.requireExistingRestaurant(restaurantId);
 
-        restaurantMapper.markDeleted(
-                restaurant,
-                restaurantScopeService.currentUserId(authentication),
-                OffsetDateTime.now(ZoneOffset.UTC)
-        );
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        branchRepository.softDeleteAllByRestaurantId(restaurantId, now, actorId);
+
+        restaurantMapper.markDeleted(restaurant, actorId, now);
         restaurantRepository.save(restaurant);
     }
 

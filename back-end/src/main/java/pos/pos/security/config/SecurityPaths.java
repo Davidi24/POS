@@ -17,6 +17,7 @@ public class SecurityPaths {
             "/auth/verify-email",
             "/auth/resend-verification",
             "/restaurants/registrations",
+            "/restaurants/registrations/*",
 
             "/v3/api-docs/**",
             "/swagger-ui/**",
