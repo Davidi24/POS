@@ -124,7 +124,7 @@ class RestaurantCoreApiIntegrationTest {
     void shouldManageRestaurantCoreEndpointsEndToEnd() throws Exception {
         assertThat(List.of(environment.getActiveProfiles())).containsExactly("prod");
         Integer migrationCount = jdbcTemplate.queryForObject(
-                "select count(*) from flyway_schema_history where version = '7'",
+                "select count(*) from flyway_schema_history where version = '8'",
                 Integer.class
         );
         assertThat(migrationCount).isEqualTo(1);
