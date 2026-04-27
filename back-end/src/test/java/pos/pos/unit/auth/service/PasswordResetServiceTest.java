@@ -305,6 +305,34 @@ class PasswordResetServiceTest {
     }
 
     @Nested
+    @DisplayName("issueRestaurantOwnerInvite()")
+    class IssueRestaurantOwnerInviteTests {
+
+        @Test
+        @DisplayName("Should send an account setup email for an active owner")
+        void shouldSendAccountSetupEmailForActiveOwner() {
+            User user = emailUser();
+            user.setEmailVerified(false);
+
+            when(opaqueTokenService.issue("reset-token-pepper"))
+                    .thenReturn(new OpaqueTokenService.IssuedToken("setup-token", "hashed-setup-token"));
+            when(frontendProperties.resolveBaseUrl(ClientLinkTarget.UNIVERSAL)).thenReturn("https://links.pos.local");
+
+            passwordResetService.issueRestaurantOwnerInvite(user, ClientLinkTarget.UNIVERSAL, "Main Restaurant");
+
+            verify(authPasswordResetTokenRepository).deleteByUserId(USER_ID);
+            verify(authPasswordResetTokenRepository).save(any(AuthPasswordResetToken.class));
+            verify(authMailService).sendAccountSetupEmail(
+                    "cashier@pos.local",
+                    "Casey",
+                    "https://links.pos.local/reset-password?token=setup-token",
+                    Duration.ofMinutes(30),
+                    "Main Restaurant"
+            );
+        }
+    }
+
+    @Nested
     @DisplayName("resetPassword()")
     class ResetPasswordTests {
 
@@ -350,6 +378,38 @@ class PasswordResetServiceTest {
             verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
             assertThat(token.getUsedAt()).isNotNull();
             verify(authPasswordResetTokenRepository).save(token);
+        }
+
+        @Test
+        @DisplayName("Should verify the email when an invited owner sets the first password")
+        void shouldVerifyEmailWhenInvitedOwnerSetsFirstPassword() {
+            pos.pos.auth.dto.ResetPasswordRequest request = new pos.pos.auth.dto.ResetPasswordRequest();
+            request.setToken("raw-reset-token");
+            request.setNewPassword("NewSecurePass1!");
+
+            AuthPasswordResetToken token = AuthPasswordResetToken.builder()
+                    .userId(USER_ID)
+                    .tokenHash("hashed-reset-token")
+                    .expiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30))
+                    .build();
+
+            User user = emailUser();
+            user.setEmailVerified(false);
+            user.setEmailVerifiedAt(null);
+
+            when(opaqueTokenService.hash("raw-reset-token", "reset-token-pepper")).thenReturn("hashed-reset-token");
+            when(authPasswordResetTokenRepository.findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(
+                    eq("hashed-reset-token"),
+                    any(OffsetDateTime.class)
+            )).thenReturn(Optional.of(token));
+            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+            when(passwordService.hash("NewSecurePass1!")).thenReturn("new-hash");
+
+            passwordResetService.resetPassword(request);
+
+            assertThat(user.isEmailVerified()).isTrue();
+            assertThat(user.getEmailVerifiedAt()).isNotNull();
+            verify(userRepository).save(user);
         }
     }
 

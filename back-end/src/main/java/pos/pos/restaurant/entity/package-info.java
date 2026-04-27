@@ -1,7 +1,7 @@
 /**
- * FUTURE FK: restaurants.owner_id -> users.id
- * FUTURE FK: restaurants.created_by -> users.id
- * FUTURE FK: restaurants.updated_by -> users.id
+ * CURRENT FK: restaurants.owner_id -> users.id
+ * CURRENT FK: restaurants.created_by -> users.id
+ * CURRENT FK: restaurants.updated_by -> users.id
  *
  * FUTURE FK: branches.manager_user_id -> users.id
  * FUTURE FK: branches.created_by -> users.id

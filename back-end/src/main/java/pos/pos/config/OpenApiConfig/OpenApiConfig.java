@@ -31,7 +31,48 @@ public class OpenApiConfig {
     public GroupedOpenApi authenticationGroup() {
         return GroupedOpenApi.builder()
                 .group("Authentication")
-                .pathsToMatch("/auth/**", "/users/**", "/roles/**")
+                .pathsToMatch("/auth", "/auth/**")
+                .pathsToExclude("/auth/device", "/auth/device/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi userGroup() {
+        return GroupedOpenApi.builder()
+                .group("Users")
+                .pathsToMatch("/users", "/users/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi roleGroup() {
+        return GroupedOpenApi.builder()
+                .group("Roles")
+                .pathsToMatch("/roles", "/roles/**", "/permissions", "/permissions/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi restaurantGroup() {
+        return GroupedOpenApi.builder()
+                .group("Restaurants")
+                .pathsToMatch("/restaurants", "/restaurants/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi settingsGroup() {
+        return GroupedOpenApi.builder()
+                .group("Settings")
+                .pathsToMatch("/settings", "/settings/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi deviceGroup() {
+        return GroupedOpenApi.builder()
+                .group("Devices")
+                .pathsToMatch("/devices", "/devices/**", "/auth/device", "/auth/device/**")
                 .build();
     }
 }

@@ -42,6 +42,31 @@ public class AuthMailService {
         send(recipientEmail, subject, body);
     }
 
+    public void sendAccountSetupEmail(
+            String recipientEmail,
+            String firstName,
+            String setupUrl,
+            Duration tokenTtl,
+            String restaurantName
+    ) {
+        String name = normalizeName(firstName);
+        String targetRestaurant = normalizeRestaurantName(restaurantName);
+        String body = """
+                Hello %s,
+
+                Your POS owner account for %s is ready.
+
+                Set your password using this link:
+                %s
+
+                This link expires in %d minutes.
+
+                If you were not expecting this invitation, you can ignore this email.
+                """.formatted(name, targetRestaurant, setupUrl, tokenTtl.toMinutes());
+
+        send(recipientEmail, "Set up your POS owner account", body);
+    }
+
     public void sendEmailVerificationEmail(
             String recipientEmail,
             String firstName,
@@ -95,5 +120,13 @@ public class AuthMailService {
         }
 
         return firstName.trim();
+    }
+
+    private String normalizeRestaurantName(String restaurantName) {
+        if (restaurantName == null || restaurantName.isBlank()) {
+            return "your restaurant";
+        }
+
+        return restaurantName.trim();
     }
 }

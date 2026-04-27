@@ -270,6 +270,48 @@ class UserAdminServiceTest {
     }
 
     @Test
+    @DisplayName("getUserByIdentifier should return the exact matched user by username")
+    void getUserByIdentifierShouldReturnTargetUser() {
+        Authentication authentication = authentication();
+        User user = user("cashier@pos.local", "cashier.one");
+
+        given(userRepository.findByUsernameAndDeletedAtIsNull("cashier.one")).willReturn(java.util.Optional.of(user));
+        given(roleRepository.findActiveRoleCodesByUserId(TARGET_USER_ID)).willReturn(List.of("WAITER"));
+
+        UserResponse response = userAdminService.getUserByIdentifier(authentication, " Cashier.One ");
+
+        verify(roleHierarchyService).assertCanManageUser(authentication, TARGET_USER_ID);
+        assertThat(response.getUsername()).isEqualTo("cashier.one");
+        assertThat(response.getRoles()).containsExactly("WAITER");
+    }
+
+    @Test
+    @DisplayName("getUserByIdentifier should return the exact matched user by email")
+    void getUserByIdentifierShouldSupportEmail() {
+        Authentication authentication = authentication();
+        User user = user("cashier@pos.local", "cashier.one");
+
+        given(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).willReturn(java.util.Optional.of(user));
+        given(roleRepository.findActiveRoleCodesByUserId(TARGET_USER_ID)).willReturn(List.of("WAITER"));
+
+        UserResponse response = userAdminService.getUserByIdentifier(authentication, " Cashier@Pos.Local ");
+
+        verify(roleHierarchyService).assertCanManageUser(authentication, TARGET_USER_ID);
+        assertThat(response.getEmail()).isEqualTo("cashier@pos.local");
+        assertThat(response.getRoles()).containsExactly("WAITER");
+    }
+
+    @Test
+    @DisplayName("getUserByIdentifier should reject unknown users")
+    void getUserByIdentifierShouldRejectMissingUser() {
+        Authentication authentication = authentication();
+        given(userRepository.findByUsernameAndDeletedAtIsNull("cashier.one")).willReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> userAdminService.getUserByIdentifier(authentication, "cashier.one"))
+                .isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
     @DisplayName("updateUser should update fields, reset phone verification, and revoke sessions when deactivated")
     void updateUserShouldResetPhoneVerificationAndRevokeSessions() {
         Authentication authentication = authentication();
