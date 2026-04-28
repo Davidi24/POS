@@ -15,7 +15,10 @@ public enum AppPermission {
     ROLES_DELETE("Delete Roles", "Delete custom roles"),
     ROLES_ASSIGN_PERMISSIONS("Assign Role Permissions", "Replace permissions assigned to a role"),
 
-    SESSIONS_MANAGE("Manage Sessions", "View and revoke sessions for any user");
+    SESSIONS_MANAGE("Manage Sessions", "View and revoke sessions for any user"),
+
+    SETTINGS_READ("View Settings", "View restaurant settings"),
+    SETTINGS_UPDATE("Update Settings", "Update restaurant settings");
 
 
     private final String displayName;

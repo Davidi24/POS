@@ -1,0 +1,169 @@
+SETTINGS API DOCUMENTATION
+
+Scope
+- This file documents the recommended settings-service API surface.
+- Items 1-38 map directly to the current schema in this repo.
+- Items 39-50 are production-grade operational endpoints strongly recommended for a real deployment.
+- Items 51-80 are common advanced settings APIs used by more mature POS products, but they need extra schema and business logic first.
+
+
+CURRENT SETTINGS SERVICE
+
+SETTINGS CORE
+
+[ ] 1. GET /restaurants/{restaurantId}/settings
+[ ] 2. PUT /restaurants/{restaurantId}/settings
+[ ] 3. PATCH /restaurants/{restaurantId}/settings/default-branch
+[ ] 4. PATCH /restaurants/{restaurantId}/settings/localization
+[ ] 5. PATCH /restaurants/{restaurantId}/settings/sequence-prefixes
+[ ] 6. PATCH /restaurants/{restaurantId}/settings/billing
+[ ] 7. PATCH /restaurants/{restaurantId}/settings/order-channels
+[ ] 8. POST /restaurants/{restaurantId}/settings/reset
+
+
+RECEIPT SETTINGS
+
+[ ] 9. GET /restaurants/{restaurantId}/settings/receipt
+[ ] 10. PUT /restaurants/{restaurantId}/settings/receipt
+[ ] 11. POST /restaurants/{restaurantId}/settings/receipt/preview
+[ ] 12. POST /restaurants/{restaurantId}/settings/receipt/test-print
+
+
+ORDER RULE SETTINGS
+
+[ ] 13. GET /restaurants/{restaurantId}/settings/order-rules
+[ ] 14. PUT /restaurants/{restaurantId}/settings/order-rules
+[ ] 15. PATCH /restaurants/{restaurantId}/settings/order-rules/void-policy
+[ ] 16. PATCH /restaurants/{restaurantId}/settings/order-rules/discount-policy
+[ ] 17. PATCH /restaurants/{restaurantId}/settings/order-rules/workflow
+
+
+RESERVATION RULES
+
+[ ] 18. GET /restaurants/{restaurantId}/settings/reservation-rules
+[ ] 19. POST /restaurants/{restaurantId}/settings/reservation-rules
+[ ] 20. GET /restaurants/{restaurantId}/settings/reservation-rules/{ruleId}
+[ ] 21. PUT /restaurants/{restaurantId}/settings/reservation-rules/{ruleId}
+[ ] 22. PATCH /restaurants/{restaurantId}/settings/reservation-rules/{ruleId}/status
+[ ] 23. PATCH /restaurants/{restaurantId}/settings/reservation-rules/{ruleId}/priority
+[ ] 24. DELETE /restaurants/{restaurantId}/settings/reservation-rules/{ruleId}
+[ ] 25. POST /restaurants/{restaurantId}/settings/reservation-rules/reorder
+
+
+BRANCH BUSINESS HOURS
+
+[ ] 26. GET /restaurants/{restaurantId}/branches/{branchId}/business-hours
+[ ] 27. PUT /restaurants/{restaurantId}/branches/{branchId}/business-hours
+[ ] 28. GET /restaurants/{restaurantId}/branches/{branchId}/business-hours/{dayOfWeek}
+[ ] 29. PATCH /restaurants/{restaurantId}/branches/{branchId}/business-hours/{dayOfWeek}
+[ ] 30. POST /restaurants/{restaurantId}/branches/{branchId}/business-hours/copy-to-other-branches
+
+
+BRANCH SPECIAL HOURS
+
+[ ] 31. GET /restaurants/{restaurantId}/branches/{branchId}/special-hours
+[ ] 32. POST /restaurants/{restaurantId}/branches/{branchId}/special-hours
+[ ] 33. GET /restaurants/{restaurantId}/branches/{branchId}/special-hours/{specialHourId}
+[ ] 34. PUT /restaurants/{restaurantId}/branches/{branchId}/special-hours/{specialHourId}
+[ ] 35. PATCH /restaurants/{restaurantId}/branches/{branchId}/special-hours/{specialHourId}/status
+[ ] 36. DELETE /restaurants/{restaurantId}/branches/{branchId}/special-hours/{specialHourId}
+[ ] 37. POST /restaurants/{restaurantId}/branches/{branchId}/special-hours/bulk
+[ ] 38. DELETE /restaurants/{restaurantId}/branches/{branchId}/special-hours/bulk
+
+
+PRODUCTION OPERATIONS
+
+[ ] 39. GET /restaurants/{restaurantId}/branches/{branchId}/settings/effective
+[ ] 40. GET /restaurants/{restaurantId}/branches/{branchId}/reservation-rules/effective
+[ ] 41. GET /restaurants/{restaurantId}/branches/{branchId}/business-hours/today
+[ ] 42. GET /restaurants/{restaurantId}/branches/{branchId}/business-hours/effective
+[ ] 43. GET /restaurants/{restaurantId}/branches/{branchId}/special-hours/calendar
+[ ] 44. POST /restaurants/{restaurantId}/settings/validate
+[ ] 45. GET /restaurants/{restaurantId}/settings/history
+[ ] 46. GET /restaurants/{restaurantId}/settings/audit-logs
+[ ] 47. GET /restaurants/{restaurantId}/settings/export
+[ ] 48. POST /restaurants/{restaurantId}/settings/import
+[ ] 49. POST /restaurants/{restaurantId}/settings/clone-from-restaurant/{sourceRestaurantId}
+[ ] 50. POST /restaurants/{restaurantId}/settings/apply-template/{templateId}
+
+
+ADVANCED POS SETTINGS MODULES
+
+Notes
+- These are not modeled in the current settings schema yet.
+- Build these only if your product scope includes them.
+
+
+SETTINGS TEMPLATES
+
+[ ] 51. GET /settings/templates
+[ ] 52. POST /settings/templates
+[ ] 53. GET /settings/templates/{templateId}
+[ ] 54. PUT /settings/templates/{templateId}
+[ ] 55. DELETE /settings/templates/{templateId}
+
+
+PRINTER AND STATION SETTINGS
+
+[ ] 56. GET /restaurants/{restaurantId}/settings/printers
+[ ] 57. POST /restaurants/{restaurantId}/settings/printers
+[ ] 58. PUT /restaurants/{restaurantId}/settings/printers/{printerId}
+[ ] 59. DELETE /restaurants/{restaurantId}/settings/printers/{printerId}
+[ ] 60. GET /restaurants/{restaurantId}/branches/{branchId}/printer-routes
+[ ] 61. PUT /restaurants/{restaurantId}/branches/{branchId}/printer-routes
+[ ] 62. POST /restaurants/{restaurantId}/branches/{branchId}/printer-routes/test
+
+
+DEVICE AND TERMINAL SETTINGS
+
+[ ] 63. GET /restaurants/{restaurantId}/branches/{branchId}/devices
+[ ] 64. POST /restaurants/{restaurantId}/branches/{branchId}/devices
+[ ] 65. PUT /restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}
+[ ] 66. PATCH /restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}/status
+[ ] 67. DELETE /restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}
+
+
+PAYMENT AND TENDER SETTINGS
+
+[ ] 68. GET /restaurants/{restaurantId}/settings/payment-methods
+[ ] 69. POST /restaurants/{restaurantId}/settings/payment-methods
+[ ] 70. PUT /restaurants/{restaurantId}/settings/payment-methods/{paymentMethodId}
+[ ] 71. PATCH /restaurants/{restaurantId}/settings/payment-methods/{paymentMethodId}/status
+[ ] 72. DELETE /restaurants/{restaurantId}/settings/payment-methods/{paymentMethodId}
+[ ] 73. GET /restaurants/{restaurantId}/settings/tip-rules
+[ ] 74. PUT /restaurants/{restaurantId}/settings/tip-rules
+
+
+DINING AND FLOOR SETTINGS
+
+[ ] 75. GET /restaurants/{restaurantId}/branches/{branchId}/floor-settings
+[ ] 76. PUT /restaurants/{restaurantId}/branches/{branchId}/floor-settings
+[ ] 77. GET /restaurants/{restaurantId}/branches/{branchId}/table-settings
+[ ] 78. PUT /restaurants/{restaurantId}/branches/{branchId}/table-settings
+
+
+NOTIFICATION, INTEGRATION, AND APPROVAL SETTINGS
+
+[ ] 79. GET /restaurants/{restaurantId}/settings/notification-rules
+[ ] 80. PUT /restaurants/{restaurantId}/settings/notification-rules
+[ ] 81. GET /restaurants/{restaurantId}/settings/integrations
+[ ] 82. PUT /restaurants/{restaurantId}/settings/integrations/{integrationKey}
+[ ] 83. POST /restaurants/{restaurantId}/settings/integrations/{integrationKey}/test
+[ ] 84. GET /restaurants/{restaurantId}/settings/approval-rules
+[ ] 85. PUT /restaurants/{restaurantId}/settings/approval-rules
+
+
+Recommended permission codes
+- SETTINGS_READ
+- SETTINGS_UPDATE
+- SETTINGS_AUDIT
+- SETTINGS_EXPORT
+- SETTINGS_IMPORT
+- SETTINGS_TEMPLATE_MANAGE
+- SETTINGS_TEMPLATE_APPLY
+
+
+Practical build guidance
+- If you only want the current repo's settings domain, build 1-50.
+- If you want a stronger POS settings foundation similar to larger platforms, plan for 1-85 in phases.
+- If you want a strict MVP first, start with 1-38.
