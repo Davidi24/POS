@@ -4,7 +4,13 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
@@ -13,11 +19,19 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
+import pos.pos.device.entity.Device;
+import pos.pos.menu.entity.Menu;
+import pos.pos.menu.entity.OptionGroup;
+import pos.pos.auth.enums.ClientLinkTarget;
 import pos.pos.restaurant.enums.RestaurantStatus;
+import pos.pos.restaurant.util.RestaurantFieldNormalizer;
+import pos.pos.settings.entity.Settings;
+import pos.pos.user.entity.User;
 import pos.pos.utils.NormalizationUtils;
 
-import java.time.DateTimeException;
-import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -47,7 +61,12 @@ import java.util.UUID;
         AND char_length(btrim(code)) > 0
         AND char_length(btrim(slug)) > 0
         AND char_length(currency) = 3
-        AND status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED')
+        AND status IN ('PENDING', 'REJECTED', 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED')
+        AND (owner_id IS NOT NULL OR status IN ('PENDING', 'REJECTED'))
+        AND (
+            pending_owner_client_target IS NULL
+            OR pending_owner_client_target IN ('WEB', 'MOBILE', 'UNIVERSAL')
+        )
         """)
 @Getter
 @Setter
@@ -93,60 +112,103 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "status", nullable = false, length = 30)
     private RestaurantStatus status = RestaurantStatus.ACTIVE;
 
-    // FUTURE FK: restaurants.owner_id -> users.id
     @Column(name = "owner_id", columnDefinition = "uuid")
     private UUID ownerId;
+
+    @Column(name = "pending_owner_email", length = 150)
+    private String pendingOwnerEmail;
+
+    @Column(name = "pending_owner_username", length = 50)
+    private String pendingOwnerUsername;
+
+    @Column(name = "pending_owner_first_name", length = 100)
+    private String pendingOwnerFirstName;
+
+    @Column(name = "pending_owner_last_name", length = 100)
+    private String pendingOwnerLastName;
+
+    @Column(name = "pending_owner_phone", length = 50)
+    private String pendingOwnerPhone;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pending_owner_client_target", length = 20)
+    private ClientLinkTarget pendingOwnerClientTarget;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "owner_id",
+            columnDefinition = "uuid",
+            insertable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_restaurants_owner_user")
+    )
+    private User owner;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "created_by",
+            columnDefinition = "uuid",
+            insertable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_restaurants_created_by_user")
+    )
+    private User createdByUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "updated_by",
+            columnDefinition = "uuid",
+            insertable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_restaurants_updated_by_user")
+    )
+    private User updatedByUser;
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Branch> branches = new ArrayList<>();
+
+    @OneToOne(mappedBy = "restaurant", fetch = FetchType.LAZY)
+    private Settings settings;
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Menu> menus = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<OptionGroup> optionGroups = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Device> devices = new ArrayList<>();
 
     @Override
     protected void normalizeFields() {
         name = NormalizationUtils.normalize(name);
         legalName = NormalizationUtils.normalize(legalName);
-        code = normalizeCode(code == null ? name : code);
-        slug = normalizeSlug(slug == null ? name : slug);
+        code = RestaurantFieldNormalizer.normalizeCodeOrFallback(code, name);
+        slug = RestaurantFieldNormalizer.normalizeSlugOrFallback(slug, name);
         description = NormalizationUtils.normalize(description);
         email = NormalizationUtils.normalizeLower(email);
         phone = NormalizationUtils.normalize(phone);
         website = NormalizationUtils.normalize(website);
         currency = NormalizationUtils.normalizeUpper(currency);
-        timezone = NormalizationUtils.normalize(timezone);
+        timezone = RestaurantFieldNormalizer.normalizeTimezone(timezone);
+        pendingOwnerEmail = NormalizationUtils.normalizeLower(pendingOwnerEmail);
+        pendingOwnerUsername = NormalizationUtils.normalizeLower(pendingOwnerUsername);
+        pendingOwnerFirstName = NormalizationUtils.normalize(pendingOwnerFirstName);
+        pendingOwnerLastName = NormalizationUtils.normalize(pendingOwnerLastName);
+        pendingOwnerPhone = NormalizationUtils.normalize(pendingOwnerPhone);
     }
 
     @Override
     protected void validateState() {
-        if (timezone == null) {
-            return;
+        if (timezone != null && !RestaurantFieldNormalizer.isValidTimezone(timezone)) {
+            throw new IllegalStateException("timezone must be a valid IANA identifier");
         }
 
-        try {
-            ZoneId.of(timezone);
-        } catch (DateTimeException ex) {
-            throw new IllegalStateException("timezone must be a valid IANA identifier", ex);
+        if (ownerId == null && status != RestaurantStatus.PENDING && status != RestaurantStatus.REJECTED) {
+            throw new IllegalStateException("ownerId is required unless restaurant status is PENDING or REJECTED");
         }
-    }
-
-    private String normalizeCode(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
-    }
-
-    private String normalizeSlug(String value) {
-        String normalized = NormalizationUtils.normalizeLower(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("^-+|-+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
     }
 }

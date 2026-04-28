@@ -16,6 +16,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
 import pos.pos.restaurant.enums.ContactType;
 import pos.pos.utils.NormalizationUtils;
 
@@ -64,12 +65,15 @@ public class BranchContact extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "phone", length = 50)
     private String phone;
 
+    // Marks the first contact to try for this branch. The service layer and DB constraint
+    // treat it as one primary contact per branch, with any other contacts acting as fallbacks.
     @Column(name = "is_primary", nullable = false)
     private boolean isPrimary = false;
 
     @Column(name = "job_title", length = 100)
     private String jobTitle;
 
+    // Display label for the person's role (e.g. "Regional Operations Manager"); contactType is the system category, this is what you print on documents
     @Override
     protected void normalizeFields() {
         fullName = NormalizationUtils.normalize(fullName);

@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Merge / tool artifacts ###
+.codex-backup-merge-state/
+*.conflicted

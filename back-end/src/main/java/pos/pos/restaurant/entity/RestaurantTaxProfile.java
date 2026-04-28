@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
@@ -66,7 +67,7 @@ public class RestaurantTaxProfile extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "tax_office", length = 150)
     private String taxOffice;
 
-    // If you want a single active default profile per restaurant, enforce it with a partial unique index in a migration.
+    // Only one active default profile is allowed per restaurant; the DB enforces it with a partial unique index.
     @Column(name = "is_default", nullable = false)
     private boolean isDefault = false;
 

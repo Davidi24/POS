@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.common.dto.PageResponse;
+import pos.pos.exception.auth.AuthException;
 import pos.pos.role.dto.RoleResponse;
 import pos.pos.user.dto.AdminPasswordResetRequest;
 import pos.pos.user.dto.ClientTargetRequest;
@@ -66,6 +68,20 @@ public class UserAdminController {
                 sortBy,
                 direction
         ));
+    }
+
+    @GetMapping("/by-identifier")
+    @PreAuthorize("hasAuthority('USERS_READ')")
+    @Operation(summary = "Get one user by exact email or username")
+    public ResponseEntity<UserResponse> getUserByIdentifier(
+            @RequestParam String identifier,
+            Authentication authentication
+    ) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new AuthException("identifier is required", HttpStatus.BAD_REQUEST);
+        }
+
+        return ResponseEntity.ok(userAdminService.getUserByIdentifier(authentication, identifier));
     }
 
     @GetMapping("/{userId}")

@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: Pos
+  profiles:
+    default: local
 
   mail:
     host: ${MAIL_HOST:}
@@ -21,10 +23,6 @@ spring:
           writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT_MS:5000}
 
   jpa:
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-
 security:
   jwt:
     secret: ${JWT_SECRET}

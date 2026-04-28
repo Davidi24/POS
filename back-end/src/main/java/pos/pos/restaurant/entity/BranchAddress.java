@@ -16,6 +16,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
 import pos.pos.restaurant.enums.AddressType;
 import pos.pos.utils.NormalizationUtils;
 

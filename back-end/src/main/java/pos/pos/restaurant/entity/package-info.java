@@ -1,7 +1,7 @@
 /**
- * FUTURE FK: restaurants.owner_id -> users.id
- * FUTURE FK: restaurants.created_by -> users.id
- * FUTURE FK: restaurants.updated_by -> users.id
+ * CURRENT FK: restaurants.owner_id -> users.id
+ * CURRENT FK: restaurants.created_by -> users.id
+ * CURRENT FK: restaurants.updated_by -> users.id
  *
  * FUTURE FK: branches.manager_user_id -> users.id
  * FUTURE FK: branches.created_by -> users.id
@@ -25,6 +25,10 @@
  * FUTURE RELATION: receipts.order_id -> orders.id
  * FUTURE RELATION: shifts.branch_id -> branches.id
  * FUTURE RELATION: shifts.user_id -> users.id
- * FUTURE RELATION: devices.branch_id -> branches.id
+ * CURRENT RELATION: settings.restaurant_id -> restaurants.id
+ * CURRENT RELATION: devices.restaurant_id -> restaurants.id
+ * CURRENT RELATION: devices.branch_id -> branches.id
+ * CURRENT RELATION: menus.restaurant_id -> restaurants.id
+ * CURRENT RELATION: option-groups.restaurant_id -> restaurants.id
  */
 package pos.pos.restaurant.entity;
