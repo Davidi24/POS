@@ -113,9 +113,16 @@ public class RestaurantValidationService {
         }
     }
 
-    public UUID validateOwnerUser(UUID ownerUserId, UUID restaurantId) {
+    public UUID validateOwnerUser(UUID ownerUserId, UUID restaurantId, RestaurantStatus status) {
         if (ownerUserId == null) {
-            return null;
+            if (allowsMissingOwner(status)) {
+                return null;
+            }
+
+            throw new AuthException(
+                    "ownerUserId is required unless restaurant status is PENDING or REJECTED",
+                    HttpStatus.BAD_REQUEST
+            );
         }
 
         User owner = userRepository.findByIdAndDeletedAtIsNull(ownerUserId)
@@ -130,6 +137,10 @@ public class RestaurantValidationService {
         }
 
         return owner.getId();
+    }
+
+    private boolean allowsMissingOwner(RestaurantStatus status) {
+        return status == RestaurantStatus.PENDING || status == RestaurantStatus.REJECTED;
     }
 
     // Rejects timezones that are not valid IANA identifiers (e.g. "America/New_York" is valid, "EST" is not).
