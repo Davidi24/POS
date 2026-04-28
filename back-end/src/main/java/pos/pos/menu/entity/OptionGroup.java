@@ -10,17 +10,30 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Check;
 import pos.pos.restaurant.entity.Restaurant;
+import pos.pos.utils.NormalizationUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Represents a group of selectable modifiers
+ * that can be attached to menu items.
+ *
+ * Examples include toppings, sauces, side choices etc.
+ *
+ * An option group contains one or more option items.
+ */
+
 @Getter
 @Setter
 @Entity
+@NoArgsConstructor
 @Table(
-        name = "option-groups",
+        name = "`option-groups`",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_option_groups_restaurant_name", columnNames = {"restaurant_id", "name"})
         },
@@ -29,6 +42,13 @@ import java.util.List;
                 @Index(name = "idx_option_groups_type_id", columnList = "type_id")
         }
 )
+@Check(constraints = """
+        char_length(btrim(name)) > 0
+        AND display_order >= 0
+        AND (min_select IS NULL OR min_select >= 0)
+        AND (max_select IS NULL OR max_select >= 0)
+        AND (min_select IS NULL OR max_select IS NULL OR min_select <= max_select)
+        """)
 public class OptionGroup extends BaseAuditEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -65,4 +85,33 @@ public class OptionGroup extends BaseAuditEntity {
 
     @OneToMany(mappedBy = "optionGroup")
     private List<MenuItemOptionGroup> menuItemLinks = new ArrayList<>();
+
+    @Override
+    protected void normalizeFields() {
+        name = NormalizationUtils.normalize(name);
+        description = NormalizationUtils.normalize(description);
+    }
+
+    @Override
+    protected void validateState() {
+        validateSelectionBounds(minSelect, maxSelect, "option group");
+
+        if (displayOrder != null && displayOrder < 0) {
+            throw new IllegalStateException("displayOrder must be greater than or equal to zero");
+        }
+    }
+
+    private void validateSelectionBounds(Integer min, Integer max, String context) {
+        if (min != null && min < 0) {
+            throw new IllegalStateException(context + " minSelect must be greater than or equal to zero");
+        }
+
+        if (max != null && max < 0) {
+            throw new IllegalStateException(context + " maxSelect must be greater than or equal to zero");
+        }
+
+        if (min != null && max != null && min > max) {
+            throw new IllegalStateException(context + " minSelect must be less than or equal to maxSelect");
+        }
+    }
 }

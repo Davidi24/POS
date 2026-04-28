@@ -10,16 +10,30 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Check;
+import pos.pos.utils.NormalizationUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Represents a section within a menu.
+ *
+ * A menu section groups related menu items into categories,
+ * such as Appetizers, Burgers, Desserts, Pasta ...
+ *
+ * A menu section belongs to one menu
+ * and contains one or more menu items.
+ */
+
 @Getter
 @Setter
 @Entity
+@NoArgsConstructor
 @Table(
-        name = "menu-sections",
+        name = "`menu-sections`",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_menu_sections_menu_name", columnNames = {"menu_id", "name"})
         },
@@ -27,6 +41,10 @@ import java.util.List;
                 @Index(name = "idx_menu_sections_menu_id", columnList = "menu_id")
         }
 )
+@Check(constraints = """
+        char_length(btrim(name)) > 0
+        AND display_order >= 0
+        """)
 public class MenuSection extends BaseAuditEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -47,4 +65,17 @@ public class MenuSection extends BaseAuditEntity {
 
     @OneToMany(mappedBy = "section")
     private List<MenuItem> items = new ArrayList<>();
+
+    @Override
+    protected void normalizeFields() {
+        name = NormalizationUtils.normalize(name);
+        description = NormalizationUtils.normalize(description);
+    }
+
+    @Override
+    protected void validateState() {
+        if (displayOrder != null && displayOrder < 0) {
+            throw new IllegalStateException("displayOrder must be greater than or equal to zero");
+        }
+    }
 }

@@ -326,7 +326,7 @@ public class SettingsService {
     }
 
     private Branch resolveBranch(UUID restaurantId, UUID branchId) {
-        return branchRepository.findByIdAndRestaurant_IdAndDeletedAtIsNull(branchId, restaurantId)
+        return branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId, restaurantId)
                 .orElseThrow(BranchNotFoundException::new);
     }
 

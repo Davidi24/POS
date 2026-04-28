@@ -20,13 +20,13 @@ public class ActorScopeService {
     private final UserRepository userRepository;
     private final RoleHierarchyService roleHierarchyService;
 
+
     public ActorScope resolve(Authentication authentication) {
         UUID userId = roleHierarchyService.currentUserId(authentication);
         User actor = userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(ActorScopeNotAvailableException::new);
 
         return new ActorScope(
-                userId,
                 actor,
                 roleHierarchyService.isSuperAdmin(authentication),
                 extractRoleCodes(authentication),

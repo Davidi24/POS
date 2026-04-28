@@ -9,11 +9,24 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Check;
+
+/**
+ * Represents the link between a menu item and an option group.
+ *
+ * Connects modifiers (like toppings or side choices)
+ * to a specific menu item.
+ *
+ * Also stores rules for that relationship,
+ * such as required selections or selection limits.
+ */
 
 @Getter
 @Setter
 @Entity
+@NoArgsConstructor
 @Table(
         name = "menu_item_option_groups",
         uniqueConstraints = {
@@ -24,6 +37,16 @@ import lombok.Setter;
                 @Index(name = "idx_menu_item_option_groups_option_group_id", columnList = "option_group_id")
         }
 )
+@Check(constraints = """
+        display_order >= 0
+        AND (min_select_override IS NULL OR min_select_override >= 0)
+        AND (max_select_override IS NULL OR max_select_override >= 0)
+        AND (
+            min_select_override IS NULL
+            OR max_select_override IS NULL
+            OR min_select_override <= max_select_override
+        )
+        """)
 public class MenuItemOptionGroup extends BaseAuditEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -45,4 +68,23 @@ public class MenuItemOptionGroup extends BaseAuditEntity {
 
     @Column(name = "is_required_override")
     private Boolean requiredOverride;
+
+    @Override
+    protected void validateState() {
+        if (displayOrder != null && displayOrder < 0) {
+            throw new IllegalStateException("displayOrder must be greater than or equal to zero");
+        }
+
+        if (minSelectOverride != null && minSelectOverride < 0) {
+            throw new IllegalStateException("minSelectOverride must be greater than or equal to zero");
+        }
+
+        if (maxSelectOverride != null && maxSelectOverride < 0) {
+            throw new IllegalStateException("maxSelectOverride must be greater than or equal to zero");
+        }
+
+        if (minSelectOverride != null && maxSelectOverride != null && minSelectOverride > maxSelectOverride) {
+            throw new IllegalStateException("minSelectOverride must be less than or equal to maxSelectOverride");
+        }
+    }
 }

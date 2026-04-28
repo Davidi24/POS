@@ -29,6 +29,7 @@ import pos.pos.user.entity.UserRole;
 import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserRoleRepository;
+import pos.pos.user.service.UserIdentityService;
 
 import java.util.List;
 import java.util.Optional;
@@ -68,6 +69,9 @@ class AuthRegisterServiceTest {
     @Mock
     private EmailVerificationService emailVerificationService;
 
+    @Mock
+    private UserIdentityService userIdentityService;
+
     @InjectMocks
     private AuthRegisterService authRegisterService;
 
@@ -101,9 +105,8 @@ class AuthRegisterServiceTest {
                 .roles(List.of("MANAGER"))
                 .build();
 
-        when(userRepository.existsByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(false);
-        when(userRepository.existsByUsernameAndDeletedAtIsNull("cashier.one")).thenReturn(false);
-        when(userRepository.existsByNormalizedPhoneAndDeletedAtIsNull("+495550100")).thenReturn(false);
+        when(userIdentityService.normalizeAndAssertUnique("  Cashier@POS.local  ", "  Cashier.One  ", " +49 555 0100 "))
+                .thenReturn(new UserIdentityService.NormalizedUserIdentity("cashier@pos.local", "cashier.one", "+495550100"));
         when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
         when(passwordService.hash("SecurePass1!")).thenReturn("hashed-password");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
@@ -149,7 +152,8 @@ class AuthRegisterServiceTest {
     void shouldRejectWhenEmailAlreadyExists() {
         CreateUserRequest request = validRequest();
 
-        when(userRepository.existsByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(true);
+        when(userIdentityService.normalizeAndAssertUnique("cashier@pos.local", "cashier.one", "+49 555 0100"))
+                .thenThrow(new EmailAlreadyExistsException());
 
         assertThatThrownBy(() -> authRegisterService.register(request, authentication(UUID.randomUUID())))
                 .isInstanceOf(EmailAlreadyExistsException.class);
@@ -163,8 +167,8 @@ class AuthRegisterServiceTest {
     void shouldRejectWhenUsernameAlreadyExists() {
         CreateUserRequest request = validRequest();
 
-        when(userRepository.existsByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(false);
-        when(userRepository.existsByUsernameAndDeletedAtIsNull("cashier.one")).thenReturn(true);
+        when(userIdentityService.normalizeAndAssertUnique("cashier@pos.local", "cashier.one", "+49 555 0100"))
+                .thenThrow(new UsernameAlreadyExistsException());
 
         assertThatThrownBy(() -> authRegisterService.register(request, authentication(UUID.randomUUID())))
                 .isInstanceOf(UsernameAlreadyExistsException.class);
@@ -178,9 +182,8 @@ class AuthRegisterServiceTest {
     void shouldRejectWhenPhoneAlreadyExists() {
         CreateUserRequest request = validRequest();
 
-        when(userRepository.existsByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(false);
-        when(userRepository.existsByUsernameAndDeletedAtIsNull("cashier.one")).thenReturn(false);
-        when(userRepository.existsByNormalizedPhoneAndDeletedAtIsNull("+495550100")).thenReturn(true);
+        when(userIdentityService.normalizeAndAssertUnique("cashier@pos.local", "cashier.one", "+49 555 0100"))
+                .thenThrow(new PhoneAlreadyExistsException());
 
         assertThatThrownBy(() -> authRegisterService.register(request, authentication(UUID.randomUUID())))
                 .isInstanceOf(PhoneAlreadyExistsException.class);
@@ -196,9 +199,8 @@ class AuthRegisterServiceTest {
         CreateUserRequest request = validRequest();
         request.setRoleId(roleId);
 
-        when(userRepository.existsByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(false);
-        when(userRepository.existsByUsernameAndDeletedAtIsNull("cashier.one")).thenReturn(false);
-        when(userRepository.existsByNormalizedPhoneAndDeletedAtIsNull("+495550100")).thenReturn(false);
+        when(userIdentityService.normalizeAndAssertUnique("cashier@pos.local", "cashier.one", "+49 555 0100"))
+                .thenReturn(new UserIdentityService.NormalizedUserIdentity("cashier@pos.local", "cashier.one", "+495550100"));
         when(roleRepository.findById(roleId)).thenReturn(Optional.of(
                 Role.builder()
                         .id(roleId)
@@ -233,9 +235,8 @@ class AuthRegisterServiceTest {
                 .protectedRole(true)
                 .build();
 
-        when(userRepository.existsByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(false);
-        when(userRepository.existsByUsernameAndDeletedAtIsNull("cashier.one")).thenReturn(false);
-        when(userRepository.existsByNormalizedPhoneAndDeletedAtIsNull("+495550100")).thenReturn(false);
+        when(userIdentityService.normalizeAndAssertUnique("cashier@pos.local", "cashier.one", "+49 555 0100"))
+                .thenReturn(new UserIdentityService.NormalizedUserIdentity("cashier@pos.local", "cashier.one", "+495550100"));
         when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
         org.mockito.Mockito.doThrow(new RoleAssignmentNotAllowedException())
                 .when(roleHierarchyService).assertCanAssignRole(authentication, role);
