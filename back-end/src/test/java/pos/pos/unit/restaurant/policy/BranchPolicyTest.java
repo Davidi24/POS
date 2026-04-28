@@ -57,7 +57,6 @@ class BranchPolicyTest {
 
     private ActorScope actorScope(UUID restaurantId) {
         return new ActorScope(
-                ACTOR_ID,
                 User.builder()
                         .id(ACTOR_ID)
                         .email("owner@pos.local")
