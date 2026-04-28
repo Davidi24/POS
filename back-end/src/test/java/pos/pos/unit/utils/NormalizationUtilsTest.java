@@ -139,6 +139,23 @@ class NormalizationUtilsTest {
         }
     }
 
+    @Nested
+    @DisplayName("normalizeLowerLike()")
+    class NormalizeLowerLike {
+
+        @Test
+        @DisplayName("Should wrap normalized lowercase text in wildcard markers")
+        void shouldWrapNormalizedLowercaseText() {
+            assertEquals("%hello world%", NormalizationUtils.normalizeLowerLike("  Hello World  "));
+        }
+
+        @Test
+        @DisplayName("Should return null for blank input")
+        void shouldReturnNullForBlank() {
+            assertNull(NormalizationUtils.normalizeLowerLike("   "));
+        }
+    }
+
     /*
      * =========================================
      * normalizeUpper()
@@ -221,6 +238,23 @@ class NormalizationUtilsTest {
         @DisplayName("Should preserve digits and a leading plus sign")
         void shouldPreserveDigitsAndLeadingPlusSign() {
             assertEquals("+12025550100", NormalizationUtils.normalizePhone("+1.202.555.0100"));
+        }
+    }
+
+    @Nested
+    @DisplayName("normalizePhoneLike()")
+    class NormalizePhoneLike {
+
+        @Test
+        @DisplayName("Should wrap normalized phone text in wildcard markers")
+        void shouldWrapNormalizedPhoneText() {
+            assertEquals("%+12025550100%", NormalizationUtils.normalizePhoneLike(" +1.202.555.0100 "));
+        }
+
+        @Test
+        @DisplayName("Should return null for null input")
+        void shouldReturnNullForNull() {
+            assertNull(NormalizationUtils.normalizePhoneLike(null));
         }
     }
 

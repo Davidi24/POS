@@ -126,6 +126,32 @@ class UserAdminControllerTest {
     }
 
     @Test
+    @DisplayName("GET /users/by-identifier should return one user")
+    void shouldReturnUserByIdentifier() throws Exception {
+        given(userAdminService.getUserByIdentifier(eq(authentication), eq("cashier.one")))
+                .willReturn(userResponse());
+
+        mockMvc.perform(get("/users/by-identifier")
+                        .principal(authentication)
+                        .param("identifier", "cashier.one"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(TARGET_USER_ID.toString()))
+                .andExpect(jsonPath("$.username").value("cashier.one"));
+    }
+
+    @Test
+    @DisplayName("GET /users/by-identifier should validate the request parameter")
+    void shouldValidateUserByIdentifierRequestParameter() throws Exception {
+        mockMvc.perform(get("/users/by-identifier")
+                        .principal(authentication)
+                        .param("identifier", " "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("identifier is required"));
+
+        verifyNoInteractions(userAdminService);
+    }
+
+    @Test
     @DisplayName("PUT /users/{userId} should return updated user")
     void shouldUpdateUser() throws Exception {
         UpdateUserRequest request = UpdateUserRequest.builder()

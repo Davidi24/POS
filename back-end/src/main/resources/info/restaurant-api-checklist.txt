@@ -1,0 +1,69 @@
+RESTAURANT CORE
+
+[ ] 1. GET /restaurants
+[ ] 2. POST /restaurants
+[ ] 3. GET /restaurants/{restaurantId}
+[ ] 4. PUT /restaurants/{restaurantId}
+[ ] 5. PATCH /restaurants/{restaurantId}/status
+[ ] 6. DELETE /restaurants/{restaurantId}
+
+
+RESTAURANT BRANDING
+
+[ ] 7. GET /restaurants/{restaurantId}/branding
+[ ] 8. PUT /restaurants/{restaurantId}/branding
+
+
+RESTAURANT ADDRESSES
+
+[ ] 9. GET /restaurants/{restaurantId}/addresses
+[ ] 10. POST /restaurants/{restaurantId}/addresses
+[ ] 11. PUT /restaurants/{restaurantId}/addresses/{addressId}
+[ ] 12. PATCH /restaurants/{restaurantId}/addresses/{addressId}/primary
+[ ] 13. DELETE /restaurants/{restaurantId}/addresses/{addressId}
+
+
+RESTAURANT CONTACTS
+
+[ ] 14. GET /restaurants/{restaurantId}/contacts
+[ ] 15. POST /restaurants/{restaurantId}/contacts
+[ ] 16. PUT /restaurants/{restaurantId}/contacts/{contactId}
+[ ] 17. PATCH /restaurants/{restaurantId}/contacts/{contactId}/primary
+[ ] 18. DELETE /restaurants/{restaurantId}/contacts/{contactId}
+
+
+RESTAURANT TAX PROFILES
+
+[ ] 19. GET /restaurants/{restaurantId}/tax-profiles
+[ ] 20. POST /restaurants/{restaurantId}/tax-profiles
+[ ] 21. PUT /restaurants/{restaurantId}/tax-profiles/{taxProfileId}
+[ ] 22. PATCH /restaurants/{restaurantId}/tax-profiles/{taxProfileId}/default
+[ ] 23. DELETE /restaurants/{restaurantId}/tax-profiles/{taxProfileId}
+
+
+BRANCH CORE
+
+[ ] 24. GET /restaurants/{restaurantId}/branches
+[ ] 25. POST /restaurants/{restaurantId}/branches
+[ ] 26. GET /restaurants/{restaurantId}/branches/{branchId}
+[ ] 27. PUT /restaurants/{restaurantId}/branches/{branchId}
+[ ] 28. PATCH /restaurants/{restaurantId}/branches/{branchId}/status
+[ ] 29. DELETE /restaurants/{restaurantId}/branches/{branchId}
+
+
+BRANCH ADDRESSES
+
+[ ] 30. GET /restaurants/{restaurantId}/branches/{branchId}/addresses
+[ ] 31. POST /restaurants/{restaurantId}/branches/{branchId}/addresses
+[ ] 32. PUT /restaurants/{restaurantId}/branches/{branchId}/addresses/{addressId}
+[ ] 33. PATCH /restaurants/{restaurantId}/branches/{branchId}/addresses/{addressId}/primary
+[ ] 34. DELETE /restaurants/{restaurantId}/branches/{branchId}/addresses/{addressId}
+
+
+BRANCH CONTACTS
+
+[ ] 35. GET /restaurants/{restaurantId}/branches/{branchId}/contacts
+[ ] 36. POST /restaurants/{restaurantId}/branches/{branchId}/contacts
+[ ] 37. PUT /restaurants/{restaurantId}/branches/{branchId}/contacts/{contactId}
+[ ] 38. PATCH /restaurants/{restaurantId}/branches/{branchId}/contacts/{contactId}/primary
+[ ] 39. DELETE /restaurants/{restaurantId}/branches/{branchId}/contacts/{contactId}

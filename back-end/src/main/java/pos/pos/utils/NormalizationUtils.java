@@ -48,6 +48,11 @@ public final class NormalizationUtils {
         return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
     }
 
+    public static String normalizeLowerLike(String value) {
+        String normalized = normalizeLower(value);
+        return normalized == null ? null : "%" + normalized + "%";
+    }
+
     public static String normalizeUpper(String value) {
         String normalized = normalize(value);
         return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
@@ -60,5 +65,10 @@ public final class NormalizationUtils {
         }
 
         return normalized.replaceAll("[\\s().-]", "");
+    }
+
+    public static String normalizePhoneLike(String value) {
+        String normalized = normalizePhone(value);
+        return normalized == null ? null : "%" + normalized + "%";
     }
 }

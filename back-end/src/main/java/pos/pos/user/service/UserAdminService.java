@@ -3,9 +3,7 @@ package pos.pos.user.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -32,6 +30,7 @@ import pos.pos.user.mapper.UserMapper;
 import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserRoleRepository;
 import pos.pos.utils.NormalizationUtils;
+import pos.pos.utils.PageableUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -73,15 +72,9 @@ public class UserAdminService {
             String sortBy,
             String direction
     ) {
-        Pageable pageable = PageRequest.of(
-                page == null ? 0 : page,
-                size == null ? DEFAULT_PAGE_SIZE : size,
-                Sort.by(resolveDirection(direction), resolveSortProperty(sortBy))
-        );
-
-        String normalizedSearch = normalizeSearch(search);
-        String searchLike = normalizedSearch == null ? null : "%" + normalizedSearch + "%";
-        String normalizedPhoneLike = normalizedSearch == null ? null : "%" + NormalizationUtils.normalizePhone(search) + "%";
+        Pageable pageable = PageableUtils.create(page, size, direction, resolveSortProperty(sortBy), DEFAULT_PAGE_SIZE);
+        String searchLike = NormalizationUtils.normalizeLowerLike(search);
+        String normalizedPhoneLike = NormalizationUtils.normalizePhoneLike(search);
         String normalizedRoleCode = NormalizationUtils.normalizeUpper(roleCode);
 
         Page<User> usersPage = userRepository.searchVisibleUsers(
@@ -107,6 +100,13 @@ public class UserAdminService {
         roleHierarchyService.assertCanManageUser(authentication, userId);
 
         return userMapper.toUserResponse(user, roleRepository.findActiveRoleCodesByUserId(userId));
+    }
+
+    public UserResponse getUserByIdentifier(Authentication authentication, String identifier) {
+        User user = findExistingUserByIdentifier(identifier);
+        roleHierarchyService.assertCanManageUser(authentication, user.getId());
+
+        return userMapper.toUserResponse(user, roleRepository.findActiveRoleCodesByUserId(user.getId()));
     }
 
     @Transactional
@@ -225,6 +225,24 @@ public class UserAdminService {
                 .orElseThrow(UserNotFoundException::new);
     }
 
+    private User findExistingUserByIdentifier(String identifier) {
+        String normalizedIdentifier = NormalizationUtils.normalizeLower(identifier);
+        if (normalizedIdentifier == null) {
+            throw new UserNotFoundException();
+        }
+
+        return findUserByIdentifier(normalizedIdentifier)
+                .orElseThrow(UserNotFoundException::new);
+    }
+
+    private java.util.Optional<User> findUserByIdentifier(String normalizedIdentifier) {
+        if (normalizedIdentifier.contains("@")) {
+            return userRepository.findByEmailAndDeletedAtIsNull(normalizedIdentifier);
+        }
+
+        return userRepository.findByUsernameAndDeletedAtIsNull(normalizedIdentifier);
+    }
+
     private void revokeAllActiveSessions(UUID userId) {
         userSessionRepository.revokeAllActiveSessionsByUserId(
                 userId,
@@ -282,17 +300,4 @@ public class UserAdminService {
         };
     }
 
-    private Sort.Direction resolveDirection(String direction) {
-        try {
-            return Sort.Direction.fromString(
-                    NormalizationUtils.normalize(direction) == null ? "desc" : direction
-            );
-        } catch (IllegalArgumentException ex) {
-            throw new AuthException("Invalid sort direction", HttpStatus.BAD_REQUEST);
-        }
-    }
-
-    private String normalizeSearch(String search) {
-        return NormalizationUtils.normalizeLower(search);
-    }
 }

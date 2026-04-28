@@ -32,6 +32,7 @@ public enum AppRole {
             true,
             false,
             EnumSet.of(
+                    RESTAURANTS_READ, RESTAURANTS_UPDATE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
                     MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
@@ -45,6 +46,7 @@ public enum AppRole {
             false,
             false,
             EnumSet.of(
+                    RESTAURANTS_READ, RESTAURANTS_UPDATE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
                     MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
@@ -58,6 +60,7 @@ public enum AppRole {
             true,
             false,
             EnumSet.of(
+                    RESTAURANTS_READ,
                     USERS_CREATE, USERS_READ, USERS_UPDATE,
                     MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ
