@@ -60,7 +60,7 @@ public class MenuController {
     @PreAuthorize("hasAuthority('MENUS_CREATE')")
     @Operation(summary = "Create a menu")
     public ResponseEntity<MenuResponse> createMenu(
-            @Valid @RequestBody CreateMenuRequest request,
+            @Valid @RequestBody CreateMenuRequest request, //what the frontend is allowed to send to backend, request DTO
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
