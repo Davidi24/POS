@@ -68,7 +68,7 @@ public class Menu extends AbstractAuditedEntity {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
-    @Column(name = "display_order", nullable = false)
+    @Column(name = "display_order", nullable = false) //orders in which menus are shown
     private Integer displayOrder = 0;
 
     @OneToMany(mappedBy = "menu")
