@@ -112,6 +112,19 @@ class UserAdminControllerSecurityTest {
     }
 
     @Test
+    @DisplayName("GET /users/by-identifier should return 200 when authenticated with USERS_READ")
+    void shouldAllowGetUserByIdentifierWhenAuthorized() throws Exception {
+        given(userAdminService.getUserByIdentifier(any(), any()))
+                .willReturn(UserResponse.builder().id(TARGET_USER_ID).username("cashier.one").build());
+
+        mockMvc.perform(get("/users/by-identifier")
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "USERS_READ")
+                        .param("identifier", "cashier.one"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("PUT /users/{userId} should return 200 when authenticated with USERS_UPDATE")
     void shouldAllowUpdateWhenAuthorized() throws Exception {
         UpdateUserRequest request = UpdateUserRequest.builder()

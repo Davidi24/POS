@@ -77,6 +77,26 @@ public class PasswordResetService {
         issueAdminEmailReset(user, clientTarget, now);
     }
 
+    @Transactional
+    public void issueRestaurantOwnerInvite(User user, ClientLinkTarget clientTarget, String restaurantName) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (!user.isActive() || user.getDeletedAt() != null) {
+            throw new AuthException(
+                    "User account must be active before sending an onboarding email",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        OpaqueTokenService.IssuedToken issuedToken = replacePasswordResetToken(user, now);
+        authMailService.sendAccountSetupEmail(
+                user.getEmail(),
+                user.getFirstName(),
+                buildResetUrl(clientTarget, issuedToken),
+                passwordResetProperties.getTokenTtl(),
+                restaurantName
+        );
+    }
+
     // Resets the password using a token from the email reset link
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
@@ -138,6 +158,10 @@ public class PasswordResetService {
         user.setPasswordUpdatedAt(now);
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
+        if (!user.isEmailVerified()) {
+            user.setEmailVerified(true);
+            user.setEmailVerifiedAt(now);
+        }
         userRepository.save(user);
 
         userSessionRepository.revokeAllActiveSessionsByUserId(
@@ -164,18 +188,7 @@ public class PasswordResetService {
         }
 
         // 3. Delete old reset tokens
-        authPasswordResetTokenRepository.deleteByUserId(user.getId());
-
-        // 4. Generate a new reset token
-        OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(passwordResetProperties.getTokenPepper());
-
-        authPasswordResetTokenRepository.save(
-                AuthPasswordResetToken.builder()
-                        .userId(user.getId())
-                        .tokenHash(issuedToken.tokenHash())
-                        .expiresAt(now.plus(passwordResetProperties.getTokenTtl()))
-                        .build()
-        );
+        OpaqueTokenService.IssuedToken issuedToken = replacePasswordResetToken(user, now);
 
         // 5. Send the reset link via email
         sendResetEmail(user, request.getClientTarget(), issuedToken);
@@ -195,18 +208,7 @@ public class PasswordResetService {
             );
         }
 
-        authPasswordResetTokenRepository.deleteByUserId(user.getId());
-        OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(passwordResetProperties.getTokenPepper());
-
-        authPasswordResetTokenRepository.save(
-                AuthPasswordResetToken.builder()
-                        .userId(user.getId())
-                        .tokenHash(issuedToken.tokenHash())
-                        .expiresAt(now.plus(passwordResetProperties.getTokenTtl()))
-                        .build()
-        );
-
-        sendResetEmail(user, clientTarget, issuedToken);
+        sendResetEmail(user, clientTarget, replacePasswordResetToken(user, now));
     }
 
     private void sendResetEmail(
@@ -218,12 +220,31 @@ public class PasswordResetService {
                 user.getEmail(),
                 user.getFirstName(),
                 passwordResetProperties.getSubject(),
-                FrontendUrlUtils.buildTokenUrl(
-                        frontendProperties.resolveBaseUrl(clientTarget),
-                        passwordResetProperties.getResetPath(),
-                        issuedToken.rawToken()
-                ),
+                buildResetUrl(clientTarget, issuedToken),
                 passwordResetProperties.getTokenTtl()
+        );
+    }
+
+    private OpaqueTokenService.IssuedToken replacePasswordResetToken(User user, OffsetDateTime now) {
+        authPasswordResetTokenRepository.deleteByUserId(user.getId());
+
+        OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(passwordResetProperties.getTokenPepper());
+        authPasswordResetTokenRepository.save(
+                AuthPasswordResetToken.builder()
+                        .userId(user.getId())
+                        .tokenHash(issuedToken.tokenHash())
+                        .expiresAt(now.plus(passwordResetProperties.getTokenTtl()))
+                        .build()
+        );
+
+        return issuedToken;
+    }
+
+    private String buildResetUrl(ClientLinkTarget clientTarget, OpaqueTokenService.IssuedToken issuedToken) {
+        return FrontendUrlUtils.buildTokenUrl(
+                frontendProperties.resolveBaseUrl(clientTarget),
+                passwordResetProperties.getResetPath(),
+                issuedToken.rawToken()
         );
     }
 
