@@ -128,6 +128,11 @@ class RestaurantCoreApiIntegrationTest {
                 Integer.class
         );
         assertThat(migrationCount).isEqualTo(1);
+        Integer ownerInvariantMigrationCount = jdbcTemplate.queryForObject(
+                "select count(*) from flyway_schema_history where version = '12'",
+                Integer.class
+        );
+        assertThat(ownerInvariantMigrationCount).isEqualTo(1);
 
         Role ownerRole = roleRepository.findByCode("OWNER").orElseThrow();
 
@@ -220,6 +225,21 @@ class RestaurantCoreApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn());
         assertThat(updatedRestaurant.get("name").asText()).isEqualTo("Main Restaurant Updated");
+
+        mockMvc.perform(put("/restaurants/{restaurantId}", restaurantId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Main Restaurant Updated",
+                                "legalName", "Main Restaurant Updated LLC",
+                                "code", "MAIN_RESTAURANT_UPDATED",
+                                "slug", "main-restaurant-updated",
+                                "currency", "USD",
+                                "timezone", "Europe/Berlin",
+                                "isActive", true,
+                                "status", "ACTIVE"
+                        ))))
+                .andExpect(status().isBadRequest());
 
         mockMvc.perform(put("/restaurants/{restaurantId}", restaurantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(ownerAccessToken))

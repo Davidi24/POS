@@ -79,7 +79,7 @@ class RestaurantValidationServiceTest {
     void shouldAllowAssignableOwnerUser() {
         given(userRepository.findByIdAndDeletedAtIsNull(OWNER_ID)).willReturn(Optional.of(owner(OWNER_ID, null, true)));
 
-        UUID result = restaurantValidationService.validateOwnerUser(OWNER_ID, RESTAURANT_ID);
+        UUID result = restaurantValidationService.validateOwnerUser(OWNER_ID, RESTAURANT_ID, RestaurantStatus.ACTIVE);
 
         assertThat(result).isEqualTo(OWNER_ID);
     }
@@ -89,7 +89,7 @@ class RestaurantValidationServiceTest {
     void shouldRejectMissingOwnerUser() {
         given(userRepository.findByIdAndDeletedAtIsNull(OWNER_ID)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> restaurantValidationService.validateOwnerUser(OWNER_ID, RESTAURANT_ID))
+        assertThatThrownBy(() -> restaurantValidationService.validateOwnerUser(OWNER_ID, RESTAURANT_ID, RestaurantStatus.ACTIVE))
                 .isInstanceOf(RestaurantOwnerNotFoundException.class);
     }
 
@@ -98,7 +98,7 @@ class RestaurantValidationServiceTest {
     void shouldRejectInactiveOwnerUser() {
         given(userRepository.findByIdAndDeletedAtIsNull(OWNER_ID)).willReturn(Optional.of(owner(OWNER_ID, RESTAURANT_ID, false)));
 
-        assertThatThrownBy(() -> restaurantValidationService.validateOwnerUser(OWNER_ID, RESTAURANT_ID))
+        assertThatThrownBy(() -> restaurantValidationService.validateOwnerUser(OWNER_ID, RESTAURANT_ID, RestaurantStatus.ACTIVE))
                 .isInstanceOf(AuthException.class)
                 .hasMessage("Owner user must be active")
                 .extracting(ex -> ((AuthException) ex).getStatus())
@@ -111,9 +111,26 @@ class RestaurantValidationServiceTest {
         given(userRepository.findByIdAndDeletedAtIsNull(OWNER_ID))
                 .willReturn(Optional.of(owner(OWNER_ID, OTHER_RESTAURANT_ID, true)));
 
-        assertThatThrownBy(() -> restaurantValidationService.validateOwnerUser(OWNER_ID, RESTAURANT_ID))
+        assertThatThrownBy(() -> restaurantValidationService.validateOwnerUser(OWNER_ID, RESTAURANT_ID, RestaurantStatus.ACTIVE))
                 .isInstanceOf(AuthException.class)
                 .hasMessage("Owner user is already assigned to another restaurant")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("validateOwnerUser should allow null owner for pending and rejected restaurants")
+    void shouldAllowNullOwnerForRegistrationStatuses() {
+        assertThat(restaurantValidationService.validateOwnerUser(null, RESTAURANT_ID, RestaurantStatus.PENDING)).isNull();
+        assertThat(restaurantValidationService.validateOwnerUser(null, RESTAURANT_ID, RestaurantStatus.REJECTED)).isNull();
+    }
+
+    @Test
+    @DisplayName("validateOwnerUser should reject null owner for operational statuses")
+    void shouldRejectNullOwnerForOperationalStatuses() {
+        assertThatThrownBy(() -> restaurantValidationService.validateOwnerUser(null, RESTAURANT_ID, RestaurantStatus.ACTIVE))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("ownerUserId is required unless restaurant status is PENDING or REJECTED")
                 .extracting(ex -> ((AuthException) ex).getStatus())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
