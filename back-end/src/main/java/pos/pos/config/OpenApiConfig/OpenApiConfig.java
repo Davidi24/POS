@@ -75,4 +75,19 @@ public class OpenApiConfig {
                 .pathsToMatch("/devices", "/devices/**", "/auth/device", "/auth/device/**")
                 .build();
     }
+
+    @Bean
+    public GroupedOpenApi menuGroup() {
+        return GroupedOpenApi.builder()
+                .group("Menus")
+                .pathsToMatch(
+                        "/menus",
+                        "/menus/**",
+                        "/option-group-types",
+                        "/option-group-types/**",
+                        "/public/restaurants/*/menus",
+                        "/public/restaurants/*/menus/**"
+                )
+                .build();
+    }
 }
