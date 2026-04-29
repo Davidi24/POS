@@ -16,6 +16,7 @@ import pos.pos.menu.entity.OptionGroup;
 import pos.pos.menu.entity.OptionGroupType;
 import pos.pos.menu.entity.OptionItem;
 import pos.pos.restaurant.entity.Restaurant;
+import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.support.AbstractTestProfilePostgresTest;
 
 import java.math.BigDecimal;
@@ -141,6 +142,8 @@ class MenuEntityPersistenceTest extends AbstractTestProfilePostgresTest {
         restaurant.setDescription(" Neighborhood restaurant ");
         restaurant.setCurrency(" usd ");
         restaurant.setTimezone(" Europe/Berlin ");
+        restaurant.setActive(false);
+        restaurant.setStatus(RestaurantStatus.PENDING);
         return restaurant;
     }
 }
