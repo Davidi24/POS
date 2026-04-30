@@ -1,20 +1,13 @@
 package pos.pos.settings.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
-import pos.pos.exception.restaurant.BranchNotFoundException;
-import pos.pos.exception.restaurant.RestaurantNotFoundException;
-import pos.pos.exception.user.UserNotFoundException;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
-import pos.pos.restaurant.repository.BranchRepository;
-import pos.pos.restaurant.repository.RestaurantRepository;
-import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.settings.dto.SettingsResponse;
 import pos.pos.settings.dto.UpdateRestaurantSettingsRequest;
 import pos.pos.settings.dto.UpdateSettingsBillingRequest;
@@ -23,14 +16,9 @@ import pos.pos.settings.dto.UpdateSettingsLocalizationRequest;
 import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
 import pos.pos.settings.dto.UpdateSettingsSequencePrefixesRequest;
 import pos.pos.settings.entity.Settings;
-import pos.pos.settings.entity.SettingsOrderRule;
-import pos.pos.settings.entity.SettingsReceipt;
 import pos.pos.settings.enums.ServiceChargeType;
 import pos.pos.settings.enums.WeekStartDay;
 import pos.pos.settings.mapper.SettingsMapper;
-import pos.pos.settings.repository.SettingsRepository;
-import pos.pos.user.entity.User;
-import pos.pos.user.repository.UserRepository;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
@@ -42,19 +30,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SettingsService {
 
-    private final SettingsRepository settingsRepository;
-    private final RestaurantRepository restaurantRepository;
-    private final BranchRepository branchRepository;
-    private final UserRepository userRepository;
-    private final RoleHierarchyService roleHierarchyService;
+    private final SettingsDomainSupport settingsDomainSupport;
     private final SettingsMapper settingsMapper;
+    private final SettingsAuditService settingsAuditService;
 
     @Transactional
     public SettingsResponse getSettings(Authentication authentication, UUID restaurantId) {
-        UUID actorId = roleHierarchyService.currentUserId(authentication);
-        Restaurant restaurant = findAccessibleRestaurant(authentication, restaurantId);
-        Settings settings = loadOrCreateSettings(restaurant, actorId);
-        return settingsMapper.toResponse(settings);
+        return settingsMapper.toResponse(loadSettingsContext(authentication, restaurantId).settings());
     }
 
     @Transactional
@@ -63,35 +45,20 @@ public class SettingsService {
             UUID restaurantId,
             UpdateRestaurantSettingsRequest request
     ) {
-        UUID actorId = roleHierarchyService.currentUserId(authentication);
-        Restaurant restaurant = findAccessibleRestaurant(authentication, restaurantId);
-        Settings settings = loadOrCreateSettings(restaurant, actorId);
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
 
         validateLocalization(request.getDefaultLanguage(), request.getDateFormat(), request.getTimeFormat());
         applyResolvedBranch(settings, restaurantId, request.getDefaultBranchId());
-        settings.setDefaultLanguage(request.getDefaultLanguage());
-        settings.setDateFormat(request.getDateFormat());
-        settings.setTimeFormat(request.getTimeFormat());
-        settings.setWeekStartDay(request.getWeekStartDay());
-        settings.setOrderSequencePrefix(request.getOrderSequencePrefix());
-        settings.setInvoiceSequencePrefix(request.getInvoiceSequencePrefix());
-        settings.setReservationSlotMinutes(request.getReservationSlotMinutes());
-        settings.setDefaultTableTurnTimeMinutes(request.getDefaultTableTurnTimeMinutes());
-        applyBilling(settings,
-                request.getServiceChargeEnabled(),
-                request.getServiceChargeType(),
-                request.getServiceChargeValue(),
-                request.getCashRoundingEnabled(),
-                request.getCashRoundingIncrement(),
-                request.getAllowSplitBills(),
-                request.getRequireCustomerForInvoice());
-        settings.setAllowOpenTickets(Boolean.TRUE.equals(request.getAllowOpenTickets()));
-        settings.setEnableQrOrdering(Boolean.TRUE.equals(request.getEnableQrOrdering()));
-        settings.setEnableTakeaway(Boolean.TRUE.equals(request.getEnableTakeaway()));
-        settings.setEnableDelivery(Boolean.TRUE.equals(request.getEnableDelivery()));
-        settings.setUpdatedBy(actorId);
+        applyCoreFields(settings, request);
 
-        return settingsMapper.toResponse(saveSettings(settings));
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_CORE",
+                "Replaced restaurant settings core fields"
+        );
     }
 
     @Transactional
@@ -100,14 +67,17 @@ public class SettingsService {
             UUID restaurantId,
             UpdateSettingsDefaultBranchRequest request
     ) {
-        UUID actorId = roleHierarchyService.currentUserId(authentication);
-        Restaurant restaurant = findAccessibleRestaurant(authentication, restaurantId);
-        Settings settings = loadOrCreateSettings(restaurant, actorId);
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
 
-        settings.setDefaultBranch(resolveBranch(restaurantId, request.getDefaultBranchId()));
-        settings.setUpdatedBy(actorId);
-
-        return settingsMapper.toResponse(saveSettings(settings));
+        settings.setDefaultBranch(settingsDomainSupport.resolveBranch(restaurantId, request.getDefaultBranchId()));
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                settings.getDefaultBranch(),
+                "UPDATE_DEFAULT_BRANCH",
+                "Updated default branch setting"
+        );
     }
 
     @Transactional
@@ -116,21 +86,27 @@ public class SettingsService {
             UUID restaurantId,
             UpdateSettingsLocalizationRequest request
     ) {
-        UUID actorId = roleHierarchyService.currentUserId(authentication);
-        Restaurant restaurant = findAccessibleRestaurant(authentication, restaurantId);
-        Settings settings = loadOrCreateSettings(restaurant, actorId);
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
 
         validateLocalization(request.getDefaultLanguage(), request.getDateFormat(), request.getTimeFormat());
+        applyLocalizationFields(
+                settings,
+                request.getDefaultLanguage(),
+                request.getDateFormat(),
+                request.getTimeFormat(),
+                request.getWeekStartDay(),
+                request.getReservationSlotMinutes(),
+                request.getDefaultTableTurnTimeMinutes()
+        );
 
-        settings.setDefaultLanguage(request.getDefaultLanguage());
-        settings.setDateFormat(request.getDateFormat());
-        settings.setTimeFormat(request.getTimeFormat());
-        settings.setWeekStartDay(request.getWeekStartDay());
-        settings.setReservationSlotMinutes(request.getReservationSlotMinutes());
-        settings.setDefaultTableTurnTimeMinutes(request.getDefaultTableTurnTimeMinutes());
-        settings.setUpdatedBy(actorId);
-
-        return settingsMapper.toResponse(saveSettings(settings));
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_LOCALIZATION",
+                "Updated localization settings"
+        );
     }
 
     @Transactional
@@ -139,15 +115,18 @@ public class SettingsService {
             UUID restaurantId,
             UpdateSettingsSequencePrefixesRequest request
     ) {
-        UUID actorId = roleHierarchyService.currentUserId(authentication);
-        Restaurant restaurant = findAccessibleRestaurant(authentication, restaurantId);
-        Settings settings = loadOrCreateSettings(restaurant, actorId);
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
 
-        settings.setOrderSequencePrefix(request.getOrderSequencePrefix());
-        settings.setInvoiceSequencePrefix(request.getInvoiceSequencePrefix());
-        settings.setUpdatedBy(actorId);
+        applySequencePrefixFields(settings, request.getOrderSequencePrefix(), request.getInvoiceSequencePrefix());
 
-        return settingsMapper.toResponse(saveSettings(settings));
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_SEQUENCE_PREFIXES",
+                "Updated settings sequence prefixes"
+        );
     }
 
     @Transactional
@@ -156,21 +135,27 @@ public class SettingsService {
             UUID restaurantId,
             UpdateSettingsBillingRequest request
     ) {
-        UUID actorId = roleHierarchyService.currentUserId(authentication);
-        Restaurant restaurant = findAccessibleRestaurant(authentication, restaurantId);
-        Settings settings = loadOrCreateSettings(restaurant, actorId);
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
 
-        applyBilling(settings,
+        applyBilling(
+                settings,
                 request.getServiceChargeEnabled(),
                 request.getServiceChargeType(),
                 request.getServiceChargeValue(),
                 request.getCashRoundingEnabled(),
                 request.getCashRoundingIncrement(),
                 request.getAllowSplitBills(),
-                request.getRequireCustomerForInvoice());
-        settings.setUpdatedBy(actorId);
+                request.getRequireCustomerForInvoice()
+        );
 
-        return settingsMapper.toResponse(saveSettings(settings));
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_BILLING",
+                "Updated billing settings"
+        );
     }
 
     @Transactional
@@ -179,95 +164,39 @@ public class SettingsService {
             UUID restaurantId,
             UpdateSettingsOrderChannelsRequest request
     ) {
-        UUID actorId = roleHierarchyService.currentUserId(authentication);
-        Restaurant restaurant = findAccessibleRestaurant(authentication, restaurantId);
-        Settings settings = loadOrCreateSettings(restaurant, actorId);
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
 
-        settings.setAllowOpenTickets(Boolean.TRUE.equals(request.getAllowOpenTickets()));
-        settings.setEnableQrOrdering(Boolean.TRUE.equals(request.getEnableQrOrdering()));
-        settings.setEnableTakeaway(Boolean.TRUE.equals(request.getEnableTakeaway()));
-        settings.setEnableDelivery(Boolean.TRUE.equals(request.getEnableDelivery()));
-        settings.setUpdatedBy(actorId);
+        applyOrderChannelFields(
+                settings,
+                request.getAllowOpenTickets(),
+                request.getEnableQrOrdering(),
+                request.getEnableTakeaway(),
+                request.getEnableDelivery()
+        );
 
-        return settingsMapper.toResponse(saveSettings(settings));
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_ORDER_CHANNELS",
+                "Updated order channel settings"
+        );
     }
 
     @Transactional
     public SettingsResponse resetSettings(Authentication authentication, UUID restaurantId) {
-        UUID actorId = roleHierarchyService.currentUserId(authentication);
-        Restaurant restaurant = findAccessibleRestaurant(authentication, restaurantId);
-        Settings settings = loadOrCreateSettings(restaurant, actorId);
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
 
         applyDefaults(settings);
-        settings.setUpdatedBy(actorId);
-
-        return settingsMapper.toResponse(saveSettings(settings));
-    }
-
-    private Restaurant findAccessibleRestaurant(Authentication authentication, UUID restaurantId) {
-        Restaurant restaurant = restaurantRepository.findByIdAndDeletedAtIsNull(restaurantId)
-                .orElseThrow(RestaurantNotFoundException::new);
-
-        if (roleHierarchyService.isSuperAdmin(authentication)) {
-            return restaurant;
-        }
-
-        User actor = userRepository.findByIdAndDeletedAtIsNull(roleHierarchyService.currentUserId(authentication))
-                .orElseThrow(UserNotFoundException::new);
-
-        if (!restaurantId.equals(actor.getRestaurantId())) {
-            throw new AuthException(
-                    "You are not allowed to manage settings for this restaurant",
-                    HttpStatus.FORBIDDEN
-            );
-        }
-
-        return restaurant;
-    }
-
-    private Settings loadOrCreateSettings(Restaurant restaurant, UUID actorId) {
-        Settings settings = settingsRepository.findByRestaurant_Id(restaurant.getId())
-                .orElseGet(() -> createDefaultSettings(restaurant, actorId));
-        return ensureChildSettings(settings, actorId);
-    }
-
-    private Settings createDefaultSettings(Restaurant restaurant, UUID actorId) {
-        Settings settings = new Settings();
-        settings.setRestaurant(restaurant);
-        settings.setCreatedBy(actorId);
-        settings.setUpdatedBy(actorId);
-        settings.setReceiptSettings(new SettingsReceipt());
-        settings.setOrderRuleSettings(new SettingsOrderRule());
-
-        try {
-            return settingsRepository.saveAndFlush(settings);
-        } catch (DataIntegrityViolationException ex) {
-            return settingsRepository.findByRestaurant_Id(restaurant.getId())
-                    .orElseThrow(() -> ex);
-        } catch (IllegalStateException ex) {
-            throw new AuthException(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-
-    private Settings ensureChildSettings(Settings settings, UUID actorId) {
-        boolean changed = false;
-
-        if (settings.getReceiptSettings() == null) {
-            settings.setReceiptSettings(new SettingsReceipt());
-            changed = true;
-        }
-
-        if (settings.getOrderRuleSettings() == null) {
-            settings.setOrderRuleSettings(new SettingsOrderRule());
-            changed = true;
-        }
-
-        if (!changed) {
-            return settings;
-        }
-
-        settings.setUpdatedBy(actorId);
-        return saveSettings(settings);
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "RESET",
+                "Reset restaurant settings to defaults"
+        );
     }
 
     private void applyResolvedBranch(Settings settings, UUID restaurantId, UUID defaultBranchId) {
@@ -276,7 +205,72 @@ public class SettingsService {
             return;
         }
 
-        settings.setDefaultBranch(resolveBranch(restaurantId, defaultBranchId));
+        settings.setDefaultBranch(settingsDomainSupport.resolveBranch(restaurantId, defaultBranchId));
+    }
+
+    private void applyCoreFields(Settings settings, UpdateRestaurantSettingsRequest request) {
+        applyLocalizationFields(
+                settings,
+                request.getDefaultLanguage(),
+                request.getDateFormat(),
+                request.getTimeFormat(),
+                request.getWeekStartDay(),
+                request.getReservationSlotMinutes(),
+                request.getDefaultTableTurnTimeMinutes()
+        );
+        applySequencePrefixFields(settings, request.getOrderSequencePrefix(), request.getInvoiceSequencePrefix());
+        applyBilling(
+                settings,
+                request.getServiceChargeEnabled(),
+                request.getServiceChargeType(),
+                request.getServiceChargeValue(),
+                request.getCashRoundingEnabled(),
+                request.getCashRoundingIncrement(),
+                request.getAllowSplitBills(),
+                request.getRequireCustomerForInvoice()
+        );
+        applyOrderChannelFields(
+                settings,
+                request.getAllowOpenTickets(),
+                request.getEnableQrOrdering(),
+                request.getEnableTakeaway(),
+                request.getEnableDelivery()
+        );
+    }
+
+    private void applyLocalizationFields(
+            Settings settings,
+            String defaultLanguage,
+            String dateFormat,
+            String timeFormat,
+            WeekStartDay weekStartDay,
+            int reservationSlotMinutes,
+            int defaultTableTurnTimeMinutes
+    ) {
+        settings.setDefaultLanguage(defaultLanguage);
+        settings.setDateFormat(dateFormat);
+        settings.setTimeFormat(timeFormat);
+        settings.setWeekStartDay(weekStartDay);
+        settings.setReservationSlotMinutes(reservationSlotMinutes);
+        settings.setDefaultTableTurnTimeMinutes(defaultTableTurnTimeMinutes);
+    }
+
+    private void applySequencePrefixFields(Settings settings, String orderSequencePrefix, String invoiceSequencePrefix) {
+        settings.setOrderSequencePrefix(orderSequencePrefix);
+        settings.setInvoiceSequencePrefix(invoiceSequencePrefix);
+    }
+
+    private void applyOrderChannelFields(
+            Settings settings,
+            Boolean allowOpenTickets,
+            Boolean enableQrOrdering,
+            Boolean enableTakeaway,
+            Boolean enableDelivery
+    ) {
+        settings.setAllowOpenTickets(Boolean.TRUE.equals(allowOpenTickets));
+        settings.setEnableQrOrdering(Boolean.TRUE.equals(enableQrOrdering));
+        settings.setEnableTakeaway(Boolean.TRUE.equals(enableTakeaway));
+        settings.setEnableDelivery(Boolean.TRUE.equals(enableDelivery));
     }
 
     private void applyBilling(
@@ -304,30 +298,33 @@ public class SettingsService {
         Settings defaults = new Settings();
 
         settings.setDefaultBranch(defaults.getDefaultBranch());
-        settings.setDefaultLanguage(defaults.getDefaultLanguage());
-        settings.setDateFormat(defaults.getDateFormat());
-        settings.setTimeFormat(defaults.getTimeFormat());
-        settings.setWeekStartDay(defaults.getWeekStartDay());
-        settings.setOrderSequencePrefix(defaults.getOrderSequencePrefix());
-        settings.setInvoiceSequencePrefix(defaults.getInvoiceSequencePrefix());
-        settings.setReservationSlotMinutes(defaults.getReservationSlotMinutes());
-        settings.setDefaultTableTurnTimeMinutes(defaults.getDefaultTableTurnTimeMinutes());
-        settings.setServiceChargeEnabled(defaults.isServiceChargeEnabled());
-        settings.setServiceChargeType(defaults.getServiceChargeType());
-        settings.setServiceChargeValue(defaults.getServiceChargeValue());
-        settings.setCashRoundingEnabled(defaults.isCashRoundingEnabled());
-        settings.setCashRoundingIncrement(defaults.getCashRoundingIncrement());
-        settings.setAllowSplitBills(defaults.isAllowSplitBills());
-        settings.setAllowOpenTickets(defaults.isAllowOpenTickets());
-        settings.setRequireCustomerForInvoice(defaults.isRequireCustomerForInvoice());
-        settings.setEnableQrOrdering(defaults.isEnableQrOrdering());
-        settings.setEnableTakeaway(defaults.isEnableTakeaway());
-        settings.setEnableDelivery(defaults.isEnableDelivery());
-    }
-
-    private Branch resolveBranch(UUID restaurantId, UUID branchId) {
-        return branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId, restaurantId)
-                .orElseThrow(BranchNotFoundException::new);
+        applyLocalizationFields(
+                settings,
+                defaults.getDefaultLanguage(),
+                defaults.getDateFormat(),
+                defaults.getTimeFormat(),
+                defaults.getWeekStartDay(),
+                defaults.getReservationSlotMinutes(),
+                defaults.getDefaultTableTurnTimeMinutes()
+        );
+        applySequencePrefixFields(settings, defaults.getOrderSequencePrefix(), defaults.getInvoiceSequencePrefix());
+        applyBilling(
+                settings,
+                defaults.isServiceChargeEnabled(),
+                defaults.getServiceChargeType(),
+                defaults.getServiceChargeValue(),
+                defaults.isCashRoundingEnabled(),
+                defaults.getCashRoundingIncrement(),
+                defaults.isAllowSplitBills(),
+                defaults.isRequireCustomerForInvoice()
+        );
+        applyOrderChannelFields(
+                settings,
+                defaults.isAllowOpenTickets(),
+                defaults.isEnableQrOrdering(),
+                defaults.isEnableTakeaway(),
+                defaults.isEnableDelivery()
+        );
     }
 
     private void validateLocalization(String defaultLanguage, String dateFormat, String timeFormat) {
@@ -393,13 +390,34 @@ public class SettingsService {
         }
     }
 
-    private Settings saveSettings(Settings settings) {
-        try {
-            return settingsRepository.saveAndFlush(settings);
-        } catch (DataIntegrityViolationException ex) {
-            throw new AuthException("Settings update violates a data constraint", HttpStatus.BAD_REQUEST);
-        } catch (IllegalStateException ex) {
-            throw new AuthException(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    private SettingsContext loadSettingsContext(Authentication authentication, UUID restaurantId) {
+        UUID actorId = settingsDomainSupport.currentActorId(authentication);
+        Restaurant restaurant = settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
+        Settings settings = settingsDomainSupport.loadOrCreateSettings(restaurant, actorId);
+        return new SettingsContext(actorId, restaurant, settings);
+    }
+
+    private SettingsResponse saveSettingsAndAudit(
+            SettingsContext context,
+            Settings settings,
+            Branch branch,
+            String action,
+            String message
+    ) {
+        settings.setUpdatedBy(context.actorId());
+        Settings savedSettings = settingsDomainSupport.saveSettings(settings);
+        settingsAuditService.log(
+                context.restaurant(),
+                branch,
+                "SETTINGS",
+                savedSettings.getId(),
+                action,
+                message,
+                context.actorId()
+        );
+        return settingsMapper.toResponse(savedSettings);
+    }
+
+    private record SettingsContext(UUID actorId, Restaurant restaurant, Settings settings) {
     }
 }
