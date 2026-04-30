@@ -24,6 +24,7 @@ import pos.pos.menu.entity.MenuSection;
 import pos.pos.menu.entity.MenuVariant;
 import pos.pos.menu.entity.OptionGroup;
 import pos.pos.menu.entity.OptionGroupType;
+import pos.pos.menu.entity.OptionItem;
 import pos.pos.menu.repository.MenuItemOptionGroupRepository;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.menu.repository.MenuRepository;
@@ -31,6 +32,7 @@ import pos.pos.menu.repository.MenuSectionRepository;
 import pos.pos.menu.repository.MenuVariantRepository;
 import pos.pos.menu.repository.OptionGroupRepository;
 import pos.pos.menu.repository.OptionGroupTypeRepository;
+import pos.pos.menu.repository.OptionItemRepository;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.repository.RestaurantRepository;
 import pos.pos.role.entity.Role;
@@ -137,6 +139,9 @@ class MenuApiIntegrationTest {
     private OptionGroupTypeRepository optionGroupTypeRepository;
 
     @Autowired
+    private OptionItemRepository optionItemRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private final AtomicInteger userSequence = new AtomicInteger(1);
@@ -157,6 +162,8 @@ class MenuApiIntegrationTest {
         assertThat(paths.has("/menus/{menuId}/status")).isTrue();
         assertThat(paths.has("/menus/{menuId}/sections/{sectionId}/items/{itemId}/variants")).isTrue();
         assertThat(paths.has("/option-group-types")).isTrue();
+        assertThat(paths.has("/option-groups")).isTrue();
+        assertThat(paths.has("/option-groups/{groupId}/items")).isTrue();
         assertThat(paths.has("/public/restaurants/{restaurantId}/menus")).isTrue();
         assertThat(paths.has("/public/restaurants/{restaurantId}/menus/{menuId}")).isTrue();
     }
@@ -1016,6 +1023,285 @@ class MenuApiIntegrationTest {
         assertThat(optionGroupTypeRepository.findById(createdTypeId)).isEmpty();
     }
 
+    @Test
+    @DisplayName("OPTION-GROUP-001 through OPTION-GROUP-014 list, create, update, validate, and delete option groups")
+    void shouldManageOptionGroups() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("groups", admin.getId());
+        OptionGroupType single = createOptionGroupType("single_select", "Single Select");
+        OptionGroupType multi = createOptionGroupType("multi_select", "Multi Select");
+        OptionGroup sauces = createOptionGroup(restaurant, single, "Sauces", "Choose a sauce", 0, 2, false, true, 1);
+        createOptionItem(sauces, "KETCHUP", "Ketchup", BigDecimal.ZERO, true, 1);
+        createOptionGroup(restaurant, multi, "Add-ons", "Choose extras", 0, 3, false, false, 2);
+
+        String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "OPTION-GROUPS");
+
+        MvcResult listResult = mockMvc.perform(get("/option-groups")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .param("restaurantId", restaurant.getId().toString())
+                        .param("typeId", single.getId().toString())
+                        .param("active", "true")
+                        .param("search", "sauce")
+                        .param("includeItems", "true"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode listBody = bodyOf(listResult);
+        assertThat(listBody).hasSize(1);
+        assertThat(listBody.get(0).get("id").asText()).isEqualTo(sauces.getId().toString());
+        assertThat(listBody.get(0).get("items")).hasSize(1);
+        assertThat(listBody.get(0).get("items").get(0).get("name").asText()).isEqualTo("Ketchup");
+
+        MvcResult createResult = mockMvc.perform(post("/option-groups")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "restaurantId", restaurant.getId().toString(),
+                                "typeId", multi.getId().toString(),
+                                "name", " Premium Toppings ",
+                                "description", " Extra premium toppings ",
+                                "minSelect", 1,
+                                "maxSelect", 2,
+                                "required", true
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode createBody = bodyOf(createResult);
+        UUID createdGroupId = UUID.fromString(createBody.get("id").asText());
+        assertThat(createBody.get("name").asText()).isEqualTo("Premium Toppings");
+        assertThat(createBody.get("displayOrder").asInt()).isZero();
+        assertThat(createBody.get("active").asBoolean()).isTrue();
+        assertThat(createBody.get("required").asBoolean()).isTrue();
+
+        MvcResult detailResult = mockMvc.perform(get("/option-groups/{groupId}", createdGroupId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .param("includeItems", "true"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode detailBody = bodyOf(detailResult);
+        assertThat(detailBody.get("id").asText()).isEqualTo(createdGroupId.toString());
+        assertThat(detailBody.get("type").get("id").asText()).isEqualTo(multi.getId().toString());
+        assertThat(detailBody.has("items")).isTrue();
+
+        MvcResult updateResult = mockMvc.perform(put("/option-groups/{groupId}", createdGroupId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "typeId", single.getId().toString(),
+                                "name", " Signature Sauces ",
+                                "description", " Signature choices ",
+                                "minSelect", 0,
+                                "maxSelect", 1,
+                                "required", false,
+                                "active", false,
+                                "displayOrder", 4
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode updateBody = bodyOf(updateResult);
+        assertThat(updateBody.get("name").asText()).isEqualTo("Signature Sauces");
+        assertThat(updateBody.get("type").get("id").asText()).isEqualTo(single.getId().toString());
+        assertThat(updateBody.get("active").asBoolean()).isFalse();
+        assertThat(updateBody.get("displayOrder").asInt()).isEqualTo(4);
+
+        MvcResult statusResult = mockMvc.perform(patch("/option-groups/{groupId}/status", createdGroupId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("active", true))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(bodyOf(statusResult).get("active").asBoolean()).isTrue();
+        assertThat(optionGroupRepository.findById(createdGroupId).orElseThrow().isActive()).isTrue();
+
+        MvcResult negativeDisplayOrderResult = mockMvc.perform(post("/option-groups")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "restaurantId", restaurant.getId().toString(),
+                                "typeId", single.getId().toString(),
+                                "name", "Invalid Group",
+                                "displayOrder", -1
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        MvcResult negativeMinSelectResult = mockMvc.perform(post("/option-groups")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "restaurantId", restaurant.getId().toString(),
+                                "typeId", single.getId().toString(),
+                                "name", "Invalid Minimum",
+                                "minSelect", -1
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        MvcResult invalidBoundsResult = mockMvc.perform(put("/option-groups/{groupId}", createdGroupId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "typeId", single.getId().toString(),
+                                "name", "Invalid Bounds",
+                                "required", false,
+                                "active", true,
+                                "displayOrder", 1,
+                                "minSelect", 3,
+                                "maxSelect", 2
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        MvcResult duplicateCreateResult = mockMvc.perform(post("/option-groups")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "restaurantId", restaurant.getId().toString(),
+                                "typeId", single.getId().toString(),
+                                "name", " Sauces "
+                        ))))
+                .andExpect(status().isConflict())
+                .andReturn();
+
+        MvcResult duplicateUpdateResult = mockMvc.perform(put("/option-groups/{groupId}", createdGroupId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "typeId", single.getId().toString(),
+                                "name", " Sauces ",
+                                "required", false,
+                                "active", true,
+                                "displayOrder", 1
+                        ))))
+                .andExpect(status().isConflict())
+                .andReturn();
+
+        mockMvc.perform(delete("/option-groups/{groupId}", createdGroupId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isNoContent());
+
+        assertThat(messageOf(negativeDisplayOrderResult)).isEqualTo("displayOrder: displayOrder must be greater than or equal to 0");
+        assertThat(messageOf(negativeMinSelectResult)).isEqualTo("minSelect: minSelect must be greater than or equal to 0");
+        assertThat(messageOf(invalidBoundsResult)).isEqualTo("minSelect must be less than or equal to maxSelect");
+        assertThat(messageOf(duplicateCreateResult)).isEqualTo("Option group name already in use for this restaurant");
+        assertThat(messageOf(duplicateUpdateResult)).isEqualTo("Option group name already in use for this restaurant");
+        assertThat(optionGroupRepository.findById(createdGroupId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("OPTION-ITEM-001 through OPTION-ITEM-010 list, create, update, validate, and delete option items")
+    void shouldManageOptionItems() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("items", admin.getId());
+        OptionGroupType type = createOptionGroupType("single_select", "Single Select");
+        OptionGroup sauces = createOptionGroup(restaurant, type, "Sauces", "Choose a sauce", 0, 2, false, true, 1);
+        OptionGroup toppings = createOptionGroup(restaurant, type, "Toppings", "Choose toppings", 0, 3, false, true, 2);
+        OptionItem ketchup = createOptionItem(sauces, "KETCHUP", "Ketchup", BigDecimal.ZERO, true, 1);
+        createOptionItem(sauces, "MAYO", "Mayo", BigDecimal.ZERO, false, 2);
+        OptionItem foreignItem = createOptionItem(toppings, "BACON", "Bacon", new BigDecimal("1.50"), true, 1);
+
+        String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "OPTION-ITEMS");
+
+        MvcResult listResult = mockMvc.perform(get("/option-groups/{groupId}/items", sauces.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .param("available", "true"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode listBody = bodyOf(listResult);
+        assertThat(listBody).hasSize(1);
+        assertThat(listBody.get(0).get("id").asText()).isEqualTo(ketchup.getId().toString());
+
+        MvcResult createResult = mockMvc.perform(post("/option-groups/{groupId}/items", sauces.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", " Extra Cheese ",
+                                "priceDelta", "1.25"
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode createBody = bodyOf(createResult);
+        UUID createdItemId = UUID.fromString(createBody.get("id").asText());
+        assertThat(createBody.get("code").asText()).isEqualTo("EXTRA_CHEESE");
+        assertThat(createBody.get("available").asBoolean()).isTrue();
+        assertThat(createBody.get("displayOrder").asInt()).isZero();
+
+        MvcResult updateResult = mockMvc.perform(put("/option-groups/{groupId}/items/{itemId}", sauces.getId(), createdItemId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "code", "cheddar_plus",
+                                "name", " Cheddar Plus ",
+                                "priceDelta", "1.75",
+                                "available", false,
+                                "displayOrder", 5
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode updateBody = bodyOf(updateResult);
+        assertThat(updateBody.get("code").asText()).isEqualTo("CHEDDAR_PLUS");
+        assertThat(updateBody.get("name").asText()).isEqualTo("Cheddar Plus");
+        assertThat(updateBody.get("priceDelta").decimalValue()).isEqualByComparingTo("1.75");
+        assertThat(updateBody.get("available").asBoolean()).isFalse();
+        assertThat(updateBody.get("displayOrder").asInt()).isEqualTo(5);
+
+        MvcResult availabilityResult = mockMvc.perform(patch("/option-groups/{groupId}/items/{itemId}/availability", sauces.getId(), createdItemId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("available", true))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(bodyOf(availabilityResult).get("available").asBoolean()).isTrue();
+        assertThat(optionItemRepository.findById(createdItemId).orElseThrow().isAvailable()).isTrue();
+
+        MvcResult negativeDisplayOrderResult = mockMvc.perform(post("/option-groups/{groupId}/items", sauces.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Invalid Item",
+                                "displayOrder", -1
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        MvcResult duplicateNameResult = mockMvc.perform(post("/option-groups/{groupId}/items", sauces.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", " Ketchup "
+                        ))))
+                .andExpect(status().isConflict())
+                .andReturn();
+
+        MvcResult mismatchResult = mockMvc.perform(put("/option-groups/{groupId}/items/{itemId}", sauces.getId(), foreignItem.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Wrong Item",
+                                "available", true,
+                                "displayOrder", 1
+                        ))))
+                .andExpect(status().isConflict())
+                .andReturn();
+
+        mockMvc.perform(delete("/option-groups/{groupId}/items/{itemId}", sauces.getId(), createdItemId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isNoContent());
+
+        assertThat(messageOf(negativeDisplayOrderResult)).isEqualTo("displayOrder: displayOrder must be greater than or equal to 0");
+        assertThat(messageOf(duplicateNameResult)).isEqualTo("Option item name already in use for this option group");
+        assertThat(messageOf(mismatchResult)).isEqualTo("Option item does not belong to this option group");
+        assertThat(optionItemRepository.findById(createdItemId)).isEmpty();
+    }
+
     private User adminUser() {
         return userRepository.findByEmailAndDeletedAtIsNull(ADMIN_EMAIL).orElseThrow();
     }
@@ -1156,6 +1442,24 @@ class MenuApiIntegrationTest {
         optionGroup.setActive(active);
         optionGroup.setDisplayOrder(displayOrder);
         return optionGroupRepository.save(optionGroup);
+    }
+
+    private OptionItem createOptionItem(
+            OptionGroup optionGroup,
+            String code,
+            String name,
+            BigDecimal priceDelta,
+            boolean available,
+            int displayOrder
+    ) {
+        OptionItem optionItem = new OptionItem();
+        optionItem.setOptionGroup(optionGroup);
+        optionItem.setCode(code);
+        optionItem.setName(name);
+        optionItem.setPriceDelta(priceDelta);
+        optionItem.setAvailable(available);
+        optionItem.setDisplayOrder(displayOrder);
+        return optionItemRepository.save(optionItem);
     }
 
     private MenuItemOptionGroup linkOptionGroup(
