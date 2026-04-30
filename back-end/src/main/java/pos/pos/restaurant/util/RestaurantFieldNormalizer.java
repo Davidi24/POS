@@ -14,16 +14,7 @@ public final class RestaurantFieldNormalizer {
     }
 
     public static String normalizeCode(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-
-        return sanitized.isEmpty() ? null : truncate(sanitized, CODE_MAX_LENGTH);
+        return NormalizationUtils.normalizeCode(value, CODE_MAX_LENGTH);
     }
 
     public static String normalizeCodeOrFallback(String value, String fallbackValue) {
