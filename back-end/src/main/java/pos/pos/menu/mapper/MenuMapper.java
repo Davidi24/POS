@@ -1,6 +1,8 @@
 package pos.pos.menu.mapper;
 
 import org.springframework.stereotype.Component;
+import pos.pos.menu.dto.OptionGroupResponse;
+import pos.pos.menu.dto.OptionItemResponse;
 import pos.pos.menu.dto.MenuItemSummaryResponse;
 import pos.pos.menu.dto.MenuItemOptionGroupSummaryResponse;
 import pos.pos.menu.dto.MenuResponse;
@@ -13,6 +15,8 @@ import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuItemOptionGroup;
 import pos.pos.menu.entity.MenuSection;
 import pos.pos.menu.entity.MenuVariant;
+import pos.pos.menu.entity.OptionGroup;
+import pos.pos.menu.entity.OptionItem;
 import pos.pos.menu.entity.OptionGroupType;
 
 import java.util.List;
@@ -133,6 +137,46 @@ public class MenuMapper {
                 .code(type.getCode())
                 .name(type.getName())
                 .description(type.getDescription())
+                .build();
+    }
+
+    public OptionGroupResponse toOptionGroupResponse(OptionGroup group) {
+        return toOptionGroupResponse(group, null);
+    }
+
+    public OptionGroupResponse toOptionGroupResponse(OptionGroup group, List<OptionItem> items) {
+        if (group == null) {
+            return null;
+        }
+
+        return OptionGroupResponse.builder()
+                .id(group.getId())
+                .restaurantId(group.getRestaurant() == null ? null : group.getRestaurant().getId())
+                .type(toOptionGroupTypeResponse(group.getType()))
+                .name(group.getName())
+                .description(group.getDescription())
+                .minSelect(group.getMinSelect())
+                .maxSelect(group.getMaxSelect())
+                .required(group.isRequired())
+                .active(group.isActive())
+                .displayOrder(group.getDisplayOrder())
+                .items(items == null ? null : items.stream().map(this::toOptionItemResponse).toList())
+                .build();
+    }
+
+    public OptionItemResponse toOptionItemResponse(OptionItem item) {
+        if (item == null) {
+            return null;
+        }
+
+        return OptionItemResponse.builder()
+                .id(item.getId())
+                .optionGroupId(item.getOptionGroup() == null ? null : item.getOptionGroup().getId())
+                .code(item.getCode())
+                .name(item.getName())
+                .priceDelta(item.getPriceDelta())
+                .available(item.isAvailable())
+                .displayOrder(item.getDisplayOrder())
                 .build();
     }
 

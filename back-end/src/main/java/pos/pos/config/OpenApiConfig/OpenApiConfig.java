@@ -85,6 +85,8 @@ public class OpenApiConfig {
                         "/menus/**",
                         "/option-group-types",
                         "/option-group-types/**",
+                        "/option-groups",
+                        "/option-groups/**",
                         "/public/restaurants/*/menus",
                         "/public/restaurants/*/menus/**"
                 )

@@ -19,4 +19,6 @@ public interface MenuItemOptionGroupRepository extends JpaRepository<MenuItemOpt
     List<MenuItemOptionGroup> findByMenuItemIdOrdered(UUID menuItemId);
 
     boolean existsByMenuItemId(UUID menuItemId);
+
+    boolean existsByOptionGroupId(UUID optionGroupId);
 }
