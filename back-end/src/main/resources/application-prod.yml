@@ -23,6 +23,12 @@ spring:
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
 
+springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+  swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
+
 app:
   security:
     trusted-proxies: ${TRUSTED_PROXIES}

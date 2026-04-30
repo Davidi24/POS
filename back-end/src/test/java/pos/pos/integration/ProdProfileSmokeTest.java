@@ -154,6 +154,8 @@ class ProdProfileSmokeTest {
         assertThat(environment.getProperty("spring.jpa.show-sql", Boolean.class)).isFalse();
         assertThat(environment.getProperty("spring.jpa.open-in-view", Boolean.class)).isFalse();
         assertThat(environment.getProperty("app.security.cookie.domain")).isEqualTo("pos.example");
+        assertThat(environment.getProperty("springdoc.api-docs.enabled", Boolean.class)).isFalse();
+        assertThat(environment.getProperty("springdoc.swagger-ui.enabled", Boolean.class)).isFalse();
 
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "select count(*) from flyway_schema_history where version = '1'",
@@ -181,6 +183,12 @@ class ProdProfileSmokeTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(firstAccessToken)))
                 .andExpect(status().isOk())
                 .andReturn()).get("username").asText()).isEqualTo(ADMIN_USERNAME);
+
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/swagger-ui/index.html"))
+                .andExpect(status().isNotFound());
 
         JsonNode assignableRoles = bodyOf(mockMvc.perform(get("/roles/assignable")
                         .header(HttpHeaders.AUTHORIZATION, bearer(firstAccessToken)))

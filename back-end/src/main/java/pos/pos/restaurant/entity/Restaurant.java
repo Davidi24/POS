@@ -62,6 +62,7 @@ import java.util.UUID;
         AND char_length(btrim(slug)) > 0
         AND char_length(currency) = 3
         AND status IN ('PENDING', 'REJECTED', 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED')
+        AND (owner_id IS NOT NULL OR status IN ('PENDING', 'REJECTED'))
         AND (
             pending_owner_client_target IS NULL
             OR pending_owner_client_target IN ('WEB', 'MOBILE', 'UNIVERSAL')
@@ -204,6 +205,10 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
     protected void validateState() {
         if (timezone != null && !RestaurantFieldNormalizer.isValidTimezone(timezone)) {
             throw new IllegalStateException("timezone must be a valid IANA identifier");
+        }
+
+        if (ownerId == null && status != RestaurantStatus.PENDING && status != RestaurantStatus.REJECTED) {
+            throw new IllegalStateException("ownerId is required unless restaurant status is PENDING or REJECTED");
         }
     }
 }
