@@ -8,16 +8,7 @@ public final class BranchFieldNormalizer {
     }
 
     public static String normalizeCode(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
+        return NormalizationUtils.normalizeCode(value);
     }
 
     public static String normalizeCodeOrFallback(String value, String fallbackValue) {

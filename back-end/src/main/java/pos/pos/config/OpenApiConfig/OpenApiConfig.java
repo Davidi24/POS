@@ -56,7 +56,7 @@ public class OpenApiConfig {
     public GroupedOpenApi restaurantGroup() {
         return GroupedOpenApi.builder()
                 .group("Restaurants")
-                .pathsToMatch("/restaurants", "/restaurants/**")
+                .packagesToScan("pos.pos.restaurant.controller")
                 .build();
     }
 
@@ -64,7 +64,7 @@ public class OpenApiConfig {
     public GroupedOpenApi settingsGroup() {
         return GroupedOpenApi.builder()
                 .group("Settings")
-                .pathsToMatch("/settings", "/settings/**")
+                .packagesToScan("pos.pos.settings.controller")
                 .build();
     }
 
