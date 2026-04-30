@@ -18,6 +18,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
@@ -66,6 +68,7 @@ public class DevicePairingToken {
     @Column(name = "used_at", columnDefinition = "timestamptz")
     private OffsetDateTime usedAt;
 
+    @JdbcTypeCode(SqlTypes.INET)
     @Column(name = "requested_ip", columnDefinition = "inet")
     private String requestedIp;
 
