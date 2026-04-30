@@ -145,6 +145,7 @@ abstract class AbstractSettingsIntegrationTest {
         restaurant.setCurrency("USD");
         restaurant.setTimezone("Europe/Berlin");
         restaurant.setStatus(RestaurantStatus.ACTIVE);
+        restaurant.setOwnerId(actorId);
         restaurant.setActive(true);
         restaurant.setCreatedBy(actorId);
         restaurant.setUpdatedBy(actorId);
