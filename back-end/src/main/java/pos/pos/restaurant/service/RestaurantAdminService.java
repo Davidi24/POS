@@ -1,5 +1,6 @@
 package pos.pos.restaurant.service;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -107,7 +108,9 @@ public class RestaurantAdminService {
                 actorId
         );
 
-        restaurantRepository.save(restaurant);
+        if (restaurant.getId() == null) {
+            restaurant.setId(UuidCreator.getTimeOrdered());
+        }
 
         User owner = restaurantOwnerProvisioningService.createAndInviteOwner(
                 request.getOwner(),
@@ -147,8 +150,12 @@ public class RestaurantAdminService {
 
         restaurantValidationService.validateStatusTransition(restaurant.getStatus(), request.getStatus());
         restaurantPolicy.assertCanChangeOwner(scope, restaurant, request.getOwnerUserId());
-        UUID ownerUserId = restaurantValidationService.validateOwnerUser(request.getOwnerUserId(), restaurant.getId());
         validateStatusFields(request.getIsActive(), request.getStatus());
+        UUID ownerUserId = restaurantValidationService.validateOwnerUser(
+                request.getOwnerUserId(),
+                restaurant.getId(),
+                request.getStatus()
+        );
         var normalizedFields = restaurantValidationService.normalizeAndValidateFields(
                 request.getCode(),
                 request.getSlug(),
