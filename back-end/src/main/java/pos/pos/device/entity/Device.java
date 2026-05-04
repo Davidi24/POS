@@ -1,17 +1,6 @@
 package pos.pos.device.entity;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,6 +9,8 @@ import org.hibernate.annotations.Check;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import pos.pos.common.entity.AbstractAuditedEntity;
+import pos.pos.device.enums.DeviceStatus;
+import pos.pos.device.enums.DeviceType;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.utils.NormalizationUtils;
@@ -50,8 +41,6 @@ import java.util.Objects;
 @Check(constraints = """
         char_length(btrim(code)) > 0
         AND char_length(btrim(name)) > 0
-        AND char_length(btrim(device_type)) > 0
-        AND char_length(btrim(status)) > 0
         """)
 @Getter
 @Setter
@@ -82,29 +71,37 @@ public class Device extends AbstractAuditedEntity {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
+    // Type of device, e.g. TABLET, PRINTER, KDS, POS_TERMINAL.
+    @Enumerated(EnumType.STRING)
     @Column(name = "device_type", nullable = false, length = 30)
-    private String deviceType;
+    private DeviceType deviceType;
 
+    // Device brand, e.g. Samsung, Epson, Apple.
     @Column(name = "manufacturer", length = 100)
     private String manufacturer;
 
+    // Device model, e.g. iPad Air, TM-T20III.
     @Column(name = "model", length = 100)
     private String model;
 
     @Column(name = "serial_number", length = 100)
     private String serialNumber;
 
+    // Device platform, e.g. Android, iOS, Windows.
     @Column(name = "platform", length = 50)
     private String platform;
 
+    // Operating system version.
     @Column(name = "os_version", length = 50)
     private String osVersion;
 
+    // Installed POS app version.
     @Column(name = "app_version", length = 50)
     private String appVersion;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
-    private String status = "PROVISIONING";
+    private DeviceStatus status = DeviceStatus.PROVISIONING;
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
@@ -115,9 +112,11 @@ public class Device extends AbstractAuditedEntity {
     @Column(name = "auth_secret_hash", columnDefinition = "text")
     private String authSecretHash;
 
+    // Time when the device auth secret was last changed.
     @Column(name = "auth_secret_rotated_at", columnDefinition = "timestamptz")
     private OffsetDateTime authSecretRotatedAt;
 
+    // Last time the device contacted the backend.
     @Column(name = "last_seen_at", columnDefinition = "timestamptz")
     private OffsetDateTime lastSeenAt;
 
@@ -137,6 +136,7 @@ public class Device extends AbstractAuditedEntity {
     @OneToOne(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private DevicePrinterProfile printerProfile;
 
+    // add or remove one DeviceAssignment from the list
     public void addAssignment(DeviceAssignment assignment) {
         if (assignment == null) {
             return;
@@ -171,14 +171,12 @@ public class Device extends AbstractAuditedEntity {
     protected void normalizeFields() {
         code = normalizeCode(code == null ? name : code);
         name = NormalizationUtils.normalize(name);
-        deviceType = normalizeToken(deviceType);
         manufacturer = NormalizationUtils.normalize(manufacturer);
         model = NormalizationUtils.normalize(model);
         serialNumber = NormalizationUtils.normalizeUpper(serialNumber);
         platform = NormalizationUtils.normalize(platform);
         osVersion = NormalizationUtils.normalize(osVersion);
         appVersion = NormalizationUtils.normalize(appVersion);
-        status = normalizeToken(status);
         authSecretHash = NormalizationUtils.normalize(authSecretHash);
         ipAddress = NormalizationUtils.normalize(ipAddress);
         macAddress = normalizeMacAddress(macAddress);
