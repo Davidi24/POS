@@ -161,6 +161,7 @@ class MenuApiIntegrationTest {
         assertThat(paths.has("/menus/{menuId}")).isTrue();
         assertThat(paths.has("/menus/{menuId}/status")).isTrue();
         assertThat(paths.has("/menus/{menuId}/sections/{sectionId}/items/{itemId}/variants")).isTrue();
+        assertThat(paths.has("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups")).isTrue();
         assertThat(paths.has("/option-group-types")).isTrue();
         assertThat(paths.has("/option-groups")).isTrue();
         assertThat(paths.has("/option-groups/{groupId}/items")).isTrue();
@@ -1300,6 +1301,155 @@ class MenuApiIntegrationTest {
         assertThat(messageOf(duplicateNameResult)).isEqualTo("Option item name already in use for this option group");
         assertThat(messageOf(mismatchResult)).isEqualTo("Option item does not belong to this option group");
         assertThat(optionItemRepository.findById(createdItemId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("MENU-ITEM-OPTION-GROUP-001 through MENU-ITEM-OPTION-GROUP-009 manage menu item option group links")
+    void shouldManageMenuItemOptionGroupLinks() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("item-links", admin.getId());
+        Restaurant foreignRestaurant = createRestaurant("item-links-foreign", admin.getId());
+        Menu menu = createMenu(restaurant, "breakfast", "Breakfast", true, 1, admin.getId());
+        MenuSection section = createSection(menu, "Mains", "Main dishes", true, 1);
+        MenuItem burger = createItem(section, "BRG-001", "Burger", new BigDecimal("12.50"), true, 1);
+        MenuItem wrap = createItem(section, "WRP-001", "Wrap", new BigDecimal("11.50"), true, 2);
+        OptionGroupType type = createOptionGroupType("single_select", "Single Select");
+        OptionGroup sauces = createOptionGroup(restaurant, type, "Sauces", "Choose a sauce", 0, 2, false, true, 1);
+        OptionGroup toppings = createOptionGroup(restaurant, type, "Toppings", "Choose toppings", 0, 3, false, true, 2);
+        OptionGroup foreignGroup = createOptionGroup(foreignRestaurant, type, "Foreign", "Foreign group", 0, 1, false, true, 1);
+        MenuItemOptionGroup existingLink = linkOptionGroup(burger, sauces, 1, null, null, null);
+        MenuItemOptionGroup foreignLink = linkOptionGroup(wrap, toppings, 1, null, null, null);
+
+        String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "MENU-ITEM-OPTION-GROUPS");
+
+        MvcResult listResult = mockMvc.perform(get("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups",
+                        menu.getId(), section.getId(), burger.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode listBody = bodyOf(listResult);
+        assertThat(listBody).hasSize(1);
+        assertThat(listBody.get(0).get("linkId").asText()).isEqualTo(existingLink.getId().toString());
+        assertThat(listBody.get(0).get("name").asText()).isEqualTo("Sauces");
+
+        MvcResult createResult = mockMvc.perform(post("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups",
+                        menu.getId(), section.getId(), burger.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "optionGroupId", toppings.getId().toString(),
+                                "displayOrder", 3,
+                                "minSelectOverride", 1,
+                                "maxSelectOverride", 2,
+                                "requiredOverride", true
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode createBody = bodyOf(createResult);
+        UUID createdLinkId = UUID.fromString(createBody.get("linkId").asText());
+        assertThat(createBody.get("optionGroupId").asText()).isEqualTo(toppings.getId().toString());
+        assertThat(createBody.get("displayOrder").asInt()).isEqualTo(3);
+        assertThat(createBody.get("minSelectOverride").asInt()).isEqualTo(1);
+        assertThat(createBody.get("maxSelectOverride").asInt()).isEqualTo(2);
+        assertThat(createBody.get("requiredOverride").asBoolean()).isTrue();
+
+        MvcResult updateResult = mockMvc.perform(put("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId}",
+                        menu.getId(), section.getId(), burger.getId(), createdLinkId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayOrder", 5,
+                                "minSelectOverride", 0,
+                                "maxSelectOverride", 1,
+                                "requiredOverride", false
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode updateBody = bodyOf(updateResult);
+        assertThat(updateBody.get("displayOrder").asInt()).isEqualTo(5);
+        assertThat(updateBody.get("minSelectOverride").asInt()).isZero();
+        assertThat(updateBody.get("maxSelectOverride").asInt()).isEqualTo(1);
+        assertThat(updateBody.get("requiredOverride").asBoolean()).isFalse();
+
+        MvcResult negativeDisplayOrderResult = mockMvc.perform(post("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups",
+                        menu.getId(), section.getId(), burger.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "optionGroupId", toppings.getId().toString(),
+                                "displayOrder", -1
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        MvcResult negativeMinSelectResult = mockMvc.perform(post("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups",
+                        menu.getId(), section.getId(), burger.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "optionGroupId", toppings.getId().toString(),
+                                "minSelectOverride", -1
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        MvcResult invalidBoundsResult = mockMvc.perform(put("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId}",
+                        menu.getId(), section.getId(), burger.getId(), createdLinkId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayOrder", 1,
+                                "minSelectOverride", 3,
+                                "maxSelectOverride", 2
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        MvcResult duplicateCreateResult = mockMvc.perform(post("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups",
+                        menu.getId(), section.getId(), burger.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "optionGroupId", sauces.getId().toString()
+                        ))))
+                .andExpect(status().isConflict())
+                .andReturn();
+
+        MvcResult mismatchResult = mockMvc.perform(put("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId}",
+                        menu.getId(), section.getId(), burger.getId(), foreignLink.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayOrder", 1
+                        ))))
+                .andExpect(status().isConflict())
+                .andReturn();
+
+        MvcResult foreignGroupResult = mockMvc.perform(post("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups",
+                        menu.getId(), section.getId(), burger.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "optionGroupId", foreignGroup.getId().toString()
+                        ))))
+                .andExpect(status().isConflict())
+                .andReturn();
+
+        mockMvc.perform(delete("/menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId}",
+                        menu.getId(), section.getId(), burger.getId(), createdLinkId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isNoContent());
+
+        assertThat(messageOf(negativeDisplayOrderResult)).isEqualTo("displayOrder: displayOrder must be greater than or equal to 0");
+        assertThat(messageOf(negativeMinSelectResult)).isEqualTo("minSelectOverride: minSelectOverride must be greater than or equal to 0");
+        assertThat(messageOf(invalidBoundsResult)).isEqualTo("minSelectOverride must be less than or equal to maxSelectOverride");
+        assertThat(messageOf(duplicateCreateResult)).isEqualTo("Option group already linked to this menu item");
+        assertThat(messageOf(mismatchResult)).isEqualTo("Menu item option group link does not belong to this item");
+        assertThat(messageOf(foreignGroupResult)).isEqualTo("Option group does not belong to the same restaurant as this menu item");
+        assertThat(menuItemOptionGroupRepository.findById(createdLinkId)).isEmpty();
     }
 
     private User adminUser() {

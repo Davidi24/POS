@@ -96,47 +96,47 @@ OPTION GROUP TYPE
 
 OPTION GROUP
 
-[ ] OPTION-GROUP-001 GET /option-groups returns option groups for a restaurant
-[ ] OPTION-GROUP-002 GET /option-groups supports filtering by typeId
-[ ] OPTION-GROUP-003 GET /option-groups supports filtering by active state
-[ ] OPTION-GROUP-004 GET /option-groups supports search by name
-[ ] OPTION-GROUP-005 GET /option-groups supports includeItems expansion
-[ ] OPTION-GROUP-006 POST /option-groups creates an option group
-[ ] OPTION-GROUP-007 GET /option-groups/{groupId} returns one option group
-[ ] OPTION-GROUP-008 PUT /option-groups/{groupId} updates type, name, description, selection rules, active, and displayOrder
-[ ] OPTION-GROUP-009 PATCH /option-groups/{groupId}/status updates only option group active state
-[ ] OPTION-GROUP-010 DELETE /option-groups/{groupId} deletes an option group
-[ ] OPTION-GROUP-011 Option group write endpoints reject negative displayOrder
-[ ] OPTION-GROUP-012 Option group write endpoints reject negative minSelect or maxSelect
-[ ] OPTION-GROUP-013 Option group write endpoints reject minSelect greater than maxSelect
-[ ] OPTION-GROUP-014 POST or PUT /option-groups rejects duplicate restaurantId + name combinations
+[x] OPTION-GROUP-001 GET /option-groups returns option groups for a restaurant
+[x] OPTION-GROUP-002 GET /option-groups supports filtering by typeId
+[x] OPTION-GROUP-003 GET /option-groups supports filtering by active state
+[x] OPTION-GROUP-004 GET /option-groups supports search by name
+[x] OPTION-GROUP-005 GET /option-groups supports includeItems expansion
+[x] OPTION-GROUP-006 POST /option-groups creates an option group
+[x] OPTION-GROUP-007 GET /option-groups/{groupId} returns one option group
+[x] OPTION-GROUP-008 PUT /option-groups/{groupId} updates type, name, description, selection rules, active, and displayOrder
+[x] OPTION-GROUP-009 PATCH /option-groups/{groupId}/status updates only option group active state
+[x] OPTION-GROUP-010 DELETE /option-groups/{groupId} deletes an option group
+[x] OPTION-GROUP-011 Option group write endpoints reject negative displayOrder
+[x] OPTION-GROUP-012 Option group write endpoints reject negative minSelect or maxSelect
+[x] OPTION-GROUP-013 Option group write endpoints reject minSelect greater than maxSelect
+[x] OPTION-GROUP-014 POST or PUT /option-groups rejects duplicate restaurantId + name combinations
 
 
 OPTION ITEM
 
-[ ] OPTION-ITEM-001 GET /option-groups/{groupId}/items returns items for one option group
-[ ] OPTION-ITEM-002 GET /option-groups/{groupId}/items supports available filtering
-[ ] OPTION-ITEM-003 POST /option-groups/{groupId}/items creates an item under the target option group
-[ ] OPTION-ITEM-004 PUT /option-groups/{groupId}/items/{itemId} updates code, name, priceDelta, available, and displayOrder
-[ ] OPTION-ITEM-005 PATCH /option-groups/{groupId}/items/{itemId}/availability updates only option item availability
-[ ] OPTION-ITEM-006 DELETE /option-groups/{groupId}/items/{itemId} deletes an option item
-[ ] OPTION-ITEM-007 Option item write endpoints reject negative displayOrder
-[ ] OPTION-ITEM-008 POST or PUT /option-groups/{groupId}/items derives code from input rules when needed
-[ ] OPTION-ITEM-009 POST or PUT /option-groups/{groupId}/items rejects duplicate optionGroupId + name combinations
-[ ] OPTION-ITEM-010 Option item reads and writes return 409 when itemId does not belong to groupId
+[x] OPTION-ITEM-001 GET /option-groups/{groupId}/items returns items for one option group
+[x] OPTION-ITEM-002 GET /option-groups/{groupId}/items supports available filtering
+[x] OPTION-ITEM-003 POST /option-groups/{groupId}/items creates an item under the target option group
+[x] OPTION-ITEM-004 PUT /option-groups/{groupId}/items/{itemId} updates code, name, priceDelta, available, and displayOrder
+[x] OPTION-ITEM-005 PATCH /option-groups/{groupId}/items/{itemId}/availability updates only option item availability
+[x] OPTION-ITEM-006 DELETE /option-groups/{groupId}/items/{itemId} deletes an option item
+[x] OPTION-ITEM-007 Option item write endpoints reject negative displayOrder
+[x] OPTION-ITEM-008 POST or PUT /option-groups/{groupId}/items derives code from input rules when needed
+[x] OPTION-ITEM-009 POST or PUT /option-groups/{groupId}/items rejects duplicate optionGroupId + name combinations
+[x] OPTION-ITEM-010 Option item reads and writes return 409 when itemId does not belong to groupId
 
 
 MENU ITEM OPTION GROUP LINK
 
-[ ] MENU-ITEM-OPTION-GROUP-001 GET /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups returns assigned option groups for one menu item
-[ ] MENU-ITEM-OPTION-GROUP-002 POST /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups links an option group to a menu item
-[ ] MENU-ITEM-OPTION-GROUP-003 PUT /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId} updates displayOrder and selection overrides
-[ ] MENU-ITEM-OPTION-GROUP-004 DELETE /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId} removes a linked option group
-[ ] MENU-ITEM-OPTION-GROUP-005 Link write endpoints reject negative displayOrder
-[ ] MENU-ITEM-OPTION-GROUP-006 Link write endpoints reject negative minSelectOverride or maxSelectOverride
-[ ] MENU-ITEM-OPTION-GROUP-007 Link write endpoints reject minSelectOverride greater than maxSelectOverride
-[ ] MENU-ITEM-OPTION-GROUP-008 POST /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups rejects duplicate menuItemId + optionGroupId links
-[ ] MENU-ITEM-OPTION-GROUP-009 Link reads and writes return 409 when linkId does not belong to itemId
+[x] MENU-ITEM-OPTION-GROUP-001 GET /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups returns assigned option groups for one menu item
+[x] MENU-ITEM-OPTION-GROUP-002 POST /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups links an option group to a menu item
+[x] MENU-ITEM-OPTION-GROUP-003 PUT /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId} updates displayOrder and selection overrides
+[x] MENU-ITEM-OPTION-GROUP-004 DELETE /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId} removes a linked option group
+[x] MENU-ITEM-OPTION-GROUP-005 Link write endpoints reject negative displayOrder
+[x] MENU-ITEM-OPTION-GROUP-006 Link write endpoints reject negative minSelectOverride or maxSelectOverride
+[x] MENU-ITEM-OPTION-GROUP-007 Link write endpoints reject minSelectOverride greater than maxSelectOverride
+[x] MENU-ITEM-OPTION-GROUP-008 POST /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups rejects duplicate menuItemId + optionGroupId links
+[x] MENU-ITEM-OPTION-GROUP-009 Link reads and writes return 409 when linkId does not belong to itemId
 
 
 RESPONSE AND ERROR BEHAVIOR
