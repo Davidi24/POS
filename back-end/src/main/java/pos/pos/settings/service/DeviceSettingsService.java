@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.device.entity.Device;
 import pos.pos.device.entity.DevicePrinterProfile;
+import pos.pos.device.enums.DeviceStatus;
+import pos.pos.device.enums.DeviceType;
 import pos.pos.device.enums.PrinterConnectionType;
 import pos.pos.device.repository.DeviceRepository;
 import pos.pos.exception.auth.AuthException;
@@ -41,8 +43,8 @@ public class DeviceSettingsService {
     @Transactional(readOnly = true)
     public List<DeviceResponse> getPrinters(Authentication authentication, UUID restaurantId) {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
-        return deviceRepository.findAllByRestaurant_IdOrderByNameAsc(restaurantId).stream()
-                .filter(this::isPrinter)
+
+        return deviceRepository.findRestaurantPrinters(restaurantId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -50,9 +52,13 @@ public class DeviceSettingsService {
     @Transactional
     public DeviceResponse createPrinter(Authentication authentication, UUID restaurantId, UpsertDeviceRequest request) {
         Restaurant restaurant = settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
+
         Device device = new Device();
         device.setRestaurant(restaurant);
+
         applyDevice(device, restaurantId, request, true);
+        stampAuditFields(device, settingsDomainSupport.currentActorId(authentication));
+
         return saveAuditAndRespond(
                 authentication,
                 device,
@@ -71,9 +77,12 @@ public class DeviceSettingsService {
             UpsertDeviceRequest request
     ) {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
-        Device device = requireDevice(restaurantId, printerId);
-        ensurePrinter(device);
+
+        Device device = requirePrinter(restaurantId, printerId);
+
         applyDevice(device, restaurantId, request, true);
+        stampAuditFields(device, settingsDomainSupport.currentActorId(authentication));
+
         return saveAuditAndRespond(
                 authentication,
                 device,
@@ -87,17 +96,18 @@ public class DeviceSettingsService {
     @Transactional
     public void deletePrinter(Authentication authentication, UUID restaurantId, UUID printerId) {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
-        Device device = requireDevice(restaurantId, printerId);
-        ensurePrinter(device);
+
+        Device device = requirePrinter(restaurantId, printerId);
+
         deleteAndAudit(authentication, device, "DEVICE_PRINTER", "DELETE", "Deleted printer settings");
     }
 
     @Transactional(readOnly = true)
     public PrinterRouteResponse getPrinterRoutes(Authentication authentication, UUID restaurantId, UUID branchId) {
         settingsDomainSupport.requireAccessibleBranch(authentication, restaurantId, branchId);
-        List<Device> printers = deviceRepository.findAllByRestaurant_IdAndBranch_IdOrderByNameAsc(restaurantId, branchId).stream()
-                .filter(this::isPrinter)
-                .toList();
+
+        List<Device> printers = deviceRepository.findBranchPrinters(restaurantId, branchId);
+
         return PrinterRouteResponse.builder()
                 .restaurantId(restaurantId)
                 .branchId(branchId)
@@ -114,15 +124,15 @@ public class DeviceSettingsService {
             UpdatePrinterRoutesRequest request
     ) {
         Branch branch = settingsDomainSupport.requireAccessibleBranch(authentication, restaurantId, branchId);
+
         Set<UUID> requestedPrinterIds = request.getPrinterIds() == null
                 ? Set.of()
                 : new LinkedHashSet<>(request.getPrinterIds());
 
-        List<Device> restaurantPrinters = deviceRepository.findAllByRestaurant_IdOrderByNameAsc(restaurantId).stream()
-                .filter(this::isPrinter)
-                .toList();
+        List<Device> restaurantPrinters = deviceRepository.findRestaurantPrinters(restaurantId);
 
         List<Device> toUpdate = new ArrayList<>();
+
         for (Device printer : restaurantPrinters) {
             if (requestedPrinterIds.contains(printer.getId())) {
                 printer.setBranch(branch);
@@ -136,7 +146,12 @@ public class DeviceSettingsService {
             }
         }
 
-        if (requestedPrinterIds.size() > restaurantPrinters.stream().map(Device::getId).filter(requestedPrinterIds::contains).count()) {
+        long foundRequestedPrinters = restaurantPrinters.stream()
+                .map(Device::getId)
+                .filter(requestedPrinterIds::contains)
+                .count();
+
+        if (requestedPrinterIds.size() > foundRequestedPrinters) {
             throw new DeviceNotFoundException();
         }
 
@@ -160,6 +175,7 @@ public class DeviceSettingsService {
     @Transactional(readOnly = true)
     public PrinterRouteTestResponse testPrinterRoutes(Authentication authentication, UUID restaurantId, UUID branchId) {
         PrinterRouteResponse routes = getPrinterRoutes(authentication, restaurantId, branchId);
+
         return PrinterRouteTestResponse.builder()
                 .restaurantId(restaurantId)
                 .branchId(branchId)
@@ -172,7 +188,8 @@ public class DeviceSettingsService {
     @Transactional(readOnly = true)
     public List<DeviceResponse> getDevices(Authentication authentication, UUID restaurantId, UUID branchId) {
         settingsDomainSupport.requireAccessibleBranch(authentication, restaurantId, branchId);
-        return deviceRepository.findAllByRestaurant_IdAndBranch_IdOrderByNameAsc(restaurantId, branchId).stream()
+
+        return deviceRepository.findBranchNonPrinterDevices(restaurantId, branchId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -185,11 +202,16 @@ public class DeviceSettingsService {
             UpsertDeviceRequest request
     ) {
         Branch branch = settingsDomainSupport.requireAccessibleBranch(authentication, restaurantId, branchId);
+
+        ensureMatchingBranchPath(request, branchId);
+
         Device device = new Device();
         device.setRestaurant(branch.getRestaurant());
         device.setBranch(branch);
+
         applyDevice(device, restaurantId, request, false);
-        device.setBranch(branch);
+        stampAuditFields(device, settingsDomainSupport.currentActorId(authentication));
+
         return saveAuditAndRespond(
                 authentication,
                 device,
@@ -208,9 +230,15 @@ public class DeviceSettingsService {
             UUID deviceId,
             UpsertDeviceRequest request
     ) {
+        ensureMatchingBranchPath(request, branchId);
+
         Device device = requireBranchDevice(authentication, restaurantId, branchId, deviceId);
+        Branch branch = settingsDomainSupport.requireAccessibleBranch(authentication, restaurantId, branchId);
+
         applyDevice(device, restaurantId, request, false);
-        device.setBranch(settingsDomainSupport.requireAccessibleBranch(authentication, restaurantId, branchId));
+        device.setBranch(branch);
+        stampAuditFields(device, settingsDomainSupport.currentActorId(authentication));
+
         return saveAuditAndRespond(
                 authentication,
                 device,
@@ -230,9 +258,21 @@ public class DeviceSettingsService {
             UpdateDeviceStatusRequest request
     ) {
         Device device = requireBranchDevice(authentication, restaurantId, branchId, deviceId);
-        device.setStatus(request.getStatus());
-        device.setActive(Boolean.TRUE.equals(request.getActive()));
-        device.setOnline(Boolean.TRUE.equals(request.getOnline()));
+
+        if (request.getStatus() != null) {
+            device.setStatus(request.getStatus());
+        }
+
+        if (request.getActive() != null) {
+            device.setActive(request.getActive());
+        }
+
+        if (request.getOnline() != null) {
+            device.setOnline(request.getOnline());
+        }
+
+        stampAuditFields(device, settingsDomainSupport.currentActorId(authentication));
+
         return saveAuditAndRespond(
                 authentication,
                 device,
@@ -246,24 +286,44 @@ public class DeviceSettingsService {
     @Transactional
     public void deleteDevice(Authentication authentication, UUID restaurantId, UUID branchId, UUID deviceId) {
         Device device = requireBranchDevice(authentication, restaurantId, branchId, deviceId);
+
         deleteAndAudit(authentication, device, "DEVICE", "DELETE", "Deleted branch device");
     }
 
     private void applyDevice(Device device, UUID restaurantId, UpsertDeviceRequest request, boolean printerMode) {
-        Branch branch = request.getBranchId() == null ? null : settingsDomainSupport.resolveBranch(restaurantId, request.getBranchId());
-        device.setBranch(branch);
+        if (printerMode) {
+            Branch branch = request.getBranchId() == null
+                    ? null
+                    : settingsDomainSupport.resolveBranch(restaurantId, request.getBranchId());
+
+            device.setBranch(branch);
+            device.setDeviceType(DeviceType.PRINTER);
+        } else {
+            ensureNonPrinterPayload(request);
+            device.setDeviceType(parseRequiredDeviceType(request.getDeviceType()));
+        }
+
         device.setCode(request.getCode());
         device.setName(request.getName());
-        device.setDeviceType(printerMode ? "PRINTER" : request.getDeviceType());
         device.setManufacturer(request.getManufacturer());
         device.setModel(request.getModel());
         device.setSerialNumber(request.getSerialNumber());
         device.setPlatform(request.getPlatform());
         device.setOsVersion(request.getOsVersion());
         device.setAppVersion(request.getAppVersion());
-        device.setStatus(request.getStatus());
-        device.setActive(Boolean.TRUE.equals(request.getActive()));
-        device.setOnline(Boolean.TRUE.equals(request.getOnline()));
+
+        if (request.getStatus() != null) {
+            device.setStatus(parseDeviceStatus(request.getStatus()));
+        }
+
+        if (request.getActive() != null) {
+            device.setActive(request.getActive());
+        }
+
+        if (request.getOnline() != null) {
+            device.setOnline(request.getOnline());
+        }
+
         device.setIpAddress(request.getIpAddress());
         device.setMacAddress(request.getMacAddress());
         device.setNotes(request.getNotes());
@@ -273,9 +333,7 @@ public class DeviceSettingsService {
             return;
         }
 
-        if (device.getPrinterProfile() != null && isPrinter(device)) {
-            applyPrinterProfile(device.getPrinterProfile(), request);
-        } else if (device.getPrinterProfile() != null) {
+        if (device.getPrinterProfile() != null) {
             device.setPrinterProfile(null);
         }
     }
@@ -289,6 +347,7 @@ public class DeviceSettingsService {
         }
 
         DevicePrinterProfile printerProfile = device.getPrinterProfile();
+
         if (printerProfile == null) {
             printerProfile = new DevicePrinterProfile();
             device.setPrinterProfile(printerProfile);
@@ -306,18 +365,16 @@ public class DeviceSettingsService {
         printerProfile.setCashDrawerKickEnabled(Boolean.TRUE.equals(request.getCashDrawerKickEnabled()));
     }
 
-    private Device requireDevice(UUID restaurantId, UUID deviceId) {
-        return deviceRepository.findByIdAndRestaurant_Id(deviceId, restaurantId)
+    private Device requirePrinter(UUID restaurantId, UUID deviceId) {
+        return deviceRepository.findPrinterByIdAndRestaurantId(deviceId, restaurantId)
                 .orElseThrow(DeviceNotFoundException::new);
     }
 
     private Device requireBranchDevice(Authentication authentication, UUID restaurantId, UUID branchId, UUID deviceId) {
         settingsDomainSupport.requireAccessibleBranch(authentication, restaurantId, branchId);
-        Device device = requireDevice(restaurantId, deviceId);
-        if (device.getBranch() == null || !branchId.equals(device.getBranch().getId())) {
-            throw new DeviceNotFoundException();
-        }
-        return device;
+
+        return deviceRepository.findBranchNonPrinterById(deviceId, restaurantId, branchId)
+                .orElseThrow(DeviceNotFoundException::new);
     }
 
     private Device saveDevice(Device device, String constraintMessage) {
@@ -339,7 +396,9 @@ public class DeviceSettingsService {
             String message
     ) {
         Device savedDevice = saveDevice(device, constraintMessage);
+
         auditDevice(authentication, savedDevice, entityType, action, message);
+
         return toResponse(savedDevice);
     }
 
@@ -352,6 +411,7 @@ public class DeviceSettingsService {
     ) {
         deviceRepository.delete(device);
         deviceRepository.flush();
+
         auditDevice(authentication, device, entityType, action, message);
     }
 
@@ -373,14 +433,56 @@ public class DeviceSettingsService {
         );
     }
 
-    private boolean isPrinter(Device device) {
-        return device.getPrinterProfile() != null
-                || "PRINTER".equals(normalizeToken(device.getDeviceType()));
+    private void ensureMatchingBranchPath(UpsertDeviceRequest request, UUID branchId) {
+        if (request.getBranchId() != null && !branchId.equals(request.getBranchId())) {
+            throw new AuthException("branchId must match the branch path", HttpStatus.BAD_REQUEST);
+        }
     }
 
-    private void ensurePrinter(Device device) {
-        if (!isPrinter(device)) {
-            throw new DeviceNotFoundException();
+    private void ensureNonPrinterPayload(UpsertDeviceRequest request) {
+        if (DeviceType.PRINTER.name().equals(normalizeToken(request.getDeviceType()))) {
+            throw new AuthException("deviceType PRINTER is only allowed on printer endpoints", HttpStatus.BAD_REQUEST);
+        }
+
+        if (request.getPrinterConnectionType() != null
+                || request.getPaperWidthMm() != null
+                || request.getPrinterIp() != null
+                || request.getPrinterPort() != null
+                || request.getAutoCut() != null
+                || request.getCashDrawerKickEnabled() != null) {
+            throw new AuthException("printer-specific fields are not allowed on branch device endpoints", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void stampAuditFields(Device device, UUID actorId) {
+        if (device.getCreatedBy() == null) {
+            device.setCreatedBy(actorId);
+        }
+
+        device.setUpdatedBy(actorId);
+    }
+
+    private DeviceType parseRequiredDeviceType(String value) {
+        if (value == null || value.isBlank()) {
+            throw new AuthException("deviceType is required", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            return DeviceType.valueOf(normalizeToken(value));
+        } catch (IllegalArgumentException ex) {
+            throw new AuthException("Invalid deviceType", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private DeviceStatus parseDeviceStatus(String value) {
+        if (value == null || value.isBlank()) {
+            throw new AuthException("status is required", HttpStatus.BAD_REQUEST);
+        }
+
+        try {
+            return DeviceStatus.valueOf(normalizeToken(value));
+        } catch (IllegalArgumentException ex) {
+            throw new AuthException("Invalid status", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -390,20 +492,21 @@ public class DeviceSettingsService {
 
     private DeviceResponse toResponse(Device device) {
         DevicePrinterProfile printerProfile = device.getPrinterProfile();
+
         return DeviceResponse.builder()
                 .id(device.getId())
                 .restaurantId(device.getRestaurant() == null ? null : device.getRestaurant().getId())
                 .branchId(device.getBranch() == null ? null : device.getBranch().getId())
                 .code(device.getCode())
                 .name(device.getName())
-                .deviceType(device.getDeviceType())
+                .deviceType(device.getDeviceType() == null ? null : device.getDeviceType().name())
                 .manufacturer(device.getManufacturer())
                 .model(device.getModel())
                 .serialNumber(device.getSerialNumber())
                 .platform(device.getPlatform())
                 .osVersion(device.getOsVersion())
                 .appVersion(device.getAppVersion())
-                .status(device.getStatus())
+                .status(device.getStatus() == null ? null : device.getStatus().name())
                 .active(device.isActive())
                 .online(device.isOnline())
                 .lastSeenAt(device.getLastSeenAt())
