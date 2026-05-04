@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+// checked
 @Entity
 @Table(
         name = "settings",
@@ -96,12 +97,19 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "invoice_sequence_prefix", length = 20)
     private String invoiceSequencePrefix = "INV";
 
+    //    The reservationSlotMinutes doesn't mean the customer only sits for 15 minutes. It’s the duration of the reservation slot.
+    //    For example, if you set it to 15 minutes, it means:
+    //    A reservation starts at a specific time (e.g., 6:00 PM).
+    //    The table is reserved for 15 minutes (so, from 6:00 PM to 6:15 PM).
+    //    After 15 minutes, the slot is considered free for another reservation or customer.
     @Column(name = "reservation_slot_minutes", nullable = false)
     private int reservationSlotMinutes = 15;
 
+    // how much a costumer is supposed to stay before another costumer comes
     @Column(name = "default_table_turn_time_minutes", nullable = false)
     private int defaultTableTurnTimeMinutes = 90;
 
+    // if you want to charge for service like 10% go for the stuff for serving the food
     @Column(name = "service_charge_enabled", nullable = false)
     private boolean serviceChargeEnabled = false;
 
@@ -112,6 +120,7 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "service_charge_value", precision = 12, scale = 2)
     private BigDecimal serviceChargeValue;
 
+    // if you want to round the amount like 10.291 dollar to make 290 dollar
     @Column(name = "cash_rounding_enabled", nullable = false)
     private boolean cashRoundingEnabled = false;
 
@@ -121,9 +130,12 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "allow_split_bills", nullable = false)
     private boolean allowSplitBills = true;
 
+    // An open ticket is a bill or order that is created but not yet paid.
+    // It’s like a temporary reservation of the customer’s items or services until they settle the payment.
     @Column(name = "allow_open_tickets", nullable = false)
     private boolean allowOpenTickets = true;
 
+    // The requireCustomerForInvoice field determines whether the system requires a customer's information to generate an invoice.
     @Column(name = "require_customer_for_invoice", nullable = false)
     private boolean requireCustomerForInvoice = false;
 
@@ -153,6 +165,8 @@ public class Settings extends AbstractAuditedEntity {
 
         this.receiptSettings = receiptSettings;
 
+        // The second if is there to establish the relationship between Settings and SettingsReceipt
+        // objects, ensuring that the receiptSettings is linked back to the current Settings object.
         if (receiptSettings != null) {
             receiptSettings.setSettings(this);
         }
@@ -242,15 +256,6 @@ public class Settings extends AbstractAuditedEntity {
     }
 
     private String normalizePrefix(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
+        return NormalizationUtils.normalizeCode(value);
     }
 }

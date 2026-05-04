@@ -50,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -221,44 +222,48 @@ class RestaurantAdminServiceTest {
         )).willReturn(new RestaurantValidationService.NormalizedRestaurantFields("POS_MAIN", "pos-main"));
         given(restaurantRepository.save(any(Restaurant.class))).willAnswer(invocation -> {
             Restaurant saved = invocation.getArgument(0);
-            if (saved.getId() == null) {
-                saved.setId(TARGET_RESTAURANT_ID);
+            if (saved.getCreatedAt() == null) {
                 saved.setCreatedAt(OffsetDateTime.parse("2026-04-22T10:15:30Z"));
+            }
+            if (saved.getUpdatedAt() == null) {
                 saved.setUpdatedAt(saved.getCreatedAt());
             }
             return saved;
         });
         given(restaurantOwnerProvisioningService.createAndInviteOwner(
-                request.getOwner(),
-                TARGET_RESTAURANT_ID,
-                ACTOR_ID,
-                " POS Main "
+                same(request.getOwner()),
+                any(UUID.class),
+                eq(ACTOR_ID),
+                eq(" POS Main ")
         )).willReturn(owner);
 
         RestaurantResponse response = restaurantAdminService.createRestaurant(authentication, request);
 
         ArgumentCaptor<Restaurant> restaurantCaptor = ArgumentCaptor.forClass(Restaurant.class);
-        verify(restaurantRepository, times(2)).save(restaurantCaptor.capture());
-        Restaurant finalSaved = restaurantCaptor.getAllValues().get(1);
+        ArgumentCaptor<UUID> restaurantIdCaptor = ArgumentCaptor.forClass(UUID.class);
+        verify(restaurantRepository).save(restaurantCaptor.capture());
+        verify(restaurantOwnerProvisioningService).createAndInviteOwner(
+                same(request.getOwner()),
+                restaurantIdCaptor.capture(),
+                eq(ACTOR_ID),
+                eq(" POS Main ")
+        );
+
+        Restaurant finalSaved = restaurantCaptor.getValue();
         assertThat(finalSaved.getOwnerId()).isEqualTo(OWNER_ID);
         assertThat(finalSaved.getCode()).isEqualTo("POS_MAIN");
         assertThat(finalSaved.getSlug()).isEqualTo("pos-main");
         assertThat(finalSaved.isActive()).isTrue();
         assertThat(finalSaved.getStatus()).isEqualTo(RestaurantStatus.ACTIVE);
         assertThat(finalSaved.getCreatedBy()).isEqualTo(ACTOR_ID);
+        assertThat(finalSaved.getId()).isEqualTo(restaurantIdCaptor.getValue());
 
-        assertThat(response.getId()).isEqualTo(TARGET_RESTAURANT_ID);
+        assertThat(response.getId()).isEqualTo(restaurantIdCaptor.getValue());
         assertThat(response.getCode()).isEqualTo("POS_MAIN");
         assertThat(response.getSlug()).isEqualTo("pos-main");
         assertThat(response.getOwnerUserId()).isEqualTo(OWNER_ID);
         assertThat(response.getIsActive()).isTrue();
         assertThat(response.getStatus()).isEqualTo(RestaurantStatus.ACTIVE);
-        verify(restaurantOwnerProvisioningService).createAndInviteOwner(
-                request.getOwner(),
-                TARGET_RESTAURANT_ID,
-                ACTOR_ID,
-                " POS Main "
-        );
     }
 
     @Test

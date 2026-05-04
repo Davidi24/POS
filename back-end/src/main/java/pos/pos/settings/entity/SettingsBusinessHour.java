@@ -19,6 +19,7 @@ import pos.pos.restaurant.entity.Branch;
 
 import java.time.LocalTime;
 
+//checked
 @Entity
 @Table(
         name = "\"settings-business-hours\"",

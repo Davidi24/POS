@@ -17,6 +17,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import pos.pos.common.entity.AbstractAuditedEntity;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
@@ -119,6 +121,7 @@ public class Device extends AbstractAuditedEntity {
     @Column(name = "last_seen_at", columnDefinition = "timestamptz")
     private OffsetDateTime lastSeenAt;
 
+    @JdbcTypeCode(SqlTypes.INET)
     @Column(name = "ip_address", columnDefinition = "inet")
     private String ipAddress;
 
@@ -196,16 +199,7 @@ public class Device extends AbstractAuditedEntity {
     }
 
     private String normalizeCode(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
+        return NormalizationUtils.normalizeCode(value);
     }
 
     private String normalizeToken(String value) {
