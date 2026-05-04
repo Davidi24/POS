@@ -119,6 +119,7 @@ public class MenuService {
         return menuMapper.toMenuResponse(menu, sections, itemsBySectionId);
     }
 
+    //checked
     @Transactional
     public MenuResponse createMenu(Authentication authentication, CreateMenuRequest request) {
         Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, request.getRestaurantId());
@@ -141,19 +142,20 @@ public class MenuService {
         return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
     }
 
+    //checked
     @Transactional
     public MenuResponse updateMenu(Authentication authentication, UUID menuId, UpdateMenuRequest request) {
-        Menu menu = requireManageableMenu(authentication, menuId);
+        Menu menu = requireManageableMenu(authentication, menuId); //this line protects the whole update
 
-        String normalizedCode = resolveUpdateCode(request.getCode(), menu.getCode());
-        assertUniqueCode(menu.getRestaurant().getId(), normalizedCode, menu.getId());
+        String normalizedCode = resolveUpdateCode(request.getCode(), menu.getCode());//decides what the menu code should be
+        assertUniqueCode(menu.getRestaurant().getId(), normalizedCode, menu.getId());//menu code must be unique inside one restaurant
 
-        menu.setCode(normalizedCode);
-        menu.setName(NormalizationUtils.normalize(request.getName()));
+        menu.setCode(normalizedCode); //saves the final menu code
+        menu.setName(NormalizationUtils.normalize(request.getName()));//normalize space "  Breakfast Menu  " → "Breakfast Menu"
         menu.setDescription(NormalizationUtils.normalize(request.getDescription()));
-        menu.setActive(Boolean.TRUE.equals(request.getActive()));
-        menu.setDisplayOrder(request.getDisplayOrder());
-        menu.setUpdatedBy(restaurantScopeService.currentActor(authentication));
+        menu.setActive(Boolean.TRUE.equals(request.getActive()));//is the menu active or not
+        menu.setDisplayOrder(request.getDisplayOrder());//saves the order position of the menu
+        menu.setUpdatedBy(restaurantScopeService.currentActor(authentication));//stores who updated the menu
 
         return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
     }
@@ -182,14 +184,16 @@ public class MenuService {
                 .orElseThrow(MenuNotFoundException::new);
     }
 
+    //before updating, get the menu safely while going through some checks such as:
     private Menu requireManageableMenu(Authentication authentication, UUID menuId) {
         ActorScope scope = actorScopeService.resolve(authentication);
-        Menu menu = findExistingMenu(menuId);
-        menuPolicy.assertCanManage(scope, menu);
-        assertMenuWriteAllowed(menu.getRestaurant());
-        return menu;
+        Menu menu = findExistingMenu(menuId);// if menu doesnt exist stop,
+        menuPolicy.assertCanManage(scope, menu); //if user not allowed stop,
+        assertMenuWriteAllowed(menu.getRestaurant()); //if restaurant cannot be edited stop
+        return menu; //otherwise return the menu
     }
 
+    //checks if the restaurant can be modified
     private void assertMenuWriteAllowed(Restaurant restaurant) {
         RestaurantStatus status = restaurant.getStatus();
         restaurantValidationService.validateManageableStatus(status);
@@ -198,6 +202,7 @@ public class MenuService {
         }
     }
 
+    //checks that no other menu in the same restaurant already uses that code
     private void assertUniqueCode(UUID restaurantId, String code, UUID menuIdToExclude) {
         boolean exists = menuIdToExclude == null
                 ? menuRepository.existsByRestaurantIdAndCode(restaurantId, code)
@@ -217,6 +222,8 @@ public class MenuService {
         return normalizedCode;
     }
 
+    //If the user sent a new Menu code, use it.
+    //If the user did not send a code, keep the old database code.
     private String resolveUpdateCode(String requestedCode, String existingCode) {
         String rawCode = NormalizationUtils.normalize(requestedCode) == null ? existingCode : requestedCode;
         String normalizedCode = MenuCodeNormalizer.normalize(rawCode);
