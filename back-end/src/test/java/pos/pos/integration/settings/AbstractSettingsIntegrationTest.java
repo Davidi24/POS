@@ -59,6 +59,7 @@ abstract class AbstractSettingsIntegrationTest {
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "settings-core-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "settings-core-email-verification-pepper");
         registry.add("SMS_CODE_PEPPER", () -> "settings-core-sms-code-pepper-value");
+        registry.add("DEVICE_PAIRING_TOKEN_PEPPER", () -> "settings-core-device-pairing-token-pepper");
         registry.add("MAIL_HOST", () -> "localhost");
         registry.add("MAIL_PORT", () -> "2525");
         registry.add("MAIL_USERNAME", () -> "integration");

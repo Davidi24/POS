@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import pos.pos.device.enums.DeviceStatus;
 
 @Getter
 @Setter
@@ -16,7 +17,7 @@ import lombok.Setter;
 public class UpdateDeviceStatusRequest {
 
     @NotBlank(message = "status is required")
-    private String status;
+    private DeviceStatus status;
 
     @NotNull(message = "active is required")
     private Boolean active;
