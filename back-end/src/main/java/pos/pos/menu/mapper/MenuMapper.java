@@ -180,7 +180,7 @@ public class MenuMapper {
                 .build();
     }
 
-    private MenuItemOptionGroupSummaryResponse toMenuItemOptionGroupSummaryResponse(MenuItemOptionGroup link) {
+    public MenuItemOptionGroupSummaryResponse toMenuItemOptionGroupSummaryResponse(MenuItemOptionGroup link) {
         return MenuItemOptionGroupSummaryResponse.builder()
                 .linkId(link.getId())
                 .optionGroupId(link.getOptionGroup().getId())

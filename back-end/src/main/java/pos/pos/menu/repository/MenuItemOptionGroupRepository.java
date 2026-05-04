@@ -1,13 +1,27 @@
 package pos.pos.menu.repository;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import pos.pos.menu.entity.MenuItemOptionGroup;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface MenuItemOptionGroupRepository extends JpaRepository<MenuItemOptionGroup, UUID> {
+
+    @Override
+    @EntityGraph(attributePaths = {
+            "menuItem",
+            "menuItem.section",
+            "menuItem.section.menu",
+            "menuItem.section.menu.restaurant",
+            "optionGroup",
+            "optionGroup.restaurant",
+            "optionGroup.type"
+    })
+    Optional<MenuItemOptionGroup> findById(UUID id);
 
     @Query("""
             SELECT link
@@ -19,6 +33,8 @@ public interface MenuItemOptionGroupRepository extends JpaRepository<MenuItemOpt
     List<MenuItemOptionGroup> findByMenuItemIdOrdered(UUID menuItemId);
 
     boolean existsByMenuItemId(UUID menuItemId);
+
+    boolean existsByMenuItemIdAndOptionGroupId(UUID menuItemId, UUID optionGroupId);
 
     boolean existsByOptionGroupId(UUID optionGroupId);
 }
