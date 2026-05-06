@@ -2,6 +2,7 @@ package pos.pos.menu.repository;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import pos.pos.menu.entity.MenuVariant;
 
 import java.util.List;
@@ -15,6 +16,14 @@ public interface MenuVariantRepository extends JpaRepository<MenuVariant, UUID> 
     Optional<MenuVariant> findById(UUID id);
 
     List<MenuVariant> findByMenuItemIdOrderByDisplayOrderAscNameAsc(UUID menuItemId);
+
+    @Query("""
+            SELECT variant
+            FROM MenuVariant variant
+            WHERE variant.menuItem.id IN :menuItemIds
+            ORDER BY variant.menuItem.id ASC, variant.displayOrder ASC, variant.name ASC, variant.id ASC
+            """)
+    List<MenuVariant> findByMenuItemIdInOrdered(List<UUID> menuItemIds);
 
     boolean existsByMenuItemId(UUID menuItemId);
 

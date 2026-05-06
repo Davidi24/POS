@@ -35,6 +35,19 @@ public class MenuMapper {
             List<MenuSection> sections,
             Map<UUID, List<MenuItem>> itemsBySectionId
     ) {
+        return toMenuResponse(menu, sections, itemsBySectionId, false, false, Map.of(), false, Map.of());
+    }
+
+    public MenuResponse toMenuResponse(
+            Menu menu,
+            List<MenuSection> sections,
+            Map<UUID, List<MenuItem>> itemsBySectionId,
+            boolean includeItems,
+            boolean includeVariants,
+            Map<UUID, List<MenuVariant>> variantsByItemId,
+            boolean includeOptionGroups,
+            Map<UUID, List<MenuItemOptionGroup>> optionGroupsByItemId
+    ) {
         if (menu == null) {
             return null;
         }
@@ -52,7 +65,15 @@ public class MenuMapper {
                 .createdAt(menu.getCreatedAt())
                 .updatedAt(menu.getUpdatedAt())
                 .sections(sections == null ? null : sections.stream()
-                        .map(section -> toMenuSectionResponse(section, itemsBySectionId.get(section.getId())))
+                        .map(section -> toMenuSectionResponse(
+                                section,
+                                itemsBySectionId.get(section.getId()),
+                                includeItems,
+                                includeVariants,
+                                variantsByItemId,
+                                includeOptionGroups,
+                                optionGroupsByItemId
+                        ))
                         .toList())
                 .build();
     }
@@ -62,6 +83,18 @@ public class MenuMapper {
     }
 
     public MenuSectionSummaryResponse toMenuSectionResponse(MenuSection section, List<MenuItem> items) {
+        return toMenuSectionResponse(section, items, false, false, Map.of(), false, Map.of());
+    }
+
+    public MenuSectionSummaryResponse toMenuSectionResponse(
+            MenuSection section,
+            List<MenuItem> items,
+            boolean includeItems,
+            boolean includeVariants,
+            Map<UUID, List<MenuVariant>> variantsByItemId,
+            boolean includeOptionGroups,
+            Map<UUID, List<MenuItemOptionGroup>> optionGroupsByItemId
+    ) {
         if (section == null) {
             return null;
         }
@@ -72,7 +105,15 @@ public class MenuMapper {
                 .description(section.getDescription())
                 .active(section.isActive())
                 .displayOrder(section.getDisplayOrder())
-                .items(items == null ? null : items.stream().map(this::toItemSummaryResponse).toList())
+                .items(items == null
+                        ? (includeItems ? List.of() : null)
+                        : items.stream()
+                        .map(item -> toMenuItemResponse(
+                                item,
+                                includeVariants ? variantsByItemId.getOrDefault(item.getId(), List.of()) : null,
+                                includeOptionGroups ? optionGroupsByItemId.getOrDefault(item.getId(), List.of()) : null
+                        ))
+                        .toList())
                 .build();
     }
 
@@ -195,9 +236,5 @@ public class MenuMapper {
                 .maxSelectOverride(link.getMaxSelectOverride())
                 .requiredOverride(link.getRequiredOverride())
                 .build();
-    }
-
-    private MenuItemSummaryResponse toItemSummaryResponse(MenuItem item) {
-        return toMenuItemResponse(item);
     }
 }
