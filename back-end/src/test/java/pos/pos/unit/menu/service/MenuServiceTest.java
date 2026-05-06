@@ -22,9 +22,11 @@ import pos.pos.menu.dto.UpdateMenuStatusRequest;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.mapper.MenuMapper;
 import pos.pos.menu.policy.MenuPolicy;
+import pos.pos.menu.repository.MenuItemOptionGroupRepository;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.menu.repository.MenuRepository;
 import pos.pos.menu.repository.MenuSectionRepository;
+import pos.pos.menu.repository.MenuVariantRepository;
 import pos.pos.menu.service.MenuService;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
@@ -67,6 +69,12 @@ class MenuServiceTest {
 
     @Mock
     private MenuItemRepository menuItemRepository;
+
+    @Mock
+    private MenuVariantRepository menuVariantRepository;
+
+    @Mock
+    private MenuItemOptionGroupRepository menuItemOptionGroupRepository;
 
     @Mock
     private ActorScopeService actorScopeService;

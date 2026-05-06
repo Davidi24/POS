@@ -32,6 +32,15 @@ public interface MenuItemOptionGroupRepository extends JpaRepository<MenuItemOpt
             """)
     List<MenuItemOptionGroup> findByMenuItemIdOrdered(UUID menuItemId);
 
+    @Query("""
+            SELECT link
+            FROM MenuItemOptionGroup link
+            JOIN FETCH link.optionGroup group
+            WHERE link.menuItem.id IN :menuItemIds
+            ORDER BY link.menuItem.id ASC, link.displayOrder ASC, group.name ASC, link.id ASC
+            """)
+    List<MenuItemOptionGroup> findByMenuItemIdInOrdered(List<UUID> menuItemIds);
+
     boolean existsByMenuItemId(UUID menuItemId);
 
     boolean existsByMenuItemIdAndOptionGroupId(UUID menuItemId, UUID optionGroupId);
