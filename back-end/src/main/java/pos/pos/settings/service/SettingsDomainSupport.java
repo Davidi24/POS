@@ -6,20 +6,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import pos.pos.exception.auth.AuthException;
-import pos.pos.exception.restaurant.BranchNotFoundException;
-import pos.pos.exception.restaurant.RestaurantNotFoundException;
-import pos.pos.exception.user.UserNotFoundException;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
-import pos.pos.restaurant.repository.BranchRepository;
-import pos.pos.restaurant.repository.RestaurantRepository;
-import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.settings.entity.Settings;
 import pos.pos.settings.entity.SettingsOrderRule;
 import pos.pos.settings.entity.SettingsReceipt;
 import pos.pos.settings.repository.SettingsRepository;
-import pos.pos.user.entity.User;
-import pos.pos.user.repository.UserRepository;
 
 import java.util.function.Function;
 import java.util.UUID;
@@ -29,44 +22,30 @@ import java.util.UUID;
 public class SettingsDomainSupport {
 
     private final SettingsRepository settingsRepository;
-    private final RestaurantRepository restaurantRepository;
-    private final BranchRepository branchRepository;
-    private final UserRepository userRepository;
-    private final RoleHierarchyService roleHierarchyService;
+    private final RestaurantScopeService restaurantScopeService;
 
     public UUID currentActorId(Authentication authentication) {
-        return roleHierarchyService.currentUserId(authentication);
+        return restaurantScopeService.currentUserId(authentication);
     }
 
     public Restaurant requireAccessibleRestaurant(Authentication authentication, UUID restaurantId) {
-        Restaurant restaurant = restaurantRepository.findByIdAndDeletedAtIsNull(restaurantId)
-                .orElseThrow(RestaurantNotFoundException::new);
+        return restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+    }
 
-        if (roleHierarchyService.isSuperAdmin(authentication)) {
-            return restaurant;
-        }
-
-        User actor = userRepository.findByIdAndDeletedAtIsNull(roleHierarchyService.currentUserId(authentication))
-                .orElseThrow(UserNotFoundException::new);
-
-        if (!restaurantId.equals(actor.getRestaurantId())) {
-            throw new AuthException(
-                    "You are not allowed to manage settings for this restaurant",
-                    HttpStatus.FORBIDDEN
-            );
-        }
-
-        return restaurant;
+    public Restaurant requireManageableRestaurant(Authentication authentication, UUID restaurantId) {
+        return restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
     }
 
     public Branch requireAccessibleBranch(Authentication authentication, UUID restaurantId, UUID branchId) {
-        requireAccessibleRestaurant(authentication, restaurantId);
-        return resolveBranch(restaurantId, branchId);
+        return restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
+    }
+
+    public Branch requireManageableBranch(Authentication authentication, UUID restaurantId, UUID branchId) {
+        return restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
     }
 
     public Branch resolveBranch(UUID restaurantId, UUID branchId) {
-        return branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId, restaurantId)
-                .orElseThrow(BranchNotFoundException::new);
+        return restaurantScopeService.requireExistingBranch(restaurantId, branchId);
     }
 
     public Settings loadOrCreateSettings(Authentication authentication, UUID restaurantId) {
