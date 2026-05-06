@@ -124,7 +124,8 @@ class OptionGroupControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("name: Name is required, typeId: typeId is required"));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("name: Name is required")))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("typeId: typeId is required")));
     }
 
     static class StubOptionGroupService extends OptionGroupService {
