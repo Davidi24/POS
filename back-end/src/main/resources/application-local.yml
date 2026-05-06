@@ -1,12 +1,15 @@
+server:
+  port: ${SERVER_PORT:8080}
+
 spring:
   sql:
     init:
       mode: never
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/pos_local
-    username: pos_user
-    password: pos_pass
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:pos_local}
+    username: ${DB_USERNAME:pos_user}
+    password: ${DB_PASSWORD:pos_pass}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -41,6 +44,8 @@ app:
       password: ChangeMe123!
       first-name: Super
       last-name: Admin
+    sample-menus:
+      enabled: true
 
   mail:
     from: no-reply@pos.local
