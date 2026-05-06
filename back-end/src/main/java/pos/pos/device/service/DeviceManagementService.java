@@ -67,10 +67,13 @@ public class DeviceManagementService {
             UUID deviceId,
             CreateDeviceAssignmentRequest request
     ) {
+        // Assignment is the business-side placement of the device:
+        // which branch it belongs to, or which user it is assigned to.
         Device device = requireManageableDevice(authentication, restaurantId, deviceId);
         UUID actorId = settingsDomainSupport.currentActorId(authentication);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
+        // Only one assignment can be active at a time, so replace the current one.
         deviceAssignmentRepository.findByDevice_IdAndActiveTrue(device.getId()).ifPresent(activeAssignment -> {
             activeAssignment.closeAt(now);
             persistAssignment(activeAssignment);
@@ -84,6 +87,7 @@ public class DeviceManagementService {
         assignment.setNotes(request.getNotes());
 
         if (request.getAssignmentType() == DeviceAssignmentType.BRANCH) {
+            // Branch assignment means the device is placed under a branch operationally.
             Branch branch = resolveAssignmentBranch(restaurantId, request);
             assignment.setBranch(branch);
             assignment.setUserId(null);
@@ -91,6 +95,7 @@ public class DeviceManagementService {
             device.setBranch(branch);
             device.setUpdatedBy(actorId);
         } else if (request.getAssignmentType() == DeviceAssignmentType.USER) {
+            // User assignment means the device is allocated to a specific staff member.
             User user = resolveAssignmentUser(restaurantId, request);
             assignment.setBranch(null);
             assignment.setUserId(user.getId());
@@ -163,10 +168,13 @@ public class DeviceManagementService {
             UUID deviceId,
             CreateDevicePairingTokenRequest request
     ) {
+        // Pairing token is the technical side of onboarding the device.
+        // The device/app uses this short-lived token to complete pairing with the backend.
         Device device = requireManageableDevice(authentication, restaurantId, deviceId);
         UUID actorId = settingsDomainSupport.currentActorId(authentication);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
+        // Keep only one currently usable pairing token per device.
         List<DevicePairingToken> openTokens = devicePairingTokenRepository
                 .findAllByDevice_IdAndUsedAtIsNullAndRevokedAtIsNull(device.getId());
         if (!openTokens.isEmpty()) {
@@ -176,6 +184,7 @@ public class DeviceManagementService {
             devicePairingTokenRepository.saveAllAndFlush(openTokens);
         }
 
+        // Persist only the hash; return the raw token once in the response for the caller/device.
         OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(devicePairingProperties.getTokenPepper());
         DevicePairingToken token = new DevicePairingToken();
         token.setDevice(device);
@@ -233,6 +242,7 @@ public class DeviceManagementService {
         return toPairingTokenResponse(token, null, now);
     }
 
+    // check if user is in the right restaurant before putting the device
     private Device requireManageableDevice(Authentication authentication, UUID restaurantId, UUID deviceId) {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
         return deviceRepository.findRestaurantNonPrinterById(deviceId, restaurantId)
