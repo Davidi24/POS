@@ -141,9 +141,9 @@ MENU ITEM OPTION GROUP LINK
 
 RESPONSE AND ERROR BEHAVIOR
 
-[ ] MENU-API-001 List endpoints return paginated summaries where pagination is supported
-[ ] MENU-API-002 Detail endpoints return one resource with optional nested children controlled by include parameters
-[ ] MENU-API-003 Validation failures return 400
-[ ] MENU-API-004 Missing resources return 404
-[ ] MENU-API-005 Duplicate unique values return 409
-[ ] MENU-API-006 Cross-resource mismatches such as item not belonging to section return 409
+[x] MENU-API-001 List endpoints return paginated summaries where pagination is supported
+[x] MENU-API-002 Detail endpoints return one resource with optional nested children controlled by include parameters
+[x] MENU-API-003 Validation failures return 400
+[x] MENU-API-004 Missing resources return 404
+[x] MENU-API-005 Duplicate unique values return 409
+[x] MENU-API-006 Cross-resource mismatches such as item not belonging to section return 409
