@@ -33,6 +33,7 @@ public enum AppRole {
             false,
             EnumSet.of(
                     RESTAURANTS_READ, RESTAURANTS_UPDATE,
+                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE, MENUS_DELETE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE,
@@ -48,6 +49,7 @@ public enum AppRole {
             false,
             EnumSet.of(
                     RESTAURANTS_READ, RESTAURANTS_UPDATE,
+                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE, MENUS_DELETE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE,
@@ -63,6 +65,7 @@ public enum AppRole {
             false,
             EnumSet.of(
                     RESTAURANTS_READ,
+                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE,
                     ROLES_READ,
                     SETTINGS_READ
@@ -74,7 +77,7 @@ public enum AppRole {
             "Handles orders and customer service",
             true,
             false,
-            EnumSet.noneOf(AppPermission.class)
+            EnumSet.of(MENUS_READ)
     );
 
     private static final long RANK_STEP = 10_000L;
