@@ -1,6 +1,5 @@
 package pos.pos.settings.dto;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,7 +15,7 @@ import pos.pos.device.enums.DeviceStatus;
 @AllArgsConstructor
 public class UpdateDeviceStatusRequest {
 
-    @NotBlank(message = "status is required")
+    @NotNull(message = "status is required")
     private DeviceStatus status;
 
     @NotNull(message = "active is required")
