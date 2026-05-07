@@ -1,6 +1,7 @@
 package pos.pos.utils;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Utility class for safe string normalization.
@@ -31,6 +32,9 @@ import java.util.Locale;
  */
 public final class NormalizationUtils {
 
+    private static final Pattern NON_ALPHANUMERIC_CODE = Pattern.compile("[^A-Z0-9]+");
+    private static final Pattern EDGE_UNDERSCORES = Pattern.compile("^_+|_+$");
+
     private NormalizationUtils() {
     }
 
@@ -56,6 +60,26 @@ public final class NormalizationUtils {
     public static String normalizeUpper(String value) {
         String normalized = normalize(value);
         return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
+    }
+
+    public static String normalizeCode(String value) {
+        String normalized = normalizeUpper(value);
+        if (normalized == null) {
+            return null;
+        }
+
+        String sanitized = NON_ALPHANUMERIC_CODE.matcher(normalized).replaceAll("_");
+        sanitized = EDGE_UNDERSCORES.matcher(sanitized).replaceAll("");
+        return sanitized.isEmpty() ? null : sanitized;
+    }
+
+    public static String normalizeCode(String value, int maxLength) {
+        String normalized = normalizeCode(value);
+        if (normalized == null || normalized.length() <= maxLength) {
+            return normalized;
+        }
+
+        return normalized.substring(0, maxLength);
     }
 
     public static String normalizePhone(String value) {
