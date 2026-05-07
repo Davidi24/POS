@@ -551,6 +551,15 @@ class SettingsExtendedIntegrationTest extends AbstractSettingsIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn());
 
+        MvcResult devicesResult = mockMvc.perform(get("/restaurants/{restaurantId}/branches/{branchId}/devices",
+                        restaurant.getId(), branch.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(bodyOf(devicesResult)).hasSize(1);
+        assertThat(bodyOf(devicesResult).get(0).get("id").asText()).isEqualTo(device.get("id").asText());
+
         MvcResult updatedDeviceResult = mockMvc.perform(patch("/restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}/status",
                         restaurant.getId(), branch.getId(), device.get("id").asText())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
@@ -565,6 +574,119 @@ class SettingsExtendedIntegrationTest extends AbstractSettingsIntegrationTest {
 
         assertThat(bodyOf(updatedDeviceResult).get("status").asText()).isEqualTo("ACTIVE");
         assertThat(bodyOf(updatedDeviceResult).get("online").asBoolean()).isTrue();
+
+        mockMvc.perform(post("/restaurants/{restaurantId}/branches/{branchId}/devices",
+                        restaurant.getId(), branch.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.ofEntries(
+                                Map.entry("code", "PRN_AS_DEVICE"),
+                                Map.entry("name", "Invalid Printer Device"),
+                                Map.entry("deviceType", "PRINTER"),
+                                Map.entry("status", "PROVISIONING"),
+                                Map.entry("active", true),
+                                Map.entry("online", false)
+                        ))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("SETTINGS-107 device assignments and pairing tokens should support history rotation and revocation")
+    void settings107DeviceAssignmentsAndPairingTokensShouldSupportHistoryRotationAndRevocation() throws Exception {
+        Restaurant restaurant = createRestaurant("settings107");
+        Branch branch = createBranch(restaurant, "settings107");
+        User admin = createRestaurantAdmin(restaurant, "settings107-admin");
+        User assignee = createRestaurantAdmin(restaurant, "settings107-assignee");
+        String accessToken = accessTokenFor(admin, "SETTINGS-107");
+
+        JsonNode device = bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/branches/{branchId}/devices",
+                        restaurant.getId(), branch.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.ofEntries(
+                                Map.entry("code", "TERM_107"),
+                                Map.entry("name", "POS Terminal 107"),
+                                Map.entry("deviceType", "TERMINAL"),
+                                Map.entry("status", "ACTIVE"),
+                                Map.entry("active", true),
+                                Map.entry("online", true)
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn());
+
+        JsonNode assignment = bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/devices/{deviceId}/assignments",
+                        restaurant.getId(), device.get("id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "assignmentType", "USER",
+                                "userId", assignee.getId().toString(),
+                                "notes", "Front counter"
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn());
+
+        assertThat(assignment.get("userId").asText()).isEqualTo(assignee.getId().toString());
+        assertThat(assignment.get("active").asBoolean()).isTrue();
+
+        MvcResult assignmentsResult = mockMvc.perform(get("/restaurants/{restaurantId}/devices/{deviceId}/assignments",
+                        restaurant.getId(), device.get("id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(bodyOf(assignmentsResult)).hasSize(1);
+
+        JsonNode firstPairingToken = bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/devices/{deviceId}/pairing-tokens",
+                        restaurant.getId(), device.get("id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "ttlMinutes", 10,
+                                "requestedIp", "10.0.0.50"
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn());
+
+        assertThat(firstPairingToken.get("state").asText()).isEqualTo("ACTIVE");
+        assertThat(firstPairingToken.get("pairingToken").asText()).isNotBlank();
+
+        JsonNode secondPairingToken = bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/devices/{deviceId}/pairing-tokens",
+                        restaurant.getId(), device.get("id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "ttlMinutes", 5
+                        ))))
+                .andExpect(status().isCreated())
+                .andReturn());
+
+        MvcResult pairingTokensResult = mockMvc.perform(get("/restaurants/{restaurantId}/devices/{deviceId}/pairing-tokens",
+                        restaurant.getId(), device.get("id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode pairingTokens = bodyOf(pairingTokensResult);
+        assertThat(pairingTokens).hasSize(2);
+        assertThat(pairingTokens.toString()).contains("\"state\":\"REVOKED\"");
+        assertThat(pairingTokens.toString()).contains(secondPairingToken.get("id").asText());
+
+        MvcResult revokedPairingTokenResult = mockMvc.perform(post("/restaurants/{restaurantId}/devices/{deviceId}/pairing-tokens/{pairingTokenId}/revoke",
+                        restaurant.getId(), device.get("id").asText(), secondPairingToken.get("id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(bodyOf(revokedPairingTokenResult).get("state").asText()).isEqualTo("REVOKED");
+
+        MvcResult unassignedResult = mockMvc.perform(post("/restaurants/{restaurantId}/devices/{deviceId}/assignments/{assignmentId}/unassign",
+                        restaurant.getId(), device.get("id").asText(), assignment.get("id").asText())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(bodyOf(unassignedResult).get("active").asBoolean()).isFalse();
     }
 
     private Branch setBranchCode(Branch branch, String code) {

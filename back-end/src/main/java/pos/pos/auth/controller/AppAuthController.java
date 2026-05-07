@@ -26,7 +26,7 @@ import pos.pos.security.util.ClientInfoExtractor;
 @RestController
 @RequestMapping("/auth/device")
 @RequiredArgsConstructor
-public class DeviceAuthController {
+public class AppAuthController {
 
     private static final String INVALID_REFRESH_TOKEN_MESSAGE = "Invalid refresh token";
 
