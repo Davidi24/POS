@@ -54,7 +54,7 @@ public class DeviceManagementService {
             UUID restaurantId,
             UUID deviceId
     ) {
-        Device device = requireManageableDevice(authentication, restaurantId, deviceId);
+        Device device = requireAccessibleDevice(authentication, restaurantId, deviceId);
         return deviceAssignmentRepository.findAllByDevice_IdOrderByAssignedAtDesc(device.getId()).stream()
                 .map(this::toAssignmentResponse)
                 .toList();
@@ -154,7 +154,7 @@ public class DeviceManagementService {
             UUID restaurantId,
             UUID deviceId
     ) {
-        Device device = requireManageableDevice(authentication, restaurantId, deviceId);
+        Device device = requireAccessibleDevice(authentication, restaurantId, deviceId);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         return devicePairingTokenRepository.findAllByDevice_IdOrderByCreatedAtDesc(device.getId()).stream()
                 .map(token -> toPairingTokenResponse(token, null, now))
@@ -242,9 +242,17 @@ public class DeviceManagementService {
         return toPairingTokenResponse(token, null, now);
     }
 
-    // check if user is in the right restaurant before putting the device
-    private Device requireManageableDevice(Authentication authentication, UUID restaurantId, UUID deviceId) {
+    private Device requireAccessibleDevice(Authentication authentication, UUID restaurantId, UUID deviceId) {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
+        return requireDeviceInRestaurant(restaurantId, deviceId);
+    }
+
+    private Device requireManageableDevice(Authentication authentication, UUID restaurantId, UUID deviceId) {
+        settingsDomainSupport.requireManageableRestaurant(authentication, restaurantId);
+        return requireDeviceInRestaurant(restaurantId, deviceId);
+    }
+
+    private Device requireDeviceInRestaurant(UUID restaurantId, UUID deviceId) {
         return deviceRepository.findRestaurantNonPrinterById(deviceId, restaurantId)
                 .orElseThrow(DeviceNotFoundException::new);
     }
