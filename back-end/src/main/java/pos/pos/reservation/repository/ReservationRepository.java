@@ -7,7 +7,6 @@ import pos.pos.reservation.enums.ReservationStatus;
 
 import java.time.OffsetDateTime;
 import java.util.Collection;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +24,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     );
 
     @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
+    List<Reservation> findAllByBranch_IdOrderByReservationStartAsc(UUID branchId);
+
+    @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
     List<Reservation> findAllByBranch_IdAndStatusInAndReservationStartLessThanAndReservationEndGreaterThanOrderByReservationStartAsc(
             UUID branchId,
             Collection<ReservationStatus> statuses,
@@ -34,6 +36,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
 
     @EntityGraph(attributePaths = {"branch", "customer", "statusHistory", "tableAssignments", "tableAssignments.restaurantTable"})
     Optional<Reservation> findByIdAndRestaurant_Id(UUID reservationId, UUID restaurantId);
+
+    @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
+    List<Reservation> findAllByCustomer_IdAndRestaurant_IdOrderByReservationStartDesc(UUID customerId, UUID restaurantId);
+
+    @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
+    Optional<Reservation> findTopByReservationCodeOrderByCreatedAtDesc(String reservationCode);
 
     boolean existsByRestaurant_IdAndReservationCode(UUID restaurantId, String reservationCode);
 

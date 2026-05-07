@@ -166,6 +166,10 @@ public class Reservation extends AbstractAuditedEntity {
     @OrderBy("primaryAssignment DESC, assignedAt ASC, createdAt ASC")
     private List<ReservationTableAssignment> tableAssignments = new ArrayList<>();
 
+    @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("createdAt ASC")
+    private List<ReservationNote> notes = new ArrayList<>();
+
     public void addStatusHistory(ReservationStatusHistory entry) {
         if (entry == null) {
             return;
@@ -200,6 +204,24 @@ public class Reservation extends AbstractAuditedEntity {
 
         tableAssignments.remove(assignment);
         assignment.setReservation(null);
+    }
+
+    public void addNote(ReservationNote note) {
+        if (note == null) {
+            return;
+        }
+
+        notes.add(note);
+        note.setReservation(this);
+    }
+
+    public void removeNote(ReservationNote note) {
+        if (note == null) {
+            return;
+        }
+
+        notes.remove(note);
+        note.setReservation(null);
     }
 
     @Override
