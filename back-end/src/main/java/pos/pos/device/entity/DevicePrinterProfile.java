@@ -15,6 +15,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import pos.pos.common.entity.AbstractTimestampedEntity;
 import pos.pos.device.enums.PrinterConnectionType;
 import pos.pos.utils.NormalizationUtils;
@@ -53,15 +55,18 @@ public class DevicePrinterProfile extends AbstractTimestampedEntity {
     @Column(name = "paper_width_mm", nullable = false)
     private int paperWidthMm = 80;
 
+    @JdbcTypeCode(SqlTypes.INET)
     @Column(name = "printer_ip", columnDefinition = "inet")
     private String printerIp;
 
     @Column(name = "printer_port")
     private Integer printerPort;
 
+    // Whether the printer should automatically cut the receipt paper.
     @Column(name = "auto_cut", nullable = false)
     private boolean autoCut = true;
 
+    // Whether the printer should trigger/open the cash drawer.
     @Column(name = "cash_drawer_kick_enabled", nullable = false)
     private boolean cashDrawerKickEnabled = false;
 

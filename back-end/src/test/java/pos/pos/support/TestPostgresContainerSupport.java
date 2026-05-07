@@ -28,6 +28,7 @@ public final class TestPostgresContainerSupport {
         registry.add("DB_URL", () -> jdbcUrlWithSchema(schema));
         registry.add("DB_USERNAME", POSTGRES::getUsername);
         registry.add("DB_PASSWORD", POSTGRES::getPassword);
+        registry.add("DEVICE_PAIRING_TOKEN_PEPPER", () -> "test-prod-device-pairing-token-pepper-0123456789");
         registerSharedPoolProperties(registry);
         registry.add("spring.flyway.default-schema", () -> schema);
         registry.add("spring.flyway.schemas[0]", () -> schema);
@@ -38,6 +39,7 @@ public final class TestPostgresContainerSupport {
         registry.add("spring.datasource.url", () -> jdbcUrlWithSchema(schema));
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("app.device.pairing.token-pepper", () -> "test-profile-device-pairing-token-pepper-0123456789");
         registerSharedPoolProperties(registry);
         registry.add("spring.flyway.default-schema", () -> schema);
         registry.add("spring.flyway.schemas", () -> schema);

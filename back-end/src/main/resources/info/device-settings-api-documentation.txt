@@ -1,0 +1,215 @@
+DEVICE SETTINGS API DOCUMENTATION
+
+Scope
+- This file documents the device-related settings APIs implemented in this repo.
+- All ids are UUID values.
+- Items 1-12 map directly to the current DeviceSettingsController.
+- Items 13-18 map to the current DeviceManagementController.
+
+
+Common auth rules
+- Protected endpoints require header: Authorization: Bearer <accessToken>
+- Read endpoints require permission: SETTINGS_READ
+- Write endpoints require permission: SETTINGS_UPDATE
+
+
+Common enum values
+- PrinterConnectionType: NETWORK, USB, BLUETOOTH, SERIAL
+
+
+CURRENT DEVICE SETTINGS SERVICE
+
+PRINTER SETTINGS
+
+[x] 1. GET /restaurants/{restaurantId}/settings/printers
+[x] 2. POST /restaurants/{restaurantId}/settings/printers
+[x] 3. PUT /restaurants/{restaurantId}/settings/printers/{printerId}
+[x] 4. DELETE /restaurants/{restaurantId}/settings/printers/{printerId}
+
+
+PRINTER ROUTES
+
+[x] 5. GET /restaurants/{restaurantId}/branches/{branchId}/printer-routes
+[x] 6. PUT /restaurants/{restaurantId}/branches/{branchId}/printer-routes
+[x] 7. POST /restaurants/{restaurantId}/branches/{branchId}/printer-routes/test
+
+
+BRANCH DEVICE SETTINGS
+
+[x] 8. GET /restaurants/{restaurantId}/branches/{branchId}/devices
+[x] 9. POST /restaurants/{restaurantId}/branches/{branchId}/devices
+[x] 10. PUT /restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}
+[x] 11. PATCH /restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}/status
+[x] 12. DELETE /restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}
+
+
+DEVICE MANAGEMENT
+
+[x] 13. GET /restaurants/{restaurantId}/devices/{deviceId}/assignments
+[x] 14. POST /restaurants/{restaurantId}/devices/{deviceId}/assignments
+[x] 15. POST /restaurants/{restaurantId}/devices/{deviceId}/assignments/{assignmentId}/unassign
+[x] 16. GET /restaurants/{restaurantId}/devices/{deviceId}/pairing-tokens
+[x] 17. POST /restaurants/{restaurantId}/devices/{deviceId}/pairing-tokens
+[x] 18. POST /restaurants/{restaurantId}/devices/{deviceId}/pairing-tokens/{pairingTokenId}/revoke
+
+
+Common payload notes
+- POST and PUT printer endpoints use UpsertDeviceRequest.
+- POST and PUT branch device endpoints also use UpsertDeviceRequest.
+- Device assignment create uses CreateDeviceAssignmentRequest.
+- Device pairing-token create uses CreateDevicePairingTokenRequest.
+- Required request fields for create and update payloads:
+  - code
+  - name
+  - deviceType
+  - status
+  - active
+  - online
+- Printer endpoints force deviceType to PRINTER internally.
+- Branch device endpoints reject deviceType PRINTER and reject printer-only fields.
+- Printer endpoints also require:
+  - printerConnectionType
+  - paperWidthMm
+- NETWORK printers also require:
+  - printerIp
+  - printerPort
+- branchId in the payload is optional for printer endpoints.
+- Branch device endpoints are branch-scoped by the branchId in the path.
+
+
+UpsertDeviceRequest fields
+- branchId: uuid, optional
+- code: string, required, max 50
+- name: string, required, max 100
+- deviceType: string, required, max 30
+- manufacturer: string, optional, max 100
+- model: string, optional, max 100
+- serialNumber: string, optional, max 100
+- platform: string, optional, max 50
+- osVersion: string, optional, max 50
+- appVersion: string, optional, max 50
+- status: string, required, max 30
+- active: boolean, required
+- online: boolean, required
+- ipAddress: string, optional
+- macAddress: string, optional, max 50
+- notes: string, optional
+- printerConnectionType: PrinterConnectionType, required for printer endpoints
+- paperWidthMm: integer, required for printer endpoints, min 1
+- printerIp: string, required for NETWORK printers
+- printerPort: integer, required for NETWORK printers, min 1, max 65535
+- autoCut: boolean, optional
+- cashDrawerKickEnabled: boolean, optional
+
+
+UpdatePrinterRoutesRequest fields
+- printerIds: array<uuid>, required
+
+
+UpdateDeviceStatusRequest fields
+- status: string, required
+- active: boolean, required
+- online: boolean, required
+
+
+CreateDeviceAssignmentRequest fields
+- assignmentType: enum, required, BRANCH or USER
+- branchId: uuid, required for BRANCH assignments
+- userId: uuid, required for USER assignments
+- notes: string, optional, max 1000
+
+
+CreateDevicePairingTokenRequest fields
+- ttlMinutes: integer, optional, min 1, capped by app.device.pairing.maxTtl
+- requestedIp: string, optional, max 45
+
+
+Response notes
+- Printer list, create, update, and branch device list, create, update, status update return DeviceResponse.
+- Device assignment list, create, and unassign return DeviceAssignmentResponse.
+- Device pairing-token list, create, and revoke return DevicePairingTokenResponse.
+- Printer delete and device delete return HTTP 204 with no body.
+- Printer create and device create return HTTP 201.
+- Device assignment create and device pairing-token create return HTTP 201.
+- Printer-route get and update return PrinterRouteResponse:
+  - restaurantId
+  - branchId
+  - printerIds
+  - printers
+- Printer-route test returns PrinterRouteTestResponse:
+  - restaurantId
+  - branchId
+  - printerCount
+  - requestedAt
+  - payload
+- DeviceResponse fields can include:
+  - id
+  - restaurantId
+  - branchId
+  - code
+  - name
+  - deviceType
+  - manufacturer
+  - model
+  - serialNumber
+  - platform
+  - osVersion
+  - appVersion
+  - status
+  - active
+  - online
+  - lastSeenAt
+  - ipAddress
+  - macAddress
+  - notes
+  - printerConnectionType
+  - paperWidthMm
+  - printerIp
+  - printerPort
+  - autoCut
+  - cashDrawerKickEnabled
+  - createdAt
+  - updatedAt
+- DeviceAssignmentResponse fields can include:
+  - id
+  - deviceId
+  - branchId
+  - branchName
+  - userId
+  - userEmail
+  - userDisplayName
+  - assignmentType
+  - assignedAt
+  - unassignedAt
+  - active
+  - assignedBy
+  - assignedByDisplayName
+  - notes
+  - createdAt
+  - updatedAt
+- DevicePairingTokenResponse fields can include:
+  - id
+  - deviceId
+  - state
+  - active
+  - pairingToken
+  - expiresAt
+  - usedAt
+  - revokedAt
+  - requestedIp
+  - createdAt
+  - createdBy
+  - createdByDisplayName
+
+
+Recommended permission codes
+- SETTINGS_READ
+- SETTINGS_UPDATE
+
+
+Practical build guidance
+- Use /settings/printers for restaurant-level printer records and printer profile settings.
+- Use /branches/{branchId}/printer-routes to attach restaurant printers to a branch.
+- Use /branches/{branchId}/devices for branch terminals, kiosks, tablets, and similar non-printer devices.
+- Use /devices/{deviceId}/assignments to track who or which branch currently owns a non-printer device.
+- Use /devices/{deviceId}/pairing-tokens to issue a single active onboarding token per non-printer device.
