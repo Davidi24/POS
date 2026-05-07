@@ -467,8 +467,13 @@ public class DeviceSettingsService {
             throw new AuthException("deviceType is required", HttpStatus.BAD_REQUEST);
         }
 
+        String normalized = normalizeToken(value);
+        if ("TERMINAL".equals(normalized)) {
+            return DeviceType.POS_TERMINAL;
+        }
+
         try {
-            return DeviceType.valueOf(normalizeToken(value));
+            return DeviceType.valueOf(normalized);
         } catch (IllegalArgumentException ex) {
             throw new AuthException("Invalid deviceType", HttpStatus.BAD_REQUEST);
         }
@@ -499,7 +504,7 @@ public class DeviceSettingsService {
                 .branchId(device.getBranch() == null ? null : device.getBranch().getId())
                 .code(device.getCode())
                 .name(device.getName())
-                .deviceType(device.getDeviceType() == null ? null : device.getDeviceType().name())
+                .deviceType(toApiDeviceType(device.getDeviceType()))
                 .manufacturer(device.getManufacturer())
                 .model(device.getModel())
                 .serialNumber(device.getSerialNumber())
@@ -522,5 +527,13 @@ public class DeviceSettingsService {
                 .createdAt(device.getCreatedAt())
                 .updatedAt(device.getUpdatedAt())
                 .build();
+    }
+
+    private String toApiDeviceType(DeviceType deviceType) {
+        if (deviceType == null) {
+            return null;
+        }
+
+        return deviceType == DeviceType.POS_TERMINAL ? "TERMINAL" : deviceType.name();
     }
 }
