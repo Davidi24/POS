@@ -15,7 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
-import pos.pos.auth.controller.DeviceAuthController;
+import pos.pos.auth.controller.AppAuthController;
 import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.dto.CurrentUserResponse;
 import pos.pos.auth.dto.LoginRequest;
@@ -60,7 +60,7 @@ class DeviceAuthControllerTest {
     private ClientInfoExtractor clientInfoExtractor;
 
     @InjectMocks
-    private DeviceAuthController controller;
+    private AppAuthController controller;
 
     private MockMvc mockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
