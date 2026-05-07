@@ -96,15 +96,6 @@ public class Menu extends BaseAuditEntity {
     }
 
     private String normalizeCode(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
-        }
-
-        String sanitized = normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
-
-        return sanitized.isEmpty() ? null : sanitized;
+        return NormalizationUtils.normalizeCode(value);
     }
 }
