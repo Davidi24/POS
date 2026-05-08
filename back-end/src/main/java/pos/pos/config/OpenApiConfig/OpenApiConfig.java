@@ -68,6 +68,14 @@ public class OpenApiConfig {
     }
 
     @Bean
+    public GroupedOpenApi tablesGroup() {
+        return GroupedOpenApi.builder()
+                .group("Tables")
+                .packagesToScan("pos.pos.tables.controller")
+                .build();
+    }
+
+    @Bean
     public GroupedOpenApi deviceGroup() {
         return GroupedOpenApi.builder()
                 .group("Devices")
@@ -83,6 +91,14 @@ public class OpenApiConfig {
                         "/restaurants/*/devices/*/pairing-tokens",
                         "/restaurants/*/devices/*/pairing-tokens/**"
                 )
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi menuGroup() {
+        return GroupedOpenApi.builder()
+                .group("Menus")
+                .pathsToMatch("/menus", "/menus/**", "/public/restaurants/*/menus", "/public/restaurants/*/menus/**")
                 .build();
     }
 }
