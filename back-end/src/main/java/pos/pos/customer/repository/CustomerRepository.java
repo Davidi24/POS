@@ -12,4 +12,6 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     List<Customer> findAllByRestaurant_IdAndDeletedAtIsNullOrderByFirstNameAscLastNameAsc(UUID restaurantId);
 
     Optional<Customer> findByIdAndRestaurant_IdAndDeletedAtIsNull(UUID customerId, UUID restaurantId);
+
+    boolean existsByRestaurant_IdAndCodeAndDeletedAtIsNull(UUID restaurantId, String code);
 }

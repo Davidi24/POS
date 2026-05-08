@@ -20,6 +20,7 @@ public class SecurityPaths {
             "/public/restaurants/*/menus/**",
             "/restaurants/registrations",
             "/restaurants/registrations/*",
+            "/public/**",
 
             "/v3/api-docs/**",
             "/swagger-ui/**",
