@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractTimestampedEntity;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
@@ -44,7 +45,7 @@ import java.util.List;
         AND base_price >= 0
         AND display_order >= 0
         """)
-public class MenuItem extends BaseAuditEntity {
+public class MenuItem extends AbstractTimestampedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "section_id", nullable = false)

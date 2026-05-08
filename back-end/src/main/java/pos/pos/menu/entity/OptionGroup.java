@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractTimestampedEntity;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.utils.NormalizationUtils;
 
@@ -49,7 +50,7 @@ import java.util.List;
         AND (max_select IS NULL OR max_select >= 0)
         AND (min_select IS NULL OR max_select IS NULL OR min_select <= max_select)
         """)
-public class OptionGroup extends BaseAuditEntity {
+public class OptionGroup extends AbstractTimestampedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "restaurant_id", nullable = false)

@@ -37,8 +37,7 @@ public class RestaurantTableLayoutService {
     @Transactional(readOnly = true)
     public TableLayoutResponse getTableLayout(Authentication authentication, UUID restaurantId, UUID branchId) {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
-        BranchTableSnapshot snapshot = restaurantTableSupport.loadBranchTables(restaurantId, branchId);
-        return restaurantTableSupport.buildLayoutResponse(snapshot);
+        return buildLayoutResponse(restaurantId, branchId);
     }
 
     @Transactional
@@ -61,7 +60,7 @@ public class RestaurantTableLayoutService {
         }
 
         restaurantTableSupport.saveTables(new ArrayList<>(tablesById.values()));
-        return getTableLayout(authentication, restaurantId, branchId);
+        return buildLayoutResponse(restaurantId, branchId);
     }
 
     @Transactional
@@ -82,7 +81,7 @@ public class RestaurantTableLayoutService {
         }
 
         restaurantTableSupport.saveTables(targetTables);
-        return getTableLayout(authentication, restaurantId, branchId);
+        return buildLayoutResponse(restaurantId, branchId);
     }
 
     @Transactional(readOnly = true)
@@ -163,6 +162,11 @@ public class RestaurantTableLayoutService {
             table.setShape(item.getShape());
         }
         table.setUpdatedBy(actorId);
+    }
+
+    private TableLayoutResponse buildLayoutResponse(UUID restaurantId, UUID branchId) {
+        BranchTableSnapshot snapshot = restaurantTableSupport.loadBranchTables(restaurantId, branchId);
+        return restaurantTableSupport.buildLayoutResponse(snapshot);
     }
 
     private List<RestaurantTable> selectAutoArrangeTargets(List<RestaurantTable> branchTables, AutoArrangeTableLayoutRequest request) {

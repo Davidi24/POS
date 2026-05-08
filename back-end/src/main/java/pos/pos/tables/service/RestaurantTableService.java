@@ -43,9 +43,33 @@ public class RestaurantTableService {
     private final RestaurantTableLayoutService restaurantTableLayoutService;
     private final RestaurantTableAvailabilityService restaurantTableAvailabilityService;
 
+    /**
+     * First, we check if the logged-in user is allowed to access this restaurant branch.
+     * <p>
+     * Then we load all tables of this branch using loadBranchTables().
+     * That method returns a BranchTableSnapshot, which contains:
+     * <p>
+     * 1. restaurantId
+     * 2. branchId
+     * 3. tables
+     *    -> the full list of tables in this branch
+     * <p>
+     * 4. childrenByParentId
+     *    -> parent table ID -> merged child tables
+     *    -> example: A1_id -> [A2, A3]
+     * <p>
+     * 5. tablesById
+     *    -> table ID -> table
+     *    -> example: A1_id -> A1
+     * <p>
+     * Then we convert each table to a TableResponse.
+     * If a table has merged child tables, their IDs are added to the response.
+     * The effective capacity is also calculated:
+     * parent table capacity + merged child tables capacity.
+     */
     @Transactional(readOnly = true)
     public List<TableResponse> getTables(Authentication authentication, UUID restaurantId, UUID branchId) {
-        requireAccessibleBranch(authentication, restaurantId, branchId);
+        restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         RestaurantTableSupport.BranchTableSnapshot snapshot = restaurantTableSupport.loadBranchTables(restaurantId, branchId);
         return snapshot.tables().stream()
                 .map(table -> restaurantTableSupport.toResponse(table, snapshot.childrenByParentId()))
@@ -59,8 +83,8 @@ public class RestaurantTableService {
             UUID branchId,
             TableRequest request
     ) {
-        Branch branch = requireManageableBranch(authentication, restaurantId, branchId);
-        UUID actorId = currentActorId(authentication);
+        Branch branch = restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
 
         RestaurantTable table = new RestaurantTable();
         table.setRestaurant(branch.getRestaurant());
@@ -74,7 +98,7 @@ public class RestaurantTableService {
 
     @Transactional(readOnly = true)
     public TableResponse getTable(Authentication authentication, UUID restaurantId, UUID branchId, UUID tableId) {
-        requireAccessibleBranch(authentication, restaurantId, branchId);
+        restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         RestaurantTable table = restaurantTableSupport.requireTable(branchId, tableId);
         return restaurantTableSupport.toResponse(table, restaurantTableSupport.loadChildMap(tableId));
     }
@@ -87,9 +111,9 @@ public class RestaurantTableService {
             UUID tableId,
             TableRequest request
     ) {
-        requireManageableBranch(authentication, restaurantId, branchId);
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         RestaurantTable table = restaurantTableSupport.requireTable(branchId, tableId);
-        table.setUpdatedBy(currentActorId(authentication));
+        table.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         restaurantTableSupport.applyTableRequest(branchId, table, request);
         return restaurantTableSupport.toResponse(
                 restaurantTableSupport.saveTable(table),
@@ -116,7 +140,7 @@ public class RestaurantTableService {
             UUID tableId,
             UpdateTablePositionRequest request
     ) {
-        requireManageableBranch(authentication, restaurantId, branchId);
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         restaurantTableSupport.validatePositionPair(
                 request.getPositionX(),
                 request.getPositionY(),
@@ -129,7 +153,7 @@ public class RestaurantTableService {
         }
         table.setPositionX(request.getPositionX());
         table.setPositionY(request.getPositionY());
-        table.setUpdatedBy(currentActorId(authentication));
+        table.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
 
         return restaurantTableSupport.toResponse(
                 restaurantTableSupport.saveTable(table),
@@ -145,10 +169,10 @@ public class RestaurantTableService {
             UUID tableId,
             UpdateTableQrCodeRequest request
     ) {
-        requireManageableBranch(authentication, restaurantId, branchId);
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         RestaurantTable table = restaurantTableSupport.requireTable(branchId, tableId);
         table.setQrCodeValue(request.getQrCodeValue());
-        table.setUpdatedBy(currentActorId(authentication));
+        table.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
 
         return restaurantTableSupport.toResponse(
                 restaurantTableSupport.saveTable(table),
@@ -158,9 +182,10 @@ public class RestaurantTableService {
 
     @Transactional
     public void deleteTable(Authentication authentication, UUID restaurantId, UUID branchId, UUID tableId) {
-        requireManageableBranch(authentication, restaurantId, branchId);
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         RestaurantTable table = restaurantTableSupport.requireTable(branchId, tableId);
 
+        // if the table is reserved you can not delete it.
         if (reservationTableAssignmentRepository.existsByRestaurantTable_Id(tableId)) {
             throw new AuthException("Cannot delete a table that already has reservation assignments", HttpStatus.CONFLICT);
         }
@@ -287,7 +312,7 @@ public class RestaurantTableService {
             UUID tableId,
             TableMergeRequest request
     ) {
-        requireManageableBranch(authentication, restaurantId, branchId);
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         RestaurantTable primaryTable = restaurantTableSupport.requireTable(branchId, tableId);
         if (primaryTable.getMergedInto() != null) {
             throw new AuthException("Cannot merge tables into a table that is already merged into another table", HttpStatus.BAD_REQUEST);
@@ -307,7 +332,7 @@ public class RestaurantTableService {
             throw new AuthException("tableIds must all belong to this branch", HttpStatus.BAD_REQUEST);
         }
 
-        UUID actorId = currentActorId(authentication);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
         for (RestaurantTable mergeTarget : mergeTargets) {
             validateMergeTarget(mergeTarget);
             mergeTarget.setMergedInto(primaryTable);
@@ -315,14 +340,14 @@ public class RestaurantTableService {
         }
 
         restaurantTableSupport.saveTables(mergeTargets);
-        return getTable(authentication, restaurantId, branchId, tableId);
+        return restaurantTableSupport.toResponse(primaryTable, restaurantTableSupport.loadChildMap(tableId));
     }
 
     @Transactional
     public TableResponse unmergeTable(Authentication authentication, UUID restaurantId, UUID branchId, UUID tableId) {
-        requireManageableBranch(authentication, restaurantId, branchId);
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         RestaurantTable table = restaurantTableSupport.requireTable(branchId, tableId);
-        UUID actorId = currentActorId(authentication);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
 
         if (table.getMergedInto() != null) {
             table.setMergedInto(null);
@@ -347,10 +372,10 @@ public class RestaurantTableService {
             UUID tableId,
             TableStatus status
     ) {
-        requireManageableBranch(authentication, restaurantId, branchId);
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         RestaurantTable table = restaurantTableSupport.requireTable(branchId, tableId);
         table.setStatus(status);
-        table.setUpdatedBy(currentActorId(authentication));
+        table.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         return restaurantTableSupport.toResponse(
                 restaurantTableSupport.saveTable(table),
                 restaurantTableSupport.loadChildMap(tableId)
@@ -375,15 +400,4 @@ public class RestaurantTableService {
         }
     }
 
-    private Branch requireAccessibleBranch(Authentication authentication, UUID restaurantId, UUID branchId) {
-        return restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
-    }
-
-    private Branch requireManageableBranch(Authentication authentication, UUID restaurantId, UUID branchId) {
-        return restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
-    }
-
-    private UUID currentActorId(Authentication authentication) {
-        return restaurantScopeService.currentUserId(authentication);
-    }
 }

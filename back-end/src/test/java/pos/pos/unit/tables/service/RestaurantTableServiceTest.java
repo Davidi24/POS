@@ -165,6 +165,7 @@ class RestaurantTableServiceTest {
         assertThat(secondChild.getMergedInto()).isEqualTo(primaryTable);
         assertThat(response.getMergedTableIds()).containsExactly(CHILD_TABLE_ID, SECOND_CHILD_TABLE_ID);
         assertThat(response.getEffectiveCapacity()).isEqualTo(8);
+        verify(restaurantScopeService, never()).requireAccessibleBranch(authentication, RESTAURANT_ID, BRANCH_ID);
     }
 
     @Test

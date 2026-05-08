@@ -23,6 +23,11 @@ spring:
           writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT_MS:5000}
 
   jpa:
+
+springdoc:
+  swagger-ui:
+    persist-authorization: true
+
 security:
   jwt:
     secret: ${JWT_SECRET}
