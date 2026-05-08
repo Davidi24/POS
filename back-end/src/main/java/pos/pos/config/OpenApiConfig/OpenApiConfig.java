@@ -93,4 +93,12 @@ public class OpenApiConfig {
                 )
                 .build();
     }
+
+    @Bean
+    public GroupedOpenApi menuGroup() {
+        return GroupedOpenApi.builder()
+                .group("Menus")
+                .pathsToMatch("/menus", "/menus/**", "/public/restaurants/*/menus", "/public/restaurants/*/menus/**")
+                .build();
+    }
 }
