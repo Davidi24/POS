@@ -13,6 +13,7 @@ import java.util.UUID;
 
 public interface RestaurantTableRepository extends JpaRepository<RestaurantTable, UUID> {
 
+    // Fetches all tables for a branch ordered by floor and name, with category and merge parent preloaded.
     @EntityGraph(attributePaths = {"category", "mergedInto"})
     List<RestaurantTable> findAllByBranch_IdOrderByFloorAscNameAsc(UUID branchId);
 
@@ -33,6 +34,9 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
 
     @EntityGraph(attributePaths = {"category", "mergedInto"})
     List<RestaurantTable> findAllByMergedInto_IdOrderByTableNumberAsc(UUID tableId);
+
+    @EntityGraph(attributePaths = {"restaurant", "branch", "category", "mergedInto"})
+    Optional<RestaurantTable> findFirstByQrCodeValueAndActiveTrue(String qrCodeValue);
 
     boolean existsByCategory_Id(UUID categoryId);
 
