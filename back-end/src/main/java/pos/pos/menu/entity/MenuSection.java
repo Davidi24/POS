@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractTimestampedEntity;
 import pos.pos.utils.NormalizationUtils;
 
 import java.util.ArrayList;
@@ -45,7 +46,7 @@ import java.util.List;
         char_length(btrim(name)) > 0
         AND display_order >= 0
         """)
-public class MenuSection extends BaseAuditEntity {
+public class MenuSection extends AbstractTimestampedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "menu_id", nullable = false)

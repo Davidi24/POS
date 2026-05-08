@@ -31,7 +31,12 @@ class AppRoleTest {
     void shouldExposeExpectedPermissions() {
         assertThat(AppRole.SUPER_ADMIN.permissions()).containsExactlyInAnyOrder(AppPermission.values());
         assertThat(AppRole.OWNER.permissions()).containsExactlyInAnyOrder(AppPermission.values());
-        assertThat(AppRole.MANAGER.permissions()).contains(AppPermission.USERS_CREATE, AppPermission.ROLES_READ);
+        assertThat(AppRole.MANAGER.permissions()).contains(
+                AppPermission.USERS_CREATE,
+                AppPermission.ROLES_READ,
+                AppPermission.MENUS_READ,
+                AppPermission.MENUS_UPDATE
+        );
         assertThat(AppRole.MANAGER.permissions()).doesNotContain(AppPermission.USERS_DELETE);
         assertThat(AppRole.WAITER.permissions()).isEmpty();
     }
