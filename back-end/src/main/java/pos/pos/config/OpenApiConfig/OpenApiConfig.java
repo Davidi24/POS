@@ -68,6 +68,14 @@ public class OpenApiConfig {
     }
 
     @Bean
+    public GroupedOpenApi tablesGroup() {
+        return GroupedOpenApi.builder()
+                .group("Tables")
+                .packagesToScan("pos.pos.tables.controller")
+                .build();
+    }
+
+    @Bean
     public GroupedOpenApi deviceGroup() {
         return GroupedOpenApi.builder()
                 .group("Devices")
