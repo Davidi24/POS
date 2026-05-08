@@ -77,6 +77,7 @@ class MenuApiIntegrationTest {
         registry.add("MAIL_FROM", () -> "no-reply@pos.example");
         registry.add("FRONTEND_BASE_URL", () -> "https://app.pos.example");
         registry.add("FRONTEND_DEFAULT_LINK_TARGET", () -> "UNIVERSAL");
+        registry.add("SPRINGDOC_API_DOCS_ENABLED", () -> "true");
         registry.add("TRUSTED_PROXIES", () -> "127.0.0.1,::1");
         registry.add("COOKIE_DOMAIN", () -> "pos.example");
         registry.add("BOOTSTRAP_SUPER_ADMIN_ENABLED", () -> "true");
@@ -445,6 +446,7 @@ class MenuApiIntegrationTest {
         restaurant.setDescription("Integration test restaurant");
         restaurant.setCurrency("USD");
         restaurant.setTimezone("Europe/Berlin");
+        restaurant.setOwnerId(actorId);
         restaurant.setCreatedBy(actorId);
         restaurant.setUpdatedBy(actorId);
         return restaurantRepository.save(restaurant);
