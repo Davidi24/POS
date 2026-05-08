@@ -14,6 +14,11 @@ public enum AppPermission {
     RESTAURANTS_UPDATE("Update Restaurants", "Update restaurant records"),
     RESTAURANTS_DELETE("Delete Restaurants", "Delete restaurant records"),
 
+    MENUS_READ("View Menus", "View restaurant menus"),
+    MENUS_CREATE("Create Menus", "Create restaurant menus"),
+    MENUS_UPDATE("Update Menus", "Update restaurant menus"),
+    MENUS_DELETE("Delete Menus", "Delete restaurant menus"),
+
     ROLES_READ("View Roles", "View available roles"),
     ROLES_CREATE("Create Roles", "Create custom roles"),
     ROLES_UPDATE("Update Roles", "Update custom roles"),

@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractTimestampedEntity;
 
 /**
  * Represents the link between a menu item and an option group.
@@ -47,7 +48,7 @@ import org.hibernate.annotations.Check;
             OR min_select_override <= max_select_override
         )
         """)
-public class MenuItemOptionGroup extends BaseAuditEntity {
+public class MenuItemOptionGroup extends AbstractTimestampedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "menu_item_id", nullable = false)

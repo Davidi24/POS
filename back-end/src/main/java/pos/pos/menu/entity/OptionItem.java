@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractTimestampedEntity;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
@@ -43,7 +44,7 @@ import java.math.BigDecimal;
         AND (code IS NULL OR char_length(btrim(code)) > 0)
         AND display_order >= 0
         """)
-public class OptionItem extends BaseAuditEntity {
+public class OptionItem extends AbstractTimestampedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "option_group_id", nullable = false)

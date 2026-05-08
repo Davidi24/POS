@@ -1,0 +1,149 @@
+MENU API BACKLOG
+
+How to use
+- Each line is one API ticket.
+- Keep it as [ ] until the endpoint is implemented and manually verified.
+- Change [ ] to [x] only when both are done.
+- These endpoints are not implemented yet in the current codebase.
+- All ids are UUID values unless noted otherwise.
+- Route style follows the existing project convention: top-level resource paths without an /api prefix.
+
+Common auth and permission assumptions
+- Protected endpoints require header: Authorization: Bearer <accessToken>
+- Suggested permission codes to add before implementation:
+  - MENUS_READ
+  - MENUS_CREATE
+  - MENUS_UPDATE
+  - MENUS_DELETE
+
+Common validation assumptions
+- code and name are normalized and trimmed
+- displayOrder must be greater than or equal to 0
+- basePrice must be greater than or equal to 0
+- minSelect and maxSelect must be greater than or equal to 0 when present
+- minSelect must be less than or equal to maxSelect when both are present
+- minSelectOverride must be less than or equal to maxSelectOverride when both are present
+
+
+MENU
+
+[ ] MENU-001 GET /menus returns paginated menus with restaurant, active, and search filters
+[ ] MENU-002 POST /menus creates a menu for a restaurant
+[ ] MENU-003 GET /menus/{menuId} returns one menu
+[ ] MENU-004 GET /menus/{menuId} supports includeSections and includeItems expansions
+[ ] MENU-005 PUT /menus/{menuId} updates code, name, description, active, and displayOrder
+[ ] MENU-006 PATCH /menus/{menuId}/status updates only menu active state
+[ ] MENU-007 DELETE /menus/{menuId} deletes a menu or returns 409 when blocked by dependent records
+[ ] MENU-008 POST /menus derives code from name when code is omitted
+[ ] MENU-009 POST or PUT /menus rejects duplicate restaurantId + code combinations
+[ ] MENU-010 Menu write endpoints persist createdBy and updatedBy from the authenticated user
+
+
+MENU SECTION
+
+[ ] MENU-SECTION-001 GET /menus/{menuId}/sections returns sections for one menu
+[ ] MENU-SECTION-002 GET /menus/{menuId}/sections supports active filtering
+[ ] MENU-SECTION-003 GET /menus/{menuId}/sections supports includeItems expansion
+[ ] MENU-SECTION-004 POST /menus/{menuId}/sections creates a section under the target menu
+[ ] MENU-SECTION-005 GET /menus/{menuId}/sections/{sectionId} returns one section scoped to its menu
+[ ] MENU-SECTION-006 PUT /menus/{menuId}/sections/{sectionId} updates name, description, active, and displayOrder
+[ ] MENU-SECTION-007 PATCH /menus/{menuId}/sections/{sectionId}/status updates only section active state
+[ ] MENU-SECTION-008 DELETE /menus/{menuId}/sections/{sectionId} deletes a section
+[ ] MENU-SECTION-009 Section write endpoints reject negative displayOrder
+[ ] MENU-SECTION-010 Section reads and writes return 409 when sectionId does not belong to menuId
+[ ] MENU-SECTION-011 POST or PUT /menus/{menuId}/sections rejects duplicate menuId + name combinations
+
+
+MENU ITEM
+
+[ ] MENU-ITEM-001 GET /menus/{menuId}/sections/{sectionId}/items returns items for one section
+[ ] MENU-ITEM-002 GET /menus/{menuId}/sections/{sectionId}/items supports available filtering
+[ ] MENU-ITEM-003 GET /menus/{menuId}/sections/{sectionId}/items supports includeVariants expansion
+[ ] MENU-ITEM-004 GET /menus/{menuId}/sections/{sectionId}/items supports includeOptionGroups expansion
+[ ] MENU-ITEM-005 POST /menus/{menuId}/sections/{sectionId}/items creates an item under the target section
+[ ] MENU-ITEM-006 GET /menus/{menuId}/sections/{sectionId}/items/{itemId} returns one item scoped to its section
+[ ] MENU-ITEM-007 PUT /menus/{menuId}/sections/{sectionId}/items/{itemId} updates sku, name, description, basePrice, imageUrl, available, and displayOrder
+[ ] MENU-ITEM-008 PATCH /menus/{menuId}/sections/{sectionId}/items/{itemId}/availability updates only item availability
+[ ] MENU-ITEM-009 DELETE /menus/{menuId}/sections/{sectionId}/items/{itemId} deletes an item
+[ ] MENU-ITEM-010 Item write endpoints reject negative basePrice
+[ ] MENU-ITEM-011 Item write endpoints reject negative displayOrder
+[ ] MENU-ITEM-012 Item reads and writes return 409 when itemId does not belong to sectionId or sectionId does not belong to menuId
+
+
+MENU VARIANT
+
+[ ] MENU-VARIANT-001 GET /menus/{menuId}/sections/{sectionId}/items/{itemId}/variants returns variants for one item
+[ ] MENU-VARIANT-002 POST /menus/{menuId}/sections/{sectionId}/items/{itemId}/variants creates a variant under the target item
+[ ] MENU-VARIANT-003 PUT /menus/{menuId}/sections/{sectionId}/items/{itemId}/variants/{variantId} updates name, sku, priceDelta, default, active, and displayOrder
+[ ] MENU-VARIANT-004 DELETE /menus/{menuId}/sections/{sectionId}/items/{itemId}/variants/{variantId} deletes a variant
+[ ] MENU-VARIANT-005 Variant write endpoints reject negative displayOrder
+[ ] MENU-VARIANT-006 POST or PUT /variants rejects duplicate menuItemId + name combinations
+[ ] MENU-VARIANT-007 Variant reads and writes return 409 when variantId does not belong to itemId
+[ ] MENU-VARIANT-008 Variant writes enforce only one default variant per menu item if that business rule is adopted
+
+
+OPTION GROUP TYPE
+
+[ ] OPTION-GROUP-TYPE-001 GET /option-group-types returns all option group types
+[ ] OPTION-GROUP-TYPE-002 GET /option-group-types supports search by code or name
+[ ] OPTION-GROUP-TYPE-003 POST /option-group-types creates an option group type
+[ ] OPTION-GROUP-TYPE-004 PUT /option-group-types/{typeId} updates code, name, and description
+[ ] OPTION-GROUP-TYPE-005 DELETE /option-group-types/{typeId} deletes an option group type
+[ ] OPTION-GROUP-TYPE-006 POST /option-group-types derives code from name when code is omitted
+[ ] OPTION-GROUP-TYPE-007 POST or PUT /option-group-types rejects duplicate code
+[ ] OPTION-GROUP-TYPE-008 POST or PUT /option-group-types rejects duplicate name
+
+
+OPTION GROUP
+
+[ ] OPTION-GROUP-001 GET /option-groups returns option groups for a restaurant
+[ ] OPTION-GROUP-002 GET /option-groups supports filtering by typeId
+[ ] OPTION-GROUP-003 GET /option-groups supports filtering by active state
+[ ] OPTION-GROUP-004 GET /option-groups supports search by name
+[ ] OPTION-GROUP-005 GET /option-groups supports includeItems expansion
+[ ] OPTION-GROUP-006 POST /option-groups creates an option group
+[ ] OPTION-GROUP-007 GET /option-groups/{groupId} returns one option group
+[ ] OPTION-GROUP-008 PUT /option-groups/{groupId} updates type, name, description, selection rules, active, and displayOrder
+[ ] OPTION-GROUP-009 PATCH /option-groups/{groupId}/status updates only option group active state
+[ ] OPTION-GROUP-010 DELETE /option-groups/{groupId} deletes an option group
+[ ] OPTION-GROUP-011 Option group write endpoints reject negative displayOrder
+[ ] OPTION-GROUP-012 Option group write endpoints reject negative minSelect or maxSelect
+[ ] OPTION-GROUP-013 Option group write endpoints reject minSelect greater than maxSelect
+[ ] OPTION-GROUP-014 POST or PUT /option-groups rejects duplicate restaurantId + name combinations
+
+
+OPTION ITEM
+
+[ ] OPTION-ITEM-001 GET /option-groups/{groupId}/items returns items for one option group
+[ ] OPTION-ITEM-002 GET /option-groups/{groupId}/items supports available filtering
+[ ] OPTION-ITEM-003 POST /option-groups/{groupId}/items creates an item under the target option group
+[ ] OPTION-ITEM-004 PUT /option-groups/{groupId}/items/{itemId} updates code, name, priceDelta, available, and displayOrder
+[ ] OPTION-ITEM-005 PATCH /option-groups/{groupId}/items/{itemId}/availability updates only option item availability
+[ ] OPTION-ITEM-006 DELETE /option-groups/{groupId}/items/{itemId} deletes an option item
+[ ] OPTION-ITEM-007 Option item write endpoints reject negative displayOrder
+[ ] OPTION-ITEM-008 POST or PUT /option-groups/{groupId}/items derives code from input rules when needed
+[ ] OPTION-ITEM-009 POST or PUT /option-groups/{groupId}/items rejects duplicate optionGroupId + name combinations
+[ ] OPTION-ITEM-010 Option item reads and writes return 409 when itemId does not belong to groupId
+
+
+MENU ITEM OPTION GROUP LINK
+
+[ ] MENU-ITEM-OPTION-GROUP-001 GET /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups returns assigned option groups for one menu item
+[ ] MENU-ITEM-OPTION-GROUP-002 POST /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups links an option group to a menu item
+[ ] MENU-ITEM-OPTION-GROUP-003 PUT /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId} updates displayOrder and selection overrides
+[ ] MENU-ITEM-OPTION-GROUP-004 DELETE /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups/{linkId} removes a linked option group
+[ ] MENU-ITEM-OPTION-GROUP-005 Link write endpoints reject negative displayOrder
+[ ] MENU-ITEM-OPTION-GROUP-006 Link write endpoints reject negative minSelectOverride or maxSelectOverride
+[ ] MENU-ITEM-OPTION-GROUP-007 Link write endpoints reject minSelectOverride greater than maxSelectOverride
+[ ] MENU-ITEM-OPTION-GROUP-008 POST /menus/{menuId}/sections/{sectionId}/items/{itemId}/option-groups rejects duplicate menuItemId + optionGroupId links
+[ ] MENU-ITEM-OPTION-GROUP-009 Link reads and writes return 409 when linkId does not belong to itemId
+
+
+RESPONSE AND ERROR BEHAVIOR
+
+[ ] MENU-API-001 List endpoints return paginated summaries where pagination is supported
+[ ] MENU-API-002 Detail endpoints return one resource with optional nested children controlled by include parameters
+[ ] MENU-API-003 Validation failures return 400
+[ ] MENU-API-004 Missing resources return 404
+[ ] MENU-API-005 Duplicate unique values return 409
+[ ] MENU-API-006 Cross-resource mismatches such as item not belonging to section return 409
