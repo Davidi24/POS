@@ -98,7 +98,7 @@ public class ReservationLifecycleService {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
         if (targetStatus == ReservationStatus.CONFIRMED) {
-            assertCurrentStatus(currentStatus, ReservationStatus.PENDING);
+            assertPendingStatus(currentStatus);
             reservation.setStatus(ReservationStatus.CONFIRMED);
             reservation.setConfirmedAt(now);
         } else if (targetStatus == ReservationStatus.CANCELLED) {
@@ -181,9 +181,9 @@ public class ReservationLifecycleService {
         return reservationSupport.toResponse(reservationSupport.saveReservation(reservation));
     }
 
-    private void assertCurrentStatus(ReservationStatus currentStatus, ReservationStatus expectedStatus) {
-        if (currentStatus != expectedStatus) {
-            throw new AuthException("Reservation must be " + expectedStatus + " before this transition", HttpStatus.BAD_REQUEST);
+    private void assertPendingStatus(ReservationStatus currentStatus) {
+        if (currentStatus != ReservationStatus.PENDING) {
+            throw new AuthException("Reservation must be PENDING before this transition", HttpStatus.BAD_REQUEST);
         }
     }
 }

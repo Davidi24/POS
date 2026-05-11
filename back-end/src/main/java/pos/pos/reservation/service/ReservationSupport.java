@@ -287,7 +287,10 @@ public class ReservationSupport {
         reservation.setPartySize(request.getPartySize());
         reservation.setReservationStart(request.getReservationStart());
         reservation.setReservationEnd(request.getReservationEnd());
-        reservation.setContactName(firstNonBlank(request.getContactName(), customerDisplayName(reservation.getCustomer())));
+        reservation.setContactName(firstNonBlank(
+                request.getContactName(),
+                reservation.getCustomer() == null ? null : reservation.getCustomer().displayName()
+        ));
         reservation.setContactPhone(firstNonBlank(
                 request.getContactPhone(),
                 reservation.getCustomer() == null ? null : reservation.getCustomer().getPhone()
@@ -388,22 +391,6 @@ public class ReservationSupport {
             return ReservationDepositStatus.PENDING;
         }
         return currentStatus;
-    }
-
-    public String customerDisplayName(Customer customer) {
-        if (customer == null) {
-            return null;
-        }
-        if (customer.getFirstName() == null && customer.getLastName() == null) {
-            return null;
-        }
-        if (customer.getFirstName() == null) {
-            return customer.getLastName();
-        }
-        if (customer.getLastName() == null) {
-            return customer.getFirstName();
-        }
-        return customer.getFirstName() + " " + customer.getLastName();
     }
 
     public String firstNonBlank(String firstValue, String fallbackValue) {
