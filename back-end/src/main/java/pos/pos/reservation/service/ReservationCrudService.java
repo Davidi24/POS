@@ -43,6 +43,9 @@ public class ReservationCrudService {
         reservationSupport.applyReservationRequest(reservation, request, actorId, true);
         reservationSupport.addStatusHistory(reservation, null, ReservationStatus.PENDING, "Reservation created", actorId);
 
+        // this check if the tables that will be assigned to this reservation can be like maybe there is
+        // another reservation there ... after that it clears the previous connection like the previous reservation
+        // and set the new one
         if (request.getInitialTableIds() != null) {
             reservationTableAssignmentService.replaceReservationTables(
                     reservation,

@@ -216,11 +216,22 @@ public class ReservationAvailabilitySupport {
                 new HashSet<>()
         );
 
+        //This finds best options first:
+        //
+        //1. fewer tables first
+        //2. less extra capacity first
+        //3. table number order
+        //
+        //Example: partySize = 6
+        //
+        //Table 4 capacity 6      ✅ best: 1 table, exact fit
+        //Table 2 + Table 3 = 6  ✅ good: 2 tables, exact fit
+        //Table 5 capacity 8     ✅ okay: 1 table, 2 extra seats
         return combinations.stream()
-                .sorted(Comparator
-                        .comparingInt(TableCombination::tableCount)
+                .sorted(Comparator //Java Comparator sorts ascending by default.
+                        .comparingInt(TableCombination::tableCount) // this check how many tables it has compare to the other object and renders them if equal it goes to the other check if nto the two other check are not visited
                         .thenComparingInt(combination -> combination.totalCapacity() - partySize)
-                        .thenComparing(TableCombination::tableNumbersKey, String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(TableCombination::tableNumbersKey, String.CASE_INSENSITIVE_ORDER)) // this compares the strings because "T1|T3" comes before "T1|T4"
                 .limit(limit)
                 .map(combination -> ReservationAvailabilityOptionResponse.builder()
                         .tableIds(combination.tableIds())
@@ -258,10 +269,11 @@ public class ReservationAvailabilitySupport {
         return selectedTables;
     }
 
+    // This function tries to find table combinations that can fit the reservation partySize.
     private void buildAvailabilityOptionsDepthFirst(
-            List<AvailableRootTable> availableRootTables,
+            List<AvailableRootTable> availableRootTables, // All currently available root/main tables.
             int partySize,
-            int limit,
+            int limit, // How many final options should be returned later.
             int startIndex,
             List<AvailableRootTable> currentSelection,
             int currentCapacity,
@@ -271,7 +283,9 @@ public class ReservationAvailabilitySupport {
         if (currentCapacity >= partySize) {
             List<UUID> tableIds = currentSelection.stream().map(selection -> selection.table().getId()).toList();
             List<String> tableNumbers = currentSelection.stream().map(selection -> selection.table().getTableNumber()).toList();
+            //Then it creates a unique key: T1-ID|T3-ID
             String key = tableIds.stream().map(UUID::toString).collect(Collectors.joining("|"));
+            // If this combination was not saved before, save it now.
             if (seenKeys.add(key)) {
                 combinations.add(new TableCombination(
                         tableIds,
@@ -284,10 +298,16 @@ public class ReservationAvailabilitySupport {
             return;
         }
 
+        // the first one is like you tried combining 4 tables still not enough capacity try smth else right?
+        //
         if (currentSelection.size() >= MAX_COMBINATION_DEPTH || combinations.size() >= limit * 4) {
             return;
         }
 
+        // Tries every possible next table for the current combination.
+        // It adds one table, continues recursively with the remaining tables,
+        // then removes that table again to try another combination.
+        // startIndex prevents duplicate combinations like T1 + T2 and T2 + T1.
         for (int index = startIndex; index < availableRootTables.size(); index++) {
             currentSelection.add(availableRootTables.get(index));
             buildAvailabilityOptionsDepthFirst(
@@ -300,6 +320,8 @@ public class ReservationAvailabilitySupport {
                     combinations,
                     seenKeys
             );
+            // here it removes because it tries recursively with all possible tables is like try T1 + T2, then T1 + T2 + T3
+            // after that start removing go T1 + T2 + T4
             currentSelection.removeLast();
         }
     }
