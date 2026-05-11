@@ -89,9 +89,11 @@ public class Reservation extends AbstractAuditedEntity {
     )
     private Customer customer;
 
+    // a unique code for each reservation
     @Column(name = "reservation_code", nullable = false, length = 50)
     private String reservationCode;
 
+    // base in when it came from it can handle it different
     @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false, length = 30)
     private ReservationSource source = ReservationSource.INTERNAL;
