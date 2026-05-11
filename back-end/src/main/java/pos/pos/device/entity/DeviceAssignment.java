@@ -2,6 +2,8 @@ package pos.pos.device.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Index;
@@ -14,7 +16,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractTimestampedEntity;
+import pos.pos.device.enums.DeviceAssignmentType;
 import pos.pos.restaurant.entity.Branch;
+import pos.pos.user.entity.User;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
@@ -64,8 +68,14 @@ public class DeviceAssignment extends AbstractTimestampedEntity {
     @Column(name = "user_id", columnDefinition = "uuid")
     private UUID userId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    private User user;
+
+    // to whom is this device like to a specific user or to a branch
+    @Enumerated(EnumType.STRING)
     @Column(name = "assignment_type", nullable = false, length = 30)
-    private String assignmentType;
+    private DeviceAssignmentType assignmentType;
 
     @Column(name = "assigned_at", nullable = false, columnDefinition = "timestamptz")
     private OffsetDateTime assignedAt;
@@ -79,12 +89,15 @@ public class DeviceAssignment extends AbstractTimestampedEntity {
     @Column(name = "assigned_by", columnDefinition = "uuid")
     private UUID assignedBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_by", insertable = false, updatable = false)
+    private User assignedByUser;
+
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
 
     @Override
     protected void normalizeFields() {
-        assignmentType = normalizeToken(assignmentType);
         notes = NormalizationUtils.normalize(notes);
 
         if (assignedAt == null) {
@@ -102,6 +115,10 @@ public class DeviceAssignment extends AbstractTimestampedEntity {
             throw new IllegalStateException("device assignment must target a branch or a user");
         }
 
+        if (assignmentType == null) {
+            throw new IllegalStateException("assignmentType is required");
+        }
+
         if (unassignedAt != null && !unassignedAt.isAfter(assignedAt)) {
             throw new IllegalStateException("unassignedAt must be after assignedAt");
         }
@@ -111,16 +128,22 @@ public class DeviceAssignment extends AbstractTimestampedEntity {
                 throw new IllegalStateException("assignment branch must belong to the same restaurant as the device");
             }
         }
-    }
 
-    private String normalizeToken(String value) {
-        String normalized = NormalizationUtils.normalizeUpper(value);
-        if (normalized == null) {
-            return null;
+        if (device != null && user != null && device.getRestaurant() != null) {
+            if (!Objects.equals(device.getRestaurant().getId(), user.getRestaurantId())) {
+                throw new IllegalStateException("assigned user must belong to the same restaurant as the device");
+            }
         }
 
-        return normalized
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
+        if (device != null && assignedByUser != null && device.getRestaurant() != null && assignedByUser.getRestaurantId() != null) {
+            if (!Objects.equals(device.getRestaurant().getId(), assignedByUser.getRestaurantId())) {
+                throw new IllegalStateException("assignedBy user must belong to the same restaurant as the device");
+            }
+        }
+    }
+
+    public void closeAt(OffsetDateTime closedAt) {
+        unassignedAt = closedAt;
+        active = false;
     }
 }

@@ -62,9 +62,11 @@ public class DevicePrinterProfile extends AbstractTimestampedEntity {
     @Column(name = "printer_port")
     private Integer printerPort;
 
+    // Whether the printer should automatically cut the receipt paper.
     @Column(name = "auto_cut", nullable = false)
     private boolean autoCut = true;
 
+    // Whether the printer should trigger/open the cash drawer.
     @Column(name = "cash_drawer_kick_enabled", nullable = false)
     private boolean cashDrawerKickEnabled = false;
 

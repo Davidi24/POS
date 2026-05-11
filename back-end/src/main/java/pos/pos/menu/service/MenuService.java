@@ -38,7 +38,6 @@ import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.restaurant.service.RestaurantValidationService;
 import pos.pos.security.scope.ActorScope;
 import pos.pos.security.scope.ActorScopeService;
-import pos.pos.user.entity.User;
 import pos.pos.utils.NormalizationUtils;
 
 import java.util.List;
@@ -186,7 +185,7 @@ public class MenuService {
         String normalizedCode = resolveCreateCode(request.getCode(), request.getName());
         assertUniqueCode(restaurant.getId(), normalizedCode, null);
 
-        User actor = restaurantScopeService.currentActor(authentication);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
         Menu menu = new Menu();
         menu.setRestaurant(restaurant);
         menu.setCode(normalizedCode);
@@ -194,8 +193,8 @@ public class MenuService {
         menu.setDescription(NormalizationUtils.normalize(request.getDescription()));
         menu.setActive(request.getActive() == null || request.getActive());
         menu.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
-        menu.setCreatedBy(actor);
-        menu.setUpdatedBy(actor);
+        menu.setCreatedBy(actorId);
+        menu.setUpdatedBy(actorId);
 
         return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
     }
@@ -213,7 +212,7 @@ public class MenuService {
         menu.setDescription(NormalizationUtils.normalize(request.getDescription()));
         menu.setActive(Boolean.TRUE.equals(request.getActive()));//is the menu active or not
         menu.setDisplayOrder(request.getDisplayOrder());//saves the order position of the menu
-        menu.setUpdatedBy(restaurantScopeService.currentActor(authentication));//stores who updated the menu
+        menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));//stores who updated the menu
 
         return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
     }
@@ -223,7 +222,7 @@ public class MenuService {
     public MenuResponse updateMenuStatus(Authentication authentication, UUID menuId, UpdateMenuStatusRequest request) {
         Menu menu = requireManageableMenu(authentication, menuId);
         menu.setActive(Boolean.TRUE.equals(request.getActive())); //sets the new updated status
-        menu.setUpdatedBy(restaurantScopeService.currentActor(authentication));//stores who updated it
+        menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));//stores who updated it
 
         return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
     }

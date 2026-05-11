@@ -1,0 +1,253 @@
+TABLE AND RESERVATION API DOCUMENTATION
+
+Scope
+- This file documents the recommended API surface for the new tables and reservations domain.
+- This commit adds the entities and repositories that support this model.
+- Controllers, DTOs, service rules, and endpoint implementation still need to be built.
+- All ids are UUID values unless noted otherwise.
+
+
+Status key
+- [x] implemented in the repo
+- [ ] recommended next API to build
+
+
+Current domain model added in this repo
+- [x] customers
+- [x] table-categories
+- [x] tables
+- [x] reservations
+- [x] reservation-status-history
+- [x] reservation_tables
+
+
+TABLE CATEGORY APIs
+
+[x] 1. GET /restaurants/{restaurantId}/branches/{branchId}/table-categories
+[x] 2. POST /restaurants/{restaurantId}/branches/{branchId}/table-categories
+[x] 3. GET /restaurants/{restaurantId}/branches/{branchId}/table-categories/{categoryId}
+[x] 4. PUT /restaurants/{restaurantId}/branches/{branchId}/table-categories/{categoryId}
+[x] 5. PATCH /restaurants/{restaurantId}/branches/{branchId}/table-categories/{categoryId}/status
+[x] 6. PATCH /restaurants/{restaurantId}/branches/{branchId}/table-categories/reorder
+[x] 7. DELETE /restaurants/{restaurantId}/branches/{branchId}/table-categories/{categoryId}
+
+
+TABLE APIs
+
+[x] 8. GET /restaurants/{restaurantId}/branches/{branchId}/tables
+[x] 9. POST /restaurants/{restaurantId}/branches/{branchId}/tables
+[x] 10. GET /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}
+[x] 11. PUT /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}
+[x] 12. PATCH /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/status
+[x] 13. PATCH /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/position
+[x] 14. PATCH /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/qr-code
+[x] 15. DELETE /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}
+
+
+TABLE LAYOUT AND FLOOR MAP APIs
+
+[x] 16. GET /restaurants/{restaurantId}/branches/{branchId}/table-layout
+[x] 17. PUT /restaurants/{restaurantId}/branches/{branchId}/table-layout
+[x] 18. POST /restaurants/{restaurantId}/branches/{branchId}/table-layout/auto-arrange
+[x] 19. GET /restaurants/{restaurantId}/branches/{branchId}/floors
+[x] 20. PUT /restaurants/{restaurantId}/branches/{branchId}/floors
+[x] 21. GET /restaurants/{restaurantId}/branches/{branchId}/tables/map
+
+
+TABLE AVAILABILITY AND OPERATIONS APIs
+
+[x] 22. GET /restaurants/{restaurantId}/branches/{branchId}/tables/availability
+[x] 23. GET /restaurants/{restaurantId}/branches/{branchId}/tables/available
+[x] 24. GET /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/availability
+[x] 25. POST /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/block
+[x] 26. POST /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/unblock
+[x] 27. POST /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/mark-clean
+[x] 28. POST /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/mark-dirty
+[x] 29. POST /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/merge
+[x] 30. POST /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/unmerge
+
+
+RESERVATION CORE APIs
+
+[ ] 31. GET /restaurants/{restaurantId}/reservations
+[ ] 32. POST /restaurants/{restaurantId}/reservations
+[ ] 33. GET /restaurants/{restaurantId}/reservations/{reservationId}
+[ ] 34. PUT /restaurants/{restaurantId}/reservations/{reservationId}
+[ ] 35. PATCH /restaurants/{restaurantId}/reservations/{reservationId}
+[ ] 36. DELETE /restaurants/{restaurantId}/reservations/{reservationId}
+[ ] 37. GET /restaurants/{restaurantId}/branches/{branchId}/reservations
+[ ] 38. GET /restaurants/{restaurantId}/branches/{branchId}/reservations/calendar
+[ ] 39. GET /restaurants/{restaurantId}/branches/{branchId}/reservations/today
+[ ] 40. GET /restaurants/{restaurantId}/branches/{branchId}/reservations/upcoming
+
+
+RESERVATION DISCOVERY AND CAPACITY APIs
+
+[ ] 41. POST /restaurants/{restaurantId}/branches/{branchId}/reservations/availability/search
+[ ] 42. POST /restaurants/{restaurantId}/branches/{branchId}/reservations/availability/recommend
+[ ] 43. GET /restaurants/{restaurantId}/branches/{branchId}/reservations/summary
+[ ] 44. GET /restaurants/{restaurantId}/branches/{branchId}/reservations/capacity
+[ ] 45. POST /restaurants/{restaurantId}/branches/{branchId}/reservations/validate
+
+
+RESERVATION STATUS TRANSITION APIs
+
+[ ] 46. POST /restaurants/{restaurantId}/reservations/{reservationId}/confirm
+[ ] 47. POST /restaurants/{restaurantId}/reservations/{reservationId}/cancel
+[ ] 48. POST /restaurants/{restaurantId}/reservations/{reservationId}/check-in
+[ ] 49. POST /restaurants/{restaurantId}/reservations/{reservationId}/seat
+[ ] 50. POST /restaurants/{restaurantId}/reservations/{reservationId}/complete
+[ ] 51. POST /restaurants/{restaurantId}/reservations/{reservationId}/mark-no-show
+[ ] 52. POST /restaurants/{restaurantId}/reservations/{reservationId}/reopen
+
+
+RESERVATION TABLE ASSIGNMENT APIs
+
+[ ] 53. GET /restaurants/{restaurantId}/reservations/{reservationId}/tables
+[ ] 54. PUT /restaurants/{restaurantId}/reservations/{reservationId}/tables
+[ ] 55. POST /restaurants/{restaurantId}/reservations/{reservationId}/tables/{tableId}
+[ ] 56. DELETE /restaurants/{restaurantId}/reservations/{reservationId}/tables/{tableId}
+[ ] 57. PATCH /restaurants/{restaurantId}/reservations/{reservationId}/tables/{tableId}/primary
+[ ] 58. POST /restaurants/{restaurantId}/reservations/{reservationId}/auto-assign-table
+
+
+RESERVATION TIMELINE AND AUDIT APIs
+
+[ ] 59. GET /restaurants/{restaurantId}/reservations/{reservationId}/status-history
+[ ] 60. GET /restaurants/{restaurantId}/reservations/{reservationId}/timeline
+[ ] 61. GET /restaurants/{restaurantId}/reservations/{reservationId}/audit
+[ ] 62. POST /restaurants/{restaurantId}/reservations/{reservationId}/notes
+[ ] 63. DELETE /restaurants/{restaurantId}/reservations/{reservationId}/notes/{noteId}
+
+
+DEPOSIT AND PAYMENT-ADJACENT APIs
+
+[ ] 64. GET /restaurants/{restaurantId}/reservations/{reservationId}/deposit
+[ ] 65. PUT /restaurants/{restaurantId}/reservations/{reservationId}/deposit
+[ ] 66. POST /restaurants/{restaurantId}/reservations/{reservationId}/deposit/pay
+[ ] 67. POST /restaurants/{restaurantId}/reservations/{reservationId}/deposit/refund
+[ ] 68. POST /restaurants/{restaurantId}/reservations/{reservationId}/deposit/waive
+[ ] 69. POST /restaurants/{restaurantId}/reservations/{reservationId}/deposit/forfeit
+
+
+CUSTOMER SUPPORT APIs FOR RESERVATIONS
+
+[ ] 70. GET /restaurants/{restaurantId}/customers
+[ ] 71. POST /restaurants/{restaurantId}/customers
+[ ] 72. GET /restaurants/{restaurantId}/customers/{customerId}
+[ ] 73. PUT /restaurants/{restaurantId}/customers/{customerId}
+[ ] 74. GET /restaurants/{restaurantId}/customers/{customerId}/reservations
+[ ] 75. DELETE /restaurants/{restaurantId}/customers/{customerId}
+
+
+QR AND PUBLIC BOOKING APIs
+
+[ ] 76. GET /public/restaurants/{restaurantSlug}/branches/{branchCode}/reservations/availability
+[ ] 77. POST /public/restaurants/{restaurantSlug}/branches/{branchCode}/reservations
+[ ] 78. GET /public/reservations/{reservationCode}
+[ ] 79. POST /public/reservations/{reservationCode}/cancel
+[ ] 80. GET /public/tables/{qrCodeValue}
+
+
+Recommended request shapes
+
+Create table category
+- code: string, required, max 50
+- name: string, required, max 100
+- description: string, optional
+- defaultCapacity: integer, required, min 1
+- locationType: TableLocationType, optional
+- color: string, optional, max 20
+- displayOrder: integer, optional, min 0
+- active: boolean, optional
+
+Create table
+- categoryId: uuid, optional
+- tableNumber: string, required, max 30
+- name: string, optional, max 100
+- capacity: integer, required, min 1
+- floor: string, optional, max 50
+- positionX: number, optional
+- positionY: number, optional
+- shape: TableShape, optional
+- status: TableStatus, optional
+- active: boolean, optional
+- qrCodeValue: string, optional, max 255
+
+Create reservation
+- customerId: uuid, optional
+- reservationCode: string, optional if generated by backend, otherwise max 50
+- source: ReservationSource, optional
+- partySize: integer, required, min 1
+- reservationStart: timestamptz, required
+- reservationEnd: timestamptz, required
+- contactName: string, recommended if customerId is null
+- contactPhone: string, recommended if customerId is null
+- contactEmail: string, recommended if customerId is null
+- seatingPreference: string, optional, max 50
+- specialRequests: string, optional
+- internalNotes: string, optional
+- depositRequired: boolean, optional
+- depositAmount: decimal, required when depositRequired is true
+- initialTableIds: array<uuid>, optional
+- primaryTableId: uuid, optional
+
+
+Recommended enum values
+
+TableLocationType
+- INDOOR
+- OUTDOOR
+- PRIVATE_ROOM
+- BAR
+- PATIO
+- ROOFTOP
+
+TableShape
+- RECTANGLE
+- ROUND
+- SQUARE
+- OVAL
+- CUSTOM
+
+TableStatus
+- AVAILABLE
+- RESERVED
+- OCCUPIED
+- DIRTY
+- MAINTENANCE
+- OUT_OF_SERVICE
+
+ReservationSource
+- INTERNAL
+- WEB
+- MOBILE
+- PHONE
+- WALK_IN
+- THIRD_PARTY
+
+ReservationStatus
+- PENDING
+- CONFIRMED
+- CHECKED_IN
+- SEATED
+- COMPLETED
+- CANCELLED
+- NO_SHOW
+
+ReservationDepositStatus
+- NOT_REQUIRED
+- PENDING
+- PAID
+- PARTIALLY_PAID
+- REFUNDED
+- FORFEITED
+- WAIVED
+
+
+Practical build order
+- Start with 1-15 for table master data.
+- Then build 31-58 for reservation CRUD, status flow, and table assignment.
+- Add 41-45 after the first reservation service is stable.
+- Add 64-69 only when your payment workflow is defined.
+- Add 76-80 only when public booking and QR entry points are in scope.
