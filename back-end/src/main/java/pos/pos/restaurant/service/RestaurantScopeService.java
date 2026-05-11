@@ -57,6 +57,11 @@ public class RestaurantScopeService {
         return restaurant;
     }
 
+    public Branch requireExistingBranch(UUID restaurantId, UUID branchId) {
+        return branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId, restaurantId)
+                .orElseThrow(BranchNotFoundException::new);
+    }
+
     public Branch requireAccessibleBranch(Authentication authentication, UUID restaurantId, UUID branchId) {
         return requireAccessibleBranch(actorScopeService.resolve(authentication), restaurantId, branchId);
     }
@@ -99,10 +104,5 @@ public class RestaurantScopeService {
 
     public User currentActor(Authentication authentication) {
         return actorScopeService.currentActor(authentication);
-    }
-
-    private Branch requireExistingBranch(UUID restaurantId, UUID branchId) {
-        return branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId, restaurantId)
-                .orElseThrow(BranchNotFoundException::new);
     }
 }

@@ -20,6 +20,7 @@ import lombok.Setter;
 import org.hibernate.annotations.Check;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import pos.pos.user.entity.User;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
@@ -38,7 +39,12 @@ import java.util.UUID;
                 @Index(name = "idx_device_pairing_tokens_created_by", columnList = "created_by")
         }
 )
-@Check(constraints = "expires_at > created_at AND (used_at IS NULL OR used_at >= created_at)")
+@Check(constraints = """
+        expires_at > created_at
+        AND (used_at IS NULL OR used_at >= created_at)
+        AND (revoked_at IS NULL OR revoked_at >= created_at)
+        AND (used_at IS NULL OR revoked_at IS NULL)
+        """)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -68,6 +74,9 @@ public class DevicePairingToken {
     @Column(name = "used_at", columnDefinition = "timestamptz")
     private OffsetDateTime usedAt;
 
+    @Column(name = "revoked_at", columnDefinition = "timestamptz")
+    private OffsetDateTime revokedAt;
+
     @JdbcTypeCode(SqlTypes.INET)
     @Column(name = "requested_ip", columnDefinition = "inet")
     private String requestedIp;
@@ -77,6 +86,10 @@ public class DevicePairingToken {
 
     @Column(name = "created_by", columnDefinition = "uuid")
     private UUID createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", insertable = false, updatable = false)
+    private User createdByUser;
 
     @PrePersist
     protected void prePersist() {
@@ -120,5 +133,27 @@ public class DevicePairingToken {
         if (usedAt != null && usedAt.isBefore(referenceCreatedAt)) {
             throw new IllegalStateException("usedAt must not be before createdAt");
         }
+
+        if (revokedAt != null && revokedAt.isBefore(referenceCreatedAt)) {
+            throw new IllegalStateException("revokedAt must not be before createdAt");
+        }
+
+        if (usedAt != null && revokedAt != null) {
+            throw new IllegalStateException("pairing token cannot be both used and revoked");
+        }
+    }
+
+    public boolean isActiveAt(OffsetDateTime now) {
+        return usedAt == null
+                && revokedAt == null
+                && expiresAt != null
+                && expiresAt.isAfter(now);
+    }
+
+    public void revokeAt(OffsetDateTime revokedAtValue) {
+        if (usedAt != null || revokedAt != null) {
+            return;
+        }
+        revokedAt = revokedAtValue;
     }
 }

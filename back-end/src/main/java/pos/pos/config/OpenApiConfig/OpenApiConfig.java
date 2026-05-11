@@ -32,7 +32,6 @@ public class OpenApiConfig {
         return GroupedOpenApi.builder()
                 .group("Authentication")
                 .pathsToMatch("/auth", "/auth/**")
-                .pathsToExclude("/auth/device", "/auth/device/**")
                 .build();
     }
 
@@ -69,10 +68,29 @@ public class OpenApiConfig {
     }
 
     @Bean
+    public GroupedOpenApi tablesGroup() {
+        return GroupedOpenApi.builder()
+                .group("Tables")
+                .packagesToScan("pos.pos.tables.controller")
+                .build();
+    }
+
+    @Bean
     public GroupedOpenApi deviceGroup() {
         return GroupedOpenApi.builder()
                 .group("Devices")
-                .pathsToMatch("/devices", "/devices/**", "/auth/device", "/auth/device/**")
+                .pathsToMatch(
+                        "/restaurants/*/settings/printers",
+                        "/restaurants/*/settings/printers/**",
+                        "/restaurants/*/branches/*/printer-routes",
+                        "/restaurants/*/branches/*/printer-routes/**",
+                        "/restaurants/*/branches/*/devices",
+                        "/restaurants/*/branches/*/devices/**",
+                        "/restaurants/*/devices/*/assignments",
+                        "/restaurants/*/devices/*/assignments/**",
+                        "/restaurants/*/devices/*/pairing-tokens",
+                        "/restaurants/*/devices/*/pairing-tokens/**"
+                )
                 .build();
     }
 

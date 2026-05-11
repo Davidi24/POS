@@ -59,3 +59,7 @@ app:
 
     sms:
       code-pepper: change-this-local-dev-sms-code-pepper
+
+  device:
+    pairing:
+      token-pepper: change-this-local-dev-device-pairing-token-pepper

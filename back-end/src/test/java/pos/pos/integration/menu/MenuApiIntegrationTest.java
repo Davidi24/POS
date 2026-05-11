@@ -1507,7 +1507,6 @@ class MenuApiIntegrationTest {
     }
 
     private Menu createMenu(Restaurant restaurant, String code, String name, boolean active, int displayOrder, UUID actorId) {
-        User actor = userRepository.findById(actorId).orElseThrow();
         Menu menu = new Menu();
         menu.setRestaurant(restaurant);
         menu.setCode(code);
@@ -1515,8 +1514,8 @@ class MenuApiIntegrationTest {
         menu.setDescription(name + " description");
         menu.setActive(active);
         menu.setDisplayOrder(displayOrder);
-        menu.setCreatedBy(actor);
-        menu.setUpdatedBy(actor);
+        menu.setCreatedBy(actorId);
+        menu.setUpdatedBy(actorId);
         return menuRepository.save(menu);
     }
 
