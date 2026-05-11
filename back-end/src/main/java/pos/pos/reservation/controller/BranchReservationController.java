@@ -23,7 +23,7 @@ import pos.pos.reservation.dto.ReservationSummaryResponse;
 import pos.pos.reservation.dto.ReservationValidationRequest;
 import pos.pos.reservation.dto.ReservationValidationResponse;
 import pos.pos.reservation.enums.ReservationStatus;
-import pos.pos.reservation.service.ReservationService;
+import pos.pos.reservation.service.ReservationQueryService;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -36,7 +36,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BranchReservationController {
 
-    private final ReservationService reservationService;
+    private final ReservationQueryService reservationQueryService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('SETTINGS_READ')")
@@ -50,7 +50,7 @@ public class BranchReservationController {
             @RequestParam(required = false) UUID customerId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getBranchReservations(
+        return ResponseEntity.ok(reservationQueryService.getBranchReservations(
                 authentication,
                 restaurantId,
                 branchId,
@@ -71,7 +71,7 @@ public class BranchReservationController {
             @RequestParam(required = false) OffsetDateTime to,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getBranchReservationCalendar(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(reservationQueryService.getBranchReservationCalendar(authentication, restaurantId, branchId, from, to));
     }
 
     @GetMapping("/today")
@@ -82,7 +82,7 @@ public class BranchReservationController {
             @PathVariable UUID branchId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getTodayReservations(authentication, restaurantId, branchId));
+        return ResponseEntity.ok(reservationQueryService.getTodayReservations(authentication, restaurantId, branchId));
     }
 
     @GetMapping("/upcoming")
@@ -94,7 +94,7 @@ public class BranchReservationController {
             @RequestParam(required = false) Integer limit,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getUpcomingReservations(authentication, restaurantId, branchId, limit));
+        return ResponseEntity.ok(reservationQueryService.getUpcomingReservations(authentication, restaurantId, branchId, limit));
     }
 
     @PostMapping("/availability/search")
@@ -106,7 +106,7 @@ public class BranchReservationController {
             @Valid @RequestBody ReservationAvailabilitySearchRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.searchAvailability(authentication, restaurantId, branchId, request));
+        return ResponseEntity.ok(reservationQueryService.searchAvailability(authentication, restaurantId, branchId, request));
     }
 
     @PostMapping("/availability/recommend")
@@ -118,7 +118,7 @@ public class BranchReservationController {
             @Valid @RequestBody ReservationAvailabilitySearchRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.recommendAvailability(authentication, restaurantId, branchId, request));
+        return ResponseEntity.ok(reservationQueryService.recommendAvailability(authentication, restaurantId, branchId, request));
     }
 
     @GetMapping("/summary")
@@ -131,7 +131,7 @@ public class BranchReservationController {
             @RequestParam(required = false) OffsetDateTime to,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getReservationSummary(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(reservationQueryService.getReservationSummary(authentication, restaurantId, branchId, from, to));
     }
 
     @GetMapping("/capacity")
@@ -145,7 +145,7 @@ public class BranchReservationController {
             @RequestParam(required = false) Integer partySize,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getReservationCapacity(authentication, restaurantId, branchId, from, to, partySize));
+        return ResponseEntity.ok(reservationQueryService.getReservationCapacity(authentication, restaurantId, branchId, from, to, partySize));
     }
 
     @PostMapping("/validate")
@@ -157,6 +157,6 @@ public class BranchReservationController {
             @Valid @RequestBody ReservationValidationRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.validateReservation(authentication, restaurantId, branchId, request));
+        return ResponseEntity.ok(reservationQueryService.validateReservation(authentication, restaurantId, branchId, request));
     }
 }
