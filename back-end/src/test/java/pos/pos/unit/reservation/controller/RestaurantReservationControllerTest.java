@@ -17,7 +17,12 @@ import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.reservation.controller.RestaurantReservationController;
 import pos.pos.reservation.dto.ReservationResponse;
 import pos.pos.reservation.enums.ReservationStatus;
-import pos.pos.reservation.service.ReservationService;
+import pos.pos.reservation.service.ReservationCrudService;
+import pos.pos.reservation.service.ReservationDepositService;
+import pos.pos.reservation.service.ReservationLifecycleService;
+import pos.pos.reservation.service.ReservationNoteService;
+import pos.pos.reservation.service.ReservationQueryService;
+import pos.pos.reservation.service.ReservationTableAssignmentService;
 import pos.pos.security.principal.AuthenticatedUser;
 
 import java.time.OffsetDateTime;
@@ -41,7 +46,17 @@ class RestaurantReservationControllerTest {
     private static final UUID RESERVATION_ID = UUID.fromString("00000000-0000-0000-0000-000000000814");
 
     @Mock
-    private ReservationService reservationService;
+    private ReservationQueryService reservationQueryService;
+    @Mock
+    private ReservationCrudService reservationCrudService;
+    @Mock
+    private ReservationLifecycleService reservationLifecycleService;
+    @Mock
+    private ReservationTableAssignmentService reservationTableAssignmentService;
+    @Mock
+    private ReservationNoteService reservationNoteService;
+    @Mock
+    private ReservationDepositService reservationDepositService;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -54,7 +69,14 @@ class RestaurantReservationControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new RestaurantReservationController(reservationService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new RestaurantReservationController(
+                        reservationQueryService,
+                        reservationCrudService,
+                        reservationLifecycleService,
+                        reservationTableAssignmentService,
+                        reservationNoteService,
+                        reservationDepositService
+                ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -85,7 +107,7 @@ class RestaurantReservationControllerTest {
                 }
                 """.formatted(BRANCH_ID);
 
-        given(reservationService.createReservation(eq(authentication), eq(RESTAURANT_ID), any()))
+        given(reservationCrudService.createReservation(eq(authentication), eq(RESTAURANT_ID), any()))
                 .willReturn(ReservationResponse.builder()
                         .id(RESERVATION_ID)
                         .restaurantId(RESTAURANT_ID)

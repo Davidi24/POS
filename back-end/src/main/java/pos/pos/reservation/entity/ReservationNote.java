@@ -17,6 +17,7 @@ import pos.pos.common.entity.AbstractAuditedEntity;
 import pos.pos.user.entity.User;
 import pos.pos.utils.NormalizationUtils;
 
+// this is class is used when users of stuff makes note to send to each other in a specific reservation
 @Entity
 @Table(
         name = "reservation_notes",
