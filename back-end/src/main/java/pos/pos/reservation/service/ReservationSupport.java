@@ -114,18 +114,6 @@ public class ReservationSupport {
         }
     }
 
-    public String resolveReservationCode(UUID restaurantId, String requestedCode, String existingCode) {
-        String normalizedCode = NormalizationUtils.normalizeCode(requestedCode, 50);
-        if (normalizedCode == null) {
-            return existingCode == null ? generateReservationCode(restaurantId) : existingCode;
-        }
-        if (!normalizedCode.equals(existingCode)
-                && reservationRepository.existsByRestaurant_IdAndReservationCode(restaurantId, normalizedCode)) {
-            throw new AuthException("Reservation code already exists in this restaurant", HttpStatus.CONFLICT);
-        }
-        return normalizedCode;
-    }
-
     public Reservation saveReservation(Reservation reservation) {
         try {
             return reservationRepository.saveAndFlush(reservation);
@@ -277,6 +265,7 @@ public class ReservationSupport {
         return (int) reservations.stream().filter(reservation -> reservation.getStatus() == status).count();
     }
 
+    // It returns the requested limit, but maximum 20.
     public int resolveAvailabilityLimit(Integer requestedLimit, int defaultLimit) {
         if (requestedLimit == null || requestedLimit <= 0) {
             return defaultLimit;
@@ -291,11 +280,9 @@ public class ReservationSupport {
     }
 
     public void applyReservationRequest(Reservation reservation, ReservationRequest request, UUID actorId, boolean creating) {
-        reservation.setReservationCode(resolveReservationCode(
-                reservation.getRestaurant().getId(),
-                request.getReservationCode(),
-                creating ? null : reservation.getReservationCode()
-        ));
+        if (creating) {
+            reservation.setReservationCode(generateReservationCode(reservation.getRestaurant().getId()));
+        }
         reservation.setSource(request.getSource() == null ? ReservationSource.INTERNAL : request.getSource());
         reservation.setPartySize(request.getPartySize());
         reservation.setReservationStart(request.getReservationStart());
@@ -318,13 +305,6 @@ public class ReservationSupport {
     }
 
     public void applyReservationPatch(Reservation reservation, UpdateReservationRequest request, UUID actorId) {
-        if (request.getReservationCode() != null) {
-            reservation.setReservationCode(resolveReservationCode(
-                    reservation.getRestaurant().getId(),
-                    request.getReservationCode(),
-                    reservation.getReservationCode()
-            ));
-        }
         if (request.getSource() != null) {
             reservation.setSource(request.getSource());
         }

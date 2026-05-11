@@ -217,6 +217,31 @@ class ReservationServicesTest {
     }
 
     @Test
+    @DisplayName("Should keep existing reservation code when updating reservation")
+    void shouldKeepExistingReservationCodeWhenUpdatingReservation() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Branch branch = branch(restaurant);
+        Reservation reservation = reservation(restaurant, branch);
+
+        when(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(restaurantScopeService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(restaurantScopeService.requireManageableBranch(authentication, RESTAURANT_ID, BRANCH_ID)).thenReturn(branch);
+        when(reservationRepository.findByIdAndRestaurant_Id(RESERVATION_ID, RESTAURANT_ID)).thenReturn(Optional.of(reservation));
+        when(reservationRepository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ReservationResponse response = reservationCrudService.updateReservation(authentication, RESTAURANT_ID, RESERVATION_ID, ReservationRequest.builder()
+                .branchId(BRANCH_ID)
+                .partySize(4)
+                .reservationStart(OffsetDateTime.parse("2026-05-10T18:30:00Z"))
+                .reservationEnd(OffsetDateTime.parse("2026-05-10T20:30:00Z"))
+                .contactName("Alex Stone")
+                .build());
+
+        assertThat(response.getReservationCode()).isEqualTo("RES_TEST");
+    }
+
+    @Test
     @DisplayName("Should keep existing deposit amount when deposit update omits amount")
     void shouldKeepExistingDepositAmountWhenDepositUpdateOmitsAmount() {
         Authentication authentication = authentication();
