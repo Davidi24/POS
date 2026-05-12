@@ -1,0 +1,25 @@
+package pos.pos.order.enums;
+
+public enum OrderEventType {
+    CREATED,
+    UPDATED,
+    STATUS_UPDATED,
+    FULFILLMENT_UPDATED,
+    PAYMENT_UPDATED,
+    ITEM_ADDED,
+    ITEM_UPDATED,
+    ITEM_REMOVED,
+    ITEM_VOIDED,
+    DISCOUNT_APPLIED,
+    DISCOUNT_REMOVED,
+    SENT_TO_KITCHEN,
+    READY,
+    FULFILLED,
+    TABLE_CHANGED,
+    RESERVATION_LINKED,
+    REOPENED,
+    CLOSED,
+    CANCELLED,
+    VOIDED,
+    NOTE_ADDED
+}
