@@ -38,7 +38,9 @@ public enum AppRole {
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE,
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
-                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY
+                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
+                    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
+                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT
             )
     ),
 
@@ -54,7 +56,9 @@ public enum AppRole {
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE,
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
-                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY
+                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
+                    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
+                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT
             )
     ),
 
@@ -68,7 +72,9 @@ public enum AppRole {
                     USERS_CREATE, USERS_READ, USERS_UPDATE,
                     MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ,
-                    SETTINGS_READ
+                    SETTINGS_READ,
+                    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
+                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT
             )
     ),
 
@@ -77,7 +83,14 @@ public enum AppRole {
             "Handles orders and customer service",
             true,
             false,
-            EnumSet.noneOf(AppPermission.class)
+            EnumSet.of(
+                    ORDER_READ,
+                    ORDER_CREATE,
+                    ORDER_UPDATE,
+                    ORDER_CLOSE,
+                    ORDER_DISCOUNT_APPLY,
+                    ORDER_TRANSFER
+            )
     );
 
     private static final long RANK_STEP = 10_000L;

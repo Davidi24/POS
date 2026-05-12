@@ -35,9 +35,18 @@ class AppRoleTest {
                 AppPermission.USERS_CREATE,
                 AppPermission.ROLES_READ,
                 AppPermission.MENUS_READ,
-                AppPermission.MENUS_UPDATE
+                AppPermission.MENUS_UPDATE,
+                AppPermission.ORDER_READ,
+                AppPermission.ORDER_CLOSE
         );
         assertThat(AppRole.MANAGER.permissions()).doesNotContain(AppPermission.USERS_DELETE);
-        assertThat(AppRole.WAITER.permissions()).isEmpty();
+        assertThat(AppRole.WAITER.permissions()).containsExactlyInAnyOrder(
+                AppPermission.ORDER_READ,
+                AppPermission.ORDER_CREATE,
+                AppPermission.ORDER_UPDATE,
+                AppPermission.ORDER_CLOSE,
+                AppPermission.ORDER_DISCOUNT_APPLY,
+                AppPermission.ORDER_TRANSFER
+        );
     }
 }

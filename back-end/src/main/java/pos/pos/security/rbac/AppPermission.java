@@ -33,7 +33,18 @@ public enum AppPermission {
     SETTINGS_EXPORT("Export Settings", "Export restaurant settings"),
     SETTINGS_IMPORT("Import Settings", "Import restaurant settings"),
     SETTINGS_TEMPLATE_MANAGE("Manage Settings Templates", "Create, update and delete settings templates"),
-    SETTINGS_TEMPLATE_APPLY("Apply Settings Templates", "Apply settings templates to restaurants");
+    SETTINGS_TEMPLATE_APPLY("Apply Settings Templates", "Apply settings templates to restaurants"),
+
+    ORDER_READ("View Orders", "View restaurant orders and order activity"),
+    ORDER_CREATE("Create Orders", "Create new restaurant orders"),
+    ORDER_UPDATE("Update Orders", "Update order headers, items, and notes"),
+    ORDER_CLOSE("Close Orders", "Close and settle restaurant orders"),
+    ORDER_CANCEL("Cancel Orders", "Cancel restaurant orders"),
+    ORDER_VOID("Void Orders", "Void restaurant orders or items"),
+    ORDER_DISCOUNT_APPLY("Apply Order Discounts", "Apply and update order discounts"),
+    ORDER_TRANSFER("Transfer Orders", "Transfer or move restaurant orders"),
+    ORDER_REOPEN("Reopen Orders", "Reopen previously closed restaurant orders"),
+    ORDER_AUDIT("Audit Orders", "View order audit trails and operational history");
 
 
     private final String displayName;
