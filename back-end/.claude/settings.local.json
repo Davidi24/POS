@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(./mvnw compile:*)",
-      "Bash(./mvnw.cmd clean:*)"
+      "Bash(./mvnw.cmd clean:*)",
+      "Bash(git stash *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

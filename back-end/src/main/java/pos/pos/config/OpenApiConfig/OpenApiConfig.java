@@ -32,7 +32,6 @@ public class OpenApiConfig {
         return GroupedOpenApi.builder()
                 .group("Authentication")
                 .pathsToMatch("/auth", "/auth/**")
-                .pathsToExclude("/auth/device", "/auth/device/**")
                 .build();
     }
 
@@ -56,7 +55,7 @@ public class OpenApiConfig {
     public GroupedOpenApi restaurantGroup() {
         return GroupedOpenApi.builder()
                 .group("Restaurants")
-                .pathsToMatch("/restaurants", "/restaurants/**")
+                .packagesToScan("pos.pos.restaurant.controller")
                 .build();
     }
 
@@ -64,7 +63,23 @@ public class OpenApiConfig {
     public GroupedOpenApi settingsGroup() {
         return GroupedOpenApi.builder()
                 .group("Settings")
-                .pathsToMatch("/settings", "/settings/**")
+                .packagesToScan("pos.pos.settings.controller")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi tablesGroup() {
+        return GroupedOpenApi.builder()
+                .group("Tables")
+                .packagesToScan("pos.pos.tables.controller")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi reservationsGroup() {
+        return GroupedOpenApi.builder()
+                .group("Reservations")
+                .packagesToScan("pos.pos.reservation.controller")
                 .build();
     }
 
@@ -72,7 +87,35 @@ public class OpenApiConfig {
     public GroupedOpenApi deviceGroup() {
         return GroupedOpenApi.builder()
                 .group("Devices")
-                .pathsToMatch("/devices", "/devices/**", "/auth/device", "/auth/device/**")
+                .pathsToMatch(
+                        "/restaurants/*/settings/printers",
+                        "/restaurants/*/settings/printers/**",
+                        "/restaurants/*/branches/*/printer-routes",
+                        "/restaurants/*/branches/*/printer-routes/**",
+                        "/restaurants/*/branches/*/devices",
+                        "/restaurants/*/branches/*/devices/**",
+                        "/restaurants/*/devices/*/assignments",
+                        "/restaurants/*/devices/*/assignments/**",
+                        "/restaurants/*/devices/*/pairing-tokens",
+                        "/restaurants/*/devices/*/pairing-tokens/**"
+                )
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi menuGroup() {
+        return GroupedOpenApi.builder()
+                .group("Menus")
+                .pathsToMatch(
+                        "/menus",
+                        "/menus/**",
+                        "/option-group-types",
+                        "/option-group-types/**",
+                        "/option-groups",
+                        "/option-groups/**",
+                        "/public/restaurants/*/menus",
+                        "/public/restaurants/*/menus/**"
+                )
                 .build();
     }
 }

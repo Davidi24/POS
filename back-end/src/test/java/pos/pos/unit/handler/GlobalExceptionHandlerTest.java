@@ -1,7 +1,9 @@
 package pos.pos.unit.handler;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import pos.pos.exception.auth.EmailAlreadyExistsException;
 import pos.pos.exception.handler.ErrorResponse;
 import pos.pos.exception.handler.GlobalExceptionHandler;
@@ -23,5 +25,19 @@ class GlobalExceptionHandlerTest {
         assertNotNull(body);
         assertEquals(400, body.status());
         assertEquals("Email already in use", body.message());
+    }
+
+    @Test
+    void handleNoResourceFound_shouldReturnNotFound() {
+        ResponseEntity<?> response = handler.handleNoResourceFound(
+                new NoResourceFoundException(HttpMethod.GET, "/v3/api-docs")
+        );
+
+        assertEquals(404, response.getStatusCode().value());
+
+        ErrorResponse body = (ErrorResponse) response.getBody();
+        assertNotNull(body);
+        assertEquals(404, body.status());
+        assertEquals("Resource not found", body.message());
     }
 }

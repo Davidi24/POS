@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.common.entity.AbstractTimestampedEntity;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
@@ -42,7 +43,7 @@ import java.math.BigDecimal;
         AND (sku IS NULL OR char_length(btrim(sku)) > 0)
         AND display_order >= 0
         """)
-public class MenuVariant extends BaseAuditEntity {
+public class MenuVariant extends AbstractTimestampedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "menu_item_id", nullable = false)

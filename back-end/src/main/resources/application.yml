@@ -23,9 +23,10 @@ spring:
           writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT_MS:5000}
 
   jpa:
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+springdoc:
+  swagger-ui:
+    persist-authorization: true
 
 security:
   jwt:
@@ -106,3 +107,9 @@ app:
     mobile-base-url: ${FRONTEND_MOBILE_BASE_URL:}
     universal-base-url: ${FRONTEND_UNIVERSAL_BASE_URL:}
     default-link-target: ${FRONTEND_DEFAULT_LINK_TARGET:UNIVERSAL}
+
+  device:
+    pairing:
+      token-pepper: ${DEVICE_PAIRING_TOKEN_PEPPER}
+      default-ttl: ${DEVICE_PAIRING_DEFAULT_TTL:15m}
+      max-ttl: ${DEVICE_PAIRING_MAX_TTL:24h}
