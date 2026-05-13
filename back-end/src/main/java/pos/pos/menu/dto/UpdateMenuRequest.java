@@ -17,6 +17,9 @@ import lombok.Setter;
 @AllArgsConstructor
 public class UpdateMenuRequest {
 
+    //a unique identifier thats machine friendly
+    //Menu name: Breakfast Menu
+    //Menu code: BREAKFAST
     @Size(max = 50, message = "Code must be at most 50 characters")
     private String code;
 
