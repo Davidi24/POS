@@ -76,6 +76,14 @@ public class OpenApiConfig {
     }
 
     @Bean
+    public GroupedOpenApi reservationsGroup() {
+        return GroupedOpenApi.builder()
+                .group("Reservations")
+                .packagesToScan("pos.pos.reservation.controller")
+                .build();
+    }
+
+    @Bean
     public GroupedOpenApi deviceGroup() {
         return GroupedOpenApi.builder()
                 .group("Devices")
