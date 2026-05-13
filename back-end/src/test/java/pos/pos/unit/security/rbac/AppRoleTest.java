@@ -31,13 +31,23 @@ class AppRoleTest {
     void shouldExposeExpectedPermissions() {
         assertThat(AppRole.SUPER_ADMIN.permissions()).containsExactlyInAnyOrder(AppPermission.values());
         assertThat(AppRole.OWNER.permissions()).containsExactlyInAnyOrder(AppPermission.values());
+        assertThat(AppRole.ADMIN.permissions()).contains(
+                AppPermission.MENUS_CREATE,
+                AppPermission.MENUS_READ,
+                AppPermission.MENUS_UPDATE,
+                AppPermission.MENUS_DELETE
+        );
         assertThat(AppRole.MANAGER.permissions()).contains(
                 AppPermission.USERS_CREATE,
                 AppPermission.ROLES_READ,
+                AppPermission.MENUS_CREATE,
                 AppPermission.MENUS_READ,
                 AppPermission.MENUS_UPDATE
         );
-        assertThat(AppRole.MANAGER.permissions()).doesNotContain(AppPermission.USERS_DELETE);
-        assertThat(AppRole.WAITER.permissions()).isEmpty();
+        assertThat(AppRole.MANAGER.permissions()).doesNotContain(
+                AppPermission.USERS_DELETE,
+                AppPermission.MENUS_DELETE
+        );
+        assertThat(AppRole.WAITER.permissions()).containsExactly(AppPermission.MENUS_READ);
     }
 }
