@@ -21,6 +21,7 @@ import pos.pos.utils.NormalizationUtils;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+//checked
 @Entity
 @Table(
         name = "\"settings-special-hours\"",
