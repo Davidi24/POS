@@ -174,12 +174,22 @@ class ProdProfileSmokeTest {
         String firstAccessToken = extractCookieValue(firstLogin, ACCESS_COOKIE_NAME);
         String firstRefreshToken = extractCookieValue(firstLogin, REFRESH_COOKIE_NAME);
 
-        assertThat(firstLogin.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
+        List<String> setCookieHeaders = firstLogin.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
+        assertThat(setCookieHeaders).hasSize(2);
+        assertThat(setCookieHeaders).anySatisfy(header -> assertThat(header)
+                .contains(REFRESH_COOKIE_NAME + "=")
                 .contains("Domain=pos.example")
                 .contains("Path=/auth/web")
                 .contains("Secure")
                 .contains("HttpOnly")
-                .contains("SameSite=Strict");
+                .contains("SameSite=Strict"));
+        assertThat(setCookieHeaders).anySatisfy(header -> assertThat(header)
+                .contains(ACCESS_COOKIE_NAME + "=")
+                .contains("Domain=pos.example")
+                .contains("Path=/")
+                .contains("Secure")
+                .contains("HttpOnly")
+                .contains("SameSite=Strict"));
 
         assertThat(bodyOf(mockMvc.perform(get("/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, bearer(firstAccessToken)))
