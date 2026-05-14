@@ -29,8 +29,11 @@ import pos.pos.order.controller.PublicOrderController;
 import pos.pos.order.controller.RestaurantOrderController;
 import pos.pos.order.dto.OrderResponse;
 import pos.pos.order.enums.OrderStatus;
+import pos.pos.order.service.OrderCommandService;
+import pos.pos.order.service.OrderItemService;
 import pos.pos.order.service.OrderPublicService;
-import pos.pos.order.service.OrderService;
+import pos.pos.order.service.OrderQueryService;
+import pos.pos.order.service.OrderWorkflowService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;
 import pos.pos.security.principal.AuthenticatedUser;
@@ -73,14 +76,20 @@ class OrderControllerSecurityTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private OrderService orderService;
+    private OrderQueryService orderQueryService;
+    @MockBean
+    private OrderCommandService orderCommandService;
+    @MockBean
+    private OrderWorkflowService orderWorkflowService;
+    @MockBean
+    private OrderItemService orderItemService;
     @MockBean
     private OrderPublicService orderPublicService;
 
     @Test
     @DisplayName("GET restaurant orders should allow ORDER_READ")
     void shouldAllowOrderRead() throws Exception {
-        given(orderService.getOrders(any(), any(), any(), any()))
+        given(orderQueryService.getOrders(any(), any(), any(), any()))
                 .willReturn(List.of(OrderResponse.builder().id(ORDER_ID).orderNumber("ORD-SEC001").status(OrderStatus.OPEN).build()));
 
         mockMvc.perform(get("/restaurants/{restaurantId}/orders", RESTAURANT_ID)
@@ -108,7 +117,7 @@ class OrderControllerSecurityTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("Access denied"));
 
-        verifyNoInteractions(orderService, orderPublicService);
+        verifyNoInteractions(orderQueryService, orderCommandService, orderWorkflowService, orderItemService, orderPublicService);
     }
 
     @Test

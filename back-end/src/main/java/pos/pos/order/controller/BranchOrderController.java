@@ -20,7 +20,8 @@ import pos.pos.order.dto.CreateOrderRequest;
 import pos.pos.order.dto.OrderExportResponse;
 import pos.pos.order.dto.OrderResponse;
 import pos.pos.order.enums.OrderStatus;
-import pos.pos.order.service.OrderService;
+import pos.pos.order.service.OrderCommandService;
+import pos.pos.order.service.OrderQueryService;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -33,7 +34,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BranchOrderController {
 
-    private final OrderService orderService;
+    private final OrderQueryService orderQueryService;
+    private final OrderCommandService orderCommandService;
 
     @GetMapping("/orders")
     @PreAuthorize("hasAuthority('ORDER_READ')")
@@ -47,7 +49,7 @@ public class BranchOrderController {
             @RequestParam(required = false) UUID customerId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getBranchOrders(authentication, restaurantId, branchId, from, to, status, customerId));
+        return ResponseEntity.ok(orderQueryService.getBranchOrders(authentication, restaurantId, branchId, from, to, status, customerId));
     }
 
     @GetMapping("/orders/open")
@@ -58,7 +60,7 @@ public class BranchOrderController {
             @PathVariable UUID branchId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getBranchOpenOrders(authentication, restaurantId, branchId));
+        return ResponseEntity.ok(orderQueryService.getBranchOpenOrders(authentication, restaurantId, branchId));
     }
 
     @GetMapping("/orders/history")
@@ -71,7 +73,7 @@ public class BranchOrderController {
             @RequestParam(required = false) OffsetDateTime to,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getBranchHistory(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(orderQueryService.getBranchHistory(authentication, restaurantId, branchId, from, to));
     }
 
     @GetMapping("/tables/{tableId}/orders/current")
@@ -83,7 +85,7 @@ public class BranchOrderController {
             @PathVariable UUID tableId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getCurrentTableOrder(authentication, restaurantId, branchId, tableId));
+        return ResponseEntity.ok(orderQueryService.getCurrentTableOrder(authentication, restaurantId, branchId, tableId));
     }
 
     @PostMapping("/orders")
@@ -96,7 +98,7 @@ public class BranchOrderController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderService.createBranchOrder(authentication, restaurantId, branchId, request));
+                .body(orderCommandService.createBranchOrder(authentication, restaurantId, branchId, request));
     }
 
     @PostMapping("/tables/{tableId}/orders")
@@ -110,7 +112,7 @@ public class BranchOrderController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderService.createTableOrder(authentication, restaurantId, branchId, tableId, request));
+                .body(orderCommandService.createTableOrder(authentication, restaurantId, branchId, tableId, request));
     }
 
     @GetMapping("/orders/kitchen-board")
@@ -121,7 +123,7 @@ public class BranchOrderController {
             @PathVariable UUID branchId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getKitchenBoard(authentication, restaurantId, branchId));
+        return ResponseEntity.ok(orderQueryService.getKitchenBoard(authentication, restaurantId, branchId));
     }
 
     @GetMapping("/orders/export")
@@ -134,6 +136,6 @@ public class BranchOrderController {
             @RequestParam(required = false) OffsetDateTime to,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.exportOrders(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(orderQueryService.exportOrders(authentication, restaurantId, branchId, from, to));
     }
 }
