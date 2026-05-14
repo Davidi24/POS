@@ -29,6 +29,7 @@ import pos.pos.auth.repository.AuthSmsOtpCodeRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.SmsMessageService;
 import pos.pos.security.service.PasswordService;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -63,7 +64,7 @@ class PhoneVerificationIntegrationTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "phone-verification-test-secret-key-for-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "phone-verification-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "phone-verification-password-reset-pepper-value");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "phone-verification-email-verification-pepper");
