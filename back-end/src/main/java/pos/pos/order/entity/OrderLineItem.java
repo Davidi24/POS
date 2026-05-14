@@ -19,6 +19,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractTimestampedEntity;
+import pos.pos.inventory.entity.InventoryMovement;
+import pos.pos.kds.entity.KdsTicketItem;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuVariant;
 import pos.pos.order.enums.OrderLineItemStatus;
@@ -118,6 +120,14 @@ public class OrderLineItem extends AbstractTimestampedEntity {
     @OneToMany(mappedBy = "orderLineItem", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
     private List<OrderItemOption> options = new ArrayList<>();
+
+    @OneToMany(mappedBy = "orderLineItem")
+    @OrderBy("createdAt ASC")
+    private List<KdsTicketItem> kdsTicketItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "orderLineItem")
+    @OrderBy("occurredAt ASC")
+    private List<InventoryMovement> inventoryMovements = new ArrayList<>();
 
     public void addOption(OrderItemOption option) {
         if (option == null) {

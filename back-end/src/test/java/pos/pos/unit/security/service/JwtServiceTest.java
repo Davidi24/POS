@@ -3,16 +3,20 @@ package pos.pos.unit.security.service;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import pos.pos.security.dto.JwksResponse;
 import pos.pos.security.service.JwtService;
+import pos.pos.support.TestJwtKeySupport;
 
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,15 +26,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("JwtService")
 class JwtServiceTest {
 
-    private static final String SECRET = "jwt-secret-key-must-be-at-least-32-bytes";
     private static final Duration ACCESS_EXPIRATION = Duration.ofMinutes(15);
-    private static final Duration REFRESH_EXPIRATION = Duration.ofDays(7);
+    private static final Duration REFRESH_EXPIRATION = Duration.ofDays(1);
 
     private JwtService jwtService;
 
     @BeforeEach
     void setUp() {
-        jwtService = configuredService(SECRET, ACCESS_EXPIRATION, REFRESH_EXPIRATION);
+        jwtService = configuredService(
+                TestJwtKeySupport.privateKeyPem(),
+                TestJwtKeySupport.publicKeyPem(),
+                ACCESS_EXPIRATION,
+                REFRESH_EXPIRATION
+        );
     }
 
     @Nested
@@ -38,36 +46,53 @@ class JwtServiceTest {
     class ConfigurationTests {
 
         @Test
-        @DisplayName("Should fail fast when secret is blank")
-        void shouldFailFastWhenSecretBlank() {
+        @DisplayName("Should fail fast when private key is blank")
+        void shouldFailFastWhenPrivateKeyBlank() {
             JwtService service = new JwtService();
-            ReflectionTestUtils.setField(service, "secret", "   ");
+            ReflectionTestUtils.setField(service, "privateKeyPem", "   ");
+            ReflectionTestUtils.setField(service, "publicKeyPem", TestJwtKeySupport.publicKeyPem());
             ReflectionTestUtils.setField(service, "accessTokenExpiration", ACCESS_EXPIRATION);
             ReflectionTestUtils.setField(service, "refreshTokenExpiration", REFRESH_EXPIRATION);
 
             assertThatThrownBy(service::init)
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessage("security.jwt.secret must not be blank");
+                    .hasMessage("security.jwt.private-key must not be blank");
         }
 
         @Test
-        @DisplayName("Should fail fast when secret is too short")
-        void shouldFailFastWhenSecretTooShort() {
+        @DisplayName("Should fail fast when public key is blank")
+        void shouldFailFastWhenPublicKeyBlank() {
             JwtService service = new JwtService();
-            ReflectionTestUtils.setField(service, "secret", "too-short-secret");
+            ReflectionTestUtils.setField(service, "privateKeyPem", TestJwtKeySupport.privateKeyPem());
+            ReflectionTestUtils.setField(service, "publicKeyPem", "   ");
             ReflectionTestUtils.setField(service, "accessTokenExpiration", ACCESS_EXPIRATION);
             ReflectionTestUtils.setField(service, "refreshTokenExpiration", REFRESH_EXPIRATION);
 
             assertThatThrownBy(service::init)
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessage("security.jwt.secret must be at least 32 bytes for HS256");
+                    .hasMessage("security.jwt.public-key must not be blank");
+        }
+
+        @Test
+        @DisplayName("Should fail fast when public key does not match private key")
+        void shouldFailFastWhenPublicKeyDoesNotMatchPrivateKey() {
+            JwtService service = new JwtService();
+            ReflectionTestUtils.setField(service, "privateKeyPem", TestJwtKeySupport.privateKeyPem());
+            ReflectionTestUtils.setField(service, "publicKeyPem", otherPublicKeyPem());
+            ReflectionTestUtils.setField(service, "accessTokenExpiration", ACCESS_EXPIRATION);
+            ReflectionTestUtils.setField(service, "refreshTokenExpiration", REFRESH_EXPIRATION);
+
+            assertThatThrownBy(service::init)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("security.jwt.public-key must match security.jwt.private-key");
         }
 
         @Test
         @DisplayName("Should fail fast when access expiration is invalid")
         void shouldFailFastWhenAccessExpirationInvalid() {
             JwtService service = new JwtService();
-            ReflectionTestUtils.setField(service, "secret", SECRET);
+            ReflectionTestUtils.setField(service, "privateKeyPem", TestJwtKeySupport.privateKeyPem());
+            ReflectionTestUtils.setField(service, "publicKeyPem", TestJwtKeySupport.publicKeyPem());
             ReflectionTestUtils.setField(service, "accessTokenExpiration", null);
             ReflectionTestUtils.setField(service, "refreshTokenExpiration", REFRESH_EXPIRATION);
 
@@ -80,7 +105,8 @@ class JwtServiceTest {
         @DisplayName("Should fail fast when refresh expiration is invalid")
         void shouldFailFastWhenRefreshExpirationInvalid() {
             JwtService service = new JwtService();
-            ReflectionTestUtils.setField(service, "secret", SECRET);
+            ReflectionTestUtils.setField(service, "privateKeyPem", TestJwtKeySupport.privateKeyPem());
+            ReflectionTestUtils.setField(service, "publicKeyPem", TestJwtKeySupport.publicKeyPem());
             ReflectionTestUtils.setField(service, "accessTokenExpiration", ACCESS_EXPIRATION);
             ReflectionTestUtils.setField(service, "refreshTokenExpiration", Duration.ZERO);
 
@@ -115,6 +141,7 @@ class JwtServiceTest {
             assertThat(extractRoles(claims)).containsExactlyElementsOf(roles);
             assertThat(claims.getIssuedAt()).isBeforeOrEqualTo(claims.getExpiration());
             assertThat(jwtService.getAccessTokenExpiration()).isEqualTo(ACCESS_EXPIRATION);
+            assertThat(headerJson(token)).contains("\"alg\":\"RS256\"");
         }
     }
 
@@ -140,6 +167,28 @@ class JwtServiceTest {
             assertThat(claims.getId()).isEqualTo(tokenId.toString());
             assertThat(claims.get("type", String.class)).isEqualTo("refresh");
             assertThat(claims.get("roles")).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("jwks")
+    class JwksTests {
+
+        @Test
+        @DisplayName("Should expose the configured public key as a JWKS document")
+        void shouldExposePublicKeyAsJwksDocument() {
+            JwksResponse response = jwtService.getJwks();
+            JwksResponse.JwkKeyResponse key = response.keys().get(0);
+            String token = jwtService.generateAccessToken(UUID.randomUUID(), List.of("ADMIN"), UUID.randomUUID());
+
+            assertThat(response.keys()).hasSize(1);
+            assertThat(key.kty()).isEqualTo("RSA");
+            assertThat(key.use()).isEqualTo("sig");
+            assertThat(key.alg()).isEqualTo("RS256");
+            assertThat(key.kid()).isNotBlank();
+            assertThat(key.n()).isNotBlank();
+            assertThat(key.e()).isEqualTo("AQAB");
+            assertThat(headerJson(token)).contains("\"kid\":\"" + key.kid() + "\"");
         }
     }
 
@@ -185,7 +234,12 @@ class JwtServiceTest {
         @Test
         @DisplayName("Should reject expired tokens")
         void shouldRejectExpiredToken() throws InterruptedException {
-            JwtService shortLivedService = configuredService(SECRET, Duration.ofMillis(50), Duration.ofMillis(50));
+            JwtService shortLivedService = configuredService(
+                    TestJwtKeySupport.privateKeyPem(),
+                    TestJwtKeySupport.publicKeyPem(),
+                    Duration.ofMillis(50),
+                    Duration.ofMillis(50)
+            );
             String token = shortLivedService.generateAccessToken(UUID.randomUUID(), List.of("ADMIN"), UUID.randomUUID());
 
             Thread.sleep(150);
@@ -198,9 +252,15 @@ class JwtServiceTest {
         }
     }
 
-    private JwtService configuredService(String secret, Duration accessExpiration, Duration refreshExpiration) {
+    private JwtService configuredService(
+            String privateKeyPem,
+            String publicKeyPem,
+            Duration accessExpiration,
+            Duration refreshExpiration
+    ) {
         JwtService service = new JwtService();
-        ReflectionTestUtils.setField(service, "secret", secret);
+        ReflectionTestUtils.setField(service, "privateKeyPem", privateKeyPem);
+        ReflectionTestUtils.setField(service, "publicKeyPem", publicKeyPem);
         ReflectionTestUtils.setField(service, "accessTokenExpiration", accessExpiration);
         ReflectionTestUtils.setField(service, "refreshTokenExpiration", refreshExpiration);
         service.init();
@@ -209,14 +269,35 @@ class JwtServiceTest {
 
     private Claims parseClaims(String token) {
         return Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+                .verifyWith(TestJwtKeySupport.publicKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
     }
 
+    private String headerJson(String token) {
+        String header = token.split("\\.")[0];
+        byte[] decoded = Base64.getUrlDecoder().decode(header);
+        return new String(decoded, StandardCharsets.UTF_8);
+    }
+
     @SuppressWarnings("unchecked")
     private List<String> extractRoles(Claims claims) {
         return (List<String>) claims.get("roles");
+    }
+
+    private String otherPublicKeyPem() {
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+            generator.initialize(2048);
+            KeyPair pair = generator.generateKeyPair();
+            String base64 = Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII))
+                    .encodeToString(pair.getPublic().getEncoded());
+            return "-----BEGIN PUBLIC KEY-----\n"
+                    + base64
+                    + "\n-----END PUBLIC KEY-----";
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 }
