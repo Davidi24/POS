@@ -10,6 +10,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+import pos.pos.common.dto.PageResponse;
+import pos.pos.exception.menu.MenuCodeAlreadyExistsException;
+import pos.pos.exception.menu.MenuItemSectionMismatchException;
+import pos.pos.exception.menu.MenuNotFoundException;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.menu.controller.MenuController;
 import pos.pos.menu.dto.CreateMenuRequest;
@@ -64,6 +68,37 @@ class MenuControllerTest {
     }
 
     @Test
+    @DisplayName("GET /menus should return a paginated summary response")
+    void shouldReturnPaginatedMenuSummaries() throws Exception {
+        menuService.listResponse = PageResponse.<MenuResponse>builder()
+                .items(List.of(
+                        MenuResponse.builder()
+                                .id(MENU_ID)
+                                .code("BREAKFAST")
+                                .name("Breakfast")
+                                .restaurant(MenuRestaurantSummaryResponse.builder().id(RESTAURANT_ID).name("Demo Kitchen").build())
+                                .build()
+                ))
+                .page(0)
+                .size(20)
+                .totalElements(1)
+                .totalPages(1)
+                .hasNext(false)
+                .hasPrevious(false)
+                .build();
+
+        mockMvc.perform(get("/menus")
+                        .principal(authentication))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].id").value(MENU_ID.toString()))
+                .andExpect(jsonPath("$.items[0].code").value("BREAKFAST"))
+                .andExpect(jsonPath("$.items[0].sections").doesNotExist())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
     @DisplayName("POST /menus should return 201 with the created menu")
     void shouldCreateMenu() throws Exception {
         CreateMenuRequest request = CreateMenuRequest.builder()
@@ -100,9 +135,16 @@ class MenuControllerTest {
         mockMvc.perform(get("/menus/{menuId}", MENU_ID)
                         .principal(authentication)
                         .param("includeSections", "true")
-                        .param("includeItems", "true"))
+                        .param("includeItems", "true")
+                        .param("includeVariants", "true")
+                        .param("includeOptionGroups", "true"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("BREAKFAST"));
+
+        org.assertj.core.api.Assertions.assertThat(menuService.lastIncludeSections).isTrue();
+        org.assertj.core.api.Assertions.assertThat(menuService.lastIncludeItems).isTrue();
+        org.assertj.core.api.Assertions.assertThat(menuService.lastIncludeVariants).isTrue();
+        org.assertj.core.api.Assertions.assertThat(menuService.lastIncludeOptionGroups).isTrue();
     }
 
     @Test
@@ -140,23 +182,100 @@ class MenuControllerTest {
                 .andExpect(jsonPath("$.active").value(false));
     }
 
+    @Test
+    @DisplayName("GET /menus/{menuId} should return 404 when menu is missing")
+    void shouldReturn404WhenMenuMissing() throws Exception {
+        menuService.detailException = new MenuNotFoundException();
+
+        mockMvc.perform(get("/menus/{menuId}", MENU_ID)
+                        .principal(authentication))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Menu not found"));
+    }
+
+    @Test
+    @DisplayName("POST /menus should return 409 when menu code is duplicated")
+    void shouldReturn409WhenMenuCodeDuplicated() throws Exception {
+        CreateMenuRequest request = CreateMenuRequest.builder()
+                .restaurantId(RESTAURANT_ID)
+                .name("Lunch Specials")
+                .build();
+        menuService.createException = new MenuCodeAlreadyExistsException();
+
+        mockMvc.perform(post("/menus")
+                        .principal(authentication)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Menu code already in use for this restaurant"));
+    }
+
+    @Test
+    @DisplayName("GET /menus/{menuId} should return 409 for cross-resource mismatches")
+    void shouldReturn409ForCrossResourceMismatch() throws Exception {
+        menuService.detailException = new MenuItemSectionMismatchException();
+
+        mockMvc.perform(get("/menus/{menuId}", MENU_ID)
+                        .principal(authentication))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Menu item does not belong to this section"));
+    }
+
     static class StubMenuService extends MenuService {
 
+        private PageResponse<MenuResponse> listResponse;
         private MenuResponse createResponse;
         private MenuResponse detailResponse;
         private MenuResponse statusResponse;
+        private RuntimeException createException;
+        private RuntimeException detailException;
+        private boolean lastIncludeSections;
+        private boolean lastIncludeItems;
+        private boolean lastIncludeVariants;
+        private boolean lastIncludeOptionGroups;
 
         StubMenuService() {
-            super(null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null);
+        }
+
+        @Override
+        public PageResponse<MenuResponse> getMenus(
+                Authentication authentication,
+                UUID restaurantId,
+                Boolean active,
+                String search,
+                Integer page,
+                Integer size,
+                String sortBy,
+                String direction
+        ) {
+            return listResponse;
         }
 
         @Override
         public MenuResponse createMenu(Authentication authentication, CreateMenuRequest request) {
+            if (createException != null) {
+                throw createException;
+            }
             return createResponse;
         }
 
         @Override
-        public MenuResponse getMenu(Authentication authentication, UUID menuId, boolean includeSections, boolean includeItems) {
+        public MenuResponse getMenu(
+                Authentication authentication,
+                UUID menuId,
+                boolean includeSections,
+                boolean includeItems,
+                boolean includeVariants,
+                boolean includeOptionGroups
+        ) {
+            if (detailException != null) {
+                throw detailException;
+            }
+            lastIncludeSections = includeSections;
+            lastIncludeItems = includeItems;
+            lastIncludeVariants = includeVariants;
+            lastIncludeOptionGroups = includeOptionGroups;
             return detailResponse;
         }
 
