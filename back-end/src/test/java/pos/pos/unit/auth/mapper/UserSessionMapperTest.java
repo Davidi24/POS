@@ -51,7 +51,7 @@ class UserSessionMapperTest {
     @Test
     @DisplayName("Should use UNKNOWN device and null client fields when client info is missing")
     void shouldHandleNullClientInfo() {
-        UserSessionMapper mapper = mapperWithRefreshExpiration(Duration.ofDays(30));
+        UserSessionMapper mapper = mapperWithRefreshExpiration(Duration.ofDays(1));
 
         UserSession session = mapper.toSession(
                 UUID.randomUUID(),
@@ -69,7 +69,7 @@ class UserSessionMapperTest {
     @Test
     @DisplayName("Should treat blank client info values as null")
     void shouldTreatBlankClientInfoValuesAsNull() {
-        UserSessionMapper mapper = mapperWithRefreshExpiration(Duration.ofDays(30));
+        UserSessionMapper mapper = mapperWithRefreshExpiration(Duration.ofDays(1));
 
         UserSession session = mapper.toSession(
                 UUID.randomUUID(),
@@ -88,7 +88,7 @@ class UserSessionMapperTest {
     @DisplayName("Device detection")
     class DeviceDetectionTests {
 
-        private final UserSessionMapper mapper = mapperWithRefreshExpiration(Duration.ofDays(30));
+        private final UserSessionMapper mapper = mapperWithRefreshExpiration(Duration.ofDays(1));
 
         @Test
         @DisplayName("Should detect Android before Linux")

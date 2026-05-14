@@ -106,7 +106,16 @@ public class OpenApiConfig {
     public GroupedOpenApi menuGroup() {
         return GroupedOpenApi.builder()
                 .group("Menus")
-                .pathsToMatch("/menus", "/menus/**", "/public/restaurants/*/menus", "/public/restaurants/*/menus/**")
+                .pathsToMatch(
+                        "/menus",
+                        "/menus/**",
+                        "/option-group-types",
+                        "/option-group-types/**",
+                        "/option-groups",
+                        "/option-groups/**",
+                        "/public/restaurants/*/menus",
+                        "/public/restaurants/*/menus/**"
+                )
                 .build();
     }
 }

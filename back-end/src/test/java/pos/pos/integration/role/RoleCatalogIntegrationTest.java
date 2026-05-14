@@ -119,8 +119,8 @@ class RoleCatalogIntegrationTest extends AbstractRoleIntegrationTest {
     }
 
     @Test
-    @DisplayName("ROLE-005 GET /permissions returns all seeded permissions including role-management permissions")
-    void role005ReturnsAllSeededPermissionsIncludingRoleManagementPermissions() throws Exception {
+    @DisplayName("ROLE-005 GET /permissions returns all seeded permissions including menu and role-management permissions")
+    void role005ReturnsAllSeededPermissionsIncludingMenuAndRoleManagementPermissions() throws Exception {
         MvcResult result = mockMvc.perform(get("/permissions")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken())))
                 .andExpect(status().isOk())
@@ -134,6 +134,10 @@ class RoleCatalogIntegrationTest extends AbstractRoleIntegrationTest {
         assertThat(codes).hasSize(expectedCodes.size());
         assertThat(codes).containsExactlyInAnyOrderElementsOf(expectedCodes);
         assertThat(codes).contains(
+                "MENUS_CREATE",
+                "MENUS_READ",
+                "MENUS_UPDATE",
+                "MENUS_DELETE",
                 "ROLES_READ",
                 "ROLES_CREATE",
                 "ROLES_UPDATE",

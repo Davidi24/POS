@@ -23,6 +23,7 @@ import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.AuthEmailVerificationTokenRepository;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -48,6 +49,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AuthSessionIntegrationTest {
 
     private static final String SCHEMA = "auth_session_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
+    private static final String REFRESH_COOKIE_NAME = "refreshToken";
     private static final String ADMIN_EMAIL = "auth.session.admin@pos.example";
     private static final String ADMIN_USERNAME = "authsessionadmin";
     private static final String ADMIN_PASSWORD = "StrongPass123!";
@@ -55,7 +58,7 @@ class AuthSessionIntegrationTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "auth-session-test-secret-key-for-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "auth-session-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "auth-session-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "auth-session-email-verification-pepper");
@@ -231,17 +234,23 @@ class AuthSessionIntegrationTest {
 
         JsonNode body = bodyOf(result);
         return new AuthTokens(
-                body.get("accessToken").asText(),
-                extractCookieValue(result.getResponse().getHeader(HttpHeaders.SET_COOKIE)),
+                extractCookieValue(result, ACCESS_COOKIE_NAME),
+                extractCookieValue(result, REFRESH_COOKIE_NAME),
                 ip
         );
     }
 
-    private String extractCookieValue(String setCookieHeader) {
-        String prefix = "refreshToken=";
-        int start = setCookieHeader.indexOf(prefix);
-        int end = setCookieHeader.indexOf(';', start);
-        return setCookieHeader.substring(start + prefix.length(), end);
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
