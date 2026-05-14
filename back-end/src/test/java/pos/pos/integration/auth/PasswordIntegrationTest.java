@@ -33,6 +33,7 @@ import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.AuthMailService;
 import pos.pos.auth.service.SmsMessageService;
 import pos.pos.security.service.PasswordService;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -65,6 +66,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PasswordIntegrationTest {
 
     private static final String SCHEMA = "password_auth_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String DEFAULT_PASSWORD = "StrongPass123!";
     private static final String NEW_PASSWORD = "ResetPass123!";
     private static final String INVALID_TOKEN_MESSAGE = "Invalid token";
@@ -72,7 +74,7 @@ class PasswordIntegrationTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "password-auth-test-secret-key-for-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "password-auth-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "password-auth-password-reset-pepper-value");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "password-auth-email-verification-pepper");
@@ -477,7 +479,7 @@ class PasswordIntegrationTest {
                 ? null
                 : bodyOf(result);
 
-        return new AuthTokens(body == null || body.get("accessToken") == null ? null : body.get("accessToken").asText());
+        return new AuthTokens(extractCookieValue(result, ACCESS_COOKIE_NAME));
     }
 
     private User createUser(String label, boolean emailVerified, String phone, boolean phoneVerified) {
@@ -535,6 +537,19 @@ class PasswordIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElse(null);
     }
 
     private RequestPostProcessor client(String ip, String userAgent) {

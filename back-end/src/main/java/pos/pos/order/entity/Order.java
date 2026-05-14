@@ -21,11 +21,13 @@ import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractAuditedEntity;
 import pos.pos.customer.entity.Customer;
+import pos.pos.kds.entity.KdsTicket;
 import pos.pos.order.enums.OrderFulfillmentStatus;
 import pos.pos.order.enums.OrderPaymentStatus;
 import pos.pos.order.enums.OrderStatus;
 import pos.pos.order.enums.OrderSource;
 import pos.pos.order.enums.OrderType;
+import pos.pos.payment.entity.Payment;
 import pos.pos.reservation.entity.Reservation;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
@@ -203,6 +205,14 @@ public class Order extends AbstractAuditedEntity {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt DESC")
     private List<OrderEvent> events = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order")
+    @OrderBy("paidAt ASC")
+    private List<Payment> payments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order")
+    @OrderBy("createdAt ASC")
+    private List<KdsTicket> kdsTickets = new ArrayList<>();
 
     public void addLineItem(OrderLineItem lineItem) {
         if (lineItem == null) {

@@ -33,8 +33,8 @@ public enum AppRole {
             false,
             EnumSet.of(
                     RESTAURANTS_READ, RESTAURANTS_UPDATE,
+                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE, MENUS_DELETE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
-                    MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE,
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
@@ -51,8 +51,8 @@ public enum AppRole {
             false,
             EnumSet.of(
                     RESTAURANTS_READ, RESTAURANTS_UPDATE,
+                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE, MENUS_DELETE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
-                    MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE,
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
@@ -69,8 +69,8 @@ public enum AppRole {
             false,
             EnumSet.of(
                     RESTAURANTS_READ,
+                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE,
-                    MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ,
                     SETTINGS_READ,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
@@ -84,6 +84,7 @@ public enum AppRole {
             true,
             false,
             EnumSet.of(
+                    MENUS_READ,
                     ORDER_READ,
                     ORDER_CREATE,
                     ORDER_UPDATE,

@@ -26,6 +26,7 @@ import pos.pos.auth.service.AuthMailService;
 import pos.pos.auth.service.SmsMessageService;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -62,12 +63,13 @@ class ProdProfileSmokeTest {
     private static final String NEW_USER_PASSWORD = "RegisterPass123!";
     private static final String NEW_USER_NEW_PASSWORD = "RegisterPass456!";
     private static final String NEW_USER_PHONE = "+1555010002";
-    private static final String COOKIE_NAME = "refreshToken";
+    private static final String ACCESS_COOKIE_NAME = "access-token";
+    private static final String REFRESH_COOKIE_NAME = "refreshToken";
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "prod-smoke-secret-key-for-hs256-minimum-32b");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "prod-smoke-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "prod-smoke-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "prod-smoke-email-verification-pepper");
@@ -169,15 +171,25 @@ class ProdProfileSmokeTest {
 
         MvcResult firstLogin = webLogin(ADMIN_USERNAME, ADMIN_PASSWORD, status().isOk());
         JsonNode firstLoginBody = bodyOf(firstLogin);
-        String firstAccessToken = firstLoginBody.get("accessToken").asText();
-        String firstRefreshToken = extractCookieValue(firstLogin.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String firstAccessToken = extractCookieValue(firstLogin, ACCESS_COOKIE_NAME);
+        String firstRefreshToken = extractCookieValue(firstLogin, REFRESH_COOKIE_NAME);
 
-        assertThat(firstLogin.getResponse().getHeader(HttpHeaders.SET_COOKIE))
+        List<String> setCookieHeaders = firstLogin.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
+        assertThat(setCookieHeaders).hasSize(2);
+        assertThat(setCookieHeaders).anySatisfy(header -> assertThat(header)
+                .contains(REFRESH_COOKIE_NAME + "=")
                 .contains("Domain=pos.example")
                 .contains("Path=/auth/web")
                 .contains("Secure")
                 .contains("HttpOnly")
-                .contains("SameSite=Strict");
+                .contains("SameSite=Strict"));
+        assertThat(setCookieHeaders).anySatisfy(header -> assertThat(header)
+                .contains(ACCESS_COOKIE_NAME + "=")
+                .contains("Domain=pos.example")
+                .contains("Path=/")
+                .contains("Secure")
+                .contains("HttpOnly")
+                .contains("SameSite=Strict"));
 
         assertThat(bodyOf(mockMvc.perform(get("/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, bearer(firstAccessToken)))
@@ -189,6 +201,12 @@ class ProdProfileSmokeTest {
 
         mockMvc.perform(get("/swagger-ui/index.html"))
                 .andExpect(status().isNotFound());
+
+        JsonNode jwks = bodyOf(mockMvc.perform(get("/auth/.well-known/jwks.json"))
+                        .andExpect(status().isOk())
+                        .andReturn());
+        assertThat(jwks.get("keys")).hasSize(1);
+        assertThat(jwks.get("keys").get(0).get("alg").asText()).isEqualTo("RS256");
 
         JsonNode assignableRoles = bodyOf(mockMvc.perform(get("/roles/assignable")
                         .header(HttpHeaders.AUTHORIZATION, bearer(firstAccessToken)))
@@ -203,8 +221,8 @@ class ProdProfileSmokeTest {
                         .cookie(refreshCookie(firstRefreshToken)))
                 .andExpect(status().isOk())
                 .andReturn();
-        String refreshedAccessToken = bodyOf(refreshed).get("accessToken").asText();
-        String refreshedRefreshToken = extractCookieValue(refreshed.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String refreshedAccessToken = extractCookieValue(refreshed, ACCESS_COOKIE_NAME);
+        String refreshedRefreshToken = extractCookieValue(refreshed, REFRESH_COOKIE_NAME);
         assertThat(refreshedAccessToken).isNotEqualTo(firstAccessToken);
         assertThat(refreshedRefreshToken).isNotEqualTo(firstRefreshToken);
 
@@ -217,7 +235,7 @@ class ProdProfileSmokeTest {
                 .andExpect(status().isUnauthorized());
 
         MvcResult secondLogin = webLogin(ADMIN_USERNAME, ADMIN_PASSWORD, status().isOk());
-        String secondRefreshToken = extractCookieValue(secondLogin.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String secondRefreshToken = extractCookieValue(secondLogin, REFRESH_COOKIE_NAME);
 
         mockMvc.perform(post("/auth/web/logout-all")
                         .cookie(refreshCookie(secondRefreshToken)))
@@ -228,7 +246,7 @@ class ProdProfileSmokeTest {
                 .andExpect(status().isUnauthorized());
 
         MvcResult thirdLogin = webLogin(ADMIN_USERNAME, ADMIN_PASSWORD, status().isOk());
-        String adminAccessToken = bodyOf(thirdLogin).get("accessToken").asText();
+        String adminAccessToken = extractCookieValue(thirdLogin, ACCESS_COOKIE_NAME);
 
         Role waiterRole = roleRepository.findByCode("WAITER").orElseThrow();
         mockMvc.perform(post("/auth/register")
@@ -270,7 +288,7 @@ class ProdProfileSmokeTest {
         assertThat(registeredUser.isEmailVerified()).isTrue();
 
         MvcResult newUserLogin = webLogin(NEW_USER_USERNAME, NEW_USER_PASSWORD, status().isOk());
-        String newUserAccessToken = bodyOf(newUserLogin).get("accessToken").asText();
+        String newUserAccessToken = extractCookieValue(newUserLogin, ACCESS_COOKIE_NAME);
 
         latestPhoneVerificationCode.set(null);
         mockMvc.perform(post("/auth/request-phone-verification")
@@ -333,16 +351,25 @@ class ProdProfileSmokeTest {
         return objectMapper.readTree(content);
     }
 
-    private String extractCookieValue(String setCookieHeader) {
-        assertThat(setCookieHeader).isNotBlank();
-        String prefix = COOKIE_NAME + "=";
-        int start = setCookieHeader.indexOf(prefix);
-        int end = setCookieHeader.indexOf(';', start);
-        return setCookieHeader.substring(start + prefix.length(), end);
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        return extractCookieValue(result.getResponse().getHeaders(HttpHeaders.SET_COOKIE), cookieName);
+    }
+
+    private String extractCookieValue(List<String> setCookieHeaders, String cookieName) {
+        String prefix = cookieName + "=";
+        return setCookieHeaders.stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private MockCookie refreshCookie(String refreshToken) {
-        return new MockCookie(COOKIE_NAME, refreshToken);
+        return new MockCookie(REFRESH_COOKIE_NAME, refreshToken);
     }
 
     private String bearer(String accessToken) {

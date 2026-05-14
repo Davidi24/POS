@@ -74,9 +74,18 @@ public class MenuController {
             Authentication authentication,
             @PathVariable UUID menuId,
             @RequestParam(defaultValue = "false") boolean includeSections,
-            @RequestParam(defaultValue = "false") boolean includeItems
+            @RequestParam(defaultValue = "false") boolean includeItems,
+            @RequestParam(defaultValue = "false") boolean includeVariants,
+            @RequestParam(defaultValue = "false") boolean includeOptionGroups
     ) {
-        return ResponseEntity.ok(menuService.getMenu(authentication, menuId, includeSections, includeItems));
+        return ResponseEntity.ok(menuService.getMenu(
+                authentication,
+                menuId,
+                includeSections,
+                includeItems,
+                includeVariants,
+                includeOptionGroups
+        ));
     }
 
     @PutMapping("/{menuId}")
