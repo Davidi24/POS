@@ -22,6 +22,7 @@ import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractAuditedEntity;
 import pos.pos.device.entity.Device;
+import pos.pos.device.enums.DeviceType;
 import pos.pos.kds.enums.KdsStationType;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
@@ -135,8 +136,23 @@ public class KdsStation extends AbstractAuditedEntity {
     @OrderBy("displayOrder ASC, createdAt ASC")
     private List<KdsStationRouting> routings = new ArrayList<>();
 
-    @OneToMany(mappedBy = "station")
-    private List<KdsTicket> tickets = new ArrayList<>();
+    public void addRouting(KdsStationRouting routing) {
+        if (routing == null) {
+            return;
+        }
+
+        routings.add(routing);
+        routing.setStation(this);
+    }
+
+    public void removeRouting(KdsStationRouting routing) {
+        if (routing == null) {
+            return;
+        }
+
+        routings.remove(routing);
+        routing.setStation(null);
+    }
 
     @Override
     protected void normalizeFields() {
@@ -158,15 +174,23 @@ public class KdsStation extends AbstractAuditedEntity {
             }
         }
 
-        if (device != null && restaurant != null && device.getRestaurant() != null) {
-            if (!Objects.equals(device.getRestaurant().getId(), restaurant.getId())) {
+        if (device != null) {
+            if (device.getDeviceType() != DeviceType.KDS) {
+                throw new IllegalStateException("kds station device must use the KDS device type");
+            }
+
+            if (restaurant != null && device.getRestaurant() != null
+                    && !Objects.equals(device.getRestaurant().getId(), restaurant.getId())) {
                 throw new IllegalStateException("kds station device must belong to the same restaurant");
             }
-        }
 
-        if (device != null && branch != null && device.getBranch() != null) {
-            if (!Objects.equals(device.getBranch().getId(), branch.getId())) {
-                throw new IllegalStateException("kds station device must belong to the same branch");
+            if (branch != null) {
+                if (device.getBranch() == null) {
+                    throw new IllegalStateException("kds station device must be assigned to the same branch");
+                }
+                if (!Objects.equals(device.getBranch().getId(), branch.getId())) {
+                    throw new IllegalStateException("kds station device must belong to the same branch");
+                }
             }
         }
     }

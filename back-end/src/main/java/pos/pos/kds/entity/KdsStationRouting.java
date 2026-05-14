@@ -91,13 +91,12 @@ public class KdsStationRouting extends AbstractTimestampedEntity {
                 && station.getRestaurant() != null
                 && menuItem.getSection() != null
                 && menuItem.getSection().getMenu() != null
-                && menuItem.getSection().getMenu().getRestaurant() != null) {
-            if (!Objects.equals(
-                    station.getRestaurant().getId(),
-                    menuItem.getSection().getMenu().getRestaurant().getId()
-            )) {
-                throw new IllegalStateException("kds routing menu item must belong to the same restaurant");
-            }
+                && menuItem.getSection().getMenu().getRestaurant() != null
+                && !Objects.equals(
+                        station.getRestaurant().getId(),
+                        menuItem.getSection().getMenu().getRestaurant().getId()
+                )) {
+            throw new IllegalStateException("kds routing menu item must belong to the same restaurant");
         }
     }
 }
