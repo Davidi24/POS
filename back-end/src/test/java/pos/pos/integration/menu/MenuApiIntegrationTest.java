@@ -58,6 +58,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MenuApiIntegrationTest {
 
     private static final String SCHEMA = "menu_api_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String ADMIN_EMAIL = "menu.admin@pos.example";
     private static final String ADMIN_USERNAME = "menuadmin";
     private static final String ADMIN_PASSWORD = "StrongPass123!";
@@ -500,7 +501,7 @@ class MenuApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        return bodyOf(result).get("accessToken").asText();
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
     }
 
     private String bearer(String accessToken) {
@@ -509,6 +510,19 @@ class MenuApiIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private String messageOf(MvcResult result) throws Exception {

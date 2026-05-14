@@ -52,6 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RestaurantRegistrationApiIntegrationTest {
 
     private static final String SCHEMA = "restaurant_reg_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String ADMIN_EMAIL = "prod.admin@pos.example";
     private static final String ADMIN_USERNAME = "prodadmin";
     private static final String ADMIN_PASSWORD = "StrongPass123!";
@@ -148,7 +149,7 @@ class RestaurantRegistrationApiIntegrationTest {
 
         verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
 
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
 
         JsonNode approved = bodyOf(mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", restaurantId)
@@ -183,7 +184,7 @@ class RestaurantRegistrationApiIntegrationTest {
                         ))))
                 .andExpect(status().isNoContent());
 
-        String ownerToken = bodyOf(webLogin(ownerUsername, OWNER_SETUP_PASSWORD)).get("accessToken").asText();
+        String ownerToken = accessTokenOf(webLogin(ownerUsername, OWNER_SETUP_PASSWORD));
         JsonNode ownerView = bodyOf(mockMvc.perform(
                         MockMvcRequestBuilders.get("/restaurants/{restaurantId}", restaurantId)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
@@ -217,7 +218,7 @@ class RestaurantRegistrationApiIntegrationTest {
                 .andReturn());
 
         UUID restaurantId = UUID.fromString(pending.get("id").asText());
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
 
         JsonNode rejected = bodyOf(mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", restaurantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
@@ -257,7 +258,7 @@ class RestaurantRegistrationApiIntegrationTest {
                 .andReturn());
 
         UUID restaurantId = UUID.fromString(pending.get("id").asText());
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
 
         mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", restaurantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
@@ -279,7 +280,7 @@ class RestaurantRegistrationApiIntegrationTest {
         String ownerEmail = "owner.rev." + uid + "@pos.example";
         String ownerUsername = "owner.rev." + uid;
 
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
 
         bodyOf(mockMvc.perform(post("/restaurants")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
@@ -339,7 +340,7 @@ class RestaurantRegistrationApiIntegrationTest {
         String ownerEmail = "cascade." + uid + "@pos.example";
         String ownerUsername = "cascade." + uid;
 
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
 
         JsonNode created = bodyOf(mockMvc.perform(post("/restaurants")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
@@ -411,7 +412,7 @@ class RestaurantRegistrationApiIntegrationTest {
                                 "newPassword", OWNER_SETUP_PASSWORD
                         ))))
                 .andExpect(status().isNoContent());
-        return bodyOf(webLogin(username, OWNER_SETUP_PASSWORD)).get("accessToken").asText();
+        return accessTokenOf(webLogin(username, OWNER_SETUP_PASSWORD));
     }
 
     private String uid() {
@@ -431,6 +432,23 @@ class RestaurantRegistrationApiIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String accessTokenOf(MvcResult result) {
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private String bearer(String accessToken) {

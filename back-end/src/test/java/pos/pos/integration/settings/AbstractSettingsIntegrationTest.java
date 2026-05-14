@@ -51,6 +51,7 @@ abstract class AbstractSettingsIntegrationTest {
     protected static final String SUPER_ADMIN_USERNAME = "settingssuperadmin";
     protected static final String SUPER_ADMIN_PASSWORD = "StrongPass123!";
     protected static final String DEFAULT_PASSWORD = "StrongPass123!";
+    private static final String ACCESS_COOKIE_NAME = "access-token";
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
@@ -217,11 +218,24 @@ abstract class AbstractSettingsIntegrationTest {
                 .andExpect(expectedStatus)
                 .andReturn();
 
-        return bodyOf(result).get("accessToken").asText();
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
     }
 
     protected JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     protected String bearer(String accessToken) {

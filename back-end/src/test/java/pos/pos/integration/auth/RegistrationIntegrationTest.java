@@ -48,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RegistrationIntegrationTest {
 
     private static final String SCHEMA = "registration_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String ADMIN_EMAIL = "registration.admin@pos.example";
     private static final String ADMIN_USERNAME = "registrationadmin";
     private static final String ADMIN_PASSWORD = "StrongPass123!";
@@ -301,7 +302,7 @@ class RegistrationIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        return bodyOf(result).get("accessToken").asText();
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
     }
 
     private User createExistingUser(RegistrationCandidate candidate, String phone) {
@@ -345,6 +346,19 @@ class RegistrationIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private RequestPostProcessor client(String ip, String userAgent) {

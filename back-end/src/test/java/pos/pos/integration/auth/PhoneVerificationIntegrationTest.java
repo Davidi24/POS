@@ -58,6 +58,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PhoneVerificationIntegrationTest {
 
     private static final String SCHEMA = "phone_verify_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String DEFAULT_PASSWORD = "StrongPass123!";
     private static final String TOO_MANY_REQUESTS_MESSAGE = "Too many phone verification requests. Try again later.";
 
@@ -273,8 +274,7 @@ class PhoneVerificationIntegrationTest {
                 .andExpect(expectedStatus)
                 .andReturn();
 
-        JsonNode body = bodyOf(result);
-        return new AuthTokens(body.get("accessToken").asText());
+        return new AuthTokens(extractCookieValue(result, ACCESS_COOKIE_NAME));
     }
 
     private User createUser(String label, boolean phoneVerified) {
@@ -315,6 +315,19 @@ class PhoneVerificationIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private RequestPostProcessor client(String ip, String userAgent) {

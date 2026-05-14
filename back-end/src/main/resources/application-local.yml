@@ -68,6 +68,9 @@ security:
 
 app:
   security:
+    cookie:
+      access-token-name: access-token
+
     refresh-token:
       pepper: change-this-local-dev-refresh-token-pepper
 

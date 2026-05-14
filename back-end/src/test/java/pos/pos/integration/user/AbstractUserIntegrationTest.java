@@ -64,6 +64,7 @@ abstract class AbstractUserIntegrationTest {
     protected static final String ADMIN_USERNAME = "usergroupedadmin";
     protected static final String ADMIN_PASSWORD = "StrongPass123!";
     protected static final String DEFAULT_PASSWORD = "StrongPass123!";
+    private static final String ACCESS_COOKIE_NAME = "access-token";
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
@@ -291,13 +292,26 @@ abstract class AbstractUserIntegrationTest {
 
         JsonNode body = result.getResponse().getContentAsString().isBlank() ? null : bodyOf(result);
         return new LoginTokens(
-                body == null || body.get("accessToken") == null ? null : body.get("accessToken").asText(),
+                extractCookieValue(result, ACCESS_COOKIE_NAME),
                 ip
         );
     }
 
     protected JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElse(null);
     }
 
     protected RequestPostProcessor client(String ip, String userAgent) {
