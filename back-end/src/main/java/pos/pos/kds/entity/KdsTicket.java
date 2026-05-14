@@ -192,34 +192,29 @@ public class KdsTicket extends AbstractAuditedEntity {
 
     @Override
     protected void validateState() {
-        if (restaurant != null && branch != null && branch.getRestaurant() != null) {
-            if (!Objects.equals(branch.getRestaurant().getId(), restaurant.getId())) {
-                throw new IllegalStateException("kds ticket branch must belong to the same restaurant");
-            }
+        if (restaurant != null && branch != null && branch.getRestaurant() != null
+                && !Objects.equals(branch.getRestaurant().getId(), restaurant.getId())) {
+            throw new IllegalStateException("kds ticket branch must belong to the same restaurant");
         }
 
-        if (restaurant != null && station != null && station.getRestaurant() != null) {
-            if (!Objects.equals(station.getRestaurant().getId(), restaurant.getId())) {
-                throw new IllegalStateException("kds ticket station must belong to the same restaurant");
-            }
+        if (restaurant != null && station != null && station.getRestaurant() != null
+                && !Objects.equals(station.getRestaurant().getId(), restaurant.getId())) {
+            throw new IllegalStateException("kds ticket station must belong to the same restaurant");
         }
 
-        if (branch != null && station != null && station.getBranch() != null) {
-            if (!Objects.equals(station.getBranch().getId(), branch.getId())) {
-                throw new IllegalStateException("kds ticket station must belong to the same branch");
-            }
+        if (branch != null && station != null && station.getBranch() != null
+                && !Objects.equals(station.getBranch().getId(), branch.getId())) {
+            throw new IllegalStateException("kds ticket station must belong to the same branch");
         }
 
-        if (restaurant != null && order != null && order.getRestaurant() != null) {
-            if (!Objects.equals(order.getRestaurant().getId(), restaurant.getId())) {
-                throw new IllegalStateException("kds ticket order must belong to the same restaurant");
-            }
+        if (restaurant != null && order != null && order.getRestaurant() != null
+                && !Objects.equals(order.getRestaurant().getId(), restaurant.getId())) {
+            throw new IllegalStateException("kds ticket order must belong to the same restaurant");
         }
 
-        if (branch != null && order != null && order.getBranch() != null) {
-            if (!Objects.equals(order.getBranch().getId(), branch.getId())) {
-                throw new IllegalStateException("kds ticket order must belong to the same branch");
-            }
+        if (branch != null && order != null && order.getBranch() != null
+                && !Objects.equals(order.getBranch().getId(), branch.getId())) {
+            throw new IllegalStateException("kds ticket order must belong to the same branch");
         }
 
         if (completedAt != null && readyAt == null) {

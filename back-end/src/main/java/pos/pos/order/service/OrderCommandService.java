@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.customer.entity.Customer;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.kds.service.KdsOrderSyncService;
 import pos.pos.order.dto.CreateOrderRequest;
 import pos.pos.order.dto.OrderCustomerRequest;
 import pos.pos.order.dto.OrderReservationRequest;
@@ -39,6 +40,7 @@ public class OrderCommandService {
     private final RestaurantScopeService restaurantScopeService;
     private final OrderSupport orderSupport;
     private final OrderDomainSupport orderDomainSupport;
+    private final KdsOrderSyncService kdsOrderSyncService;
 
     @Transactional
     public OrderResponse createBranchOrder(
@@ -110,8 +112,19 @@ public class OrderCommandService {
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         Branch branch = order.getBranch();
         if (request.getBranchId() != null && !Objects.equals(request.getBranchId(), order.getBranch().getId())) {
+            kdsOrderSyncService.assertNoTicketHistory(
+                    order,
+                    "Orders with KDS ticket history cannot be moved to another branch"
+            );
             branch = orderSupport.resolveManagedBranch(authentication, restaurantId, request.getBranchId());
             order.setBranch(branch);
+        }
+
+        if (request.getItems() != null) {
+            kdsOrderSyncService.assertNoLineItemHistory(
+                    order,
+                    "Orders with KDS ticket history cannot replace their line items"
+            );
         }
 
         if (request.getCustomerId() != null) {

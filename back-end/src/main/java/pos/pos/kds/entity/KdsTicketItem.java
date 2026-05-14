@@ -42,6 +42,14 @@ import java.util.Objects;
         AND quantity > 0
         AND status IN ('PENDING', 'FIRED', 'IN_PROGRESS', 'READY', 'EXPO_READY', 'COMPLETED', 'CANCELLED')
         AND priority IN ('NORMAL', 'RUSH', 'VIP', 'HOLD_FIRE')
+        AND (
+            completed_at IS NULL
+            OR ready_at IS NOT NULL
+        )
+        AND (
+            ready_at IS NULL
+            OR fired_at IS NOT NULL
+        )
         """)
 @Getter
 @Setter
@@ -119,10 +127,17 @@ public class KdsTicketItem extends AbstractTimestampedEntity {
 
         if (kdsTicket != null && orderLineItem != null
                 && kdsTicket.getOrder() != null
-                && orderLineItem.getOrder() != null) {
-            if (!Objects.equals(kdsTicket.getOrder().getId(), orderLineItem.getOrder().getId())) {
-                throw new IllegalStateException("kds ticket item must belong to the same order as the ticket");
-            }
+                && orderLineItem.getOrder() != null
+                && !Objects.equals(kdsTicket.getOrder().getId(), orderLineItem.getOrder().getId())) {
+            throw new IllegalStateException("kds ticket item must belong to the same order as the ticket");
+        }
+
+        if (completedAt != null && readyAt == null) {
+            throw new IllegalStateException("completedAt requires readyAt");
+        }
+
+        if (readyAt != null && firedAt == null) {
+            throw new IllegalStateException("readyAt requires firedAt");
         }
     }
 }
