@@ -30,9 +30,10 @@ springdoc:
 
 security:
   jwt:
-    secret: ${JWT_SECRET}
+    private-key: ${JWT_PRIVATE_KEY}
+    public-key: ${JWT_PUBLIC_KEY}
     access-expiration: 15m
-    refresh-expiration: 30d
+    refresh-expiration: 1d
 
 app:
   security:
@@ -64,6 +65,7 @@ app:
         window-minutes: 1
 
     cookie:
+      access-token-name: access-token
       refresh-token-name: refreshToken
       refresh-token-path: /auth/web
       same-site: Strict
