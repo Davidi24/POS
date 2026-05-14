@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.kds.service.KdsOrderSyncService;
 import pos.pos.order.dto.OrderActionRequest;
 import pos.pos.order.dto.OrderMergeRequest;
 import pos.pos.order.dto.OrderPaymentStatusRequest;
@@ -47,6 +48,7 @@ public class OrderWorkflowService {
     private final RestaurantScopeService restaurantScopeService;
     private final OrderSupport orderSupport;
     private final OrderDomainSupport orderDomainSupport;
+    private final KdsOrderSyncService kdsOrderSyncService;
 
     @Transactional
     public OrderResponse openOrder(Authentication authentication, UUID restaurantId, UUID orderId, OrderActionRequest request) {
@@ -81,6 +83,7 @@ public class OrderWorkflowService {
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.SENT_TO_KITCHEN, orderDomainSupport.firstNote(request, "Order sent to kitchen"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
         return orderSupport.toResponse(order);
     }
 
@@ -99,6 +102,7 @@ public class OrderWorkflowService {
         order.setFulfillmentStatus(OrderFulfillmentStatus.READY);
         orderSupport.addEvent(order, OrderEventType.READY, orderDomainSupport.firstNote(request, "Order marked ready"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
         return orderSupport.toResponse(order);
     }
 
@@ -115,6 +119,7 @@ public class OrderWorkflowService {
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.FULFILLED, orderDomainSupport.firstNote(request, "Order fulfilled"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
         return orderSupport.toResponse(order);
     }
 
@@ -178,6 +183,7 @@ public class OrderWorkflowService {
         orderDomainSupport.applyStatusSideEffects(order);
         orderSupport.addEvent(order, OrderEventType.CANCELLED, orderDomainSupport.firstNote(request, "Order cancelled"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy(), request == null ? null : request.getReason());
         return orderSupport.toResponse(order);
     }
 
@@ -200,6 +206,7 @@ public class OrderWorkflowService {
         orderDomainSupport.applyStatusSideEffects(order);
         orderSupport.addEvent(order, OrderEventType.VOIDED, orderDomainSupport.firstNote(request, "Order voided"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy(), request == null ? null : request.getReason());
         return orderSupport.toResponse(order);
     }
 
@@ -224,6 +231,8 @@ public class OrderWorkflowService {
         if (!orderSupport.loadOrderRules(targetOrder.getRestaurant()).isMergeOrdersEnabled()) {
             throw new AuthException("Order merging is disabled for this restaurant", HttpStatus.BAD_REQUEST);
         }
+        kdsOrderSyncService.assertNoTicketHistory(targetOrder, "Orders with KDS ticket history cannot be merged");
+        kdsOrderSyncService.assertNoTicketHistory(sourceOrder, "Orders with KDS ticket history cannot be merged");
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         for (OrderLineItem lineItem : orderSupport.activeLineItems(sourceOrder)) {
@@ -292,6 +301,10 @@ public class OrderWorkflowService {
         if (!orderSupport.loadOrderRules(order.getRestaurant()).isTransferOrdersEnabled()) {
             throw new AuthException("Order transfers are disabled for this restaurant", HttpStatus.BAD_REQUEST);
         }
+        kdsOrderSyncService.assertNoTicketHistory(
+                order,
+                "Orders with KDS ticket history cannot be transferred to another branch"
+        );
 
         Branch branch = orderSupport.resolveManagedBranch(authentication, restaurantId, request.getBranchId());
         Reservation reservation = orderSupport.resolveReservation(restaurantId, request.getReservationId());
@@ -362,6 +375,7 @@ public class OrderWorkflowService {
         if (!orderSupport.loadSettings(sourceOrder.getRestaurant()).isAllowSplitBills()) {
             throw new AuthException("Split bills are disabled for this restaurant", HttpStatus.BAD_REQUEST);
         }
+        kdsOrderSyncService.assertNoLineItemHistory(sourceOrder, "Orders with KDS ticket history cannot be split");
 
         List<OrderLineItem> selectedLineItems = orderDomainSupport.resolveSplitLineItems(sourceOrder, request.getLineItemIds());
         if (selectedLineItems.size() >= orderSupport.activeLineItems(sourceOrder).size()) {
