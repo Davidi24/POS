@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.kds.service.KdsOrderSyncService;
 import pos.pos.order.dto.CreateOrderDiscountRequest;
 import pos.pos.order.dto.CreateOrderItemOptionRequest;
 import pos.pos.order.dto.CreateOrderLineItemRequest;
@@ -35,6 +36,7 @@ public class OrderItemService {
     private final RestaurantScopeService restaurantScopeService;
     private final OrderSupport orderSupport;
     private final OrderDomainSupport orderDomainSupport;
+    private final KdsOrderSyncService kdsOrderSyncService;
 
     @Transactional
     public OrderLineItemResponse addItem(
@@ -70,6 +72,10 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        kdsOrderSyncService.assertLineItemMutable(
+                lineItem,
+                "Order items with KDS ticket history cannot be structurally replaced"
+        );
         orderSupport.applyLineItemRequest(order, lineItem, request, true);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
@@ -92,6 +98,10 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        kdsOrderSyncService.assertLineItemMutable(
+                lineItem,
+                "Order items with KDS ticket history cannot change quantity"
+        );
         lineItem.setQuantity(request.getQuantity());
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
@@ -118,6 +128,7 @@ public class OrderItemService {
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, "Order item notes updated", order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncLineItemNotes(lineItem, order.getUpdatedBy());
 
         return orderSupport.toLineItemResponse(lineItem);
     }
@@ -143,6 +154,7 @@ public class OrderItemService {
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, "Order item status updated", order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
 
         return orderSupport.toLineItemResponse(lineItem);
     }
@@ -206,6 +218,7 @@ public class OrderItemService {
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_VOIDED, orderDomainSupport.firstNote(request, "Order item voided"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy(), request == null ? null : request.getReason());
 
         return orderSupport.toLineItemResponse(lineItem);
     }
@@ -389,6 +402,7 @@ public class OrderItemService {
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, note, order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
 
         return orderSupport.toLineItemResponse(lineItem);
     }
