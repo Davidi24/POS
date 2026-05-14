@@ -6,7 +6,7 @@ create table orders (
     reservation_id uuid,
     customer_id uuid,
     order_number varchar(50) not null,
-    currency char(3) not null,
+    currency varchar(3) not null,
     order_type varchar(30) not null,
     source varchar(30) not null,
     status varchar(30) not null,

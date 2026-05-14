@@ -1,0 +1,5799 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------------------< pos:pos >-------------------------------
+[INFO] Building pos 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.2.5:run (default-cli) > test-compile @ pos >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ pos ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 32 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.11.0:compile (default-compile) @ pos ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ pos ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.11.0:testCompile (default-testCompile) @ pos ---
+[INFO] Changes detected - recompiling the module! :source
+[INFO] Compiling 164 source files with javac [debug release 21] to target\test-classes
+[INFO] /C:/Users/zaimi/Documents/coding_projects/POS/back-end/src/test/java/pos/pos/support/TestPostgresContainerSupport.java: C:\Users\zaimi\Documents\coding_projects\POS\back-end\src\test\java\pos\pos\support\TestPostgresContainerSupport.java uses or overrides a deprecated API.
+[INFO] /C:/Users/zaimi/Documents/coding_projects/POS/back-end/src/test/java/pos/pos/support/TestPostgresContainerSupport.java: Recompile with -Xlint:deprecation for details.
+[INFO] /C:/Users/zaimi/Documents/coding_projects/POS/back-end/src/test/java/pos/pos/unit/user/service/UserAdminServiceTest.java: C:\Users\zaimi\Documents\coding_projects\POS\back-end\src\test\java\pos\pos\unit\user\service\UserAdminServiceTest.java uses unchecked or unsafe operations.
+[INFO] /C:/Users/zaimi/Documents/coding_projects/POS/back-end/src/test/java/pos/pos/unit/user/service/UserAdminServiceTest.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] <<< spring-boot:3.2.5:run (default-cli) < test-compile @ pos <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.2.5:run (default-cli) @ pos ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+ :: Spring Boot ::                (v3.2.5)
+
+2026-05-11T16:47:13.732+02:00  INFO 37064 --- [Pos] [           main] pos.pos.PosApplication                   : Starting PosApplication using Java 23.0.1 with PID 37064 (C:\Users\zaimi\Documents\coding_projects\POS\back-end\target\classes started by zaimi in C:\Users\zaimi\Documents\coding_projects\POS\back-end)
+2026-05-11T16:47:13.738+02:00  INFO 37064 --- [Pos] [           main] pos.pos.PosApplication                   : The following 1 profile is active: "local"
+2026-05-11T16:47:15.383+02:00  INFO 37064 --- [Pos] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-11T16:47:15.866+02:00  INFO 37064 --- [Pos] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 425 ms. Found 44 JPA repository interfaces.
+2026-05-11T16:47:17.755+02:00  INFO 37064 --- [Pos] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+2026-05-11T16:47:17.797+02:00  INFO 37064 --- [Pos] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-05-11T16:47:17.799+02:00  INFO 37064 --- [Pos] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.20]
+2026-05-11T16:47:17.978+02:00  INFO 37064 --- [Pos] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-05-11T16:47:18.025+02:00  INFO 37064 --- [Pos] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 4199 ms
+2026-05-11T16:47:18.336+02:00  INFO 37064 --- [Pos] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-05-11T16:47:18.804+02:00  INFO 37064 --- [Pos] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@b3857e2
+2026-05-11T16:47:18.852+02:00  INFO 37064 --- [Pos] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-05-11T16:47:19.053+02:00  INFO 37064 --- [Pos] [           main] o.f.c.internal.license.VersionPrinter    : Flyway Community Edition 9.22.3 by Redgate
+2026-05-11T16:47:19.096+02:00  INFO 37064 --- [Pos] [           main] o.f.c.internal.license.VersionPrinter    : See release notes here: https://rd.gt/416ObMi
+2026-05-11T16:47:19.099+02:00  INFO 37064 --- [Pos] [           main] o.f.c.internal.license.VersionPrinter    : 
+2026-05-11T16:47:19.150+02:00  INFO 37064 --- [Pos] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://localhost:5433/pos_local (PostgreSQL 16.13)
+2026-05-11T16:47:19.179+02:00  WARN 37064 --- [Pos] [           main] o.f.c.internal.database.base.Database    : Flyway upgrade recommended: PostgreSQL 16.13 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-05-11T16:47:19.319+02:00  INFO 37064 --- [Pos] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 24 migrations (execution time 00:00.108s)
+2026-05-11T16:47:19.409+02:00  INFO 37064 --- [Pos] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "foundation_local": 23
+2026-05-11T16:47:19.419+02:00  INFO 37064 --- [Pos] [           main] o.f.core.internal.command.DbMigrate      : Schema "foundation_local" is up to date. No migration necessary.
+2026-05-11T16:47:19.697+02:00  INFO 37064 --- [Pos] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-05-11T16:47:19.881+02:00  INFO 37064 --- [Pos] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.4.4.Final
+2026-05-11T16:47:19.970+02:00  INFO 37064 --- [Pos] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-05-11T16:47:20.599+02:00  INFO 37064 --- [Pos] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-11T16:47:26.170+02:00  INFO 37064 --- [Pos] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-11T16:47:26.363+02:00  INFO 37064 --- [Pos] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-11T16:47:27.201+02:00  INFO 37064 --- [Pos] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-05-11T16:47:36.449+02:00  WARN 37064 --- [Pos] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-05-11T16:47:36.567+02:00  WARN 37064 --- [Pos] [           main] .s.s.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: fd4d21f5-c3eb-42f9-b8c2-541552834404
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-05-11T16:47:37.680+02:00  INFO 37064 --- [Pos] [           main] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@42050876, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@56834b7d, org.springframework.security.web.context.SecurityContextHolderFilter@63b6f144, org.springframework.security.web.header.HeaderWriterFilter@44549b28, org.springframework.web.filter.CorsFilter@74e53fc7, org.springframework.security.web.authentication.logout.LogoutFilter@61a93de8, pos.pos.security.filter.JwtAuthenticationFilter@71657b8c, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@192e0219, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@554ca67a, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@4f7c3ec5, org.springframework.security.web.session.SessionManagementFilter@4c7a6e7f, org.springframework.security.web.access.ExceptionTranslationFilter@55f111f3, org.springframework.security.web.access.intercept.AuthorizationFilter@66de4992]
+2026-05-11T16:47:38.856+02:00  INFO 37064 --- [Pos] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path ''
+2026-05-11T16:47:38.889+02:00  INFO 37064 --- [Pos] [           main] pos.pos.PosApplication                   : Started PosApplication in 25.847 seconds (process running for 26.384)
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.is_assignable,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.is_active,
+        r1_0.is_system,
+        r1_0.name,
+        r1_0.is_protected,
+        r1_0.rank,
+        r1_0.updated_at 
+    from
+        foundation_local.roles r1_0 
+    where
+        r1_0.code=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.is_assignable,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.is_active,
+        r1_0.is_system,
+        r1_0.name,
+        r1_0.is_protected,
+        r1_0.rank,
+        r1_0.updated_at 
+    from
+        foundation_local.roles r1_0 
+    where
+        r1_0.code=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.is_assignable,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.is_active,
+        r1_0.is_system,
+        r1_0.name,
+        r1_0.is_protected,
+        r1_0.rank,
+        r1_0.updated_at 
+    from
+        foundation_local.roles r1_0 
+    where
+        r1_0.code=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.is_assignable,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.is_active,
+        r1_0.is_system,
+        r1_0.name,
+        r1_0.is_protected,
+        r1_0.rank,
+        r1_0.updated_at 
+    from
+        foundation_local.roles r1_0 
+    where
+        r1_0.code=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.is_assignable,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.is_active,
+        r1_0.is_system,
+        r1_0.name,
+        r1_0.is_protected,
+        r1_0.rank,
+        r1_0.updated_at 
+    from
+        foundation_local.roles r1_0 
+    where
+        r1_0.code=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.is_assignable,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.is_active,
+        r1_0.is_system,
+        r1_0.name,
+        r1_0.is_protected,
+        r1_0.rank,
+        r1_0.updated_at 
+    from
+        foundation_local.roles r1_0 
+    where
+        r1_0.code=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        p1_0.id,
+        p1_0.code,
+        p1_0.created_at,
+        p1_0.description,
+        p1_0.name 
+    from
+        foundation_local.permissions p1_0 
+    where
+        p1_0.code=?
+Hibernate: 
+    select
+        rp1_0.id 
+    from
+        foundation_local.role_permissions rp1_0 
+    where
+        rp1_0.role_id=? 
+        and rp1_0.permission_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.is_assignable,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.is_active,
+        r1_0.is_system,
+        r1_0.name,
+        r1_0.is_protected,
+        r1_0.rank,
+        r1_0.updated_at 
+    from
+        foundation_local.roles r1_0 
+    where
+        r1_0.code=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.default_branch_id,
+        u1_0.deleted_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.email_verified_at,
+        u1_0.failed_login_attempts,
+        u1_0.first_name,
+        u1_0.is_active,
+        u1_0.last_login_at,
+        u1_0.last_login_ip,
+        u1_0.last_name,
+        u1_0.locked_until,
+        u1_0.normalized_phone,
+        u1_0.password_hash,
+        u1_0.password_updated_at,
+        u1_0.phone,
+        u1_0.phone_verified,
+        u1_0.phone_verified_at,
+        u1_0.pin_attempts,
+        u1_0.pin_enabled,
+        u1_0.pin_hash,
+        u1_0.pin_locked_until,
+        u1_0.restaurant_id,
+        u1_0.status,
+        u1_0.updated_at,
+        u1_0.updated_by,
+        u1_0.username,
+        u1_0.version 
+    from
+        foundation_local.users u1_0 
+    where
+        u1_0.email=? 
+        and u1_0.deleted_at is null
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.default_branch_id,
+        u1_0.deleted_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.email_verified_at,
+        u1_0.failed_login_attempts,
+        u1_0.first_name,
+        u1_0.is_active,
+        u1_0.last_login_at,
+        u1_0.last_login_ip,
+        u1_0.last_name,
+        u1_0.locked_until,
+        u1_0.normalized_phone,
+        u1_0.password_hash,
+        u1_0.password_updated_at,
+        u1_0.phone,
+        u1_0.phone_verified,
+        u1_0.phone_verified_at,
+        u1_0.pin_attempts,
+        u1_0.pin_enabled,
+        u1_0.pin_hash,
+        u1_0.pin_locked_until,
+        u1_0.restaurant_id,
+        u1_0.status,
+        u1_0.updated_at,
+        u1_0.updated_by,
+        u1_0.username,
+        u1_0.version 
+    from
+        foundation_local.users u1_0 
+    where
+        u1_0.username=? 
+        and u1_0.deleted_at is null
+Hibernate: 
+    select
+        ur1_0.id 
+    from
+        foundation_local.user_roles ur1_0 
+    where
+        ur1_0.user_id=? 
+        and ur1_0.role_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.is_assignable,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.is_active,
+        r1_0.is_system,
+        r1_0.name,
+        r1_0.is_protected,
+        r1_0.rank,
+        r1_0.updated_at 
+    from
+        foundation_local.roles r1_0 
+    where
+        r1_0.code=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.default_branch_id,
+        u1_0.deleted_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.email_verified_at,
+        u1_0.failed_login_attempts,
+        u1_0.first_name,
+        u1_0.is_active,
+        u1_0.last_login_at,
+        u1_0.last_login_ip,
+        u1_0.last_name,
+        u1_0.locked_until,
+        u1_0.normalized_phone,
+        u1_0.password_hash,
+        u1_0.password_updated_at,
+        u1_0.phone,
+        u1_0.phone_verified,
+        u1_0.phone_verified_at,
+        u1_0.pin_attempts,
+        u1_0.pin_enabled,
+        u1_0.pin_hash,
+        u1_0.pin_locked_until,
+        u1_0.restaurant_id,
+        u1_0.status,
+        u1_0.updated_at,
+        u1_0.updated_by,
+        u1_0.username,
+        u1_0.version 
+    from
+        foundation_local.users u1_0 
+    where
+        u1_0.id=?
+Hibernate: 
+    select
+        ur1_0.id 
+    from
+        foundation_local.user_roles ur1_0 
+    where
+        ur1_0.user_id=? 
+        and ur1_0.role_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.currency,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.email,
+        r1_0.is_active,
+        r1_0.legal_name,
+        r1_0.name,
+        r1_0.owner_id,
+        r1_0.pending_owner_client_target,
+        r1_0.pending_owner_email,
+        r1_0.pending_owner_first_name,
+        r1_0.pending_owner_last_name,
+        r1_0.pending_owner_phone,
+        r1_0.pending_owner_username,
+        r1_0.phone,
+        r1_0.rejection_reason,
+        r1_0.slug,
+        r1_0.status,
+        r1_0.timezone,
+        r1_0.updated_at,
+        r1_0.updated_by,
+        r1_0.website 
+    from
+        foundation_local.restaurants r1_0 
+    where
+        r1_0.id=?
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.allow_open_tickets,
+        s1_0.allow_split_bills,
+        s1_0.cash_rounding_enabled,
+        s1_0.cash_rounding_increment,
+        s1_0.created_at,
+        s1_0.created_by,
+        s1_0.date_format,
+        s1_0.default_branch_id,
+        s1_0.default_language,
+        s1_0.default_table_turn_time_minutes,
+        s1_0.enable_delivery,
+        s1_0.enable_qr_ordering,
+        s1_0.enable_takeaway,
+        s1_0.invoice_sequence_prefix,
+        s1_0.order_sequence_prefix,
+        s1_0.require_customer_for_invoice,
+        s1_0.reservation_slot_minutes,
+        s1_0.restaurant_id,
+        s1_0.service_charge_enabled,
+        s1_0.service_charge_type,
+        s1_0.service_charge_value,
+        s1_0.time_format,
+        s1_0.updated_at,
+        s1_0.updated_by,
+        s1_0.week_start_day 
+    from
+        foundation_local.settings s1_0 
+    where
+        s1_0.restaurant_id=?
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.default_branch_id,
+        u1_0.deleted_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.email_verified_at,
+        u1_0.failed_login_attempts,
+        u1_0.first_name,
+        u1_0.is_active,
+        u1_0.last_login_at,
+        u1_0.last_login_ip,
+        u1_0.last_name,
+        u1_0.locked_until,
+        u1_0.normalized_phone,
+        u1_0.password_hash,
+        u1_0.password_updated_at,
+        u1_0.phone,
+        u1_0.phone_verified,
+        u1_0.phone_verified_at,
+        u1_0.pin_attempts,
+        u1_0.pin_enabled,
+        u1_0.pin_hash,
+        u1_0.pin_locked_until,
+        u1_0.restaurant_id,
+        u1_0.status,
+        u1_0.updated_at,
+        u1_0.updated_by,
+        u1_0.username,
+        u1_0.version 
+    from
+        foundation_local.users u1_0 
+    where
+        u1_0.id=?
+Hibernate: 
+    select
+        ur1_0.id 
+    from
+        foundation_local.user_roles ur1_0 
+    where
+        ur1_0.user_id=? 
+        and ur1_0.role_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.currency,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.email,
+        r1_0.is_active,
+        r1_0.legal_name,
+        r1_0.name,
+        r1_0.owner_id,
+        r1_0.pending_owner_client_target,
+        r1_0.pending_owner_email,
+        r1_0.pending_owner_first_name,
+        r1_0.pending_owner_last_name,
+        r1_0.pending_owner_phone,
+        r1_0.pending_owner_username,
+        r1_0.phone,
+        r1_0.rejection_reason,
+        r1_0.slug,
+        r1_0.status,
+        r1_0.timezone,
+        r1_0.updated_at,
+        r1_0.updated_by,
+        r1_0.website 
+    from
+        foundation_local.restaurants r1_0 
+    where
+        r1_0.id=?
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.allow_open_tickets,
+        s1_0.allow_split_bills,
+        s1_0.cash_rounding_enabled,
+        s1_0.cash_rounding_increment,
+        s1_0.created_at,
+        s1_0.created_by,
+        s1_0.date_format,
+        s1_0.default_branch_id,
+        s1_0.default_language,
+        s1_0.default_table_turn_time_minutes,
+        s1_0.enable_delivery,
+        s1_0.enable_qr_ordering,
+        s1_0.enable_takeaway,
+        s1_0.invoice_sequence_prefix,
+        s1_0.order_sequence_prefix,
+        s1_0.require_customer_for_invoice,
+        s1_0.reservation_slot_minutes,
+        s1_0.restaurant_id,
+        s1_0.service_charge_enabled,
+        s1_0.service_charge_type,
+        s1_0.service_charge_value,
+        s1_0.time_format,
+        s1_0.updated_at,
+        s1_0.updated_by,
+        s1_0.week_start_day 
+    from
+        foundation_local.settings s1_0 
+    where
+        s1_0.restaurant_id=?
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.avatar_url,
+        u1_0.created_at,
+        u1_0.created_by,
+        u1_0.default_branch_id,
+        u1_0.deleted_at,
+        u1_0.email,
+        u1_0.email_verified,
+        u1_0.email_verified_at,
+        u1_0.failed_login_attempts,
+        u1_0.first_name,
+        u1_0.is_active,
+        u1_0.last_login_at,
+        u1_0.last_login_ip,
+        u1_0.last_name,
+        u1_0.locked_until,
+        u1_0.normalized_phone,
+        u1_0.password_hash,
+        u1_0.password_updated_at,
+        u1_0.phone,
+        u1_0.phone_verified,
+        u1_0.phone_verified_at,
+        u1_0.pin_attempts,
+        u1_0.pin_enabled,
+        u1_0.pin_hash,
+        u1_0.pin_locked_until,
+        u1_0.restaurant_id,
+        u1_0.status,
+        u1_0.updated_at,
+        u1_0.updated_by,
+        u1_0.username,
+        u1_0.version 
+    from
+        foundation_local.users u1_0 
+    where
+        u1_0.id=?
+Hibernate: 
+    select
+        ur1_0.id 
+    from
+        foundation_local.user_roles ur1_0 
+    where
+        ur1_0.user_id=? 
+        and ur1_0.role_id=? 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.currency,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.email,
+        r1_0.is_active,
+        r1_0.legal_name,
+        r1_0.name,
+        r1_0.owner_id,
+        r1_0.pending_owner_client_target,
+        r1_0.pending_owner_email,
+        r1_0.pending_owner_first_name,
+        r1_0.pending_owner_last_name,
+        r1_0.pending_owner_phone,
+        r1_0.pending_owner_username,
+        r1_0.phone,
+        r1_0.rejection_reason,
+        r1_0.slug,
+        r1_0.status,
+        r1_0.timezone,
+        r1_0.updated_at,
+        r1_0.updated_by,
+        r1_0.website 
+    from
+        foundation_local.restaurants r1_0 
+    where
+        r1_0.id=?
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.allow_open_tickets,
+        s1_0.allow_split_bills,
+        s1_0.cash_rounding_enabled,
+        s1_0.cash_rounding_increment,
+        s1_0.created_at,
+        s1_0.created_by,
+        s1_0.date_format,
+        s1_0.default_branch_id,
+        s1_0.default_language,
+        s1_0.default_table_turn_time_minutes,
+        s1_0.enable_delivery,
+        s1_0.enable_qr_ordering,
+        s1_0.enable_takeaway,
+        s1_0.invoice_sequence_prefix,
+        s1_0.order_sequence_prefix,
+        s1_0.require_customer_for_invoice,
+        s1_0.reservation_slot_minutes,
+        s1_0.restaurant_id,
+        s1_0.service_charge_enabled,
+        s1_0.service_charge_type,
+        s1_0.service_charge_value,
+        s1_0.time_format,
+        s1_0.updated_at,
+        s1_0.updated_by,
+        s1_0.week_start_day 
+    from
+        foundation_local.settings s1_0 
+    where
+        s1_0.restaurant_id=?
+2026-05-11T16:47:41.198+02:00  INFO 37064 --- [Pos] [           main] p.p.r.b.LocalRestaurantSeedRunner        : Local sample restaurants ready. Use these ids for menu-related development data:
+2026-05-11T16:47:41.201+02:00  INFO 37064 --- [Pos] [           main] p.p.r.b.LocalRestaurantSeedRunner        :  - 10000000-0000-0000-0000-000000000001 | Local Demo Bistro | slug=local-demo-bistro | code=LOCAL_DEMO_BISTRO | owner=demo.bistro.owner
+2026-05-11T16:47:41.201+02:00  INFO 37064 --- [Pos] [           main] p.p.r.b.LocalRestaurantSeedRunner        :  - 10000000-0000-0000-0000-000000000002 | Local Demo Pizza | slug=local-demo-pizza | code=LOCAL_DEMO_PIZZA | owner=demo.pizza.owner
+2026-05-11T16:47:41.202+02:00  INFO 37064 --- [Pos] [           main] p.p.r.b.LocalRestaurantSeedRunner        :  - 10000000-0000-0000-0000-000000000003 | Local Demo Cafe | slug=local-demo-cafe | code=LOCAL_DEMO_CAFE | owner=demo.cafe.owner
+Hibernate: 
+    select
+        ogt1_0.id,
+        ogt1_0.code,
+        ogt1_0.created_at,
+        ogt1_0.description,
+        ogt1_0.name,
+        ogt1_0.updated_at 
+    from
+        foundation_local."option-group-types" ogt1_0
+Hibernate: 
+    select
+        ogt1_0.id,
+        ogt1_0.code,
+        ogt1_0.created_at,
+        ogt1_0.description,
+        ogt1_0.name,
+        ogt1_0.updated_at 
+    from
+        foundation_local."option-group-types" ogt1_0
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.currency,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.email,
+        r1_0.is_active,
+        r1_0.legal_name,
+        r1_0.name,
+        r1_0.owner_id,
+        r1_0.pending_owner_client_target,
+        r1_0.pending_owner_email,
+        r1_0.pending_owner_first_name,
+        r1_0.pending_owner_last_name,
+        r1_0.pending_owner_phone,
+        r1_0.pending_owner_username,
+        r1_0.phone,
+        r1_0.rejection_reason,
+        r1_0.slug,
+        r1_0.status,
+        r1_0.timezone,
+        r1_0.updated_at,
+        r1_0.updated_by,
+        r1_0.website 
+    from
+        foundation_local.restaurants r1_0 
+    where
+        r1_0.id=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.allow_open_tickets,
+        s1_0.allow_split_bills,
+        s1_0.cash_rounding_enabled,
+        s1_0.cash_rounding_increment,
+        s1_0.created_at,
+        s1_0.created_by,
+        s1_0.date_format,
+        s1_0.default_branch_id,
+        s1_0.default_language,
+        s1_0.default_table_turn_time_minutes,
+        s1_0.enable_delivery,
+        s1_0.enable_qr_ordering,
+        s1_0.enable_takeaway,
+        s1_0.invoice_sequence_prefix,
+        s1_0.order_sequence_prefix,
+        s1_0.require_customer_for_invoice,
+        s1_0.reservation_slot_minutes,
+        s1_0.restaurant_id,
+        s1_0.service_charge_enabled,
+        s1_0.service_charge_type,
+        s1_0.service_charge_value,
+        s1_0.time_format,
+        s1_0.updated_at,
+        s1_0.updated_by,
+        s1_0.week_start_day 
+    from
+        foundation_local.settings s1_0 
+    where
+        s1_0.restaurant_id=?
+Hibernate: 
+    select
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at 
+    from
+        foundation_local."option-groups" og1_0
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at 
+    from
+        foundation_local."option-groups" og1_0
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at 
+    from
+        foundation_local."option-groups" og1_0
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.is_active,
+        m1_0.code,
+        m1_0.created_at,
+        m1_0.created_by,
+        m1_0.description,
+        m1_0.display_order,
+        m1_0.name,
+        m1_0.restaurant_id,
+        m1_0.updated_at,
+        m1_0.updated_by 
+    from
+        foundation_local.menus m1_0
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mv1_0.id,
+        mv1_0.is_active,
+        mv1_0.created_at,
+        mv1_0.display_order,
+        mv1_0.is_default,
+        mv1_0.menu_item_id,
+        mv1_0.name,
+        mv1_0.price_delta,
+        mv1_0.sku,
+        mv1_0.updated_at 
+    from
+        foundation_local."menu-variants" mv1_0 
+    join
+        foundation_local."menu-items" mi1_0 
+            on mi1_0.id=mv1_0.menu_item_id 
+    where
+        mi1_0.id=? 
+    order by
+        mv1_0.display_order,
+        mv1_0.name
+Hibernate: 
+    select
+        mv1_0.id,
+        mv1_0.is_active,
+        mv1_0.created_at,
+        mv1_0.display_order,
+        mv1_0.is_default,
+        mv1_0.menu_item_id,
+        mv1_0.name,
+        mv1_0.price_delta,
+        mv1_0.sku,
+        mv1_0.updated_at 
+    from
+        foundation_local."menu-variants" mv1_0 
+    join
+        foundation_local."menu-items" mi1_0 
+            on mi1_0.id=mv1_0.menu_item_id 
+    where
+        mi1_0.id=? 
+    order by
+        mv1_0.display_order,
+        mv1_0.name
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mv1_0.id,
+        mv1_0.is_active,
+        mv1_0.created_at,
+        mv1_0.display_order,
+        mv1_0.is_default,
+        mv1_0.menu_item_id,
+        mv1_0.name,
+        mv1_0.price_delta,
+        mv1_0.sku,
+        mv1_0.updated_at 
+    from
+        foundation_local."menu-variants" mv1_0 
+    join
+        foundation_local."menu-items" mi1_0 
+            on mi1_0.id=mv1_0.menu_item_id 
+    where
+        mi1_0.id=? 
+    order by
+        mv1_0.display_order,
+        mv1_0.name
+Hibernate: 
+    select
+        mv1_0.id,
+        mv1_0.is_active,
+        mv1_0.created_at,
+        mv1_0.display_order,
+        mv1_0.is_default,
+        mv1_0.menu_item_id,
+        mv1_0.name,
+        mv1_0.price_delta,
+        mv1_0.sku,
+        mv1_0.updated_at 
+    from
+        foundation_local."menu-variants" mv1_0 
+    join
+        foundation_local."menu-items" mi1_0 
+            on mi1_0.id=mv1_0.menu_item_id 
+    where
+        mi1_0.id=? 
+    order by
+        mv1_0.display_order,
+        mv1_0.name
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.is_active,
+        m1_0.code,
+        m1_0.created_at,
+        m1_0.created_by,
+        m1_0.description,
+        m1_0.display_order,
+        m1_0.name,
+        m1_0.restaurant_id,
+        m1_0.updated_at,
+        m1_0.updated_by 
+    from
+        foundation_local.menus m1_0
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+2026-05-11T16:47:41.740+02:00  INFO 37064 --- [Pos] [           main] p.p.menu.bootstrap.LocalMenuSeedRunner   : Local sample menu data ready for Bistro restaurant: Local Demo Bistro (10000000-0000-0000-0000-000000000001)
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.currency,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.email,
+        r1_0.is_active,
+        r1_0.legal_name,
+        r1_0.name,
+        r1_0.owner_id,
+        r1_0.pending_owner_client_target,
+        r1_0.pending_owner_email,
+        r1_0.pending_owner_first_name,
+        r1_0.pending_owner_last_name,
+        r1_0.pending_owner_phone,
+        r1_0.pending_owner_username,
+        r1_0.phone,
+        r1_0.rejection_reason,
+        r1_0.slug,
+        r1_0.status,
+        r1_0.timezone,
+        r1_0.updated_at,
+        r1_0.updated_by,
+        r1_0.website 
+    from
+        foundation_local.restaurants r1_0 
+    where
+        r1_0.id=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.allow_open_tickets,
+        s1_0.allow_split_bills,
+        s1_0.cash_rounding_enabled,
+        s1_0.cash_rounding_increment,
+        s1_0.created_at,
+        s1_0.created_by,
+        s1_0.date_format,
+        s1_0.default_branch_id,
+        s1_0.default_language,
+        s1_0.default_table_turn_time_minutes,
+        s1_0.enable_delivery,
+        s1_0.enable_qr_ordering,
+        s1_0.enable_takeaway,
+        s1_0.invoice_sequence_prefix,
+        s1_0.order_sequence_prefix,
+        s1_0.require_customer_for_invoice,
+        s1_0.reservation_slot_minutes,
+        s1_0.restaurant_id,
+        s1_0.service_charge_enabled,
+        s1_0.service_charge_type,
+        s1_0.service_charge_value,
+        s1_0.time_format,
+        s1_0.updated_at,
+        s1_0.updated_by,
+        s1_0.week_start_day 
+    from
+        foundation_local.settings s1_0 
+    where
+        s1_0.restaurant_id=?
+Hibernate: 
+    select
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at 
+    from
+        foundation_local."option-groups" og1_0
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at 
+    from
+        foundation_local."option-groups" og1_0
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at 
+    from
+        foundation_local."option-groups" og1_0
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.is_active,
+        m1_0.code,
+        m1_0.created_at,
+        m1_0.created_by,
+        m1_0.description,
+        m1_0.display_order,
+        m1_0.name,
+        m1_0.restaurant_id,
+        m1_0.updated_at,
+        m1_0.updated_by 
+    from
+        foundation_local.menus m1_0
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mv1_0.id,
+        mv1_0.is_active,
+        mv1_0.created_at,
+        mv1_0.display_order,
+        mv1_0.is_default,
+        mv1_0.menu_item_id,
+        mv1_0.name,
+        mv1_0.price_delta,
+        mv1_0.sku,
+        mv1_0.updated_at 
+    from
+        foundation_local."menu-variants" mv1_0 
+    join
+        foundation_local."menu-items" mi1_0 
+            on mi1_0.id=mv1_0.menu_item_id 
+    where
+        mi1_0.id=? 
+    order by
+        mv1_0.display_order,
+        mv1_0.name
+Hibernate: 
+    select
+        mv1_0.id,
+        mv1_0.is_active,
+        mv1_0.created_at,
+        mv1_0.display_order,
+        mv1_0.is_default,
+        mv1_0.menu_item_id,
+        mv1_0.name,
+        mv1_0.price_delta,
+        mv1_0.sku,
+        mv1_0.updated_at 
+    from
+        foundation_local."menu-variants" mv1_0 
+    join
+        foundation_local."menu-items" mi1_0 
+            on mi1_0.id=mv1_0.menu_item_id 
+    where
+        mi1_0.id=? 
+    order by
+        mv1_0.display_order,
+        mv1_0.name
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+2026-05-11T16:47:42.073+02:00  INFO 37064 --- [Pos] [           main] p.p.menu.bootstrap.LocalMenuSeedRunner   : Local sample menu data ready for Pizza restaurant: Local Demo Pizza (10000000-0000-0000-0000-000000000002)
+Hibernate: 
+    select
+        r1_0.id,
+        r1_0.code,
+        r1_0.created_at,
+        r1_0.created_by,
+        r1_0.currency,
+        r1_0.deleted_at,
+        r1_0.description,
+        r1_0.email,
+        r1_0.is_active,
+        r1_0.legal_name,
+        r1_0.name,
+        r1_0.owner_id,
+        r1_0.pending_owner_client_target,
+        r1_0.pending_owner_email,
+        r1_0.pending_owner_first_name,
+        r1_0.pending_owner_last_name,
+        r1_0.pending_owner_phone,
+        r1_0.pending_owner_username,
+        r1_0.phone,
+        r1_0.rejection_reason,
+        r1_0.slug,
+        r1_0.status,
+        r1_0.timezone,
+        r1_0.updated_at,
+        r1_0.updated_by,
+        r1_0.website 
+    from
+        foundation_local.restaurants r1_0 
+    where
+        r1_0.id=? 
+        and r1_0.deleted_at is null
+Hibernate: 
+    select
+        s1_0.id,
+        s1_0.allow_open_tickets,
+        s1_0.allow_split_bills,
+        s1_0.cash_rounding_enabled,
+        s1_0.cash_rounding_increment,
+        s1_0.created_at,
+        s1_0.created_by,
+        s1_0.date_format,
+        s1_0.default_branch_id,
+        s1_0.default_language,
+        s1_0.default_table_turn_time_minutes,
+        s1_0.enable_delivery,
+        s1_0.enable_qr_ordering,
+        s1_0.enable_takeaway,
+        s1_0.invoice_sequence_prefix,
+        s1_0.order_sequence_prefix,
+        s1_0.require_customer_for_invoice,
+        s1_0.reservation_slot_minutes,
+        s1_0.restaurant_id,
+        s1_0.service_charge_enabled,
+        s1_0.service_charge_type,
+        s1_0.service_charge_value,
+        s1_0.time_format,
+        s1_0.updated_at,
+        s1_0.updated_by,
+        s1_0.week_start_day 
+    from
+        foundation_local.settings s1_0 
+    where
+        s1_0.restaurant_id=?
+Hibernate: 
+    select
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at 
+    from
+        foundation_local."option-groups" og1_0
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at 
+    from
+        foundation_local."option-groups" og1_0
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at 
+    from
+        foundation_local."option-groups" og1_0
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        oi1_0.id,
+        oi1_0.is_available,
+        oi1_0.code,
+        oi1_0.created_at,
+        oi1_0.display_order,
+        oi1_0.name,
+        oi1_0.option_group_id,
+        oi1_0.price_delta,
+        oi1_0.updated_at 
+    from
+        foundation_local."option-items" oi1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=oi1_0.option_group_id 
+    where
+        og1_0.id=? 
+    order by
+        oi1_0.display_order,
+        oi1_0.name
+Hibernate: 
+    select
+        m1_0.id,
+        m1_0.is_active,
+        m1_0.code,
+        m1_0.created_at,
+        m1_0.created_by,
+        m1_0.description,
+        m1_0.display_order,
+        m1_0.name,
+        m1_0.restaurant_id,
+        m1_0.updated_at,
+        m1_0.updated_by 
+    from
+        foundation_local.menus m1_0
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mv1_0.id,
+        mv1_0.is_active,
+        mv1_0.created_at,
+        mv1_0.display_order,
+        mv1_0.is_default,
+        mv1_0.menu_item_id,
+        mv1_0.name,
+        mv1_0.price_delta,
+        mv1_0.sku,
+        mv1_0.updated_at 
+    from
+        foundation_local."menu-variants" mv1_0 
+    join
+        foundation_local."menu-items" mi1_0 
+            on mi1_0.id=mv1_0.menu_item_id 
+    where
+        mi1_0.id=? 
+    order by
+        mv1_0.display_order,
+        mv1_0.name
+Hibernate: 
+    select
+        mv1_0.id,
+        mv1_0.is_active,
+        mv1_0.created_at,
+        mv1_0.display_order,
+        mv1_0.is_default,
+        mv1_0.menu_item_id,
+        mv1_0.name,
+        mv1_0.price_delta,
+        mv1_0.sku,
+        mv1_0.updated_at 
+    from
+        foundation_local."menu-variants" mv1_0 
+    join
+        foundation_local."menu-items" mi1_0 
+            on mi1_0.id=mv1_0.menu_item_id 
+    where
+        mi1_0.id=? 
+    order by
+        mv1_0.display_order,
+        mv1_0.name
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        miog1_0.id,
+        miog1_0.created_at,
+        miog1_0.display_order,
+        miog1_0.max_select_override,
+        miog1_0.menu_item_id,
+        miog1_0.min_select_override,
+        miog1_0.option_group_id,
+        og1_0.id,
+        og1_0.is_active,
+        og1_0.created_at,
+        og1_0.description,
+        og1_0.display_order,
+        og1_0.max_select,
+        og1_0.min_select,
+        og1_0.name,
+        og1_0.is_required,
+        og1_0.restaurant_id,
+        og1_0.type_id,
+        og1_0.updated_at,
+        miog1_0.is_required_override,
+        miog1_0.updated_at 
+    from
+        foundation_local.menu_item_option_groups miog1_0 
+    join
+        foundation_local."option-groups" og1_0 
+            on og1_0.id=miog1_0.option_group_id 
+    where
+        miog1_0.menu_item_id=? 
+    order by
+        miog1_0.display_order,
+        og1_0.name,
+        miog1_0.id
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        ms1_0.id,
+        ms1_0.is_active,
+        ms1_0.created_at,
+        ms1_0.description,
+        ms1_0.display_order,
+        ms1_0.menu_id,
+        ms1_0.name,
+        ms1_0.updated_at 
+    from
+        foundation_local."menu-sections" ms1_0 
+    join
+        foundation_local.menus m1_0 
+            on m1_0.id=ms1_0.menu_id 
+    where
+        m1_0.id=? 
+    order by
+        ms1_0.display_order,
+        ms1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+Hibernate: 
+    select
+        mi1_0.id,
+        mi1_0.is_available,
+        mi1_0.base_price,
+        mi1_0.created_at,
+        mi1_0.description,
+        mi1_0.display_order,
+        mi1_0.image_url,
+        mi1_0.name,
+        mi1_0.section_id,
+        mi1_0.sku,
+        mi1_0.updated_at 
+    from
+        foundation_local."menu-items" mi1_0 
+    join
+        foundation_local."menu-sections" s1_0 
+            on s1_0.id=mi1_0.section_id 
+    where
+        s1_0.id=? 
+    order by
+        mi1_0.display_order,
+        mi1_0.name
+2026-05-11T16:47:42.374+02:00  INFO 37064 --- [Pos] [           main] p.p.menu.bootstrap.LocalMenuSeedRunner   : Local sample menu data ready for Cafe restaurant: Local Demo Cafe (10000000-0000-0000-0000-000000000003)
+System started successfully
+2026-05-11T16:48:08.473+02:00  INFO 37064 --- [Pos] [nio-8081-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-05-11T16:48:08.475+02:00  INFO 37064 --- [Pos] [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-05-11T16:48:08.482+02:00  INFO 37064 --- [Pos] [nio-8081-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 6 ms
+Hibernate: 
+    delete 
+    from
+        foundation_local.user_sessions 
+    where
+        expires_at<? 
+        or (
+            revoked=true 
+            and revoked_at is not null
+        )
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_password_reset_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_email_verification_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_sms_otp_codes 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_login_attempts 
+    where
+        attempted_at<?
+2026-05-11T18:55:24.164+02:00  WARN 37064 --- [Pos] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=1h43m34s810ms56µs700ns).
+Hibernate: 
+    delete 
+    from
+        foundation_local.user_sessions 
+    where
+        expires_at<? 
+        or (
+            revoked=true 
+            and revoked_at is not null
+        )
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_password_reset_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_email_verification_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_sms_otp_codes 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_login_attempts 
+    where
+        attempted_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.user_sessions 
+    where
+        expires_at<? 
+        or (
+            revoked=true 
+            and revoked_at is not null
+        )
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_password_reset_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_email_verification_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_sms_otp_codes 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_login_attempts 
+    where
+        attempted_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.user_sessions 
+    where
+        expires_at<? 
+        or (
+            revoked=true 
+            and revoked_at is not null
+        )
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_password_reset_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_email_verification_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_sms_otp_codes 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_login_attempts 
+    where
+        attempted_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.user_sessions 
+    where
+        expires_at<? 
+        or (
+            revoked=true 
+            and revoked_at is not null
+        )
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_password_reset_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_email_verification_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_sms_otp_codes 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_login_attempts 
+    where
+        attempted_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.user_sessions 
+    where
+        expires_at<? 
+        or (
+            revoked=true 
+            and revoked_at is not null
+        )
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_password_reset_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_email_verification_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_sms_otp_codes 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_login_attempts 
+    where
+        attempted_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.user_sessions 
+    where
+        expires_at<? 
+        or (
+            revoked=true 
+            and revoked_at is not null
+        )
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_password_reset_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_email_verification_tokens 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_sms_otp_codes 
+    where
+        expires_at<?
+Hibernate: 
+    delete 
+    from
+        foundation_local.auth_login_attempts 
+    where
+        attempted_at<?
+2026-05-12T04:21:41.662+02:00  WARN 37064 --- [Pos] [l-1 housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=4h21m11s595ms554µs400ns).
