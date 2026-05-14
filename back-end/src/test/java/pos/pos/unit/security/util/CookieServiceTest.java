@@ -15,12 +15,44 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CookieServiceTest {
 
     @Test
-    @DisplayName("Should add refresh token cookie with configured security attributes")
-    void shouldAddRefreshTokenCookie() {
+    @DisplayName("Should add access token cookie with configured security attributes")
+    void shouldAddAccessTokenCookie() {
         JwtProperties jwtProperties = new JwtProperties();
+        jwtProperties.setAccessExpiration(Duration.ofMinutes(15));
         jwtProperties.setRefreshExpiration(Duration.ofDays(1));
 
         AuthCookieProperties cookieProperties = new AuthCookieProperties();
+        cookieProperties.setAccessTokenName("access-token");
+        cookieProperties.setRefreshTokenName("refreshToken");
+        cookieProperties.setRefreshTokenPath("/auth/web");
+        cookieProperties.setSameSite("Strict");
+        cookieProperties.setSecure(true);
+        cookieProperties.setDomain("  example.com  ");
+
+        CookieService cookieService = new CookieService(jwtProperties, cookieProperties);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        cookieService.addAccessTokenCookie(response, "access-token-value");
+
+        String cookieHeader = response.getHeader("Set-Cookie");
+        assertThat(cookieHeader).contains("access-token=access-token-value");
+        assertThat(cookieHeader).contains("Domain=example.com");
+        assertThat(cookieHeader).contains("Path=/");
+        assertThat(cookieHeader).contains("Max-Age=900");
+        assertThat(cookieHeader).contains("HttpOnly");
+        assertThat(cookieHeader).contains("Secure");
+        assertThat(cookieHeader).contains("SameSite=Strict");
+    }
+
+    @Test
+    @DisplayName("Should add refresh token cookie with configured security attributes")
+    void shouldAddRefreshTokenCookie() {
+        JwtProperties jwtProperties = new JwtProperties();
+        jwtProperties.setAccessExpiration(Duration.ofMinutes(15));
+        jwtProperties.setRefreshExpiration(Duration.ofDays(1));
+
+        AuthCookieProperties cookieProperties = new AuthCookieProperties();
+        cookieProperties.setAccessTokenName("access-token");
         cookieProperties.setRefreshTokenName("refreshToken");
         cookieProperties.setRefreshTokenPath("/auth/web");
         cookieProperties.setSameSite("Strict");
@@ -43,12 +75,41 @@ class CookieServiceTest {
     }
 
     @Test
-    @DisplayName("Should clear refresh token cookie and omit blank domain")
-    void shouldClearRefreshTokenCookie() {
+    @DisplayName("Should clear access token cookie and omit blank domain")
+    void shouldClearAccessTokenCookie() {
         JwtProperties jwtProperties = new JwtProperties();
+        jwtProperties.setAccessExpiration(Duration.ofMinutes(15));
         jwtProperties.setRefreshExpiration(Duration.ofDays(1));
 
         AuthCookieProperties cookieProperties = new AuthCookieProperties();
+        cookieProperties.setAccessTokenName("access-token");
+        cookieProperties.setRefreshTokenName("refreshToken");
+        cookieProperties.setRefreshTokenPath("/auth/web");
+        cookieProperties.setSameSite("Strict");
+        cookieProperties.setSecure(true);
+        cookieProperties.setDomain("   ");
+
+        CookieService cookieService = new CookieService(jwtProperties, cookieProperties);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        cookieService.clearAccessTokenCookie(response);
+
+        String cookieHeader = response.getHeader("Set-Cookie");
+        assertThat(cookieHeader).contains("access-token=");
+        assertThat(cookieHeader).contains("Max-Age=0");
+        assertThat(cookieHeader).contains("Path=/");
+        assertThat(cookieHeader).doesNotContain("Domain=");
+    }
+
+    @Test
+    @DisplayName("Should clear refresh token cookie and omit blank domain")
+    void shouldClearRefreshTokenCookie() {
+        JwtProperties jwtProperties = new JwtProperties();
+        jwtProperties.setAccessExpiration(Duration.ofMinutes(15));
+        jwtProperties.setRefreshExpiration(Duration.ofDays(1));
+
+        AuthCookieProperties cookieProperties = new AuthCookieProperties();
+        cookieProperties.setAccessTokenName("access-token");
         cookieProperties.setRefreshTokenName("refreshToken");
         cookieProperties.setRefreshTokenPath("/auth/web");
         cookieProperties.setSameSite("Strict");

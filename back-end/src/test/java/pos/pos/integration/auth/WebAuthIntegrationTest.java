@@ -50,7 +50,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WebAuthIntegrationTest {
 
     private static final String SCHEMA = "web_auth_" + UUID.randomUUID().toString().replace("-", "");
-    private static final String COOKIE_NAME = "refreshToken";
+    private static final String ACCESS_COOKIE_NAME = "access-token";
+    private static final String REFRESH_COOKIE_NAME = "refreshToken";
     private static final String DEFAULT_PASSWORD = "StrongPass123!";
     private static final String WRONG_PASSWORD = "WrongPass123!";
     private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid username/email or password";
@@ -123,10 +124,11 @@ class WebAuthIntegrationTest {
         MvcResult result = webLogin(user.getEmail(), DEFAULT_PASSWORD, ip, "AUTH-001", status().isOk());
 
         JsonNode body = bodyOf(result);
-        assertThat(body.get("accessToken").asText()).isNotBlank();
+        assertThat(body.get("accessToken")).isNull();
         assertThat(body.get("tokenType").asText()).isEqualTo("Bearer");
         assertThat(body.get("user").get("email").asText()).isEqualTo(user.getEmail());
-        assertRefreshCookieIssued(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieIssued(result);
+        assertRefreshCookieIssued(result);
         assertThat(activeSessionsFor(user)).hasSize(1);
     }
 
@@ -139,10 +141,11 @@ class WebAuthIntegrationTest {
         MvcResult result = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-002", status().isOk());
 
         JsonNode body = bodyOf(result);
-        assertThat(body.get("accessToken").asText()).isNotBlank();
+        assertThat(body.get("accessToken")).isNull();
         assertThat(body.get("tokenType").asText()).isEqualTo("Bearer");
         assertThat(body.get("user").get("username").asText()).isEqualTo(user.getUsername());
-        assertRefreshCookieIssued(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieIssued(result);
+        assertRefreshCookieIssued(result);
         assertThat(activeSessionsFor(user)).hasSize(1);
     }
 
@@ -305,7 +308,8 @@ class WebAuthIntegrationTest {
                 "AUTH-009-refresh-oldest",
                 status().isUnauthorized()
         );
-        assertRefreshCookieCleared(revokedRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(revokedRefreshResult);
+        assertRefreshCookieCleared(revokedRefreshResult);
 
         MvcResult latestRefreshResult = webRefresh(
                 fourthRefreshToken,
@@ -313,8 +317,9 @@ class WebAuthIntegrationTest {
                 "AUTH-009-refresh-current",
                 status().isOk()
         );
-        assertThat(bodyOf(latestRefreshResult).get("accessToken").asText()).isNotBlank();
-        assertRefreshCookieIssued(latestRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertThat(extractCookieValue(latestRefreshResult, ACCESS_COOKIE_NAME)).isNotBlank();
+        assertAccessCookieIssued(latestRefreshResult);
+        assertRefreshCookieIssued(latestRefreshResult);
     }
 
     @Test
@@ -324,15 +329,19 @@ class WebAuthIntegrationTest {
         String ip = nextIp();
 
         MvcResult loginResult = webLogin(user.getEmail(), DEFAULT_PASSWORD, ip, "AUTH-010-login", status().isOk());
-        String firstAccessToken = bodyOf(loginResult).get("accessToken").asText();
-        String firstRefreshToken = extractCookieValue(loginResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String firstAccessToken = extractCookieValue(loginResult, ACCESS_COOKIE_NAME);
+        String firstRefreshToken = extractCookieValue(loginResult, REFRESH_COOKIE_NAME);
 
         MvcResult refreshResult = webRefresh(firstRefreshToken, ip, "AUTH-010-refresh", status().isOk());
 
         JsonNode body = bodyOf(refreshResult);
-        String rotatedRefreshToken = extractCookieValue(refreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
-        assertThat(body.get("accessToken").asText()).isNotEqualTo(firstAccessToken);
+        String rotatedAccessToken = extractCookieValue(refreshResult, ACCESS_COOKIE_NAME);
+        String rotatedRefreshToken = extractCookieValue(refreshResult, REFRESH_COOKIE_NAME);
+        assertThat(body.get("accessToken")).isNull();
+        assertThat(rotatedAccessToken).isNotEqualTo(firstAccessToken);
         assertThat(rotatedRefreshToken).isNotEqualTo(firstRefreshToken);
+        assertAccessCookieIssued(refreshResult);
+        assertRefreshCookieIssued(refreshResult);
         assertThat(activeSessionsFor(user)).hasSize(1);
     }
 
@@ -344,7 +353,8 @@ class WebAuthIntegrationTest {
         MvcResult result = webRefresh(null, ip, "AUTH-011", status().isUnauthorized());
 
         assertThat(bodyOf(result).get("message").asText()).isEqualTo(INVALID_REFRESH_TOKEN_MESSAGE);
-        assertRefreshCookieCleared(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(result);
+        assertRefreshCookieCleared(result);
     }
 
     @Test
@@ -355,7 +365,8 @@ class WebAuthIntegrationTest {
         MvcResult result = webRefresh("not-a-refresh-token", ip, "AUTH-012-invalid", status().isUnauthorized());
 
         assertThat(bodyOf(result).get("message").asText()).isEqualTo(INVALID_REFRESH_TOKEN_MESSAGE);
-        assertRefreshCookieCleared(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(result);
+        assertRefreshCookieCleared(result);
     }
 
     @Test
@@ -365,7 +376,7 @@ class WebAuthIntegrationTest {
         String ip = nextIp();
 
         MvcResult loginResult = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-012-reused-login", status().isOk());
-        String firstRefreshToken = extractCookieValue(loginResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String firstRefreshToken = extractCookieValue(loginResult, REFRESH_COOKIE_NAME);
 
         MvcResult rotatedResult = webRefresh(
                 firstRefreshToken,
@@ -373,7 +384,7 @@ class WebAuthIntegrationTest {
                 "AUTH-012-reused-refresh",
                 status().isOk()
         );
-        String rotatedRefreshToken = extractCookieValue(rotatedResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String rotatedRefreshToken = extractCookieValue(rotatedResult, REFRESH_COOKIE_NAME);
 
         MvcResult reusedResult = webRefresh(
                 firstRefreshToken,
@@ -383,7 +394,8 @@ class WebAuthIntegrationTest {
         );
 
         assertThat(bodyOf(reusedResult).get("message").asText()).isEqualTo(INVALID_REFRESH_TOKEN_MESSAGE);
-        assertRefreshCookieCleared(reusedResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(reusedResult);
+        assertRefreshCookieCleared(reusedResult);
         assertThat(rotatedRefreshToken).isNotEqualTo(firstRefreshToken);
     }
 
@@ -394,7 +406,7 @@ class WebAuthIntegrationTest {
         String ip = nextIp();
 
         MvcResult loginResult = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-012-expired-login", status().isOk());
-        String refreshToken = extractCookieValue(loginResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String refreshToken = extractCookieValue(loginResult, REFRESH_COOKIE_NAME);
 
         UserSession session = sessionsFor(user).getFirst();
         session.setExpiresAt(OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(1));
@@ -403,7 +415,8 @@ class WebAuthIntegrationTest {
         MvcResult expiredResult = webRefresh(refreshToken, ip, "AUTH-012-expired-refresh", status().isUnauthorized());
 
         assertThat(bodyOf(expiredResult).get("message").asText()).isEqualTo(INVALID_REFRESH_TOKEN_MESSAGE);
-        assertRefreshCookieCleared(expiredResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(expiredResult);
+        assertRefreshCookieCleared(expiredResult);
         UserSession expiredSession = userSessionRepository.findById(session.getId()).orElseThrow();
         assertThat(expiredSession.isRevoked()).isTrue();
         assertThat(expiredSession.getRevokedReason()).isEqualTo("EXPIRED");
@@ -416,12 +429,13 @@ class WebAuthIntegrationTest {
         String ip = nextIp();
 
         MvcResult loginResult = webLogin(user.getEmail(), DEFAULT_PASSWORD, ip, "AUTH-013-login", status().isOk());
-        String refreshToken = extractCookieValue(loginResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String refreshToken = extractCookieValue(loginResult, REFRESH_COOKIE_NAME);
         UserSession session = sessionsFor(user).getFirst();
 
         MvcResult logoutResult = webLogout(refreshToken, ip, "AUTH-013-logout", status().isNoContent());
 
-        assertRefreshCookieCleared(logoutResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(logoutResult);
+        assertRefreshCookieCleared(logoutResult);
         UserSession revokedSession = userSessionRepository.findById(session.getId()).orElseThrow();
         assertThat(revokedSession.isRevoked()).isTrue();
         assertThat(revokedSession.getRevokedReason()).isEqualTo("LOGOUT");
@@ -432,7 +446,8 @@ class WebAuthIntegrationTest {
                 "AUTH-013-refresh-after-logout",
                 status().isUnauthorized()
         );
-        assertRefreshCookieCleared(refreshAfterLogout.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(refreshAfterLogout);
+        assertRefreshCookieCleared(refreshAfterLogout);
     }
 
     @Test
@@ -443,8 +458,10 @@ class WebAuthIntegrationTest {
         MvcResult missingCookieResult = webLogout(null, ip, "AUTH-014-missing", status().isNoContent());
         MvcResult invalidCookieResult = webLogout("not-a-refresh-token", ip, "AUTH-014-invalid", status().isNoContent());
 
-        assertRefreshCookieCleared(missingCookieResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
-        assertRefreshCookieCleared(invalidCookieResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(missingCookieResult);
+        assertRefreshCookieCleared(missingCookieResult);
+        assertAccessCookieCleared(invalidCookieResult);
+        assertRefreshCookieCleared(invalidCookieResult);
     }
 
     @Test
@@ -459,7 +476,8 @@ class WebAuthIntegrationTest {
 
         MvcResult logoutAllResult = webLogoutAll(secondRefreshToken, ip, "AUTH-015-logout-all", status().isNoContent());
 
-        assertRefreshCookieCleared(logoutAllResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(logoutAllResult);
+        assertRefreshCookieCleared(logoutAllResult);
         assertThat(activeSessionsFor(user)).isEmpty();
         assertThat(sessionsFor(user))
                 .allSatisfy(session -> {
@@ -486,9 +504,12 @@ class WebAuthIntegrationTest {
                 status().isUnauthorized()
         );
 
-        assertRefreshCookieCleared(firstRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
-        assertRefreshCookieCleared(secondRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
-        assertRefreshCookieCleared(thirdRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(firstRefreshResult);
+        assertRefreshCookieCleared(firstRefreshResult);
+        assertAccessCookieCleared(secondRefreshResult);
+        assertRefreshCookieCleared(secondRefreshResult);
+        assertAccessCookieCleared(thirdRefreshResult);
+        assertRefreshCookieCleared(thirdRefreshResult);
     }
 
     private User createVerifiedUser(String label) {
@@ -522,7 +543,7 @@ class WebAuthIntegrationTest {
     private String loginAndExtractRefreshToken(String identifier, String password, String ip, String userAgent)
             throws Exception {
         MvcResult result = webLogin(identifier, password, ip, userAgent, status().isOk());
-        return extractCookieValue(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        return extractCookieValue(result, REFRESH_COOKIE_NAME);
     }
 
     private MvcResult webLogin(
@@ -611,34 +632,58 @@ class WebAuthIntegrationTest {
     }
 
     private MockCookie refreshCookie(String refreshToken) {
-        return new MockCookie(COOKIE_NAME, refreshToken);
+        return new MockCookie(REFRESH_COOKIE_NAME, refreshToken);
     }
 
-    private String extractCookieValue(String setCookieHeader) {
-        assertThat(setCookieHeader).isNotBlank();
-        String prefix = COOKIE_NAME + "=";
-        int start = setCookieHeader.indexOf(prefix);
-        int end = setCookieHeader.indexOf(';', start);
-        return setCookieHeader.substring(start + prefix.length(), end);
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
-    private void assertRefreshCookieIssued(String setCookieHeader) {
-        assertThat(setCookieHeader).contains(COOKIE_NAME + "=");
-        assertThat(setCookieHeader).contains("Path=/auth/web");
-        assertThat(setCookieHeader).contains("HttpOnly");
-        assertThat(setCookieHeader).contains("Secure");
-        assertThat(setCookieHeader).contains("SameSite=Strict");
-        assertThat(setCookieHeader).contains("Domain=pos.example");
+    private void assertAccessCookieIssued(MvcResult result) {
+        assertCookie(result, ACCESS_COOKIE_NAME, "/", false);
     }
 
-    private void assertRefreshCookieCleared(String setCookieHeader) {
-        assertThat(setCookieHeader).contains(COOKIE_NAME + "=");
-        assertThat(setCookieHeader).contains("Max-Age=0");
-        assertThat(setCookieHeader).contains("Path=/auth/web");
-        assertThat(setCookieHeader).contains("HttpOnly");
-        assertThat(setCookieHeader).contains("Secure");
-        assertThat(setCookieHeader).contains("SameSite=Strict");
-        assertThat(setCookieHeader).contains("Domain=pos.example");
+    private void assertAccessCookieCleared(MvcResult result) {
+        assertCookie(result, ACCESS_COOKIE_NAME, "/", true);
+    }
+
+    private void assertRefreshCookieIssued(MvcResult result) {
+        assertCookie(result, REFRESH_COOKIE_NAME, "/auth/web", false);
+    }
+
+    private void assertRefreshCookieCleared(MvcResult result) {
+        assertCookie(result, REFRESH_COOKIE_NAME, "/auth/web", true);
+    }
+
+    private void assertCookie(MvcResult result, String cookieName, String path, boolean cleared) {
+        String cookieHeader = extractCookieHeader(result, cookieName);
+        assertThat(cookieHeader).contains(cookieName + "=");
+        assertThat(cookieHeader).contains("Path=" + path);
+        assertThat(cookieHeader).contains("HttpOnly");
+        assertThat(cookieHeader).contains("Secure");
+        assertThat(cookieHeader).contains("SameSite=Strict");
+        assertThat(cookieHeader).contains("Domain=pos.example");
+
+        if (cleared) {
+            assertThat(cookieHeader).contains("Max-Age=0");
+        }
+    }
+
+    private String extractCookieHeader(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .orElseThrow();
     }
 
     private List<UserSession> sessionsFor(User user) {

@@ -47,6 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RestaurantResourcesApiIntegrationTest {
 
     private static final String SCHEMA = "restaurant_resources_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String ADMIN_EMAIL = "prod.admin@pos.example";
     private static final String ADMIN_USERNAME = "prodadmin";
     private static final String ADMIN_PASSWORD = "StrongPass123!";
@@ -368,7 +369,7 @@ class RestaurantResourcesApiIntegrationTest {
         String ownerUsername = "owner." + unique;
         String restaurantName = "Resource Restaurant " + unique.substring(0, 8);
 
-        String adminAccessToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminAccessToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
 
         JsonNode createdRestaurant = bodyOf(mockMvc.perform(post("/restaurants")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
@@ -401,7 +402,7 @@ class RestaurantResourcesApiIntegrationTest {
                         ))))
                 .andExpect(status().isNoContent());
 
-        String ownerAccessToken = bodyOf(webLogin(ownerUsername, OWNER_SETUP_PASSWORD)).get("accessToken").asText();
+        String ownerAccessToken = accessTokenOf(webLogin(ownerUsername, OWNER_SETUP_PASSWORD));
         return new OwnedRestaurantContext(UUID.fromString(createdRestaurant.get("id").asText()), ownerAccessToken);
     }
 
@@ -437,6 +438,23 @@ class RestaurantResourcesApiIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String accessTokenOf(MvcResult result) {
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private String bearer(String accessToken) {

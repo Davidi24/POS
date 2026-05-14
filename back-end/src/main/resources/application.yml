@@ -65,6 +65,7 @@ app:
         window-minutes: 1
 
     cookie:
+      access-token-name: access-token
       refresh-token-name: refreshToken
       refresh-token-path: /auth/web
       same-site: Strict

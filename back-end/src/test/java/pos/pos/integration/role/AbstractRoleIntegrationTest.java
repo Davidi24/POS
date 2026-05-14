@@ -48,6 +48,7 @@ abstract class AbstractRoleIntegrationTest {
     protected static final String ADMIN_USERNAME = "roleadmin";
     protected static final String ADMIN_PASSWORD = "StrongPass123!";
     protected static final String DEFAULT_PASSWORD = "StrongPass123!";
+    private static final String ACCESS_COOKIE_NAME = "access-token";
 
     @Autowired
     protected MockMvc mockMvc;
@@ -278,7 +279,7 @@ abstract class AbstractRoleIntegrationTest {
                 .andExpect(expectedStatus)
                 .andReturn();
 
-        return bodyOf(result).get("accessToken").asText();
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
     }
 
     protected JsonNode bodyOf(MvcResult result) throws Exception {
@@ -287,6 +288,19 @@ abstract class AbstractRoleIntegrationTest {
 
     protected String messageOf(MvcResult result) throws Exception {
         return bodyOf(result).get("message").asText();
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     protected List<String> codesOf(JsonNode arrayNode) {
