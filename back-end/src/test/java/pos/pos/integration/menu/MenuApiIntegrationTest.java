@@ -27,6 +27,7 @@ import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.repository.RestaurantRepository;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserRole;
@@ -65,7 +66,7 @@ class MenuApiIntegrationTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "menu-api-test-secret-key-for-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "menu-api-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "menu-api-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "menu-api-email-verification-pepper");

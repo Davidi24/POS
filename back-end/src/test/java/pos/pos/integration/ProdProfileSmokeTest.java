@@ -26,6 +26,7 @@ import pos.pos.auth.service.AuthMailService;
 import pos.pos.auth.service.SmsMessageService;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -67,7 +68,7 @@ class ProdProfileSmokeTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "prod-smoke-secret-key-for-hs256-minimum-32b");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "prod-smoke-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "prod-smoke-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "prod-smoke-email-verification-pepper");
@@ -189,6 +190,12 @@ class ProdProfileSmokeTest {
 
         mockMvc.perform(get("/swagger-ui/index.html"))
                 .andExpect(status().isNotFound());
+
+        JsonNode jwks = bodyOf(mockMvc.perform(get("/auth/.well-known/jwks.json"))
+                        .andExpect(status().isOk())
+                        .andReturn());
+        assertThat(jwks.get("keys")).hasSize(1);
+        assertThat(jwks.get("keys").get(0).get("alg").asText()).isEqualTo("RS256");
 
         JsonNode assignableRoles = bodyOf(mockMvc.perform(get("/roles/assignable")
                         .header(HttpHeaders.AUTHORIZATION, bearer(firstAccessToken)))

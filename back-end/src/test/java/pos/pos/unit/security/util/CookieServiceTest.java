@@ -18,7 +18,7 @@ class CookieServiceTest {
     @DisplayName("Should add refresh token cookie with configured security attributes")
     void shouldAddRefreshTokenCookie() {
         JwtProperties jwtProperties = new JwtProperties();
-        jwtProperties.setRefreshExpiration(Duration.ofDays(30));
+        jwtProperties.setRefreshExpiration(Duration.ofDays(1));
 
         AuthCookieProperties cookieProperties = new AuthCookieProperties();
         cookieProperties.setRefreshTokenName("refreshToken");
@@ -36,7 +36,7 @@ class CookieServiceTest {
         assertThat(cookieHeader).contains("refreshToken=refresh-token-value");
         assertThat(cookieHeader).contains("Domain=example.com");
         assertThat(cookieHeader).contains("Path=/auth/web");
-        assertThat(cookieHeader).contains("Max-Age=2592000");
+        assertThat(cookieHeader).contains("Max-Age=86400");
         assertThat(cookieHeader).contains("HttpOnly");
         assertThat(cookieHeader).contains("Secure");
         assertThat(cookieHeader).contains("SameSite=Strict");
@@ -46,7 +46,7 @@ class CookieServiceTest {
     @DisplayName("Should clear refresh token cookie and omit blank domain")
     void shouldClearRefreshTokenCookie() {
         JwtProperties jwtProperties = new JwtProperties();
-        jwtProperties.setRefreshExpiration(Duration.ofDays(30));
+        jwtProperties.setRefreshExpiration(Duration.ofDays(1));
 
         AuthCookieProperties cookieProperties = new AuthCookieProperties();
         cookieProperties.setRefreshTokenName("refreshToken");
