@@ -22,8 +22,11 @@ import pos.pos.order.enums.OrderPaymentStatus;
 import pos.pos.order.enums.OrderSource;
 import pos.pos.order.enums.OrderStatus;
 import pos.pos.order.enums.OrderType;
+import pos.pos.order.service.OrderCommandService;
+import pos.pos.order.service.OrderItemService;
 import pos.pos.order.service.OrderPublicService;
-import pos.pos.order.service.OrderService;
+import pos.pos.order.service.OrderQueryService;
+import pos.pos.order.service.OrderWorkflowService;
 import pos.pos.security.principal.AuthenticatedUser;
 
 import java.time.OffsetDateTime;
@@ -48,7 +51,13 @@ class OrderControllerTest {
     private static final UUID ORDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000915");
 
     @Mock
-    private OrderService orderService;
+    private OrderQueryService orderQueryService;
+    @Mock
+    private OrderCommandService orderCommandService;
+    @Mock
+    private OrderWorkflowService orderWorkflowService;
+    @Mock
+    private OrderItemService orderItemService;
     @Mock
     private OrderPublicService orderPublicService;
 
@@ -63,8 +72,8 @@ class OrderControllerTest {
         validator.afterPropertiesSet();
 
         mockMvc = MockMvcBuilders.standaloneSetup(
-                        new RestaurantOrderController(orderService),
-                        new BranchOrderController(orderService),
+                        new RestaurantOrderController(orderQueryService, orderCommandService, orderWorkflowService, orderItemService),
+                        new BranchOrderController(orderQueryService, orderCommandService),
                         new PublicOrderController(orderPublicService)
                 )
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -102,7 +111,7 @@ class OrderControllerTest {
                 }
                 """.formatted(TABLE_ID);
 
-        given(orderService.createBranchOrder(eq(authentication), eq(RESTAURANT_ID), eq(BRANCH_ID), any()))
+        given(orderCommandService.createBranchOrder(eq(authentication), eq(RESTAURANT_ID), eq(BRANCH_ID), any()))
                 .willReturn(OrderResponse.builder()
                         .id(ORDER_ID)
                         .restaurantId(RESTAURANT_ID)

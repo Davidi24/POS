@@ -48,7 +48,10 @@ import pos.pos.order.dto.OrderValidationResponse;
 import pos.pos.order.dto.UpdateOrderLineItemStatusRequest;
 import pos.pos.order.dto.UpdateOrderRequest;
 import pos.pos.order.enums.OrderStatus;
-import pos.pos.order.service.OrderService;
+import pos.pos.order.service.OrderCommandService;
+import pos.pos.order.service.OrderItemService;
+import pos.pos.order.service.OrderQueryService;
+import pos.pos.order.service.OrderWorkflowService;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -61,7 +64,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RestaurantOrderController {
 
-    private final OrderService orderService;
+    private final OrderQueryService orderQueryService;
+    private final OrderCommandService orderCommandService;
+    private final OrderWorkflowService orderWorkflowService;
+    private final OrderItemService orderItemService;
 
     @GetMapping("/orders")
     @PreAuthorize("hasAuthority('ORDER_READ')")
@@ -72,7 +78,7 @@ public class RestaurantOrderController {
             @RequestParam(required = false) OffsetDateTime to,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getOrders(authentication, restaurantId, from, to));
+        return ResponseEntity.ok(orderQueryService.getOrders(authentication, restaurantId, from, to));
     }
 
     @GetMapping("/orders/{orderId}")
@@ -83,7 +89,7 @@ public class RestaurantOrderController {
             @PathVariable UUID orderId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getOrder(authentication, restaurantId, orderId));
+        return ResponseEntity.ok(orderQueryService.getOrder(authentication, restaurantId, orderId));
     }
 
     @GetMapping("/orders/number/{orderNumber}")
@@ -94,7 +100,7 @@ public class RestaurantOrderController {
             @PathVariable String orderNumber,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getOrderByNumber(authentication, restaurantId, orderNumber));
+        return ResponseEntity.ok(orderQueryService.getOrderByNumber(authentication, restaurantId, orderNumber));
     }
 
     @GetMapping("/customers/{customerId}/orders")
@@ -105,7 +111,7 @@ public class RestaurantOrderController {
             @PathVariable UUID customerId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getCustomerOrders(authentication, restaurantId, customerId));
+        return ResponseEntity.ok(orderQueryService.getCustomerOrders(authentication, restaurantId, customerId));
     }
 
     @PatchMapping("/orders/{orderId}")
@@ -117,7 +123,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody UpdateOrderRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateOrder(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderCommandService.updateOrder(authentication, restaurantId, orderId, request));
     }
 
     @PatchMapping("/orders/{orderId}/customer")
@@ -129,7 +135,7 @@ public class RestaurantOrderController {
             @RequestBody OrderCustomerRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateOrderCustomer(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderCommandService.updateOrderCustomer(authentication, restaurantId, orderId, request));
     }
 
     @PatchMapping("/orders/{orderId}/table")
@@ -141,7 +147,7 @@ public class RestaurantOrderController {
             @RequestBody OrderTableRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateOrderTable(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderCommandService.updateOrderTable(authentication, restaurantId, orderId, request));
     }
 
     @PatchMapping("/orders/{orderId}/reservation")
@@ -153,7 +159,7 @@ public class RestaurantOrderController {
             @RequestBody OrderReservationRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateOrderReservation(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderCommandService.updateOrderReservation(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/validate")
@@ -164,7 +170,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody CreateOrderRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.validateOrder(authentication, restaurantId, request));
+        return ResponseEntity.ok(orderCommandService.validateOrder(authentication, restaurantId, request));
     }
 
     @PostMapping("/orders/next-number")
@@ -174,7 +180,7 @@ public class RestaurantOrderController {
             @PathVariable UUID restaurantId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.nextOrderNumber(authentication, restaurantId));
+        return ResponseEntity.ok(orderQueryService.nextOrderNumber(authentication, restaurantId));
     }
 
     @PostMapping("/orders/{orderId}/open")
@@ -186,7 +192,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.openOrder(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.openOrder(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/send-to-kitchen")
@@ -198,7 +204,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.sendToKitchen(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.sendToKitchen(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/ready")
@@ -210,7 +216,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.markOrderReady(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.markOrderReady(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/fulfill")
@@ -222,7 +228,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.fulfillOrder(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.fulfillOrder(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/close")
@@ -234,7 +240,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.closeOrder(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.closeOrder(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/reopen")
@@ -246,7 +252,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.reopenOrder(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.reopenOrder(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/cancel")
@@ -258,7 +264,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.cancelOrder(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.cancelOrder(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/void")
@@ -270,7 +276,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.voidOrder(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.voidOrder(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/merge")
@@ -282,7 +288,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody OrderMergeRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.mergeOrders(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.mergeOrders(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/transfer/table")
@@ -294,7 +300,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody OrderTransferTableRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.transferOrderTable(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.transferOrderTable(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/transfer/branch")
@@ -306,7 +312,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody OrderTransferBranchRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.transferOrderBranch(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.transferOrderBranch(authentication, restaurantId, orderId, request));
     }
 
     @GetMapping("/orders/{orderId}/items")
@@ -317,7 +323,7 @@ public class RestaurantOrderController {
             @PathVariable UUID orderId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getItems(authentication, restaurantId, orderId));
+        return ResponseEntity.ok(orderQueryService.getItems(authentication, restaurantId, orderId));
     }
 
     @PostMapping("/orders/{orderId}/items")
@@ -330,7 +336,7 @@ public class RestaurantOrderController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderService.addItem(authentication, restaurantId, orderId, request));
+                .body(orderItemService.addItem(authentication, restaurantId, orderId, request));
     }
 
     @GetMapping("/orders/{orderId}/items/{lineItemId}")
@@ -342,7 +348,7 @@ public class RestaurantOrderController {
             @PathVariable UUID lineItemId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getItem(authentication, restaurantId, orderId, lineItemId));
+        return ResponseEntity.ok(orderQueryService.getItem(authentication, restaurantId, orderId, lineItemId));
     }
 
     @PutMapping("/orders/{orderId}/items/{lineItemId}")
@@ -355,7 +361,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody CreateOrderLineItemRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateItem(authentication, restaurantId, orderId, lineItemId, request));
+        return ResponseEntity.ok(orderItemService.updateItem(authentication, restaurantId, orderId, lineItemId, request));
     }
 
     @PatchMapping("/orders/{orderId}/items/{lineItemId}/quantity")
@@ -368,7 +374,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody OrderLineItemQuantityRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateItemQuantity(authentication, restaurantId, orderId, lineItemId, request));
+        return ResponseEntity.ok(orderItemService.updateItemQuantity(authentication, restaurantId, orderId, lineItemId, request));
     }
 
     @PatchMapping("/orders/{orderId}/items/{lineItemId}/notes")
@@ -381,7 +387,7 @@ public class RestaurantOrderController {
             @RequestBody OrderLineItemNotesRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateItemNotes(authentication, restaurantId, orderId, lineItemId, request));
+        return ResponseEntity.ok(orderItemService.updateItemNotes(authentication, restaurantId, orderId, lineItemId, request));
     }
 
     @PatchMapping("/orders/{orderId}/items/{lineItemId}/status")
@@ -394,7 +400,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody UpdateOrderLineItemStatusRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateItemStatus(authentication, restaurantId, orderId, lineItemId, request));
+        return ResponseEntity.ok(orderItemService.updateItemStatus(authentication, restaurantId, orderId, lineItemId, request));
     }
 
     @PostMapping("/orders/{orderId}/items/{lineItemId}/fire")
@@ -407,7 +413,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.fireItem(authentication, restaurantId, orderId, lineItemId, request));
+        return ResponseEntity.ok(orderItemService.fireItem(authentication, restaurantId, orderId, lineItemId, request));
     }
 
     @PostMapping("/orders/{orderId}/items/{lineItemId}/ready")
@@ -420,7 +426,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.readyItem(authentication, restaurantId, orderId, lineItemId, request));
+        return ResponseEntity.ok(orderItemService.readyItem(authentication, restaurantId, orderId, lineItemId, request));
     }
 
     @PostMapping("/orders/{orderId}/items/{lineItemId}/fulfill")
@@ -433,7 +439,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.fulfillItem(authentication, restaurantId, orderId, lineItemId, request));
+        return ResponseEntity.ok(orderItemService.fulfillItem(authentication, restaurantId, orderId, lineItemId, request));
     }
 
     @PostMapping("/orders/{orderId}/items/{lineItemId}/void")
@@ -446,7 +452,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.voidItem(authentication, restaurantId, orderId, lineItemId, request));
+        return ResponseEntity.ok(orderItemService.voidItem(authentication, restaurantId, orderId, lineItemId, request));
     }
 
     @GetMapping("/orders/{orderId}/items/{lineItemId}/options")
@@ -458,7 +464,7 @@ public class RestaurantOrderController {
             @PathVariable UUID lineItemId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getItemOptions(authentication, restaurantId, orderId, lineItemId));
+        return ResponseEntity.ok(orderQueryService.getItemOptions(authentication, restaurantId, orderId, lineItemId));
     }
 
     @PostMapping("/orders/{orderId}/items/{lineItemId}/options")
@@ -472,7 +478,7 @@ public class RestaurantOrderController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderService.addItemOption(authentication, restaurantId, orderId, lineItemId, request));
+                .body(orderItemService.addItemOption(authentication, restaurantId, orderId, lineItemId, request));
     }
 
     @PutMapping("/orders/{orderId}/items/{lineItemId}/options/{optionId}")
@@ -486,7 +492,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody CreateOrderItemOptionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateItemOption(authentication, restaurantId, orderId, lineItemId, optionId, request));
+        return ResponseEntity.ok(orderItemService.updateItemOption(authentication, restaurantId, orderId, lineItemId, optionId, request));
     }
 
     @DeleteMapping("/orders/{orderId}/items/{lineItemId}/options/{optionId}")
@@ -499,7 +505,7 @@ public class RestaurantOrderController {
             @PathVariable UUID optionId,
             Authentication authentication
     ) {
-        orderService.deleteItemOption(authentication, restaurantId, orderId, lineItemId, optionId);
+        orderItemService.deleteItemOption(authentication, restaurantId, orderId, lineItemId, optionId);
         return ResponseEntity.noContent().build();
     }
 
@@ -511,7 +517,7 @@ public class RestaurantOrderController {
             @PathVariable UUID orderId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getDiscounts(authentication, restaurantId, orderId));
+        return ResponseEntity.ok(orderQueryService.getDiscounts(authentication, restaurantId, orderId));
     }
 
     @PostMapping("/orders/{orderId}/discounts")
@@ -524,7 +530,7 @@ public class RestaurantOrderController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderService.addDiscount(authentication, restaurantId, orderId, request));
+                .body(orderItemService.addDiscount(authentication, restaurantId, orderId, request));
     }
 
     @PutMapping("/orders/{orderId}/discounts/{discountId}")
@@ -537,7 +543,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody CreateOrderDiscountRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updateDiscount(authentication, restaurantId, orderId, discountId, request));
+        return ResponseEntity.ok(orderItemService.updateDiscount(authentication, restaurantId, orderId, discountId, request));
     }
 
     @DeleteMapping("/orders/{orderId}/discounts/{discountId}")
@@ -549,7 +555,7 @@ public class RestaurantOrderController {
             @PathVariable UUID discountId,
             Authentication authentication
     ) {
-        orderService.deleteDiscount(authentication, restaurantId, orderId, discountId);
+        orderItemService.deleteDiscount(authentication, restaurantId, orderId, discountId);
         return ResponseEntity.noContent().build();
     }
 
@@ -561,7 +567,7 @@ public class RestaurantOrderController {
             @PathVariable UUID orderId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getEvents(authentication, restaurantId, orderId));
+        return ResponseEntity.ok(orderQueryService.getEvents(authentication, restaurantId, orderId));
     }
 
     @PostMapping("/orders/{orderId}/events/notes")
@@ -574,7 +580,7 @@ public class RestaurantOrderController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderService.addNoteEvent(authentication, restaurantId, orderId, request));
+                .body(orderItemService.addNoteEvent(authentication, restaurantId, orderId, request));
     }
 
     @GetMapping("/orders/{orderId}/timeline")
@@ -585,7 +591,7 @@ public class RestaurantOrderController {
             @PathVariable UUID orderId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getTimeline(authentication, restaurantId, orderId));
+        return ResponseEntity.ok(orderQueryService.getTimeline(authentication, restaurantId, orderId));
     }
 
     @GetMapping("/orders/{orderId}/audit")
@@ -596,7 +602,7 @@ public class RestaurantOrderController {
             @PathVariable UUID orderId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getAudit(authentication, restaurantId, orderId));
+        return ResponseEntity.ok(orderQueryService.getAudit(authentication, restaurantId, orderId));
     }
 
     @GetMapping("/orders/{orderId}/totals")
@@ -607,7 +613,7 @@ public class RestaurantOrderController {
             @PathVariable UUID orderId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getTotals(authentication, restaurantId, orderId));
+        return ResponseEntity.ok(orderQueryService.getTotals(authentication, restaurantId, orderId));
     }
 
     @PostMapping("/orders/{orderId}/payment-status")
@@ -619,7 +625,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody OrderPaymentStatusRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.updatePaymentStatus(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.updatePaymentStatus(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/mark-paid")
@@ -631,7 +637,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.markPaid(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.markPaid(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/mark-partially-paid")
@@ -643,7 +649,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.markPartiallyPaid(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.markPartiallyPaid(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/mark-refunded")
@@ -655,7 +661,7 @@ public class RestaurantOrderController {
             @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.markRefunded(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.markRefunded(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/split-preview")
@@ -667,7 +673,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody OrderSplitRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.splitPreview(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderQueryService.splitPreview(authentication, restaurantId, orderId, request));
     }
 
     @PostMapping("/orders/{orderId}/split")
@@ -679,7 +685,7 @@ public class RestaurantOrderController {
             @Valid @RequestBody OrderSplitRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.splitOrder(authentication, restaurantId, orderId, request));
+        return ResponseEntity.ok(orderWorkflowService.splitOrder(authentication, restaurantId, orderId, request));
     }
 
     @GetMapping("/orders/summary")
@@ -692,6 +698,6 @@ public class RestaurantOrderController {
             @RequestParam(required = false) OffsetDateTime to,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(orderService.getSummary(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(orderQueryService.getSummary(authentication, restaurantId, branchId, from, to));
     }
 }
