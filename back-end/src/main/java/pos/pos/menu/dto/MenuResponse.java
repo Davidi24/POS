@@ -19,14 +19,14 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class MenuResponse {
 
-    private UUID id;
+    private UUID id; //same logic of UUID, it's menu's ID
     private MenuRestaurantSummaryResponse restaurant;
     private String code;
     private String name;
     private String description;
     private Boolean active;
     private Integer displayOrder;
-    private UUID createdBy;
+    private UUID createdBy; //using UUID to store ID of the user who created the menu, not the full User
     private UUID updatedBy;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
