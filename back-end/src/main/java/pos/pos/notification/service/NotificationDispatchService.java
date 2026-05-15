@@ -55,7 +55,7 @@ class NotificationDispatchService {
     public NotificationResponse dispatchNow(NotificationOperationalEvent event, UUID currentUserId) {
         OffsetDateTime happenedAt = OffsetDateTime.now(ZoneOffset.UTC);
         List<DispatchPair> persisted = persist(List.of(event), happenedAt);
-        DispatchPair pair = persisted.get(0);
+        DispatchPair pair = persisted.getFirst();
         if (pair.notification().getChannel() == NotificationChannel.IN_APP) {
             notificationStreamService.broadcast(pair.event(), pair.notification(), happenedAt);
         }
