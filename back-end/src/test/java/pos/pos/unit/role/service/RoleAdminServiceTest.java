@@ -14,6 +14,7 @@ import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.role.PermissionAssignmentNotAllowedException;
 import pos.pos.exception.role.PermissionNotFoundException;
 import pos.pos.exception.role.RoleCodeAlreadyExistsException;
+import pos.pos.notification.service.NotificationService;
 import pos.pos.role.dto.CloneRoleRequest;
 import pos.pos.role.dto.CreateRoleRequest;
 import pos.pos.role.dto.ReplaceRolePermissionsRequest;
@@ -29,6 +30,8 @@ import pos.pos.role.repository.RoleRepository;
 import pos.pos.role.service.RoleAdminService;
 import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.user.entity.User;
+import pos.pos.user.repository.UserRepository;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -66,6 +69,12 @@ class RoleAdminServiceTest {
     @Mock
     private RoleHierarchyService roleHierarchyService;
 
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private UserRepository userRepository;
+
     @InjectMocks
     private RoleAdminService roleAdminService;
 
@@ -80,6 +89,7 @@ class RoleAdminServiceTest {
 
         when(roleHierarchyService.currentUserId(authentication)).thenReturn(ACTOR_ID);
         when(roleHierarchyService.highestActiveRank(ACTOR_ID)).thenReturn(30_000L);
+        when(userRepository.findActiveById(ACTOR_ID)).thenReturn(Optional.of(actorUser()));
         when(roleRepository.save(any(Role.class))).thenAnswer(invocation -> {
             Role savedRole = invocation.getArgument(0);
             savedRole.setId(ROLE_ID);
@@ -128,6 +138,8 @@ class RoleAdminServiceTest {
         Role role = customRole();
 
         when(roleRepository.findByIdAndDeletedAtIsNull(ROLE_ID)).thenReturn(Optional.of(role));
+        when(roleHierarchyService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(userRepository.findActiveById(ACTOR_ID)).thenReturn(Optional.of(actorUser()));
         when(roleRepository.save(role)).thenReturn(role);
 
         RoleResponse response = roleAdminService.updateRole(authentication, ROLE_ID, request);
@@ -208,6 +220,8 @@ class RoleAdminServiceTest {
         when(permissionRepository.findAllById(request.getPermissionIds())).thenReturn(List.of(readUsers, updateUsers));
         when(rolePermissionRepository.findByRoleId(ROLE_ID)).thenReturn(List.of(oldAssignment, keepAssignment));
         when(roleHierarchyService.isSuperAdmin(authentication)).thenReturn(false);
+        when(roleHierarchyService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(userRepository.findActiveById(ACTOR_ID)).thenReturn(Optional.of(actorUser()));
 
         List<pos.pos.role.dto.PermissionResponse> response =
                 roleAdminService.replaceRolePermissions(authentication, ROLE_ID, request);
@@ -230,6 +244,8 @@ class RoleAdminServiceTest {
         Role role = customRole();
 
         when(roleRepository.findByIdAndDeletedAtIsNull(ROLE_ID)).thenReturn(Optional.of(role));
+        when(roleHierarchyService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(userRepository.findActiveById(ACTOR_ID)).thenReturn(Optional.of(actorUser()));
         when(roleRepository.save(role)).thenReturn(role);
 
         RoleResponse response = roleAdminService.updateRoleStatus(authentication, ROLE_ID, request);
@@ -245,6 +261,8 @@ class RoleAdminServiceTest {
         Role role = customRole();
 
         when(roleRepository.findByIdAndDeletedAtIsNull(ROLE_ID)).thenReturn(Optional.of(role));
+        when(roleHierarchyService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(userRepository.findActiveById(ACTOR_ID)).thenReturn(Optional.of(actorUser()));
 
         roleAdminService.deleteRole(authentication, ROLE_ID);
 
@@ -268,6 +286,8 @@ class RoleAdminServiceTest {
         when(rolePermissionRepository.findByRoleId(ROLE_ID)).thenReturn(List.of(assignment(PERMISSION_ID)));
         when(permissionRepository.findAllById(List.of(PERMISSION_ID))).thenReturn(List.of(permission));
         when(roleHierarchyService.isSuperAdmin(authentication)).thenReturn(false);
+        when(roleHierarchyService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(userRepository.findActiveById(ACTOR_ID)).thenReturn(Optional.of(actorUser()));
         when(roleRepository.save(any(Role.class))).thenAnswer(invocation -> {
             Role savedRole = invocation.getArgument(0);
             savedRole.setId(CLONED_ROLE_ID);
@@ -336,6 +356,13 @@ class RoleAdminServiceTest {
                 .roleId(ROLE_ID)
                 .permissionId(permissionId)
                 .createdAt(OffsetDateTime.now())
+                .build();
+    }
+
+    private User actorUser() {
+        return User.builder()
+                .id(ACTOR_ID)
+                .restaurantId(UUID.fromString("00000000-0000-0000-0000-000000000227"))
                 .build();
     }
 }
