@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8081}
+  port: ${SERVER_PORT:8080}
 
 spring:
   sql:
@@ -7,7 +7,7 @@ spring:
       mode: never
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:pos_local}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:pos_local}
     username: ${DB_USERNAME:pos_user}
     password: ${DB_PASSWORD:pos_pass}
     driver-class-name: org.postgresql.Driver
