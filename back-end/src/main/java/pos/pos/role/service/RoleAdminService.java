@@ -27,7 +27,10 @@ import pos.pos.role.mapper.RoleMapper;
 import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RolePermissionRepository;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.notification.service.NotificationService;
 import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.user.entity.User;
+import pos.pos.user.repository.UserRepository;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
@@ -52,6 +55,8 @@ public class RoleAdminService {
     private final PermissionRepository permissionRepository;
     private final RolePermissionRepository rolePermissionRepository;
     private final RoleHierarchyService roleHierarchyService;
+    private final NotificationService notificationService;
+    private final UserRepository userRepository;
 
     @Transactional
     public RoleResponse createRole(Authentication authentication, CreateRoleRequest request) {
@@ -72,6 +77,8 @@ public class RoleAdminService {
                 .protectedRole(false)
                 .build());
 
+        publishRoleChange(authentication, role.getId(), "Role created");
+
         return RoleMapper.toResponse(role);
     }
 
@@ -88,6 +95,8 @@ public class RoleAdminService {
 
         role.setName(normalizedName);
         role.setDescription(request.getDescription());
+
+        publishRoleChange(authentication, role.getId(), "Role updated");
 
         return RoleMapper.toResponse(roleRepository.save(role));
     }
@@ -137,6 +146,8 @@ public class RoleAdminService {
             rolePermissionRepository.saveAll(assignmentsToAdd);
         }
 
+        publishRoleChange(authentication, roleId, "Role permissions changed");
+
         return requestedPermissions.stream()
                 .map(PermissionMapper::toResponse)
                 .toList();
@@ -149,6 +160,7 @@ public class RoleAdminService {
         roleHierarchyService.assertCanManageRole(authentication, role);
 
         role.setActive(Boolean.TRUE.equals(request.getIsActive()));
+        publishRoleChange(authentication, role.getId(), "Role status changed");
         return RoleMapper.toResponse(roleRepository.save(role));
     }
 
@@ -162,6 +174,7 @@ public class RoleAdminService {
         role.setAssignable(false);
         role.setDeletedAt(OffsetDateTime.now(ZoneOffset.UTC));
         roleRepository.save(role);
+        publishRoleChange(authentication, role.getId(), "Role deleted");
     }
 
     @Transactional
@@ -200,7 +213,17 @@ public class RoleAdminService {
                     .toList());
         }
 
+        publishRoleChange(authentication, clonedRole.getId(), "Role cloned");
+
         return RoleMapper.toResponse(clonedRole);
+    }
+
+    private void publishRoleChange(Authentication authentication, UUID roleId, String message) {
+        User actor = userRepository.findActiveById(roleHierarchyService.currentUserId(authentication)).orElse(null);
+        if (actor == null || actor.getRestaurantId() == null) {
+            return;
+        }
+        notificationService.publishRoleChange(actor.getRestaurantId(), roleId, actor.getId(), message);
     }
 
     private Role findExistingRole(UUID roleId) {
