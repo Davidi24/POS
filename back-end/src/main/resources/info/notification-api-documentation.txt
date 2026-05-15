@@ -1,0 +1,172 @@
+NOTIFICATION API DOCUMENTATION
+
+Scope
+- This file documents the notification delivery, feed, preference, and template APIs in this repo.
+- The implementation provides an in-app persistent feed plus live SSE delivery.
+- External delivery channels (EMAIL, SMS, PUSH, WEBHOOK) are persisted and queued conceptually, but provider execution is still a future integration.
+
+
+Implemented pieces
+- Persistent notification feed backed by notification tables from V25.
+- Live SSE stream for restaurant- and branch-scoped operational updates.
+- Automatic operational publishing from repository writes across active domains.
+- Manual broadcast endpoint for future integrations or admin-triggered operational messages.
+- Current-user preference management.
+- Restaurant-level template management.
+- Notification coverage catalog with TODO status for incomplete domains.
+
+
+Common auth rules
+- Feed, stream, catalog, and preference endpoints require authentication.
+- Restaurant template and manual broadcast endpoints require restaurant access plus SETTINGS_READ or SETTINGS_UPDATE.
+- Access checks still enforce restaurant / branch visibility even when the endpoint itself only requires authentication.
+
+
+Implemented endpoints
+
+[x] 1. GET /restaurants/{restaurantId}/notifications
+[x] 2. GET /restaurants/{restaurantId}/notifications/catalog
+[x] 3. GET /restaurants/{restaurantId}/notifications/stream
+[x] 4. POST /restaurants/{restaurantId}/notifications/{notificationId}/read
+[x] 5. POST /restaurants/{restaurantId}/notifications/broadcast
+[x] 6. GET /notifications/preferences
+[x] 7. PUT /notifications/preferences
+[x] 8. GET /restaurants/{restaurantId}/notifications/templates
+[x] 9. POST /restaurants/{restaurantId}/notifications/templates
+[x] 10. PUT /restaurants/{restaurantId}/notifications/templates/{templateId}
+[x] 11. DELETE /restaurants/{restaurantId}/notifications/templates/{templateId}
+
+
+Feed endpoint
+- Query params:
+  - branchId: uuid, optional
+  - channel: NotificationChannel, optional
+  - topic: NotificationTopic, optional
+  - eventCode: string, optional
+  - unreadOnly: boolean, optional, default false
+  - personalOnly: boolean, optional, default false
+  - page: integer, optional
+  - size: integer, optional
+  - direction: asc|desc, optional
+- Returns PageResponse<NotificationResponse>.
+- Feed includes:
+  - broadcast in-app operational notifications for the restaurant or branch
+  - personal notifications targeted to the current user
+
+
+Stream endpoint
+- SSE endpoint for operational live updates.
+- Query params:
+  - branchId: uuid, optional
+  - topic: repeated NotificationTopic value, optional
+  - eventCode: repeated string value, optional
+- Event names:
+  - connected
+  - notification
+- The server filters by:
+  - restaurant scope
+  - optional branch scope
+  - optional topic list
+  - optional eventCode list
+  - current user disabled IN_APP preferences
+
+
+Manual broadcast endpoint
+- Payload: CreateNotificationBroadcastRequest
+- Fields:
+  - branchId: uuid, optional
+  - recipientUserId: uuid, optional
+  - topic: NotificationTopic, required
+  - channel: NotificationChannel, optional, default IN_APP
+  - priority: NotificationPriority, optional, default NORMAL
+  - eventCode: string, optional
+  - subject: string, optional
+  - body: string, required
+  - referenceType: string, optional
+  - referenceId: uuid, optional
+- Use this endpoint for:
+  - admin or operations broadcasts
+  - future external integrations that need to inject notifications before deep domain wiring exists
+  - inventory or provider-side integrations you connect later
+
+
+Preference endpoint
+- PUT body is a list of NotificationPreferenceRequest items.
+- Fields per item:
+  - channel: NotificationChannel, required
+  - eventCode: string, required
+  - enabled: boolean, required
+- Current implementation is user-scoped only.
+- Disabled IN_APP preferences are respected by the SSE stream filter.
+
+
+Template endpoint
+- Template payload fields:
+  - code: string, optional; normalized and auto-derived from name when omitted
+  - name: string, required
+  - channel: NotificationChannel, required
+  - subjectTemplate: string, optional
+  - bodyTemplate: string, optional
+  - active: boolean, required
+- Templates are applied by matching:
+  - restaurantId
+  - eventCode
+  - channel
+- Supported variables:
+  - {{eventCode}}
+  - {{topic}}
+  - {{mutationType}}
+  - {{referenceType}}
+  - {{referenceId}}
+  - {{restaurantId}}
+  - {{branchId}}
+  - {{recipientUserId}}
+  - {{occurredAt}}
+
+
+Current live operational coverage
+- ORDER
+- KDS
+- DEVICE
+- SETTINGS
+- TABLE
+- RESERVATION
+- MENU
+- CUSTOMER
+- USER
+- ROLE
+- RESTAURANT
+- BRANCH
+
+
+Prepared TODO coverage
+- INVENTORY
+  - schema exists
+  - repositories already fit the generic repository-write publisher
+  - missing piece is command/service/controller wiring
+  - recommended first events:
+    - INVENTORY_INVENTORY_ITEM_UPSERT
+    - INVENTORY_INVENTORY_LEVEL_UPSERT
+    - INVENTORY_INVENTORY_MOVEMENT_UPSERT
+    - INVENTORY_INVENTORY_COUNT_UPSERT
+- PAYMENT
+  - schema exists
+  - add payment command services and publish operational events through repository writes or manual broadcast
+- SHIFT
+  - schema exists
+  - add shift workflow services and publish open/break/close activity
+- RECIPE
+  - schema exists
+  - connect recipe command services
+- REPORT
+  - schema exists
+  - connect report definition/execution services
+- AUTH
+  - future personal inbox items can target password changes, session revocations, verification state, or lockouts
+
+
+Operational design notes
+- Automatic publishing is driven by repository save/delete interception plus transaction-aware after-commit dispatch.
+- In-app notifications are persisted as DELIVERED and streamed immediately.
+- Non-IN_APP channels are persisted as QUEUED so provider integrations can pick them up later.
+- Role and user-role changes are published explicitly because those changes do not always carry enough restaurant context to infer safely from repository writes alone.
