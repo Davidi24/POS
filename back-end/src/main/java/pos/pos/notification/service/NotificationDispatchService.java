@@ -2,6 +2,7 @@ package pos.pos.notification.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import pos.pos.notification.dto.NotificationResponse;
@@ -35,7 +36,7 @@ class NotificationDispatchService {
     private final NotificationTemplateRenderer notificationTemplateRenderer;
     private final NotificationStreamService notificationStreamService;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void dispatch(Collection<NotificationOperationalEvent> events) {
         if (events.isEmpty()) {
             return;
