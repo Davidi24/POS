@@ -1,4 +1,4 @@
-package pos.pos.notification.service;
+package pos.pos.notification.mapper;
 
 import org.springframework.stereotype.Component;
 import pos.pos.notification.dto.NotificationLiveEventResponse;
@@ -8,15 +8,18 @@ import pos.pos.notification.dto.NotificationTemplateResponse;
 import pos.pos.notification.entity.Notification;
 import pos.pos.notification.entity.NotificationPreference;
 import pos.pos.notification.entity.NotificationTemplate;
+import pos.pos.notification.enums.NotificationMutationType;
+import pos.pos.notification.enums.NotificationPriority;
 import pos.pos.notification.enums.NotificationTopic;
+import pos.pos.notification.support.NotificationEventCodeSupport;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Component
-class NotificationMapper {
+public class NotificationMapper {
 
-    NotificationResponse toResponse(Notification notification, UUID currentUserId) {
+    public NotificationResponse toResponse(Notification notification, UUID currentUserId) {
         boolean personal = notification.getRecipientUser() != null
                 && currentUserId != null
                 && currentUserId.equals(notification.getRecipientUser().getId());
@@ -51,7 +54,7 @@ class NotificationMapper {
                 .build();
     }
 
-    NotificationPreferenceResponse toResponse(NotificationPreference preference) {
+    public NotificationPreferenceResponse toResponse(NotificationPreference preference) {
         return NotificationPreferenceResponse.builder()
                 .id(preference.getId())
                 .userId(preference.getUser() == null ? null : preference.getUser().getId())
@@ -63,7 +66,7 @@ class NotificationMapper {
                 .build();
     }
 
-    NotificationTemplateResponse toResponse(NotificationTemplate template) {
+    public NotificationTemplateResponse toResponse(NotificationTemplate template) {
         return NotificationTemplateResponse.builder()
                 .id(template.getId())
                 .restaurantId(template.getRestaurant() == null ? null : template.getRestaurant().getId())
@@ -80,17 +83,19 @@ class NotificationMapper {
                 .build();
     }
 
-    NotificationLiveEventResponse toLiveEvent(
+    public NotificationLiveEventResponse toLiveEvent(
             Notification notification,
-            NotificationOperationalEvent operationalEvent,
+            NotificationTopic topic,
+            NotificationMutationType mutationType,
+            NotificationPriority priority,
             OffsetDateTime occurredAt
     ) {
         return NotificationLiveEventResponse.builder()
                 .streamEventId(notification.getId().toString())
                 .notificationId(notification.getId())
-                .topic(operationalEvent.topic())
-                .mutationType(operationalEvent.mutationType())
-                .priority(operationalEvent.priority())
+                .topic(topic)
+                .mutationType(mutationType)
+                .priority(priority)
                 .eventCode(notification.getEventCode())
                 .restaurantId(notification.getRestaurant() == null ? null : notification.getRestaurant().getId())
                 .branchId(notification.getBranch() == null ? null : notification.getBranch().getId())
