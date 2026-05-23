@@ -10,6 +10,7 @@ import pos.pos.exception.auth.AuthException;
 import pos.pos.notification.dto.NotificationTemplateRequest;
 import pos.pos.notification.dto.NotificationTemplateResponse;
 import pos.pos.notification.entity.NotificationTemplate;
+import pos.pos.notification.mapper.NotificationMapper;
 import pos.pos.notification.repository.NotificationTemplateRepository;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
