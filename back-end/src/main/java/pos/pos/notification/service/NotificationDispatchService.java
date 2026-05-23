@@ -10,6 +10,7 @@ import pos.pos.notification.entity.Notification;
 import pos.pos.notification.entity.NotificationTemplate;
 import pos.pos.notification.enums.NotificationChannel;
 import pos.pos.notification.enums.NotificationStatus;
+import pos.pos.notification.mapper.NotificationMapper;
 import pos.pos.notification.repository.NotificationRepository;
 import pos.pos.notification.repository.NotificationTemplateRepository;
 import pos.pos.restaurant.repository.BranchRepository;

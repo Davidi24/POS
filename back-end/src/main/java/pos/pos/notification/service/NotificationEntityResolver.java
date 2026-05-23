@@ -10,6 +10,7 @@ import pos.pos.notification.enums.NotificationChannel;
 import pos.pos.notification.enums.NotificationMutationType;
 import pos.pos.notification.enums.NotificationPriority;
 import pos.pos.notification.enums.NotificationTopic;
+import pos.pos.notification.support.NotificationEventCodeSupport;
 
 import java.lang.reflect.Method;
 import java.util.IdentityHashMap;

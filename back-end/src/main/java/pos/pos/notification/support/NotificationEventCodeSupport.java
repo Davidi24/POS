@@ -1,4 +1,4 @@
-package pos.pos.notification.service;
+package pos.pos.notification.support;
 
 import org.springframework.util.StringUtils;
 import pos.pos.notification.enums.NotificationMutationType;
@@ -7,12 +7,12 @@ import pos.pos.utils.NormalizationUtils;
 
 import java.util.Locale;
 
-final class NotificationEventCodeSupport {
+public final class NotificationEventCodeSupport {
 
     private NotificationEventCodeSupport() {
     }
 
-    static String normalizeEventCode(
+    public static String normalizeEventCode(
             String requestedEventCode,
             NotificationTopic topic,
             NotificationMutationType mutationType,
@@ -30,7 +30,7 @@ final class NotificationEventCodeSupport {
         return topic.name() + "_" + typeToken + "_" + mutationType.name();
     }
 
-    static NotificationTopic topicOf(String eventCode) {
+    public static NotificationTopic topicOf(String eventCode) {
         String normalized = NormalizationUtils.normalizeUpper(eventCode);
         if (normalized == null) {
             return null;
@@ -45,7 +45,7 @@ final class NotificationEventCodeSupport {
         return null;
     }
 
-    static String defaultSubject(NotificationTopic topic, NotificationMutationType mutationType, String referenceType) {
+    public static String defaultSubject(NotificationTopic topic, NotificationMutationType mutationType, String referenceType) {
         String resource = humanize(referenceType == null ? topic.name() : referenceType);
         return switch (mutationType) {
             case DELETE -> resource + " deleted";
@@ -55,7 +55,7 @@ final class NotificationEventCodeSupport {
         };
     }
 
-    static String defaultBody(NotificationTopic topic, NotificationMutationType mutationType, String referenceType) {
+    public static String defaultBody(NotificationTopic topic, NotificationMutationType mutationType, String referenceType) {
         String resource = humanize(referenceType == null ? topic.name() : referenceType);
         return switch (mutationType) {
             case DELETE -> resource + " was deleted";
@@ -65,7 +65,7 @@ final class NotificationEventCodeSupport {
         };
     }
 
-    static String toToken(String rawValue) {
+    public static String toToken(String rawValue) {
         if (!StringUtils.hasText(rawValue)) {
             return null;
         }
