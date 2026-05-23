@@ -10,6 +10,7 @@ import pos.pos.notification.dto.NotificationLiveEventResponse;
 import pos.pos.notification.entity.Notification;
 import pos.pos.notification.enums.NotificationChannel;
 import pos.pos.notification.enums.NotificationTopic;
+import pos.pos.notification.mapper.NotificationMapper;
 import pos.pos.notification.repository.NotificationPreferenceRepository;
 import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.security.scope.ActorScopeService;
@@ -89,7 +90,13 @@ public class NotificationStreamService {
     }
 
     void broadcast(NotificationOperationalEvent event, Notification notification, OffsetDateTime occurredAt) {
-        NotificationLiveEventResponse payload = notificationMapper.toLiveEvent(notification, event, occurredAt);
+        NotificationLiveEventResponse payload = notificationMapper.toLiveEvent(
+                notification,
+                event.topic(),
+                event.mutationType(),
+                event.priority(),
+                occurredAt
+        );
         for (NotificationSubscriber subscriber : subscribers.values()) {
             if (!subscriber.accepts(event)) {
                 continue;

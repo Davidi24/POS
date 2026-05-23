@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pos.pos.notification.dto.NotificationPreferenceRequest;
 import pos.pos.notification.dto.NotificationPreferenceResponse;
 import pos.pos.notification.entity.NotificationPreference;
+import pos.pos.notification.mapper.NotificationMapper;
 import pos.pos.notification.repository.NotificationPreferenceRepository;
 import pos.pos.security.scope.ActorScopeService;
 import pos.pos.user.repository.UserRepository;
