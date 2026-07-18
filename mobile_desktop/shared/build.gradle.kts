@@ -59,6 +59,8 @@ kotlin {
             implementation(libs.androidx.datastore.preferences)
             implementation(libs.tink.android)
             implementation(compose.materialIconsExtended)
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

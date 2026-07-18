@@ -2,6 +2,7 @@ package com.saporini.mobile_desktop.core.network
 
 import com.saporini.mobile_desktop.auth.data.dto.AuthenticationResponse
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.Logging
@@ -9,6 +10,7 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import io.ktor.client.plugins.auth.Auth
@@ -58,11 +60,24 @@ expect fun platformBaseUrl(): String
 
 expect fun platformFallbackBaseUrls(): List<String>
 
-val httpClient = HttpClient {
+fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
     install(HttpTimeout) {
         connectTimeoutMillis = 5_000
         requestTimeoutMillis = 15_000
         socketTimeoutMillis = 15_000
+    }
+    HttpResponseValidator {
+        validateResponse { response ->
+            if (!response.status.isSuccess()) {
+                val message = try {
+                    response.body<ApiErrorResponse>().message
+                } catch (e: Exception) {
+                    println("Unparsed API error: ${response.status.value}")
+                    "Something went wrong. Please try again."
+                }
+                throw ApiException(response.status.value, message)
+            }
+        }
     }
     install(ContentNegotiation) {
         json(Json {
@@ -100,8 +115,7 @@ val httpClient = HttpClient {
                     BearerTokens(refreshResponse.accessToken, refreshResponse.refreshToken)
                 } catch (e: Exception) {
                     // Refresh failed — refresh token is invalid/expired. User must log in again.
-                    TokenStore.clear()
-                    SessionManager.signOut()
+                    sessionManager.signOut()
                     null
                 }
             }
