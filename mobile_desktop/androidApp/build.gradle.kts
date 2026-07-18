@@ -14,6 +14,7 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.koin.core)
     debugImplementation(libs.compose.uiTooling)
 }
 

@@ -5,20 +5,20 @@ import cafe.adriel.voyager.core.model.screenModelScope
 import com.saporini.mobile_desktop.auth.data.dto.CurrentUserResponse
 import com.saporini.mobile_desktop.auth.data.repository.AuthRepository
 import com.saporini.mobile_desktop.core.network.ApiConfig
+import com.saporini.mobile_desktop.core.session.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class LoginUiState(
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val user: CurrentUserResponse? = null
+    val isLoading: Boolean = false, val error: String? = null, val user: CurrentUserResponse? = null
 )
 
-class LoginScreenModel : ScreenModel {
-
-    private val repository = AuthRepository()
+class LoginScreenModel(
+    private val repository: AuthRepository,
+    private val sessionManager: SessionManager
+) : ScreenModel {
 
     private val _state = MutableStateFlow(LoginUiState())
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
@@ -32,6 +32,8 @@ class LoginScreenModel : ScreenModel {
 
                 // 2. Prove auth works — call protected /auth/me
                 val me = repository.me()
+                sessionManager.signIn(me)
+                _state.value = LoginUiState(user = me)
 
                 _state.value = LoginUiState(user = me)
             } catch (e: Exception) {
@@ -54,16 +56,11 @@ class LoginScreenModel : ScreenModel {
     }
 
     private fun isConnectionError(error: Throwable): Boolean {
-        return generateSequence(error) { it.cause }
-            .mapNotNull { it.message }
-            .joinToString(" ")
-            .lowercase()
+        return generateSequence(error) { it.cause }.mapNotNull { it.message }.joinToString(" ").lowercase()
             .let { message ->
-                message.contains("connect") ||
-                    message.contains("timeout") ||
-                    message.contains("unresolved") ||
-                    message.contains("network is unreachable") ||
-                    message.contains("connection refused")
+                message.contains("connect") || message.contains("timeout") || message.contains("unresolved") || message.contains(
+                    "network is unreachable"
+                ) || message.contains("connection refused")
             }
     }
 }
