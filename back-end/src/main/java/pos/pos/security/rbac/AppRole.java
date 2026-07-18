@@ -40,7 +40,8 @@ public enum AppRole {
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
                     SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
-                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT
+                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
+                    KDS_READ, KDS_UPDATE
             )
     ),
 
@@ -58,7 +59,8 @@ public enum AppRole {
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
                     SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
-                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT
+                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
+                    KDS_READ, KDS_UPDATE
             )
     ),
 
@@ -74,7 +76,8 @@ public enum AppRole {
                     ROLES_READ,
                     SETTINGS_READ,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
-                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT
+                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
+                    KDS_READ, KDS_UPDATE
             )
     ),
 
@@ -91,6 +94,19 @@ public enum AppRole {
                     ORDER_CLOSE,
                     ORDER_DISCOUNT_APPLY,
                     ORDER_TRANSFER
+            )
+    ),
+
+    KITCHEN(
+            "Kitchen",
+            "Kitchen staff - views and updates kitchen display tickets",
+            true,
+            false,
+            EnumSet.of(
+                    MENUS_READ,
+                    ORDER_READ,
+                    KDS_READ,
+                    KDS_UPDATE
             )
     );
 

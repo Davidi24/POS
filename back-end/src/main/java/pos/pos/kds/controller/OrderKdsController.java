@@ -30,7 +30,7 @@ public class OrderKdsController {
     private final KdsTicketWorkflowService kdsTicketWorkflowService;
 
     @GetMapping("/tickets")
-    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @PreAuthorize("hasAuthority('KDS_READ')")
     @Operation(summary = "List KDS tickets for one order")
     public ResponseEntity<List<KdsTicketResponse>> getOrderTickets(
             @PathVariable UUID restaurantId,
@@ -41,7 +41,7 @@ public class OrderKdsController {
     }
 
     @PostMapping("/tickets/sync")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Sync one order into KDS tickets")
     public ResponseEntity<List<KdsTicketResponse>> syncOrderTickets(
             @PathVariable UUID restaurantId,

@@ -103,13 +103,13 @@ class KdsControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("POST KDS ticket ready should reject missing ORDER_UPDATE")
-    void shouldRejectMissingOrderUpdateForTicketAction() throws Exception {
+    @DisplayName("POST KDS ticket ready should reject missing KDS_UPDATE")
+    void shouldRejectMissingKdsUpdateForTicketAction() throws Exception {
         String request = objectMapper.writeValueAsString(java.util.Map.of("note", "Ready for pass"));
 
         mockMvc.perform(post("/restaurants/{restaurantId}/branches/{branchId}/kds/tickets/{ticketId}/ready", RESTAURANT_ID, BRANCH_ID, TICKET_ID)
                         .header("X-Test-User", "order.reader@pos.local")
-                        .header("X-Test-Authorities", "ORDER_READ")
+                        .header("X-Test-Authorities", "KDS_READ")
                         .contentType(APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isForbidden())
@@ -119,11 +119,11 @@ class KdsControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("POST order KDS sync should reject missing ORDER_UPDATE")
-    void shouldRejectMissingOrderUpdateForOrderSync() throws Exception {
+    @DisplayName("POST order KDS sync should reject missing KDS_UPDATE")
+    void shouldRejectMissingKdsUpdateForOrderSync() throws Exception {
         mockMvc.perform(post("/restaurants/{restaurantId}/orders/{orderId}/kds/tickets/sync", RESTAURANT_ID, ORDER_ID)
                         .header("X-Test-User", "order.reader@pos.local")
-                        .header("X-Test-Authorities", "ORDER_READ"))
+                        .header("X-Test-Authorities", "KDS_READ"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("Access denied"));
 
