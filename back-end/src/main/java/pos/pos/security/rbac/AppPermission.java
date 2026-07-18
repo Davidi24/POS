@@ -44,7 +44,10 @@ public enum AppPermission {
     ORDER_DISCOUNT_APPLY("Apply Order Discounts", "Apply and update order discounts"),
     ORDER_TRANSFER("Transfer Orders", "Transfer or move restaurant orders"),
     ORDER_REOPEN("Reopen Orders", "Reopen previously closed restaurant orders"),
-    ORDER_AUDIT("Audit Orders", "View order audit trails and operational history");
+    ORDER_AUDIT("Audit Orders", "View order audit trails and operational history"),
+
+    KDS_READ("View Kitchen Display", "View kitchen display stations, boards, and tickets"),
+    KDS_UPDATE("Update Kitchen Display", "Update kitchen display ticket and item workflow state");
 
 
     private final String displayName;
