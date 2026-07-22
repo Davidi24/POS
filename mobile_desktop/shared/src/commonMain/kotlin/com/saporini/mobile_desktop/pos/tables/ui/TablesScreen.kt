@@ -1,10 +1,12 @@
-package com.saporini.mobile_desktop.pos.tables
+package com.saporini.mobile_desktop.pos.tables.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
@@ -29,7 +31,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
@@ -64,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -72,11 +74,15 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
@@ -84,10 +90,15 @@ import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.auth_login_img
 import mobile_desktop.shared.generated.resources.plan
 import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.decodeToImageBitmap
+import kotlin.math.cos
+import kotlin.math.roundToInt
+import kotlin.math.sin
 
 @Composable
 fun TablesScreen(
     modifier: Modifier = Modifier,
+    canEditLayout: Boolean = false,
     onAddItemsRequested: () -> Unit = {}
 ) {
     var selectedFloor by remember { mutableStateOf(FloorOption.FIRST) }
@@ -103,8 +114,22 @@ fun TablesScreen(
     var tableOrderOverrides by remember { mutableStateOf<Map<String, TableOrderOverride>>(emptyMap()) }
     var nextOrderNumber by remember { mutableStateOf(1246) }
     var newOrderTables by remember { mutableStateOf<List<FloorPlanTable>>(emptyList()) }
-    val currentTables = floorPlanTables.map { table ->
+    var layoutTables by remember { mutableStateOf(floorPlanTables) }
+    var searchQuery by remember { mutableStateOf("") }
+    var editMode by remember { mutableStateOf(false) }
+    var selectedEditTableLabel by remember { mutableStateOf<String?>(null) }
+    var customPlanBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var showBundledPlan by remember { mutableStateOf(floorPlanTables.isNotEmpty()) }
+    var planOffset by remember { mutableStateOf(Offset.Zero) }
+    var planMoveMode by remember { mutableStateOf(false) }
+    var planScale by remember { mutableStateOf(1f) }
+    val customPlan = remember(customPlanBytes) {
+        customPlanBytes?.decodeToImageBitmap()
+    }
+    val currentTables = layoutTables.map { table ->
         tableOrderOverrides[table.label]?.applyTo(table) ?: table
+    }.filter { table ->
+        searchQuery.isBlank() || table.label.contains(searchQuery, ignoreCase = true)
     }
 
     Column(
@@ -162,10 +187,112 @@ fun TablesScreen(
                                 }
                             )
                         } else {
-                            FloorSwitcher(
-                                selectedFloor = selectedFloor,
-                                onFloorSelected = { selectedFloor = it }
+                            TableLayoutToolbar(
+                                searchQuery = searchQuery,
+                                onSearchQueryChanged = { searchQuery = it },
+                                editMode = editMode,
+                                hasBackground = customPlan != null || showBundledPlan,
+                                planMoveMode = planMoveMode,
+                                selectedTableLabel = selectedEditTableLabel,
+                                onEditModeChanged = {
+                                    editMode = it
+                                    selectedEditTableLabel = null
+                                    if (!it) planMoveMode = false
+                                    if (it) searchQuery = ""
+                                },
+                                onAddTable = { shape, chairs ->
+                                    val newTable = newPreviewTable(
+                                        tables = layoutTables,
+                                        shape = shape,
+                                        seatCount = chairs
+                                    )
+                                    layoutTables = layoutTables + newTable
+                                    selectedEditTableLabel = newTable.label
+                                },
+                                onRotateSelectedTable = { change ->
+                                    selectedEditTableLabel?.let { label ->
+                                        layoutTables = layoutTables.map { table ->
+                                            if (table.label == label) {
+                                                table.copy(
+                                                    rotationDegrees =
+                                                        (table.rotationDegrees + change + 360f) % 360f
+                                                )
+                                            } else table
+                                        }
+                                    }
+                                },
+                                onScaleSelectedTable = { change ->
+                                    selectedEditTableLabel?.let { label ->
+                                        layoutTables = layoutTables.map { table ->
+                                            if (table.label == label) {
+                                                table.copy(
+                                                    scale = (table.scale + change).coerceIn(0.35f, 1.20f)
+                                                )
+                                            } else table
+                                        }
+                                    }
+                                },
+                                onDeleteSelectedTable = {
+                                    selectedEditTableLabel?.let { label ->
+                                        layoutTables = layoutTables.filterNot { it.label == label }
+                                        mergedGroups = mergedGroups
+                                            .map { it - label }
+                                            .filter { it.size >= 2 }
+                                        selectedEditTableLabel = null
+                                    }
+                                },
+                                onBackgroundSelected = {
+                                    customPlanBytes = it
+                                    showBundledPlan = false
+                                    planOffset = Offset.Zero
+                                    planMoveMode = false
+                                    planScale = 1f
+                                },
+                                onRemoveBackground = {
+                                    customPlanBytes = null
+                                    showBundledPlan = false
+                                    planOffset = Offset.Zero
+                                    planMoveMode = false
+                                    planScale = 1f
+                                },
+                                onPlanMoveModeChanged = { planMoveMode = it },
+                                onScalePlan = { change ->
+                                    planScale = (planScale + change).coerceIn(0.60f, 1.40f)
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .offset(
+                                        x = if (editMode) {
+                                            0.dp
+                                        } else if (canEditLayout) {
+                                            (-180).dp
+                                        } else {
+                                            (-148).dp
+                                        }
+                                    )
                             )
+                            if (!editMode) {
+                                FloorSwitcher(
+                                    selectedFloor = selectedFloor,
+                                    onFloorSelected = { selectedFloor = it },
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .offset(x = if (canEditLayout) 90.dp else 128.dp)
+                                )
+                                if (canEditLayout) {
+                                    EditLayoutIconButton(
+                                        onClick = {
+                                            editMode = true
+                                            selectedEditTableLabel = null
+                                            planMoveMode = false
+                                            searchQuery = ""
+                                        },
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .offset(x = 270.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -178,6 +305,31 @@ fun TablesScreen(
                         mergeGroupColorIndexes = mergeGroupColorIndexes,
                         activeMergeColorIndex = activeMergeColorIndex,
                         editingMergeGroup = editingMergeGroup,
+                        editMode = editMode && canEditLayout,
+                        customPlan = customPlan,
+                        showBundledPlan = showBundledPlan,
+                        planOffset = planOffset,
+                        planScale = planScale,
+                        planMoveMode = planMoveMode,
+                        onPlanMove = { x, y -> planOffset += Offset(x, y) },
+                        selectedEditTableLabel = selectedEditTableLabel,
+                        onTableMoveDelta = { label, deltaX, deltaY ->
+                            layoutTables = layoutTables.map {
+                                if (it.label == label) {
+                                    it.copy(
+                                        x = (it.x + deltaX).coerceIn(0.04f, 0.96f),
+                                        y = (it.y + deltaY).coerceIn(0.04f, 0.96f)
+                                    )
+                                } else it
+                            }
+                        },
+                        onEditTableSelected = {
+                            planMoveMode = false
+                            selectedEditTableLabel = it.label
+                        },
+                        onEditSelectionCleared = {
+                            selectedEditTableLabel = null
+                        },
                         onTableClick = { table ->
                             if (mergeMode) {
                                 val clickedGroup = mergedGroups.firstOrNull { table.label in it }
@@ -207,18 +359,20 @@ fun TablesScreen(
                     )
                 }
 
-                StatusFilterOverlays(
-                    tables = currentTables,
-                    selectedStatuses = selectedStatuses,
-                    onAllSelected = { selectedStatuses = emptySet() },
-                    onStatusToggled = { status ->
-                        selectedStatuses = if (status in selectedStatuses) {
-                            selectedStatuses - status
-                        } else {
-                            selectedStatuses + status
+                if (!editMode) {
+                    StatusFilterOverlays(
+                        tables = currentTables,
+                        selectedStatuses = selectedStatuses,
+                        onAllSelected = { selectedStatuses = emptySet() },
+                        onStatusToggled = { status ->
+                            selectedStatuses = if (status in selectedStatuses) {
+                                selectedStatuses - status
+                            } else {
+                                selectedStatuses + status
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
 
             if (selectedTables.isNotEmpty()) {
@@ -281,6 +435,17 @@ private fun FloorPlanTables(
     mergeGroupColorIndexes: Map<Set<String>, Int>,
     activeMergeColorIndex: Int?,
     editingMergeGroup: Set<String>?,
+    editMode: Boolean,
+    customPlan: ImageBitmap?,
+    showBundledPlan: Boolean,
+    planOffset: Offset,
+    planScale: Float,
+    planMoveMode: Boolean,
+    onPlanMove: (Float, Float) -> Unit,
+    selectedEditTableLabel: String?,
+    onTableMoveDelta: (String, Float, Float) -> Unit,
+    onEditTableSelected: (FloorPlanTable) -> Unit,
+    onEditSelectionCleared: () -> Unit,
     onTableClick: (FloorPlanTable) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -288,15 +453,117 @@ private fun FloorPlanTables(
         modifier = modifier
             .fillMaxWidth(0.98f)
             .aspectRatio(1448f / 1086f)
+            .clipToBounds()
     ) {
         val planHeight = maxWidth / (1448f / 1086f)
+        val clearSelectionInteractions = remember { MutableInteractionSource() }
 
-        Image(
-            painter = painterResource(Res.drawable.plan),
-            contentDescription = "Restaurant floor plan",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.FillBounds
-        )
+        if (editMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusProperties { canFocus = false }
+                    .clickable(
+                        interactionSource = clearSelectionInteractions,
+                        indication = null,
+                        onClick = onEditSelectionCleared
+                    )
+            )
+        }
+
+        if (customPlan != null || showBundledPlan) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(22.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clipToBounds()
+                ) {
+                    val imageModifier = Modifier
+                        .fillMaxSize()
+                        .offset {
+                            IntOffset(
+                                x = planOffset.x.roundToInt(),
+                                y = planOffset.y.roundToInt()
+                            )
+                        }
+                        .graphicsLayer {
+                            scaleX = planScale
+                            scaleY = planScale
+                        }
+
+                    if (customPlan != null) {
+                        Image(
+                            bitmap = customPlan,
+                            contentDescription = "Imported restaurant floor plan",
+                            modifier = imageModifier,
+                            contentScale = ContentScale.FillBounds
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(Res.drawable.plan),
+                            contentDescription = "Restaurant floor plan",
+                            modifier = imageModifier,
+                            contentScale = ContentScale.FillBounds
+                        )
+                    }
+                }
+
+                if (editMode && planMoveMode) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(
+                                1.dp,
+                                Color(0xFF918C84),
+                                RoundedCornerShape(10.dp)
+                            )
+                    )
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = (-16).dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        PlanMoveButton("↑") { onPlanMove(0f, -24f) }
+                        PlanMoveButton("↓") { onPlanMove(0f, 24f) }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .offset(y = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        PlanMoveButton("↑") { onPlanMove(0f, -24f) }
+                        PlanMoveButton("↓") { onPlanMove(0f, 24f) }
+                    }
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = (-16).dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        PlanMoveButton("←") { onPlanMove(-24f, 0f) }
+                        PlanMoveButton("→") { onPlanMove(24f, 0f) }
+                    }
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .offset(x = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        PlanMoveButton("←") { onPlanMove(-24f, 0f) }
+                        PlanMoveButton("→") { onPlanMove(24f, 0f) }
+                    }
+                }
+            }
+        } else if (tables.isEmpty()) {
+            EmptyFloorPlan(editMode = editMode)
+        }
 
         val visibleTables = if (selectedStatuses.isEmpty()) {
             tables
@@ -340,6 +607,9 @@ private fun FloorPlanTables(
         }
 
         visibleTables.forEach { table ->
+            val displayedTable = table.copy(scale = table.scale * planScale)
+            val scaledX = 0.5f + (table.x - 0.5f) * planScale
+            val scaledY = 0.5f + (table.y - 0.5f) * planScale
             Table(
                 shape = table.shape,
                 seatCount = table.seatCount,
@@ -347,127 +617,58 @@ private fun FloorPlanTables(
                 state = table.state,
                 orderLabel = table.orderLabel,
                 statusText = table.statusText,
-                scale = table.scale,
+                servedItems = table.servedItems,
+                totalItems = table.totalItems,
+                scale = displayedTable.scale,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .offset(
-                        x = maxWidth * table.x - table.visualWidth() * 0.5f,
-                        y = planHeight * table.y - table.visualHeight() * 0.5f
+                        x = maxWidth * scaledX - displayedTable.visualWidth() * 0.5f,
+                        y = planHeight * scaledY - displayedTable.visualHeight() * 0.5f
                     )
-                    .graphicsLayer(rotationZ = table.rotationDegrees)
-                    .clickable { onTableClick(table) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun BoxScope.TableDetailsModal(
-    tables: List<FloorPlanTable>,
-    onDismiss: () -> Unit,
-    onAddOrder: () -> Unit,
-    onAddItems: () -> Unit,
-    onMergeTables: () -> Unit
-) {
-    val table = tables.first()
-    val tableTitle = tables.joinToString(separator = "-") { it.label }
-    val covers = tables.sumOf { it.seatCount.coerceAtLeast(1) }
-    val hasOrder = tables.any { it.orderLabel != null || it.state == TableVisualState.Occupied }
-
-    Column(
-        modifier = Modifier
-            .align(Alignment.Center)
-            .width(430.dp)
-            .shadow(18.dp, RoundedCornerShape(20.dp))
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.White)
-            .padding(24.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Table $tableTitle",
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 24.sp,
-                    letterSpacing = 0.sp,
-                    color = Color(0xFF242424)
-                )
-                Spacer(Modifier.height(10.dp))
-                StatusPill(table.statusLabel(), table.statusColor())
-            }
-
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.size(34.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Close",
-                    modifier = Modifier.size(26.dp),
-                    tint = Color(0xFF242424)
-                )
-            }
-        }
-
-        if (hasOrder) {
-            Spacer(Modifier.height(24.dp))
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .border(1.dp, Color(0xFFE7E1DC), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
-                DetailRow(Icons.Filled.Settings, "Status", table.statusLabel(), table.statusColor(), showDot = true)
-                DetailRow(Icons.Filled.LocationOn, "Location", "Main Salon")
-                DetailRow(Icons.Filled.Groups, "Covers", "$covers Guests")
-                DetailRow(Icons.Filled.AccessTime, "Seated Since", table.seatedSince())
-                DetailRow(Icons.Filled.Assignment, "Current Order", table.orderLabel ?: "#ORD-1245")
-                DetailRow(Icons.Filled.Payments, "Order Total", table.orderTotal())
-                DetailRow(Icons.Filled.Person, "Server", "David K.")
-                DetailRow(Icons.Filled.QrCode2, "QR Session", "Active", Color(0xFF319B48), badge = true)
-            }
-
-            Spacer(Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                DialogActionButton(
-                    text = "View Order",
-                    icon = Icons.Filled.List,
-                    modifier = Modifier.weight(1f)
-                )
-                DialogActionButton(
-                    text = "Add Items",
-                    icon = Icons.Filled.AddCircle,
-                    modifier = Modifier.weight(1f),
-                    onClick = onAddItems
-                )
-                MoreActionsButton(
-                    text = "More Actions",
-                    icon = Icons.Filled.MoreHoriz,
-                    modifier = Modifier.weight(1.12f),
-                    onMergeTables = onMergeTables
-                )
-            }
-        } else {
-            Spacer(Modifier.height(26.dp))
-            DialogActionButton(
-                text = "Add Order",
-                icon = Icons.Filled.AddCircle,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                dark = true,
-                onClick = onAddOrder
+                    .graphicsLayer {
+                        rotationZ = table.rotationDegrees
+                        translationX = planOffset.x
+                        translationY = planOffset.y
+                    }
+                    .then(
+                        if (editMode) {
+                            Modifier.border(
+                                width = if (selectedEditTableLabel == table.label) 3.dp else 1.dp,
+                                color = if (selectedEditTableLabel == table.label) {
+                                    Color(0xFF242424)
+                                } else {
+                                    Color(0xFF8B8B87)
+                                },
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
+                    .focusProperties { canFocus = false }
+                    .pointerInput(editMode, table.label, table.rotationDegrees) {
+                        if (editMode) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                val angle = Math.toRadians(table.rotationDegrees.toDouble())
+                                val screenDeltaX =
+                                    dragAmount.x * cos(angle).toFloat() -
+                                        dragAmount.y * sin(angle).toFloat()
+                                val screenDeltaY =
+                                    dragAmount.x * sin(angle).toFloat() +
+                                        dragAmount.y * cos(angle).toFloat()
+                                onTableMoveDelta(
+                                    table.label,
+                                    screenDeltaX / constraints.maxWidth / planScale,
+                                    screenDeltaY / constraints.maxHeight / planScale
+                                )
+                            }
+                        }
+                    }
+                    .clickable {
+                        if (editMode) onEditTableSelected(table) else onTableClick(table)
+                    }
             )
         }
     }
@@ -1692,189 +1893,6 @@ private fun RemovedMergeTables(
 }
 
 @Composable
-private fun StatusPill(
-    text: String,
-    color: Color
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(color)
-            .padding(horizontal = 18.dp, vertical = 7.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            fontFamily = Inter(),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            letterSpacing = 0.sp,
-            color = Color.White
-        )
-    }
-}
-
-@Composable
-private fun DetailRow(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    valueColor: Color = Color(0xFF303033),
-    showDot: Boolean = false,
-    badge: Boolean = false
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = Color(0xFF696969)
-        )
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            fontFamily = Inter(),
-            fontWeight = FontWeight.Medium,
-            fontSize = 15.sp,
-            letterSpacing = 0.sp,
-            color = Color(0xFF3E3E42)
-        )
-        if (badge) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(18.dp))
-                    .border(1.dp, Color(0xFF7BCB8B), RoundedCornerShape(18.dp))
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = value,
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    letterSpacing = 0.sp,
-                    color = valueColor
-                )
-            }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (showDot) {
-                    Box(
-                        modifier = Modifier
-                            .size(13.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(valueColor)
-                    )
-                    Spacer(Modifier.width(9.dp))
-                }
-                Text(
-                    text = value,
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 15.sp,
-                    letterSpacing = 0.sp,
-                    color = valueColor
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DialogActionButton(
-    text: String,
-    icon: ImageVector,
-    modifier: Modifier = Modifier,
-    dark: Boolean = false,
-    onClick: () -> Unit = {}
-) {
-    Row(
-        modifier = modifier
-            .height(46.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (dark) Color(0xFF30381E) else Color.White)
-            .border(
-                width = if (dark) 0.dp else 1.dp,
-                color = Color(0xFFE1DCD8),
-                shape = RoundedCornerShape(8.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = if (dark) Color.White else Color(0xFF2E2E31)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = text,
-            fontFamily = Inter(),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            letterSpacing = 0.sp,
-            maxLines = 1,
-            softWrap = false,
-            color = if (dark) Color.White else Color(0xFF2E2E31)
-        )
-    }
-}
-
-@Composable
-private fun MoreActionsButton(
-    text: String,
-    icon: ImageVector,
-    modifier: Modifier = Modifier,
-    onMergeTables: () -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = modifier) {
-        DialogActionButton(
-            text = text,
-            icon = icon,
-            dark = true,
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { expanded = true }
-        )
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(Color.White),
-            shape = RoundedCornerShape(10.dp),
-            containerColor = Color.White,
-            tonalElevation = 0.dp,
-            shadowElevation = 6.dp
-        ) {
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        text = "Merge Tables",
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        letterSpacing = 0.sp,
-                        color = Color(0xFF2E2E31)
-                    )
-                },
-                onClick = {
-                    expanded = false
-                    onMergeTables()
-                }
-            )
-        }
-    }
-}
-
-@Composable
 private fun MergeModeToolbar(
     selectedCount: Int,
     onCancel: () -> Unit,
@@ -1898,7 +1916,9 @@ private fun MergeModeToolbar(
             fontWeight = FontWeight.SemiBold,
             fontSize = 15.sp,
             letterSpacing = 0.sp,
-            color = Color(0xFF1F2322)
+            color = Color(0xFF1F2322),
+            maxLines = 1,
+            softWrap = false
         )
         TextButton(
             onClick = onCancel,
@@ -2028,10 +2048,11 @@ private fun TableStatusCard(
     iconBackground: Color,
     iconTint: Color,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(46.dp)
             .clip(RoundedCornerShape(8.dp))
@@ -2083,10 +2104,11 @@ private fun TableStatusCard(
 @Composable
 private fun FloorSwitcher(
     selectedFloor: FloorOption,
-    onFloorSelected: (FloorOption) -> Unit
+    onFloorSelected: (FloorOption) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .width(276.dp)
             .height(46.dp)
             .clip(RoundedCornerShape(14.dp))
@@ -2119,6 +2141,76 @@ private fun FloorSwitcher(
             }
         }
     }
+}
+
+@Composable
+private fun BoxScope.EmptyFloorPlan(editMode: Boolean) {
+    Column(
+        modifier = Modifier.align(Alignment.Center),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "No floor layout yet",
+            fontFamily = Inter(),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 22.sp,
+            color = Color(0xFF303033)
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = if (editMode) {
+                "Import a plan or add your first table above."
+            } else {
+                "An administrator has not configured this floor."
+            },
+            fontFamily = Inter(),
+            fontSize = 14.sp,
+            color = Color(0xFF777777)
+        )
+    }
+}
+
+@Composable
+private fun PlanMoveButton(
+    symbol: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .size(32.dp)
+            .shadow(5.dp, RoundedCornerShape(50))
+            .background(Color(0xFF4B522A), RoundedCornerShape(50))
+            .border(2.dp, Color.White, RoundedCornerShape(50))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = symbol,
+            fontFamily = Inter(),
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            color = Color.White
+        )
+    }
+}
+
+private fun newPreviewTable(
+    tables: List<FloorPlanTable>,
+    shape: TableShape,
+    seatCount: Int
+): FloorPlanTable {
+    val nextNumber = (tables.mapNotNull {
+        it.label.removePrefix("T").toIntOrNull()
+    }.maxOrNull() ?: 0) + 1
+
+    return FloorPlanTable(
+        x = 0.5f,
+        y = 0.5f,
+        shape = shape,
+        seatCount = seatCount,
+        label = "T${nextNumber.toString().padStart(2, '0')}"
+    )
 }
 
 private enum class FloorOption(val label: String) {
@@ -2438,67 +2530,6 @@ private fun straightConnectorRect(from: Rect, to: Rect, maxGap: Float, thickness
     return emptyList()
 }
 
-private fun FloorPlanTable.statusLabel(): String =
-    statusText ?: when (state) {
-        TableVisualState.Free -> "Free"
-        TableVisualState.Occupied -> "In Progress"
-        TableVisualState.Reserved -> "Reserved"
-        TableVisualState.BillPending -> "Bill Pending"
-        TableVisualState.Unavailable -> "Unavailable"
-    }
-
-private fun FloorPlanTable.statusColor(): Color =
-    when (state) {
-        TableVisualState.Free -> Color(0xFF4B522A)
-        TableVisualState.Occupied -> Color(0xFFB86A0B)
-        TableVisualState.Reserved -> Color(0xFFC47A18)
-        TableVisualState.BillPending -> Color(0xFF2F6FB1)
-        TableVisualState.Unavailable -> Color(0xFF777777)
-    }
-
-private fun FloorPlanTable.seatedSince(): String =
-    if (state == TableVisualState.Free) "--" else "6:15 PM (45m ago)"
-
-private fun FloorPlanTable.orderTotal(): String =
-    if (state == TableVisualState.Free) "\$0.00" else "\$72.30"
-
-private data class FloorPlanTable(
-    val x: Float,
-    val y: Float,
-    val shape: TableShape,
-    val seatCount: Int,
-    val label: String,
-    val state: TableVisualState = TableVisualState.Free,
-    val orderLabel: String? = null,
-    val statusText: String? = null,
-    val scale: Float = 0.74f,
-    val rotationDegrees: Float = 0f
-) {
-    fun visualWidth(): Dp =
-        when (shape) {
-            TableShape.Circle -> 156.dp * scale
-            TableShape.Square -> ((if (seatCount > 4) 248.dp else 128.dp) + 48.dp) * scale
-        }
-
-    fun visualHeight(): Dp =
-        when (shape) {
-            TableShape.Circle -> 156.dp * scale
-            TableShape.Square -> ((if (seatCount > 4) 112.dp else 128.dp) + 40.dp) * scale
-        }
-}
-
-private data class TableOrderOverride(
-    val orderLabel: String,
-    val statusText: String
-) {
-    fun applyTo(table: FloorPlanTable): FloorPlanTable =
-        table.copy(
-            state = TableVisualState.Occupied,
-            orderLabel = orderLabel,
-            statusText = statusText
-        )
-}
-
 private data class OrderMenuItem(
     val name: String,
     val description: String,
@@ -2595,6 +2626,8 @@ private val floorPlanTables = listOf(
         state = TableVisualState.Occupied,
         orderLabel = "DI106",
         statusText = "In Progress",
+        servedItems = 3,
+        totalItems = 10,
         scale = 0.40f,
     ),
     FloorPlanTable(
@@ -2606,11 +2639,16 @@ private val floorPlanTables = listOf(
         state = TableVisualState.Occupied,
         orderLabel = "DI106",
         statusText = "In Progress",
+        servedItems = 7,
+        totalItems = 10,
         scale = 0.40f,
         rotationDegrees = 90f
     ),
     FloorPlanTable(0.135f, 0.33f, TableShape.Circle, 4, "T01"),
-    FloorPlanTable(0.135f, 0.47f, TableShape.Circle, 4, "T02", TableVisualState.Occupied),
+    FloorPlanTable(
+        0.135f, 0.47f, TableShape.Circle, 4, "T02",
+        TableVisualState.Occupied, servedItems = 5, totalItems = 10
+    ),
     FloorPlanTable(0.18f, 0.62f, TableShape.Circle, 4, "T03", TableVisualState.Reserved),
     FloorPlanTable(0.28f, 0.70f, TableShape.Circle, 4, "T04"),
     FloorPlanTable(0.26f, 0.52f, TableShape.Circle, 4, "T05"),
@@ -2621,7 +2659,10 @@ private val floorPlanTables = listOf(
     FloorPlanTable(0.63f, 0.71f, TableShape.Circle, 4, "T09", TableVisualState.Unavailable),
     FloorPlanTable(0.55f, 0.62f, TableShape.Circle, 4, "T10"),
 
-    FloorPlanTable(0.62f, 0.35f, TableShape.Circle, 4, "T11", TableVisualState.Occupied),
+    FloorPlanTable(
+        0.62f, 0.35f, TableShape.Circle, 4, "T11",
+        TableVisualState.Occupied, servedItems = 2, totalItems = 8
+    ),
     FloorPlanTable(0.73f, 0.35f, TableShape.Circle, 4, "T12", TableVisualState.Reserved),
     FloorPlanTable(0.62f, 0.495f, TableShape.Circle, 4, "T13"),
     FloorPlanTable(0.73f, 0.495f, TableShape.Circle, 4, "T14", TableVisualState.Unavailable),

@@ -1,12 +1,14 @@
-package com.saporini.mobile_desktop.pos.tables
+package com.saporini.mobile_desktop.pos.tables.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -61,13 +65,19 @@ fun Table(
     state: TableVisualState = TableVisualState.Free,
     orderLabel: String? = null,
     statusText: String? = null,
+    servedItems: Int = 0,
+    totalItems: Int = 0,
     scale: Float = 1f
 ) {
+    val servedProgress = if (totalItems > 0) {
+        servedItems.coerceIn(0, totalItems).toFloat() / totalItems
+    } else 0f
     when (shape) {
         TableShape.Circle -> CircleTable(
             seatCount = seatCount,
             label = label,
             state = state,
+            servedProgress = servedProgress,
             modifier = modifier,
             scale = scale
         )
@@ -78,13 +88,14 @@ fun Table(
             state = state,
             orderLabel = orderLabel,
             statusText = statusText,
+            servedProgress = servedProgress,
             modifier = modifier,
             scale = scale
         )
     }
 }
 
-private fun tableColors(state: TableVisualState): TableColors =
+private fun tableColors(state: TableVisualState, servedProgress: Float = 0f): TableColors =
     when (state) {
         TableVisualState.Free -> TableColors(
             surface = Color(0xFF4B522A),
@@ -129,11 +140,12 @@ private fun SquareTable(
     state: TableVisualState,
     orderLabel: String?,
     statusText: String?,
+    servedProgress: Float,
     modifier: Modifier = Modifier,
     scale: Float = 1f
 ) {
     val showDetails = state != TableVisualState.Free && (orderLabel != null || statusText != null)
-    val colors = tableColors(state)
+    val colors = tableColors(state, servedProgress)
     val bodyWidth = (if (seatCount > 4) 248.dp else 128.dp) * scale
     val bodyHeight = (if (seatCount > 4) 112.dp else 128.dp) * scale
     val totalWidth = bodyWidth + 48.dp * scale
@@ -215,7 +227,6 @@ private fun SquareTable(
                         color = colors.content
                     )
                 }
-
                 orderLabel?.let {
                     Text(
                         text = it,
@@ -275,6 +286,16 @@ private fun SquareTable(
                     )
                 }
             }
+            if (state == TableVisualState.Occupied && seatCount > 4) {
+                ServedProgressLine(
+                    progress = servedProgress,
+                    scale = scale,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 8.dp * scale)
+                        .width(bodyWidth * 0.72f)
+                )
+            }
         }
     }
 }
@@ -284,10 +305,11 @@ private fun CircleTable(
     seatCount: Int,
     label: String,
     state: TableVisualState,
+    servedProgress: Float,
     modifier: Modifier = Modifier,
     scale: Float = 1f
 ) {
-    val colors = tableColors(state)
+    val colors = tableColors(state, servedProgress)
     val totalSize = 156.dp * scale
     val tableSize = 86.dp * scale
     val chairWidth = 34.dp * scale
@@ -346,6 +368,46 @@ private fun CircleTable(
                 )
             }
         }
+
+        if (state == TableVisualState.Occupied) {
+            Canvas(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(tableSize)
+            ) {
+                drawArc(
+                    color = Color(0xFF6F43B5),
+                    startAngle = -90f,
+                    sweepAngle = 360f * servedProgress.coerceIn(0f, 1f),
+                    useCenter = false,
+                    style = Stroke(
+                        width = 6.dp.toPx() * scale,
+                        cap = StrokeCap.Round
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServedProgressLine(
+    progress: Float,
+    scale: Float,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(5.dp * scale)
+            .clip(RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = 0.48f))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .height(5.dp * scale)
+                .background(Color(0xFF5F35A4), RoundedCornerShape(50))
+        )
     }
 }
 
