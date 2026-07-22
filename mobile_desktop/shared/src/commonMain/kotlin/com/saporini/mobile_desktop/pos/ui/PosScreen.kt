@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,8 +28,8 @@ import com.saporini.mobile_desktop.pos.orders.OrdersScreen
 import com.saporini.mobile_desktop.pos.payment.PaymentScreen
 import com.saporini.mobile_desktop.pos.reservations.ReservationsScreen
 import com.saporini.mobile_desktop.pos.sales.MySalesScreen
-import com.saporini.mobile_desktop.pos.tables.AddItemModal
-import com.saporini.mobile_desktop.pos.tables.TablesScreen
+import com.saporini.mobile_desktop.pos.tables.ui.AddItemModal
+import com.saporini.mobile_desktop.pos.tables.ui.TablesScreen
 import com.saporini.mobile_desktop.pos.ui.shell.PosTopBar
 import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.pos_simple_logo
@@ -43,6 +44,8 @@ object PosScreen : Screen {
         var showAddItemModal by remember { mutableStateOf(false) }
         var showPaymentScreen by remember { mutableStateOf(false) }
         val sessionManager = koinInject<SessionManager>()
+        val currentUser by sessionManager.currentUser.collectAsState()
+        val canEditTableLayout = "SETTINGS_UPDATE" in currentUser?.permissions.orEmpty()
 
         Box(Modifier.fillMaxSize().background(Color.White)) {
             Column(Modifier.fillMaxSize()) {
@@ -71,6 +74,7 @@ object PosScreen : Screen {
                     when (selected) {
                         PosSection.TABLES -> TablesScreen(
                             modifier = Modifier.weight(1f),
+                            canEditLayout = canEditTableLayout,
                             onAddItemsRequested = { showAddItemModal = true }
                         )
                         PosSection.ORDERS -> OrdersScreen(

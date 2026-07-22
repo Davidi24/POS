@@ -61,6 +61,7 @@ kotlin {
             implementation(compose.materialIconsExtended)
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
+            implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
