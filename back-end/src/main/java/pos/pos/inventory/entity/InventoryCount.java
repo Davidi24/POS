@@ -50,7 +50,7 @@ import java.util.Objects;
         }
 )
 @Check(constraints = """
-        char_length(btrim(count_number)) > 0
+        char_length(trim(count_number)) > 0
         AND status IN ('DRAFT', 'IN_PROGRESS', 'COMPLETED', 'APPROVED', 'CANCELLED')
         AND variance_value >= 0
         AND (
@@ -140,6 +140,9 @@ public class InventoryCount extends AbstractAuditedEntity {
     )
     private User updatedByUser;
 
+    /**
+     * The list of individual item results counted in this session (the InventoryCountLine rows).
+     */
     @OneToMany(mappedBy = "inventoryCount", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
     private List<InventoryCountLine> lines = new ArrayList<>();
