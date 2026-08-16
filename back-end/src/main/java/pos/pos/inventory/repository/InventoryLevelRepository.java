@@ -25,4 +25,11 @@ public interface InventoryLevelRepository extends JpaRepository<InventoryLevel, 
             ORDER BY lvl.inventoryItem.name ASC
             """)
     List<InventoryLevel> findLowStockByRestaurantId(@Param("restaurantId") UUID restaurantId);
+
+    @Query("""
+            SELECT lvl FROM InventoryLevel lvl
+            WHERE lvl.location.restaurant.id = :restaurantId
+            ORDER BY lvl.location.name ASC, lvl.inventoryItem.name ASC
+            """)
+    List<InventoryLevel> findAllByRestaurantId(@Param("restaurantId") UUID restaurantId);
 }

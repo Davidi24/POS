@@ -13,7 +13,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
 
     Optional<InventoryItem> findByRestaurant_IdAndBarcodeAndDeletedAtIsNull(UUID restaurantId, String barcode);
 
+    Optional<InventoryItem> findByRestaurant_IdAndCodeAndDeletedAtIsNull(UUID restaurantId, String code);
+
     List<InventoryItem> findAllByRestaurant_IdAndActiveTrueAndDeletedAtIsNullOrderByNameAsc(UUID restaurantId);
+
+    List<InventoryItem> findAllByRestaurant_IdAndActiveFalseAndDeletedAtIsNullOrderByNameAsc(UUID restaurantId);
+
+    List<InventoryItem> findAllByRestaurant_IdAndDeletedAtIsNullOrderByNameAsc(UUID restaurantId);
 
     List<InventoryItem> findAllByRestaurant_IdAndNameContainingIgnoreCaseAndDeletedAtIsNullOrderByNameAsc(
             UUID restaurantId,

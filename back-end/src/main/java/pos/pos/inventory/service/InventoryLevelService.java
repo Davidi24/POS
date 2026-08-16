@@ -23,13 +23,10 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
-// This service is read-only from the outside. InventoryLevel represents the current stock
-// balance for one (item, location) pair, and it should never be edited directly through a
-// public endpoint — that would let a number get typed in without any record of why it changed.
-// Every real change to onHandQuantity is supposed to come from an InventoryMovement (delivery,
-// sale, waste, count correction, etc). upsertLevel() below is the one place that's allowed to
-// touch onHandQuantity, and it's package-private on purpose: only another service in this same
-// package (the future InventoryMovement service) is meant to call it.
+// Manages the current stock quantity of each item at each inventory location.
+// It allows users to view stock levels and find items that are low in stock.
+// Stock quantities are not changed directly by an endpoint.
+// They are updated internally when an inventory movement or approved count changes the stock.
 @Service
 @RequiredArgsConstructor
 public class InventoryLevelService {
@@ -40,9 +37,12 @@ public class InventoryLevelService {
     private final InventoryLocationRepository inventoryLocationRepository;
     private final InventoryItemRepository inventoryItemRepository;
 
+
+    //Checks the Access of the user to the restaurant and
     @Transactional(readOnly = true)
     public InventoryLevelResponse getLevel(Authentication authentication, UUID restaurantId, UUID locationId, UUID itemId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        //Checks the existence of the Location and Item
         requireLocation(restaurantId, locationId);
         requireItem(restaurantId, itemId);
 
@@ -52,26 +52,52 @@ public class InventoryLevelService {
         );
     }
 
+    //It lists the items on the Location searched.
+    //It can List from given Item, from given Location and also from both given item and location
+    //The variables ItemID and LoacationID can also be null and list the level of everyhing in this restaurant
+    //Same logic as getLevel but uses no Exception if it does not exist
     @Transactional(readOnly = true)
-    public List<InventoryLevelResponse> listByLocation(Authentication authentication, UUID restaurantId, UUID locationId) {
+    public List<InventoryLevelResponse> listLevels(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID locationId,
+            UUID itemId
+    ) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
-        requireLocation(restaurantId, locationId);
 
-        return inventoryLevelRepository.findAllByLocation_IdOrderByInventoryItem_NameAsc(locationId).stream()
+        if (locationId != null && itemId != null) {
+            requireLocation(restaurantId, locationId);
+            requireItem(restaurantId, itemId);
+
+            return inventoryLevelRepository.findByLocation_IdAndInventoryItem_Id(locationId, itemId)
+                    .map(inventoryLevelMapper::toResponse)
+                    .map(List::of)
+                    .orElseGet(List::of);
+        }
+
+        if (locationId != null) {
+            requireLocation(restaurantId, locationId);
+
+            return inventoryLevelRepository.findAllByLocation_IdOrderByInventoryItem_NameAsc(locationId).stream()
+                    .map(inventoryLevelMapper::toResponse)
+                    .toList();
+        }
+
+        if (itemId != null) {
+            requireItem(restaurantId, itemId);
+
+            return inventoryLevelRepository.findAllByInventoryItem_IdOrderByLocation_NameAsc(itemId).stream()
+                    .map(inventoryLevelMapper::toResponse)
+                    .toList();
+        }
+
+        return inventoryLevelRepository.findAllByRestaurantId(restaurantId).stream()
                 .map(inventoryLevelMapper::toResponse)
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<InventoryLevelResponse> listByItem(Authentication authentication, UUID restaurantId, UUID itemId) {
-        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
-        requireItem(restaurantId, itemId);
 
-        return inventoryLevelRepository.findAllByInventoryItem_IdOrderByLocation_NameAsc(itemId).stream()
-                .map(inventoryLevelMapper::toResponse)
-                .toList();
-    }
-
+    // Returns the Repository Method for listing the stock that is lower than reorder variable
     @Transactional(readOnly = true)
     public List<InventoryLevelResponse> listLowStock(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
@@ -87,6 +113,7 @@ public class InventoryLevelService {
     // instead of any endpoint being able to set onHandQuantity directly.
     @Transactional
     InventoryLevel upsertLevel(InventoryLocation location, InventoryItem item, BigDecimal quantityDelta) {
+        //Get the Inventor Level Created, if it does not exist a level create a new one and return it
         InventoryLevel level = inventoryLevelRepository
                 .findByLocation_IdAndInventoryItem_Id(location.getId(), item.getId())
                 .orElseGet(() -> {
@@ -97,6 +124,7 @@ public class InventoryLevelService {
                     return created;
                 });
 
+        // updates the onhand quantity and sets the last Movement
         BigDecimal currentOnHand = level.getOnHandQuantity() == null ? BigDecimal.ZERO : level.getOnHandQuantity();
         level.setOnHandQuantity(currentOnHand.add(quantityDelta));
         level.setLastMovementAt(OffsetDateTime.now(ZoneOffset.UTC));
@@ -104,11 +132,42 @@ public class InventoryLevelService {
         return inventoryLevelRepository.saveAndFlush(level);
     }
 
+    // Internal use only. Meant to be called by InventoryCountService when a count is approved:
+    // records that an item was physically verified at a location, independent of whether its
+    // quantity actually changed (a line can have zero variance and still count as "checked").
+    @Transactional
+    InventoryLevel markCounted(InventoryLocation location, InventoryItem item, OffsetDateTime countedAt) {
+        InventoryLevel level = inventoryLevelRepository
+                .findByLocation_IdAndInventoryItem_Id(location.getId(), item.getId())
+                .orElseGet(() -> {
+                    InventoryLevel created = new InventoryLevel();
+                    created.setLocation(location);
+                    created.setInventoryItem(item);
+                    created.setOnHandQuantity(BigDecimal.ZERO);
+                    return created;
+                });
+
+        level.setLastCountedAt(countedAt);
+        return inventoryLevelRepository.saveAndFlush(level);
+    }
+
+    // Internal use only. Meant to be called by InventoryCountService to pre-fill a new count
+    // line's expectedQuantity from the live on-hand balance, defaulting to zero if no level
+    // row exists yet for that (location, item) pair.
+    @Transactional(readOnly = true)
+    BigDecimal currentOnHandQuantity(UUID locationId, UUID itemId) {
+        return inventoryLevelRepository.findByLocation_IdAndInventoryItem_Id(locationId, itemId)
+                .map(InventoryLevel::getOnHandQuantity)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    //Calls the reporitory Method of the Location with ID
     private InventoryLocation requireLocation(UUID restaurantId, UUID locationId) {
         return inventoryLocationRepository.findByIdAndRestaurant_Id(locationId, restaurantId)
                 .orElseThrow(InventoryLocationNotFoundException::new);
     }
 
+    //Calls the repository Method of Item from its ID
     private InventoryItem requireItem(UUID restaurantId, UUID itemId) {
         return inventoryItemRepository.findByIdAndRestaurant_IdAndDeletedAtIsNull(itemId, restaurantId)
                 .orElseThrow(InventoryItemNotFoundException::new);

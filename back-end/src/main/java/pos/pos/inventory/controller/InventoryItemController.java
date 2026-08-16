@@ -117,6 +117,26 @@ public class InventoryItemController {
         return ResponseEntity.ok(inventoryItemService.listActiveItems(authentication, restaurantId));
     }
 
+    @GetMapping("/all")
+    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @Operation(summary = "List all inventory items, including inactive")
+    public ResponseEntity<List<InventoryItemResponse>> listAllItems(
+            @PathVariable UUID restaurantId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(inventoryItemService.listAllItems(authentication, restaurantId));
+    }
+
+    @GetMapping("/inactive")
+    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @Operation(summary = "List only inactive (deactivated) inventory items")
+    public ResponseEntity<List<InventoryItemResponse>> listInactiveItems(
+            @PathVariable UUID restaurantId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(inventoryItemService.listInactiveItems(authentication, restaurantId));
+    }
+
     @DeleteMapping("/{itemId}")
     @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
     @Operation(summary = "Deactivate an inventory item (soft, not a real delete)")

@@ -21,6 +21,10 @@ import pos.pos.utils.NormalizationUtils;
 import java.util.List;
 import java.util.UUID;
 
+// Manages the places where inventory is stored, such as a warehouse, kitchen, bar, or freezer.
+// It can create, update, find, list, and deactivate inventory locations.
+// A location may belong to a branch, but it must always belong to the correct restaurant.
+// It also prevents two locations in the same restaurant from using the same code.
 @Service
 @RequiredArgsConstructor
 public class InventoryLocationService {
