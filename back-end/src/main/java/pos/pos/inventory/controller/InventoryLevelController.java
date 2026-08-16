@@ -31,26 +31,16 @@ public class InventoryLevelController {
 
     private final InventoryLevelService inventoryLevelService;
 
-    @GetMapping(params = "locationId")
+    @GetMapping
     @PreAuthorize("hasAuthority('SETTINGS_READ')")
-    @Operation(summary = "List stock levels at one location")
-    public ResponseEntity<List<InventoryLevelResponse>> listByLocation(
+    @Operation(summary = "List stock levels, optionally filtered by location and/or item")
+    public ResponseEntity<List<InventoryLevelResponse>> listLevels(
             @PathVariable UUID restaurantId,
-            @RequestParam UUID locationId,
+            @RequestParam(required = false) UUID locationId,
+            @RequestParam(required = false) UUID itemId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(inventoryLevelService.listByLocation(authentication, restaurantId, locationId));
-    }
-
-    @GetMapping(params = "itemId")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
-    @Operation(summary = "List stock levels for one item, across all locations")
-    public ResponseEntity<List<InventoryLevelResponse>> listByItem(
-            @PathVariable UUID restaurantId,
-            @RequestParam UUID itemId,
-            Authentication authentication
-    ) {
-        return ResponseEntity.ok(inventoryLevelService.listByItem(authentication, restaurantId, itemId));
+        return ResponseEntity.ok(inventoryLevelService.listLevels(authentication, restaurantId, locationId, itemId));
     }
 
     @GetMapping("/low-stock")

@@ -114,6 +114,7 @@ public class InventoryCount extends AbstractAuditedEntity {
     @Column(name = "approved_at", columnDefinition = "timestamptz")
     private OffsetDateTime approvedAt;
 
+    // Total monetary difference between expected and physically counted stock
     @Column(name = "variance_value", nullable = false, precision = 19, scale = 2)
     private BigDecimal varianceValue = BigDecimal.ZERO;
 
