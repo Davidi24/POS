@@ -1,6 +1,7 @@
 package pos.pos.tables.dto;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,4 +18,7 @@ public class UpdateTableStatusRequest {
 
     @NotNull(message = "status is required")
     private TableStatus status;
+
+    @Positive(message = "guestCount must be greater than zero")
+    private Integer guestCount;
 }

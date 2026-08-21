@@ -32,6 +32,7 @@ import pos.pos.tables.controller.RestaurantTableController;
 import pos.pos.tables.controller.TableLayoutController;
 import pos.pos.tables.dto.TableLayoutResponse;
 import pos.pos.tables.dto.TableResponse;
+import pos.pos.tables.realtime.TableLayoutChangeNotifier;
 import pos.pos.tables.service.RestaurantTableService;
 
 import java.io.IOException;
@@ -72,6 +73,9 @@ class RestaurantTableControllerSecurityTest {
     @MockBean
     private RestaurantTableService restaurantTableService;
 
+    @MockBean
+    private TableLayoutChangeNotifier layoutChangeNotifier;
+
     @Test
     @DisplayName("GET tables should allow SETTINGS_READ")
     void shouldAllowTableReadWithSettingsReadPermission() throws Exception {
@@ -101,6 +105,21 @@ class RestaurantTableControllerSecurityTest {
     }
 
     @Test
+    @DisplayName("POST table should allow managers")
+    void shouldAllowTableCreateForManager() throws Exception {
+        String request = objectMapper.writeValueAsString(new CreateRequest("A1", "Window", 4, "Main"));
+        given(restaurantTableService.createTable(any(), any(), any(), any()))
+                .willReturn(TableResponse.builder().id(TABLE_ID).tableNumber("A1").build());
+
+        mockMvc.perform(post("/restaurants/{restaurantId}/branches/{branchId}/tables", RESTAURANT_ID, BRANCH_ID)
+                        .header("X-Test-User", "manager@pos.local")
+                        .header("X-Test-Authorities", "ROLE_MANAGER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     @DisplayName("GET table layout should allow SETTINGS_READ")
     void shouldAllowTableLayoutReadWithSettingsReadPermission() throws Exception {
         given(restaurantTableService.getTableLayout(any(), any(), any()))
@@ -114,6 +133,23 @@ class RestaurantTableControllerSecurityTest {
         mockMvc.perform(get("/restaurants/{restaurantId}/branches/{branchId}/table-layout", RESTAURANT_ID, BRANCH_ID)
                         .header("X-Test-User", "owner@pos.local")
                         .header("X-Test-Authorities", "SETTINGS_READ"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET table layout should allow order staff")
+    void shouldAllowTableLayoutReadWithOrderReadPermission() throws Exception {
+        given(restaurantTableService.getTableLayout(any(), any(), any()))
+                .willReturn(TableLayoutResponse.builder()
+                        .restaurantId(RESTAURANT_ID)
+                        .branchId(BRANCH_ID)
+                        .floors(List.of())
+                        .tables(List.of())
+                        .build());
+
+        mockMvc.perform(get("/restaurants/{restaurantId}/branches/{branchId}/table-layout", RESTAURANT_ID, BRANCH_ID)
+                        .header("X-Test-User", "waiter@pos.local")
+                        .header("X-Test-Authorities", "ORDER_READ"))
                 .andExpect(status().isOk());
     }
 

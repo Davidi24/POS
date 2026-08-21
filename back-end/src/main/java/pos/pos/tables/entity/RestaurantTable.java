@@ -27,6 +27,7 @@ import pos.pos.tables.enums.TableStatus;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -112,6 +113,12 @@ public class RestaurantTable extends AbstractAuditedEntity {
     @Column(name = "position_y", precision = 10, scale = 2)
     private BigDecimal positionY;
 
+    @Column(name = "rotation_degrees", nullable = false, precision = 7, scale = 3)
+    private BigDecimal rotationDegrees = BigDecimal.ZERO;
+
+    @Column(name = "layout_scale", nullable = false, precision = 6, scale = 4)
+    private BigDecimal layoutScale = new BigDecimal("0.7400");
+
     @Enumerated(EnumType.STRING)
     @Column(name = "shape", nullable = false, length = 30)
     private TableShape shape = TableShape.RECTANGLE;
@@ -119,6 +126,12 @@ public class RestaurantTable extends AbstractAuditedEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private TableStatus status = TableStatus.AVAILABLE;
+
+    @Column(name = "guest_count")
+    private Integer guestCount;
+
+    @Column(name = "seated_at")
+    private OffsetDateTime seatedAt;
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
@@ -140,6 +153,12 @@ public class RestaurantTable extends AbstractAuditedEntity {
         name = NormalizationUtils.normalize(name == null ? tableNumber : name);
         floor = NormalizationUtils.normalize(floor);
         qrCodeValue = NormalizationUtils.normalize(qrCodeValue);
+        if (rotationDegrees == null) {
+            rotationDegrees = BigDecimal.ZERO;
+        }
+        if (layoutScale == null) {
+            layoutScale = new BigDecimal("0.7400");
+        }
     }
 
     @Override
@@ -150,6 +169,32 @@ public class RestaurantTable extends AbstractAuditedEntity {
 
         if ((positionX == null) != (positionY == null)) {
             throw new IllegalStateException("positionX and positionY must both be set together");
+        }
+
+        if (active && (floor == null || floor.isBlank() || positionX == null || positionY == null)) {
+            throw new IllegalStateException("active tables must have a floor and position");
+        }
+
+        if (rotationDegrees.compareTo(BigDecimal.ZERO) < 0
+                || rotationDegrees.compareTo(new BigDecimal("360")) >= 0) {
+            throw new IllegalStateException("rotationDegrees must be between 0 and less than 360");
+        }
+
+        if (layoutScale.compareTo(new BigDecimal("0.25")) < 0
+                || layoutScale.compareTo(new BigDecimal("4.00")) > 0) {
+            throw new IllegalStateException("layoutScale must be between 0.25 and 4.00");
+        }
+
+        if (status == TableStatus.OCCUPIED) {
+            if (guestCount == null || guestCount <= 0 || seatedAt == null) {
+                throw new IllegalStateException(
+                        "occupied tables must have a positive guestCount and seatedAt"
+                );
+            }
+        } else if (guestCount != null || seatedAt != null) {
+            throw new IllegalStateException(
+                    "only occupied tables can have seating details"
+            );
         }
 
         if (restaurant != null && branch != null && branch.getRestaurant() != null) {

@@ -19,6 +19,7 @@ import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.tables.dto.TableMergeRequest;
 import pos.pos.tables.dto.TableRequest;
 import pos.pos.tables.dto.TableResponse;
+import pos.pos.tables.dto.UpdateTableStatusRequest;
 import pos.pos.tables.entity.RestaurantTable;
 import pos.pos.tables.entity.TableCategory;
 import pos.pos.tables.enums.TableLocationType;
@@ -130,6 +131,48 @@ class RestaurantTableServiceTest {
         assertThat(response.getStatus()).isEqualTo(TableStatus.AVAILABLE);
         assertThat(response.getActive()).isTrue();
         assertThat(response.getEffectiveCapacity()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("Should seat guests without creating an order")
+    void shouldSeatGuestsWithoutCreatingOrder() {
+        Authentication authentication = authentication();
+        Branch branch = branch();
+        RestaurantTable table = table(branch, PRIMARY_TABLE_ID, "A1", 4);
+        UpdateTableStatusRequest request = UpdateTableStatusRequest.builder()
+                .status(TableStatus.OCCUPIED)
+                .guestCount(3)
+                .build();
+
+        when(restaurantScopeService.requireManageableBranch(
+                authentication,
+                RESTAURANT_ID,
+                BRANCH_ID
+        )).thenReturn(branch);
+        when(restaurantScopeService.currentUserId(authentication))
+                .thenReturn(ACTOR_ID);
+        when(restaurantTableRepository.findByIdAndBranch_Id(
+                PRIMARY_TABLE_ID,
+                BRANCH_ID
+        )).thenReturn(Optional.of(table));
+        when(restaurantTableRepository.saveAndFlush(any(RestaurantTable.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(restaurantTableRepository
+                .findAllByMergedInto_IdOrderByTableNumberAsc(PRIMARY_TABLE_ID))
+                .thenReturn(List.of());
+
+        TableResponse response = restaurantTableService.updateTableStatus(
+                authentication,
+                RESTAURANT_ID,
+                BRANCH_ID,
+                PRIMARY_TABLE_ID,
+                request
+        );
+
+        assertThat(response.getStatus()).isEqualTo(TableStatus.OCCUPIED);
+        assertThat(response.getGuestCount()).isEqualTo(3);
+        assertThat(response.getSeatedAt()).isNotNull();
+        assertThat(table.getUpdatedBy()).isEqualTo(ACTOR_ID);
     }
 
     @Test
