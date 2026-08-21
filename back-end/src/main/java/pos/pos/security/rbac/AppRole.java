@@ -13,6 +13,7 @@ public enum AppRole {
     SUPER_ADMIN(
             "Super Admin",
             "System-level control across all tenants",
+            60_000L,
             false,
             true,
             EnumSet.allOf(AppPermission.class)
@@ -21,6 +22,7 @@ public enum AppRole {
     OWNER(
             "Owner",
             "Business owner - full control over the restaurant",
+            50_000L,
             false,
             true,
             EnumSet.allOf(AppPermission.class)
@@ -29,6 +31,7 @@ public enum AppRole {
     CO_OWNER(
             "Co-Owner",
             "Shares ownership with limited restrictions",
+            40_000L,
             true,
             false,
             EnumSet.of(
@@ -48,6 +51,7 @@ public enum AppRole {
     ADMIN(
             "Admin",
             "Store administrator - manages staff, inventory, settings and reports",
+            30_000L,
             false,
             false,
             EnumSet.of(
@@ -67,6 +71,7 @@ public enum AppRole {
     MANAGER(
             "Manager",
             "Store manager - oversees operations and staff",
+            20_000L,
             true,
             false,
             EnumSet.of(
@@ -84,6 +89,7 @@ public enum AppRole {
     WAITER(
             "Waiter",
             "Handles orders and customer service",
+            10_000L,
             true,
             false,
             EnumSet.of(
@@ -100,7 +106,8 @@ public enum AppRole {
     KITCHEN(
             "Kitchen",
             "Kitchen staff - views and updates kitchen display tickets",
-            true,
+            5_000L,
+            false,
             false,
             EnumSet.of(
                     MENUS_READ,
@@ -110,10 +117,9 @@ public enum AppRole {
             )
     );
 
-    private static final long RANK_STEP = 10_000L;
-
     private final String displayName;
     private final String description;
+    private final long rank;
     private final boolean assignable;
     private final boolean protectedRole;
     private final Set<AppPermission> permissions;
@@ -121,12 +127,14 @@ public enum AppRole {
     AppRole(
             String displayName,
             String description,
+            long rank,
             boolean assignable,
             boolean protectedRole,
             Set<AppPermission> permissions
     ) {
         this.displayName = displayName;
         this.description = description;
+        this.rank = rank;
         this.assignable = assignable;
         this.protectedRole = protectedRole;
         this.permissions = permissions;
@@ -134,7 +142,7 @@ public enum AppRole {
 
     public String displayName() { return displayName; }
     public String description() { return description; }
-    public long rank() { return (values().length - ordinal()) * RANK_STEP; }
+    public long rank() { return rank; }
     public boolean assignable() { return assignable; }
     public boolean protectedRole() { return protectedRole; }
     public Set<AppPermission> permissions() { return permissions; }

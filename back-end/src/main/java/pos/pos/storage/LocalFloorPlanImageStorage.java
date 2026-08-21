@@ -80,6 +80,14 @@ public class LocalFloorPlanImageStorage implements FloorPlanImageStorage {
         }
     }
 
+    @Override
+    public String publicUrl(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return null;
+        }
+        return "/public/floor-plan-images/" + objectKey;
+    }
+
     private void validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file is required");

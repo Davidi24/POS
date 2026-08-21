@@ -9,6 +9,7 @@ import pos.pos.tables.enums.TableShape;
 import pos.pos.tables.enums.TableStatus;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,7 +30,11 @@ public class TableLayoutItemResponse {
     private String floor;
     private BigDecimal positionX;
     private BigDecimal positionY;
+    private BigDecimal rotationDegrees;
+    private BigDecimal layoutScale;
     private TableShape shape;
     private TableStatus status;
+    private Integer guestCount;
+    private OffsetDateTime seatedAt;
     private Boolean active;
 }
