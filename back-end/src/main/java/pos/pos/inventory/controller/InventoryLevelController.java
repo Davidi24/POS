@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.inventory.dto.InventoryLevelResponse;
+import pos.pos.inventory.dto.InventoryLevelTotalResponse;
 import pos.pos.inventory.service.InventoryLevelService;
 
 import java.util.List;
@@ -51,6 +52,19 @@ public class InventoryLevelController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(inventoryLevelService.listLowStock(authentication, restaurantId));
+    }
+
+    @GetMapping("/total/{itemId}")
+    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @Operation(summary = "Get the total on-hand quantity for one item, summed across all locations")
+    @ApiResponse(responseCode = "200", description = "Total computed")
+    @ApiResponse(responseCode = "404", description = "Item not found")
+    public ResponseEntity<InventoryLevelTotalResponse> getTotalOnHand(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID itemId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(inventoryLevelService.getTotalOnHand(authentication, restaurantId, itemId));
     }
 
     @GetMapping("/{locationId}/{itemId}")

@@ -8,6 +8,7 @@ import pos.pos.exception.inventory.InventoryItemNotFoundException;
 import pos.pos.exception.inventory.InventoryLevelNotFoundException;
 import pos.pos.exception.inventory.InventoryLocationNotFoundException;
 import pos.pos.inventory.dto.InventoryLevelResponse;
+import pos.pos.inventory.dto.InventoryLevelTotalResponse;
 import pos.pos.inventory.entity.InventoryItem;
 import pos.pos.inventory.entity.InventoryLevel;
 import pos.pos.inventory.entity.InventoryLocation;
@@ -96,6 +97,23 @@ public class InventoryLevelService {
                 .toList();
     }
 
+
+    // Same access + ownership pattern as the other reads: confirm the restaurant is accessible,
+    // then confirm the item actually belongs to it (404 otherwise), before summing.
+    @Transactional(readOnly = true)
+    public InventoryLevelTotalResponse getTotalOnHand(Authentication authentication, UUID restaurantId, UUID itemId) {
+        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        InventoryItem item = requireItem(restaurantId, itemId);
+
+        BigDecimal total = inventoryLevelRepository.sumOnHandQuantityByRestaurantAndItem(restaurantId, itemId);
+
+        return InventoryLevelTotalResponse.builder()
+                .itemId(item.getId())
+                .itemName(item.getName())
+                .totalOnHandQuantity(total == null ? BigDecimal.ZERO : total)
+                .unit(item.getBaseUnit())
+                .build();
+    }
 
     // Returns the Repository Method for listing the stock that is lower than reorder variable
     @Transactional(readOnly = true)
