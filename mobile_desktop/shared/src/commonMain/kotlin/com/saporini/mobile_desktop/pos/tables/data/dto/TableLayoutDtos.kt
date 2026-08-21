@@ -33,6 +33,8 @@ data class TableLayoutItemResponseDto(
     val layoutScale: Double = 0.74,
     val shape: String,
     val status: String,
+    val guestCount: Int? = null,
+    val seatedAt: String? = null,
     val active: Boolean
 )
 

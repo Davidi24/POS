@@ -25,6 +25,8 @@ data class AuthenticationResponse(
 @Serializable
 data class CurrentUserResponse(
     val id: String,
+    val restaurantId: String? = null,
+    val defaultBranchId: String? = null,
     val email: String,
     val username: String,
     val firstName: String,
