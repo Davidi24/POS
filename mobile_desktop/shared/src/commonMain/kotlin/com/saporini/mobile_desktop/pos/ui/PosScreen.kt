@@ -45,7 +45,9 @@ object PosScreen : Screen {
         var showPaymentScreen by remember { mutableStateOf(false) }
         val sessionManager = koinInject<SessionManager>()
         val currentUser by sessionManager.currentUser.collectAsState()
-        val canEditTableLayout = "SETTINGS_UPDATE" in currentUser?.permissions.orEmpty()
+        val canEditTableLayout =
+            "SETTINGS_UPDATE" in currentUser?.permissions.orEmpty() ||
+                "MANAGER" in currentUser?.roles.orEmpty()
 
         Box(Modifier.fillMaxSize().background(Color.White)) {
             Column(Modifier.fillMaxSize()) {

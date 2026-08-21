@@ -8,9 +8,7 @@ import com.saporini.mobile_desktop.core.network.ApiConfig
 import com.saporini.mobile_desktop.core.session.TokenStore
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.auth.Auth
-import io.ktor.client.plugins.auth.providers.*
-import io.ktor.client.plugins.pluginOrNull
+import io.ktor.client.plugins.auth.clearAuthTokens
 import io.ktor.client.request.*
 import io.ktor.http.*
 
@@ -32,11 +30,7 @@ class AuthRepository(
 
         TokenStore.save(response.accessToken, response.refreshToken)
 
-        client.pluginOrNull(Auth)
-            ?.providers
-            .orEmpty()
-            .filterIsInstance<BearerAuthProvider>()
-            .forEach { it.clearToken() }
+        client.clearAuthTokens()
 
         return response
     }
@@ -66,11 +60,7 @@ class AuthRepository(
 
         TokenStore.clear()
 
-        client.pluginOrNull(Auth)
-            ?.providers
-            .orEmpty()
-            .filterIsInstance<BearerAuthProvider>()
-            .forEach { it.clearToken() }
+        client.clearAuthTokens()
     }
 
     private suspend fun <T> executeWithFallback(block: suspend (String) -> T): T {

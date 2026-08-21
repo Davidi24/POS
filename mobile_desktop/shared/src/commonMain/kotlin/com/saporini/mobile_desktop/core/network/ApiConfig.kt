@@ -7,6 +7,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -85,8 +86,9 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
             isLenient = true
         })
     }
+    install(SSE)
     install(Logging) {
-        level = LogLevel.ALL
+        level = LogLevel.NONE
     }
     install(Auth) {
         bearer {

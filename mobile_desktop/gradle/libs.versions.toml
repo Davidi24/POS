@@ -9,16 +9,17 @@ androidx-core = "1.18.0"
 androidx-espresso = "3.7.0"
 androidx-lifecycle = "2.11.0-beta01"
 androidx-testExt = "1.3.0"
-composeMultiplatform = "1.11.0"
+composeMultiplatform = "1.11.1"
 junit = "4.13.2"
 kotlin = "2.3.21"
 kotlinx-coroutines = "1.11.0"
+ktor = "3.5.0"
 material3 = "1.11.0-alpha07"
 voyager = "1.1.0-beta03"
 jna = "5.14.0"
 datastore = "1.1.1"
 tink = "1.15.0"
-composeHotReload = "1.1.1"
+composeHotReload = "1.2.0-rc01"
 koin = "4.0.0"
 
 [libraries]
@@ -40,6 +41,15 @@ compose-ui                          = { module = "org.jetbrains.compose.ui:ui", 
 compose-components-resources        = { module = "org.jetbrains.compose.components:components-resources",             version.ref = "composeMultiplatform" }
 compose-uiToolingPreview            = { module = "org.jetbrains.compose.ui:ui-tooling-preview",                       version.ref = "composeMultiplatform" }
 kotlinx-coroutinesSwing             = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing",                    version.ref = "kotlinx-coroutines" }
+kotlinx-coroutinesCore              = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",                     version.ref = "kotlinx-coroutines" }
+kotlinx-coroutinesTest              = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test",                     version.ref = "kotlinx-coroutines" }
+ktor-clientAuth                     = { module = "io.ktor:ktor-client-auth",                                          version.ref = "ktor" }
+ktor-clientContentNegotiation       = { module = "io.ktor:ktor-client-content-negotiation",                           version.ref = "ktor" }
+ktor-clientCore                     = { module = "io.ktor:ktor-client-core",                                         version.ref = "ktor" }
+ktor-clientLogging                  = { module = "io.ktor:ktor-client-logging",                                      version.ref = "ktor" }
+ktor-clientMock                     = { module = "io.ktor:ktor-client-mock",                                         version.ref = "ktor" }
+ktor-clientOkhttp                   = { module = "io.ktor:ktor-client-okhttp",                                       version.ref = "ktor" }
+ktor-serializationKotlinxJson       = { module = "io.ktor:ktor-serialization-kotlinx-json",                          version.ref = "ktor" }
 voyager-navigator                   = { module = "cafe.adriel.voyager:voyager-navigator", version.ref = "voyager" }
 voyager-screenmodel                 = { module = "cafe.adriel.voyager:voyager-screenmodel", version.ref = "voyager" }
 voyager-transitions                 = { module = "cafe.adriel.voyager:voyager-transitions", version.ref = "voyager" }

@@ -14,8 +14,13 @@ data class FloorPlanTable(
     val statusText: String? = null,
     val servedItems: Int = 0,
     val totalItems: Int = 0,
+    val guestCount: Int? = null,
+    val seatedAt: String? = null,
     val scale: Float = 0.74f,
-    val rotationDegrees: Float = 0f
+    val rotationDegrees: Float = 0f,
+    val id: String? = null,
+    val floorName: String = "1st Floor",
+    val active: Boolean = true
 ) {
     fun visualWidth(): Dp =
         when (shape) {

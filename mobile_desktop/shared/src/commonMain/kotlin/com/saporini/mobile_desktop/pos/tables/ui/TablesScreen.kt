@@ -58,6 +58,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,6 +93,7 @@ import mobile_desktop.shared.generated.resources.auth_login_img
 import mobile_desktop.shared.generated.resources.plan
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.decodeToImageBitmap
+import org.koin.compose.koinInject
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -101,36 +104,86 @@ fun TablesScreen(
     canEditLayout: Boolean = false,
     onAddItemsRequested: () -> Unit = {}
 ) {
+    val screenModel = koinInject<TablesScreenModel>()
+    val backendState by screenModel.state.collectAsState()
     var selectedFloor by remember { mutableStateOf(FloorOption.FIRST) }
     var selectedStatuses by remember { mutableStateOf<Set<TableVisualState>>(emptySet()) }
     var selectedTables by remember { mutableStateOf<List<FloorPlanTable>>(emptyList()) }
     var mergeMode by remember { mutableStateOf(false) }
     var mergeSelection by remember { mutableStateOf<Set<String>>(emptySet()) }
     var mergedGroups by remember { mutableStateOf<List<Set<String>>>(emptyList()) }
-    var mergeGroupColorIndexes by remember { mutableStateOf<Map<Set<String>, Int>>(emptyMap()) }
-    var nextMergeColorIndex by remember { mutableStateOf(0) }
-    var activeMergeColorIndex by remember { mutableStateOf<Int?>(null) }
     var editingMergeGroup by remember { mutableStateOf<Set<String>?>(null) }
+    var mergePrimaryLabel by remember { mutableStateOf<String?>(null) }
     var tableOrderOverrides by remember { mutableStateOf<Map<String, TableOrderOverride>>(emptyMap()) }
     var nextOrderNumber by remember { mutableStateOf(1246) }
     var newOrderTables by remember { mutableStateOf<List<FloorPlanTable>>(emptyList()) }
-    var layoutTables by remember { mutableStateOf(floorPlanTables) }
+    var layoutTables by remember { mutableStateOf<List<FloorPlanTable>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
     var editMode by remember { mutableStateOf(false) }
-    var selectedEditTableLabel by remember { mutableStateOf<String?>(null) }
+    var selectedEditTableLabels by remember {
+        mutableStateOf<Set<String>>(emptySet())
+    }
+    var editTableSnapshot by remember {
+        mutableStateOf<List<FloorPlanTable>?>(null)
+    }
     var customPlanBytes by remember { mutableStateOf<ByteArray?>(null) }
-    var showBundledPlan by remember { mutableStateOf(floorPlanTables.isNotEmpty()) }
+    var showBundledPlan by remember { mutableStateOf(false) }
     var planOffset by remember { mutableStateOf(Offset.Zero) }
     var planMoveMode by remember { mutableStateOf(false) }
     var planScale by remember { mutableStateOf(1f) }
     val customPlan = remember(customPlanBytes) {
         customPlanBytes?.decodeToImageBitmap()
     }
+    val selectedFloorLayout = backendState.floorLayouts.firstOrNull {
+        it.floorName == selectedFloor.label
+    }
+
+    LaunchedEffect(backendState.tableLayout) {
+        if (!editMode) {
+            layoutTables = backendState.tableLayout
+                ?.tables
+                .orEmpty()
+                .map { it.toUiTable() }
+            mergedGroups = backendState.tableLayout
+                ?.tables
+                .orEmpty()
+                .filter { it.mergedTableIds.isNotEmpty() }
+                .map { parent ->
+                    buildSet {
+                        add(parent.tableNumber)
+                        parent.mergedTableIds.forEach { childId ->
+                            backendState.tableLayout?.tables
+                                ?.firstOrNull { it.id == childId }
+                                ?.tableNumber
+                                ?.let(::add)
+                        }
+                    }
+                }
+                .filter { it.size >= 2 }
+        }
+    }
+
+    LaunchedEffect(selectedFloor, selectedFloorLayout, backendState.planImageBytes) {
+        customPlanBytes = selectedFloorLayout?.let {
+            backendState.planImageBytes[it.id]
+        }
+        showBundledPlan = false
+        planOffset = Offset(
+            selectedFloorLayout?.planOffsetX ?: 0f,
+            selectedFloorLayout?.planOffsetY ?: 0f
+        )
+        planScale = selectedFloorLayout?.planScale ?: 1f
+        planMoveMode = false
+        selectedEditTableLabels = emptySet()
+    }
+
     val currentTables = layoutTables.map { table ->
         tableOrderOverrides[table.label]?.applyTo(table) ?: table
-    }.filter { table ->
-        searchQuery.isBlank() || table.label.contains(searchQuery, ignoreCase = true)
-    }
+    }.filter { it.floorName == selectedFloor.label }
+        .filter { editMode || it.active }
+        .filter { table ->
+            searchQuery.isBlank() || table.label.contains(searchQuery, ignoreCase = true)
+        }
 
     Column(
         modifier = modifier
@@ -165,24 +218,59 @@ fun TablesScreen(
                                 onCancel = {
                                     mergeMode = false
                                     mergeSelection = emptySet()
-                                    activeMergeColorIndex = null
                                     editingMergeGroup = null
+                                    mergePrimaryLabel = null
                                 },
                                 onDone = {
                                     if (mergeSelection.size >= 2) {
-                                        val nextGroups = mergedGroups
-                                            .filterNot { it == editingMergeGroup }
-                                            .filterNot { group -> group.any { it in mergeSelection } }
-                                        val colorIndex = activeMergeColorIndex ?: nextMergeColorIndex
-                                        mergedGroups = nextGroups.plus(listOf(mergeSelection))
-                                        mergeGroupColorIndexes = mergeGroupColorIndexes
-                                            .filterKeys { it in nextGroups }
-                                            .plus(mergeSelection to colorIndex)
-                                        nextMergeColorIndex = maxOf(nextMergeColorIndex, colorIndex + 1)
+                                        val groupsBeingReplaced = mergedGroups.filter { group ->
+                                            group == editingMergeGroup ||
+                                                group.any { it in mergeSelection }
+                                        }
+                                        val nextGroups = mergedGroups.filterNot {
+                                            it in groupsBeingReplaced
+                                        }
+                                        val backendTables = backendState.tableLayout
+                                            ?.tables
+                                            .orEmpty()
+                                        val selectedBackendTables = backendTables
+                                            .filter { it.tableNumber in mergeSelection }
+                                        val primaryTable = selectedBackendTables
+                                            .firstOrNull {
+                                                it.tableNumber == mergePrimaryLabel
+                                            }
+                                            ?: selectedBackendTables.firstOrNull()
+                                        val replacedLabels = groupsBeingReplaced
+                                            .flatten()
+                                            .toSet()
+                                        val previousPrimaryTableIds = backendTables
+                                            .filter {
+                                                it.mergedTableIds.isNotEmpty() &&
+                                                    it.tableNumber in replacedLabels
+                                            }
+                                            .map { it.id }
+                                        val childTableIds = selectedBackendTables
+                                            .filter { it.id != primaryTable?.id }
+                                            .map { it.id }
+
+                                        if (
+                                            primaryTable != null &&
+                                            childTableIds.isNotEmpty()
+                                        ) {
+                                            screenModel.saveTableMerge(
+                                                primaryTableId = primaryTable.id,
+                                                childTableIds = childTableIds,
+                                                previousPrimaryTableIds =
+                                                    previousPrimaryTableIds
+                                            )
+                                        }
+
+                                        mergedGroups =
+                                            nextGroups + listOf(mergeSelection)
                                         mergeMode = false
                                         mergeSelection = emptySet()
-                                        activeMergeColorIndex = null
                                         editingMergeGroup = null
+                                        mergePrimaryLabel = null
                                     }
                                 }
                             )
@@ -193,10 +281,50 @@ fun TablesScreen(
                                 editMode = editMode,
                                 hasBackground = customPlan != null || showBundledPlan,
                                 planMoveMode = planMoveMode,
-                                selectedTableLabel = selectedEditTableLabel,
+                                selectedTableLabels = selectedEditTableLabels,
                                 onEditModeChanged = {
+                                    if (!it) {
+                                        if (
+                                            editTableSnapshot != null &&
+                                            layoutTables != editTableSnapshot
+                                        ) {
+                                            val originalTables =
+                                                backendState.tableLayout
+                                                    ?.tables
+                                                    .orEmpty()
+                                                    .associateBy { table -> table.id }
+                                            screenModel.saveTables(
+                                                layoutTables.map { table ->
+                                                    table.toDomainTable(
+                                                        table.id?.let(originalTables::get)
+                                                    )
+                                                }
+                                            )
+                                        }
+                                        if (
+                                            selectedFloorLayout != null &&
+                                            (
+                                                planOffset.x !=
+                                                    selectedFloorLayout.planOffsetX ||
+                                                planOffset.y !=
+                                                    selectedFloorLayout.planOffsetY ||
+                                                planScale !=
+                                                    selectedFloorLayout.planScale
+                                            )
+                                        ) {
+                                            screenModel.saveFloor(
+                                                selectedFloorLayout.copy(
+                                                    planOffsetX = planOffset.x,
+                                                    planOffsetY = planOffset.y,
+                                                    planScale = planScale
+                                                )
+                                            )
+                                        }
+                                    }
                                     editMode = it
-                                    selectedEditTableLabel = null
+                                    editTableSnapshot =
+                                        if (it) layoutTables else null
+                                    selectedEditTableLabels = emptySet()
                                     if (!it) planMoveMode = false
                                     if (it) searchQuery = ""
                                 },
@@ -205,48 +333,84 @@ fun TablesScreen(
                                         tables = layoutTables,
                                         shape = shape,
                                         seatCount = chairs
-                                    )
+                                    ).copy(floorName = selectedFloor.label)
                                     layoutTables = layoutTables + newTable
-                                    selectedEditTableLabel = newTable.label
+                                    selectedEditTableLabels = setOf(newTable.label)
+                                },
+                                onDuplicateSelectedTables = {
+                                    val selectedTablesToDuplicate =
+                                        layoutTables.filter {
+                                            it.label in selectedEditTableLabels
+                                        }
+                                    if (selectedTablesToDuplicate.isNotEmpty()) {
+                                        var updatedTables = layoutTables
+                                        val duplicateLabels =
+                                            mutableSetOf<String>()
+                                        selectedTablesToDuplicate.forEach { source ->
+                                            val duplicate =
+                                                duplicatePreviewTable(
+                                                    tables = updatedTables,
+                                                    source = source
+                                                )
+                                            updatedTables =
+                                                updatedTables + duplicate
+                                            duplicateLabels += duplicate.label
+                                        }
+                                        layoutTables = updatedTables
+                                        selectedEditTableLabels =
+                                            duplicateLabels
+                                    }
                                 },
                                 onRotateSelectedTable = { change ->
-                                    selectedEditTableLabel?.let { label ->
-                                        layoutTables = layoutTables.map { table ->
-                                            if (table.label == label) {
-                                                table.copy(
-                                                    rotationDegrees =
-                                                        (table.rotationDegrees + change + 360f) % 360f
-                                                )
-                                            } else table
-                                        }
+                                    layoutTables = layoutTables.map { table ->
+                                        if (
+                                            table.label in
+                                            selectedEditTableLabels
+                                        ) {
+                                            table.copy(
+                                                rotationDegrees =
+                                                    (table.rotationDegrees +
+                                                        change + 360f) % 360f
+                                            )
+                                        } else table
                                     }
                                 },
                                 onScaleSelectedTable = { change ->
-                                    selectedEditTableLabel?.let { label ->
-                                        layoutTables = layoutTables.map { table ->
-                                            if (table.label == label) {
-                                                table.copy(
-                                                    scale = (table.scale + change).coerceIn(0.35f, 1.20f)
-                                                )
-                                            } else table
-                                        }
+                                    layoutTables = layoutTables.map { table ->
+                                        if (
+                                            table.label in
+                                            selectedEditTableLabels
+                                        ) {
+                                            table.copy(
+                                                scale = (table.scale + change)
+                                                    .coerceIn(0.35f, 1.20f)
+                                            )
+                                        } else table
                                     }
                                 },
                                 onDeleteSelectedTable = {
-                                    selectedEditTableLabel?.let { label ->
-                                        layoutTables = layoutTables.filterNot { it.label == label }
-                                        mergedGroups = mergedGroups
-                                            .map { it - label }
-                                            .filter { it.size >= 2 }
-                                        selectedEditTableLabel = null
+                                    layoutTables = layoutTables.filterNot {
+                                        it.label in selectedEditTableLabels
                                     }
+                                    mergedGroups = mergedGroups
+                                        .map {
+                                            it - selectedEditTableLabels
+                                        }
+                                        .filter { it.size >= 2 }
+                                    selectedEditTableLabels = emptySet()
                                 },
-                                onBackgroundSelected = {
-                                    customPlanBytes = it
+                                onBackgroundSelected = { bytes, fileName, contentType ->
+                                    customPlanBytes = bytes
                                     showBundledPlan = false
                                     planOffset = Offset.Zero
                                     planMoveMode = false
                                     planScale = 1f
+                                    screenModel.uploadPlanImage(
+                                        floorName = selectedFloor.label,
+                                        imageBytes = bytes,
+                                        fileName = fileName,
+                                        contentType = contentType
+                                    )
                                 },
                                 onRemoveBackground = {
                                     customPlanBytes = null
@@ -254,6 +418,9 @@ fun TablesScreen(
                                     planOffset = Offset.Zero
                                     planMoveMode = false
                                     planScale = 1f
+                                    selectedFloorLayout?.let {
+                                        screenModel.removePlanImage(it.id)
+                                    }
                                 },
                                 onPlanMoveModeChanged = { planMoveMode = it },
                                 onScalePlan = { change ->
@@ -283,7 +450,8 @@ fun TablesScreen(
                                     EditLayoutIconButton(
                                         onClick = {
                                             editMode = true
-                                            selectedEditTableLabel = null
+                                            editTableSnapshot = layoutTables
+                                            selectedEditTableLabels = emptySet()
                                             planMoveMode = false
                                             searchQuery = ""
                                         },
@@ -302,8 +470,6 @@ fun TablesScreen(
                         mergeMode = mergeMode,
                         mergeSelection = mergeSelection,
                         mergedGroups = mergedGroups,
-                        mergeGroupColorIndexes = mergeGroupColorIndexes,
-                        activeMergeColorIndex = activeMergeColorIndex,
                         editingMergeGroup = editingMergeGroup,
                         editMode = editMode && canEditLayout,
                         customPlan = customPlan,
@@ -312,23 +478,35 @@ fun TablesScreen(
                         planScale = planScale,
                         planMoveMode = planMoveMode,
                         onPlanMove = { x, y -> planOffset += Offset(x, y) },
-                        selectedEditTableLabel = selectedEditTableLabel,
+                        selectedEditTableLabels = selectedEditTableLabels,
                         onTableMoveDelta = { label, deltaX, deltaY ->
-                            layoutTables = layoutTables.map {
-                                if (it.label == label) {
-                                    it.copy(
-                                        x = (it.x + deltaX).coerceIn(0.04f, 0.96f),
-                                        y = (it.y + deltaY).coerceIn(0.04f, 0.96f)
-                                    )
-                                } else it
+                            val labelsToMove =
+                                if (label in selectedEditTableLabels) {
+                                    selectedEditTableLabels
+                                } else {
+                                    setOf(label)
+                                }
+                            if (label !in selectedEditTableLabels) {
+                                selectedEditTableLabels = setOf(label)
                             }
+                            layoutTables = moveSelectedTables(
+                                tables = layoutTables,
+                                selectedLabels = labelsToMove,
+                                deltaX = deltaX,
+                                deltaY = deltaY
+                            )
                         },
                         onEditTableSelected = {
                             planMoveMode = false
-                            selectedEditTableLabel = it.label
+                            selectedEditTableLabels =
+                                if (it.label in selectedEditTableLabels) {
+                                    selectedEditTableLabels - it.label
+                                } else {
+                                    selectedEditTableLabels + it.label
+                                }
                         },
                         onEditSelectionCleared = {
-                            selectedEditTableLabel = null
+                            selectedEditTableLabels = emptySet()
                         },
                         onTableClick = { table ->
                             if (mergeMode) {
@@ -375,11 +553,69 @@ fun TablesScreen(
                 }
             }
 
+            if (
+                !backendState.isLoading &&
+                layoutTables.none {
+                    it.floorName == selectedFloor.label &&
+                        (editMode || it.active)
+                } &&
+                customPlan == null &&
+                !showBundledPlan
+            ) {
+                EmptyFloorPlan(editMode = editMode)
+            }
+
+            if (backendState.isLoading || backendState.isSaving) {
+                Text(
+                    text = if (backendState.isLoading) {
+                        "Loading table layout…"
+                    } else {
+                        "Saving table layout…"
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 82.dp)
+                        .background(Color.White, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp,
+                    color = Color(0xFF4B522A)
+                )
+            }
+
+            backendState.errorMessage?.let { message ->
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 82.dp)
+                        .background(Color(0xFFFFF1F0), RoundedCornerShape(8.dp))
+                        .padding(start = 14.dp, end = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = message,
+                        fontFamily = Inter(),
+                        fontSize = 13.sp,
+                        color = Color(0xFFB42318)
+                    )
+                    TextButton(onClick = screenModel::load) {
+                        Text("Retry")
+                    }
+                }
+            }
+
             if (selectedTables.isNotEmpty()) {
                 TableDetailsModal(
                     tables = selectedTables,
                     onDismiss = { selectedTables = emptyList() },
-                    onAddOrder = {
+                    onSeatGuests = { guestCount ->
+                        selectedTables.firstOrNull()?.id?.let { tableId ->
+                            screenModel.seatGuests(tableId, guestCount)
+                        }
+                        selectedTables = emptyList()
+                    },
+                    onStartOrder = {
                         newOrderTables = selectedTables
                         selectedTables = emptyList()
                     },
@@ -390,15 +626,19 @@ fun TablesScreen(
                     onMergeTables = {
                         val initialSelection = selectedTables.map { it.label }.toSet()
                         val existingGroup = mergedGroups.firstOrNull { it == initialSelection }
+                        val persistedParent = backendState.tableLayout
+                            ?.tables
+                            .orEmpty()
+                            .firstOrNull {
+                                it.mergedTableIds.isNotEmpty() &&
+                                    it.tableNumber in initialSelection
+                            }
                         selectedTables = emptyList()
                         mergeMode = true
                         mergeSelection = initialSelection
-                        activeMergeColorIndex = if (existingGroup != null) {
-                            mergeGroupColorIndexes[existingGroup] ?: mergedGroups.indexOf(existingGroup)
-                        } else {
-                            nextMergeColorIndex.also { nextMergeColorIndex += 1 }
-                        }
                         editingMergeGroup = existingGroup
+                        mergePrimaryLabel = persistedParent?.tableNumber
+                            ?: initialSelection.firstOrNull()
                     }
                 )
             }
@@ -432,8 +672,6 @@ private fun FloorPlanTables(
     mergeMode: Boolean,
     mergeSelection: Set<String>,
     mergedGroups: List<Set<String>>,
-    mergeGroupColorIndexes: Map<Set<String>, Int>,
-    activeMergeColorIndex: Int?,
     editingMergeGroup: Set<String>?,
     editMode: Boolean,
     customPlan: ImageBitmap?,
@@ -442,7 +680,7 @@ private fun FloorPlanTables(
     planScale: Float,
     planMoveMode: Boolean,
     onPlanMove: (Float, Float) -> Unit,
-    selectedEditTableLabel: String?,
+    selectedEditTableLabels: Set<String>,
     onTableMoveDelta: (String, Float, Float) -> Unit,
     onEditTableSelected: (FloorPlanTable) -> Unit,
     onEditSelectionCleared: () -> Unit,
@@ -561,8 +799,6 @@ private fun FloorPlanTables(
                     }
                 }
             }
-        } else if (tables.isEmpty()) {
-            EmptyFloorPlan(editMode = editMode)
         }
 
         val visibleTables = if (selectedStatuses.isEmpty()) {
@@ -573,12 +809,14 @@ private fun FloorPlanTables(
 
         mergedGroups
             .filterNot { mergeMode && it.any { label -> label in mergeSelection } }
-            .forEachIndexed { index, group ->
+            .forEach { group ->
             MergeGroupBox(
                 tables = tables.filter { it.label in group },
                 planWidth = maxWidth,
                 planHeight = planHeight,
-                color = mergeGroupColor(mergeGroupColorIndexes[group] ?: index)
+                planScale = planScale,
+                planOffset = planOffset,
+                color = Color.Black
             )
         }
 
@@ -593,7 +831,9 @@ private fun FloorPlanTables(
                 tables = tables.filter { it.label in mergeSelection },
                 planWidth = maxWidth,
                 planHeight = planHeight,
-                color = mergeGroupColor(activeMergeColorIndex ?: mergedGroups.size),
+                planScale = planScale,
+                planOffset = planOffset,
+                color = Color.Black,
                 selected = true
             )
         }
@@ -602,7 +842,9 @@ private fun FloorPlanTables(
             RemovedMergeTables(
                 tables = tables.filter { it.label in removedFromEditedGroup },
                 planWidth = maxWidth,
-                planHeight = planHeight
+                planHeight = planHeight,
+                planScale = planScale,
+                planOffset = planOffset
             )
         }
 
@@ -634,8 +876,8 @@ private fun FloorPlanTables(
                     .then(
                         if (editMode) {
                             Modifier.border(
-                                width = if (selectedEditTableLabel == table.label) 3.dp else 1.dp,
-                                color = if (selectedEditTableLabel == table.label) {
+                                width = if (table.label in selectedEditTableLabels) 3.dp else 1.dp,
+                                color = if (table.label in selectedEditTableLabels) {
                                     Color(0xFF242424)
                                 } else {
                                     Color(0xFF8B8B87)
@@ -682,7 +924,14 @@ private fun BoxScope.NewOrderModal(
     onCreateOrder: (Set<String>) -> Unit
 ) {
     var selectedLabels by remember(initialTables) { mutableStateOf(initialTables.map { it.label }.toSet()) }
-    var covers by remember(initialTables) { mutableStateOf(initialTables.sumOf { it.seatCount.coerceAtLeast(1) }.coerceAtLeast(1)) }
+    var covers by remember(initialTables) {
+        mutableStateOf(
+            initialTables.mapNotNull { it.guestCount }.maxOrNull()
+                ?: initialTables.sumOf {
+                    it.seatCount.coerceAtLeast(1)
+                }.coerceAtLeast(1)
+        )
+    }
     var guestName by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var selectedFloor by remember { mutableStateOf(FloorOption.FIRST) }
@@ -1805,6 +2054,8 @@ private fun MergeGroupBox(
     tables: List<FloorPlanTable>,
     planWidth: Dp,
     planHeight: Dp,
+    planScale: Float,
+    planOffset: Offset,
     color: Color,
     selected: Boolean = false
 ) {
@@ -1815,12 +2066,19 @@ private fun MergeGroupBox(
             .width(planWidth)
             .height(planHeight)
     ) {
-        val padding = 2.dp.toPx()
+        // Keep the selection outline flush with the tables instead of leaving
+        // a visible box-shaped gap around the group.
+        val padding = 0.dp.toPx()
         val tableRects = tables.map { table ->
-            val centerX = size.width * table.x
-            val centerY = size.height * table.y
-            val halfWidth = table.rotatedVisualWidth().toPx() * 0.5f + padding
-            val halfHeight = table.rotatedVisualHeight().toPx() * 0.5f + padding
+            val displayedTable = table.copy(scale = table.scale * planScale)
+            val scaledX = 0.5f + (table.x - 0.5f) * planScale
+            val scaledY = 0.5f + (table.y - 0.5f) * planScale
+            val centerX = size.width * scaledX + planOffset.x
+            val centerY = size.height * scaledY + planOffset.y
+            val halfWidth =
+                displayedTable.rotatedVisualWidth().toPx() * 0.5f + padding
+            val halfHeight =
+                displayedTable.rotatedVisualHeight().toPx() * 0.5f + padding
 
             Rect(
                 left = centerX - halfWidth,
@@ -1830,7 +2088,7 @@ private fun MergeGroupBox(
             )
         }
         val rects = tableRects + connectorRects(tableRects, 28.dp.toPx())
-        val fillColor = color.copy(alpha = if (selected) 0.12f else 0.08f)
+        val fillColor = color.copy(alpha = if (selected) 0.05f else 0.025f)
         tableRects.forEach { rect ->
             drawRect(
                 color = fillColor,
@@ -1855,7 +2113,9 @@ private fun MergeGroupBox(
 private fun RemovedMergeTables(
     tables: List<FloorPlanTable>,
     planWidth: Dp,
-    planHeight: Dp
+    planHeight: Dp,
+    planScale: Float,
+    planOffset: Offset
 ) {
     if (tables.isEmpty()) return
 
@@ -1868,10 +2128,15 @@ private fun RemovedMergeTables(
         val dash = PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 8.dp.toPx()))
 
         tables.forEach { table ->
-            val centerX = size.width * table.x
-            val centerY = size.height * table.y
-            val width = table.rotatedVisualWidth().toPx() + padding * 2
-            val height = table.rotatedVisualHeight().toPx() + padding * 2
+            val displayedTable = table.copy(scale = table.scale * planScale)
+            val scaledX = 0.5f + (table.x - 0.5f) * planScale
+            val scaledY = 0.5f + (table.y - 0.5f) * planScale
+            val centerX = size.width * scaledX + planOffset.x
+            val centerY = size.height * scaledY + planOffset.y
+            val width =
+                displayedTable.rotatedVisualWidth().toPx() + padding * 2
+            val height =
+                displayedTable.rotatedVisualHeight().toPx() + padding * 2
             val left = centerX - width * 0.5f
             val top = centerY - height * 0.5f
 
@@ -1882,7 +2147,7 @@ private fun RemovedMergeTables(
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx())
             )
             drawRoundRect(
-                color = Color(0xFF9A9A9A),
+                color = Color.Black,
                 topLeft = Offset(left, top),
                 size = androidx.compose.ui.geometry.Size(width, height),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
@@ -2051,18 +2316,35 @@ private fun TableStatusCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val enabled = count > 0
+    val visuallySelected = selected && enabled
+    val disabledContentColor = Color(0xFF7F847D)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(46.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) iconBackground else Color.White)
+            .background(
+                when {
+                    visuallySelected -> iconBackground
+                    enabled -> Color.White
+                    else -> Color(0xFFF3F4F2)
+                }
+            )
             .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = if (selected) iconTint else Color(0xFFE8E8E4),
+                width = if (visuallySelected) 2.dp else 1.dp,
+                color = when {
+                    visuallySelected -> iconTint
+                    enabled -> Color(0xFFE8E8E4)
+                    else -> Color(0xFFD8DBD5)
+                },
                 shape = RoundedCornerShape(8.dp)
             )
-            .clickable(onClick = onClick)
+            .clickable(
+                enabled = enabled,
+                onClick = onClick
+            )
             .padding(horizontal = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -2070,14 +2352,16 @@ private fun TableStatusCard(
             modifier = Modifier
                 .size(28.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(iconBackground),
+                .background(
+                    if (enabled) iconBackground else Color(0xFFE1E4DE)
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(17.dp),
-                tint = iconTint
+                tint = if (enabled) iconTint else disabledContentColor
             )
         }
         Spacer(Modifier.width(9.dp))
@@ -2088,7 +2372,11 @@ private fun TableStatusCard(
             fontWeight = FontWeight.SemiBold,
             fontSize = 13.sp,
             letterSpacing = 0.sp,
-            color = Color(0xFF1F2322)
+            color = if (enabled) {
+                Color(0xFF1F2322)
+            } else {
+                disabledContentColor
+            }
         )
         Text(
             text = count.toString(),
@@ -2096,7 +2384,11 @@ private fun TableStatusCard(
             fontWeight = FontWeight.SemiBold,
             fontSize = 15.sp,
             letterSpacing = 0.sp,
-            color = Color(0xFF1F2322)
+            color = if (enabled) {
+                Color(0xFF1F2322)
+            } else {
+                disabledContentColor
+            }
         )
     }
 }
@@ -2209,9 +2501,73 @@ private fun newPreviewTable(
         y = 0.5f,
         shape = shape,
         seatCount = seatCount,
-        label = "T${nextNumber.toString().padStart(2, '0')}"
+        label = tableLabel(nextNumber)
     )
 }
+
+private fun duplicatePreviewTable(
+    tables: List<FloorPlanTable>,
+    source: FloorPlanTable
+): FloorPlanTable {
+    val nextNumber = (tables.mapNotNull {
+        it.label.removePrefix("T").toIntOrNull()
+    }.maxOrNull() ?: 0) + 1
+
+    return source.copy(
+        id = null,
+        x = duplicatePosition(source.x),
+        y = duplicatePosition(source.y),
+        label = tableLabel(nextNumber),
+        state = TableVisualState.Free,
+        orderLabel = null,
+        statusText = null,
+        servedItems = 0,
+        totalItems = 0,
+        guestCount = null,
+        seatedAt = null,
+        active = true
+    )
+}
+
+private fun duplicatePosition(value: Float): Float =
+    if (value <= 0.91f) value + 0.04f else value - 0.04f
+
+private fun moveSelectedTables(
+    tables: List<FloorPlanTable>,
+    selectedLabels: Set<String>,
+    deltaX: Float,
+    deltaY: Float
+): List<FloorPlanTable> {
+    val selectedTables = tables.filter {
+        it.label in selectedLabels
+    }
+    if (selectedTables.isEmpty()) {
+        return tables
+    }
+
+    val appliedDeltaX = deltaX.coerceIn(
+        minimumValue = selectedTables.maxOf { 0.04f - it.x },
+        maximumValue = selectedTables.minOf { 0.96f - it.x }
+    )
+    val appliedDeltaY = deltaY.coerceIn(
+        minimumValue = selectedTables.maxOf { 0.04f - it.y },
+        maximumValue = selectedTables.minOf { 0.96f - it.y }
+    )
+
+    return tables.map { table ->
+        if (table.label in selectedLabels) {
+            table.copy(
+                x = table.x + appliedDeltaX,
+                y = table.y + appliedDeltaY
+            )
+        } else {
+            table
+        }
+    }
+}
+
+private fun tableLabel(number: Int): String =
+    "T${number.toString().padStart(2, '0')}"
 
 private enum class FloorOption(val label: String) {
     FIRST("1st Floor"),
@@ -2221,18 +2577,6 @@ private enum class FloorOption(val label: String) {
 
 private fun statusCount(tables: List<FloorPlanTable>, status: TableVisualState): Int =
     tables.count { it.state == status }
-
-private fun mergeGroupColor(index: Int): Color {
-    val colors = listOf(
-        Color(0xFF111111),
-        Color(0xFF2F6FB1),
-        Color(0xFFC47A18),
-        Color(0xFF7B3FA1),
-        Color(0xFF0F8B6F),
-        Color(0xFFB85E3B)
-    )
-    return colors[index % colors.size]
-}
 
 private fun orthogonalBoundarySegments(
     rects: List<Rect>,

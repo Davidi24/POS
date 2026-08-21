@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Close
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -53,16 +55,24 @@ import com.saporini.mobile_desktop.core.theme.Inter
 fun BoxScope.TableDetailsModal(
     tables: List<FloorPlanTable>,
     onDismiss: () -> Unit,
-    onAddOrder: () -> Unit,
+    onSeatGuests: (Int) -> Unit,
+    onStartOrder: () -> Unit,
     onAddItems: () -> Unit,
     onMergeTables: () -> Unit
 ) {
     val table = tables.first()
     val tableTitle = tables.joinToString(separator = "-") { it.label }
-    val covers = tables.sumOf { it.seatCount.coerceAtLeast(1) }
-    val hasOrder = tables.any {
-        it.orderLabel != null ||
-                it.state == TableVisualState.Occupied
+    val covers = tables.mapNotNull { it.guestCount }.maxOrNull()
+        ?: tables.sumOf { it.seatCount.coerceAtLeast(1) }
+    val hasOrder = tables.any { it.orderLabel != null }
+    val isSeated = !hasOrder && tables.any {
+        it.state == TableVisualState.Occupied
+    }
+    var guestCount by remember(tables) {
+        mutableStateOf(
+            tables.mapNotNull { it.guestCount }.maxOrNull()
+                ?: 1
+        )
     }
 
     Column(
@@ -109,7 +119,7 @@ fun BoxScope.TableDetailsModal(
             }
         }
 
-        if (hasOrder) {
+        if (hasOrder || isSeated) {
             Spacer(Modifier.height(24.dp))
 
             Column(
@@ -153,72 +163,204 @@ fun BoxScope.TableDetailsModal(
                     value = table.seatedSince()
                 )
 
-                DetailRow(
-                    icon = Icons.Filled.Assignment,
-                    label = "Current Order",
-                    value = table.orderLabel ?: "#ORD-1245"
-                )
+                if (hasOrder) {
+                    DetailRow(
+                        icon = Icons.Filled.Assignment,
+                        label = "Current Order",
+                        value = table.orderLabel.orEmpty()
+                    )
 
-                DetailRow(
-                    icon = Icons.Filled.Payments,
-                    label = "Order Total",
-                    value = table.orderTotal()
-                )
+                    DetailRow(
+                        icon = Icons.Filled.Payments,
+                        label = "Order Total",
+                        value = table.orderTotal()
+                    )
 
-                DetailRow(
-                    icon = Icons.Filled.Person,
-                    label = "Server",
-                    value = "David K."
-                )
+                    DetailRow(
+                        icon = Icons.Filled.Person,
+                        label = "Server",
+                        value = "David K."
+                    )
 
-                DetailRow(
-                    icon = Icons.Filled.QrCode2,
-                    label = "QR Session",
-                    value = "Active",
-                    valueColor = Color(0xFF319B48),
-                    badge = true
-                )
+                    DetailRow(
+                        icon = Icons.Filled.QrCode2,
+                        label = "QR Session",
+                        value = "Active",
+                        valueColor = Color(0xFF319B48),
+                        badge = true
+                    )
+                }
             }
 
             Spacer(Modifier.height(24.dp))
+
+            if (hasOrder) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    DialogActionButton(
+                        text = "View Order",
+                        icon = Icons.Filled.List,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    DialogActionButton(
+                        text = "Add Items",
+                        icon = Icons.Filled.AddCircle,
+                        modifier = Modifier.weight(1f),
+                        onClick = onAddItems
+                    )
+
+                    MoreActionsButton(
+                        text = "More Actions",
+                        icon = Icons.Filled.MoreHoriz,
+                        modifier = Modifier.weight(1.12f),
+                        onMergeTables = onMergeTables
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    DialogActionButton(
+                        text = "Start order",
+                        icon = Icons.Filled.AddCircle,
+                        modifier = Modifier.weight(1f),
+                        dark = true,
+                        onClick = onStartOrder
+                    )
+
+                    DialogActionButton(
+                        text = "Merge tables",
+                        icon = Icons.Filled.Settings,
+                        modifier = Modifier.weight(1f),
+                        onClick = onMergeTables
+                    )
+                }
+            }
+        } else {
+            Spacer(Modifier.height(26.dp))
+
+            Text(
+                text = "Number of guests",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                letterSpacing = 0.sp,
+                color = Color(0xFF303033)
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            GuestCountPicker(
+                guestCount = guestCount,
+                onGuestCountChanged = { guestCount = it }
+            )
+
+            Spacer(Modifier.height(22.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 DialogActionButton(
-                    text = "View Order",
-                    icon = Icons.Filled.List,
-                    modifier = Modifier.weight(1f)
+                    text = "Seat guests",
+                    icon = Icons.Filled.Groups,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(54.dp),
+                    dark = true,
+                    onClick = { onSeatGuests(guestCount) }
                 )
 
                 DialogActionButton(
-                    text = "Add Items",
-                    icon = Icons.Filled.AddCircle,
-                    modifier = Modifier.weight(1f),
-                    onClick = onAddItems
-                )
-
-                MoreActionsButton(
-                    text = "More Actions",
-                    icon = Icons.Filled.MoreHoriz,
-                    modifier = Modifier.weight(1.12f),
-                    onMergeTables = onMergeTables
+                    text = "Merge tables",
+                    icon = Icons.Filled.Settings,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(54.dp),
+                    onClick = onMergeTables
                 )
             }
-        } else {
-            Spacer(Modifier.height(26.dp))
+        }
+    }
+}
 
-            DialogActionButton(
-                text = "Add Order",
-                icon = Icons.Filled.AddCircle,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp),
-                dark = true,
-                onClick = onAddOrder
+@Composable
+private fun GuestCountPicker(
+    guestCount: Int,
+    onGuestCountChanged: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        GuestCountButton(
+            icon = Icons.Filled.Remove,
+            contentDescription = "Remove guest",
+            onClick = {
+                onGuestCountChanged((guestCount - 1).coerceAtLeast(1))
+            }
+        )
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(46.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFFE1DCD8),
+                    shape = RoundedCornerShape(8.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "$guestCount ${if (guestCount == 1) "guest" else "guests"}",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
+                letterSpacing = 0.sp,
+                color = Color(0xFF242424)
             )
         }
+
+        GuestCountButton(
+            icon = Icons.Filled.Add,
+            contentDescription = "Add guest",
+            onClick = { onGuestCountChanged(guestCount + 1) }
+        )
+    }
+}
+
+@Composable
+private fun GuestCountButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(46.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFF5F3F0))
+            .border(
+                width = 1.dp,
+                color = Color(0xFFE1DCD8),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(20.dp),
+            tint = Color(0xFF30381E)
+        )
     }
 }
 
@@ -432,7 +574,8 @@ private fun MoreActionsButton(
 private fun FloorPlanTable.statusLabel(): String =
     statusText ?: when (state) {
         TableVisualState.Free -> "Free"
-        TableVisualState.Occupied -> "In Progress"
+        TableVisualState.Occupied ->
+            if (orderLabel == null) "Seated" else "In Progress"
         TableVisualState.Reserved -> "Reserved"
         TableVisualState.BillPending -> "Bill Pending"
         TableVisualState.Unavailable -> "Unavailable"
@@ -451,8 +594,14 @@ private fun FloorPlanTable.seatedSince(): String =
     if (state == TableVisualState.Free) {
         "--"
     } else {
-        "6:15 PM (45m ago)"
+        seatedAt?.toSeatedTimeLabel() ?: "Just now"
     }
+
+private fun String.toSeatedTimeLabel(): String {
+    val time = substringAfter('T', missingDelimiterValue = "")
+        .take(5)
+    return if (time.length == 5) "$time UTC" else this
+}
 
 private fun FloorPlanTable.orderTotal(): String =
     if (state == TableVisualState.Free) {

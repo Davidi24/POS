@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.OpenWith
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.launch
 
@@ -56,13 +58,14 @@ fun TableLayoutToolbar(
     editMode: Boolean,
     hasBackground: Boolean,
     planMoveMode: Boolean,
-    selectedTableLabel: String?,
+    selectedTableLabels: Set<String>,
     onEditModeChanged: (Boolean) -> Unit,
     onAddTable: (TableShape, Int) -> Unit,
+    onDuplicateSelectedTables: () -> Unit,
     onRotateSelectedTable: (Float) -> Unit,
     onScaleSelectedTable: (Float) -> Unit,
     onDeleteSelectedTable: () -> Unit,
-    onBackgroundSelected: (ByteArray) -> Unit,
+    onBackgroundSelected: (ByteArray, String, String) -> Unit,
     onRemoveBackground: () -> Unit,
     onPlanMoveModeChanged: (Boolean) -> Unit,
     onScalePlan: (Float) -> Unit,
@@ -71,7 +74,16 @@ fun TableLayoutToolbar(
     var showAddTableDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val imagePicker = rememberFilePickerLauncher(type = FileKitType.Image) { file ->
-        if (file != null) scope.launch { onBackgroundSelected(file.readBytes()) }
+        if (file != null) {
+            scope.launch {
+                val fileName = file.name
+                onBackgroundSelected(
+                    file.readBytes(),
+                    fileName,
+                    imageContentType(fileName)
+                )
+            }
+        }
     }
 
     if (editMode) {
@@ -85,7 +97,7 @@ fun TableLayoutToolbar(
         ) {
             ToolbarButton("Done", primary = true) { onEditModeChanged(false) }
             ToolbarButton("Add table") { showAddTableDialog = true }
-            if (selectedTableLabel == null) {
+            if (selectedTableLabels.isEmpty()) {
                 UploadPlanIconButton(
                     contentDescription = if (hasBackground) "Change plan" else "Upload plan"
                 ) {
@@ -111,12 +123,24 @@ fun TableLayoutToolbar(
                     )
                 }
             }
-            if (selectedTableLabel != null) {
+            if (selectedTableLabels.isNotEmpty()) {
+                PlanAdjustButton(
+                    icon = Icons.Outlined.ContentCopy,
+                    contentDescription = "Duplicate selected tables",
+                    onClick = onDuplicateSelectedTables
+                )
                 ToolbarButton("↶ 15°") { onRotateSelectedTable(-15f) }
                 ToolbarButton("↷ 15°") { onRotateSelectedTable(15f) }
                 ToolbarButton("− Size") { onScaleSelectedTable(-0.08f) }
                 ToolbarButton("+ Size") { onScaleSelectedTable(0.08f) }
-                ToolbarButton("Delete $selectedTableLabel", destructive = true) {
+                ToolbarButton(
+                    text = if (selectedTableLabels.size == 1) {
+                        "Delete ${selectedTableLabels.first()}"
+                    } else {
+                        "Delete ${selectedTableLabels.size} tables"
+                    },
+                    destructive = true
+                ) {
                     onDeleteSelectedTable()
                 }
             }
@@ -139,6 +163,14 @@ fun TableLayoutToolbar(
                 showAddTableDialog = false
             }
         )
+    }
+}
+
+private fun imageContentType(fileName: String): String {
+    return when (fileName.substringAfterLast('.', "").lowercase()) {
+        "jpg", "jpeg" -> "image/jpeg"
+        "webp" -> "image/webp"
+        else -> "image/png"
     }
 }
 
