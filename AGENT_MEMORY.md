@@ -13,6 +13,12 @@ Running handoff log for AI agents (Claude, Codex, or others) working on this rep
 
 ---
 
+## 2026-08-29 23:09 (Codex, branch: POS/pos-workflows-ui)
+**Did:** Prepared the POS workflows branch for a pull request to `develop`: committed the shared agent documentation as `8556239`, created recovery branch `codex/pos-workflows-ui-pre-sync-20260829`, merged both `origin/POS/pos-workflows-ui` and current `origin/develop` without conflicts, and corrected `OrderEntityPersistenceTest` so its active table fixture includes the floor and coordinates required by the newer table-layout invariant. Verified the focused regression test, full backend Maven `verify` (886 unit tests and 216 integration tests), and the Kotlin mobile/desktop build (`:shared:jvmTest`, `:desktopApp:build`, and `:androidApp:assembleDebug`) successfully.
+**Why:** The user asked to commit and push all current work, open a pull request into `develop`, and confirm CI is green without merging it.
+**Files/modules touched:** `AGENTS.md`, `AGENT_MEMORY.md`, `back-end/src/test/java/pos/pos/unit/order/entity/OrderEntityPersistenceTest.java`, and Git merge history for `POS/pos-workflows-ui`.
+**Left open / next steps:** Commit this final test/handoff update, push `POS/pos-workflows-ui`, create or reuse its pull request into `develop`, and wait for GitHub CI to pass. Do not merge the pull request. `stash@{0}` remains intentionally untouched because it belongs to prior `frankos-work` inventory/mobile work.
+
 ## 2026-08-29 20:05 (Codex, branch: POS/pos-workflows-ui)
 **Did:** Diagnosed the waiter table-screen error `No restaurant branch is assigned to this user`; no source or database data changed. The waiter is correctly assigned in PostgreSQL, but the backend process on port 8080 was started/compiled from the older `frankos-work/develop` code. Its compiled `CurrentUserResponse.class` lacks `restaurantId` and `defaultBranchId`. The mobile DTO defaults those absent JSON fields to null, and `TablesScreenModel.currentBranchScope()` then emits the error.
 **Why:** The user logged in as `waiter` and provided a screenshot of the branch-assignment error despite the database showing a valid assignment.
