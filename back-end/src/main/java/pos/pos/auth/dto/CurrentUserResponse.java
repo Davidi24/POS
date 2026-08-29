@@ -15,6 +15,8 @@ import java.util.UUID;
 public class CurrentUserResponse {
 
     private UUID id;
+    private UUID restaurantId;
+    private UUID defaultBranchId;
     private String email;
     private String username;
     private String firstName;

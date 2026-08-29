@@ -59,8 +59,7 @@ class LocalRestaurantSeedRunnerTest {
     @Test
     @DisplayName("run should create sample owners, roles, and restaurants when missing")
     void shouldCreateMissingSampleRestaurants() throws Exception {
-        Role ownerRole = ownerRole();
-        given(roleRepository.findByCode("OWNER")).willReturn(Optional.of(ownerRole));
+        given(roleRepository.findByCode(anyString())).willAnswer(invocation -> Optional.of(role(invocation.getArgument(0))));
         given(passwordService.hash(anyString())).willReturn("hashed-demo-password");
         given(userRepository.findById(any(UUID.class))).willReturn(Optional.empty());
         given(userRepository.findByEmailAndDeletedAtIsNull(anyString())).willReturn(Optional.empty());
@@ -76,11 +75,11 @@ class LocalRestaurantSeedRunnerTest {
 
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         ArgumentCaptor<Restaurant> restaurantCaptor = ArgumentCaptor.forClass(Restaurant.class);
-        verify(userRepository, times(3)).save(userCaptor.capture());
-        verify(userRoleRepository, times(3)).save(any(UserRole.class));
+        verify(userRepository, times(9)).save(userCaptor.capture());
+        verify(userRoleRepository, times(9)).save(any(UserRole.class));
         verify(restaurantRepository, times(3)).save(restaurantCaptor.capture());
 
-        List<User> savedOwners = userCaptor.getAllValues();
+        List<User> savedOwners = userCaptor.getAllValues().subList(0, 3);
         assertThat(savedOwners)
                 .extracting(User::getId)
                 .containsExactly(
@@ -94,6 +93,16 @@ class LocalRestaurantSeedRunnerTest {
                         LocalRestaurantSeedRunner.DEMO_BISTRO_ID,
                         LocalRestaurantSeedRunner.DEMO_PIZZA_ID,
                         LocalRestaurantSeedRunner.DEMO_CAFE_ID
+                );
+        assertThat(userCaptor.getAllValues())
+                .extracting(User::getUsername)
+                .contains(
+                        "owner",
+                        "co-owner",
+                        "restaurant.admin",
+                        "manager",
+                        "waiter",
+                        "kitchen"
                 );
 
         List<Restaurant> savedRestaurants = restaurantCaptor.getAllValues();
@@ -116,8 +125,7 @@ class LocalRestaurantSeedRunnerTest {
     @Test
     @DisplayName("run should reuse existing valid sample owners and restaurants without saving")
     void shouldReuseExistingRestaurantsWithoutSaving() throws Exception {
-        Role ownerRole = ownerRole();
-        given(roleRepository.findByCode("OWNER")).willReturn(Optional.of(ownerRole));
+        given(roleRepository.findByCode(anyString())).willAnswer(invocation -> Optional.of(role(invocation.getArgument(0))));
         given(userRepository.findById(LocalRestaurantSeedRunner.DEMO_BISTRO_OWNER_ID))
                 .willReturn(Optional.of(existingOwner(
                         LocalRestaurantSeedRunner.DEMO_BISTRO_OWNER_ID,
@@ -139,6 +147,9 @@ class LocalRestaurantSeedRunnerTest {
                         "demo.cafe.owner",
                         LocalRestaurantSeedRunner.DEMO_CAFE_ID
                 )));
+        existingDemoUsers().forEach(user ->
+                given(userRepository.findById(user.getId())).willReturn(Optional.of(user))
+        );
         given(userRoleRepository.existsByUserIdAndRoleId(any(UUID.class), any(UUID.class))).willReturn(true);
         given(restaurantRepository.findById(LocalRestaurantSeedRunner.DEMO_BISTRO_ID))
                 .willReturn(Optional.of(existingRestaurant(
@@ -178,7 +189,6 @@ class LocalRestaurantSeedRunnerTest {
     @Test
     @DisplayName("run should repair ownerless sample restaurants")
     void shouldRepairOwnerlessRestaurant() throws Exception {
-        Role ownerRole = ownerRole();
         User bistroOwner = existingOwner(
                 LocalRestaurantSeedRunner.DEMO_BISTRO_OWNER_ID,
                 "bistro.owner@pos.local",
@@ -197,7 +207,7 @@ class LocalRestaurantSeedRunnerTest {
         ownerlessRestaurant.setActive(false);
         ownerlessRestaurant.setStatus(RestaurantStatus.ARCHIVED);
 
-        given(roleRepository.findByCode("OWNER")).willReturn(Optional.of(ownerRole));
+        given(roleRepository.findByCode(anyString())).willAnswer(invocation -> Optional.of(role(invocation.getArgument(0))));
         given(userRepository.findById(LocalRestaurantSeedRunner.DEMO_BISTRO_OWNER_ID)).willReturn(Optional.of(bistroOwner));
         given(userRepository.findById(LocalRestaurantSeedRunner.DEMO_PIZZA_OWNER_ID))
                 .willReturn(Optional.of(existingOwner(
@@ -213,6 +223,9 @@ class LocalRestaurantSeedRunnerTest {
                         "demo.cafe.owner",
                         LocalRestaurantSeedRunner.DEMO_CAFE_ID
                 )));
+        existingDemoUsers().forEach(user ->
+                given(userRepository.findById(user.getId())).willReturn(Optional.of(user))
+        );
         given(userRoleRepository.existsByUserIdAndRoleId(any(UUID.class), any(UUID.class))).willReturn(true);
         given(restaurantRepository.findById(LocalRestaurantSeedRunner.DEMO_BISTRO_ID))
                 .willReturn(Optional.of(ownerlessRestaurant));
@@ -245,13 +258,41 @@ class LocalRestaurantSeedRunnerTest {
         verify(restaurantRepository, times(1)).save(ownerlessRestaurant);
     }
 
-    private Role ownerRole() {
+    private Role role(String code) {
         Role role = new Role();
-        role.setId(OWNER_ROLE_ID);
-        role.setCode("OWNER");
-        role.setName("Owner");
+        role.setId("OWNER".equals(code) ? OWNER_ROLE_ID : UUID.nameUUIDFromBytes(code.getBytes()));
+        role.setCode(code);
+        role.setName(code);
         role.setActive(true);
         return role;
+    }
+
+    private List<User> existingDemoUsers() {
+        return List.of(
+                existingDemoUser(LocalRestaurantSeedRunner.DEMO_OWNER_USER_ID, "owner@pos.local", "owner", "Owner"),
+                existingDemoUser(LocalRestaurantSeedRunner.DEMO_CO_OWNER_USER_ID, "co-owner@pos.local", "co-owner", "Co-Owner"),
+                existingDemoUser(LocalRestaurantSeedRunner.DEMO_ADMIN_USER_ID, "restaurant.admin@pos.local", "restaurant.admin", "Admin"),
+                existingDemoUser(LocalRestaurantSeedRunner.DEMO_MANAGER_USER_ID, "manager@pos.local", "manager", "Manager"),
+                existingDemoUser(LocalRestaurantSeedRunner.DEMO_WAITER_USER_ID, "waiter@pos.local", "waiter", "Waiter"),
+                existingDemoUser(LocalRestaurantSeedRunner.DEMO_KITCHEN_USER_ID, "kitchen@pos.local", "kitchen", "Kitchen")
+        );
+    }
+
+    private User existingDemoUser(UUID id, String email, String username, String lastName) {
+        User user = User.builder()
+                .id(id)
+                .email(email)
+                .username(username)
+                .passwordHash("stored-hash")
+                .firstName("Demo")
+                .lastName(lastName)
+                .restaurantId(LocalRestaurantSeedRunner.DEMO_BISTRO_ID)
+                .status("ACTIVE")
+                .isActive(true)
+                .emailVerified(true)
+                .build();
+        user.setDeletedAt(null);
+        return user;
     }
 
     private User existingOwner(UUID id, String email, String username, UUID restaurantId) {

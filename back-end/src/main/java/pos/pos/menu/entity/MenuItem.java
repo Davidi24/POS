@@ -13,6 +13,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractTimestampedEntity;
+import pos.pos.kds.entity.KdsStationRouting;
+import pos.pos.recipe.entity.Recipe;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
@@ -77,6 +79,12 @@ public class MenuItem extends AbstractTimestampedEntity {
 
     @OneToMany(mappedBy = "menuItem")
     private List<MenuItemOptionGroup> optionGroups = new ArrayList<>();
+
+    @OneToMany(mappedBy = "menuItem")
+    private List<Recipe> recipes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "menuItem")
+    private List<KdsStationRouting> kdsStationRoutings = new ArrayList<>();
 
     @Override
     protected void normalizeFields() {

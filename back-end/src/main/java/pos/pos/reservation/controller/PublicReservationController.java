@@ -19,7 +19,7 @@ import pos.pos.reservation.dto.PublicReservationResponse;
 import pos.pos.reservation.dto.PublicTableLookupResponse;
 import pos.pos.reservation.dto.ReservationActionRequest;
 import pos.pos.reservation.dto.ReservationAvailabilityOptionResponse;
-import pos.pos.reservation.service.ReservationService;
+import pos.pos.reservation.service.ReservationPublicService;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -31,7 +31,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PublicReservationController {
 
-    private final ReservationService reservationService;
+    private final ReservationPublicService reservationPublicService;
 
     @GetMapping("/restaurants/{restaurantSlug}/branches/{branchCode}/reservations/availability")
     @Operation(summary = "Get public booking availability")
@@ -43,7 +43,7 @@ public class PublicReservationController {
             @RequestParam Integer partySize,
             @RequestParam(required = false) Integer maxOptions
     ) {
-        return ResponseEntity.ok(reservationService.getPublicAvailability(
+        return ResponseEntity.ok(reservationPublicService.getPublicAvailability(
                 restaurantSlug,
                 branchCode,
                 reservationStart,
@@ -61,13 +61,13 @@ public class PublicReservationController {
             @Valid @RequestBody PublicReservationRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(reservationService.createPublicReservation(restaurantSlug, branchCode, request));
+                .body(reservationPublicService.createPublicReservation(restaurantSlug, branchCode, request));
     }
 
     @GetMapping("/reservations/{reservationCode}")
     @Operation(summary = "Get a public reservation by code")
     public ResponseEntity<PublicReservationResponse> getPublicReservation(@PathVariable String reservationCode) {
-        return ResponseEntity.ok(reservationService.getPublicReservation(reservationCode));
+        return ResponseEntity.ok(reservationPublicService.getPublicReservation(reservationCode));
     }
 
     @PostMapping("/reservations/{reservationCode}/cancel")
@@ -76,12 +76,12 @@ public class PublicReservationController {
             @PathVariable String reservationCode,
             @RequestBody(required = false) ReservationActionRequest request
     ) {
-        return ResponseEntity.ok(reservationService.cancelPublicReservation(reservationCode, request));
+        return ResponseEntity.ok(reservationPublicService.cancelPublicReservation(reservationCode, request));
     }
 
     @GetMapping("/tables/{qrCodeValue}")
     @Operation(summary = "Resolve a public table QR code")
     public ResponseEntity<PublicTableLookupResponse> getPublicTable(@PathVariable String qrCodeValue) {
-        return ResponseEntity.ok(reservationService.getPublicTable(qrCodeValue));
+        return ResponseEntity.ok(reservationPublicService.getPublicTable(qrCodeValue));
     }
 }

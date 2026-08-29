@@ -21,6 +21,7 @@ import pos.pos.role.entity.Role;
 import pos.pos.role.mapper.RoleMapper;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.notification.service.NotificationService;
 import pos.pos.user.dto.ReplaceUserRolesRequest;
 import pos.pos.user.dto.UpdateUserRequest;
 import pos.pos.user.dto.UserResponse;
@@ -61,6 +62,7 @@ public class UserAdminService {
     private final UserMapper userMapper;
     private final RoleHierarchyService roleHierarchyService;
     private final UserSessionRepository userSessionRepository;
+    private final NotificationService notificationService;
 
     public PageResponse<UserResponse> getUsers(
             Authentication authentication,
@@ -199,6 +201,9 @@ public class UserAdminService {
         }
 
         User user = findExistingUser(userId);
+        if (user.getRestaurantId() != null) {
+            notificationService.publishUserRoleChange(user.getRestaurantId(), userId, actorId);
+        }
         return userMapper.toUserResponse(
                 user,
                 requestedRoles.stream().map(Role::getCode).toList()

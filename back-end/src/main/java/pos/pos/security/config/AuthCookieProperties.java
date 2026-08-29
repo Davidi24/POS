@@ -14,6 +14,9 @@ import org.springframework.validation.annotation.Validated;
 public class AuthCookieProperties {
 
     @NotBlank
+    private String accessTokenName;
+
+    @NotBlank
     private String refreshTokenName;
 
     @NotBlank

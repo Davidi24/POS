@@ -15,31 +15,56 @@ public class CookieService {
     private final JwtProperties jwtProperties;
     private final AuthCookieProperties authCookieProperties;
 
+    public void addAccessTokenCookie(HttpServletResponse response, String token) {
+        ResponseCookie.ResponseCookieBuilder builder = baseCookieBuilder(
+                authCookieProperties.getAccessTokenName(),
+                token,
+                "/"
+        ).maxAge(jwtProperties.getAccessExpiration());
+
+        addCookieHeader(response, builder);
+    }
+
     public void addRefreshTokenCookie(HttpServletResponse response, String token) {
-        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
-                .from(authCookieProperties.getRefreshTokenName(), token)
-                .httpOnly(true)
-                .secure(authCookieProperties.getSecure())
-                .path(authCookieProperties.getRefreshTokenPath())
-                .sameSite(authCookieProperties.getSameSite())
-                .maxAge(jwtProperties.getRefreshExpiration());
+        ResponseCookie.ResponseCookieBuilder builder = baseCookieBuilder(
+                authCookieProperties.getRefreshTokenName(),
+                token,
+                authCookieProperties.getRefreshTokenPath()
+        ).maxAge(jwtProperties.getRefreshExpiration());
 
-        if (authCookieProperties.getDomain() != null && !authCookieProperties.getDomain().isBlank()) {
-            builder.domain(authCookieProperties.getDomain().trim());
-        }
+        addCookieHeader(response, builder);
+    }
 
-        response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
+    public void clearAccessTokenCookie(HttpServletResponse response) {
+        ResponseCookie.ResponseCookieBuilder builder = baseCookieBuilder(
+                authCookieProperties.getAccessTokenName(),
+                "",
+                "/"
+        ).maxAge(0);
+
+        addCookieHeader(response, builder);
     }
 
     public void clearRefreshTokenCookie(HttpServletResponse response) {
-        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
-                .from(authCookieProperties.getRefreshTokenName(), "")
+        ResponseCookie.ResponseCookieBuilder builder = baseCookieBuilder(
+                authCookieProperties.getRefreshTokenName(),
+                "",
+                authCookieProperties.getRefreshTokenPath()
+        ).maxAge(0);
+
+        addCookieHeader(response, builder);
+    }
+
+    private ResponseCookie.ResponseCookieBuilder baseCookieBuilder(String name, String value, String path) {
+        return ResponseCookie
+                .from(name, value)
                 .httpOnly(true)
                 .secure(authCookieProperties.getSecure())
-                .path(authCookieProperties.getRefreshTokenPath())
-                .sameSite(authCookieProperties.getSameSite())
-                .maxAge(0);
+                .path(path)
+                .sameSite(authCookieProperties.getSameSite());
+    }
 
+    private void addCookieHeader(HttpServletResponse response, ResponseCookie.ResponseCookieBuilder builder) {
         if (authCookieProperties.getDomain() != null && !authCookieProperties.getDomain().isBlank()) {
             builder.domain(authCookieProperties.getDomain().trim());
         }
