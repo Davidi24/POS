@@ -118,4 +118,20 @@ public class OpenApiConfig {
                 )
                 .build();
     }
+
+    @Bean
+    public GroupedOpenApi inventoryGroup() {
+        return GroupedOpenApi.builder()
+                .group("Inventory")
+                .packagesToScan("pos.pos.inventory.controller")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi recipeGroup() {
+        return GroupedOpenApi.builder()
+                .group("Recipes")
+                .packagesToScan("pos.pos.recipe.controller")
+                .build();
+    }
 }

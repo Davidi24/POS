@@ -12,3 +12,5 @@
  * FUTURE RELATION: automated stock decrements should be emitted from order fulfillment and waste workflows.
  */
 package pos.pos.inventory.entity;
+
+
