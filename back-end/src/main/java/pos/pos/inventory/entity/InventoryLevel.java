@@ -20,6 +20,9 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 
+/**
+ * Balance between the items
+ */
 @Entity
 @Table(
         name = "inventory_levels",
@@ -45,6 +48,9 @@ import java.util.Objects;
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class InventoryLevel extends AbstractTimestampedEntity {
 
+    /**
+     * Which location this balance is in
+     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "location_id",
@@ -53,6 +59,7 @@ public class InventoryLevel extends AbstractTimestampedEntity {
             foreignKey = @ForeignKey(name = "fk_inventory_levels_location")
     )
     private InventoryLocation location;
+
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
@@ -66,15 +73,29 @@ public class InventoryLevel extends AbstractTimestampedEntity {
     @Column(name = "on_hand_quantity", nullable = false, precision = 12, scale = 3)
     private BigDecimal onHandQuantity = BigDecimal.ZERO;
 
+
+    /**
+     * 	How much is already "reserved" for something, but hasn't physically left the shelf yet.
+     */
     @Column(name = "committed_quantity", nullable = false, precision = 12, scale = 3)
     private BigDecimal committedQuantity = BigDecimal.ZERO;
 
+
+    /**
+     * 	The target stock amount for this item, at this specific location.
+     */
     @Column(name = "par_quantity", precision = 12, scale = 3)
     private BigDecimal parQuantity;
 
+    /**
+     * 	The "getting low, reorder now" threshold, for this item, at this specific location.
+     */
     @Column(name = "reorder_quantity", precision = 12, scale = 3)
     private BigDecimal reorderQuantity;
 
+    /**
+     * Last physical count
+     */
     @Column(name = "last_counted_at", columnDefinition = "timestamptz")
     private OffsetDateTime lastCountedAt;
 
