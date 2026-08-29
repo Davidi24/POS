@@ -130,9 +130,16 @@ public class Recipe extends AbstractAuditedEntity {
     @Column(name = "version", nullable = false)
     private int version = 1;
 
+    /**
+     * How many portions this makes
+     */
     @Column(name = "yield_quantity", nullable = false, precision = 12, scale = 3)
     private BigDecimal yieldQuantity = BigDecimal.ONE;
 
+
+    /**
+     * Unit measured
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "yield_unit", nullable = false, length = 30)
     private InventoryUnit yieldUnit = InventoryUnit.PORTION;

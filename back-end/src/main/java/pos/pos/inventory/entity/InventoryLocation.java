@@ -115,12 +115,23 @@ public class InventoryLocation extends AbstractAuditedEntity {
     )
     private User updatedByUser;
 
+    /**
+     * List of every item's stock balance at this location. Read-only link, not a real column.
+     */
     @OneToMany(mappedBy = "location")
     private List<InventoryLevel> levels = new ArrayList<>();
 
+
+    /**
+     * 	List of every stock change event that happened at this location. Read-only link.
+     */
     @OneToMany(mappedBy = "location")
     private List<InventoryMovement> movements = new ArrayList<>();
 
+    /**
+     * 	List of every stock-take session done at this location. Read-only link.
+     * 	Check if numbers match reality
+     */
     @OneToMany(mappedBy = "location")
     private List<InventoryCount> counts = new ArrayList<>();
 
