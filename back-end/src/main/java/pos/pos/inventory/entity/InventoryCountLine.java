@@ -61,7 +61,7 @@ import java.util.Objects;
 @Setter
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
-public class InventoryCountLine extends AbstractTimestampedEntity {
+public class   InventoryCountLine extends AbstractTimestampedEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
