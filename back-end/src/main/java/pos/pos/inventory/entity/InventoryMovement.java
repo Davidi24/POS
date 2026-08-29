@@ -100,6 +100,9 @@ public class InventoryMovement extends AbstractAuditedEntity {
     )
     private InventoryItem inventoryItem;
 
+    /**
+     * Order linked to this change, customer order, missing amount...
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "order_line_item_id",
@@ -112,6 +115,9 @@ public class InventoryMovement extends AbstractAuditedEntity {
     @Column(name = "movement_type", nullable = false, length = 30)
     private InventoryMovementType movementType = InventoryMovementType.MANUAL_ADJUSTMENT;
 
+    /**
+     * 	How much changed, plus or minus (e.g. +20 for a delivery, -2 for a sale).
+     */
     @Column(name = "quantity_delta", nullable = false, precision = 12, scale = 3)
     private BigDecimal quantityDelta = BigDecimal.ZERO;
 
@@ -119,20 +125,31 @@ public class InventoryMovement extends AbstractAuditedEntity {
     @Column(name = "unit", nullable = false, length = 30)
     private InventoryUnit unit = InventoryUnit.EACH;
 
+
+    /**
+     * How much it costed at the specific type
+     */
     @Column(name = "unit_cost_snapshot", nullable = false, precision = 19, scale = 4)
     private BigDecimal unitCostSnapshot = BigDecimal.ZERO;
 
+    /**
+     * the value of the changed stuff(quantityDelta*unitCosSnapshot)
+     */
     @Column(name = "total_cost_delta", nullable = false, precision = 19, scale = 4)
     private BigDecimal totalCostDelta = BigDecimal.ZERO;
 
     @Column(name = "reason", columnDefinition = "text")
     private String reason;
 
+    /**
+     * Purchase, order... + id
+     */
     @Column(name = "reference_type", length = 50)
     private String referenceType;
 
     @Column(name = "reference_id", columnDefinition = "uuid")
     private UUID referenceId;
+
 
     @Column(name = "occurred_at", nullable = false, columnDefinition = "timestamptz")
     private OffsetDateTime occurredAt;
