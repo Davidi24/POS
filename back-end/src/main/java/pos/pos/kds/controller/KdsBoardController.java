@@ -35,7 +35,7 @@ public class KdsBoardController {
     private final KdsTicketWorkflowService kdsTicketWorkflowService;
 
     @GetMapping("/board")
-    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @PreAuthorize("hasAuthority('KDS_READ')")
     @Operation(summary = "Get the KDS board for one branch")
     public ResponseEntity<List<KdsStationBoardResponse>> getBoard(
             @PathVariable UUID restaurantId,
@@ -51,7 +51,7 @@ public class KdsBoardController {
     }
 
     @GetMapping("/display")
-    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @PreAuthorize("hasAuthority('KDS_READ')")
     @Operation(summary = "Get the KDS display board for one device")
     public ResponseEntity<KdsStationBoardResponse> getDisplay(
             @PathVariable UUID restaurantId,
@@ -66,7 +66,7 @@ public class KdsBoardController {
     }
 
     @GetMapping("/tickets/{ticketId}")
-    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @PreAuthorize("hasAuthority('KDS_READ')")
     @Operation(summary = "Get one KDS ticket")
     public ResponseEntity<KdsTicketResponse> getTicket(
             @PathVariable UUID restaurantId,
@@ -78,7 +78,7 @@ public class KdsBoardController {
     }
 
     @PostMapping("/tickets/{ticketId}/fire")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Fire one KDS ticket")
     public ResponseEntity<KdsTicketResponse> fireTicket(
             @PathVariable UUID restaurantId,
@@ -93,7 +93,7 @@ public class KdsBoardController {
     }
 
     @PostMapping("/tickets/{ticketId}/start")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Start one KDS ticket")
     public ResponseEntity<KdsTicketResponse> startTicket(
             @PathVariable UUID restaurantId,
@@ -108,7 +108,7 @@ public class KdsBoardController {
     }
 
     @PostMapping("/tickets/{ticketId}/ready")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Mark one KDS ticket ready")
     public ResponseEntity<KdsTicketResponse> readyTicket(
             @PathVariable UUID restaurantId,
@@ -123,7 +123,7 @@ public class KdsBoardController {
     }
 
     @PostMapping("/tickets/{ticketId}/complete")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Complete one KDS ticket")
     public ResponseEntity<KdsTicketResponse> completeTicket(
             @PathVariable UUID restaurantId,
@@ -138,7 +138,7 @@ public class KdsBoardController {
     }
 
     @PostMapping("/tickets/{ticketId}/items/{ticketItemId}/fire")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Fire one KDS ticket item")
     public ResponseEntity<KdsTicketResponse> fireTicketItem(
             @PathVariable UUID restaurantId,
@@ -154,7 +154,7 @@ public class KdsBoardController {
     }
 
     @PostMapping("/tickets/{ticketId}/items/{ticketItemId}/start")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Start one KDS ticket item")
     public ResponseEntity<KdsTicketResponse> startTicketItem(
             @PathVariable UUID restaurantId,
@@ -170,7 +170,7 @@ public class KdsBoardController {
     }
 
     @PostMapping("/tickets/{ticketId}/items/{ticketItemId}/ready")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Mark one KDS ticket item ready")
     public ResponseEntity<KdsTicketResponse> readyTicketItem(
             @PathVariable UUID restaurantId,
@@ -186,7 +186,7 @@ public class KdsBoardController {
     }
 
     @PostMapping("/tickets/{ticketId}/items/{ticketItemId}/complete")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Complete one KDS ticket item")
     public ResponseEntity<KdsTicketResponse> completeTicketItem(
             @PathVariable UUID restaurantId,

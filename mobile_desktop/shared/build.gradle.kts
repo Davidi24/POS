@@ -30,10 +30,10 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
-            implementation("io.ktor:ktor-client-okhttp:2.3.12")
+            implementation(libs.ktor.clientOkhttp)
         }
         jvmMain.dependencies {
-            implementation("io.ktor:ktor-client-okhttp:2.3.12")
+            implementation(libs.ktor.clientOkhttp)
             implementation(libs.kotlinx.coroutinesSwing)
         }
         commonMain.dependencies {
@@ -45,13 +45,13 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation("io.ktor:ktor-client-core:2.3.12")
-            implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
-            implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
-            implementation("io.ktor:ktor-client-logging:2.3.12")
+            implementation(libs.ktor.clientCore)
+            implementation(libs.ktor.clientContentNegotiation)
+            implementation(libs.ktor.serializationKotlinxJson)
+            implementation(libs.ktor.clientLogging)
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-            implementation("io.ktor:ktor-client-auth:2.3.12")
+            implementation(libs.kotlinx.coroutinesCore)
+            implementation(libs.ktor.clientAuth)
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.screenmodel)
             implementation(libs.voyager.transitions)
@@ -59,11 +59,14 @@ kotlin {
             implementation(libs.androidx.datastore.preferences)
             implementation(libs.tink.android)
             implementation(compose.materialIconsExtended)
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-            implementation("io.ktor:ktor-client-mock:2.3.12")
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+            implementation(libs.ktor.clientMock)
+            implementation(libs.kotlinx.coroutinesTest)
         }
     }
 }

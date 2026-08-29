@@ -244,6 +244,9 @@ class OrderEntityPersistenceTest extends AbstractTestProfilePostgresTest {
         restaurantTable.setTableNumber(" a-01 ");
         restaurantTable.setName(" Window Two ");
         restaurantTable.setCapacity(4);
+        restaurantTable.setFloor(" Main Floor ");
+        restaurantTable.setPositionX(new BigDecimal("120.00"));
+        restaurantTable.setPositionY(new BigDecimal("80.00"));
         restaurantTable.setShape(TableShape.ROUND);
         restaurantTable.setStatus(TableStatus.AVAILABLE);
         return restaurantTable;

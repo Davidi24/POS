@@ -70,6 +70,11 @@ security:
       -----END PUBLIC KEY-----
 
 app:
+  storage:
+    floor-plans:
+      provider: local
+      local-directory: ${FLOOR_PLAN_UPLOAD_DIRECTORY:uploads/floor-plans}
+
   security:
     cookie:
       access-token-name: access-token

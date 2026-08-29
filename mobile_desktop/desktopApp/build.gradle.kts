@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.composeHotReload)
 }
 
 dependencies {
@@ -13,6 +14,7 @@ dependencies {
     implementation(libs.kotlinx.coroutinesSwing)
 
     implementation(libs.compose.uiToolingPreview)
+    implementation(libs.koin.core)
     implementation("org.slf4j:slf4j-simple:2.0.13")
 }
 
