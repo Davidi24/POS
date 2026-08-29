@@ -26,6 +26,7 @@ import pos.pos.tables.dto.TableResponse;
 import pos.pos.tables.dto.UpdateTablePositionRequest;
 import pos.pos.tables.dto.UpdateTableQrCodeRequest;
 import pos.pos.tables.dto.UpdateTableStatusRequest;
+import pos.pos.tables.realtime.TableLayoutChangeNotifier;
 import pos.pos.tables.service.RestaurantTableService;
 
 import java.time.OffsetDateTime;
@@ -40,6 +41,7 @@ import java.util.UUID;
 public class RestaurantTableController {
 
     private final RestaurantTableService restaurantTableService;
+    private final TableLayoutChangeNotifier layoutChangeNotifier;
 
     @GetMapping
     @PreAuthorize("hasAuthority('SETTINGS_READ')")
@@ -53,7 +55,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
     @Operation(summary = "Create a branch table")
     public ResponseEntity<TableResponse> createTable(
             @PathVariable UUID restaurantId,
@@ -61,8 +63,14 @@ public class RestaurantTableController {
             @Valid @RequestBody TableRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(restaurantTableService.createTable(authentication, restaurantId, branchId, request));
+        TableResponse response = restaurantTableService.createTable(
+                authentication,
+                restaurantId,
+                branchId,
+                request
+        );
+        layoutChangeNotifier.notifyBranchChanged(restaurantId, branchId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping("/{tableId}")
@@ -78,7 +86,7 @@ public class RestaurantTableController {
     }
 
     @PutMapping("/{tableId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
     @Operation(summary = "Replace a branch table")
     public ResponseEntity<TableResponse> updateTable(
             @PathVariable UUID restaurantId,
@@ -87,11 +95,19 @@ public class RestaurantTableController {
             @Valid @RequestBody TableRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(restaurantTableService.updateTable(authentication, restaurantId, branchId, tableId, request));
+        TableResponse response = restaurantTableService.updateTable(
+                authentication,
+                restaurantId,
+                branchId,
+                tableId,
+                request
+        );
+        layoutChangeNotifier.notifyBranchChanged(restaurantId, branchId);
+        return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{tableId}/status")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
     @Operation(summary = "Update a branch table status")
     public ResponseEntity<TableResponse> updateTableStatus(
             @PathVariable UUID restaurantId,
@@ -100,11 +116,19 @@ public class RestaurantTableController {
             @Valid @RequestBody UpdateTableStatusRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(restaurantTableService.updateTableStatus(authentication, restaurantId, branchId, tableId, request));
+        TableResponse response = restaurantTableService.updateTableStatus(
+                authentication,
+                restaurantId,
+                branchId,
+                tableId,
+                request
+        );
+        layoutChangeNotifier.notifyBranchChanged(restaurantId, branchId);
+        return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{tableId}/position")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
     @Operation(summary = "Update a branch table position")
     public ResponseEntity<TableResponse> updateTablePosition(
             @PathVariable UUID restaurantId,
@@ -113,7 +137,15 @@ public class RestaurantTableController {
             @Valid @RequestBody UpdateTablePositionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(restaurantTableService.updateTablePosition(authentication, restaurantId, branchId, tableId, request));
+        TableResponse response = restaurantTableService.updateTablePosition(
+                authentication,
+                restaurantId,
+                branchId,
+                tableId,
+                request
+        );
+        layoutChangeNotifier.notifyBranchChanged(restaurantId, branchId);
+        return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{tableId}/qr-code")
@@ -130,7 +162,7 @@ public class RestaurantTableController {
     }
 
     @DeleteMapping("/{tableId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
     @Operation(summary = "Delete a branch table")
     public ResponseEntity<Void> deleteTable(
             @PathVariable UUID restaurantId,
@@ -139,6 +171,7 @@ public class RestaurantTableController {
             Authentication authentication
     ) {
         restaurantTableService.deleteTable(authentication, restaurantId, branchId, tableId);
+        layoutChangeNotifier.notifyBranchChanged(restaurantId, branchId);
         return ResponseEntity.noContent().build();
     }
 
@@ -234,7 +267,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping("/{tableId}/merge")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
     @Operation(summary = "Merge child tables into a primary table")
     public ResponseEntity<TableResponse> mergeTable(
             @PathVariable UUID restaurantId,
@@ -243,11 +276,19 @@ public class RestaurantTableController {
             @Valid @RequestBody TableMergeRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(restaurantTableService.mergeTable(authentication, restaurantId, branchId, tableId, request));
+        TableResponse response = restaurantTableService.mergeTable(
+                authentication,
+                restaurantId,
+                branchId,
+                tableId,
+                request
+        );
+        layoutChangeNotifier.notifyBranchChanged(restaurantId, branchId);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{tableId}/unmerge")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
     @Operation(summary = "Unmerge a child table or all child tables from a primary table")
     public ResponseEntity<TableResponse> unmergeTable(
             @PathVariable UUID restaurantId,
@@ -255,6 +296,13 @@ public class RestaurantTableController {
             @PathVariable UUID tableId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(restaurantTableService.unmergeTable(authentication, restaurantId, branchId, tableId));
+        TableResponse response = restaurantTableService.unmergeTable(
+                authentication,
+                restaurantId,
+                branchId,
+                tableId
+        );
+        layoutChangeNotifier.notifyBranchChanged(restaurantId, branchId);
+        return ResponseEntity.ok(response);
     }
 }

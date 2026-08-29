@@ -46,9 +46,15 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
     public static final UUID DEMO_BISTRO_OWNER_ID = UUID.fromString("10000000-0000-0000-0000-000000000101");
     public static final UUID DEMO_PIZZA_OWNER_ID = UUID.fromString("10000000-0000-0000-0000-000000000102");
     public static final UUID DEMO_CAFE_OWNER_ID = UUID.fromString("10000000-0000-0000-0000-000000000103");
+    public static final UUID DEMO_OWNER_USER_ID = UUID.fromString("10000000-0000-0000-0000-000000000201");
+    public static final UUID DEMO_CO_OWNER_USER_ID = UUID.fromString("10000000-0000-0000-0000-000000000202");
+    public static final UUID DEMO_ADMIN_USER_ID = UUID.fromString("10000000-0000-0000-0000-000000000203");
+    public static final UUID DEMO_MANAGER_USER_ID = UUID.fromString("10000000-0000-0000-0000-000000000204");
+    public static final UUID DEMO_WAITER_USER_ID = UUID.fromString("10000000-0000-0000-0000-000000000205");
+    public static final UUID DEMO_KITCHEN_USER_ID = UUID.fromString("10000000-0000-0000-0000-000000000206");
 
     private static final Logger logger = LoggerFactory.getLogger(LocalRestaurantSeedRunner.class);
-    private static final String DEMO_OWNER_PASSWORD = "LocalDemo123!";
+    private static final String DEMO_PASSWORD = "ChangeMe123!";
 
     private final RestaurantRepository restaurantRepository;
     private final UserRepository userRepository;
@@ -66,6 +72,7 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
         List<SeededRestaurant> restaurants = sampleRestaurants().stream()
                 .map(spec -> seedRestaurant(spec, ownerRole))
                 .toList();
+        List<User> demoUsers = seedDemoRoleUsers(DEMO_BISTRO_ID);
 
         logger.info("Local sample restaurants ready. Use these ids for menu-related development data:");
         restaurants.forEach(seed -> logger.info(
@@ -76,6 +83,7 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
                 seed.restaurant().getCode(),
                 seed.owner().getUsername()
         ));
+        logger.info("Local demo role accounts ready: {}", demoUsers.stream().map(User::getUsername).toList());
     }
 
     private SeededRestaurant seedRestaurant(SampleRestaurantSpec spec, Role ownerRole) {
@@ -130,7 +138,7 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
             owner.setPhoneVerifiedAt(now);
         }
         if (owner.getPasswordHash() == null || owner.getPasswordHash().isBlank()) {
-            owner.setPasswordHash(passwordService.hash(DEMO_OWNER_PASSWORD));
+            owner.setPasswordHash(passwordService.hash(DEMO_PASSWORD));
         }
         if (owner.getPasswordUpdatedAt() == null) {
             owner.setPasswordUpdatedAt(now);
@@ -158,7 +166,7 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
                 .id(spec.id())
                 .email(spec.email())
                 .username(spec.username())
-                .passwordHash(passwordService.hash(DEMO_OWNER_PASSWORD))
+                .passwordHash(passwordService.hash(DEMO_PASSWORD))
                 .firstName(spec.firstName())
                 .lastName(spec.lastName())
                 .phone(spec.phone())
@@ -169,6 +177,98 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
                 .emailVerifiedAt(now)
                 .phoneVerified(spec.phone() != null)
                 .phoneVerifiedAt(spec.phone() != null ? now : null)
+                .failedLoginAttempts(0)
+                .pinEnabled(false)
+                .pinAttempts(0)
+                .passwordUpdatedAt(now)
+                .build());
+    }
+
+    private List<User> seedDemoRoleUsers(UUID restaurantId) {
+        return sampleUsers().stream()
+                .map(spec -> seedDemoUser(spec, restaurantId))
+                .toList();
+    }
+
+    private User seedDemoUser(SampleUserSpec spec, UUID restaurantId) {
+        Role role = roleRepository.findByCode(spec.role().name())
+                .filter(Role::isActive)
+                .orElseThrow(RoleNotFoundException::new);
+
+        User user = userRepository.findById(spec.id())
+                .or(() -> userRepository.findByEmailAndDeletedAtIsNull(spec.email()))
+                .or(() -> userRepository.findByUsernameAndDeletedAtIsNull(spec.username()))
+                .map(existing -> restoreDemoUserIfNeeded(existing, spec, restaurantId))
+                .orElseGet(() -> createDemoUser(spec, restaurantId));
+
+        if (!userRoleRepository.existsByUserIdAndRoleId(user.getId(), role.getId())) {
+            userRoleRepository.save(UserRole.builder()
+                    .userId(user.getId())
+                    .roleId(role.getId())
+                    .build());
+        }
+
+        return user;
+    }
+
+    private User restoreDemoUserIfNeeded(User user, SampleUserSpec spec, UUID restaurantId) {
+        if (isDemoUserReady(user, spec, restaurantId)) {
+            return user;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        user.setEmail(spec.email());
+        user.setUsername(spec.username());
+        user.setFirstName(spec.firstName());
+        user.setLastName(spec.lastName());
+        user.setPhone(null);
+        user.setRestaurantId(restaurantId);
+        user.setStatus("ACTIVE");
+        user.setActive(true);
+        user.setDeletedAt(null);
+        user.setEmailVerified(true);
+        if (user.getEmailVerifiedAt() == null) {
+            user.setEmailVerifiedAt(now);
+        }
+        user.setPhoneVerified(false);
+        user.setPhoneVerifiedAt(null);
+        if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
+            user.setPasswordHash(passwordService.hash(DEMO_PASSWORD));
+        }
+        if (user.getPasswordUpdatedAt() == null) {
+            user.setPasswordUpdatedAt(now);
+        }
+
+        return userRepository.save(user);
+    }
+
+    private boolean isDemoUserReady(User user, SampleUserSpec spec, UUID restaurantId) {
+        return user.getDeletedAt() == null
+                && user.isActive()
+                && "ACTIVE".equals(user.getStatus())
+                && Objects.equals(user.getEmail(), spec.email())
+                && Objects.equals(user.getUsername(), spec.username())
+                && Objects.equals(user.getFirstName(), spec.firstName())
+                && Objects.equals(user.getLastName(), spec.lastName())
+                && Objects.equals(user.getRestaurantId(), restaurantId)
+                && user.isEmailVerified();
+    }
+
+    private User createDemoUser(SampleUserSpec spec, UUID restaurantId) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        return userRepository.save(User.builder()
+                .id(spec.id())
+                .email(spec.email())
+                .username(spec.username())
+                .passwordHash(passwordService.hash(DEMO_PASSWORD))
+                .firstName(spec.firstName())
+                .lastName(spec.lastName())
+                .restaurantId(restaurantId)
+                .status("ACTIVE")
+                .isActive(true)
+                .emailVerified(true)
+                .emailVerifiedAt(now)
+                .phoneVerified(false)
                 .failedLoginAttempts(0)
                 .pinEnabled(false)
                 .pinAttempts(0)
@@ -316,6 +416,59 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
         );
     }
 
+    private List<SampleUserSpec> sampleUsers() {
+        return List.of(
+                new SampleUserSpec(
+                        DEMO_OWNER_USER_ID,
+                        "owner@pos.local",
+                        "owner",
+                        "Demo",
+                        "Owner",
+                        AppRole.OWNER
+                ),
+                new SampleUserSpec(
+                        DEMO_CO_OWNER_USER_ID,
+                        "co-owner@pos.local",
+                        "co-owner",
+                        "Demo",
+                        "Co-Owner",
+                        AppRole.CO_OWNER
+                ),
+                new SampleUserSpec(
+                        DEMO_ADMIN_USER_ID,
+                        "restaurant.admin@pos.local",
+                        "restaurant.admin",
+                        "Demo",
+                        "Admin",
+                        AppRole.ADMIN
+                ),
+                new SampleUserSpec(
+                        DEMO_MANAGER_USER_ID,
+                        "manager@pos.local",
+                        "manager",
+                        "Demo",
+                        "Manager",
+                        AppRole.MANAGER
+                ),
+                new SampleUserSpec(
+                        DEMO_WAITER_USER_ID,
+                        "waiter@pos.local",
+                        "waiter",
+                        "Demo",
+                        "Waiter",
+                        AppRole.WAITER
+                ),
+                new SampleUserSpec(
+                        DEMO_KITCHEN_USER_ID,
+                        "kitchen@pos.local",
+                        "kitchen",
+                        "Demo",
+                        "Kitchen",
+                        AppRole.KITCHEN
+                )
+        );
+    }
+
     private record SeededRestaurant(Restaurant restaurant, User owner) {
     }
 
@@ -342,6 +495,16 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
             String firstName,
             String lastName,
             String phone
+    ) {
+    }
+
+    private record SampleUserSpec(
+            UUID id,
+            String email,
+            String username,
+            String firstName,
+            String lastName,
+            AppRole role
     ) {
     }
 }

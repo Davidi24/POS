@@ -7,6 +7,11 @@ spring:
   profiles:
     default: local
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+
   mail:
     host: ${MAIL_HOST:}
     port: ${MAIL_PORT:587}
@@ -23,6 +28,7 @@ spring:
           writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT_MS:5000}
 
   jpa:
+    open-in-view: false
 
 springdoc:
   swagger-ui:

@@ -129,7 +129,14 @@ public class RestaurantTableService {
             UUID tableId,
             UpdateTableStatusRequest request
     ) {
-        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, request.getStatus());
+        return updateOperationalStatus(
+                authentication,
+                restaurantId,
+                branchId,
+                tableId,
+                request.getStatus(),
+                request.getGuestCount()
+        );
     }
 
     @Transactional
@@ -141,18 +148,25 @@ public class RestaurantTableService {
             UpdateTablePositionRequest request
     ) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
-        restaurantTableSupport.validatePositionPair(
-                request.getPositionX(),
-                request.getPositionY(),
-                "positionX and positionY must both be set together"
-        );
-
         RestaurantTable table = restaurantTableSupport.requireTable(branchId, tableId);
         if (request.getFloor() != null) {
             table.setFloor(request.getFloor());
         }
-        table.setPositionX(request.getPositionX());
-        table.setPositionY(request.getPositionY());
+        if (request.getPositionX() != null || request.getPositionY() != null) {
+            restaurantTableSupport.validatePositionPair(
+                    request.getPositionX(),
+                    request.getPositionY(),
+                    "positionX and positionY must both be set together"
+            );
+            table.setPositionX(request.getPositionX());
+            table.setPositionY(request.getPositionY());
+        }
+        if (request.getRotationDegrees() != null) {
+            table.setRotationDegrees(request.getRotationDegrees());
+        }
+        if (request.getLayoutScale() != null) {
+            table.setLayoutScale(request.getLayoutScale());
+        }
         table.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
 
         return restaurantTableSupport.toResponse(
@@ -286,22 +300,22 @@ public class RestaurantTableService {
 
     @Transactional
     public TableResponse blockTable(Authentication authentication, UUID restaurantId, UUID branchId, UUID tableId) {
-        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, TableStatus.OUT_OF_SERVICE);
+        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, TableStatus.OUT_OF_SERVICE, null);
     }
 
     @Transactional
     public TableResponse unblockTable(Authentication authentication, UUID restaurantId, UUID branchId, UUID tableId) {
-        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, TableStatus.AVAILABLE);
+        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, TableStatus.AVAILABLE, null);
     }
 
     @Transactional
     public TableResponse markTableClean(Authentication authentication, UUID restaurantId, UUID branchId, UUID tableId) {
-        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, TableStatus.AVAILABLE);
+        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, TableStatus.AVAILABLE, null);
     }
 
     @Transactional
     public TableResponse markTableDirty(Authentication authentication, UUID restaurantId, UUID branchId, UUID tableId) {
-        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, TableStatus.DIRTY);
+        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, TableStatus.DIRTY, null);
     }
 
     @Transactional
@@ -370,10 +384,26 @@ public class RestaurantTableService {
             UUID restaurantId,
             UUID branchId,
             UUID tableId,
-            TableStatus status
+            TableStatus status,
+            Integer guestCount
     ) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         RestaurantTable table = restaurantTableSupport.requireTable(branchId, tableId);
+        if (status == TableStatus.OCCUPIED) {
+            if (guestCount == null || guestCount <= 0) {
+                throw new AuthException(
+                        "guestCount is required when seating guests",
+                        HttpStatus.BAD_REQUEST
+                );
+            }
+            table.setGuestCount(guestCount);
+            if (table.getStatus() != TableStatus.OCCUPIED || table.getSeatedAt() == null) {
+                table.setSeatedAt(OffsetDateTime.now());
+            }
+        } else {
+            table.setGuestCount(null);
+            table.setSeatedAt(null);
+        }
         table.setStatus(status);
         table.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         return restaurantTableSupport.toResponse(

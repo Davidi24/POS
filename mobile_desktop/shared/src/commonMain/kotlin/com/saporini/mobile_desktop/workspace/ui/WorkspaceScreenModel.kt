@@ -1,4 +1,4 @@
-package com.saporini.mobile_desktop.home.ui
+package com.saporini.mobile_desktop.workspace.ui
 
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
@@ -10,17 +10,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-data class HomeUiState(
+data class WorkspaceUiState (
     val isLoggingOut: Boolean = false,
     val loggedOut: Boolean = false
 )
 
-class HomeScreenModel : ScreenModel {
+class WorkspaceScreenModel(
+    private val repository: AuthRepository,
+    private val sessionManager: SessionManager
+) : ScreenModel {
 
-    private val repository = AuthRepository()
 
-    private val _state = MutableStateFlow(HomeUiState())
-    val state: StateFlow<HomeUiState> = _state.asStateFlow()
+    private val _state = MutableStateFlow(WorkspaceUiState())
+    val state: StateFlow<WorkspaceUiState> = _state.asStateFlow()
 
     fun logout() {
         screenModelScope.launch {
@@ -28,7 +30,7 @@ class HomeScreenModel : ScreenModel {
             try {
                 TokenStore.refreshToken.value?.let { repository.logout(it) }
             } catch (_: Exception) { }
-            SessionManager.signOut()
+            sessionManager.signOut()
             _state.value = _state.value.copy(loggedOut = true)
         }
     }
