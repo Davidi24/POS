@@ -40,6 +40,7 @@ import pos.pos.security.scope.ActorScope;
 import pos.pos.security.scope.ActorScopeService;
 import pos.pos.utils.NormalizationUtils;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -98,8 +99,17 @@ public class MenuService {
                 pageable
         );
         //converts each menu entity into a MenuResponse DTO
-        List<MenuResponse> items = menusPage.getContent().stream()
-                .map(menuMapper::toMenuResponse)
+        List<Menu> menuEntities = menusPage.getContent();
+        List<UUID> menuIds = menuEntities.stream().map(Menu::getId).toList();
+        Map<UUID, Integer> itemCountsByMenuId = menuIds.isEmpty()
+                ? Map.of()
+                : menuItemRepository.countItemsByMenuIds(menuIds).stream()
+                        .collect(Collectors.toMap(
+                                MenuItemRepository.MenuItemCountRow::getMenuId,
+                                row -> row.getItemCount().intValue()
+                        ));
+        List<MenuResponse> items = menuEntities.stream()
+                .map(menu -> menuMapper.toMenuResponse(menu, itemCountsByMenuId.getOrDefault(menu.getId(), 0)))
                 .toList();
 
         //returns a paged list of menus
@@ -119,8 +129,9 @@ public class MenuService {
         ActorScope scope = actorScopeService.resolve(authentication);
         Menu menu = findExistingMenu(menuId);
         menuPolicy.assertCanAccess(scope, menu);//checks if the user is allowed to see the menu
+        int itemCount = (int) menuItemRepository.countByMenuId(menuId);
         if (!includeSections && !includeItems) {
-            return menuMapper.toMenuResponse(menu);
+            return menuMapper.toMenuResponse(menu, itemCount);
         }
         //gets all sections of the menu ordered by displayOrder, name
         List<MenuSection> sections = menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(menuId);
@@ -172,7 +183,8 @@ public class MenuService {
                 includeVariants,
                 variantsByItemId,
                 includeOptionGroups,
-                optionGroupsByItemId
+                optionGroupsByItemId,
+                itemCount
         );
     }
 
@@ -184,6 +196,7 @@ public class MenuService {
 
         String normalizedCode = resolveCreateCode(request.getCode(), request.getName());
         assertUniqueCode(restaurant.getId(), normalizedCode, null);
+        validateAvailabilityDateRange(request.getAvailableFromDate(), request.getAvailableUntilDate());
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         Menu menu = new Menu();
@@ -193,10 +206,15 @@ public class MenuService {
         menu.setDescription(NormalizationUtils.normalize(request.getDescription()));
         menu.setActive(request.getActive() == null || request.getActive());
         menu.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
+        menu.setAvailableFrom(request.getAvailableFrom());
+        menu.setAvailableUntil(request.getAvailableUntil());
+        menu.setAvailableFromDate(request.getAvailableFromDate());
+        menu.setAvailableUntilDate(request.getAvailableUntilDate());
+        menu.setColor(NormalizationUtils.normalize(request.getColor()));
         menu.setCreatedBy(actorId);
         menu.setUpdatedBy(actorId);
 
-        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
+        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), 0);
     }
 
     //checked
@@ -206,15 +224,22 @@ public class MenuService {
 
         String normalizedCode = resolveUpdateCode(request.getCode(), menu.getCode());//decides what the menu code should be
         assertUniqueCode(menu.getRestaurant().getId(), normalizedCode, menu.getId());//menu code must be unique inside one restaurant
+        validateAvailabilityDateRange(request.getAvailableFromDate(), request.getAvailableUntilDate());
 
         menu.setCode(normalizedCode); //saves the final menu code
         menu.setName(NormalizationUtils.normalize(request.getName()));//normalize space "  Breakfast Menu  " → "Breakfast Menu"
         menu.setDescription(NormalizationUtils.normalize(request.getDescription()));
         menu.setActive(Boolean.TRUE.equals(request.getActive()));//is the menu active or not
         menu.setDisplayOrder(request.getDisplayOrder());//saves the order position of the menu
+        menu.setAvailableFrom(request.getAvailableFrom());
+        menu.setAvailableUntil(request.getAvailableUntil());
+        menu.setAvailableFromDate(request.getAvailableFromDate());
+        menu.setAvailableUntilDate(request.getAvailableUntilDate());
+        menu.setColor(NormalizationUtils.normalize(request.getColor()));
         menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));//stores who updated the menu
 
-        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
+        int itemCount = (int) menuItemRepository.countByMenuId(menu.getId());
+        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), itemCount);
     }
 
     //checked
@@ -224,7 +249,8 @@ public class MenuService {
         menu.setActive(Boolean.TRUE.equals(request.getActive())); //sets the new updated status
         menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));//stores who updated it
 
-        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
+        int itemCount = (int) menuItemRepository.countByMenuId(menu.getId());
+        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), itemCount);
     }
 
     //checked
@@ -269,6 +295,21 @@ public class MenuService {
                 : menuRepository.existsByRestaurantIdAndCodeAndIdNot(restaurantId, code, menuIdToExclude);
         if (exists) {
             throw new MenuCodeAlreadyExistsException();
+        }
+    }
+
+    private void validateAvailabilityDateRange(LocalDate availableFromDate, LocalDate availableUntilDate) {
+        if ((availableFromDate == null) != (availableUntilDate == null)) {
+            throw new AuthException(
+                    "availableFromDate and availableUntilDate must both be provided",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (availableFromDate != null && availableFromDate.isAfter(availableUntilDate)) {
+            throw new AuthException(
+                    "availableFromDate must not be after availableUntilDate",
+                    HttpStatus.BAD_REQUEST
+            );
         }
     }
 

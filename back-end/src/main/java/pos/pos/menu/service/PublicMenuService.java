@@ -16,6 +16,8 @@ import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.repository.RestaurantRepository;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -34,15 +36,21 @@ public class PublicMenuService {
 
     public List<PublicMenuResponse> getMenus(UUID restaurantId) {
         Restaurant restaurant = findPublicRestaurant(restaurantId);
+        LocalDate today = LocalDate.now(ZoneId.of(restaurant.getTimezone()));
         return menuRepository.findPublicMenusByRestaurantId(restaurant.getId()).stream()
+                .filter(menu -> menu.isAvailableOn(today))
                 .map(publicMenuMapper::toMenuResponse)
                 .toList();
     }
 
     public PublicMenuResponse getMenu(UUID restaurantId, UUID menuId, boolean includeSections, boolean includeItems) {
-        findPublicRestaurant(restaurantId);
+        Restaurant restaurant = findPublicRestaurant(restaurantId);
         Menu menu = menuRepository.findPublicMenuByRestaurantIdAndId(restaurantId, menuId)
                 .orElseThrow(MenuNotFoundException::new);
+        LocalDate today = LocalDate.now(ZoneId.of(restaurant.getTimezone()));
+        if (!menu.isAvailableOn(today)) {
+            throw new MenuNotFoundException();
+        }
         if (!includeSections && !includeItems) {
             return publicMenuMapper.toMenuResponse(menu);
         }

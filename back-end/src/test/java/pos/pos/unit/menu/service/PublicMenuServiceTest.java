@@ -126,6 +126,7 @@ class PublicMenuServiceTest {
         restaurant.setName("POS Main");
         restaurant.setActive(active);
         restaurant.setStatus(status);
+        restaurant.setTimezone("UTC");
         return restaurant;
     }
 
