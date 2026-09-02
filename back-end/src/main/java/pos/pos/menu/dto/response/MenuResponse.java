@@ -17,7 +17,11 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class MenuResponse {
+/**
+ * Management menu view. MenuController exposes this shape only to callers
+ * with menu-management permissions.
+ */
+public class MenuResponse implements MenuViewResponse {
 
     private UUID id; //same logic of UUID, it's menu's ID
     private MenuRestaurantSummaryResponse restaurant;
