@@ -3,8 +3,10 @@ package com.saporini.mobile_desktop.pos.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +32,7 @@ import com.saporini.mobile_desktop.pos.reservations.ReservationsScreen
 import com.saporini.mobile_desktop.pos.sales.MySalesScreen
 import com.saporini.mobile_desktop.pos.tables.ui.AddItemModal
 import com.saporini.mobile_desktop.pos.tables.ui.TablesScreen
+import com.saporini.mobile_desktop.pos.ui.shell.PosBottomBar
 import com.saporini.mobile_desktop.pos.ui.shell.PosTopBar
 import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.pos_simple_logo
@@ -49,24 +52,28 @@ object PosScreen : Screen {
             "SETTINGS_UPDATE" in currentUser?.permissions.orEmpty() ||
                 "MANAGER" in currentUser?.roles.orEmpty()
 
-        Box(Modifier.fillMaxSize().background(Color.White)) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(Color.White)) {
+            val isPhoneLayout = maxWidth < 600.dp
+
             Column(Modifier.fillMaxSize()) {
-                PosTopBar(
-                    selected = selected,
-                    onSelect = {
-                        selected = it
-                        showPaymentScreen = false
-                    },
-                    onLogout = { sessionManager.signOut() },
-                    logo = {
-                        Image(
-                            painter = painterResource(Res.drawable.pos_simple_logo),
-                            contentDescription = "Saporini",
-                            modifier = Modifier.size(82.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-                )
+                if (!isPhoneLayout) {
+                    PosTopBar(
+                        selected = selected,
+                        onSelect = {
+                            selected = it
+                            showPaymentScreen = false
+                        },
+                        onLogout = { sessionManager.signOut() },
+                        logo = {
+                            Image(
+                                painter = painterResource(Res.drawable.pos_simple_logo),
+                                contentDescription = "Saporini",
+                                modifier = Modifier.size(82.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                    )
+                }
                 if (showPaymentScreen) {
                     PaymentScreen(
                         modifier = Modifier.weight(1f),
@@ -90,10 +97,26 @@ object PosScreen : Screen {
                         PosSection.MENU -> MenuScreen(Modifier.weight(1f))
                         PosSection.KITCHEN_STATUS -> KitchenStatusScreen(Modifier.weight(1f))
                         PosSection.MY_SALES -> MySalesScreen(Modifier.weight(1f))
-                        else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        else -> Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(selected.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold)
                         }
                     }
+                }
+
+                if (isPhoneLayout) {
+                    PosBottomBar(
+                        selected = selected,
+                        onSelect = {
+                            selected = it
+                            showPaymentScreen = false
+                        },
+                        onLogout = { sessionManager.signOut() }
+                    )
                 }
             }
 
