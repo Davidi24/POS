@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -30,6 +32,12 @@ public class MenuResponse implements MenuViewResponse {
     private String description;
     private Boolean active;
     private Integer displayOrder;
+    private LocalTime availableFrom;
+    private LocalTime availableUntil;
+    private LocalDate availableFromDate;
+    private LocalDate availableUntilDate;
+    private String color;
+    private Integer itemCount;
     private UUID createdBy; //using UUID to store ID of the user who created the menu, not the full User
     private UUID updatedBy;
     private OffsetDateTime createdAt;

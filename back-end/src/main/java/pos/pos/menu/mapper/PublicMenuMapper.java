@@ -34,6 +34,8 @@ public class PublicMenuMapper {
                 .name(menu.getName())
                 .description(menu.getDescription())
                 .displayOrder(menu.getDisplayOrder())
+                .availableFromDate(menu.getAvailableFromDate())
+                .availableUntilDate(menu.getAvailableUntilDate())
                 .sections(sections == null ? null : sections.stream()
                         .map(section -> toSectionResponse(section, itemsBySectionId.get(section.getId())))
                         .toList())

@@ -3,6 +3,8 @@ package pos.pos.menu.bootstrap;
 import pos.pos.menu.entity.OptionGroupType;
 import pos.pos.restaurant.bootstrap.LocalRestaurantSeedRunner;
 
+import java.time.LocalTime;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -251,6 +253,10 @@ final class LocalMenuSeedData {
                                         )
                                 )
                         )
+                ,
+                        null,
+                        null,
+                        "#B88945"
                 ),
                 new MenuSpec(
                         "BISTRO_DRINKS",
@@ -280,6 +286,76 @@ final class LocalMenuSeedData {
                                         )
                                 )
                         )
+                ,
+                        null,
+                        null,
+                        "#315F7B"
+                ),
+                new MenuSpec(
+                        "BISTRO_LUNCH",
+                        "Lunch Menu",
+                        "Weekday lunch specials and lighter plates.",
+                        true,
+                        2,
+                        List.of(
+                                new SectionSpec(
+                                        "Soups & Salads",
+                                        "Light starters for midday.",
+                                        0,
+                                        true,
+                                        List.of(
+                                                new ItemSpec("BIS-CAESAR", "Chicken Caesar Salad", "Grilled chicken, romaine, parmesan, and garlic croutons.", money("11.50"), null, true, 0, List.of(), List.of()),
+                                                new ItemSpec("BIS-TOMATO-SOUP", "Roasted Tomato Soup", "Basil oil and a grilled cheese crouton.", money("7.20"), null, true, 1, List.of(), List.of())
+                                        )
+                                ),
+                                new SectionSpec(
+                                        "Sandwiches",
+                                        "Handhelds served with house fries.",
+                                        1,
+                                        true,
+                                        List.of(
+                                                new ItemSpec("BIS-CLUB", "Turkey Club", "Roast turkey, bacon, lettuce, tomato, and herb mayo on sourdough.", money("10.90"), null, true, 0, List.of(), List.of()),
+                                                new ItemSpec("BIS-CHICKEN-WRAP", "Grilled Chicken Wrap", "Grilled chicken, greens, avocado, and chipotle sauce.", money("9.80"), null, true, 1, List.of(), List.of())
+                                        )
+                                )
+                        )
+                ,
+                        LocalTime.of(11, 0),
+                        LocalTime.of(15, 0),
+                        "#B88945"
+                ),
+                new MenuSpec(
+                        "BISTRO_DINNER",
+                        "Dinner Menu",
+                        "Evening plates with heartier mains.",
+                        true,
+                        3,
+                        List.of(
+                                new SectionSpec(
+                                        "Starters",
+                                        "Warm plates to open the evening.",
+                                        0,
+                                        true,
+                                        List.of(
+                                                new ItemSpec("BIS-CRAB-CAKE", "Crab Cake", "Pan-seared crab cake with lemon aioli.", money("12.50"), null, true, 0, List.of(), List.of()),
+                                                new ItemSpec("BIS-BEET-SALAD", "Roasted Beet Salad", "Goat cheese, candied walnuts, and citrus vinaigrette.", money("8.90"), null, true, 1, List.of(), List.of())
+                                        )
+                                ),
+                                new SectionSpec(
+                                        "Mains",
+                                        "Heartier evening plates.",
+                                        1,
+                                        true,
+                                        List.of(
+                                                new ItemSpec("BIS-SEA-BASS", "Pan-Seared Sea Bass", "Served with saffron risotto and seasonal vegetables.", money("22.50"), null, true, 0, List.of(), List.of()),
+                                                new ItemSpec("BIS-SHORT-RIB", "Braised Short Rib", "Slow braised short rib with mashed potatoes and red wine jus.", money("25.00"), null, true, 1, List.of(), List.of())
+                                        )
+                                )
+                        )
+                ,
+                        LocalTime.of(17, 0),
+                        LocalTime.of(23, 0),
+                        "#4F6431"
                 )
         );
     }
@@ -337,6 +413,10 @@ final class LocalMenuSeedData {
                                         )
                                 )
                         )
+                ,
+                        null,
+                        null,
+                        "#B88945"
                 )
         );
     }
@@ -391,6 +471,10 @@ final class LocalMenuSeedData {
                                         )
                                 )
                         )
+                ,
+                        LocalTime.of(9, 0),
+                        LocalTime.of(14, 0),
+                        "#B88945"
                 )
         );
     }
@@ -413,7 +497,10 @@ final class LocalMenuSeedData {
             String description,
             boolean active,
             int displayOrder,
-            List<SectionSpec> sections
+            List<SectionSpec> sections,
+            LocalTime availableFrom,
+            LocalTime availableUntil,
+            String color
     ) {
     }
 

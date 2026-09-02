@@ -10,6 +10,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.UUID;
 
 @Getter
@@ -35,4 +37,15 @@ public class CreateMenuRequest {
 
     @Min(value = 0, message = "displayOrder must be greater than or equal to 0")
     private Integer displayOrder;
+
+    private LocalTime availableFrom;
+
+    private LocalTime availableUntil;
+
+    private LocalDate availableFromDate;
+
+    private LocalDate availableUntilDate;
+
+    @Size(max = 20, message = "Color must be at most 20 characters")
+    private String color;
 }

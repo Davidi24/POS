@@ -26,16 +26,17 @@ import java.util.UUID;
 @Component
 public class MenuMapper {
 
-    public MenuResponse toMenuResponse(Menu menu) {
-        return toMenuResponse(menu, null, Map.of());
+    public MenuResponse toMenuResponse(Menu menu, Integer itemCount) {
+        return toMenuResponse(menu, null, Map.of(), itemCount);
     }
 
     public MenuResponse toMenuResponse(
             Menu menu,
             List<MenuSection> sections,
-            Map<UUID, List<MenuItem>> itemsBySectionId
+            Map<UUID, List<MenuItem>> itemsBySectionId,
+            Integer itemCount
     ) {
-        return toMenuResponse(menu, sections, itemsBySectionId, false, false, Map.of(), false, Map.of());
+        return toMenuResponse(menu, sections, itemsBySectionId, false, false, Map.of(), false, Map.of(), itemCount);
     }
 
     public MenuResponse toMenuResponse(
@@ -46,7 +47,8 @@ public class MenuMapper {
             boolean includeVariants,
             Map<UUID, List<MenuVariant>> variantsByItemId,
             boolean includeOptionGroups,
-            Map<UUID, List<MenuItemOptionGroup>> optionGroupsByItemId
+            Map<UUID, List<MenuItemOptionGroup>> optionGroupsByItemId,
+            Integer itemCount
     ) {
         if (menu == null) {
             return null;
@@ -60,6 +62,12 @@ public class MenuMapper {
                 .description(menu.getDescription())
                 .active(menu.isActive())
                 .displayOrder(menu.getDisplayOrder())
+                .availableFrom(menu.getAvailableFrom())
+                .availableUntil(menu.getAvailableUntil())
+                .availableFromDate(menu.getAvailableFromDate())
+                .availableUntilDate(menu.getAvailableUntilDate())
+                .color(menu.getColor())
+                .itemCount(itemCount)
                 .createdBy(menu.getCreatedBy())
                 .updatedBy(menu.getUpdatedBy())
                 .createdAt(menu.getCreatedAt())
