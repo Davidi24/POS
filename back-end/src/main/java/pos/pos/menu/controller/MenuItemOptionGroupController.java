@@ -16,9 +16,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import pos.pos.menu.dto.CreateMenuItemOptionGroupRequest;
-import pos.pos.menu.dto.MenuItemOptionGroupSummaryResponse;
-import pos.pos.menu.dto.UpdateMenuItemOptionGroupRequest;
+import pos.pos.menu.dto.request.CreateMenuItemOptionGroupRequest;
+import pos.pos.menu.dto.response.MenuItemOptionGroupSummaryResponse;
+import pos.pos.menu.dto.update.UpdateMenuItemOptionGroupRequest;
 import pos.pos.menu.service.MenuItemOptionGroupService;
 
 import java.util.List;

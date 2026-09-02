@@ -1,15 +1,15 @@
 package pos.pos.menu.mapper;
 
 import org.springframework.stereotype.Component;
-import pos.pos.menu.dto.OptionGroupResponse;
-import pos.pos.menu.dto.OptionItemResponse;
-import pos.pos.menu.dto.MenuItemSummaryResponse;
-import pos.pos.menu.dto.MenuItemOptionGroupSummaryResponse;
-import pos.pos.menu.dto.MenuResponse;
-import pos.pos.menu.dto.OptionGroupTypeResponse;
-import pos.pos.menu.dto.MenuRestaurantSummaryResponse;
-import pos.pos.menu.dto.MenuSectionSummaryResponse;
-import pos.pos.menu.dto.MenuVariantSummaryResponse;
+import pos.pos.menu.dto.response.OptionGroupResponse;
+import pos.pos.menu.dto.response.OptionItemResponse;
+import pos.pos.menu.dto.response.MenuItemSummaryResponse;
+import pos.pos.menu.dto.response.MenuItemOptionGroupSummaryResponse;
+import pos.pos.menu.dto.response.MenuResponse;
+import pos.pos.menu.dto.response.OptionGroupTypeResponse;
+import pos.pos.menu.dto.response.MenuRestaurantSummaryResponse;
+import pos.pos.menu.dto.response.MenuSectionSummaryResponse;
+import pos.pos.menu.dto.response.MenuVariantSummaryResponse;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuItemOptionGroup;
