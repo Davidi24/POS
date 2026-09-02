@@ -18,10 +18,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import pos.pos.menu.dto.CreateOptionItemRequest;
-import pos.pos.menu.dto.OptionItemResponse;
-import pos.pos.menu.dto.UpdateOptionItemAvailabilityRequest;
-import pos.pos.menu.dto.UpdateOptionItemRequest;
+import pos.pos.menu.dto.request.CreateOptionItemRequest;
+import pos.pos.menu.dto.response.OptionItemResponse;
+import pos.pos.menu.dto.update.UpdateOptionItemAvailabilityRequest;
+import pos.pos.menu.dto.update.UpdateOptionItemRequest;
 import pos.pos.menu.service.OptionItemService;
 
 import java.util.List;

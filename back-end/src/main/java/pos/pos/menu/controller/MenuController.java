@@ -22,10 +22,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.common.dto.PageResponse;
-import pos.pos.menu.dto.CreateMenuRequest;
-import pos.pos.menu.dto.MenuResponse;
-import pos.pos.menu.dto.UpdateMenuRequest;
-import pos.pos.menu.dto.UpdateMenuStatusRequest;
+import pos.pos.menu.dto.request.CreateMenuRequest;
+import pos.pos.menu.dto.response.MenuResponse;
+import pos.pos.menu.dto.update.UpdateMenuRequest;
+import pos.pos.menu.dto.update.UpdateMenuStatusRequest;
 import pos.pos.menu.service.MenuService;
 
 import java.util.UUID;

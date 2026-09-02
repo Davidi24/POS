@@ -12,9 +12,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.menu.controller.OptionItemController;
-import pos.pos.menu.dto.CreateOptionItemRequest;
-import pos.pos.menu.dto.OptionItemResponse;
-import pos.pos.menu.dto.UpdateOptionItemRequest;
+import pos.pos.menu.dto.request.CreateOptionItemRequest;
+import pos.pos.menu.dto.response.OptionItemResponse;
+import pos.pos.menu.dto.update.UpdateOptionItemRequest;
 import pos.pos.menu.service.OptionItemService;
 import pos.pos.security.principal.AuthenticatedUser;
 

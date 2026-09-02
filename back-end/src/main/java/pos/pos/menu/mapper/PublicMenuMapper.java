@@ -1,9 +1,9 @@
 package pos.pos.menu.mapper;
 
 import org.springframework.stereotype.Component;
-import pos.pos.menu.dto.PublicMenuItemResponse;
-import pos.pos.menu.dto.PublicMenuResponse;
-import pos.pos.menu.dto.PublicMenuSectionResponse;
+import pos.pos.menu.dto.response.PublicMenuItemResponse;
+import pos.pos.menu.dto.response.PublicMenuResponse;
+import pos.pos.menu.dto.response.PublicMenuSectionResponse;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
