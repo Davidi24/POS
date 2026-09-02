@@ -11,7 +11,12 @@ import com.saporini.mobile_desktop.workspace.ui.WorkspaceScreenModel
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
 import com.saporini.mobile_desktop.pos.tables.ui.TablesScreenModel
+import com.saporini.mobile_desktop.pos.menu.data.api.MenuApi
+import com.saporini.mobile_desktop.pos.menu.data.repository.DefaultMenuRepository
+import com.saporini.mobile_desktop.pos.menu.domain.repository.MenuRepository
+import com.saporini.mobile_desktop.pos.menu.ui.MenuScreenModel
 
+//to be understood
 private val appModule = module {
     single { SessionManager() }
     single { createHttpClient(get()) }
@@ -32,6 +37,19 @@ private val appModule = module {
             sessionManager = get()
         )
     }
+
+    single { MenuApi(client = get()) }
+
+    single<MenuRepository> {
+        DefaultMenuRepository(api = get())
+    }
+
+    factory {
+        MenuScreenModel(
+            repository = get(),
+            sessionManager = get()
+        )
+    }
 }
 
 fun initKoin() {
@@ -39,3 +57,5 @@ fun initKoin() {
         modules(appModule)
     }
 }
+
+
