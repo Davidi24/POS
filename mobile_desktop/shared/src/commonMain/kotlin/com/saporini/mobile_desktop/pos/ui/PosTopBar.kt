@@ -48,7 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.ui.PosSection
 
-private val ActiveOlive = Color(0xFF4B522A)
+private val ActiveOlive = Color(0xFF94A27F)
 private val Ink = Color(0xFF202426)
 private val MutedInk = Color(0xFF3D4342)
 private val OnlineGreen = Color(0xFF18C637)

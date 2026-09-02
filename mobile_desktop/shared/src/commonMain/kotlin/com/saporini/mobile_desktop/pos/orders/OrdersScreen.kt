@@ -55,7 +55,7 @@ import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.auth_login_img
 import org.jetbrains.compose.resources.painterResource
 
-private val ActiveOlive = Color(0xFF4B522A)
+private val ActiveOlive = Color(0xFF94A27F)
 private val Ink = Color(0xFF202124)
 private val Muted = Color(0xFF6F716E)
 private val Border = Color(0xFFE7E1DC)

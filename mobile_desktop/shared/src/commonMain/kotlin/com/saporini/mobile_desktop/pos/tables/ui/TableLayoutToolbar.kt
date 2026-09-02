@@ -201,7 +201,7 @@ private fun UploadPlanIconButton(
             imageVector = Icons.Outlined.FileUpload,
             contentDescription = contentDescription,
             modifier = Modifier.size(23.dp),
-            tint = Color(0xFF4B522A)
+            tint = Color(0xFFAEBE95)
         )
     }
 }
@@ -237,7 +237,7 @@ fun EditLayoutIconButton(
     Row(
         modifier = modifier
             .size(46.dp)
-            .background(Color(0xFF4B522A), RoundedCornerShape(10.dp))
+            .background(Color(0xFFAEBE95), RoundedCornerShape(10.dp))
             .clickable(onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
@@ -321,7 +321,7 @@ private fun ChoiceButton(text: String, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .width(110.dp)
             .background(if (selected) Color(0xFFE9EDDE) else Color.White, RoundedCornerShape(10.dp))
-            .border(1.dp, if (selected) Color(0xFF4B522A) else Color(0xFFD9D5D0), RoundedCornerShape(10.dp))
+            .border(1.dp, if (selected) Color(0xFFAEBE95) else Color(0xFFD9D5D0), RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 12.dp),
         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -356,7 +356,7 @@ private fun ToolbarButton(
 ) {
     val background = when {
         destructive -> Color(0xFFFFEEEE)
-        primary -> Color(0xFF4B522A)
+        primary -> Color(0xFFAEBE95)
         else -> Color.White
     }
     val foreground = when {
