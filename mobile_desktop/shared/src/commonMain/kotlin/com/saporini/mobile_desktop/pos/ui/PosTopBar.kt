@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.RestaurantMenu
 import androidx.compose.material.icons.outlined.TableRestaurant
 import androidx.compose.material3.Badge
@@ -54,11 +55,12 @@ private val MutedInk = Color(0xFF3D4342)
 private val OnlineGreen = Color(0xFF18C637)
 private val AlertRed = Color(0xFFFF1414)
 private val MenuSelectedBackground = Color(0xFFF3F5EF)
-private val OverflowSections = listOf(
+internal val OverflowSections = listOf(
     PosSection.KITCHEN_STATUS,
     PosSection.SHIFT,
     PosSection.MY_SALES,
-    PosSection.HISTORY
+    PosSection.HISTORY,
+    PosSection.PROFILE
 )
 
 @Composable
@@ -445,7 +447,7 @@ private fun MenuText(
     )
 }
 
-private fun PosSection.icon(): ImageVector = when (this) {
+internal fun PosSection.icon(): ImageVector = when (this) {
     PosSection.TABLES -> Icons.Outlined.TableRestaurant
     PosSection.ORDERS -> Icons.AutoMirrored.Outlined.ReceiptLong
     PosSection.RESERVATIONS -> Icons.AutoMirrored.Outlined.EventNote
@@ -454,6 +456,7 @@ private fun PosSection.icon(): ImageVector = when (this) {
     PosSection.SHIFT -> Icons.AutoMirrored.Outlined.EventNote
     PosSection.MY_SALES -> Icons.AutoMirrored.Outlined.ReceiptLong
     PosSection.HISTORY -> Icons.AutoMirrored.Outlined.EventNote
+    PosSection.PROFILE -> Icons.Outlined.Person
 }
 
 @Composable
