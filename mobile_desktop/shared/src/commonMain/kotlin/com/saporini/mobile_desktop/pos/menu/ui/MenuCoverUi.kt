@@ -291,7 +291,8 @@ private fun MenuCoverActions(
         horizontalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val buttonModifier = if (isPhone) Modifier.weight(1f).height(40.dp) else Modifier
+        val reorderButtonModifier = if (isPhone) Modifier.weight(0.82f).height(38.dp) else Modifier
+        val createButtonModifier = if (isPhone) Modifier.weight(1.18f).height(44.dp) else Modifier
         TextButton(
             onClick = onToggleReorder,
             shape = RoundedCornerShape(if (isPhone) 5.dp else 8.dp),
@@ -299,7 +300,7 @@ private fun MenuCoverActions(
                 containerColor = if (isReordering) CoverInk else Color.White,
                 contentColor = if (isReordering) Color.White else CoverInk
             ),
-            modifier = buttonModifier
+            modifier = reorderButtonModifier
                 .graphicsLayer {
                     if (isReordering && !isPhone) {
                         scaleX = reorderPulseScale
@@ -320,20 +321,20 @@ private fun MenuCoverActions(
             Icon(
                 imageVector = if (isReordering) Icons.Filled.Check else Icons.Outlined.DragIndicator,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(if (isPhone) 16.dp else 18.dp)
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 text = if (isReordering) "Save Changes" else "Edit Order",
                 fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold,
-                fontSize = if (isPhone) 13.sp else 14.sp,
+                fontSize = if (isPhone) 12.sp else 14.sp,
                 maxLines = 1
             )
         }
         TextButton(
             onClick = onAddMenu,
-            modifier = buttonModifier,
+            modifier = createButtonModifier,
             shape = RoundedCornerShape(if (isPhone) 5.dp else 8.dp),
             colors = ButtonDefaults.textButtonColors(
                 containerColor = CoverOlive,
