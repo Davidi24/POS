@@ -71,6 +71,7 @@ import mobile_desktop.shared.generated.resources.brand_logo
 import org.jetbrains.compose.resources.painterResource
 
 private val PhoneCoverAccent = Color(0xFF94A27F)
+private val PhoneCoverInk = Color(0xFF222426)
 
 internal fun phoneMenuCoverHeight(availableHeight: Dp): Dp =
     (availableHeight - 24.dp).coerceAtLeast(360.dp) * 0.9f
