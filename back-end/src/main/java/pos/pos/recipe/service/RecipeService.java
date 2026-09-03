@@ -13,10 +13,13 @@ import pos.pos.exception.recipe.RecipeComponentValidationException;
 import pos.pos.exception.recipe.RecipeNotFoundException;
 import pos.pos.inventory.entity.InventoryItem;
 import pos.pos.inventory.repository.InventoryItemRepository;
+import pos.pos.inventory.service.UnitConversionService;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.recipe.dto.RecipeComponentUpsertRequest;
 import pos.pos.recipe.dto.RecipeCreateRequest;
+import pos.pos.recipe.dto.RecipeExpansionLineResponse;
+import pos.pos.recipe.dto.RecipeExpansionResponse;
 import pos.pos.recipe.dto.RecipeResponse;
 import pos.pos.recipe.dto.RecipeUpdateRequest;
 import pos.pos.recipe.entity.Recipe;
@@ -34,8 +37,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -57,6 +63,7 @@ public class RecipeService {
     private final MenuItemRepository menuItemRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final RecipeMapper recipeMapper;
+    private final UnitConversionService unitConversionService;
 
 
     // Takes the request from the API and checks the user, after that the method checks if this recipe
@@ -253,6 +260,56 @@ public class RecipeService {
         return recipeMapper.toResponse(saveRecipe(recipe));
     }
 
+    // Read-only preview: "if I made quantityRequested of this menu item's active recipe, what raw
+    // inventory items -- and how much of each -- would that use?" Walks the exact same component
+    // tree as calculateTheoreticalCost (same recursion shape, same cycle guard, same yield-loss
+    // math), just accumulating quantities per raw item instead of summing a cost. Never creates
+    // an InventoryMovement and never touches InventoryLevel -- that's the future Order module's
+    // job, not this one's.
+    @Transactional(readOnly = true)
+    public RecipeExpansionResponse expandToInventoryConsumption(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID menuItemId,
+            BigDecimal quantityRequested
+    ) {
+        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+
+        Recipe recipe = recipeRepository
+                .findByRestaurant_IdAndMenuItem_IdAndStatus(restaurantId, menuItemId, RecipeStatus.ACTIVE)
+                .orElseThrow(RecipeNotFoundException::new);
+
+        // Two maps built together in one walk: quantities keyed by item id (so the same raw item
+        // used in two different branches, e.g. flour in both the dough and a roux, sums into one
+        // line instead of two), and the actual InventoryItem references, so names/units can be
+        // resolved afterward without a second query per item.
+        Map<UUID, BigDecimal> quantityByItemId = new LinkedHashMap<>();
+        Map<UUID, InventoryItem> itemsById = new HashMap<>();
+
+        accumulateConsumption(recipe, quantityRequested, new HashSet<>(), quantityByItemId, itemsById);
+
+        List<RecipeExpansionLineResponse> lines = quantityByItemId.entrySet().stream()
+                .map(entry -> {
+                    InventoryItem item = itemsById.get(entry.getKey());
+                    return RecipeExpansionLineResponse.builder()
+                            .inventoryItemId(item.getId())
+                            .inventoryItemName(item.getName())
+                            .baseUnit(item.getBaseUnit())
+                            .quantity(entry.getValue())
+                            .build();
+                })
+                .toList();
+
+        return RecipeExpansionResponse.builder()
+                .recipeId(recipe.getId())
+                .recipeName(recipe.getName())
+                .menuItemId(recipe.getMenuItem() == null ? null : recipe.getMenuItem().getId())
+                .menuItemName(recipe.getMenuItem() == null ? null : recipe.getMenuItem().getName())
+                .quantityRequested(quantityRequested)
+                .lines(lines)
+                .build();
+    }
+
     // This method takes each component, calls the method yieldAdjusted quantity and calculates what is the
     // exact quantity needed to have the recipe with this needed quantity(so it calculates loss and other stuff)
     // and puts the whole result in a variable and returns it as total
@@ -280,6 +337,50 @@ public class RecipeService {
 
         visitedRecipeIds.remove(recipe.getId());
         return total;
+    }
+
+    // Same tree-walking structure and cycle guard as accumulateCost above -- kept as a separate
+    // method rather than refactored to share one implementation, since threading a shared
+    // accumulation strategy through accumulateCost risked changing its already-working behavior
+    // for no benefit to it. The one real difference beyond "sum a map instead of a total": a
+    // recipe component's quantity is normalized into the raw item's own baseUnit (via
+    // UnitConversionService) before being merged in, since two components referencing the same
+    // item could be written in different units (e.g. "500 GRAM" here, "0.2 KILOGRAM" there) --
+    // summing those as raw numbers without converting first would silently produce a wrong total.
+    private void accumulateConsumption(
+            Recipe recipe,
+            BigDecimal multiplier,
+            Set<UUID> visitedRecipeIds,
+            Map<UUID, BigDecimal> quantityByItemId,
+            Map<UUID, InventoryItem> itemsById
+    ) {
+        if (!visitedRecipeIds.add(recipe.getId())) {
+            throw new RecipeComponentValidationException(
+                    "Cycle detected in recipe components: \"" + recipe.getName() + "\" is reachable from one of its own sub-recipes"
+            );
+        }
+
+        for (RecipeComponent component : recipe.getComponents()) {
+            BigDecimal effectiveQuantity = yieldAdjustedQuantity(component.getQuantity(), component.getYieldLossPercent())
+                    .multiply(multiplier);
+
+            if (component.getComponentType() == RecipeComponentType.INVENTORY_ITEM) {
+                InventoryItem item = component.getInventoryItem();
+                BigDecimal normalizedQuantity = unitConversionService.convert(
+                        item,
+                        effectiveQuantity,
+                        component.getUnit(),
+                        item.getBaseUnit()
+                );
+
+                quantityByItemId.merge(item.getId(), normalizedQuantity, BigDecimal::add);
+                itemsById.putIfAbsent(item.getId(), item);
+            } else {
+                accumulateConsumption(component.getChildRecipe(), effectiveQuantity, visitedRecipeIds, quantityByItemId, itemsById);
+            }
+        }
+
+        visitedRecipeIds.remove(recipe.getId());
     }
 
     // The use of this method is:

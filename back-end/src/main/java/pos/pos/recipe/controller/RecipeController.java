@@ -21,12 +21,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.recipe.dto.RecipeComponentUpsertRequest;
 import pos.pos.recipe.dto.RecipeCreateRequest;
+import pos.pos.recipe.dto.RecipeExpansionResponse;
 import pos.pos.recipe.dto.RecipeResponse;
 import pos.pos.recipe.dto.RecipeUpdateRequest;
 import pos.pos.recipe.enums.RecipeStatus;
 import pos.pos.recipe.enums.RecipeType;
 import pos.pos.recipe.service.RecipeService;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -132,6 +134,20 @@ public class RecipeController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(recipeService.archiveRecipe(authentication, restaurantId, recipeId));
+    }
+
+    @GetMapping("/expand-menu-item/{menuItemId}")
+    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @Operation(summary = "Preview the raw inventory ingredients (and quantities) needed to make N of this menu item's active recipe")
+    @ApiResponse(responseCode = "200", description = "Expansion computed")
+    @ApiResponse(responseCode = "404", description = "No active recipe found for this menu item")
+    public ResponseEntity<RecipeExpansionResponse> expandMenuItem(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID menuItemId,
+            @RequestParam(name = "quantity", defaultValue = "1") BigDecimal quantity,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(recipeService.expandToInventoryConsumption(authentication, restaurantId, menuItemId, quantity));
     }
 
     @PostMapping("/{recipeId}/recalculate-cost")
