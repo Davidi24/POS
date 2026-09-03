@@ -26,7 +26,9 @@ public class InventoryLevelResponse {
     private BigDecimal committedQuantity;
     private BigDecimal availableQuantity;
     private BigDecimal parQuantity;
-    private BigDecimal reorderQuantity;
+    private BigDecimal calculatedReorderPoint;
+    private BigDecimal manualReorderPoint;
+    private BigDecimal effectiveReorderPoint;
     private OffsetDateTime lastCountedAt;
     private OffsetDateTime lastMovementAt;
     private boolean lowStock;

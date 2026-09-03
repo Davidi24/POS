@@ -21,8 +21,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.inventory.dto.InventoryItemRequest;
 import pos.pos.inventory.dto.InventoryItemResponse;
+import pos.pos.inventory.dto.InventoryUnitConversionRequest;
+import pos.pos.inventory.dto.InventoryUnitConversionResponse;
+import pos.pos.inventory.dto.InventoryUnitConversionTestResponse;
+import pos.pos.inventory.enums.InventoryUnit;
 import pos.pos.inventory.service.InventoryItemService;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -135,6 +140,64 @@ public class InventoryItemController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(inventoryItemService.listInactiveItems(authentication, restaurantId));
+    }
+
+    @PostMapping("/{itemId}/unit-conversions")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Add a unit conversion rule for one item")
+    @ApiResponse(responseCode = "201", description = "Conversion created")
+    public ResponseEntity<InventoryUnitConversionResponse> createUnitConversion(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID itemId,
+            @Valid @RequestBody InventoryUnitConversionRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(inventoryItemService.createUnitConversion(authentication, restaurantId, itemId, request));
+    }
+
+    @GetMapping("/{itemId}/unit-conversions")
+    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @Operation(summary = "List unit conversion rules for one item")
+    public ResponseEntity<List<InventoryUnitConversionResponse>> listUnitConversions(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID itemId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(inventoryItemService.listUnitConversions(authentication, restaurantId, itemId));
+    }
+
+    @GetMapping("/{itemId}/convert")
+    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @Operation(summary = "Convert a quantity between two units for one item (test/utility endpoint)")
+    @ApiResponse(responseCode = "200", description = "Conversion computed")
+    @ApiResponse(responseCode = "400", description = "No conversion path exists between these units for this item")
+    @ApiResponse(responseCode = "404", description = "Item not found")
+    public ResponseEntity<InventoryUnitConversionTestResponse> convertQuantity(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID itemId,
+            @RequestParam BigDecimal quantity,
+            @RequestParam InventoryUnit fromUnit,
+            @RequestParam InventoryUnit toUnit,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                inventoryItemService.convertQuantity(authentication, restaurantId, itemId, quantity, fromUnit, toUnit)
+        );
+    }
+
+    @DeleteMapping("/{itemId}/unit-conversions/{conversionId}")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Remove a unit conversion rule from one item")
+    @ApiResponse(responseCode = "204", description = "Conversion removed")
+    public ResponseEntity<Void> deleteUnitConversion(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID itemId,
+            @PathVariable UUID conversionId,
+            Authentication authentication
+    ) {
+        inventoryItemService.deleteUnitConversion(authentication, restaurantId, itemId, conversionId);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{itemId}")

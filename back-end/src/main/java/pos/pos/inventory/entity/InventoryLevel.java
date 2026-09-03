@@ -40,7 +40,8 @@ import java.util.Objects;
         on_hand_quantity >= 0
         AND committed_quantity >= 0
         AND (par_quantity IS NULL OR par_quantity >= 0)
-        AND (reorder_quantity IS NULL OR reorder_quantity >= 0)
+        AND (calculated_reorder_point IS NULL OR calculated_reorder_point >= 0)
+        AND (manual_reorder_point IS NULL OR manual_reorder_point >= 0)
         """)
 @Getter
 @Setter
@@ -88,10 +89,18 @@ public class InventoryLevel extends AbstractTimestampedEntity {
     private BigDecimal parQuantity;
 
     /**
-     * 	The "getting low, reorder now" threshold, for this item, at this specific location.
+     * The "getting low, reorder now" threshold worked out automatically by the system.
+     * The actual calculation logic is a later phase -- for now this is just a settable field.
      */
-    @Column(name = "reorder_quantity", precision = 12, scale = 3)
-    private BigDecimal reorderQuantity;
+    @Column(name = "calculated_reorder_point", precision = 12, scale = 3)
+    private BigDecimal calculatedReorderPoint;
+
+    /**
+     * An explicit reorder-point override a manager can set for this item at this location,
+     * taking priority over calculatedReorderPoint whenever it's set.
+     */
+    @Column(name = "manual_reorder_point", precision = 12, scale = 3)
+    private BigDecimal manualReorderPoint;
 
     /**
      * Last physical count
@@ -107,7 +116,8 @@ public class InventoryLevel extends AbstractTimestampedEntity {
         onHandQuantity = defaultQuantity(onHandQuantity);
         committedQuantity = defaultQuantity(committedQuantity);
         parQuantity = nullableQuantity(parQuantity);
-        reorderQuantity = nullableQuantity(reorderQuantity);
+        calculatedReorderPoint = nullableQuantity(calculatedReorderPoint);
+        manualReorderPoint = nullableQuantity(manualReorderPoint);
     }
 
     @Override
@@ -115,13 +125,27 @@ public class InventoryLevel extends AbstractTimestampedEntity {
         validateNonNegative(onHandQuantity, "onHandQuantity");
         validateNonNegative(committedQuantity, "committedQuantity");
         validateNonNegative(parQuantity, "parQuantity");
-        validateNonNegative(reorderQuantity, "reorderQuantity");
+        validateNonNegative(calculatedReorderPoint, "calculatedReorderPoint");
+        validateNonNegative(manualReorderPoint, "manualReorderPoint");
 
         if (location != null && inventoryItem != null && location.getRestaurant() != null && inventoryItem.getRestaurant() != null) {
             if (!Objects.equals(location.getRestaurant().getId(), inventoryItem.getRestaurant().getId())) {
                 throw new IllegalStateException("inventory level item and location must belong to the same restaurant");
             }
         }
+    }
+
+    /**
+     * Not a real column -- just a shortcut for "which reorder point actually applies right now."
+     * A manager's manual override always wins if it's set; otherwise falls back to whatever the
+     * system last calculated; otherwise null (nothing set at the level yet at all).
+     */
+    public BigDecimal getEffectiveReorderPoint() {
+        if (manualReorderPoint != null) {
+            return manualReorderPoint;
+        }
+
+        return calculatedReorderPoint;
     }
 
     private BigDecimal defaultQuantity(BigDecimal value) {

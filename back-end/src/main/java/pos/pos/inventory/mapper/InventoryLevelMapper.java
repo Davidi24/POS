@@ -16,7 +16,14 @@ public class InventoryLevelMapper {
 
         BigDecimal onHand = level.getOnHandQuantity() == null ? BigDecimal.ZERO : level.getOnHandQuantity();
         BigDecimal committed = level.getCommittedQuantity() == null ? BigDecimal.ZERO : level.getCommittedQuantity();
-        BigDecimal reorderQuantity = level.getReorderQuantity();
+        BigDecimal effectiveReorderPoint = level.getEffectiveReorderPoint();
+
+        // effectiveReorderPoint is null exactly when both calculatedReorderPoint and
+        // manualReorderPoint are null -- that's the only case that falls back to the item's
+        // own reorderPoint, matching the same three-tier priority the low-stock query uses.
+        BigDecimal lowStockThreshold = effectiveReorderPoint != null
+                ? effectiveReorderPoint
+                : (level.getInventoryItem() == null ? null : level.getInventoryItem().getReorderPoint());
 
         return InventoryLevelResponse.builder()
                 .id(level.getId())
@@ -28,10 +35,12 @@ public class InventoryLevelMapper {
                 .committedQuantity(committed)
                 .availableQuantity(onHand.subtract(committed))
                 .parQuantity(level.getParQuantity())
-                .reorderQuantity(reorderQuantity)
+                .calculatedReorderPoint(level.getCalculatedReorderPoint())
+                .manualReorderPoint(level.getManualReorderPoint())
+                .effectiveReorderPoint(effectiveReorderPoint)
                 .lastCountedAt(level.getLastCountedAt())
                 .lastMovementAt(level.getLastMovementAt())
-                .lowStock(reorderQuantity != null && onHand.compareTo(reorderQuantity) < 0)
+                .lowStock(lowStockThreshold != null && onHand.compareTo(lowStockThreshold) < 0)
                 .build();
     }
 }

@@ -10,14 +10,23 @@ import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.inventory.InventoryItemNotFoundException;
 import pos.pos.inventory.dto.InventoryItemRequest;
 import pos.pos.inventory.dto.InventoryItemResponse;
+import pos.pos.inventory.dto.InventoryUnitConversionRequest;
+import pos.pos.inventory.dto.InventoryUnitConversionResponse;
+import pos.pos.inventory.dto.InventoryUnitConversionTestResponse;
 import pos.pos.inventory.entity.InventoryItem;
+import pos.pos.inventory.entity.InventoryUnitConversion;
+import pos.pos.inventory.enums.InventoryUnit;
 import pos.pos.inventory.mapper.InventoryItemMapper;
+import pos.pos.inventory.mapper.InventoryUnitConversionMapper;
 import pos.pos.inventory.repository.InventoryItemRepository;
+import pos.pos.inventory.repository.InventoryUnitConversionRepository;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.utils.NormalizationUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 
@@ -32,6 +41,9 @@ public class InventoryItemService {
     private final RestaurantScopeService restaurantScopeService;
     private final InventoryItemRepository inventoryItemRepository;
     private final InventoryItemMapper inventoryItemMapper;
+    private final InventoryUnitConversionRepository inventoryUnitConversionRepository;
+    private final InventoryUnitConversionMapper inventoryUnitConversionMapper;
+    private final UnitConversionService unitConversionService;
 
 
     //Finds the restaurant and the logged in user who is doing the change and then saves these Info and other info through the mapper
@@ -151,6 +163,82 @@ public class InventoryItemService {
     }
 
 
+    // Adds one item-specific unit conversion rule (e.g. "1 CASE = 12 BOTTLE" for this item).
+    // fromUnit/toUnit are rejected if equal, and a pre-check gives a clear 409 if this exact
+    // direction was already defined, instead of a raw constraint violation from the DB's own
+    // unique index on (inventory_item_id, from_unit, to_unit).
+    @Transactional
+    public InventoryUnitConversionResponse createUnitConversion(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID itemId,
+            InventoryUnitConversionRequest request
+    ) {
+        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        InventoryItem item = requireItem(restaurantId, itemId);
+
+        if (request.getFromUnit() == request.getToUnit()) {
+            throw new AuthException("fromUnit and toUnit must be different", HttpStatus.BAD_REQUEST);
+        }
+
+        assertConversionNotAlreadyDefined(itemId, request.getFromUnit(), request.getToUnit());
+
+        InventoryUnitConversion conversion = new InventoryUnitConversion();
+        conversion.setInventoryItem(item);
+        conversion.setFromUnit(request.getFromUnit());
+        conversion.setToUnit(request.getToUnit());
+        conversion.setConversionFactor(request.getConversionFactor());
+
+        return inventoryUnitConversionMapper.toResponse(saveUnitConversion(conversion));
+    }
+
+    @Transactional(readOnly = true)
+    public List<InventoryUnitConversionResponse> listUnitConversions(Authentication authentication, UUID restaurantId, UUID itemId) {
+        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        requireItem(restaurantId, itemId);
+
+        return inventoryUnitConversionRepository.findAllByInventoryItem_Id(itemId).stream()
+                .map(inventoryUnitConversionMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void deleteUnitConversion(Authentication authentication, UUID restaurantId, UUID itemId, UUID conversionId) {
+        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        requireItem(restaurantId, itemId);
+
+        InventoryUnitConversion conversion = inventoryUnitConversionRepository.findById(conversionId)
+                .filter(existing -> existing.getInventoryItem() != null && Objects.equals(existing.getInventoryItem().getId(), itemId))
+                .orElseThrow(() -> new AuthException("Unit conversion not found", HttpStatus.NOT_FOUND));
+
+        inventoryUnitConversionRepository.delete(conversion);
+    }
+
+    // Read-only pass-through to UnitConversionService.convert(), for testing a conversion path
+    // (or any future direct use) without needing to actually create a movement or count line.
+    // Does not modify UnitConversionService itself -- just resolves the item and hands off.
+    @Transactional(readOnly = true)
+    public InventoryUnitConversionTestResponse convertQuantity(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID itemId,
+            BigDecimal quantity,
+            InventoryUnit fromUnit,
+            InventoryUnit toUnit
+    ) {
+        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        InventoryItem item = requireItem(restaurantId, itemId);
+
+        BigDecimal convertedQuantity = unitConversionService.convert(item, quantity, fromUnit, toUnit);
+
+        return InventoryUnitConversionTestResponse.builder()
+                .originalQuantity(quantity)
+                .fromUnit(fromUnit)
+                .convertedQuantity(convertedQuantity)
+                .toUnit(toUnit)
+                .build();
+    }
+
     //Gets the item from repository method and changes the setter and updated by, after that calls the saveItem method
     @Transactional
     public void deactivateItem(Authentication authentication, UUID restaurantId, UUID itemId) {
@@ -214,6 +302,27 @@ public class InventoryItemService {
     }
 
 
+    // Friendly pre-check ahead of the DB's own unique constraint on
+    // (inventory_item_id, from_unit, to_unit), same reasoning as assertBarcodeAvailable/assertCodeAvailable.
+    private void assertConversionNotAlreadyDefined(UUID itemId, InventoryUnit fromUnit, InventoryUnit toUnit) {
+        inventoryUnitConversionRepository.findByInventoryItem_IdAndFromUnitAndToUnit(itemId, fromUnit, toUnit)
+                .ifPresent(existing -> {
+                    throw new AuthException(
+                            "A conversion from " + fromUnit + " to " + toUnit + " already exists for this item",
+                            HttpStatus.CONFLICT
+                    );
+                });
+    }
+
+    private InventoryUnitConversion saveUnitConversion(InventoryUnitConversion conversion) {
+        try {
+            return inventoryUnitConversionRepository.saveAndFlush(conversion);
+        } catch (DataIntegrityViolationException ex) {
+            throw new AuthException("Unit conversion violates a data constraint", HttpStatus.BAD_REQUEST);
+        } catch (IllegalStateException ex) {
+            throw new AuthException(ex.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
 
     //
     private InventoryItem saveItem(InventoryItem item) {
