@@ -1,8 +1,10 @@
 package com.saporini.mobile_desktop.pos.ui.shell
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +32,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,11 +46,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.ui.PosSection
+import mobile_desktop.shared.generated.resources.Res
+import mobile_desktop.shared.generated.resources.pos_simple_logo
+import org.jetbrains.compose.resources.painterResource
 
 private val ActiveOlive = Color(0xFF94A27F)
 private val Ink = Color(0xFF202426)
@@ -62,6 +69,51 @@ internal val OverflowSections = listOf(
     PosSection.HISTORY,
     PosSection.PROFILE
 )
+
+@Composable
+fun PosPhoneTopBar(initials: String) {
+    Column(Modifier.fillMaxWidth().background(Color.White)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(Res.drawable.pos_simple_logo),
+                contentDescription = "Saporini",
+                modifier = Modifier.size(width = 24.dp, height = 40.dp),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(Modifier.weight(1f))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OnlineStatus(textColor = ActiveOlive)
+                LanguageSelector()
+                NotificationButton(count = 3)
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(ActiveOlive),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = initials,
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+        HorizontalDivider(color = Color(0xFFEDEEEB))
+    }
+}
 
 @Composable
 fun PosTopBar(
@@ -320,7 +372,7 @@ private fun NotificationButton(count: Int) {
 }
 
 @Composable
-private fun OnlineStatus() {
+private fun OnlineStatus(textColor: Color = Ink) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -337,7 +389,7 @@ private fun OnlineStatus() {
             fontWeight = FontWeight.SemiBold,
             fontSize = 13.sp,
             letterSpacing = 0.sp,
-            color = Ink
+            color = textColor
         )
     }
 }

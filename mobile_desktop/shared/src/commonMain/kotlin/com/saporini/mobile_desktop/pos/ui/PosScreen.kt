@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,9 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import com.saporini.mobile_desktop.core.session.SessionManager
+import com.saporini.mobile_desktop.core.ui.isPhoneWindow
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.kitchen.KitchenStatusScreen
-import com.saporini.mobile_desktop.pos.menu.MenuScreen
+import com.saporini.mobile_desktop.pos.menu.ui.MenuScreen
 import com.saporini.mobile_desktop.pos.orders.OrdersScreen
 import com.saporini.mobile_desktop.pos.payment.PaymentScreen
 import com.saporini.mobile_desktop.pos.reservations.ReservationsScreen
@@ -53,9 +55,9 @@ object PosScreen : Screen {
                 "MANAGER" in currentUser?.roles.orEmpty()
 
         BoxWithConstraints(Modifier.fillMaxSize().background(Color.White)) {
-            val isPhoneLayout = maxWidth < 600.dp
+            val isPhoneLayout = isPhoneWindow()
 
-            Column(Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().then(if (isPhoneLayout) Modifier.safeDrawingPadding() else Modifier)) {
                 if (!isPhoneLayout) {
                     PosTopBar(
                         selected = selected,
