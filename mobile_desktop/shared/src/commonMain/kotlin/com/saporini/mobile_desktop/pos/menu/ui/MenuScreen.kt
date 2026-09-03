@@ -390,7 +390,7 @@ private fun MenuDetailsContent(
                 searchField(Modifier.fillMaxWidth())
             }
             Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(end = 18.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 sections.forEach { category ->
@@ -407,7 +407,7 @@ private fun MenuDetailsContent(
                             imageVector = categoryIcon(category),
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
-                            tint = if (selected) Color.White else ActiveOlive
+                            tint = TextInk
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(category, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
@@ -423,7 +423,7 @@ private fun MenuDetailsContent(
                         Icons.Outlined.Edit,
                         contentDescription = "Edit menu sections",
                         modifier = Modifier.size(18.dp),
-                        tint = if (isReorderingItems) MutedInk.copy(alpha = 0.4f) else ActiveOlive
+                        tint = if (isReorderingItems) TextInk.copy(alpha = 0.35f) else TextInk
                     )
                 }
             }
@@ -932,7 +932,7 @@ private fun CategoryButtons(
                         imageVector = categoryIcon(item),
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = if (isSelected) Color.White else ActiveOlive
+                        tint = TextInk
                     )
                     Text(
                         text = item,
@@ -961,7 +961,7 @@ private fun CategoryButtons(
                         imageVector = Icons.Outlined.Menu,
                         contentDescription = "More categories",
                         modifier = Modifier.size(24.dp),
-                        tint = ActiveOlive
+                        tint = TextInk
                     )
                 }
 
@@ -996,7 +996,7 @@ private fun CategoryButtons(
                                     imageVector = categoryIcon(item),
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
-                                    tint = ActiveOlive
+                                    tint = TextInk
                                 )
                             }
                         )
@@ -1014,7 +1014,7 @@ private fun CategoryButtons(
                 Icons.Outlined.Edit,
                 contentDescription = "Edit menu sections",
                 modifier = Modifier.size(19.dp),
-                tint = ActiveOlive
+                tint = TextInk
             )
         }
     }
