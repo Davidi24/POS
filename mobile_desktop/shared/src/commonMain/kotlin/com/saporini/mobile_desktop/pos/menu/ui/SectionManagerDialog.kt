@@ -136,7 +136,7 @@ private fun OrderTypeRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(38.dp).background(Color.White, RoundedCornerShape(9.dp)), contentAlignment = Alignment.Center) {
-            Icon(icon, null, Modifier.size(20.dp), tint = SectionGreen)
+            Icon(icon, null, Modifier.size(20.dp), tint = SectionInk)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = SectionInk)
@@ -218,11 +218,11 @@ internal fun SectionManagerDialog(
                         Spacer(Modifier.size(4.dp))
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             Box(
-                                modifier = Modifier.size(44.dp).border(1.dp, SectionGreen, RoundedCornerShape(8.dp))
+                                modifier = Modifier.size(44.dp).border(1.dp, SectionInk, RoundedCornerShape(8.dp))
                                     .clickable { addSectionOpen = true },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Outlined.Add, "Add new section", Modifier.size(21.dp), tint = SectionGreen)
+                                Icon(Icons.Outlined.Add, "Add new section", Modifier.size(21.dp), tint = SectionInk)
                             }
                         }
                     }
@@ -427,7 +427,7 @@ private fun SectionRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(32.dp).background(Color.White, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-            Icon(categoryIcon(section), null, Modifier.size(18.dp), tint = SectionGreen)
+            Icon(categoryIcon(section), null, Modifier.size(18.dp), tint = SectionInk)
         }
         Spacer(Modifier.size(9.dp))
         Column(Modifier.weight(1f)) {
@@ -452,7 +452,7 @@ private fun SectionRow(
                     if (section == "All") Icons.Outlined.Lock else Icons.Outlined.DragIndicator,
                     if (section == "All") "All stays first" else "Drag and drop $section",
                     Modifier.size(if (section == "All") 17.dp else 24.dp),
-                    tint = if (canMove) SectionMuted else SectionBorder
+                    tint = SectionInk
                 )
             }
         } else if (section == "All") {
@@ -461,26 +461,29 @@ private fun SectionRow(
                     .background(Color.White).border(1.dp, SectionBorder, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.Lock, "All is protected", Modifier.size(17.dp), tint = SectionBorder)
+                Icon(Icons.Outlined.Lock, "All is protected", Modifier.size(17.dp), tint = SectionInk)
             }
         } else {
-            IconButton(
-                onClick = onEdit,
-                modifier = Modifier.size(38.dp).border(1.dp, SectionBorder, RoundedCornerShape(8.dp))
+            Box(
+                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp))
+                    .background(Color.White).border(1.dp, SectionBorder, RoundedCornerShape(8.dp))
+                    .clickable(onClick = onEdit),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.Edit, "Rename $section", Modifier.size(17.dp), tint = SectionInk)
+                Icon(Icons.Outlined.Edit, "Rename $section", Modifier.size(18.dp), tint = SectionInk)
             }
-            Spacer(Modifier.size(6.dp))
-            IconButton(
-                onClick = onDelete,
-                enabled = itemCount == 0,
-                modifier = Modifier.size(38.dp).border(1.dp, SectionBorder, RoundedCornerShape(8.dp))
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp))
+                    .background(if (itemCount == 0) SectionDanger else SectionDanger.copy(alpha = 0.35f))
+                    .then(if (itemCount == 0) Modifier.clickable(onClick = onDelete) else Modifier),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Outlined.DeleteOutline,
                     if (itemCount == 0) "Delete $section" else "$section cannot be deleted while it contains items",
                     Modifier.size(18.dp),
-                    tint = if (itemCount == 0) SectionDanger else SectionBorder
+                    tint = Color.White
                 )
             }
         }
