@@ -3,6 +3,9 @@ package com.saporini.mobile_desktop.pos.menu.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -32,7 +35,6 @@ import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.OpenWith
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -48,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -76,11 +79,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.CormorantGaramond
+import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
+import com.saporini.mobile_desktop.pos.ui.shell.PosPhoneTopBar
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import mobile_desktop.shared.generated.resources.Res
@@ -107,167 +113,243 @@ fun MenuCoverUi(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     hiddenMenuIds: Set<String> = emptySet(),
-    deletingMenuId: String? = null
+    deletingMenuId: String? = null,
+    profileInitials: String = "?"
 ) {
     var isReordering by remember { mutableStateOf(false) }
     var orderedMenus by remember(state.menus, hiddenMenuIds) {
         mutableStateOf(state.menus.filter { it.id !in hiddenMenuIds })
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .padding(horizontal = 28.dp, vertical = 20.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Choose your Menu",
-                fontFamily = Inter(),
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                color = CoverInk
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Gentle breathing scale only -- no colored glow, no border while
-                // active. Clean solid pill, same spirit as the original toggle.
-                val reorderPulse = rememberInfiniteTransition(label = "reorder-save-pulse")
-                val reorderPulseScale by reorderPulse.animateFloat(
-                    initialValue = 1f,
-                    targetValue = 1.045f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(durationMillis = 750),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "reorder-save-pulse-scale"
-                )
-                if (canManageMenus) {
-                TextButton(
-                    onClick = { isReordering = !isReordering },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = if (isReordering) CoverInk else Color.White,
-                        contentColor = if (isReordering) Color.White else CoverInk
-                    ),
-                    modifier = Modifier
-                        .graphicsLayer {
-                            if (isReordering) {
-                                scaleX = reorderPulseScale
-                                scaleY = reorderPulseScale
-                            }
-                        }
-                        .then(
-                            if (isReordering) {
-                                Modifier.shadow(
-                                    elevation = 8.dp,
-                                    shape = RoundedCornerShape(8.dp),
-                                    clip = false,
-                                    ambientColor = Color(0x33141414),
-                                    spotColor = Color(0x40141414)
-                                )
-                            } else {
-                                Modifier.border(1.dp, Color(0xFFDDD9D2), RoundedCornerShape(8.dp))
-                            }
-                        ),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isReordering) Icons.Filled.Check else Icons.Outlined.OpenWith,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = if (isReordering) "Save Changes" else "Edit Order",
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
-                }
-                }
-                if (canManageMenus) {
-                TextButton(
-                    onClick = onAddMenu,
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = Color(0xFF94A27F),
-                        contentColor = Color.White
-                    ),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "Create Menu",
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
-                    )
-                }
-                }
+    BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
+        val isPhone = isPhoneMenuWindow()
+        val isWidePhone = isWidePhoneWindow()
+        val widePhoneActionsWidth = minOf(360.dp, maxWidth * 0.55f)
+        Column(Modifier.fillMaxSize()) {
+            if (isPhone) {
+                PosPhoneTopBar(initials = profileInitials)
             }
-        }
-        Spacer(Modifier.height(16.dp))
-
-        state.errorMessage?.let { message ->
-            Row(
+            Column(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .background(Color(0xFFFFF2F0), RoundedCornerShape(9.dp))
-                    .border(1.dp, Color(0xFFF3C7C1), RoundedCornerShape(9.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(
+                        start = if (isPhone) 0.dp else 28.dp,
+                        end = if (isPhone) 0.dp else 28.dp,
+                        top = if (isWidePhone) 8.dp else if (isPhone) 16.dp else 20.dp,
+                        bottom = if (isPhone) 0.dp else 20.dp
+                    )
             ) {
-                Text(
-                    text = message,
-                    modifier = Modifier.weight(1f),
-                    fontFamily = Inter(),
-                    color = Color(0xFFB13A2F)
-                )
-                TextButton(onClick = onRetry) {
-                    Text("Retry", fontFamily = Inter(), fontWeight = FontWeight.Bold)
+                if (isWidePhone) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Choose your Menu",
+                            modifier = Modifier.weight(1f),
+                            fontFamily = Inter(), fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp, lineHeight = 24.sp, color = CoverInk
+                        )
+                        if (canManageMenus) {
+                            MenuCoverActions(
+                                isReordering = isReordering,
+                                isPhone = true,
+                                onToggleReorder = { isReordering = !isReordering },
+                                onAddMenu = onAddMenu,
+                                modifier = Modifier.width(widePhoneActionsWidth)
+                            )
+                        }
+                    }
+                } else if (isPhone) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Choose your Menu",
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            lineHeight = 24.sp,
+                            color = CoverInk
+                        )
+                        if (canManageMenus) {
+                            MenuCoverActions(
+                                isReordering = isReordering,
+                                isPhone = true,
+                                onToggleReorder = { isReordering = !isReordering },
+                                onAddMenu = onAddMenu,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Choose your Menu",
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = CoverInk
+                        )
+                        if (canManageMenus) {
+                            MenuCoverActions(
+                                isReordering = isReordering,
+                                isPhone = false,
+                                onToggleReorder = { isReordering = !isReordering },
+                                onAddMenu = onAddMenu
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(if (isWidePhone) 8.dp else if (isPhone) 14.dp else 16.dp))
+
+                state.errorMessage?.let { message ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = if (isPhone) 16.dp else 0.dp)
+                            .background(Color(0xFFFFF2F0), RoundedCornerShape(9.dp))
+                            .border(1.dp, Color(0xFFF3C7C1), RoundedCornerShape(9.dp))
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = message,
+                            modifier = Modifier.weight(1f),
+                            fontFamily = Inter(),
+                            color = Color(0xFFB13A2F)
+                        )
+                        TextButton(onClick = onRetry) {
+                            Text("Retry", fontFamily = Inter(), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(Modifier.height(18.dp))
+                }
+
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                    if (state.isLoading) {
+                        if (isPhone) {
+                            PhoneMenuCoverSkeletons(
+                                availableWidth = maxWidth,
+                                availableHeight = maxHeight
+                            )
+                        } else {
+                            MenuCoverSkeletonGrid(
+                                columns = menuGridColumns(maxWidth),
+                                availableHeight = maxHeight
+                            )
+                        }
+                    } else {
+                        MenuCoverCollection(
+                            menus = orderedMenus,
+                            columns = menuGridColumns(maxWidth),
+                            availableWidth = maxWidth,
+                            availableHeight = maxHeight,
+                            isPhone = isPhone,
+                            isReordering = isReordering,
+                            canManageMenus = canManageMenus,
+                            deletingMenuId = deletingMenuId,
+                            onReorder = { orderedMenus = it },
+                            onOpenMenu = onOpenMenu,
+                            onEditMenu = onEditMenu,
+                            onAddMenu = onAddMenu
+                        )
+                    }
                 }
             }
-            Spacer(Modifier.height(18.dp))
         }
+    }
+}
 
-        when {
-            state.isLoading -> {
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    MenuCoverSkeletonGrid(
-                        columns = menuGridColumns(maxWidth),
-                        availableHeight = maxHeight
-                    )
+@Composable
+private fun MenuCoverActions(
+    isReordering: Boolean,
+    isPhone: Boolean,
+    onToggleReorder: () -> Unit,
+    onAddMenu: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val reorderPulse = rememberInfiniteTransition(label = "reorder-save-pulse")
+    val reorderPulseScale by reorderPulse.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.045f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 750),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "reorder-save-pulse-scale"
+    )
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val buttonModifier = if (isPhone) Modifier.weight(1f).height(40.dp) else Modifier
+        TextButton(
+            onClick = onToggleReorder,
+            shape = RoundedCornerShape(if (isPhone) 5.dp else 8.dp),
+            colors = ButtonDefaults.textButtonColors(
+                containerColor = if (isReordering) CoverInk else Color.White,
+                contentColor = if (isReordering) Color.White else CoverInk
+            ),
+            modifier = buttonModifier
+                .graphicsLayer {
+                    if (isReordering && !isPhone) {
+                        scaleX = reorderPulseScale
+                        scaleY = reorderPulseScale
+                    }
                 }
-            }
-
-            else -> {
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    NonScrollingMenuGrid(
-                        menus = orderedMenus,
-                        columns = menuGridColumns(maxWidth),
-                        availableHeight = maxHeight,
-                        isReordering = isReordering,
-                        canManageMenus = canManageMenus,
-                        deletingMenuId = deletingMenuId,
-                        onReorder = { orderedMenus = it },
-                        onOpenMenu = onOpenMenu,
-                        onEditMenu = onEditMenu,
-                        onAddMenu = onAddMenu
+                .then(
+                    if (isReordering && !isPhone) {
+                        Modifier.shadow(8.dp, RoundedCornerShape(8.dp), clip = false)
+                    } else if (isReordering) Modifier else Modifier.border(
+                        1.dp,
+                        Color(0xFFDDD9D2),
+                        RoundedCornerShape(if (isPhone) 5.dp else 8.dp)
                     )
-                }
-            }
+                ),
+            contentPadding = PaddingValues(horizontal = if (isPhone) 8.dp else 16.dp, vertical = if (isPhone) 8.dp else 10.dp)
+        ) {
+            Icon(
+                imageVector = if (isReordering) Icons.Filled.Check else Icons.Outlined.OpenWith,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = if (isReordering) "Save Changes" else "Edit Order",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = if (isPhone) 13.sp else 14.sp,
+                maxLines = 1
+            )
+        }
+        TextButton(
+            onClick = onAddMenu,
+            modifier = buttonModifier,
+            shape = RoundedCornerShape(if (isPhone) 5.dp else 8.dp),
+            colors = ButtonDefaults.textButtonColors(
+                containerColor = CoverOlive,
+                contentColor = Color.White
+            ),
+            contentPadding = PaddingValues(horizontal = if (isPhone) 8.dp else 16.dp, vertical = if (isPhone) 8.dp else 10.dp)
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "Create Menu",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = if (isPhone) 13.sp else 14.sp,
+                maxLines = 1
+            )
         }
     }
 }
@@ -415,10 +497,12 @@ private fun MenuCoverSkeleton(
 }
 
 @Composable
-private fun NonScrollingMenuGrid(
+private fun MenuCoverCollection(
     menus: List<Menu>,
     columns: Int,
+    availableWidth: androidx.compose.ui.unit.Dp,
     availableHeight: androidx.compose.ui.unit.Dp,
+    isPhone: Boolean,
     isReordering: Boolean,
     canManageMenus: Boolean,
     deletingMenuId: String?,
@@ -429,11 +513,25 @@ private fun NonScrollingMenuGrid(
 ) {
     val itemCount = menus.size + if (isReordering || !canManageMenus) 0 else 1
     val rowCount = if (itemCount == 0) 0 else (itemCount + columns - 1) / columns
-    val horizontalGap = 24.dp
+    val horizontalGap = if (isPhone) 18.dp else 24.dp
     val verticalGap = 20.dp
-    val coverHeight = minOf(availableHeight, 440.dp)
+    val coverHeight = if (isPhone) phoneMenuCoverHeight(availableHeight) else minOf(availableHeight, 440.dp)
+    val cardWidth = if (isPhone) phoneMenuCoverWidth(availableWidth, coverHeight) else (availableWidth - horizontalGap * (columns - 1)) / columns
+    val contentWidth = if (isPhone && itemCount > 0) {
+        cardWidth * itemCount + horizontalGap * (itemCount - 1) + 40.dp
+    } else {
+        availableWidth
+    }
+    val scrollState = rememberScrollState()
     val compact = coverHeight < 390.dp
-    val contentHeight = if (rowCount == 0) {
+    val phoneVerticalPadding = if (isPhone && availableHeight > coverHeight) {
+        ((availableHeight - coverHeight) / 2f).coerceAtLeast(4.dp)
+    } else {
+        4.dp
+    }
+    val contentHeight = if (isPhone) {
+        maxOf(availableHeight, coverHeight + phoneVerticalPadding * 2)
+    } else if (rowCount == 0) {
         0.dp
     } else {
         coverHeight * rowCount + verticalGap * (rowCount - 1)
@@ -462,14 +560,31 @@ private fun NonScrollingMenuGrid(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .then(
+                if (isPhone) {
+                    Modifier.verticalScroll(rememberScrollState()).horizontalScroll(scrollState)
+                } else {
+                    Modifier.verticalScroll(scrollState)
+                }
+            )
     ) {
         BoxWithConstraints(
             modifier = Modifier
-                .fillMaxWidth()
+                .width(contentWidth)
                 .height(contentHeight)
+                .then(
+                    if (isPhone) {
+                        Modifier.padding(
+                            start = 20.dp,
+                            end = 20.dp,
+                            top = phoneVerticalPadding,
+                            bottom = phoneVerticalPadding
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
         ) {
-            val cardWidth = (maxWidth - horizontalGap * (columns - 1)) / columns
             val density = LocalDensity.current
             val cardWidthPx = with(density) { cardWidth.toPx() }
             val coverHeightPx = with(density) { coverHeight.toPx() }
@@ -477,8 +592,8 @@ private fun NonScrollingMenuGrid(
             val verticalGapPx = with(density) { verticalGap.toPx() }
 
             fun slotPosition(index: Int): Offset {
-                val column = index % columns
-                val row = index / columns
+                val column = if (isPhone) index else index % columns
+                val row = if (isPhone) 0 else index / columns
                 return Offset(
                     x = column * (cardWidthPx + horizontalGapPx),
                     y = row * (coverHeightPx + verticalGapPx)
@@ -491,6 +606,39 @@ private fun NonScrollingMenuGrid(
                 return (0 until menuCount).minByOrNull { index ->
                     val slotCenter = slotPosition(index) + Offset(cardWidthPx / 2f, coverHeightPx / 2f)
                     (slotCenter - draggedCenter).getDistance()
+                }
+            }
+
+            // Long-press dragging can move through menus beyond the visible viewport.
+            LaunchedEffect(draggingId, isPhone, cardWidthPx, horizontalGapPx) {
+                if (!isPhone) return@LaunchedEffect
+                val viewportWidth = with(density) { availableWidth.toPx() }
+                val edge = with(density) { 56.dp.toPx() }
+                val inset = with(density) { 20.dp.toPx() }
+                val speed = with(density) { 8.dp.toPx() }
+                while (draggingId != null) {
+                    withFrameNanos { }
+                    val activeId = draggingId ?: break
+                    val center = draggedPosition.x + inset + cardWidthPx / 2f - scrollState.value
+                    val delta = when {
+                        center < edge -> -speed
+                        center > viewportWidth - edge -> speed
+                        else -> 0f
+                    }
+                    if (delta != 0f) {
+                        val consumed = scrollState.scrollBy(delta)
+                        if (draggingId != activeId) break
+                        draggedPosition += Offset(consumed, 0f)
+                        val currentOrder = gestureOrder ?: latestMenus
+                        val from = currentOrder.indexOfFirst { it.id == activeId }
+                        val to = nearestSlotIndex(draggedPosition, currentOrder.size)
+                        if (from >= 0 && to != null && from != to) {
+                            val reordered = currentOrder.toMutableList()
+                            reordered.add(to, reordered.removeAt(from))
+                            gestureOrder = reordered
+                            latestOnReorder(reordered)
+                        }
+                    }
                 }
             }
 
@@ -559,7 +707,8 @@ private fun NonScrollingMenuGrid(
                         }
                     }
 
-                    MenuBookCover(
+                    MenuChooserCover(
+                        isPhone = isPhone,
                         menu = menu,
                         theme = coverTheme(menu, itemIndex),
                         compact = compact,
@@ -597,45 +746,52 @@ private fun NonScrollingMenuGrid(
                                         cardWidthPx,
                                         coverHeightPx,
                                         horizontalGapPx,
-                                        verticalGapPx
+                                        verticalGapPx,
+                                        isPhone
                                     ) {
-                                        detectDragGestures(
-                                            onDragStart = {
-                                                settlingId = null
-                                                settleScope.launch {
-                                                    settleX.stop()
-                                                    settleY.stop()
-                                                }
-                                                val currentIndex = latestMenus.indexOfFirst { it.id == menu.id }
-                                                if (currentIndex >= 0) {
-                                                    gestureOrder = latestMenus
-                                                    draggedPosition = slotPosition(currentIndex)
-                                                    draggingId = menu.id
-                                                }
-                                            },
-                                            onDragEnd = ::releaseDraggedMenu,
-                                            onDragCancel = ::releaseDraggedMenu,
-                                            onDrag = { change, dragAmount ->
-                                                change.consume()
-                                                if (draggingId != menu.id) return@detectDragGestures
-
+                                        val startDrag: (Offset) -> Unit = {
+                                            settlingId = null
+                                            settleScope.launch {
+                                                settleX.stop()
+                                                settleY.stop()
+                                            }
+                                            val currentIndex = latestMenus.indexOfFirst { it.id == menu.id }
+                                            if (currentIndex >= 0) {
+                                                gestureOrder = latestMenus
+                                                draggedPosition = slotPosition(currentIndex)
+                                                draggingId = menu.id
+                                            }
+                                        }
+                                        val moveDrag: (PointerInputChange, Offset) -> Unit = { change, dragAmount ->
+                                            change.consume()
+                                            if (draggingId == menu.id) {
                                                 draggedPosition += dragAmount
                                                 val currentOrder = gestureOrder ?: latestMenus
                                                 val fromIndex = currentOrder.indexOfFirst { it.id == menu.id }
-                                                val toIndex = nearestSlotIndex(
-                                                    position = draggedPosition,
-                                                    menuCount = currentOrder.size
-                                                )
-
+                                                val toIndex = nearestSlotIndex(draggedPosition, currentOrder.size)
                                                 if (fromIndex >= 0 && toIndex != null && toIndex != fromIndex) {
                                                     val reordered = currentOrder.toMutableList()
-                                                    val draggedMenu = reordered.removeAt(fromIndex)
-                                                    reordered.add(toIndex, draggedMenu)
+                                                    reordered.add(toIndex, reordered.removeAt(fromIndex))
                                                     gestureOrder = reordered
                                                     latestOnReorder(reordered)
                                                 }
                                             }
-                                        )
+                                        }
+                                        if (isPhone) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = startDrag,
+                                                onDragEnd = ::releaseDraggedMenu,
+                                                onDragCancel = ::releaseDraggedMenu,
+                                                onDrag = moveDrag
+                                            )
+                                        } else {
+                                            detectDragGestures(
+                                                onDragStart = startDrag,
+                                                onDragEnd = ::releaseDraggedMenu,
+                                                onDragCancel = ::releaseDraggedMenu,
+                                                onDrag = moveDrag
+                                            )
+                                        }
                                     }
                                 } else {
                                     Modifier
@@ -659,6 +815,45 @@ private fun NonScrollingMenuGrid(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun MenuChooserCover(
+    isPhone: Boolean,
+    menu: Menu,
+    theme: MenuCoverTheme,
+    compact: Boolean,
+    isReordering: Boolean,
+    isDragging: Boolean,
+    canManageMenus: Boolean,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    modifier: Modifier
+) {
+    if (isPhone) {
+        PhoneMenuBookCover(
+            menu = menu,
+            theme = theme,
+            isReordering = isReordering,
+            isDragging = isDragging,
+            canManageMenus = canManageMenus,
+            onClick = onClick,
+            onEdit = onEdit,
+            modifier = modifier
+        )
+    } else {
+        MenuBookCover(
+            menu = menu,
+            theme = theme,
+            compact = compact,
+            isReordering = isReordering,
+            isDragging = isDragging,
+            canManageMenus = canManageMenus,
+            onClick = onClick,
+            onEdit = onEdit,
+            modifier = modifier
+        )
     }
 }
 
@@ -1030,11 +1225,11 @@ private fun MenuBookCover(
 }
 
 @Composable
-private fun MenuDescriptionDialog(
+internal fun MenuDescriptionDialog(
     menu: Menu,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    MenuNestedDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = onDismiss) {
@@ -1065,7 +1260,8 @@ private fun MenuDescriptionDialog(
                 lineHeight = 20.sp,
                 color = CoverMuted
             )
-        }
+        },
+        dismissButton = {}
     )
 }
 
@@ -1160,7 +1356,7 @@ private fun AddMenuCover(
     }
 }
 
-private data class MenuCoverTheme(
+internal data class MenuCoverTheme(
     val background: Color,
     val texture: Color,
     val ink: Color
@@ -1241,14 +1437,14 @@ private fun Color.darken(fraction: Float): Color {
     )
 }
 
-private fun coverTitle(name: String): String {
+internal fun coverTitle(name: String): String {
     val words = name.trim().uppercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
     if (words.isEmpty()) return "MENU"
     if (words.size == 1) return "${words.first()}\nMENU"
     return "${words.dropLast(1).joinToString(" ")}\n${words.last()}"
 }
 
-private fun coverSchedule(menu: Menu): String {
+internal fun coverSchedule(menu: Menu): String {
     val from = formatTimeOfDay(menu.availableFrom)
     val until = formatTimeOfDay(menu.availableUntil)
     if (from == null || until == null) {

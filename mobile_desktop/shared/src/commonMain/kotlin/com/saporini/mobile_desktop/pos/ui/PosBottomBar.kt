@@ -45,7 +45,7 @@ import com.saporini.mobile_desktop.pos.ui.PosSection
 
 private val BottomBarActive = Color(0xFF94A27F)
 private val BottomBarInk = Color(0xFF202426)
-private val BottomBarMuted = Color(0xFF737A77)
+private val BottomBarMuted = Color(0xFF202426)
 private val BottomBarDivider = Color(0xFFE8EBE5)
 
 private val PrimaryPhoneSections = listOf(
@@ -67,24 +67,31 @@ fun PosBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(74.dp)
+            .height(68.dp)
     ) {
         Surface(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(74.dp),
+                .height(68.dp),
             color = Color.White,
-            shadowElevation = 8.dp,
-            tonalElevation = 0.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, BottomBarDivider)
+            shadowElevation = 0.dp,
+            tonalElevation = 0.dp
         ) {}
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(BottomBarDivider)
+        )
 
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(74.dp),
+                .height(68.dp),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
@@ -195,22 +202,22 @@ private fun PhoneNavItem(
 
     Box(
         modifier = modifier
-            .height(74.dp)
+            .height(68.dp)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 4.dp)
+                .width(32.dp)
                 .height(3.dp)
-                .padding(horizontal = 8.dp)
-                .clip(RoundedCornerShape(bottomStart = 2.dp, bottomEnd = 2.dp))
+                .clip(RoundedCornerShape(2.dp))
                 .background(if (selected) BottomBarActive else Color.Transparent)
         )
 
         Column(
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -224,8 +231,8 @@ private fun PhoneNavItem(
                 text = label,
                 fontFamily = Inter(),
                 fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
-                fontSize = 10.sp,
-                lineHeight = 12.sp,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
                 maxLines = 1,
                 color = contentColor
             )

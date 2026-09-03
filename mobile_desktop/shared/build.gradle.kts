@@ -29,6 +29,7 @@ kotlin {
 
     sourceSets {
         androidMain.dependencies {
+            implementation(libs.androidx.activityCompose)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.ktor.clientOkhttp)
         }
@@ -51,6 +52,7 @@ kotlin {
             implementation(libs.ktor.clientLogging)
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             implementation(libs.kotlinx.coroutinesCore)
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
             implementation(libs.ktor.clientAuth)
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.screenmodel)

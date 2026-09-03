@@ -7,6 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,7 +35,6 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -61,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -213,352 +216,270 @@ fun ItemEditorDialog(
         }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.34f))
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
+    MenuFormDialog(
+        title = if (isEditing) "Edit Item" else "Add New Item",
+        onDismiss = onDismiss,
+        onSave = {
+            onSave(
+                name.trim(),
+                formatItemPrice(basePrice),
+                sku.trim().takeIf { it.isNotEmpty() },
+                description.trim().takeIf { it.isNotEmpty() },
+                selectedImageName,
+                available,
+                selectedIngredients.map { DraftIngredient(it.name, it.quantity, it.unit) }
+            )
+        },
+        saveLabel = if (isEditing) "Save Changes" else "Add Item",
+        canSave = canSave,
+        desktopWidth = 0.6f,
+        desktopHeight = 0.9f,
+        desktopMaxWidth = 620.dp,
+        scrollState = formScrollState
+    ) { isPhone ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .fillMaxHeight(0.9f)
-                    .widthIn(max = 620.dp)
-                    .shadow(24.dp, RoundedCornerShape(10.dp))
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White)
-                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(10.dp))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 24.dp, end = 18.dp, top = 8.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isEditing) "Edit Item" else "Add New Item",
-                        modifier = Modifier.weight(1f),
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = Color(0xFF232422)
-                    )
+            ItemEditorFieldLabel(text = "Item name", required = true)
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = if (available) "Available" else "Unavailable",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                color = if (available) ItemEditorOlive else ItemEditorMuted
+            )
+            Spacer(Modifier.width(9.dp))
+            Switch(
+                checked = available,
+                onCheckedChange = { available = it },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = ItemEditorOlive
+                )
+            )
+        }
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("For example: Spaghetti alla Carbonara") },
+            singleLine = true,
+            shape = RoundedCornerShape(9.dp),
+            colors = itemEditorOutlinedTextFieldColors()
+        )
 
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(ItemEditorSurface)
-                            .border(1.dp, ItemEditorBorder, CircleShape)
-                            .clickable(onClick = onDismiss),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = "Close item editor",
-                            modifier = Modifier.size(18.dp),
-                            tint = ItemEditorInk
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = ItemEditorBorder)
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(formScrollState)
-                        .padding(horizontal = 24.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ItemEditorFieldLabel(text = "Item name", required = true)
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            text = if (available) "Available" else "Unavailable",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                            color = if (available) ItemEditorOlive else ItemEditorMuted
-                        )
-                        Spacer(Modifier.width(9.dp))
-                        Switch(
-                            checked = available,
-                            onCheckedChange = { available = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ItemEditorOlive
-                            )
-                        )
-                    }
+        MenuFormFieldPair(
+            isPhone = isPhone,
+            first = { fieldModifier ->
+                Column(modifier = fieldModifier) {
+                    ItemEditorFieldLabel(text = "Price", required = true)
+                    Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
+                        value = basePrice,
+                        onValueChange = { basePrice = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("For example: Spaghetti alla Carbonara") },
+                        placeholder = { Text("0.00") },
+                        leadingIcon = {
+                            Text(
+                                text = "$",
+                                fontFamily = Inter(),
+                                fontWeight = FontWeight.SemiBold,
+                                color = ItemEditorMuted
+                            )
+                        },
+                        singleLine = true,
+                        isError = basePrice.isNotBlank() && !priceIsValid,
+                        shape = RoundedCornerShape(9.dp),
+                        colors = itemEditorOutlinedTextFieldColors()
+                    )
+                }
+            },
+            second = { fieldModifier ->
+                Column(modifier = fieldModifier) {
+                    ItemEditorFieldLabel(text = "SKU")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = sku,
+                        onValueChange = { if (it.length <= 80) sku = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. PZA-MARG-12") },
                         singleLine = true,
                         shape = RoundedCornerShape(9.dp),
                         colors = itemEditorOutlinedTextFieldColors()
                     )
+                }
+            }
+        )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            ItemEditorFieldLabel(text = "Price", required = true)
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = basePrice,
-                                onValueChange = { basePrice = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("0.00") },
-                                leadingIcon = {
-                                    Text(
-                                        text = "$",
-                                        fontFamily = Inter(),
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = ItemEditorMuted
-                                    )
-                                },
-                                singleLine = true,
-                                isError = basePrice.isNotBlank() && !priceIsValid,
-                                shape = RoundedCornerShape(9.dp),
-                                colors = itemEditorOutlinedTextFieldColors()
-                            )
-                        }
+        if (basePrice.isNotBlank() && !priceIsValid) {
+            Text(
+                text = "Enter a valid price, for example 14.00.",
+                fontFamily = Inter(),
+                fontSize = 12.sp,
+                color = Color(0xFFB13A2F)
+            )
+        }
 
-                        Column(modifier = Modifier.weight(1f)) {
-                            ItemEditorFieldLabel(text = "SKU")
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = sku,
-                                onValueChange = { if (it.length <= 80) sku = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("e.g. PZA-MARG-12") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(9.dp),
-                                colors = itemEditorOutlinedTextFieldColors()
-                            )
-                        }
-                    }
+        ItemEditorFieldLabel(text = "Description")
+        OutlinedTextField(
+            value = description,
+            onValueChange = { description = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Describe the dish") },
+            minLines = 4,
+            maxLines = 6,
+            shape = RoundedCornerShape(9.dp),
+            colors = itemEditorOutlinedTextFieldColors()
+        )
 
-                    if (basePrice.isNotBlank() && !priceIsValid) {
-                        Text(
-                            text = "Enter a valid price, for example 14.00.",
-                            fontFamily = Inter(),
-                            fontSize = 12.sp,
-                            color = Color(0xFFB13A2F)
-                        )
-                    }
+        ItemEditorFieldLabel(text = "Item photo")
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (selectedImageName != null) {
+                Image(
+                    painter = painterResource(Res.drawable.auth_login_img),
+                    contentDescription = "Current item photo",
+                    modifier = Modifier
+                        .size(width = 64.dp, height = 52.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.width(12.dp))
+            }
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(ItemEditorSurface)
+                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+                    .clickable { imagePicker.launch() }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.FileUpload,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = ItemEditorOlive
+                )
+                Text(
+                    text = if (selectedImageName != null) "Change Image" else "Import Image",
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = ItemEditorOlive
+                )
+            }
+            if (!isPhone) {
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = selectedImageName ?: "No image selected",
+                    fontFamily = Inter(),
+                    fontSize = 12.sp,
+                    color = if (selectedImageName != null) ItemEditorInk else ItemEditorMuted,
+                    maxLines = 1
+                )
+            }
+        }
 
-                    ItemEditorFieldLabel(text = "Description")
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { description = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Describe the dish") },
-                        minLines = 4,
-                        maxLines = 6,
-                        shape = RoundedCornerShape(9.dp),
-                        colors = itemEditorOutlinedTextFieldColors()
-                    )
+        if (isPhone) {
+            Text(
+                text = selectedImageName ?: "No image selected",
+                modifier = Modifier.fillMaxWidth(),
+                fontFamily = Inter(),
+                fontSize = 12.sp,
+                color = ItemEditorMuted,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
 
-                    ItemEditorFieldLabel(text = "Item photo")
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (selectedImageName != null) {
-                            Image(
-                                painter = painterResource(Res.drawable.auth_login_img),
-                                contentDescription = "Current item photo",
-                                modifier = Modifier
-                                    .size(width = 64.dp, height = 52.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Crop
-                            )
-                            Spacer(Modifier.width(12.dp))
-                        }
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(9.dp))
-                                .background(ItemEditorSurface)
-                                .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
-                                .clickable { imagePicker.launch() }
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.FileUpload,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = ItemEditorOlive
-                            )
-                            Text(
-                                text = if (selectedImageName != null) "Change Image" else "Import Image",
-                                fontFamily = Inter(),
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp,
-                                color = ItemEditorOlive
-                            )
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            text = selectedImageName ?: "No image selected",
-                            fontFamily = Inter(),
-                            fontSize = 12.sp,
-                            color = if (selectedImageName != null) ItemEditorInk else ItemEditorMuted,
-                            maxLines = 1
-                        )
-                    }
+        ItemEditorFieldLabel(text = "Recipe / Ingredients")
 
-                    ItemEditorFieldLabel(text = "Recipe / Ingredients")
-
-                    if (selectedIngredients.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier.padding(bottom = 2.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            selectedIngredients.forEach { ingredient ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(9.dp))
-                                        .background(ItemEditorSurface)
-                                        .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Image(
-                                        painter = painterResource(Res.drawable.auth_login_img),
-                                        contentDescription = ingredient.name,
-                                        modifier = Modifier
-                                            .size(width = 44.dp, height = 36.dp)
-                                            .clip(RoundedCornerShape(6.dp)),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    Spacer(Modifier.width(10.dp))
-                                    Text(
-                                        text = ingredient.name,
-                                        modifier = Modifier.weight(1f),
-                                        fontFamily = Inter(),
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp,
-                                        color = ItemEditorInk
-                                    )
-                                    Text(
-                                        text = "${ingredient.quantity} ${ingredient.unit}".trim(),
-                                        fontFamily = Inter(),
-                                        fontSize = 12.sp,
-                                        color = ItemEditorMuted
-                                    )
-                                    Spacer(Modifier.width(10.dp))
-                                    IconButton(
-                                        onClick = {
-                                            selectedIngredients = selectedIngredients.filterNot { it.id == ingredient.id }
-                                        },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Close,
-                                            contentDescription = "Remove ingredient",
-                                            modifier = Modifier.size(15.dp),
-                                            tint = ItemEditorMuted
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
+        if (selectedIngredients.isNotEmpty()) {
+            Column(
+                modifier = Modifier.padding(bottom = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                selectedIngredients.forEach { ingredient ->
                     Row(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(9.dp))
                             .background(ItemEditorSurface)
                             .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
-                            .clickable { ingredientSearchOpen = true }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = ItemEditorOlive
+                        Image(
+                            painter = painterResource(Res.drawable.auth_login_img),
+                            contentDescription = ingredient.name,
+                            modifier = Modifier
+                                .size(width = 44.dp, height = 36.dp)
+                                .clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Crop
                         )
+                        Spacer(Modifier.width(10.dp))
                         Text(
-                            text = "Add Ingredient",
+                            text = ingredient.name,
+                            modifier = Modifier.weight(1f),
                             fontFamily = Inter(),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.sp,
-                            color = ItemEditorOlive
+                            color = ItemEditorInk
                         )
-                    }
-                }
-
-                HorizontalDivider(color = ItemEditorBorder)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 7.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
                         Text(
-                            text = "Cancel",
+                            text = "${ingredient.quantity} ${ingredient.unit}".trim(),
                             fontFamily = Inter(),
-                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp,
                             color = ItemEditorMuted
                         )
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Button(
-                        onClick = {
-                            onSave(
-                                name.trim(),
-                                formatItemPrice(basePrice),
-                                sku.trim().takeIf { it.isNotEmpty() },
-                                description.trim().takeIf { it.isNotEmpty() },
-                                selectedImageName,
-                                available,
-                                selectedIngredients.map { row ->
-                                    DraftIngredient(row.name, row.quantity, row.unit)
-                                }
+                        Spacer(Modifier.width(10.dp))
+                        IconButton(
+                            onClick = {
+                                selectedIngredients = selectedIngredients.filterNot { it.id == ingredient.id }
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "Remove ingredient",
+                                modifier = Modifier.size(15.dp),
+                                tint = ItemEditorMuted
                             )
-                        },
-                        enabled = canSave,
-                        colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive),
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = if (isEditing) "Save Changes" else "Add Item",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.Bold
-                        )
+                        }
                     }
                 }
             }
+        }
+
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .background(ItemEditorSurface)
+                .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+                .clickable { ingredientSearchOpen = true }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Add,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = ItemEditorOlive
+            )
+            Text(
+                text = "Add Ingredient",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                color = ItemEditorOlive
+            )
         }
     }
 
@@ -578,9 +499,8 @@ fun ItemEditorDialog(
         var popupUnit by remember(ingredient) { mutableStateOf(ingredient.defaultUnit) }
         var unitDropdownOpen by remember(ingredient) { mutableStateOf(false) }
 
-        AlertDialog(
+        MenuNestedDialog(
             onDismissRequest = { pendingIngredient = null },
-            shape = RoundedCornerShape(16.dp),
             containerColor = Color.White,
             titleContentColor = ItemEditorInk,
             textContentColor = ItemEditorMuted,
@@ -735,196 +655,92 @@ fun VariantEditorDialog(
     var currentVariants by remember { mutableStateOf(variants) }
     var addVariantOpen by remember { mutableStateOf(false) }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.34f))
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth(0.46f)
-                    .fillMaxHeight(0.72f)
-                    .widthIn(max = 480.dp)
-                    .shadow(24.dp, RoundedCornerShape(10.dp))
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White)
-                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(10.dp))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 24.dp, end = 18.dp, top = 8.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Variants",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            color = Color(0xFF232422)
-                        )
-                        Text(
-                            text = itemName,
-                            fontFamily = Inter(),
-                            fontSize = 13.sp,
-                            color = ItemEditorMuted,
-                            maxLines = 1
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(ItemEditorSurface)
-                            .border(1.dp, ItemEditorBorder, CircleShape)
-                            .clickable(onClick = onDismiss),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = "Close variant editor",
-                            modifier = Modifier.size(18.dp),
-                            tint = ItemEditorInk
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = ItemEditorBorder)
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    if (currentVariants.isEmpty()) {
-                        Text(
-                            text = "No variants yet. Add a size or configuration option below.",
-                            fontFamily = Inter(),
-                            fontSize = 13.sp,
-                            color = ItemEditorMuted
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            currentVariants.forEach { variant ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(9.dp))
-                                        .background(ItemEditorSurface)
-                                        .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = variant.name,
-                                        modifier = Modifier.weight(1f),
-                                        fontFamily = Inter(),
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp,
-                                        color = ItemEditorInk
-                                    )
-                                    if (variant.priceDeltaLabel.isNotBlank()) {
-                                        Text(
-                                            text = variant.priceDeltaLabel,
-                                            fontFamily = Inter(),
-                                            fontSize = 12.sp,
-                                            color = ItemEditorMuted
-                                        )
-                                    }
-                                    Spacer(Modifier.width(10.dp))
-                                    IconButton(
-                                        onClick = {
-                                            currentVariants = currentVariants.filterNot { it.name == variant.name }
-                                        },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Close,
-                                            contentDescription = "Remove variant",
-                                            modifier = Modifier.size(15.dp),
-                                            tint = ItemEditorMuted
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
+    MenuFormDialog(
+        title = "Variants",
+        subtitle = itemName,
+        onDismiss = onDismiss,
+        onSave = { onSave(currentVariants) },
+        desktopWidth = 0.46f,
+        desktopHeight = 0.72f,
+        desktopMaxWidth = 480.dp
+    ) { _ ->
+        if (currentVariants.isEmpty()) {
+            Text(
+                text = "No variants yet. Add a size or configuration option below.",
+                fontFamily = Inter(),
+                fontSize = 13.sp,
+                color = ItemEditorMuted
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                currentVariants.forEach { variant ->
                     Row(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(9.dp))
                             .background(ItemEditorSurface)
                             .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
-                            .clickable { addVariantOpen = true }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = ItemEditorOlive
-                        )
                         Text(
-                            text = "Add Variant",
+                            text = variant.name,
+                            modifier = Modifier.weight(1f),
                             fontFamily = Inter(),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.sp,
-                            color = ItemEditorOlive
+                            color = ItemEditorInk
                         )
-                    }
-                }
-
-                HorizontalDivider(color = ItemEditorBorder)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 7.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "Cancel",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.SemiBold,
-                            color = ItemEditorMuted
-                        )
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Button(
-                        onClick = { onSave(currentVariants) },
-                        colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive),
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "Save Changes",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.Bold
-                        )
+                        if (variant.priceDeltaLabel.isNotBlank()) {
+                            Text(
+                                text = variant.priceDeltaLabel,
+                                fontFamily = Inter(),
+                                fontSize = 12.sp,
+                                color = ItemEditorMuted
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        IconButton(
+                            onClick = {
+                                currentVariants = currentVariants.filterNot { it.name == variant.name }
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "Remove variant",
+                                modifier = Modifier.size(15.dp),
+                                tint = ItemEditorMuted
+                            )
+                        }
                     }
                 }
             }
+        }
+
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .background(ItemEditorSurface)
+                .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+                .clickable { addVariantOpen = true }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Add,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = ItemEditorOlive
+            )
+            Text(
+                text = "Add Variant",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                color = ItemEditorOlive
+            )
         }
     }
 
@@ -933,9 +749,8 @@ fun VariantEditorDialog(
         var variantPriceDelta by remember { mutableStateOf("") }
         val variantPriceValid = isValidPriceDelta(variantPriceDelta)
 
-        AlertDialog(
+        MenuNestedDialog(
             onDismissRequest = { addVariantOpen = false },
-            shape = RoundedCornerShape(16.dp),
             containerColor = Color.White,
             titleContentColor = ItemEditorInk,
             textContentColor = ItemEditorMuted,
@@ -1031,215 +846,112 @@ fun OptionsEditorDialog(
     onDismiss: () -> Unit,
     onSave: (List<DraftOptionGroup>) -> Unit
 ) {
+    val isPhoneLayout = isPhoneMenuWindow()
     var currentOptionGroups by remember { mutableStateOf(optionGroups) }
     var addOptionGroupOpen by remember { mutableStateOf(false) }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.34f))
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth(0.46f)
-                    .fillMaxHeight(0.72f)
-                    .widthIn(max = 480.dp)
-                    .shadow(24.dp, RoundedCornerShape(10.dp))
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White)
-                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(10.dp))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 24.dp, end = 18.dp, top = 8.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Options",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
-                            color = Color(0xFF232422)
-                        )
-                        Text(
-                            text = itemName,
-                            fontFamily = Inter(),
-                            fontSize = 13.sp,
-                            color = ItemEditorMuted,
-                            maxLines = 1
-                        )
-                    }
-
-                    Box(
+    MenuFormDialog(
+        title = "Options",
+        subtitle = itemName,
+        onDismiss = onDismiss,
+        onSave = { onSave(currentOptionGroups) },
+        desktopWidth = 0.46f,
+        desktopHeight = 0.72f,
+        desktopMaxWidth = 480.dp
+    ) { _ ->
+        if (currentOptionGroups.isEmpty()) {
+            Text(
+                text = "No option groups yet. Add a group of choices below, like sauces or sides.",
+                fontFamily = Inter(),
+                fontSize = 13.sp,
+                color = ItemEditorMuted
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                currentOptionGroups.forEach { group ->
+                    Column(
                         modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(ItemEditorSurface)
-                            .border(1.dp, ItemEditorBorder, CircleShape)
-                            .clickable(onClick = onDismiss),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = "Close options editor",
-                            modifier = Modifier.size(18.dp),
-                            tint = ItemEditorInk
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = ItemEditorBorder)
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    if (currentOptionGroups.isEmpty()) {
-                        Text(
-                            text = "No option groups yet. Add a group of choices below, like sauces or sides.",
-                            fontFamily = Inter(),
-                            fontSize = 13.sp,
-                            color = ItemEditorMuted
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            currentOptionGroups.forEach { group ->
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(9.dp))
-                                        .background(ItemEditorSurface)
-                                        .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = group.name,
-                                            modifier = Modifier.weight(1f),
-                                            fontFamily = Inter(),
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 13.sp,
-                                            color = ItemEditorInk
-                                        )
-                                        Text(
-                                            text = if (group.required) "Required" else "Optional",
-                                            fontFamily = Inter(),
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 11.sp,
-                                            color = if (group.required) ItemEditorOlive else ItemEditorMuted
-                                        )
-                                        Spacer(Modifier.width(10.dp))
-                                        IconButton(
-                                            onClick = {
-                                                currentOptionGroups = currentOptionGroups.filterNot { it.name == group.name }
-                                            },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Close,
-                                                contentDescription = "Remove option group",
-                                                modifier = Modifier.size(15.dp),
-                                                tint = ItemEditorMuted
-                                            )
-                                        }
-                                    }
-                                    Text(
-                                        text = group.choices.joinToString(separator = "  •  ") { choice ->
-                                            if (choice.priceDeltaLabel.isNotBlank()) {
-                                                "${choice.name} (${choice.priceDeltaLabel})"
-                                            } else {
-                                                choice.name
-                                            }
-                                        },
-                                        fontFamily = Inter(),
-                                        fontSize = 12.sp,
-                                        color = ItemEditorMuted
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(9.dp))
                             .background(ItemEditorSurface)
                             .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
-                            .clickable { addOptionGroupOpen = true }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = ItemEditorOlive
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = group.name,
+                                modifier = Modifier.weight(1f),
+                                fontFamily = Inter(),
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = ItemEditorInk
+                            )
+                            Text(
+                                text = if (group.required) "Required" else "Optional",
+                                fontFamily = Inter(),
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp,
+                                color = if (group.required) ItemEditorOlive else ItemEditorMuted
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            IconButton(
+                                onClick = {
+                                    currentOptionGroups = currentOptionGroups.filterNot { it.name == group.name }
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Close,
+                                    contentDescription = "Remove option group",
+                                    modifier = Modifier.size(15.dp),
+                                    tint = ItemEditorMuted
+                                )
+                            }
+                        }
                         Text(
-                            text = "Add Options",
+                            text = group.choices.joinToString(separator = "  •  ") { choice ->
+                                if (choice.priceDeltaLabel.isNotBlank()) {
+                                    "${choice.name} (${choice.priceDeltaLabel})"
+                                } else {
+                                    choice.name
+                                }
+                            },
                             fontFamily = Inter(),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                            color = ItemEditorOlive
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = ItemEditorBorder)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 7.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(
-                        onClick = onDismiss,
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "Cancel",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp,
                             color = ItemEditorMuted
-                        )
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Button(
-                        onClick = { onSave(currentOptionGroups) },
-                        colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive),
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = "Save Changes",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
+        }
+
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .background(ItemEditorSurface)
+                .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+                .clickable { addOptionGroupOpen = true }
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Add,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = ItemEditorOlive
+            )
+            Text(
+                text = "Add Options",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                color = ItemEditorOlive
+            )
         }
     }
 
@@ -1251,9 +963,8 @@ fun OptionsEditorDialog(
         val choicesValid = choiceDrafts.all { isValidPriceDelta(it.priceDelta) }
         val canAddGroup = groupName.isNotBlank() && validChoices.isNotEmpty() && choicesValid
 
-        AlertDialog(
+        MenuNestedDialog(
             onDismissRequest = { addOptionGroupOpen = false },
-            shape = RoundedCornerShape(16.dp),
             containerColor = Color.White,
             titleContentColor = ItemEditorInk,
             textContentColor = ItemEditorMuted,
@@ -1268,7 +979,7 @@ fun OptionsEditorDialog(
             },
             text = {
                 Column(
-                    modifier = Modifier
+                    modifier = if (isPhoneLayout) Modifier else Modifier
                         .heightIn(max = 360.dp)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -1317,52 +1028,100 @@ fun OptionsEditorDialog(
                     ItemEditorFieldLabel(text = "Choices", required = true)
 
                     choiceDrafts.forEachIndexed { index, choice ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedTextField(
-                                value = choice.name,
-                                onValueChange = { newValue ->
-                                    choiceDrafts = choiceDrafts.toMutableList().also {
-                                        it[index] = it[index].copy(name = newValue)
-                                    }
-                                },
-                                modifier = Modifier.weight(1.4f),
-                                placeholder = { Text("Choice name") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(8.dp),
-                                colors = itemEditorOutlinedTextFieldColors()
-                            )
-                            OutlinedTextField(
-                                value = choice.priceDelta,
-                                onValueChange = { newValue ->
-                                    choiceDrafts = choiceDrafts.toMutableList().also {
-                                        it[index] = it[index].copy(priceDelta = newValue)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f),
-                                placeholder = { Text("+0.00") },
-                                singleLine = true,
-                                isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = itemEditorOutlinedTextFieldColors()
-                            )
-                            IconButton(
-                                onClick = {
-                                    if (choiceDrafts.size > 1) {
-                                        choiceDrafts = choiceDrafts.filterIndexed { i, _ -> i != index }
-                                    }
-                                },
-                                modifier = Modifier.size(28.dp)
+                        if (isPhoneLayout) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Close,
-                                    contentDescription = "Remove choice",
-                                    modifier = Modifier.size(15.dp),
-                                    tint = ItemEditorMuted
+                                OutlinedTextField(
+                                    value = choice.name,
+                                    onValueChange = { newValue ->
+                                        choiceDrafts = choiceDrafts.toMutableList().also {
+                                            it[index] = it[index].copy(name = newValue)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    placeholder = { Text("Choice name") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = itemEditorOutlinedTextFieldColors()
                                 )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = choice.priceDelta,
+                                        onValueChange = { newValue ->
+                                            choiceDrafts = choiceDrafts.toMutableList().also {
+                                                it[index] = it[index].copy(priceDelta = newValue)
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        placeholder = { Text("Price adjustment (+0.00)") },
+                                        singleLine = true,
+                                        isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = itemEditorOutlinedTextFieldColors()
+                                    )
+                                    IconButton(
+                                        onClick = { choiceDrafts = choiceDrafts.filterIndexed { i, _ -> i != index } },
+                                        enabled = choiceDrafts.size > 1,
+                                        modifier = Modifier.size(44.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.Close, "Remove choice", tint = ItemEditorMuted)
+                                    }
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = choice.name,
+                                    onValueChange = { newValue ->
+                                        choiceDrafts = choiceDrafts.toMutableList().also {
+                                            it[index] = it[index].copy(name = newValue)
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1.4f),
+                                    placeholder = { Text("Choice name") },
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = itemEditorOutlinedTextFieldColors()
+                                )
+                                OutlinedTextField(
+                                    value = choice.priceDelta,
+                                    onValueChange = { newValue ->
+                                        choiceDrafts = choiceDrafts.toMutableList().also {
+                                            it[index] = it[index].copy(priceDelta = newValue)
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    placeholder = { Text("+0.00") },
+                                    singleLine = true,
+                                    isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = itemEditorOutlinedTextFieldColors()
+                                )
+                                IconButton(
+                                    onClick = {
+                                        if (choiceDrafts.size > 1) {
+                                            choiceDrafts = choiceDrafts.filterIndexed { i, _ -> i != index }
+                                        }
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Close,
+                                        contentDescription = "Remove choice",
+                                        modifier = Modifier.size(15.dp),
+                                        tint = ItemEditorMuted
+                                    )
+                                }
                             }
                         }
                     }
@@ -1435,6 +1194,7 @@ private fun IngredientCommandPalette(
     onDismiss: () -> Unit,
     onSelect: (MockIngredient) -> Unit
 ) {
+    val isPhone = isPhoneMenuWindow()
     var query by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("All") }
     val focusRequester = remember { FocusRequester() }
@@ -1464,7 +1224,7 @@ private fun IngredientCommandPalette(
             usePlatformDefaultWidth = false
         )
     ) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.34f))
@@ -1473,14 +1233,15 @@ private fun IngredientCommandPalette(
                     indication = null,
                     onClick = onDismiss
                 )
-                .padding(24.dp),
+                .then(if (isPhone) Modifier.safeDrawingPadding().imePadding() else Modifier)
+                .padding(if (isPhone) 16.dp else 24.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth(0.55f)
+                    .fillMaxWidth(if (isPhone) 1f else 0.55f)
                     .widthIn(max = 560.dp)
-                    .heightIn(max = 480.dp)
+                    .heightIn(max = if (isPhone) minOf(480.dp, maxHeight * 0.9f) else 480.dp)
                     .shadow(24.dp, RoundedCornerShape(14.dp))
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color.White)
@@ -1588,6 +1349,7 @@ private fun IngredientCommandPalette(
                     )
                     Column(
                         modifier = Modifier
+                            .weight(1f, fill = false)
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
