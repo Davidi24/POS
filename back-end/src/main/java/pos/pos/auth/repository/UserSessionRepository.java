@@ -49,13 +49,13 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     // to make room for the new one.
     @Modifying
     @Query(value = """
-        UPDATE user_sessions
+        UPDATE foundation_local.user_sessions
         SET revoked = true,
             revoked_at = :now,
             revoked_reason = :reason
         WHERE id = (
             SELECT id
-            FROM user_sessions
+            FROM foundation_local.user_sessions
             WHERE user_id = :userId
               AND revoked = false
               AND expires_at > :now
