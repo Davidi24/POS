@@ -18,11 +18,15 @@ public interface InventoryLevelRepository extends JpaRepository<InventoryLevel, 
 
     List<InventoryLevel> findAllByInventoryItem_IdOrderByLocation_NameAsc(UUID itemId);
 
+    // Three-tier priority for "what counts as the reorder threshold": a manager's manual
+    // override first, then whatever the system last calculated, then the item's own catalog
+    // reorderPoint as a last resort. Same priority InventoryLevelMapper uses for the lowStock
+    // flag on a single level, just expressed as a cross-table COALESCE here.
     @Query("""
             SELECT lvl FROM InventoryLevel lvl
             WHERE lvl.location.restaurant.id = :restaurantId
-              AND lvl.reorderQuantity IS NOT NULL
-              AND lvl.onHandQuantity < lvl.reorderQuantity
+              AND COALESCE(lvl.manualReorderPoint, lvl.calculatedReorderPoint, lvl.inventoryItem.reorderPoint) IS NOT NULL
+              AND lvl.onHandQuantity < COALESCE(lvl.manualReorderPoint, lvl.calculatedReorderPoint, lvl.inventoryItem.reorderPoint)
             ORDER BY lvl.inventoryItem.name ASC
             """)
     List<InventoryLevel> findLowStockByRestaurantId(@Param("restaurantId") UUID restaurantId);

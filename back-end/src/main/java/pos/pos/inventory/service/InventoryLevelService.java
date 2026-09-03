@@ -1,12 +1,16 @@
 package pos.pos.inventory.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.inventory.InventoryItemNotFoundException;
 import pos.pos.exception.inventory.InventoryLevelNotFoundException;
 import pos.pos.exception.inventory.InventoryLocationNotFoundException;
+import pos.pos.inventory.dto.InventoryLevelReorderSettingsRequest;
 import pos.pos.inventory.dto.InventoryLevelResponse;
 import pos.pos.inventory.dto.InventoryLevelTotalResponse;
 import pos.pos.inventory.entity.InventoryItem;
@@ -125,6 +129,30 @@ public class InventoryLevelService {
                 .toList();
     }
 
+    // The one write InventoryLevelController actually exposes. Everything else about a level
+    // (onHandQuantity, lastCountedAt, lastMovementAt) only ever changes as a side effect of a
+    // movement or an approved count -- manualReorderPoint is different, it's a setting a manager
+    // decides directly, not something derived from stock activity.
+    @Transactional
+    public InventoryLevelResponse updateReorderSettings(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID locationId,
+            UUID itemId,
+            InventoryLevelReorderSettingsRequest request
+    ) {
+        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        requireLocation(restaurantId, locationId);
+        requireItem(restaurantId, itemId);
+
+        InventoryLevel level = inventoryLevelRepository.findByLocation_IdAndInventoryItem_Id(locationId, itemId)
+                .orElseThrow(InventoryLevelNotFoundException::new);
+
+        level.setManualReorderPoint(request.getManualReorderPoint());
+
+        return inventoryLevelMapper.toResponse(saveLevel(level));
+    }
+
     // Internal use only. Not exposed through InventoryLevelController.
     // Meant to be called by the InventoryMovement service once it exists: every delivery,
     // sale, waste log, count correction, etc. calls this to apply its effect on stock,
@@ -189,5 +217,15 @@ public class InventoryLevelService {
     private InventoryItem requireItem(UUID restaurantId, UUID itemId) {
         return inventoryItemRepository.findByIdAndRestaurant_IdAndDeletedAtIsNull(itemId, restaurantId)
                 .orElseThrow(InventoryItemNotFoundException::new);
+    }
+
+    private InventoryLevel saveLevel(InventoryLevel level) {
+        try {
+            return inventoryLevelRepository.saveAndFlush(level);
+        } catch (DataIntegrityViolationException ex) {
+            throw new AuthException("Inventory level update violates a data constraint", HttpStatus.BAD_REQUEST);
+        } catch (IllegalStateException ex) {
+            throw new AuthException(ex.getMessage(), HttpStatus.BAD_REQUEST);
+        }
     }
 }

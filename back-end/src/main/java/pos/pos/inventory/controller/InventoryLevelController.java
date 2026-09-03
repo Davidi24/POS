@@ -3,6 +3,7 @@ package pos.pos.inventory.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -10,9 +11,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import pos.pos.inventory.dto.InventoryLevelReorderSettingsRequest;
 import pos.pos.inventory.dto.InventoryLevelResponse;
 import pos.pos.inventory.dto.InventoryLevelTotalResponse;
 import pos.pos.inventory.service.InventoryLevelService;
@@ -79,5 +83,22 @@ public class InventoryLevelController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(inventoryLevelService.getLevel(authentication, restaurantId, locationId, itemId));
+    }
+
+    @PutMapping("/{locationId}/{itemId}/reorder-settings")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Set or clear the manual reorder point override for one item at one location")
+    @ApiResponse(responseCode = "200", description = "Reorder settings updated")
+    @ApiResponse(responseCode = "404", description = "No stock level recorded yet for this item at this location")
+    public ResponseEntity<InventoryLevelResponse> updateReorderSettings(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID locationId,
+            @PathVariable UUID itemId,
+            @Valid @RequestBody InventoryLevelReorderSettingsRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                inventoryLevelService.updateReorderSettings(authentication, restaurantId, locationId, itemId, request)
+        );
     }
 }
