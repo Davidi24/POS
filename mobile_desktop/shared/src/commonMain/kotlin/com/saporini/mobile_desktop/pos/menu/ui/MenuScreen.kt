@@ -48,7 +48,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.LocalDrink
 import androidx.compose.material.icons.outlined.LocalPizza
 import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.OpenWith
+import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.RestaurantMenu
 import androidx.compose.material.icons.outlined.Search
@@ -363,7 +363,7 @@ private fun MenuDetailsContent(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to all menus", tint = ActiveOlive)
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to all menus", tint = TextInk)
                 }
                 Text(
                     text = menu.name,
@@ -444,7 +444,7 @@ private fun MenuDetailsContent(
                         imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                         contentDescription = "Back to all menus",
                         modifier = Modifier.size(30.dp),
-                        tint = ActiveOlive
+                        tint = TextInk
                     )
                 }
 
@@ -718,7 +718,7 @@ private fun MenuDetailsContent(
             colors = ButtonDefaults.textButtonColors(contentColor = Color.White)
         ) {
             Icon(
-                imageVector = if (isReorderingItems) Icons.Filled.Check else Icons.Outlined.OpenWith,
+                imageVector = if (isReorderingItems) Icons.Filled.Check else Icons.Outlined.DragIndicator,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
                 tint = Color.White

@@ -35,7 +35,7 @@ import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.OpenWith
+import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -241,7 +241,7 @@ internal fun PhoneMenuBookCover(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Outlined.OpenWith, null, Modifier.size(16.dp), tint = PhoneCoverAccent)
+                    Icon(Icons.Outlined.DragIndicator, null, Modifier.size(18.dp), tint = PhoneCoverInk)
                     Text(
                         text = if (isDragging) "Moving..." else "Hold & drag",
                         fontFamily = Inter(),

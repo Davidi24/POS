@@ -34,7 +34,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.OpenWith
+import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -318,7 +318,7 @@ private fun MenuCoverActions(
             contentPadding = PaddingValues(horizontal = if (isPhone) 8.dp else 16.dp, vertical = if (isPhone) 8.dp else 10.dp)
         ) {
             Icon(
-                imageVector = if (isReordering) Icons.Filled.Check else Icons.Outlined.OpenWith,
+                imageVector = if (isReordering) Icons.Filled.Check else Icons.Outlined.DragIndicator,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
@@ -1198,10 +1198,10 @@ private fun MenuBookCover(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.OpenWith,
+                        imageVector = Icons.Outlined.DragIndicator,
                         contentDescription = "Drag to move ${menu.name}",
                         modifier = Modifier.size(15.dp),
-                        tint = if (isDragging) Color.White else CoverOlive
+                        tint = if (isDragging) Color.White else CoverInk
                     )
                     Spacer(Modifier.width(5.dp))
                     Text(
