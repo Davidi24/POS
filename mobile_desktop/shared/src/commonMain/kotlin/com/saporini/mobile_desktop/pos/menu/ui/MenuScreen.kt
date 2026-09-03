@@ -317,7 +317,7 @@ private fun MenuDetailsContent(
     var selectedCategory by remember(menu.id) { mutableStateOf("All") }
     var sections by remember(menu.id) { mutableStateOf(DefaultMenuSections) }
     var showOrderTypeDialog by remember(menu.id) { mutableStateOf(false) }
-    var showSectionManager by remember(menu.id) { mutableStateOf(false) }
+    var sectionManagerMode by remember(menu.id) { mutableStateOf<SectionManagerMode?>(null) }
     var searchQuery by remember(menu.id) { mutableStateOf("") }
     var selectedSearchItemName by remember(menu.id) { mutableStateOf<String?>(null) }
     var localItems by remember(menu.id) { mutableStateOf(menuItems) }
@@ -413,6 +413,19 @@ private fun MenuDetailsContent(
                         Text(category, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                 }
+                IconButton(
+                    onClick = { sectionManagerMode = SectionManagerMode.EDIT },
+                    enabled = !isReorderingItems,
+                    modifier = Modifier.size(44.dp).background(Color.White, RoundedCornerShape(8.dp))
+                        .border(1.dp, Border, RoundedCornerShape(8.dp))
+                ) {
+                    Icon(
+                        Icons.Outlined.Edit,
+                        contentDescription = "Edit menu sections",
+                        modifier = Modifier.size(18.dp),
+                        tint = if (isReorderingItems) MutedInk.copy(alpha = 0.4f) else ActiveOlive
+                    )
+                }
             }
             if (isReorderingItems) {
                 Text("Hold an item, then drag to reorder.", fontFamily = Inter(), fontSize = 12.sp, color = MutedInk)
@@ -438,7 +451,8 @@ private fun MenuDetailsContent(
                 CategoryButtons(
                     items = sections,
                     selected = selectedCategory,
-                    onSelected = { if (!isReorderingItems) selectedCategory = it }
+                    onSelected = { if (!isReorderingItems) selectedCategory = it },
+                    onManageSections = { sectionManagerMode = SectionManagerMode.EDIT }
                 )
 
                 Spacer(Modifier.weight(1f))
@@ -661,16 +675,17 @@ private fun MenuDetailsContent(
                 },
                 onSections = {
                     showOrderTypeDialog = false
-                    showSectionManager = true
+                    sectionManagerMode = SectionManagerMode.REORDER
                 }
             )
         }
 
-        if (showSectionManager) {
+        sectionManagerMode?.let { managerMode ->
             SectionManagerDialog(
                 sections = sections,
                 itemCounts = localItems.groupingBy { it.category }.eachCount(),
-                onDismiss = { showSectionManager = false },
+                mode = managerMode,
+                onDismiss = { sectionManagerMode = null },
                 onSave = { updatedSections, renames ->
                     sections = updatedSections
                     localItems = localItems.map { item ->
@@ -680,7 +695,7 @@ private fun MenuDetailsContent(
                     }
                     selectedCategory = renames[selectedCategory] ?: selectedCategory
                     if (selectedCategory !in updatedSections) selectedCategory = "All"
-                    showSectionManager = false
+                    sectionManagerMode = null
                 }
             )
         }
@@ -870,7 +885,8 @@ private fun SearchSuggestionRow(
 private fun CategoryButtons(
     items: List<String>,
     selected: String,
-    onSelected: (String) -> Unit
+    onSelected: (String) -> Unit,
+    onManageSections: () -> Unit
 ) {
     val visibleCategoryLimit = 5
     var overflowExpanded by remember { mutableStateOf(false) }
@@ -987,6 +1003,19 @@ private fun CategoryButtons(
                     }
                 }
             }
+        }
+
+        IconButton(
+            onClick = onManageSections,
+            modifier = Modifier.size(46.dp).clip(RoundedCornerShape(8.dp))
+                .background(Color.White).border(1.dp, Border, RoundedCornerShape(8.dp))
+        ) {
+            Icon(
+                Icons.Outlined.Edit,
+                contentDescription = "Edit menu sections",
+                modifier = Modifier.size(19.dp),
+                tint = ActiveOlive
+            )
         }
     }
 }
