@@ -407,7 +407,7 @@ private fun MenuDetailsContent(
                             imageVector = categoryIcon(category),
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
-                            tint = TextInk
+                            tint = if (selected) Color.White else TextInk
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(category, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
@@ -710,25 +710,26 @@ private fun MenuDetailsContent(
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(28.dp)
-                .shadow(12.dp, RoundedCornerShape(12.dp))
-                .clip(RoundedCornerShape(12.dp))
+                .padding(if (isPhone) 12.dp else 18.dp)
+                .height(if (isPhone) 40.dp else 44.dp)
+                .shadow(12.dp, RoundedCornerShape(if (isPhone) 8.dp else 10.dp))
+                .clip(RoundedCornerShape(if (isPhone) 8.dp else 10.dp))
                 .background(if (isReorderingItems) TextInk else ActiveOlive),
-            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(horizontal = if (isPhone) 10.dp else 16.dp, vertical = 0.dp),
             colors = ButtonDefaults.textButtonColors(contentColor = Color.White)
         ) {
             Icon(
                 imageVector = if (isReorderingItems) Icons.Filled.Check else Icons.Outlined.DragIndicator,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(if (isPhone) 16.dp else 18.dp),
                 tint = Color.White
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(if (isPhone) 6.dp else 8.dp))
             Text(
                 text = if (isReorderingItems) "Save Order" else "Change Order",
                 fontFamily = Inter(),
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
+                fontSize = if (isPhone) 12.sp else 13.sp,
                 color = Color.White
             )
         }
@@ -932,7 +933,7 @@ private fun CategoryButtons(
                         imageVector = categoryIcon(item),
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = TextInk
+                        tint = if (isSelected) Color.White else TextInk
                     )
                     Text(
                         text = item,

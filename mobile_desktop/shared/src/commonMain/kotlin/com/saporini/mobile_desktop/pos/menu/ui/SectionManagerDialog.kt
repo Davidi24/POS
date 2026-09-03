@@ -190,7 +190,7 @@ internal fun SectionManagerDialog(
                                 if (isPhone) "Press and hold the six-dot handle, then drag and drop to change the order."
                                 else "Drag and drop the six-dot handle to change the order."
                             } else {
-                                "Rename sections, delete empty sections, or add a new one."
+                                "Rename or delete sections, or add a new one."
                             },
                             fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = SectionMuted
                         )
@@ -270,8 +270,10 @@ internal fun SectionManagerDialog(
     }
 
     sectionToDelete?.let { section ->
+        val originalSection = sectionOrigins[section] ?: section
         DeleteSectionDialog(
             section = section,
+            itemCount = itemCounts[originalSection] ?: 0,
             onDismiss = { sectionToDelete = null },
             onDelete = {
                 workingSections = workingSections.filterNot { it == section }
@@ -390,7 +392,7 @@ private fun SectionReorderList(
                     canMove = canMove,
                     isDragging = isDragging,
                     onEdit = { onEdit(section) },
-                    onDelete = { if (itemCount == 0) onDelete(section) },
+                    onDelete = { onDelete(section) },
                     dragHandleModifier = dragModifier,
                     modifier = Modifier.width(listWidth).heightIn(min = rowHeight, max = rowHeight)
                         .zIndex(if (isDragging) 2f else 0f)
@@ -475,13 +477,12 @@ private fun SectionRow(
             Spacer(Modifier.width(8.dp))
             Box(
                 modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp))
-                    .background(if (itemCount == 0) SectionDanger else SectionDanger.copy(alpha = 0.35f))
-                    .then(if (itemCount == 0) Modifier.clickable(onClick = onDelete) else Modifier),
+                    .background(SectionDanger).clickable(onClick = onDelete),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Outlined.DeleteOutline,
-                    if (itemCount == 0) "Delete $section" else "$section cannot be deleted while it contains items",
+                    "Delete $section",
                     Modifier.size(18.dp),
                     tint = Color.White
                 )
@@ -513,7 +514,7 @@ private fun SectionEditorDialog(
                 )
                 Text(
                     if (itemCount == 0) "This section is empty and can be deleted."
-                    else "$itemCount ${if (itemCount == 1) "item" else "items"} use this section. Move them before deleting it.",
+                    else "$itemCount ${if (itemCount == 1) "item uses" else "items use"} this section.",
                     fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = SectionMuted
                 )
             }
@@ -530,12 +531,16 @@ private fun SectionEditorDialog(
 }
 
 @Composable
-private fun DeleteSectionDialog(section: String, onDismiss: () -> Unit, onDelete: () -> Unit) {
+private fun DeleteSectionDialog(section: String, itemCount: Int, onDismiss: () -> Unit, onDelete: () -> Unit) {
     MenuNestedDialog(
         onDismissRequest = onDismiss,
         title = { Text("Delete $section?", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
         text = {
-            Text("Are you sure you want to delete this empty section?", fontFamily = Inter(), fontSize = 13.sp, color = SectionMuted)
+            Text(
+                if (itemCount == 0) "Are you sure you want to delete this section?"
+                else "Are you sure? The section will be removed, and its $itemCount ${if (itemCount == 1) "item" else "items"} will remain available under All.",
+                fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = SectionMuted
+            )
         },
         confirmButton = {
             TextButton(onClick = onDelete) {
