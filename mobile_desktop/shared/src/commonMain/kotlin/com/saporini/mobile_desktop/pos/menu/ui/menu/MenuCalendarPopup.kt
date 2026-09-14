@@ -1,4 +1,4 @@
-package com.saporini.mobile_desktop.pos.menu.ui
+package com.saporini.mobile_desktop.pos.menu.ui.menu
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

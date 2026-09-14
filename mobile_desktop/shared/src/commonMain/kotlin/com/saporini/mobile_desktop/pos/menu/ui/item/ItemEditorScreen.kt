@@ -1,4 +1,4 @@
-package com.saporini.mobile_desktop.pos.menu.ui
+package com.saporini.mobile_desktop.pos.menu.ui.item
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -70,6 +70,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuFormDialog
+import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuFormFieldPair
+import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuNestedDialog
+import com.saporini.mobile_desktop.pos.menu.ui.menu.isPhoneMenuWindow
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
