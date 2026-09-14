@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,7 +35,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -51,8 +49,6 @@ import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.RestaurantMenu
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.ZoomOutMap
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -89,7 +85,6 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -97,13 +92,27 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.PopupProperties
 import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.core.theme.CormorantGaramond
 import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
 import com.saporini.mobile_desktop.core.ui.PlatformBackHandler
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu as DomainMenu
+import com.saporini.mobile_desktop.pos.menu.ui.item.DraftIngredient
+import com.saporini.mobile_desktop.pos.menu.ui.item.DraftOptionGroup
+import com.saporini.mobile_desktop.pos.menu.ui.item.DraftVariant
+import com.saporini.mobile_desktop.pos.menu.ui.item.EditableMenuItem
+import com.saporini.mobile_desktop.pos.menu.ui.item.ItemEditorDialog
+import com.saporini.mobile_desktop.pos.menu.ui.item.MenuItemCard
+import com.saporini.mobile_desktop.pos.menu.ui.item.OptionsEditorDialog
+import com.saporini.mobile_desktop.pos.menu.ui.item.VariantEditorDialog
+import com.saporini.mobile_desktop.pos.menu.ui.item.phoneMenuItemHeight
+import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuCoverUi
+import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuEditorDialog
+import com.saporini.mobile_desktop.pos.menu.ui.menu.isPhoneMenuWindow
+import com.saporini.mobile_desktop.pos.menu.ui.section.OrderTypeDialog
+import com.saporini.mobile_desktop.pos.menu.ui.section.SectionManagerDialog
+import com.saporini.mobile_desktop.pos.menu.ui.section.SectionManagerMode
 import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.auth_login_img
 import kotlinx.coroutines.delay
@@ -323,6 +332,7 @@ private fun MenuDetailsContent(
     var localItems by remember(menu.id) { mutableStateOf(menuItems) }
     var showAddItemDialog by remember(menu.id) { mutableStateOf(false) }
     var itemBeingEdited by remember(menu.id) { mutableStateOf<MenuItem?>(null) }
+    var itemBeingViewed by remember(menu.id) { mutableStateOf<MenuItem?>(null) }
     var showItemEditor by remember(menu.id) { mutableStateOf(false) }
     var showVariantEditor by remember(menu.id) { mutableStateOf(false) }
     var showOptionsEditor by remember(menu.id) { mutableStateOf(false) }
@@ -340,135 +350,184 @@ private fun MenuDetailsContent(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = if (isPhone) 16.dp else 22.dp, end = if (isPhone) 16.dp else 22.dp, top = if (isWidePhone) 8.dp else 18.dp, bottom = 96.dp),
+                .padding(
+                    start = if (isPhone) 16.dp else 22.dp,
+                    end = if (isPhone) 16.dp else 22.dp,
+                    top = if (isWidePhone) 8.dp else 18.dp,
+                    bottom = 96.dp
+                ),
             verticalArrangement = Arrangement.spacedBy(if (isWidePhone) 10.dp else 18.dp)
         ) {
-        if (isPhone) {
-            val searchField: @Composable (Modifier) -> Unit = { fieldModifier ->
-                SearchBox(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    onSuggestionClick = { item ->
-                        searchQuery = item.name
-                        selectedCategory = item.category.takeIf { it in sections } ?: "All"
-                        selectedSearchItemName = item.name
-                    },
-                    modifier = fieldModifier,
-                    items = localItems
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to all menus", tint = TextInk)
+            if (isPhone) {
+                val searchField: @Composable (Modifier) -> Unit = { fieldModifier ->
+                    MenuSearchBox(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        items = localItems,
+                        itemName = { it.name },
+                        itemCategory = { it.category },
+                        itemPrice = { it.price },
+                        itemAvailable = { it.available },
+                        onSuggestionClick = { item ->
+                            searchQuery = item.name
+                            selectedCategory = item.category.takeIf { it in sections } ?: "All"
+                            selectedSearchItemName = item.name
+                        },
+                        modifier = fieldModifier
+                    )
                 }
-                Text(
-                    text = menu.name,
-                    modifier = Modifier.weight(if (isWidePhone) 0.7f else 1f),
-                    fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp,
-                    color = TextInk, maxLines = 2, overflow = TextOverflow.Ellipsis
-                )
-                if (isWidePhone) {
-                    searchField(Modifier.weight(1.2f))
-                }
-                TextButton(
-                    onClick = { showAddItemDialog = true },
-                    enabled = !isReorderingItems,
-                    modifier = Modifier.heightIn(min = 44.dp).background(ActiveOlive, RoundedCornerShape(8.dp)),
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-                    contentPadding = PaddingValues(horizontal = 12.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Filled.Add, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add Item", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                }
-            }
-            if (!isWidePhone) {
-                searchField(Modifier.fillMaxWidth())
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(end = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                sections.forEach { category ->
-                    val selected = selectedCategory == category
+                    IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to all menus", tint = TextInk)
+                    }
+                    Text(
+                        text = menu.name,
+                        modifier = Modifier.weight(if (isWidePhone) 0.7f else 1f),
+                        fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp,
+                        color = TextInk, maxLines = 2, overflow = TextOverflow.Ellipsis
+                    )
+                    if (isWidePhone) {
+                        searchField(Modifier.weight(1.2f))
+                    }
                     TextButton(
-                        onClick = { if (!isReorderingItems) selectedCategory = category },
-                        modifier = Modifier.heightIn(min = 44.dp)
-                            .background(if (selected) ActiveOlive else Color.White, RoundedCornerShape(8.dp))
-                            .border(1.dp, if (selected) ActiveOlive else Border, RoundedCornerShape(8.dp)),
-                        contentPadding = PaddingValues(horizontal = 14.dp),
-                        colors = ButtonDefaults.textButtonColors(contentColor = if (selected) Color.White else TextInk)
+                        onClick = { showAddItemDialog = true },
+                        enabled = !isReorderingItems,
+                        modifier = Modifier
+                            .heightIn(min = 44.dp)
+                            .background(ActiveOlive, RoundedCornerShape(8.dp)),
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
                     ) {
-                        Icon(
-                            imageVector = categoryIcon(category),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = if (selected) Color.White else TextInk
+                        Icon(Icons.Filled.Add, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Add Item",
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Text(category, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
                 }
-                IconButton(
-                    onClick = { sectionManagerMode = SectionManagerMode.EDIT },
-                    enabled = !isReorderingItems,
-                    modifier = Modifier.size(44.dp).background(Color.White, RoundedCornerShape(8.dp))
-                        .border(1.dp, Border, RoundedCornerShape(8.dp))
+                if (!isWidePhone) {
+                    searchField(Modifier.fillMaxWidth())
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(end = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        Icons.Outlined.Edit,
-                        contentDescription = "Edit menu sections",
-                        modifier = Modifier.size(18.dp),
-                        tint = if (isReorderingItems) TextInk.copy(alpha = 0.35f) else TextInk
+                    sections.forEach { category ->
+                        val selected = selectedCategory == category
+                        TextButton(
+                            onClick = { if (!isReorderingItems) selectedCategory = category },
+                            modifier = Modifier
+                                .heightIn(min = 44.dp)
+                                .background(
+                                    if (selected) ActiveOlive else Color.White,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (selected) ActiveOlive else Border,
+                                    RoundedCornerShape(8.dp)
+                                ),
+                            contentPadding = PaddingValues(horizontal = 14.dp),
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = if (selected) Color.White else TextInk
+                            )
+                        ) {
+                            Icon(
+                                imageVector = categoryIcon(category),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (selected) Color.White else TextInk
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                category,
+                                fontFamily = Inter(),
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = { sectionManagerMode = SectionManagerMode.EDIT },
+                        enabled = !isReorderingItems,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .background(Color.White, RoundedCornerShape(8.dp))
+                            .border(1.dp, Border, RoundedCornerShape(8.dp))
+                    ) {
+                        Icon(
+                            Icons.Outlined.Edit,
+                            contentDescription = "Edit menu sections",
+                            modifier = Modifier.size(18.dp),
+                            tint = if (isReorderingItems) {
+                                TextInk.copy(alpha = 0.35f)
+                            } else {
+                                TextInk
+                            }
+                        )
+                    }
+                }
+                if (isReorderingItems) {
+                    Text(
+                        "Hold an item, then drag to reorder.",
+                        fontFamily = Inter(),
+                        fontSize = 12.sp,
+                        color = MutedInk
+                    )
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(46.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back to all menus",
+                            modifier = Modifier.size(30.dp),
+                            tint = TextInk
+                        )
+                    }
+
+                    CategoryButtons(
+                        items = sections,
+                        selected = selectedCategory,
+                        onSelected = { if (!isReorderingItems) selectedCategory = it },
+                        onManageSections = { sectionManagerMode = SectionManagerMode.EDIT }
+                    )
+
+                    Spacer(Modifier.weight(1f))
+                    MenuSearchBox(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        items = localItems,
+                        itemName = { it.name },
+                        itemCategory = { it.category },
+                        itemPrice = { it.price },
+                        itemAvailable = { it.available },
+                        onSuggestionClick = { item ->
+                            searchQuery = item.name
+                            selectedCategory = item.category.takeIf { it in sections } ?: "All"
+                            selectedSearchItemName = item.name
+                        },
+                        modifier = Modifier.width(360.dp)
                     )
                 }
             }
-            if (isReorderingItems) {
-                Text("Hold an item, then drag to reorder.", fontFamily = Inter(), fontSize = 12.sp, color = MutedInk)
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.size(46.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Back to all menus",
-                        modifier = Modifier.size(30.dp),
-                        tint = TextInk
-                    )
-                }
-
-                CategoryButtons(
-                    items = sections,
-                    selected = selectedCategory,
-                    onSelected = { if (!isReorderingItems) selectedCategory = it },
-                    onManageSections = { sectionManagerMode = SectionManagerMode.EDIT }
-                )
-
-                Spacer(Modifier.weight(1f))
-                SearchBox(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    onSuggestionClick = { item ->
-                        searchQuery = item.name
-                        selectedCategory = item.category.takeIf { it in sections } ?: "All"
-                        selectedSearchItemName = item.name
-                    },
-                    modifier = Modifier.width(360.dp)
-                )
-            }
-
-        }
 
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val columns = when {
@@ -524,12 +583,19 @@ private fun MenuDetailsContent(
                                     )
                                 } else {
                                     MenuItemCard(
-                                        item = item,
-                                        isPhone = isPhone,
+                                        name = item.name,
+                                        description = item.description,
+                                        price = item.price,
+                                        category = item.category,
+                                        available = item.available,
                                         selected = item.name == selectedSearchItemName,
+                                        isPhone = isPhone,
                                         modifier = Modifier
                                             .weight(1f)
                                             .fillMaxHeight(),
+                                        onExpand = {
+                                            itemBeingViewed = item
+                                        },
                                         onEditMenuItem = {
                                             itemBeingEdited = item
                                             showItemEditor = true
@@ -611,6 +677,13 @@ private fun MenuDetailsContent(
                     }
                 )
             }
+        }
+
+        itemBeingViewed?.let { viewingItem ->
+            ItemDetailDialog(
+                item = viewingItem,
+                onDismiss = { itemBeingViewed = null }
+            )
         }
 
         if (showVariantEditor) {
@@ -736,151 +809,7 @@ private fun MenuDetailsContent(
     }
 }
 
-@Composable
-private fun SearchBox(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onSuggestionClick: (MenuItem) -> Unit,
-    modifier: Modifier = Modifier,
-    items: List<MenuItem> = menuItems
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val suggestions = remember(query, expanded, items) {
-        if (query.isBlank() || !expanded) {
-            emptyList()
-        } else {
-            items
-                .filter { it.name.contains(query, ignoreCase = true) }
-                .take(5)
-        }
-    }
 
-    BoxWithConstraints(modifier = modifier) {
-        val suggestionWidth = maxWidth
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .border(1.dp, Border, RoundedCornerShape(8.dp))
-                .padding(horizontal = 15.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = null,
-                modifier = Modifier.size(21.dp),
-                tint = Color(0xFF303236)
-            )
-            Spacer(Modifier.width(14.dp))
-            BasicTextField(
-                value = query,
-                onValueChange = { value ->
-                    onQueryChange(value)
-                    expanded = value.isNotBlank()
-                },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                textStyle = TextStyle(
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    letterSpacing = 0.sp,
-                    color = TextInk
-                ),
-                decorationBox = { innerTextField ->
-                    if (query.isEmpty()) {
-                        Text(
-                            text = "Search menu items",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            letterSpacing = 0.sp,
-                            color = Color(0xFF91918F)
-                        )
-                    }
-                    innerTextField()
-                }
-            )
-        }
-
-        if (suggestions.isNotEmpty()) {
-            DropdownMenu(
-                expanded = true,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier
-                    .width(suggestionWidth)
-                    .background(Color.White),
-                properties = PopupProperties(focusable = false)
-            ) {
-                suggestions.forEach { item ->
-                    SearchSuggestionRow(
-                        item = item,
-                        onClick = {
-                            expanded = false
-                            onSuggestionClick(item)
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchSuggestionRow(
-    item: MenuItem,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Image(
-            painter = painterResource(Res.drawable.auth_login_img),
-            contentDescription = item.name,
-            modifier = Modifier
-                .size(width = 58.dp, height = 42.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .graphicsLayer(alpha = if (item.available) 1f else 0.45f),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.name,
-                fontFamily = Inter(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                letterSpacing = 0.sp,
-                color = TextInk,
-                maxLines = 1,
-                softWrap = false
-            )
-            Text(
-                text = item.category,
-                fontFamily = Inter(),
-                fontWeight = FontWeight.Medium,
-                fontSize = 12.sp,
-                letterSpacing = 0.sp,
-                color = MutedInk,
-                maxLines = 1,
-                softWrap = false
-            )
-        }
-        Text(
-            text = item.price,
-            fontFamily = Inter(),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            letterSpacing = 0.sp,
-            color = TextInk
-        )
-    }
-}
 
 @Composable
 private fun CategoryButtons(
@@ -1039,7 +968,11 @@ private fun ReorderableMenuItemGrid(
         modifier = modifier
     ) {
         val cardWidth = (maxWidth - horizontalGap * (columns - 1)) / columns
-        val cardHeight = if (isPhone) phoneMenuItemHeight(LocalDensity.current.fontScale) else if (columns <= 2) 430.dp else 350.dp
+        val cardHeight = when {
+            isPhone -> phoneMenuItemHeight(LocalDensity.current.fontScale)
+            columns <= 2 -> 430.dp
+            else -> 350.dp
+        }
         val rowCount = (items.size + columns - 1) / columns
         val contentHeight = if (rowCount == 0) 0.dp else cardHeight * rowCount + verticalGap * (rowCount - 1)
         val density = LocalDensity.current
@@ -1082,10 +1015,14 @@ private fun ReorderableMenuItemGrid(
                     val isDragging = draggingItem === item
 
                     MenuItemCard(
-                        item = item,
+                        name = item.name,
+                        description = item.description,
+                        price = item.price,
+                        category = item.category,
+                        available = item.available,
                         selected = false,
-                        isReordering = true,
                         isPhone = isPhone,
+                        isReordering = true,
                         modifier = Modifier
                             .width(cardWidth)
                             .height(cardHeight)
@@ -1141,326 +1078,6 @@ private fun ReorderableMenuItemGrid(
                 }
             }
         }
-    }
-}
-
-private fun phoneMenuItemHeight(fontScale: Float) = 164.dp * fontScale.coerceAtLeast(1f)
-
-@Composable
-private fun PhoneMenuItemCard(
-    item: MenuItem,
-    selected: Boolean,
-    modifier: Modifier,
-    isReordering: Boolean,
-    onExpand: () -> Unit,
-    onEditMenuItem: () -> Unit,
-    onEditVariants: () -> Unit,
-    onEditOptions: () -> Unit
-) {
-    val contentAlpha = if (item.available) 1f else 0.5f
-    var editMenuOpen by remember { mutableStateOf(false) }
-    val cardShape = RoundedCornerShape(12.dp)
-
-    Row(
-        modifier = modifier
-            .height(phoneMenuItemHeight(LocalDensity.current.fontScale))
-            .clip(cardShape)
-            .background(Color.White)
-            .border(if (selected || isReordering) 2.dp else 1.dp, if (selected || isReordering) ActiveOlive else Border, cardShape)
-            .padding(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth(0.36f).fillMaxHeight().clip(RoundedCornerShape(8.dp))
-        ) {
-            Image(
-                painter = painterResource(Res.drawable.auth_login_img),
-                contentDescription = item.name,
-                modifier = Modifier.fillMaxSize().graphicsLayer(alpha = contentAlpha),
-                contentScale = ContentScale.Crop
-            )
-            AvailabilityButton(
-                available = item.available,
-                compact = true,
-                modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
-            )
-        }
-        Column(Modifier.weight(1f).fillMaxHeight()) {
-            Text(
-                item.category.uppercase(),
-                fontFamily = Inter(), fontWeight = FontWeight.SemiBold,
-                fontSize = 10.sp, lineHeight = 13.sp, letterSpacing = 0.5.sp,
-                color = MutedInk.copy(alpha = contentAlpha), maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                item.name,
-                fontFamily = Inter(), fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp, lineHeight = 20.sp,
-                color = TextInk.copy(alpha = contentAlpha),
-                maxLines = 2, overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                item.description,
-                fontFamily = Inter(), fontSize = 12.sp, lineHeight = 16.sp,
-                color = MutedInk.copy(alpha = contentAlpha),
-                maxLines = 2, overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.weight(1f))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    item.price,
-                    modifier = Modifier.weight(1f),
-                    fontFamily = Inter(), fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp, color = TextInk.copy(alpha = contentAlpha),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-                if (!isReordering) {
-                    if (item.available) {
-                        Box {
-                            PhoneMenuItemAction(Icons.Outlined.Edit, "Edit item") { editMenuOpen = true }
-                            DropdownMenu(
-                                expanded = editMenuOpen,
-                                onDismissRequest = { editMenuOpen = false },
-                                offset = DpOffset(0.dp, 4.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                containerColor = Color.White,
-                                tonalElevation = 0.dp,
-                                shadowElevation = 6.dp
-                            ) {
-                                listOf(
-                                    "Menu Item" to onEditMenuItem,
-                                    "Variant" to onEditVariants,
-                                    "Option" to onEditOptions
-                                ).forEach { (label, action) ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextInk)
-                                        },
-                                        onClick = {
-                                            editMenuOpen = false
-                                            action()
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    PhoneMenuItemAction(Icons.Outlined.ZoomOutMap, "View item details", onExpand)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PhoneMenuItemAction(icon: ImageVector, label: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier.size(28.dp).background(Color(0xFFF7F7F5), RoundedCornerShape(7.dp))
-                .border(1.dp, Border, RoundedCornerShape(7.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, label, modifier = Modifier.size(15.dp), tint = TextInk)
-        }
-    }
-}
-
-@Composable
-private fun MenuItemCard(
-    item: MenuItem,
-    selected: Boolean,
-    isPhone: Boolean = false,
-    modifier: Modifier = Modifier,
-    isReordering: Boolean = false,
-    onEditMenuItem: () -> Unit = { },
-    onEditVariants: () -> Unit = { },
-    onEditOptions: () -> Unit = { }
-) {
-    val contentAlpha = if (item.available) 1f else 0.42f
-    var showDescription by remember { mutableStateOf(false) }
-
-    if (isPhone) {
-        PhoneMenuItemCard(
-            item = item,
-            selected = selected,
-            modifier = modifier,
-            isReordering = isReordering,
-            onExpand = { showDescription = true },
-            onEditMenuItem = onEditMenuItem,
-            onEditVariants = onEditVariants,
-            onEditOptions = onEditOptions
-        )
-    } else {
-        Box(
-            modifier = modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color.White)
-                .border(
-                    width = if (selected || isReordering) 2.dp else 1.dp,
-                    color = if (selected || isReordering) ActiveOlive else Border,
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .padding(10.dp)
-        ) {
-            Column {
-                Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(if (isPhone) 1.45f else 2.12f)
-                    .clip(RoundedCornerShape(6.dp))
-                ) {
-                    Image(
-                        painter = painterResource(Res.drawable.auth_login_img),
-                        contentDescription = item.name,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer(alpha = contentAlpha),
-                        contentScale = ContentScale.Crop
-                    )
-
-                    AvailabilityButton(
-                        available = item.available,
-                        compact = isPhone,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(if (isPhone) 6.dp else 10.dp)
-                    )
-
-                    if (item.available && !isReordering) {
-                        var showEditMenu by remember { mutableStateOf(false) }
-
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(if (isPhone) 6.dp else 10.dp)
-                        ) {
-                            EditItemButton(
-                                onClick = { showEditMenu = true },
-                                isPhone = isPhone
-                            )
-
-                            DropdownMenu(
-                                expanded = showEditMenu,
-                                onDismissRequest = { showEditMenu = false },
-                                offset = DpOffset(x = 0.dp, y = 8.dp),
-                                modifier = Modifier.background(Color.White),
-                                shape = RoundedCornerShape(10.dp),
-                                containerColor = Color.White,
-                                tonalElevation = 0.dp,
-                                shadowElevation = 6.dp
-                            ) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "Menu Item",
-                                            fontFamily = Inter(),
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 14.sp,
-                                            color = TextInk
-                                        )
-                                    },
-                                    onClick = {
-                                        showEditMenu = false
-                                        onEditMenuItem()
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "Variant",
-                                            fontFamily = Inter(),
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 14.sp,
-                                            color = TextInk
-                                        )
-                                    },
-                                    onClick = {
-                                        showEditMenu = false
-                                        onEditVariants()
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "Option",
-                                            fontFamily = Inter(),
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 14.sp,
-                                            color = TextInk
-                                        )
-                                    },
-                                    onClick = {
-                                        showEditMenu = false
-                                        onEditOptions()
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = item.name,
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = if (isPhone) 15.sp else 18.sp,
-                    letterSpacing = 0.sp,
-                    color = TextInk.copy(alpha = contentAlpha),
-                    maxLines = if (isPhone) 2 else 1,
-                    softWrap = isPhone,
-                    overflow = if (isPhone) TextOverflow.Ellipsis else TextOverflow.Clip
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = item.description,
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp,
-                    letterSpacing = 0.sp,
-                    color = MutedInk.copy(alpha = contentAlpha),
-                    minLines = 2,
-                    maxLines = 2
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = item.price,
-                    modifier = if (isPhone && !isReordering) Modifier.padding(end = 44.dp) else Modifier,
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = if (isPhone) 15.sp else 17.sp,
-                    letterSpacing = 0.sp,
-                    color = TextInk.copy(alpha = contentAlpha)
-                )
-            }
-
-            if (!isReordering) {
-                ExpandImageButton(
-                    onClick = { showDescription = true },
-                    isPhone = isPhone,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 2.dp, bottom = 0.dp)
-                )
-            }
-        }
-    }
-
-    if (showDescription) {
-        ItemDetailDialog(
-            item = item,
-            onDismiss = { showDescription = false }
-        )
     }
 }
 
@@ -1876,7 +1493,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                     fontSize = 24.sp, lineHeight = 29.sp, color = TextInk
                 )
                 Text(
-                    item.category + (item.sku?.let { "  •  SKU $it" } ?: ""),
+                    item.category + (item.sku?.let { "  ï¿½  SKU $it" } ?: ""),
                     fontFamily = Inter(), fontSize = 12.sp, color = MutedInk
                 )
                 Text(item.price, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 21.sp, color = TextInk)
@@ -1889,7 +1506,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                     PhoneItemDetailText("No ingredients added.")
                 } else {
                     item.ingredients.forEach { ingredient ->
-                        PhoneItemDetailText("${ingredient.name} — ${ingredient.quantity} ${ingredient.unit}")
+                        PhoneItemDetailText("${ingredient.name} ï¿½ ${ingredient.quantity} ${ingredient.unit}")
                     }
                 }
             }
@@ -1911,7 +1528,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                     item.optionGroups.forEach { group ->
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                group.name + if (group.required) " · Required" else " · Optional",
+                                group.name + if (group.required) " ï¿½ Required" else " ï¿½ Optional",
                                 fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextInk
                             )
                             group.choices.forEach { choice ->
@@ -1980,52 +1597,6 @@ private fun AvailabilityButton(
             color = if (available) ActiveOlive else Color.White,
             maxLines = 1,
             softWrap = false
-        )
-    }
-}
-
-@Composable
-private fun ExpandImageButton(
-    onClick: () -> Unit,
-    isPhone: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    IconButton(
-        onClick = onClick,
-        modifier = modifier
-            .size(if (isPhone) 40.dp else 29.dp)
-            .shadow(2.dp, RoundedCornerShape(7.dp))
-            .clip(RoundedCornerShape(7.dp))
-            .background(Color.White.copy(alpha = 0.92f))
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.ZoomOutMap,
-            contentDescription = "Expand image",
-            modifier = Modifier.size(18.dp),
-            tint = TextInk
-        )
-    }
-}
-
-@Composable
-private fun EditItemButton(
-    onClick: () -> Unit,
-    isPhone: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    IconButton(
-        onClick = onClick,
-        modifier = modifier
-            .size(if (isPhone) 40.dp else 29.dp)
-            .shadow(2.dp, RoundedCornerShape(7.dp))
-            .clip(RoundedCornerShape(7.dp))
-            .background(Color.White.copy(alpha = 0.92f))
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Edit,
-            contentDescription = "Edit item",
-            modifier = Modifier.size(16.dp),
-            tint = TextInk
         )
     }
 }
@@ -2102,18 +1673,90 @@ private data class MenuItem(
 )
 
 private val menuItems = listOf(
-    MenuItem("Burrata con Pomodorini", "Creamy burrata with heirloom cherry tomatoes, basil, and olive oil.", "\$14.00", "Antipasti", true),
-    MenuItem("Bruschetta al Pomodoro", "Grilled sourdough topped with ripe tomatoes, garlic, basil, and olive oil.", "\$10.00", "Antipasti", true),
-    MenuItem("Prosciutto e Melone", "Thinly sliced prosciutto di Parma with sweet melon.", "\$13.00", "Antipasti", true),
-    MenuItem("Carpaccio di Manzo", "Thinly sliced beef tenderloin with arugula, parmesan, and lemon.", "\$15.00", "Antipasti", false),
-    MenuItem("Spaghetti alla Carbonara", "Classic Roman pasta with eggs, Pecorino cheese, guanciale, and black pepper.", "\$18.00", "Pasta", true),
-    MenuItem("Lasagna alla Bolognese", "Layers of pasta, slow-cooked meat sauce, bechamel, and melted mozzarella.", "from \$20.00", "Pasta", true),
-    MenuItem("Risotto ai Funghi", "Creamy Arborio rice with wild mushrooms, white wine, and parmesan.", "\$19.00", "Pasta", true),
-    MenuItem("Pizza Quattro Formaggi", "Mozzarella, gorgonzola, fontina, parmesan, and ricotta.", "\$16.00", "Pizza", false),
-    MenuItem("Pizza Margherita", "San Marzano tomato sauce, fior di latte mozzarella, fresh basil, and olive oil.", "\$15.00", "Pizza", true),
-    MenuItem("Tiramisu", "Classic Italian dessert with mascarpone cream and espresso-soaked ladyfingers.", "\$8.50", "Dolci", true),
-    MenuItem("Panna Cotta", "Silky vanilla panna cotta with mixed berry compote.", "\$7.50", "Dolci", true),
-    MenuItem("Lemon Soda", "Refreshing sparkling lemon soda with a hint of mint.", "\$4.50", "Beverages", true)
+    MenuItem(
+        "Burrata con Pomodorini",
+        "Creamy burrata with heirloom cherry tomatoes, basil, and olive oil.",
+        "\$14.00",
+        "Antipasti",
+        true
+    ),
+    MenuItem(
+        "Bruschetta al Pomodoro",
+        "Grilled sourdough topped with ripe tomatoes, garlic, basil, and olive oil.",
+        "\$10.00",
+        "Antipasti",
+        true
+    ),
+    MenuItem(
+        "Prosciutto e Melone",
+        "Thinly sliced prosciutto di Parma with sweet melon.",
+        "\$13.00",
+        "Antipasti",
+        true
+    ),
+    MenuItem(
+        "Carpaccio di Manzo",
+        "Thinly sliced beef tenderloin with arugula, parmesan, and lemon.",
+        "\$15.00",
+        "Antipasti",
+        false
+    ),
+    MenuItem(
+        "Spaghetti alla Carbonara",
+        "Classic Roman pasta with eggs, Pecorino cheese, guanciale, and black pepper.",
+        "\$18.00",
+        "Pasta",
+        true
+    ),
+    MenuItem(
+        "Lasagna alla Bolognese",
+        "Layers of pasta, slow-cooked meat sauce, bechamel, and melted mozzarella.",
+        "from \$20.00",
+        "Pasta",
+        true
+    ),
+    MenuItem(
+        "Risotto ai Funghi",
+        "Creamy Arborio rice with wild mushrooms, white wine, and parmesan.",
+        "\$19.00",
+        "Pasta",
+        true
+    ),
+    MenuItem(
+        "Pizza Quattro Formaggi",
+        "Mozzarella, gorgonzola, fontina, parmesan, and ricotta.",
+        "\$16.00",
+        "Pizza",
+        false
+    ),
+    MenuItem(
+        "Pizza Margherita",
+        "San Marzano tomato sauce, fior di latte mozzarella, fresh basil, and olive oil.",
+        "\$15.00",
+        "Pizza",
+        true
+    ),
+    MenuItem(
+        "Tiramisu",
+        "Classic Italian dessert with mascarpone cream and espresso-soaked ladyfingers.",
+        "\$8.50",
+        "Dolci",
+        true
+    ),
+    MenuItem(
+        "Panna Cotta",
+        "Silky vanilla panna cotta with mixed berry compote.",
+        "\$7.50",
+        "Dolci",
+        true
+    ),
+    MenuItem(
+        "Lemon Soda",
+        "Refreshing sparkling lemon soda with a hint of mint.",
+        "\$4.50",
+        "Beverages",
+        true
+    )
 )
 
 private suspend fun PointerInputScope.detectMenuItemDrag(

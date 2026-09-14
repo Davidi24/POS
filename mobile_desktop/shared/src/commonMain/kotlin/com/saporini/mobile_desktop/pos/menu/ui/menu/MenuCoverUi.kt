@@ -1,4 +1,4 @@
-package com.saporini.mobile_desktop.pos.menu.ui
+package com.saporini.mobile_desktop.pos.menu.ui.menu
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -82,6 +82,7 @@ import com.saporini.mobile_desktop.core.theme.CormorantGaramond
 import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
+import com.saporini.mobile_desktop.pos.menu.ui.MenuUiState
 import com.saporini.mobile_desktop.pos.ui.shell.PosPhoneTopBar
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -516,8 +517,16 @@ private fun MenuCoverCollection(
     val rowCount = if (itemCount == 0) 0 else (itemCount + columns - 1) / columns
     val horizontalGap = if (isPhone) 18.dp else 24.dp
     val verticalGap = 20.dp
-    val coverHeight = if (isPhone) phoneMenuCoverHeight(availableHeight) else minOf(availableHeight, 440.dp)
-    val cardWidth = if (isPhone) phoneMenuCoverWidth(availableWidth, coverHeight) else (availableWidth - horizontalGap * (columns - 1)) / columns
+    val coverHeight = if (isPhone) {
+        phoneMenuCoverHeight(availableHeight)
+    } else {
+        minOf(availableHeight, 440.dp)
+    }
+    val cardWidth = if (isPhone) {
+        phoneMenuCoverWidth(availableWidth, coverHeight)
+    } else {
+        (availableWidth - horizontalGap * (columns - 1)) / columns
+    }
     val contentWidth = if (isPhone && itemCount > 0) {
         cardWidth * itemCount + horizontalGap * (itemCount - 1) + 40.dp
     } else {

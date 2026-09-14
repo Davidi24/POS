@@ -1,4 +1,4 @@
-package com.saporini.mobile_desktop.pos.menu.ui
+package com.saporini.mobile_desktop.pos.menu.ui.section
 
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.animation.core.spring
@@ -71,6 +71,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
+import com.saporini.mobile_desktop.pos.menu.ui.categoryIcon
+import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuNestedDialog
+import com.saporini.mobile_desktop.pos.menu.ui.menu.isPhoneMenuWindow
 import kotlin.math.roundToInt
 
 private val SectionGreen = Color(0xFF94A27F)
@@ -531,15 +534,28 @@ private fun SectionEditorDialog(
 }
 
 @Composable
-private fun DeleteSectionDialog(section: String, itemCount: Int, onDismiss: () -> Unit, onDelete: () -> Unit) {
+private fun DeleteSectionDialog(
+    section: String,
+    itemCount: Int,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit
+) {
     MenuNestedDialog(
         onDismissRequest = onDismiss,
         title = { Text("Delete $section?", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
         text = {
+            val message = if (itemCount == 0) {
+                "Are you sure you want to delete this section?"
+            } else {
+                "Are you sure? The section will be removed, and its $itemCount " +
+                    "${if (itemCount == 1) "item" else "items"} will remain available under All."
+            }
             Text(
-                if (itemCount == 0) "Are you sure you want to delete this section?"
-                else "Are you sure? The section will be removed, and its $itemCount ${if (itemCount == 1) "item" else "items"} will remain available under All.",
-                fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = SectionMuted
+                message,
+                fontFamily = Inter(),
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                color = SectionMuted
             )
         },
         confirmButton = {

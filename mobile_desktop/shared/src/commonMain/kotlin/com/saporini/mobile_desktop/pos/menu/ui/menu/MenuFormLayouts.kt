@@ -1,4 +1,4 @@
-package com.saporini.mobile_desktop.pos.menu.ui
+package com.saporini.mobile_desktop.pos.menu.ui.menu
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -121,9 +121,22 @@ internal fun MenuFormDialog(
                             Spacer(Modifier.width(8.dp))
                         }
                         Column(Modifier.weight(1f)) {
-                            Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = FormInk)
+                            Text(
+                                title,
+                                fontFamily = Inter(),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = FormInk
+                            )
                             subtitle?.let {
-                                Text(it, fontFamily = Inter(), fontSize = 13.sp, color = FormMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    it,
+                                    fontFamily = Inter(),
+                                    fontSize = 13.sp,
+                                    color = FormMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
                         if (!isPhone) {
@@ -139,8 +152,14 @@ internal fun MenuFormDialog(
                     }
                     HorizontalDivider(color = FormBorder)
                     Column(
-                        modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(scrollState)
-                            .padding(horizontal = if (isPhone) 20.dp else 24.dp, vertical = if (isWidePhone) 12.dp else 18.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(scrollState)
+                            .padding(
+                                horizontal = if (isPhone) 20.dp else 24.dp,
+                                vertical = if (isWidePhone) 12.dp else 18.dp
+                            ),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         content(isPhone)
@@ -169,10 +188,19 @@ internal fun MenuFormDialog(
                                 onSave()
                             },
                             enabled = canSave,
-                            modifier = if (isPhone) Modifier.fillMaxWidth().heightIn(min = if (isWidePhone) 44.dp else 50.dp) else Modifier,
+                            modifier = if (isPhone) {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = if (isWidePhone) 44.dp else 50.dp)
+                            } else {
+                                Modifier
+                            },
                             shape = if (isPhone) RoundedCornerShape(10.dp) else ButtonDefaults.shape,
                             colors = ButtonDefaults.buttonColors(containerColor = FormGreen),
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = if (isPhone && !isWidePhone) 14.dp else 8.dp)
+                            contentPadding = PaddingValues(
+                                horizontal = 18.dp,
+                                vertical = if (isPhone && !isWidePhone) 14.dp else 8.dp
+                            )
                         ) {
                             Text(saveLabel, fontFamily = Inter(), fontWeight = FontWeight.Bold)
                         }

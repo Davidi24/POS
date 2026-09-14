@@ -1,4 +1,4 @@
-package com.saporini.mobile_desktop.pos.menu.ui
+package com.saporini.mobile_desktop.pos.menu.ui.menu
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -326,7 +326,14 @@ internal fun PhoneMenuCoverSkeletons(availableWidth: Dp, availableHeight: Dp) {
             ) {
                 Box(Modifier.fillMaxWidth(0.136f).fillMaxHeight().background(Color(0xFFD1D3CF)))
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(start = 60.dp * scale, end = 24.dp * scale, top = 64.dp * scale, bottom = 32.dp * scale),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            start = 60.dp * scale,
+                            end = 24.dp * scale,
+                            top = 64.dp * scale,
+                            bottom = 32.dp * scale
+                        ),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(Modifier.fillMaxWidth(0.75f).height(62.dp * scale).background(Color(0xFFE0E2DC), RoundedCornerShape(8.dp)))
