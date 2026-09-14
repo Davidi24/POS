@@ -1493,7 +1493,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                     fontSize = 24.sp, lineHeight = 29.sp, color = TextInk
                 )
                 Text(
-                    item.category + (item.sku?.let { "  �  SKU $it" } ?: ""),
+                    item.category + (item.sku?.let { "  •  SKU $it" } ?: ""),
                     fontFamily = Inter(), fontSize = 12.sp, color = MutedInk
                 )
                 Text(item.price, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 21.sp, color = TextInk)
@@ -1506,7 +1506,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                     PhoneItemDetailText("No ingredients added.")
                 } else {
                     item.ingredients.forEach { ingredient ->
-                        PhoneItemDetailText("${ingredient.name} � ${ingredient.quantity} ${ingredient.unit}")
+                        PhoneItemDetailText("${ingredient.name} • ${ingredient.quantity} ${ingredient.unit}")
                     }
                 }
             }
@@ -1528,7 +1528,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                     item.optionGroups.forEach { group ->
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                group.name + if (group.required) " � Required" else " � Optional",
+                                group.name + if (group.required) " • Required" else " • Optional",
                                 fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextInk
                             )
                             group.choices.forEach { choice ->
