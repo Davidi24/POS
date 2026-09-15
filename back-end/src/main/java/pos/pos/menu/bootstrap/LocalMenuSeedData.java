@@ -197,8 +197,8 @@ final class LocalMenuSeedData {
                                         0,
                                         true,
                                         List.of(
-                                                new ItemSpec("BIS-TRUFFLE-FRIES", "Truffle Fries", "Crispy fries with parmesan, parsley, and black garlic aioli.", money("6.90"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("BIS-BURRATA", "Burrata Plate", "Tomatoes, basil oil, toasted sourdough, and sea salt.", money("9.50"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("BIS-TRUFFLE-FRIES", "Truffle Fries", "Crispy fries with parmesan, parsley, and black garlic aioli.", money("6.90"), null, true, 0, List.of(), List.of(), List.of("Potato", "Truffle Oil", "Parmesan", "Parsley", "Black Garlic Aioli")),
+                                                new ItemSpec("BIS-BURRATA", "Burrata Plate", "Tomatoes, basil oil, toasted sourdough, and sea salt.", money("9.50"), null, true, 1, List.of(), List.of(), List.of("Burrata", "Heirloom Tomato", "Basil Oil", "Sourdough", "Sea Salt"))
                                         )
                                 ),
                                 new SectionSpec(
@@ -222,7 +222,8 @@ final class LocalMenuSeedData {
                                                         List.of(
                                                                 new ItemOptionLinkSpec("Burger Bun", 0, 1, 1, true),
                                                                 new ItemOptionLinkSpec("Burger Add-ons", 1, 0, 4, false)
-                                                        )
+                                                        ),
+                                                        List.of("Beef Patty", "Aged Cheddar", "Brioche Bun", "Pickles", "House Sauce", "Lettuce")
                                                 ),
                                                 new ItemSpec(
                                                         "BIS-RIBEYE",
@@ -238,7 +239,8 @@ final class LocalMenuSeedData {
                                                         ),
                                                         List.of(
                                                                 new ItemOptionLinkSpec("Steak Temperature", 0, 1, 1, true)
-                                                        )
+                                                        ),
+                                                        List.of("Ribeye Steak", "Herb Butter", "Roasted Potatoes", "Beef Jus", "Rosemary")
                                                 )
                                         )
                                 ),
@@ -248,8 +250,8 @@ final class LocalMenuSeedData {
                                         2,
                                         true,
                                         List.of(
-                                                new ItemSpec("BIS-TIRAMISU", "Tiramisu", "Mascarpone cream, coffee sponge, and cocoa.", money("6.40"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("BIS-CHOC-MOUSSE", "Chocolate Mousse", "Dark chocolate mousse with sea salt and berries.", money("5.90"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("BIS-TIRAMISU", "Tiramisu", "Mascarpone cream, coffee sponge, and cocoa.", money("6.40"), null, true, 0, List.of(), List.of(), List.of("Mascarpone", "Ladyfingers", "Espresso", "Cocoa Powder", "Egg Yolk")),
+                                                new ItemSpec("BIS-CHOC-MOUSSE", "Chocolate Mousse", "Dark chocolate mousse with sea salt and berries.", money("5.90"), null, true, 1, List.of(), List.of(), List.of("Dark Chocolate", "Heavy Cream", "Egg White", "Sea Salt", "Mixed Berries"))
                                         )
                                 )
                         )
@@ -271,8 +273,8 @@ final class LocalMenuSeedData {
                                         0,
                                         true,
                                         List.of(
-                                                new ItemSpec("BIS-SPRITZ", "Garden Spritz", "Elderflower, citrus, sparkling wine, and mint.", money("8.50"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("BIS-NEGRONI", "Smoked Negroni", "Gin, vermouth, bitter aperitif, and orange zest.", money("9.50"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("BIS-SPRITZ", "Garden Spritz", "Elderflower, citrus, sparkling wine, and mint.", money("8.50"), null, true, 0, List.of(), List.of(), List.of("Elderflower Liqueur", "Sparkling Wine", "Citrus", "Mint", "Soda Water")),
+                                                new ItemSpec("BIS-NEGRONI", "Smoked Negroni", "Gin, vermouth, bitter aperitif, and orange zest.", money("9.50"), null, true, 1, List.of(), List.of(), List.of("Gin", "Sweet Vermouth", "Bitter Aperitif", "Orange Zest"))
                                         )
                                 ),
                                 new SectionSpec(
@@ -281,8 +283,8 @@ final class LocalMenuSeedData {
                                         1,
                                         true,
                                         List.of(
-                                                new ItemSpec("BIS-HIBISCUS-FIZZ", "Hibiscus Fizz", "Hibiscus cordial, lemon, and sparkling water.", money("5.50"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("BIS-CUCUMBER-TONIC", "Cucumber Tonic", "Cucumber, lime, rosemary, and tonic.", money("5.20"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("BIS-HIBISCUS-FIZZ", "Hibiscus Fizz", "Hibiscus cordial, lemon, and sparkling water.", money("5.50"), null, true, 0, List.of(), List.of(), List.of("Hibiscus Cordial", "Lemon", "Sparkling Water", "Mint")),
+                                                new ItemSpec("BIS-CUCUMBER-TONIC", "Cucumber Tonic", "Cucumber, lime, rosemary, and tonic.", money("5.20"), null, true, 1, List.of(), List.of(), List.of("Cucumber", "Lime", "Rosemary", "Tonic Water"))
                                         )
                                 )
                         )
@@ -304,8 +306,8 @@ final class LocalMenuSeedData {
                                         0,
                                         true,
                                         List.of(
-                                                new ItemSpec("BIS-CAESAR", "Chicken Caesar Salad", "Grilled chicken, romaine, parmesan, and garlic croutons.", money("11.50"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("BIS-TOMATO-SOUP", "Roasted Tomato Soup", "Basil oil and a grilled cheese crouton.", money("7.20"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("BIS-CAESAR", "Chicken Caesar Salad", "Grilled chicken, romaine, parmesan, and garlic croutons.", money("11.50"), null, true, 0, List.of(), List.of(), List.of("Grilled Chicken", "Romaine Lettuce", "Parmesan", "Garlic Croutons", "Caesar Dressing")),
+                                                new ItemSpec("BIS-TOMATO-SOUP", "Roasted Tomato Soup", "Basil oil and a grilled cheese crouton.", money("7.20"), null, true, 1, List.of(), List.of(), List.of("Roasted Tomato", "Basil Oil", "Cream", "Grilled Cheese Crouton", "Garlic"))
                                         )
                                 ),
                                 new SectionSpec(
@@ -314,8 +316,8 @@ final class LocalMenuSeedData {
                                         1,
                                         true,
                                         List.of(
-                                                new ItemSpec("BIS-CLUB", "Turkey Club", "Roast turkey, bacon, lettuce, tomato, and herb mayo on sourdough.", money("10.90"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("BIS-CHICKEN-WRAP", "Grilled Chicken Wrap", "Grilled chicken, greens, avocado, and chipotle sauce.", money("9.80"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("BIS-CLUB", "Turkey Club", "Roast turkey, bacon, lettuce, tomato, and herb mayo on sourdough.", money("10.90"), null, true, 0, List.of(), List.of(), List.of("Roast Turkey", "Bacon", "Lettuce", "Tomato", "Herb Mayo", "Sourdough")),
+                                                new ItemSpec("BIS-CHICKEN-WRAP", "Grilled Chicken Wrap", "Grilled chicken, greens, avocado, and chipotle sauce.", money("9.80"), null, true, 1, List.of(), List.of(), List.of("Grilled Chicken", "Mixed Greens", "Avocado", "Chipotle Sauce", "Flour Tortilla"))
                                         )
                                 )
                         )
@@ -337,8 +339,8 @@ final class LocalMenuSeedData {
                                         0,
                                         true,
                                         List.of(
-                                                new ItemSpec("BIS-CRAB-CAKE", "Crab Cake", "Pan-seared crab cake with lemon aioli.", money("12.50"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("BIS-BEET-SALAD", "Roasted Beet Salad", "Goat cheese, candied walnuts, and citrus vinaigrette.", money("8.90"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("BIS-CRAB-CAKE", "Crab Cake", "Pan-seared crab cake with lemon aioli.", money("12.50"), null, true, 0, List.of(), List.of(), List.of("Lump Crab Meat", "Breadcrumbs", "Egg", "Lemon Aioli", "Chives")),
+                                                new ItemSpec("BIS-BEET-SALAD", "Roasted Beet Salad", "Goat cheese, candied walnuts, and citrus vinaigrette.", money("8.90"), null, true, 1, List.of(), List.of(), List.of("Roasted Beet", "Goat Cheese", "Candied Walnuts", "Arugula", "Citrus Vinaigrette"))
                                         )
                                 ),
                                 new SectionSpec(
@@ -347,8 +349,8 @@ final class LocalMenuSeedData {
                                         1,
                                         true,
                                         List.of(
-                                                new ItemSpec("BIS-SEA-BASS", "Pan-Seared Sea Bass", "Served with saffron risotto and seasonal vegetables.", money("22.50"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("BIS-SHORT-RIB", "Braised Short Rib", "Slow braised short rib with mashed potatoes and red wine jus.", money("25.00"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("BIS-SEA-BASS", "Pan-Seared Sea Bass", "Served with saffron risotto and seasonal vegetables.", money("22.50"), null, true, 0, List.of(), List.of(), List.of("Sea Bass", "Saffron Risotto", "Seasonal Vegetables", "White Wine Butter Sauce")),
+                                                new ItemSpec("BIS-SHORT-RIB", "Braised Short Rib", "Slow braised short rib with mashed potatoes and red wine jus.", money("25.00"), null, true, 1, List.of(), List.of(), List.of("Beef Short Rib", "Mashed Potatoes", "Red Wine Jus", "Carrot", "Thyme"))
                                         )
                                 )
                         )
@@ -378,11 +380,11 @@ final class LocalMenuSeedData {
                                                 new ItemSpec("PIZ-MARGHERITA", "Margherita", "San Marzano tomato, fior di latte, basil, and olive oil.", money("10.90"), null, true, 0, List.of(), List.of(
                                                         new ItemOptionLinkSpec("Pizza Size", 0, 1, 1, true),
                                                         new ItemOptionLinkSpec("Pizza Toppings", 1, 0, 6, false)
-                                                )),
+                                                ), List.of("Pizza Dough", "San Marzano Tomato", "Fior di Latte Mozzarella", "Basil", "Olive Oil")),
                                                 new ItemSpec("PIZ-HOT-HONEY", "Hot Honey Pepperoni", "Pepperoni, mozzarella, hot honey, and chili flakes.", money("13.40"), null, true, 1, List.of(), List.of(
                                                         new ItemOptionLinkSpec("Pizza Size", 0, 1, 1, true),
                                                         new ItemOptionLinkSpec("Pizza Toppings", 1, 0, 6, false)
-                                                ))
+                                                ), List.of("Pizza Dough", "Pepperoni", "Mozzarella", "Hot Honey", "Chili Flakes"))
                                         )
                                 ),
                                 new SectionSpec(
@@ -393,13 +395,13 @@ final class LocalMenuSeedData {
                                         List.of(
                                                 new ItemSpec("PIZ-GARLIC-KNOTS", "Garlic Knots", "Warm knots brushed with garlic butter and pecorino.", money("5.20"), null, true, 0, List.of(), List.of(
                                                         new ItemOptionLinkSpec("Dip Sauce", 0, 0, 1, false)
-                                                )),
+                                                ), List.of("Pizza Dough", "Garlic Butter", "Pecorino", "Parsley")),
                                                 new ItemSpec("PIZ-CHICKEN-BITES", "Crispy Chicken Bites", "Buttermilk chicken bites with parmesan and herbs.", money("7.60"), null, true, 1, List.of(
                                                         new VariantSpec("Regular", "PIZ-CHICKEN-BITES-R", money("0.00"), true, true, 0),
                                                         new VariantSpec("Large", "PIZ-CHICKEN-BITES-L", money("3.00"), false, true, 1)
                                                 ), List.of(
                                                         new ItemOptionLinkSpec("Dip Sauce", 0, 0, 1, false)
-                                                ))
+                                                ), List.of("Chicken Breast", "Buttermilk", "Breadcrumbs", "Parmesan", "Herbs"))
                                         )
                                 ),
                                 new SectionSpec(
@@ -408,8 +410,8 @@ final class LocalMenuSeedData {
                                         2,
                                         true,
                                         List.of(
-                                                new ItemSpec("PIZ-TIRAMISU-CUP", "Tiramisu Cup", "Single-serve tiramisu in a chilled cup.", money("4.90"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("PIZ-NUTELLA-CALZONE", "Nutella Calzone", "Mini dessert calzone with hazelnut spread.", money("6.80"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("PIZ-TIRAMISU-CUP", "Tiramisu Cup", "Single-serve tiramisu in a chilled cup.", money("4.90"), null, true, 0, List.of(), List.of(), List.of("Mascarpone", "Ladyfingers", "Espresso", "Cocoa Powder")),
+                                                new ItemSpec("PIZ-NUTELLA-CALZONE", "Nutella Calzone", "Mini dessert calzone with hazelnut spread.", money("6.80"), null, true, 1, List.of(), List.of(), List.of("Pizza Dough", "Hazelnut Spread", "Powdered Sugar"))
                                         )
                                 )
                         )
@@ -442,10 +444,10 @@ final class LocalMenuSeedData {
                                                 ), List.of(
                                                         new ItemOptionLinkSpec("Milk Choice", 0, 1, 1, true),
                                                         new ItemOptionLinkSpec("Syrup Shot", 1, 0, 3, false)
-                                                )),
+                                                ), List.of("Espresso", "Vanilla Syrup", "Steamed Milk")),
                                                 new ItemSpec("CAF-MATCHA", "Strawberry Matcha", "Ceremonial matcha, strawberry puree, and milk.", money("5.50"), null, true, 1, List.of(), List.of(
                                                         new ItemOptionLinkSpec("Milk Choice", 0, 1, 1, true)
-                                                ))
+                                                ), List.of("Ceremonial Matcha", "Strawberry Puree", "Milk"))
                                         )
                                 ),
                                 new SectionSpec(
@@ -456,8 +458,8 @@ final class LocalMenuSeedData {
                                         List.of(
                                                 new ItemSpec("CAF-AVO-TOAST", "Avocado Toast", "Sourdough, whipped feta, avocado, and chili oil.", money("9.80"), null, true, 0, List.of(), List.of(
                                                         new ItemOptionLinkSpec("Toast Side", 0, 0, 1, false)
-                                                )),
-                                                new ItemSpec("CAF-GRANOLA", "Berry Granola Bowl", "Greek yogurt, mixed berries, local honey, and toasted granola.", money("7.90"), null, true, 1, List.of(), List.of())
+                                                ), List.of("Sourdough", "Whipped Feta", "Avocado", "Chili Oil", "Lemon")),
+                                                new ItemSpec("CAF-GRANOLA", "Berry Granola Bowl", "Greek yogurt, mixed berries, local honey, and toasted granola.", money("7.90"), null, true, 1, List.of(), List.of(), List.of("Greek Yogurt", "Mixed Berries", "Local Honey", "Toasted Granola"))
                                         )
                                 ),
                                 new SectionSpec(
@@ -466,8 +468,8 @@ final class LocalMenuSeedData {
                                         2,
                                         true,
                                         List.of(
-                                                new ItemSpec("CAF-CROISSANT", "Butter Croissant", "Classic laminated croissant.", money("2.90"), null, true, 0, List.of(), List.of()),
-                                                new ItemSpec("CAF-BANANA-BREAD", "Banana Bread", "Toasted banana bread with whipped butter.", money("3.60"), null, true, 1, List.of(), List.of())
+                                                new ItemSpec("CAF-CROISSANT", "Butter Croissant", "Classic laminated croissant.", money("2.90"), null, true, 0, List.of(), List.of(), List.of("Flour", "Butter", "Yeast", "Milk")),
+                                                new ItemSpec("CAF-BANANA-BREAD", "Banana Bread", "Toasted banana bread with whipped butter.", money("3.60"), null, true, 1, List.of(), List.of(), List.of("Banana", "Flour", "Egg", "Whipped Butter", "Brown Sugar"))
                                         )
                                 )
                         )
@@ -522,7 +524,8 @@ final class LocalMenuSeedData {
             boolean available,
             int displayOrder,
             List<VariantSpec> variants,
-            List<ItemOptionLinkSpec> optionGroups
+            List<ItemOptionLinkSpec> optionGroups,
+            List<String> ingredients
     ) {
     }
 

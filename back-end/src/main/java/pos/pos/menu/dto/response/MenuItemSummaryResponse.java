@@ -27,6 +27,7 @@ public class MenuItemSummaryResponse {
     private String imageUrl;
     private Boolean available;
     private Integer displayOrder;
+    private List<String> ingredients;
     private List<MenuVariantSummaryResponse> variants;
     private List<MenuItemOptionGroupSummaryResponse> optionGroups;
 }
