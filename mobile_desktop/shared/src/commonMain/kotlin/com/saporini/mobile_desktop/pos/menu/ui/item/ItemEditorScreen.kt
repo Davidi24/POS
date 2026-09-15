@@ -32,6 +32,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Search
@@ -70,6 +72,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogActionStatus
+import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogStatusBody
 import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuFormDialog
 import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuFormFieldPair
 import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuNestedDialog
@@ -98,7 +102,8 @@ data class DraftIngredient(
 
 data class DraftVariant(
     val name: String,
-    val priceDeltaLabel: String
+    val priceDeltaLabel: String,
+    val id: String? = null
 )
 
 data class DraftOptionChoice(
@@ -168,9 +173,13 @@ private val IngredientCategories = listOf(
 )
 
 @Composable
-fun ItemEditorDialog(
+internal fun ItemEditorDialog(
     existingItem: EditableMenuItem? = null,
+    status: DialogActionStatus = DialogActionStatus.Idle,
+    onRetry: () -> Unit = {},
+    onSuccessSettled: () -> Unit = {},
     onDismiss: () -> Unit,
+    onDeleteItem: (() -> Unit)? = null,
     onSave: (
         name: String,
         priceLabel: String,
@@ -236,10 +245,14 @@ fun ItemEditorDialog(
         },
         saveLabel = if (isEditing) "Save Changes" else "Add Item",
         canSave = canSave,
+        onDelete = onDeleteItem,
         desktopWidth = 0.6f,
         desktopHeight = 0.9f,
         desktopMaxWidth = 620.dp,
-        scrollState = formScrollState
+        scrollState = formScrollState,
+        status = status,
+        onRetry = onRetry,
+        onSuccessSettled = onSuccessSettled
     ) { isPhone ->
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -650,20 +663,26 @@ fun ItemEditorDialog(
 }
 
 @Composable
-fun VariantEditorDialog(
+internal fun VariantEditorDialog(
     itemName: String,
     variants: List<DraftVariant>,
     onDismiss: () -> Unit,
-    onSave: (List<DraftVariant>) -> Unit
+    onDoneEditing: (List<DraftVariant>) -> Unit,
+    onCreateVariant: suspend (name: String, priceDelta: Double, displayOrder: Int) -> Result<String>,
+    onUpdateVariant: suspend (variantId: String, name: String, priceDelta: Double, displayOrder: Int) -> Result<Unit>,
+    onDeleteVariant: suspend (variantId: String) -> Result<Unit>
 ) {
     var currentVariants by remember { mutableStateOf(variants) }
     var addVariantOpen by remember { mutableStateOf(false) }
+    var variantBeingEdited by remember { mutableStateOf<DraftVariant?>(null) }
+    var variantToDelete by remember { mutableStateOf<DraftVariant?>(null) }
 
     MenuFormDialog(
         title = "Variants",
         subtitle = itemName,
-        onDismiss = onDismiss,
-        onSave = { onSave(currentVariants) },
+        onDismiss = { onDoneEditing(currentVariants) },
+        onSave = { onDoneEditing(currentVariants) },
+        saveLabel = "Done",
         desktopWidth = 0.46f,
         desktopHeight = 0.72f,
         desktopMaxWidth = 480.dp
@@ -687,34 +706,54 @@ fun VariantEditorDialog(
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = variant.name,
-                            modifier = Modifier.weight(1f),
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                            color = ItemEditorInk
-                        )
-                        if (variant.priceDeltaLabel.isNotBlank()) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = variant.priceDeltaLabel,
+                                text = variant.name,
                                 fontFamily = Inter(),
-                                fontSize = 12.sp,
-                                color = ItemEditorMuted
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp,
+                                color = ItemEditorInk
                             )
+                            if (variant.priceDeltaLabel.isNotBlank()) {
+                                Text(
+                                    text = variant.priceDeltaLabel,
+                                    fontFamily = Inter(),
+                                    fontSize = 12.sp,
+                                    color = ItemEditorMuted
+                                )
+                            }
                         }
                         Spacer(Modifier.width(10.dp))
-                        IconButton(
-                            onClick = {
-                                currentVariants = currentVariants.filterNot { it.name == variant.name }
-                            },
-                            modifier = Modifier.size(28.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White)
+                                .border(1.dp, ItemEditorBorder, RoundedCornerShape(8.dp))
+                                .clickable { variantBeingEdited = variant },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.Close,
-                                contentDescription = "Remove variant",
+                                imageVector = Icons.Outlined.Edit,
+                                contentDescription = "Edit ${variant.name}",
                                 modifier = Modifier.size(15.dp),
-                                tint = ItemEditorMuted
+                                tint = ItemEditorInk
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFB13A2F))
+                                .clickable { variantToDelete = variant },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.DeleteOutline,
+                                contentDescription = "Delete ${variant.name}",
+                                modifier = Modifier.size(16.dp),
+                                tint = Color.White
                             )
                         }
                     }
@@ -725,8 +764,7 @@ fun VariantEditorDialog(
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(9.dp))
-                .background(ItemEditorSurface)
-                .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+                .background(ItemEditorOlive)
                 .clickable { addVariantOpen = true }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -736,38 +774,115 @@ fun VariantEditorDialog(
                 imageVector = Icons.Outlined.Add,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = ItemEditorOlive
+                tint = Color.White
             )
             Text(
                 text = "Add Variant",
                 fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
-                color = ItemEditorOlive
+                color = Color.White
             )
         }
     }
 
     if (addVariantOpen) {
-        var variantName by remember { mutableStateOf("") }
-        var variantPriceDelta by remember { mutableStateOf("") }
-        val variantPriceValid = isValidPriceDelta(variantPriceDelta)
+        AddVariantDialog(
+            existingVariants = currentVariants,
+            displayOrder = currentVariants.size,
+            onDismiss = { addVariantOpen = false },
+            onCreateVariant = onCreateVariant,
+            onAdded = { added ->
+                currentVariants = currentVariants + added
+                addVariantOpen = false
+            }
+        )
+    }
 
-        MenuNestedDialog(
-            onDismissRequest = { addVariantOpen = false },
-            containerColor = Color.White,
-            titleContentColor = ItemEditorInk,
-            textContentColor = ItemEditorMuted,
-            title = {
-                Text(
-                    text = "Add Variant",
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    color = ItemEditorInk
+    variantBeingEdited?.let { variant ->
+        EditVariantDialog(
+            variant = variant,
+            existingVariants = currentVariants,
+            displayOrder = currentVariants.indexOfFirst { it === variant }.coerceAtLeast(0),
+            onDismiss = { variantBeingEdited = null },
+            onUpdateVariant = onUpdateVariant,
+            onUpdated = { updated ->
+                currentVariants = currentVariants.map { if (it === variant) updated else it }
+                variantBeingEdited = null
+            }
+        )
+    }
+
+    variantToDelete?.let { variant ->
+        DeleteVariantDialog(
+            variant = variant,
+            onDismiss = { variantToDelete = null },
+            onDeleteVariant = onDeleteVariant,
+            onDeleted = {
+                currentVariants = currentVariants.filterNot { it === variant }
+                variantToDelete = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun AddVariantDialog(
+    existingVariants: List<DraftVariant>,
+    displayOrder: Int,
+    onDismiss: () -> Unit,
+    onCreateVariant: suspend (name: String, priceDelta: Double, displayOrder: Int) -> Result<String>,
+    onAdded: (DraftVariant) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var variantName by remember { mutableStateOf("") }
+    var variantPriceDelta by remember { mutableStateOf("") }
+    var attemptedSubmit by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
+    val trimmedName = variantName.trim()
+    val priceValid = isValidPriceDelta(variantPriceDelta)
+    val isDuplicate = trimmedName.isNotEmpty() &&
+        existingVariants.any { it.name.equals(trimmedName, ignoreCase = true) }
+    val valid = trimmedName.isNotEmpty() && priceValid && !isDuplicate
+    val showValidationError = attemptedSubmit && !valid
+    val isBusy = status is DialogActionStatus.Loading
+    val isIdle = status is DialogActionStatus.Idle
+
+    fun submit() {
+        if (!valid) {
+            attemptedSubmit = true
+        } else if (!isBusy) {
+            status = DialogActionStatus.Loading("Adding")
+            scope.launch {
+                onCreateVariant(trimmedName, parsePriceDelta(variantPriceDelta), displayOrder).fold(
+                    onSuccess = { newId ->
+                        status = DialogActionStatus.Success("$trimmedName added")
+                        onAdded(DraftVariant(trimmedName, formatPriceDelta(variantPriceDelta), newId))
+                    },
+                    onFailure = { error ->
+                        status = DialogActionStatus.Failed(message = error.message ?: "Could not create this variant.")
+                    }
                 )
-            },
-            text = {
+            }
+        }
+    }
+
+    MenuNestedDialog(
+        onDismissRequest = { if (!isBusy) onDismiss() },
+        containerColor = Color.White,
+        titleContentColor = ItemEditorInk,
+        textContentColor = ItemEditorMuted,
+        title = {
+            Text(
+                text = "Add Variant",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = ItemEditorInk
+            )
+        },
+        text = {
+            if (isIdle) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "A variant is a different size or configuration of this item, like a portion size.",
@@ -783,6 +898,7 @@ fun VariantEditorDialog(
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("e.g. Large") },
                             singleLine = true,
+                            isError = showValidationError && (trimmedName.isEmpty() || isDuplicate),
                             shape = RoundedCornerShape(8.dp),
                             colors = itemEditorOutlinedTextFieldColors()
                         )
@@ -795,42 +911,54 @@ fun VariantEditorDialog(
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("e.g. +2.00") },
                             singleLine = true,
-                            isError = variantPriceDelta.isNotBlank() && !variantPriceValid,
+                            isError = variantPriceDelta.isNotBlank() && !priceValid,
                             shape = RoundedCornerShape(8.dp),
                             colors = itemEditorOutlinedTextFieldColors()
                         )
                     }
-                    if (variantPriceDelta.isNotBlank() && !variantPriceValid) {
+                    if (showValidationError) {
                         Text(
-                            text = "Enter a valid amount, for example +2.00 or -1.50.",
+                            text = when {
+                                trimmedName.isEmpty() -> "Variant name is required."
+                                isDuplicate -> "A variant with this name already exists."
+                                !priceValid -> "Enter a valid amount, for example +2.00 or -1.50."
+                                else -> ""
+                            },
                             fontFamily = Inter(),
                             fontSize = 12.sp,
                             color = Color(0xFFB13A2F)
                         )
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        currentVariants = currentVariants + DraftVariant(
-                            name = variantName.trim(),
-                            priceDeltaLabel = formatPriceDelta(variantPriceDelta)
-                        )
-                        addVariantOpen = false
-                    },
-                    enabled = variantName.isNotBlank() && variantPriceValid
+            } else {
+                DialogStatusBody(
+                    status = status,
+                    onRetry = { status = DialogActionStatus.Idle },
+                    onCancel = onDismiss,
+                    onSuccessSettled = {},
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            if (isIdle) {
+                Button(
+                    onClick = { submit() },
+                    shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
                 ) {
                     Text(
                         text = "Add",
                         fontFamily = Inter(),
                         fontWeight = FontWeight.SemiBold,
-                        color = ItemEditorOlive
+                        color = Color.White
                     )
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { addVariantOpen = false }) {
+            }
+        },
+        dismissButton = {
+            if (isIdle) {
+                TextButton(onClick = onDismiss) {
                     Text(
                         text = "Cancel",
                         fontFamily = Inter(),
@@ -839,14 +967,240 @@ fun VariantEditorDialog(
                     )
                 }
             }
-        )
-    }
+        }
+    )
 }
 
 @Composable
-fun OptionsEditorDialog(
+private fun EditVariantDialog(
+    variant: DraftVariant,
+    existingVariants: List<DraftVariant>,
+    displayOrder: Int,
+    onDismiss: () -> Unit,
+    onUpdateVariant: suspend (variantId: String, name: String, priceDelta: Double, displayOrder: Int) -> Result<Unit>,
+    onUpdated: (DraftVariant) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var variantName by remember(variant) { mutableStateOf(variant.name) }
+    var variantPriceDelta by remember(variant) { mutableStateOf(variant.priceDeltaLabel) }
+    var attemptedSubmit by remember(variant) { mutableStateOf(false) }
+    var status by remember(variant) { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
+    val trimmedName = variantName.trim()
+    val priceValid = isValidPriceDelta(variantPriceDelta)
+    val isDuplicate = trimmedName.isNotEmpty() &&
+        existingVariants.any { it !== variant && it.name.equals(trimmedName, ignoreCase = true) }
+    val valid = trimmedName.isNotEmpty() && priceValid && !isDuplicate
+    val showValidationError = attemptedSubmit && !valid
+    val isBusy = status is DialogActionStatus.Loading
+    val isIdle = status is DialogActionStatus.Idle
+
+    fun submit() {
+        if (!valid) {
+            attemptedSubmit = true
+        } else if (!isBusy) {
+            status = DialogActionStatus.Loading("Saving")
+            scope.launch {
+                onUpdateVariant(variant.id!!, trimmedName, parsePriceDelta(variantPriceDelta), displayOrder).fold(
+                    onSuccess = { status = DialogActionStatus.Success("$trimmedName saved") },
+                    onFailure = { error ->
+                        status = DialogActionStatus.Failed(message = error.message ?: "Could not save this variant.")
+                    }
+                )
+            }
+        }
+    }
+
+    MenuNestedDialog(
+        onDismissRequest = { if (!isBusy) onDismiss() },
+        containerColor = Color.White,
+        titleContentColor = ItemEditorInk,
+        textContentColor = ItemEditorMuted,
+        title = {
+            Text(
+                text = "Edit Variant",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = ItemEditorInk
+            )
+        },
+        text = {
+            if (isIdle) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ItemEditorFieldLabel(text = "Variant Name", required = true)
+                        OutlinedTextField(
+                            value = variantName,
+                            onValueChange = { variantName = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = showValidationError && (trimmedName.isEmpty() || isDuplicate),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = itemEditorOutlinedTextFieldColors()
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ItemEditorFieldLabel(text = "Price Adjustment")
+                        OutlinedTextField(
+                            value = variantPriceDelta,
+                            onValueChange = { variantPriceDelta = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("e.g. +2.00") },
+                            singleLine = true,
+                            isError = variantPriceDelta.isNotBlank() && !priceValid,
+                            shape = RoundedCornerShape(8.dp),
+                            colors = itemEditorOutlinedTextFieldColors()
+                        )
+                    }
+                    if (showValidationError) {
+                        Text(
+                            text = when {
+                                trimmedName.isEmpty() -> "Variant name is required."
+                                isDuplicate -> "A variant with this name already exists."
+                                !priceValid -> "Enter a valid amount, for example +2.00 or -1.50."
+                                else -> ""
+                            },
+                            fontFamily = Inter(),
+                            fontSize = 12.sp,
+                            color = Color(0xFFB13A2F)
+                        )
+                    }
+                }
+            } else {
+                DialogStatusBody(
+                    status = status,
+                    onRetry = { status = DialogActionStatus.Idle },
+                    onCancel = onDismiss,
+                    onSuccessSettled = {
+                        onUpdated(DraftVariant(trimmedName, formatPriceDelta(variantPriceDelta), variant.id))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            if (isIdle) {
+                Button(
+                    onClick = { submit() },
+                    shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
+                ) {
+                    Text(
+                        text = "Save",
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            if (isIdle) {
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        text = "Cancel",
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = ItemEditorMuted
+                    )
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteVariantDialog(
+    variant: DraftVariant,
+    onDismiss: () -> Unit,
+    onDeleteVariant: suspend (variantId: String) -> Result<Unit>,
+    onDeleted: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var status by remember { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
+    val isBusy = status is DialogActionStatus.Loading
+    val isIdle = status is DialogActionStatus.Idle
+
+    MenuNestedDialog(
+        onDismissRequest = { if (!isBusy) onDismiss() },
+        containerColor = Color.White,
+        titleContentColor = ItemEditorInk,
+        textContentColor = ItemEditorMuted,
+        title = {
+            Text(
+                text = "Delete ${variant.name}?",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = ItemEditorInk
+            )
+        },
+        text = {
+            if (isIdle) {
+                Text(
+                    text = "Are you sure you want to delete this variant?",
+                    fontFamily = Inter(),
+                    fontSize = 13.sp,
+                    color = ItemEditorMuted
+                )
+            } else {
+                DialogStatusBody(
+                    status = status,
+                    onRetry = { status = DialogActionStatus.Idle },
+                    onCancel = onDismiss,
+                    onSuccessSettled = onDeleted,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            if (isIdle) {
+                Button(
+                    onClick = {
+                        status = DialogActionStatus.Loading("Deleting")
+                        scope.launch {
+                            onDeleteVariant(variant.id!!).fold(
+                                onSuccess = { status = DialogActionStatus.Success("${variant.name} deleted") },
+                                onFailure = { error ->
+                                    status = DialogActionStatus.Failed(message = error.message ?: "Could not delete this variant.")
+                                }
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
+                ) {
+                    Text(
+                        text = "Delete",
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            if (isIdle) {
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        text = "Cancel",
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = ItemEditorMuted
+                    )
+                }
+            }
+        }
+    )
+}
+
+@Composable
+internal fun OptionsEditorDialog(
     itemName: String,
     optionGroups: List<DraftOptionGroup>,
+    status: DialogActionStatus = DialogActionStatus.Idle,
+    onRetry: () -> Unit = {},
+    onSuccessSettled: () -> Unit = {},
     onDismiss: () -> Unit,
     onSave: (List<DraftOptionGroup>) -> Unit
 ) {
@@ -861,7 +1215,10 @@ fun OptionsEditorDialog(
         onSave = { onSave(currentOptionGroups) },
         desktopWidth = 0.46f,
         desktopHeight = 0.72f,
-        desktopMaxWidth = 480.dp
+        desktopMaxWidth = 480.dp,
+        status = status,
+        onRetry = onRetry,
+        onSuccessSettled = onSuccessSettled
     ) { _ ->
         if (currentOptionGroups.isEmpty()) {
             Text(
@@ -902,17 +1259,21 @@ fun OptionsEditorDialog(
                                 color = if (group.required) ItemEditorOlive else ItemEditorMuted
                             )
                             Spacer(Modifier.width(10.dp))
-                            IconButton(
-                                onClick = {
-                                    currentOptionGroups = currentOptionGroups.filterNot { it.name == group.name }
-                                },
-                                modifier = Modifier.size(28.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFB13A2F))
+                                    .clickable {
+                                        currentOptionGroups = currentOptionGroups.filterNot { it.name == group.name }
+                                    },
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Close,
+                                    imageVector = Icons.Outlined.DeleteOutline,
                                     contentDescription = "Remove option group",
-                                    modifier = Modifier.size(15.dp),
-                                    tint = ItemEditorMuted
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.White
                                 )
                             }
                         }
@@ -936,8 +1297,7 @@ fun OptionsEditorDialog(
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(9.dp))
-                .background(ItemEditorSurface)
-                .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+                .background(ItemEditorOlive)
                 .clickable { addOptionGroupOpen = true }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -947,14 +1307,14 @@ fun OptionsEditorDialog(
                 imageVector = Icons.Outlined.Add,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = ItemEditorOlive
+                tint = Color.White
             )
             Text(
                 text = "Add Options",
                 fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
-                color = ItemEditorOlive
+                color = Color.White
             )
         }
     }
@@ -1132,15 +1492,17 @@ fun OptionsEditorDialog(
 
                     Row(
                         modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(ItemEditorOlive)
                             .clickable { choiceDrafts = choiceDrafts + OptionChoiceInput("", "") }
-                            .padding(vertical = 4.dp),
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Add,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
-                            tint = ItemEditorOlive
+                            tint = Color.White
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
@@ -1148,13 +1510,13 @@ fun OptionsEditorDialog(
                             fontFamily = Inter(),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp,
-                            color = ItemEditorOlive
+                            color = Color.White
                         )
                     }
                 }
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         currentOptionGroups = currentOptionGroups + DraftOptionGroup(
                             name = groupName.trim(),
@@ -1168,13 +1530,15 @@ fun OptionsEditorDialog(
                         )
                         addOptionGroupOpen = false
                     },
-                    enabled = canAddGroup
+                    enabled = canAddGroup,
+                    shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
                 ) {
                     Text(
                         text = "Add",
                         fontFamily = Inter(),
                         fontWeight = FontWeight.SemiBold,
-                        color = ItemEditorOlive
+                        color = Color.White
                     )
                 }
             },
@@ -1451,6 +1815,15 @@ private fun extractPriceValue(priceLabel: String): String {
 private fun isValidPriceDelta(value: String): Boolean {
     if (value.isBlank()) return true
     return Regex("^[+-]?\\d+(\\.\\d{1,2})?$").matches(value.trim())
+}
+
+private fun parsePriceDelta(raw: String): Double {
+    val trimmed = raw.trim()
+    if (trimmed.isBlank()) return 0.0
+    val negative = trimmed.startsWith("-")
+    val numberPart = trimmed.removePrefix("+").removePrefix("-")
+    val value = numberPart.toDoubleOrNull() ?: return 0.0
+    return if (negative) -value else value
 }
 
 private fun formatPriceDelta(raw: String): String {

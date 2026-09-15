@@ -113,13 +113,12 @@ fun MenuCoverUi(
     onEditMenu: (Menu) -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
-    hiddenMenuIds: Set<String> = emptySet(),
     deletingMenuId: String? = null,
     profileInitials: String = "?"
 ) {
     var isReordering by remember { mutableStateOf(false) }
-    var orderedMenus by remember(state.menus, hiddenMenuIds) {
-        mutableStateOf(state.menus.filter { it.id !in hiddenMenuIds })
+    var orderedMenus by remember(state.menus) {
+        mutableStateOf(state.menus)
     }
 
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
