@@ -75,6 +75,7 @@ fun MenuItemDto.toDomain(): MenuItem {
         imageUrl = imageUrl,
         available = available,
         displayOrder = displayOrder,
+        ingredients = ingredients,
         variants = variants.map { it.toDomain() },
         optionGroups = optionGroups.map { it.toDomain() }
     )

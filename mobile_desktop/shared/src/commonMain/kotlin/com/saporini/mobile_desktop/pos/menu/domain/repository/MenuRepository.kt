@@ -51,7 +51,8 @@ data class MenuItemInput(
     val basePrice: Double,
     val imageUrl: String? = null,
     val available: Boolean = true,
-    val displayOrder: Int = 0
+    val displayOrder: Int = 0,
+    val ingredients: List<String> = emptyList()
 )
 
 data class MenuVariantInput(
@@ -66,13 +67,6 @@ data class MenuVariantInput(
 data class CreateMenuItemOptionGroupInput(
     val optionGroupId: String,
     val displayOrder: Int = 0,
-    val minSelectOverride: Int? = null,
-    val maxSelectOverride: Int? = null,
-    val requiredOverride: Boolean? = null
-)
-
-data class UpdateMenuItemOptionGroupInput(
-    val displayOrder: Int,
     val minSelectOverride: Int? = null,
     val maxSelectOverride: Int? = null,
     val requiredOverride: Boolean? = null
@@ -94,17 +88,6 @@ data class CreateOptionGroupInput(
     val required: Boolean = false,
     val active: Boolean = true,
     val displayOrder: Int = 0
-)
-
-data class UpdateOptionGroupInput(
-    val typeId: String,
-    val name: String,
-    val description: String? = null,
-    val minSelect: Int = 0,
-    val maxSelect: Int = 0,
-    val required: Boolean,
-    val active: Boolean,
-    val displayOrder: Int
 )
 
 data class OptionItemInput(
@@ -146,28 +129,11 @@ interface MenuRepository {
         input: UpdateMenuInput
     ): Menu
 
-    suspend fun updateMenuStatus(
-        menuId: String,
-        active: Boolean
-    ): Menu
-
     suspend fun deleteMenu(
         menuId: String
     )
 
     // Menu sections
-
-    suspend fun getSections(
-        menuId: String,
-        active: Boolean? = null,
-        includeItems: Boolean = false
-    ): List<MenuSection>
-
-    suspend fun getSection(
-        menuId: String,
-        sectionId: String,
-        includeItems: Boolean = false
-    ): MenuSection
 
     suspend fun createSection(
         menuId: String,
@@ -180,34 +146,12 @@ interface MenuRepository {
         input: MenuSectionInput
     ): MenuSection
 
-    suspend fun updateSectionStatus(
-        menuId: String,
-        sectionId: String,
-        active: Boolean
-    ): MenuSection
-
     suspend fun deleteSection(
         menuId: String,
         sectionId: String
     )
 
     // Menu items
-
-    suspend fun getItems(
-        menuId: String,
-        sectionId: String,
-        available: Boolean? = null,
-        includeVariants: Boolean = false,
-        includeOptionGroups: Boolean = false
-    ): List<MenuItem>
-
-    suspend fun getItem(
-        menuId: String,
-        sectionId: String,
-        itemId: String,
-        includeVariants: Boolean = false,
-        includeOptionGroups: Boolean = false
-    ): MenuItem
 
     suspend fun createItem(
         menuId: String,
@@ -237,12 +181,6 @@ interface MenuRepository {
 
     // Menu variants
 
-    suspend fun getVariants(
-        menuId: String,
-        sectionId: String,
-        itemId: String
-    ): List<MenuVariant>
-
     suspend fun createVariant(
         menuId: String,
         sectionId: String,
@@ -267,25 +205,11 @@ interface MenuRepository {
 
     // Menu item option-group links
 
-    suspend fun getItemOptionGroups(
-        menuId: String,
-        sectionId: String,
-        itemId: String
-    ): List<MenuItemOptionGroup>
-
     suspend fun createItemOptionGroup(
         menuId: String,
         sectionId: String,
         itemId: String,
         input: CreateMenuItemOptionGroupInput
-    ): MenuItemOptionGroup
-
-    suspend fun updateItemOptionGroup(
-        menuId: String,
-        sectionId: String,
-        itemId: String,
-        linkId: String,
-        input: UpdateMenuItemOptionGroupInput
     ): MenuItemOptionGroup
 
     suspend fun deleteItemOptionGroup(
@@ -305,74 +229,16 @@ interface MenuRepository {
         input: OptionGroupTypeInput
     ): OptionGroupType
 
-    suspend fun updateOptionGroupType(
-        typeId: String,
-        input: OptionGroupTypeInput
-    ): OptionGroupType
-
-    suspend fun deleteOptionGroupType(
-        typeId: String
-    )
-
     // Option groups
-
-    suspend fun getOptionGroups(
-        restaurantId: String,
-        typeId: String? = null,
-        active: Boolean? = null,
-        search: String? = null,
-        includeItems: Boolean = false
-    ): List<OptionGroup>
-
-    suspend fun getOptionGroup(
-        groupId: String,
-        includeItems: Boolean = false
-    ): OptionGroup
 
     suspend fun createOptionGroup(
         input: CreateOptionGroupInput
     ): OptionGroup
 
-    suspend fun updateOptionGroup(
-        groupId: String,
-        input: UpdateOptionGroupInput
-    ): OptionGroup
-
-    suspend fun updateOptionGroupStatus(
-        groupId: String,
-        active: Boolean
-    ): OptionGroup
-
-    suspend fun deleteOptionGroup(
-        groupId: String
-    )
-
     // Option items
-
-    suspend fun getOptionItems(
-        groupId: String,
-        available: Boolean? = null
-    ): List<OptionItem>
 
     suspend fun createOptionItem(
         groupId: String,
         input: OptionItemInput
     ): OptionItem
-
-    suspend fun updateOptionItem(
-        groupId: String,
-        itemId: String,
-        input: OptionItemInput
-    ): OptionItem
-
-    suspend fun updateOptionItemAvailability(
-        groupId: String,
-        itemId: String,
-        available: Boolean
-    ): OptionItem
-
-    suspend fun deleteOptionItem(
-        groupId: String,
-        itemId: String
-    )
 }

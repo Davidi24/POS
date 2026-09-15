@@ -90,16 +90,6 @@ class MenuApi(
         }.body()
     }
 
-    suspend fun updateMenuStatus(
-        menuId: String,
-        request: UpdateMenuStatusRequestDto
-    ): MenuResponseDto {
-        return client.patch(endpoint("/menus/$menuId/status")) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
-
     suspend fun deleteMenu(
         menuId: String
     ) {
@@ -107,32 +97,6 @@ class MenuApi(
     }
 
     // Menu sections
-
-    suspend fun getSections(
-        menuId: String,
-        active: Boolean? = null,
-        includeItems: Boolean = false
-    ): List<MenuSectionDto> {
-        return client.get(endpoint("/menus/$menuId/sections")) {
-            active?.let {
-                parameter("active", it)
-            }
-
-            parameter("includeItems", includeItems)
-        }.body()
-    }
-
-    suspend fun getSection(
-        menuId: String,
-        sectionId: String,
-        includeItems: Boolean = false
-    ): MenuSectionDto {
-        return client.get(
-            endpoint("/menus/$menuId/sections/$sectionId")
-        ) {
-            parameter("includeItems", includeItems)
-        }.body()
-    }
 
     suspend fun createSection(
         menuId: String,
@@ -159,19 +123,6 @@ class MenuApi(
         }.body()
     }
 
-    suspend fun updateSectionStatus(
-        menuId: String,
-        sectionId: String,
-        request: UpdateMenuSectionStatusRequestDto
-    ): MenuSectionDto {
-        return client.patch(
-            endpoint("/menus/$menuId/sections/$sectionId/status")
-        ) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
-
     suspend fun deleteSection(
         menuId: String,
         sectionId: String
@@ -182,42 +133,6 @@ class MenuApi(
     }
 
     // Menu items
-
-    suspend fun getItems(
-        menuId: String,
-        sectionId: String,
-        available: Boolean? = null,
-        includeVariants: Boolean = false,
-        includeOptionGroups: Boolean = false
-    ): List<MenuItemDto> {
-        return client.get(
-            endpoint("/menus/$menuId/sections/$sectionId/items")
-        ) {
-            available?.let {
-                parameter("available", it)
-            }
-
-            parameter("includeVariants", includeVariants)
-            parameter("includeOptionGroups", includeOptionGroups)
-        }.body()
-    }
-
-    suspend fun getItem(
-        menuId: String,
-        sectionId: String,
-        itemId: String,
-        includeVariants: Boolean = false,
-        includeOptionGroups: Boolean = false
-    ): MenuItemDto {
-        return client.get(
-            endpoint(
-                "/menus/$menuId/sections/$sectionId/items/$itemId"
-            )
-        ) {
-            parameter("includeVariants", includeVariants)
-            parameter("includeOptionGroups", includeOptionGroups)
-        }.body()
-    }
 
     suspend fun createItem(
         menuId: String,
@@ -279,19 +194,6 @@ class MenuApi(
 
     // Menu variants
 
-    suspend fun getVariants(
-        menuId: String,
-        sectionId: String,
-        itemId: String
-    ): List<MenuVariantDto> {
-        return client.get(
-            endpoint(
-                "/menus/$menuId/sections/$sectionId" +
-                        "/items/$itemId/variants"
-            )
-        ).body()
-    }
-
     suspend fun createVariant(
         menuId: String,
         sectionId: String,
@@ -343,19 +245,6 @@ class MenuApi(
 
     // Menu item option-group links
 
-    suspend fun getItemOptionGroups(
-        menuId: String,
-        sectionId: String,
-        itemId: String
-    ): List<MenuItemOptionGroupDto> {
-        return client.get(
-            endpoint(
-                "/menus/$menuId/sections/$sectionId" +
-                        "/items/$itemId/option-groups"
-            )
-        ).body()
-    }
-
     suspend fun createItemOptionGroup(
         menuId: String,
         sectionId: String,
@@ -366,24 +255,6 @@ class MenuApi(
             endpoint(
                 "/menus/$menuId/sections/$sectionId" +
                         "/items/$itemId/option-groups"
-            )
-        ) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
-
-    suspend fun updateItemOptionGroup(
-        menuId: String,
-        sectionId: String,
-        itemId: String,
-        linkId: String,
-        request: UpdateMenuItemOptionGroupRequestDto
-    ): MenuItemOptionGroupDto {
-        return client.put(
-            endpoint(
-                "/menus/$menuId/sections/$sectionId" +
-                        "/items/$itemId/option-groups/$linkId"
             )
         ) {
             contentType(ContentType.Application.Json)
@@ -426,64 +297,7 @@ class MenuApi(
         }.body()
     }
 
-    suspend fun updateOptionGroupType(
-        typeId: String,
-        request: UpdateOptionGroupTypeRequestDto
-    ): OptionGroupTypeDto {
-        return client.put(
-            endpoint("/option-group-types/$typeId")
-        ) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
-
-    suspend fun deleteOptionGroupType(
-        typeId: String
-    ) {
-        client.delete(
-            endpoint("/option-group-types/$typeId")
-        )
-    }
-
     // Option groups
-
-    suspend fun getOptionGroups(
-        restaurantId: String,
-        typeId: String? = null,
-        active: Boolean? = null,
-        search: String? = null,
-        includeItems: Boolean = false
-    ): List<OptionGroupDto> {
-        return client.get(endpoint("/option-groups")) {
-            parameter("restaurantId", restaurantId)
-
-            typeId?.let {
-                parameter("typeId", it)
-            }
-
-            active?.let {
-                parameter("active", it)
-            }
-
-            search?.takeIf { it.isNotBlank() }?.let {
-                parameter("search", it)
-            }
-
-            parameter("includeItems", includeItems)
-        }.body()
-    }
-
-    suspend fun getOptionGroup(
-        groupId: String,
-        includeItems: Boolean = false
-    ): OptionGroupDto {
-        return client.get(
-            endpoint("/option-groups/$groupId")
-        ) {
-            parameter("includeItems", includeItems)
-        }.body()
-    }
 
     suspend fun createOptionGroup(
         request: CreateOptionGroupRequestDto
@@ -494,52 +308,7 @@ class MenuApi(
         }.body()
     }
 
-    suspend fun updateOptionGroup(
-        groupId: String,
-        request: UpdateOptionGroupRequestDto
-    ): OptionGroupDto {
-        return client.put(
-            endpoint("/option-groups/$groupId")
-        ) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
-
-    suspend fun updateOptionGroupStatus(
-        groupId: String,
-        request: UpdateOptionGroupStatusRequestDto
-    ): OptionGroupDto {
-        return client.patch(
-            endpoint("/option-groups/$groupId/status")
-        ) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
-
-    suspend fun deleteOptionGroup(
-        groupId: String
-    ) {
-        client.delete(
-            endpoint("/option-groups/$groupId")
-        )
-    }
-
     // Option items
-
-    suspend fun getOptionItems(
-        groupId: String,
-        available: Boolean? = null
-    ): List<OptionItemDto> {
-        return client.get(
-            endpoint("/option-groups/$groupId/items")
-        ) {
-            available?.let {
-                parameter("available", it)
-            }
-        }.body()
-    }
 
     suspend fun createOptionItem(
         groupId: String,
@@ -551,42 +320,5 @@ class MenuApi(
             contentType(ContentType.Application.Json)
             setBody(request)
         }.body()
-    }
-
-    suspend fun updateOptionItem(
-        groupId: String,
-        itemId: String,
-        request: UpdateOptionItemRequestDto
-    ): OptionItemDto {
-        return client.put(
-            endpoint("/option-groups/$groupId/items/$itemId")
-        ) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
-
-    suspend fun updateOptionItemAvailability(
-        groupId: String,
-        itemId: String,
-        request: UpdateOptionItemAvailabilityRequestDto
-    ): OptionItemDto {
-        return client.patch(
-            endpoint(
-                "/option-groups/$groupId/items/$itemId/availability"
-            )
-        ) {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
-
-    suspend fun deleteOptionItem(
-        groupId: String,
-        itemId: String
-    ) {
-        client.delete(
-            endpoint("/option-groups/$groupId/items/$itemId")
-        )
     }
 }
