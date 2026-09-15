@@ -50,6 +50,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,10 +72,14 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
-import com.saporini.mobile_desktop.pos.menu.ui.categoryIcon
+import com.saporini.mobile_desktop.pos.menu.ui.MenuCategory
+import com.saporini.mobile_desktop.pos.menu.ui.MenuCategoryIcon
+import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogActionStatus
+import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogStatusBody
 import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuNestedDialog
 import com.saporini.mobile_desktop.pos.menu.ui.menu.isPhoneMenuWindow
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 private val SectionGreen = Color(0xFF94A27F)
 private val SectionInk = Color(0xFF222426)
@@ -148,22 +153,32 @@ private fun OrderTypeRow(
     }
 }
 
+/**
+ * Edit mode persists every add/rename/delete immediately (each nested dialog calls its
+ * backend callback itself and shows its own loading/error state); the footer button is
+ * just "Done" and closes. Reorder mode is unchanged: dragging only rearranges local
+ * state, and the footer's "Save order" batches the position updates on click.
+ */
 @Composable
 internal fun SectionManagerDialog(
-    sections: List<String>,
+    sections: List<MenuCategory>,
     itemCounts: Map<String, Int>,
     mode: SectionManagerMode,
     onDismiss: () -> Unit,
-    onSave: (List<String>, Map<String, String>) -> Unit
+    onDoneEditing: (List<MenuCategory>) -> Unit,
+    onSaveOrder: (List<MenuCategory>) -> Unit,
+    onCreateSection: suspend (name: String, displayOrder: Int) -> Result<String>,
+    onRenameSection: suspend (sectionId: String, name: String, displayOrder: Int) -> Result<Unit>,
+    onDeleteSection: suspend (sectionId: String) -> Result<Unit>
 ) {
     val isPhone = isPhoneMenuWindow()
     val isWidePhone = isWidePhoneWindow()
     val isReordering = mode == SectionManagerMode.REORDER
-    var workingSections by remember(sections) { mutableStateOf(sections.distinct()) }
-    var sectionOrigins by remember(sections) { mutableStateOf(sections.associateWith { it }) }
-    var sectionBeingEdited by remember { mutableStateOf<String?>(null) }
-    var sectionToDelete by remember { mutableStateOf<String?>(null) }
+    var workingSections by remember(sections) { mutableStateOf(sections.distinctBy { it.name }) }
+    var sectionBeingEdited by remember { mutableStateOf<MenuCategory?>(null) }
+    var sectionToDelete by remember { mutableStateOf<MenuCategory?>(null) }
     var addSectionOpen by remember { mutableStateOf(false) }
+    fun realIndexOf(name: String) = workingSections.filter { it.name != "All" }.indexOfFirst { it.name == name }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(
@@ -212,7 +227,7 @@ internal fun SectionManagerDialog(
                         sections = workingSections,
                         isPhone = isPhone,
                         mode = mode,
-                        itemCountFor = { section -> itemCounts[sectionOrigins[section] ?: section] ?: 0 },
+                        itemCountFor = { section -> itemCounts[section.name] ?: 0 },
                         onReorder = { workingSections = it },
                         onEdit = { sectionBeingEdited = it },
                         onDelete = { sectionToDelete = it }
@@ -240,15 +255,13 @@ internal fun SectionManagerDialog(
                     Spacer(Modifier.size(8.dp))
                     Button(
                         onClick = {
-                            val renames = sectionOrigins.entries
-                                .filter { (current, original) -> current != original }
-                                .associate { (current, original) -> original to current }
-                            onSave(workingSections, renames)
+                            if (isReordering) onSaveOrder(workingSections) else onDoneEditing(workingSections)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = SectionGreen)
+                        shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SectionGreen)
                     ) {
                         Text(
-                            if (isReordering) "Save order" else "Save sections",
+                            if (isReordering) "Save order" else "Done",
                             fontFamily = Inter(), fontWeight = FontWeight.Bold
                         )
                     }
@@ -258,29 +271,28 @@ internal fun SectionManagerDialog(
     }
 
     sectionBeingEdited?.let { section ->
-        val originalSection = sectionOrigins[section] ?: section
         SectionEditorDialog(
             section = section,
             sections = workingSections,
-            itemCount = itemCounts[originalSection] ?: 0,
+            itemCount = itemCounts[section.name] ?: 0,
+            displayOrder = realIndexOf(section.name).coerceAtLeast(0),
             onDismiss = { sectionBeingEdited = null },
-            onRename = { newName ->
-                workingSections = workingSections.map { if (it == section) newName else it }
-                sectionOrigins = sectionOrigins - section + (newName to originalSection)
+            onRenameSection = onRenameSection,
+            onRenamed = { updated ->
+                workingSections = workingSections.map { if (it.name == section.name) updated else it }
                 sectionBeingEdited = null
             }
         )
     }
 
     sectionToDelete?.let { section ->
-        val originalSection = sectionOrigins[section] ?: section
         DeleteSectionDialog(
             section = section,
-            itemCount = itemCounts[originalSection] ?: 0,
+            itemCount = itemCounts[section.name] ?: 0,
             onDismiss = { sectionToDelete = null },
-            onDelete = {
-                workingSections = workingSections.filterNot { it == section }
-                sectionOrigins = sectionOrigins - section
+            onDeleteSection = onDeleteSection,
+            onDeleted = {
+                workingSections = workingSections.filterNot { it.name == section.name }
                 sectionToDelete = null
             }
         )
@@ -289,26 +301,26 @@ internal fun SectionManagerDialog(
     if (addSectionOpen) {
         AddSectionDialog(
             sections = workingSections,
+            displayOrder = workingSections.count { it.name != "All" },
             onDismiss = { addSectionOpen = false },
-            onAdd = { section ->
-                workingSections = workingSections + section
-                sectionOrigins = sectionOrigins + (section to section)
+            onCreateSection = onCreateSection,
+            onAdded = { newSection ->
+                workingSections = workingSections + newSection
                 addSectionOpen = false
             }
         )
     }
-
 }
 
 @Composable
 private fun SectionReorderList(
-    sections: List<String>,
+    sections: List<MenuCategory>,
     isPhone: Boolean,
     mode: SectionManagerMode,
-    itemCountFor: (String) -> Int,
-    onReorder: (List<String>) -> Unit,
-    onEdit: (String) -> Unit,
-    onDelete: (String) -> Unit
+    itemCountFor: (MenuCategory) -> Int,
+    onReorder: (List<MenuCategory>) -> Unit,
+    onEdit: (MenuCategory) -> Unit,
+    onDelete: (MenuCategory) -> Unit
 ) {
     val rowHeight = 56.dp
     val rowGap = 8.dp
@@ -316,7 +328,7 @@ private fun SectionReorderList(
     val listHeight = if (sections.isEmpty()) 0.dp else rowStep * sections.size - rowGap
     var draggingSection by remember { mutableStateOf<String?>(null) }
     var draggedY by remember { mutableFloatStateOf(0f) }
-    var gestureOrder by remember { mutableStateOf<List<String>?>(null) }
+    var gestureOrder by remember { mutableStateOf<List<MenuCategory>?>(null) }
     val latestSections by rememberUpdatedState(sections)
     val latestOnReorder by rememberUpdatedState(onReorder)
 
@@ -336,24 +348,24 @@ private fun SectionReorderList(
         }
 
         sections.forEachIndexed { index, section ->
-            key(section) {
+            key(section.name) {
                 val targetOffset = IntOffset(0, slotY(index).roundToInt())
                 val animatedOffset by animateIntOffsetAsState(
                     targetValue = targetOffset,
                     animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f),
-                    label = "section-slot-$section"
+                    label = "section-slot-${section.name}"
                 )
-                val isDragging = draggingSection == section
+                val isDragging = draggingSection == section.name
                 val itemCount = itemCountFor(section)
-                val canMove = mode == SectionManagerMode.REORDER && section != "All" && sections.size > 2
+                val canMove = mode == SectionManagerMode.REORDER && section.name != "All" && sections.size > 2
                 val dragModifier = if (canMove) {
-                    Modifier.pointerInput(section, rowStepPx, isPhone) {
+                    Modifier.pointerInput(section.name, rowStepPx, isPhone) {
                         val startDrag: (Offset) -> Unit = {
-                            val current = latestSections.indexOf(section)
+                            val current = latestSections.indexOfFirst { it.name == section.name }
                             if (current > 0) {
                                 gestureOrder = latestSections
                                 draggedY = slotY(current)
-                                draggingSection = section
+                                draggingSection = section.name
                             }
                         }
                         val endDrag: () -> Unit = {
@@ -362,10 +374,10 @@ private fun SectionReorderList(
                         }
                         val moveDrag: (androidx.compose.ui.input.pointer.PointerInputChange, Offset) -> Unit = { change, amount ->
                             change.consume()
-                            if (draggingSection == section) {
+                            if (draggingSection == section.name) {
                                 draggedY += amount.y
                                 val currentOrder = gestureOrder ?: latestSections
-                                val from = currentOrder.indexOf(section)
+                                val from = currentOrder.indexOfFirst { it.name == section.name }
                                 val to = nearestMovableSlot(draggedY, currentOrder.size)
                                 if (from > 0 && to != null && from != to) {
                                     val reordered = currentOrder.toMutableList().also { list ->
@@ -414,7 +426,7 @@ private fun SectionReorderList(
 
 @Composable
 private fun SectionRow(
-    section: String,
+    section: MenuCategory,
     itemCount: Int,
     mode: SectionManagerMode,
     canMove: Boolean,
@@ -432,16 +444,16 @@ private fun SectionRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(32.dp).background(Color.White, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-            Icon(categoryIcon(section), null, Modifier.size(18.dp), tint = SectionInk)
+            Icon(section.icon.icon, null, Modifier.size(18.dp), tint = SectionInk)
         }
         Spacer(Modifier.size(9.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                section, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
+                section.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
                 color = SectionInk, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
             Text(
-                if (section == "All") "Default filter" else "$itemCount ${if (itemCount == 1) "item" else "items"}",
+                if (section.name == "All") "Default filter" else "$itemCount ${if (itemCount == 1) "item" else "items"}",
                 fontFamily = Inter(), fontSize = 11.sp, color = SectionMuted
             )
         }
@@ -454,13 +466,13 @@ private fun SectionRow(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    if (section == "All") Icons.Outlined.Lock else Icons.Outlined.DragIndicator,
-                    if (section == "All") "All stays first" else "Drag and drop $section",
-                    Modifier.size(if (section == "All") 17.dp else 24.dp),
+                    if (section.name == "All") Icons.Outlined.Lock else Icons.Outlined.DragIndicator,
+                    if (section.name == "All") "All stays first" else "Drag and drop ${section.name}",
+                    Modifier.size(if (section.name == "All") 17.dp else 24.dp),
                     tint = SectionInk
                 )
             }
-        } else if (section == "All") {
+        } else if (section.name == "All") {
             Box(
                 modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp))
                     .background(Color.White).border(1.dp, SectionBorder, RoundedCornerShape(8.dp)),
@@ -475,7 +487,7 @@ private fun SectionRow(
                     .clickable(onClick = onEdit),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Outlined.Edit, "Rename $section", Modifier.size(18.dp), tint = SectionInk)
+                Icon(Icons.Outlined.Edit, "Rename ${section.name}", Modifier.size(18.dp), tint = SectionInk)
             }
             Spacer(Modifier.width(8.dp))
             Box(
@@ -485,7 +497,7 @@ private fun SectionRow(
             ) {
                 Icon(
                     Icons.Outlined.DeleteOutline,
-                    "Delete $section",
+                    "Delete ${section.name}",
                     Modifier.size(18.dp),
                     tint = Color.White
                 )
@@ -496,102 +508,301 @@ private fun SectionRow(
 
 @Composable
 private fun SectionEditorDialog(
-    section: String,
-    sections: List<String>,
+    section: MenuCategory,
+    sections: List<MenuCategory>,
     itemCount: Int,
+    displayOrder: Int,
     onDismiss: () -> Unit,
-    onRename: (String) -> Unit
+    onRenameSection: suspend (sectionId: String, name: String, displayOrder: Int) -> Result<Unit>,
+    onRenamed: (MenuCategory) -> Unit
 ) {
-    var name by remember(section) { mutableStateOf(section) }
+    val scope = rememberCoroutineScope()
+    var name by remember(section) { mutableStateOf(section.name) }
+    var icon by remember(section) { mutableStateOf(section.icon) }
+    var attemptedSubmit by remember(section) { mutableStateOf(false) }
+    var status by remember(section) { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
     val trimmed = name.trim()
-    val valid = trimmed.length in 2..40 && sections.none { it != section && it.equals(trimmed, ignoreCase = true) }
+    val isDuplicate = trimmed.length >= 2 &&
+        sections.any { it.name != section.name && it.name.equals(trimmed, ignoreCase = true) }
+    val valid = trimmed.length in 2..40 && !isDuplicate
+    val showValidationError = attemptedSubmit && !valid
+    val errorText = when {
+        trimmed.isEmpty() -> "Section name is required."
+        trimmed.length < 2 -> "Use at least 2 characters."
+        isDuplicate -> "A section with this name already exists."
+        else -> null
+    }
+    val isBusy = status is DialogActionStatus.Loading
+    val isIdle = status is DialogActionStatus.Idle
+
+    fun submit() {
+        if (!valid) {
+            attemptedSubmit = true
+        } else if (!isBusy) {
+            status = DialogActionStatus.Loading("Saving")
+            scope.launch {
+                onRenameSection(section.id!!, trimmed, displayOrder).fold(
+                    onSuccess = { status = DialogActionStatus.Success("$trimmed saved") },
+                    onFailure = { error ->
+                        status = DialogActionStatus.Failed(message = error.message ?: "Could not save this section.")
+                    }
+                )
+            }
+        }
+    }
+
     MenuNestedDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isBusy) onDismiss() },
         title = { Text("Edit section", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("Section name", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SectionInk)
-                OutlinedTextField(
-                    value = name, onValueChange = { if (it.length <= 40) name = it },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
-                Text(
-                    if (itemCount == 0) "This section is empty and can be deleted."
-                    else "$itemCount ${if (itemCount == 1) "item uses" else "items use"} this section.",
-                    fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = SectionMuted
+            if (isIdle) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Text("Section name", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SectionInk)
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { if (it.length <= 40) name = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = showValidationError
+                        )
+                        if (showValidationError && errorText != null) {
+                            Text(errorText, fontFamily = Inter(), fontSize = 12.sp, color = SectionDanger)
+                        } else {
+                            Text(
+                                if (itemCount == 0) "This section is empty and can be deleted."
+                                else "$itemCount ${if (itemCount == 1) "item uses" else "items use"} this section.",
+                                fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = SectionMuted
+                            )
+                        }
+                    }
+                    SectionIconPicker(selected = icon, onSelect = { icon = it })
+                }
+            } else {
+                DialogStatusBody(
+                    status = status,
+                    onRetry = { status = DialogActionStatus.Idle },
+                    onCancel = onDismiss,
+                    onSuccessSettled = { onRenamed(MenuCategory(trimmed, icon, section.id)) },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onRename(trimmed) }, enabled = valid) {
-                Text("Save", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = SectionGreen)
+            if (isIdle) {
+                Button(
+                    onClick = { submit() },
+                    shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SectionGreen)
+                ) {
+                    Text("Save", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = SectionMuted) }
+            if (isIdle) {
+                TextButton(onClick = onDismiss) { Text("Cancel", color = SectionMuted) }
+            }
         }
     )
 }
 
 @Composable
 private fun DeleteSectionDialog(
-    section: String,
+    section: MenuCategory,
     itemCount: Int,
     onDismiss: () -> Unit,
-    onDelete: () -> Unit
+    onDeleteSection: suspend (sectionId: String) -> Result<Unit>,
+    onDeleted: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    var status by remember { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
+    val isBusy = status is DialogActionStatus.Loading
+    val isIdle = status is DialogActionStatus.Idle
+
     MenuNestedDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Delete $section?", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
+        onDismissRequest = { if (!isBusy) onDismiss() },
+        title = { Text("Delete ${section.name}?", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
         text = {
-            val message = if (itemCount == 0) {
-                "Are you sure you want to delete this section?"
+            if (isIdle) {
+                val message = if (itemCount == 0) {
+                    "Are you sure you want to delete this section?"
+                } else {
+                    "Are you sure? The section will be removed, and its $itemCount " +
+                        "${if (itemCount == 1) "item" else "items"} will remain available under All."
+                }
+                Text(message, fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = SectionMuted)
             } else {
-                "Are you sure? The section will be removed, and its $itemCount " +
-                    "${if (itemCount == 1) "item" else "items"} will remain available under All."
+                DialogStatusBody(
+                    status = status,
+                    onRetry = { status = DialogActionStatus.Idle },
+                    onCancel = onDismiss,
+                    onSuccessSettled = onDeleted,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-            Text(
-                message,
-                fontFamily = Inter(),
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                color = SectionMuted
-            )
         },
         confirmButton = {
-            TextButton(onClick = onDelete) {
-                Text("Delete", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = SectionDanger)
+            if (isIdle) {
+                Button(
+                    onClick = {
+                        status = DialogActionStatus.Loading("Deleting")
+                        scope.launch {
+                            onDeleteSection(section.id!!).fold(
+                                onSuccess = { status = DialogActionStatus.Success("${section.name} deleted") },
+                                onFailure = { error ->
+                                    status = DialogActionStatus.Failed(message = error.message ?: "Could not delete this section.")
+                                }
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SectionDanger)
+                ) {
+                    Text("Delete", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = SectionMuted) } }
+        dismissButton = {
+            if (isIdle) {
+                TextButton(onClick = onDismiss) { Text("Cancel", color = SectionMuted) }
+            }
+        }
     )
 }
 
 @Composable
-private fun AddSectionDialog(sections: List<String>, onDismiss: () -> Unit, onAdd: (String) -> Unit) {
+private fun AddSectionDialog(
+    sections: List<MenuCategory>,
+    displayOrder: Int,
+    onDismiss: () -> Unit,
+    onCreateSection: suspend (name: String, displayOrder: Int) -> Result<String>,
+    onAdded: (MenuCategory) -> Unit
+) {
+    val scope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
+    var icon by remember { mutableStateOf(MenuCategoryIcon.RESTAURANT_MENU) }
+    var attemptedSubmit by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
     val trimmed = name.trim()
-    val valid = trimmed.length in 2..40 && sections.none { it.equals(trimmed, ignoreCase = true) }
+    val isDuplicate = trimmed.length >= 2 && sections.any { it.name.equals(trimmed, ignoreCase = true) }
+    val valid = trimmed.length in 2..40 && !isDuplicate
+    val showValidationError = attemptedSubmit && !valid
+    val errorText = when {
+        trimmed.isEmpty() -> "Section name is required."
+        trimmed.length < 2 -> "Use at least 2 characters."
+        isDuplicate -> "A section with this name already exists."
+        else -> null
+    }
+    val isBusy = status is DialogActionStatus.Loading
+    val isIdle = status is DialogActionStatus.Idle
+    var createdSection by remember { mutableStateOf<MenuCategory?>(null) }
+
+    fun submit() {
+        if (!valid) {
+            attemptedSubmit = true
+        } else if (!isBusy) {
+            status = DialogActionStatus.Loading("Adding")
+            scope.launch {
+                onCreateSection(trimmed, displayOrder).fold(
+                    onSuccess = { newId ->
+                        createdSection = MenuCategory(trimmed, icon, newId)
+                        status = DialogActionStatus.Success("$trimmed added")
+                    },
+                    onFailure = { error ->
+                        status = DialogActionStatus.Failed(message = error.message ?: "Could not create this section.")
+                    }
+                )
+            }
+        }
+    }
+
     MenuNestedDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isBusy) onDismiss() },
         title = { Text("Add section", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Section name", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SectionInk)
-                OutlinedTextField(
-                    value = name, onValueChange = { if (it.length <= 40) name = it },
-                    modifier = Modifier.fillMaxWidth(), placeholder = { Text("For example: Salads") }, singleLine = true
-                )
-                if (trimmed.isNotEmpty() && !valid) {
-                    Text("Use a unique name with at least 2 characters.", fontFamily = Inter(), fontSize = 12.sp, color = SectionDanger)
+            if (isIdle) {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Section name", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SectionInk)
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { if (it.length <= 40) name = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("For example: Salads") },
+                            singleLine = true,
+                            isError = showValidationError
+                        )
+                        if (showValidationError && errorText != null) {
+                            Text(errorText, fontFamily = Inter(), fontSize = 12.sp, color = SectionDanger)
+                        }
+                    }
+                    SectionIconPicker(selected = icon, onSelect = { icon = it })
                 }
+            } else {
+                DialogStatusBody(
+                    status = status,
+                    onRetry = { status = DialogActionStatus.Idle },
+                    onCancel = onDismiss,
+                    onSuccessSettled = { createdSection?.let(onAdded) },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = {
-            TextButton(onClick = { onAdd(trimmed) }, enabled = valid) {
-                Text("Add", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = SectionGreen)
+            if (isIdle) {
+                Button(
+                    onClick = { submit() },
+                    shape = RoundedCornerShape(9.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = SectionGreen)
+                ) {
+                    Text("Add", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = SectionMuted) } }
+        dismissButton = {
+            if (isIdle) {
+                TextButton(onClick = onDismiss) { Text("Cancel", color = SectionMuted) }
+            }
+        }
     )
+}
+
+@Composable
+private fun SectionIconPicker(
+    selected: MenuCategoryIcon,
+    onSelect: (MenuCategoryIcon) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Text("Section icon", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SectionInk)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            MenuCategoryIcon.entries.chunked(5).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { option ->
+                        val isSelected = option == selected
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(if (isSelected) SectionGreen else SectionSurface)
+                                .border(
+                                    1.dp,
+                                    if (isSelected) SectionGreen else SectionBorder,
+                                    RoundedCornerShape(9.dp)
+                                )
+                                .clickable { onSelect(option) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = option.icon,
+                                contentDescription = option.label,
+                                modifier = Modifier.size(22.dp),
+                                tint = if (isSelected) Color.White else SectionInk
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

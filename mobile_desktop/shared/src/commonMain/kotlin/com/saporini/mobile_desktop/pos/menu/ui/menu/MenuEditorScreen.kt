@@ -93,10 +93,12 @@ private val MenuColorSuggestions = listOf(
 )
 
 @Composable
-fun MenuEditorDialog(
+internal fun MenuEditorDialog(
     menu: Menu?,
-    isSaving: Boolean,
-    errorMessage: String?,
+    existingColors: Set<String> = emptySet(),
+    status: DialogActionStatus = DialogActionStatus.Idle,
+    onRetry: () -> Unit = {},
+    onSuccessSettled: () -> Unit = {},
     onDismiss: () -> Unit,
     onDeleteMenu: () -> Unit = { },
     onSave: (
@@ -132,11 +134,19 @@ fun MenuEditorDialog(
         mutableStateOf(menu?.availableUntilDate.orEmpty())
     }
     var selectedColor by remember(menu?.id) {
-        mutableStateOf(normalizeHexInput(menu?.color ?: "#AEBE95"))
+        mutableStateOf(
+            normalizeHexInput(
+                menu?.color ?: run {
+                    val usedColors = existingColors.map { normalizeHexInput(it) }.toSet()
+                    MenuColorSuggestions.firstOrNull { normalizeHexInput(it.hex) !in usedColors }?.hex ?: "#AEBE95"
+                }
+            )
+        )
     }
     var showDeleteConfirm by remember(menu?.id) { mutableStateOf(false) }
 
     val isEditing = menu != null
+    val isSaving = status is DialogActionStatus.Loading
     val colorIsValid = isValidHexColor(selectedColor)
     val fromIsValid = availableAllDay || isValidTime(availableFrom)
     val untilIsValid = availableAllDay || isValidTime(availableUntil)
@@ -165,12 +175,20 @@ fun MenuEditorDialog(
         )
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            if (isPhone) {
+            if (status !is DialogActionStatus.Idle) {
+                MenuEditorStatusTakeover(
+                    isPhone = isPhone,
+                    status = status,
+                    onRetry = onRetry,
+                    onCancel = onDismiss,
+                    onSuccessSettled = onSuccessSettled
+                )
+            } else if (isPhone) {
                 PhoneMenuEditorPage(
                     isEditing = isEditing,
                     isSaving = isSaving,
                     canSave = canSave,
-                    errorMessage = errorMessage,
+                    errorMessage = null,
                     onDismiss = onDismiss,
                     onDeleteMenu = { showDeleteConfirm = true },
                     onSave = {
@@ -319,7 +337,7 @@ fun MenuEditorDialog(
                                         untilDateIsValid = untilDateIsValid,
                                         dateOrderIsValid = dateOrderIsValid,
                                         isSaving = isSaving,
-                                        errorMessage = errorMessage,
+                                        errorMessage = null,
                                         modifier = Modifier
                                             .weight(1.15f)
                                             .fillMaxHeight()
@@ -394,7 +412,7 @@ fun MenuEditorDialog(
                                         untilDateIsValid = untilDateIsValid,
                                         dateOrderIsValid = dateOrderIsValid,
                                         isSaving = isSaving,
-                                        errorMessage = errorMessage,
+                                        errorMessage = null,
                                         modifier = Modifier.fillMaxWidth()
                                     )
 
@@ -430,23 +448,25 @@ fun MenuEditorDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (isEditing) {
-                                TextButton(
+                                Button(
                                     onClick = { showDeleteConfirm = true },
                                     enabled = !isSaving,
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                    shape = RoundedCornerShape(9.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.DeleteOutline,
                                         contentDescription = null,
                                         modifier = Modifier.size(18.dp),
-                                        tint = Color(0xFFB13A2F)
+                                        tint = Color.White
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     Text(
                                         text = "Delete Menu",
                                         fontFamily = Inter(),
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color(0xFFB13A2F)
+                                        color = Color.White
                                     )
                                 }
                             }
@@ -530,17 +550,19 @@ fun MenuEditorDialog(
                 )
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         showDeleteConfirm = false
                         onDeleteMenu()
-                    }
+                    },
+                    shape = RoundedCornerShape(9.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
                 ) {
                     Text(
                         text = "Yes, Delete",
                         fontFamily = Inter(),
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFB13A2F)
+                        color = Color.White
                     )
                 }
             },
@@ -555,6 +577,48 @@ fun MenuEditorDialog(
                 }
             }
         )
+    }
+}
+
+/** Full takeover shown in place of the form while status is Loading/Success/Failed. */
+@Composable
+private fun MenuEditorStatusTakeover(
+    isPhone: Boolean,
+    status: DialogActionStatus,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+    onSuccessSettled: () -> Unit
+) {
+    Box(
+        modifier = if (isPhone) {
+            Modifier.fillMaxSize().background(Color.White).safeDrawingPadding()
+        } else {
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.34f)).padding(24.dp)
+        },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = if (isPhone) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier
+                    .fillMaxWidth(0.5f)
+                    .widthIn(max = 420.dp)
+                    .shadow(24.dp, RoundedCornerShape(20.dp))
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White)
+                    .border(1.dp, EditorBorder, RoundedCornerShape(20.dp))
+            },
+            verticalArrangement = Arrangement.Center
+        ) {
+            DialogStatusBody(
+                status = status,
+                onRetry = onRetry,
+                onCancel = onCancel,
+                onSuccessSettled = onSuccessSettled,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -623,23 +687,25 @@ private fun PhoneMenuEditorPage(
             HorizontalDivider(color = EditorBorder)
             visuals()
             if (isEditing) {
-                TextButton(
+                Button(
                     onClick = onDeleteMenu,
                     enabled = !isSaving,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    shape = RoundedCornerShape(9.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
                 ) {
                     Icon(
                         Icons.Outlined.DeleteOutline,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = Color(0xFFB13A2F)
+                        tint = Color.White
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = "Delete Menu",
                         fontFamily = Inter(),
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFB13A2F)
+                        color = Color.White
                     )
                 }
             }
