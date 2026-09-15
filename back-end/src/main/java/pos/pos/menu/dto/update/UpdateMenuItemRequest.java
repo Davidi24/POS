@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Getter
 @Setter
@@ -41,4 +42,6 @@ public class UpdateMenuItemRequest {
     @NotNull(message = "displayOrder is required")
     @Min(value = 0, message = "displayOrder must be greater than or equal to 0")
     private Integer displayOrder;
+
+    private List<String> ingredients;
 }

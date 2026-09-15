@@ -19,7 +19,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateMenuRequest {
+public class CreateMenuRequest  {
 
     @NotNull(message = "restaurantId is required")
     private UUID restaurantId;

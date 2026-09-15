@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -25,4 +26,5 @@ public class PublicMenuItemResponse {
     private BigDecimal basePrice;
     private String imageUrl;
     private Integer displayOrder;
+    private List<String> ingredients;
 }

@@ -107,6 +107,7 @@ public class MenuItemService {
         item.setImageUrl(NormalizationUtils.normalize(request.getImageUrl()));
         item.setAvailable(request.getAvailable() == null || request.getAvailable());
         item.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
+        item.setIngredients(request.getIngredients());
 
         return menuMapper.toMenuItemResponse(menuItemRepository.saveAndFlush(item));
     }
@@ -131,6 +132,7 @@ public class MenuItemService {
         item.setImageUrl(NormalizationUtils.normalize(request.getImageUrl()));
         item.setAvailable(Boolean.TRUE.equals(request.getAvailable()));
         item.setDisplayOrder(request.getDisplayOrder());
+        item.setIngredients(request.getIngredients());
 
         return menuMapper.toMenuItemResponse(menuItemRepository.saveAndFlush(item));
     }

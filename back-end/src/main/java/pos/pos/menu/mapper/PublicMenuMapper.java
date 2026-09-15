@@ -61,6 +61,7 @@ public class PublicMenuMapper {
                 .basePrice(item.getBasePrice())
                 .imageUrl(item.getImageUrl())
                 .displayOrder(item.getDisplayOrder())
+                .ingredients(List.copyOf(item.getIngredients()))
                 .build();
     }
 }

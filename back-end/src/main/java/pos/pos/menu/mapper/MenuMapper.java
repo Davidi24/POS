@@ -147,6 +147,7 @@ public class MenuMapper {
                 .imageUrl(item.getImageUrl())
                 .available(item.isAvailable())
                 .displayOrder(item.getDisplayOrder())
+                .ingredients(List.copyOf(item.getIngredients()))
                 .variants(variants == null ? null : variants.stream().map(this::toMenuVariantSummaryResponse).toList())
                 .optionGroups(optionGroups == null ? null : optionGroups.stream().map(this::toMenuItemOptionGroupSummaryResponse).toList())
                 .build();
