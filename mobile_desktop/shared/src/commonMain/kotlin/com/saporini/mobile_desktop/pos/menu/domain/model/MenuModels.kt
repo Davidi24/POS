@@ -55,6 +55,7 @@ data class MenuItem(
     val imageUrl: String?,
     val available: Boolean,
     val displayOrder: Int,
+    val ingredients: List<String>,
     val variants: List<MenuVariant>,
     val optionGroups: List<MenuItemOptionGroup>
 )

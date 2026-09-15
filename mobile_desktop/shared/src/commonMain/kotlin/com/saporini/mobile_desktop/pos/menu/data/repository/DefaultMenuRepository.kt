@@ -88,45 +88,11 @@ class DefaultMenuRepository(
         ).toDomain()
     }
 
-    override suspend fun updateMenuStatus(
-        menuId: String,
-        active: Boolean
-    ): Menu {
-        return api.updateMenuStatus(
-            menuId = menuId,
-            request = UpdateMenuStatusRequestDto(active = active)
-        ).toDomain()
-    }
-
     override suspend fun deleteMenu(menuId: String) {
         api.deleteMenu(menuId)
     }
 
     // Menu sections
-
-    override suspend fun getSections(
-        menuId: String,
-        active: Boolean?,
-        includeItems: Boolean
-    ): List<MenuSection> {
-        return api.getSections(
-            menuId = menuId,
-            active = active,
-            includeItems = includeItems
-        ).map { it.toDomain() }
-    }
-
-    override suspend fun getSection(
-        menuId: String,
-        sectionId: String,
-        includeItems: Boolean
-    ): MenuSection {
-        return api.getSection(
-            menuId = menuId,
-            sectionId = sectionId,
-            includeItems = includeItems
-        ).toDomain()
-    }
 
     override suspend fun createSection(
         menuId: String,
@@ -160,18 +126,6 @@ class DefaultMenuRepository(
         ).toDomain()
     }
 
-    override suspend fun updateSectionStatus(
-        menuId: String,
-        sectionId: String,
-        active: Boolean
-    ): MenuSection {
-        return api.updateSectionStatus(
-            menuId = menuId,
-            sectionId = sectionId,
-            request = UpdateMenuSectionStatusRequestDto(active = active)
-        ).toDomain()
-    }
-
     override suspend fun deleteSection(
         menuId: String,
         sectionId: String
@@ -180,38 +134,6 @@ class DefaultMenuRepository(
     }
 
     // Menu items
-
-    override suspend fun getItems(
-        menuId: String,
-        sectionId: String,
-        available: Boolean?,
-        includeVariants: Boolean,
-        includeOptionGroups: Boolean
-    ): List<MenuItem> {
-        return api.getItems(
-            menuId = menuId,
-            sectionId = sectionId,
-            available = available,
-            includeVariants = includeVariants,
-            includeOptionGroups = includeOptionGroups
-        ).map { it.toDomain() }
-    }
-
-    override suspend fun getItem(
-        menuId: String,
-        sectionId: String,
-        itemId: String,
-        includeVariants: Boolean,
-        includeOptionGroups: Boolean
-    ): MenuItem {
-        return api.getItem(
-            menuId = menuId,
-            sectionId = sectionId,
-            itemId = itemId,
-            includeVariants = includeVariants,
-            includeOptionGroups = includeOptionGroups
-        ).toDomain()
-    }
 
     override suspend fun createItem(
         menuId: String,
@@ -228,7 +150,8 @@ class DefaultMenuRepository(
                 basePrice = input.basePrice,
                 imageUrl = input.imageUrl,
                 available = input.available,
-                displayOrder = input.displayOrder
+                displayOrder = input.displayOrder,
+                ingredients = input.ingredients
             )
         ).toDomain()
     }
@@ -250,7 +173,8 @@ class DefaultMenuRepository(
                 basePrice = input.basePrice,
                 imageUrl = input.imageUrl,
                 available = input.available,
-                displayOrder = input.displayOrder
+                displayOrder = input.displayOrder,
+                ingredients = input.ingredients
             )
         ).toDomain()
     }
@@ -284,18 +208,6 @@ class DefaultMenuRepository(
     }
 
     // Menu variants
-
-    override suspend fun getVariants(
-        menuId: String,
-        sectionId: String,
-        itemId: String
-    ): List<MenuVariant> {
-        return api.getVariants(
-            menuId = menuId,
-            sectionId = sectionId,
-            itemId = itemId
-        ).map { it.toDomain() }
-    }
 
     override suspend fun createVariant(
         menuId: String,
@@ -357,18 +269,6 @@ class DefaultMenuRepository(
 
     // Menu item option-group links
 
-    override suspend fun getItemOptionGroups(
-        menuId: String,
-        sectionId: String,
-        itemId: String
-    ): List<MenuItemOptionGroup> {
-        return api.getItemOptionGroups(
-            menuId = menuId,
-            sectionId = sectionId,
-            itemId = itemId
-        ).map { it.toDomain() }
-    }
-
     override suspend fun createItemOptionGroup(
         menuId: String,
         sectionId: String,
@@ -381,27 +281,6 @@ class DefaultMenuRepository(
             itemId = itemId,
             request = CreateMenuItemOptionGroupRequestDto(
                 optionGroupId = input.optionGroupId,
-                displayOrder = input.displayOrder,
-                minSelectOverride = input.minSelectOverride,
-                maxSelectOverride = input.maxSelectOverride,
-                requiredOverride = input.requiredOverride
-            )
-        ).toDomain()
-    }
-
-    override suspend fun updateItemOptionGroup(
-        menuId: String,
-        sectionId: String,
-        itemId: String,
-        linkId: String,
-        input: UpdateMenuItemOptionGroupInput
-    ): MenuItemOptionGroup {
-        return api.updateItemOptionGroup(
-            menuId = menuId,
-            sectionId = sectionId,
-            itemId = itemId,
-            linkId = linkId,
-            request = UpdateMenuItemOptionGroupRequestDto(
                 displayOrder = input.displayOrder,
                 minSelectOverride = input.minSelectOverride,
                 maxSelectOverride = input.maxSelectOverride,
@@ -445,51 +324,7 @@ class DefaultMenuRepository(
         ).toDomain()
     }
 
-    override suspend fun updateOptionGroupType(
-        typeId: String,
-        input: OptionGroupTypeInput
-    ): OptionGroupType {
-        return api.updateOptionGroupType(
-            typeId = typeId,
-            request = UpdateOptionGroupTypeRequestDto(
-                code = input.code,
-                name = input.name,
-                description = input.description
-            )
-        ).toDomain()
-    }
-
-    override suspend fun deleteOptionGroupType(typeId: String) {
-        api.deleteOptionGroupType(typeId)
-    }
-
     // Option groups
-
-    override suspend fun getOptionGroups(
-        restaurantId: String,
-        typeId: String?,
-        active: Boolean?,
-        search: String?,
-        includeItems: Boolean
-    ): List<OptionGroup> {
-        return api.getOptionGroups(
-            restaurantId = restaurantId,
-            typeId = typeId,
-            active = active,
-            search = search,
-            includeItems = includeItems
-        ).map { it.toDomain() }
-    }
-
-    override suspend fun getOptionGroup(
-        groupId: String,
-        includeItems: Boolean
-    ): OptionGroup {
-        return api.getOptionGroup(
-            groupId = groupId,
-            includeItems = includeItems
-        ).toDomain()
-    }
 
     override suspend fun createOptionGroup(
         input: CreateOptionGroupInput
@@ -509,50 +344,7 @@ class DefaultMenuRepository(
         ).toDomain()
     }
 
-    override suspend fun updateOptionGroup(
-        groupId: String,
-        input: UpdateOptionGroupInput
-    ): OptionGroup {
-        return api.updateOptionGroup(
-            groupId = groupId,
-            request = UpdateOptionGroupRequestDto(
-                typeId = input.typeId,
-                name = input.name,
-                description = input.description,
-                minSelect = input.minSelect,
-                maxSelect = input.maxSelect,
-                required = input.required,
-                active = input.active,
-                displayOrder = input.displayOrder
-            )
-        ).toDomain()
-    }
-
-    override suspend fun updateOptionGroupStatus(
-        groupId: String,
-        active: Boolean
-    ): OptionGroup {
-        return api.updateOptionGroupStatus(
-            groupId = groupId,
-            request = UpdateOptionGroupStatusRequestDto(active = active)
-        ).toDomain()
-    }
-
-    override suspend fun deleteOptionGroup(groupId: String) {
-        api.deleteOptionGroup(groupId)
-    }
-
     // Option items
-
-    override suspend fun getOptionItems(
-        groupId: String,
-        available: Boolean?
-    ): List<OptionItem> {
-        return api.getOptionItems(
-            groupId = groupId,
-            available = available
-        ).map { it.toDomain() }
-    }
 
     override suspend fun createOptionItem(
         groupId: String,
@@ -568,44 +360,5 @@ class DefaultMenuRepository(
                 displayOrder = input.displayOrder
             )
         ).toDomain()
-    }
-
-    override suspend fun updateOptionItem(
-        groupId: String,
-        itemId: String,
-        input: OptionItemInput
-    ): OptionItem {
-        return api.updateOptionItem(
-            groupId = groupId,
-            itemId = itemId,
-            request = UpdateOptionItemRequestDto(
-                code = input.code,
-                name = input.name,
-                priceDelta = input.priceDelta,
-                available = input.available,
-                displayOrder = input.displayOrder
-            )
-        ).toDomain()
-    }
-
-    override suspend fun updateOptionItemAvailability(
-        groupId: String,
-        itemId: String,
-        available: Boolean
-    ): OptionItem {
-        return api.updateOptionItemAvailability(
-            groupId = groupId,
-            itemId = itemId,
-            request = UpdateOptionItemAvailabilityRequestDto(
-                available = available
-            )
-        ).toDomain()
-    }
-
-    override suspend fun deleteOptionItem(
-        groupId: String,
-        itemId: String
-    ) {
-        api.deleteOptionItem(groupId = groupId, itemId = itemId)
     }
 }

@@ -66,7 +66,8 @@ data class CreateMenuItemRequestDto(
     val basePrice: Double,
     val imageUrl: String? = null,
     val available: Boolean? = null,
-    val displayOrder: Int? = null
+    val displayOrder: Int? = null,
+    val ingredients: List<String> = emptyList()
 )
 
 @Serializable
@@ -77,7 +78,8 @@ data class UpdateMenuItemRequestDto(
     val basePrice: Double,
     val imageUrl: String? = null,
     val available: Boolean,
-    val displayOrder: Int
+    val displayOrder: Int,
+    val ingredients: List<String> = emptyList()
 )
 
 @Serializable

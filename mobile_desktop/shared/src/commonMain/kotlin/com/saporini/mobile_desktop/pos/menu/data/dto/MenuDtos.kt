@@ -63,6 +63,7 @@ data class MenuItemDto(
     val imageUrl: String? = null,
     val available: Boolean,
     val displayOrder: Int = 0,
+    val ingredients: List<String> = emptyList(),
     val variants: List<MenuVariantDto> = emptyList(),
     val optionGroups: List<MenuItemOptionGroupDto> = emptyList()
 )
