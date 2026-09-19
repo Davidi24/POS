@@ -580,7 +580,7 @@ fun TablesScreen(
                     fontFamily = Inter(),
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
-                    color = Color(0xFF4B522A)
+                    color = Color(0xFFAEBE95)
                 )
             }
 
@@ -1003,7 +1003,7 @@ private fun BoxScope.NewOrderModal(
                                 .height(38.dp)
                                 .width(100.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (selected) Color(0xFF4B522A) else Color.White)
+                                .background(if (selected) Color(0xFFAEBE95) else Color.White)
                                 .border(1.dp, Color(0xFFE7E1DC), RoundedCornerShape(8.dp)),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp),
@@ -1152,7 +1152,7 @@ private fun BoxScope.NewOrderModal(
                     .clip(RoundedCornerShape(8.dp))
                     .border(1.dp, Color(0xFFBDB8B2), RoundedCornerShape(8.dp)),
                 shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF4B522A))
+                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFAEBE95))
             ) {
                 Text(
                     text = "Cancel",
@@ -1169,7 +1169,7 @@ private fun BoxScope.NewOrderModal(
                     .width(168.dp)
                     .height(44.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (selectedLabels.isNotEmpty()) Color(0xFF4B522A) else Color(0xFFE7E7E4)),
+                    .background(if (selectedLabels.isNotEmpty()) Color(0xFFAEBE95) else Color(0xFFE7E7E4)),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = if (selectedLabels.isNotEmpty()) Color.White else Color(0xFF8A8A86),
@@ -1448,7 +1448,7 @@ private fun AddItemMealButtons(
                     .height(48.dp)
                     .width(88.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) Color(0xFF4B522A) else Color.White)
+                    .background(if (isSelected) Color(0xFFAEBE95) else Color.White)
                     .border(1.dp, Color(0xFFE7E1DC), RoundedCornerShape(8.dp)),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp),
@@ -1485,7 +1485,7 @@ private fun AddItemCategoryButtons(
                     .height(46.dp)
                     .width(128.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) Color(0xFF4B522A) else Color.White)
+                    .background(if (isSelected) Color(0xFFAEBE95) else Color.White)
                     .border(1.dp, Color(0xFFE7E1DC), RoundedCornerShape(8.dp)),
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp),
@@ -1501,7 +1501,7 @@ private fun AddItemCategoryButtons(
                         imageVector = addItemCategoryIcon(item),
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = if (isSelected) Color.White else Color(0xFF4B522A)
+                        tint = if (isSelected) Color.White else Color(0xFFAEBE95)
                     )
                     Text(
                         text = item,
@@ -1541,7 +1541,7 @@ private fun AddItemCard(
             .background(Color.White)
             .border(
                 width = if (selected) 2.dp else 1.dp,
-                color = if (selected) Color(0xFF4B522A) else Color(0xFFE7E1DC),
+                color = if (selected) Color(0xFFAEBE95) else Color(0xFFE7E1DC),
                 shape = RoundedCornerShape(8.dp)
             )
             .clickable(onClick = onClick)
@@ -1573,7 +1573,7 @@ private fun AddItemCard(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 11.sp,
                     letterSpacing = 0.sp,
-                    color = Color(0xFF4B522A)
+                    color = Color(0xFFAEBE95)
                 )
             }
             IconButton(
@@ -1590,7 +1590,7 @@ private fun AddItemCard(
                     imageVector = Icons.Outlined.ZoomOutMap,
                     contentDescription = "Expand item",
                     modifier = Modifier.size(18.dp),
-                    tint = Color(0xFF4B522A)
+                    tint = Color(0xFFAEBE95)
                 )
             }
         }
@@ -1626,7 +1626,7 @@ private fun AddItemCard(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 17.sp,
                 letterSpacing = 0.sp,
-                color = Color(0xFF4B522A)
+                color = Color(0xFFAEBE95)
             )
             Row(
                 modifier = Modifier
@@ -1643,7 +1643,7 @@ private fun AddItemCard(
                     imageVector = Icons.Filled.AddCircle,
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
-                    tint = Color(0xFF4B522A)
+                    tint = Color(0xFFAEBE95)
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
@@ -1778,7 +1778,7 @@ private fun AddItemDetailsPanel(
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 24.sp,
                     letterSpacing = 0.sp,
-                    color = Color(0xFF4B522A)
+                    color = Color(0xFFAEBE95)
                 )
             }
         }
@@ -1788,7 +1788,7 @@ private fun AddItemDetailsPanel(
                 .fillMaxWidth()
                 .height(46.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF4B522A))
+                .background(Color(0xFFAEBE95))
                 .clickable(onClick = onAddToOrder),
             contentAlignment = Alignment.Center
         ) {
@@ -1864,7 +1864,7 @@ private fun AddItemQuantitySegment(
             fontWeight = FontWeight.SemiBold,
             fontSize = 20.sp,
             letterSpacing = 0.sp,
-            color = Color(0xFF4B522A)
+            color = Color(0xFFAEBE95)
         )
     }
 }
@@ -1888,8 +1888,8 @@ private fun OptionRow(
             modifier = Modifier
                 .size(18.dp)
                 .clip(RoundedCornerShape(if (radio) 50 else 4))
-                .border(1.dp, if (selected) Color(0xFF4B522A) else Color(0xFF9F9F9F), RoundedCornerShape(if (radio) 50 else 4))
-                .background(if (selected && !radio) Color(0xFF4B522A) else Color.White),
+                .border(1.dp, if (selected) Color(0xFFAEBE95) else Color(0xFF9F9F9F), RoundedCornerShape(if (radio) 50 else 4))
+                .background(if (selected && !radio) Color(0xFFAEBE95) else Color.White),
             contentAlignment = Alignment.Center
         ) {
             if (selected && radio) {
@@ -1897,7 +1897,7 @@ private fun OptionRow(
                     modifier = Modifier
                         .size(9.dp)
                         .clip(RoundedCornerShape(50))
-                        .background(Color(0xFF4B522A))
+                        .background(Color(0xFFAEBE95))
                 )
             }
         }
@@ -1933,7 +1933,7 @@ private fun OrderTableOption(
         modifier = modifier
             .height(54.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) Color(0xFF4B522A) else Color.White)
+            .background(if (selected) Color(0xFFAEBE95) else Color.White)
             .border(
                 width = if (selected) 0.dp else 1.dp,
                 color = Color(0xFFE7E1DC),
@@ -1975,7 +1975,7 @@ private fun OrderTableOption(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
-                    tint = Color(0xFF4B522A)
+                    tint = Color(0xFFAEBE95)
                 )
             }
         }
@@ -2001,7 +2001,7 @@ private fun StepperButton(
             fontWeight = FontWeight.SemiBold,
             fontSize = 20.sp,
             letterSpacing = 0.sp,
-            color = Color(0xFF4B522A)
+            color = Color(0xFFAEBE95)
         )
     }
 }
@@ -2206,7 +2206,7 @@ private fun MergeModeToolbar(
             modifier = Modifier
                 .height(36.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(if (canDone) Color(0xFF4B522A) else Color(0xFFE7E7E4)),
+                .background(if (canDone) Color(0xFFAEBE95) else Color(0xFFE7E7E4)),
             shape = RoundedCornerShape(8.dp),
             contentPadding = PaddingValues(horizontal = 16.dp),
             colors = ButtonDefaults.textButtonColors(
@@ -2253,7 +2253,7 @@ private fun BoxScope.StatusFilterOverlays(
             count = statusCount(tables, TableVisualState.Free),
             icon = Icons.Filled.CheckCircle,
             iconBackground = Color(0xFFE5EBD8),
-            iconTint = Color(0xFF4B522A),
+            iconTint = Color(0xFFAEBE95),
             selected = TableVisualState.Free in selectedStatuses,
             onClick = { onStatusToggled(TableVisualState.Free) }
         )
@@ -2416,7 +2416,7 @@ private fun FloorSwitcher(
                     .weight(1f)
                     .height(40.dp)
                     .clip(RoundedCornerShape(9.dp))
-                    .background(if (selected) Color(0xFF4B522A) else Color.Transparent),
+                    .background(if (selected) Color(0xFFAEBE95) else Color.Transparent),
                 shape = RoundedCornerShape(9.dp),
                 contentPadding = PaddingValues(horizontal = 8.dp),
                 colors = ButtonDefaults.textButtonColors(
@@ -2472,7 +2472,7 @@ private fun PlanMoveButton(
         modifier = modifier
             .size(32.dp)
             .shadow(5.dp, RoundedCornerShape(50))
-            .background(Color(0xFF4B522A), RoundedCornerShape(50))
+            .background(Color(0xFFAEBE95), RoundedCornerShape(50))
             .border(2.dp, Color.White, RoundedCornerShape(50))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center

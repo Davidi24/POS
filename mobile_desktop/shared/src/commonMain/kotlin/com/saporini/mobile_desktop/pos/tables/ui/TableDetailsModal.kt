@@ -583,7 +583,7 @@ private fun FloorPlanTable.statusLabel(): String =
 
 private fun FloorPlanTable.statusColor(): Color =
     when (state) {
-        TableVisualState.Free -> Color(0xFF4B522A)
+        TableVisualState.Free -> Color(0xFFAEBE95)
         TableVisualState.Occupied -> Color(0xFFB86A0B)
         TableVisualState.Reserved -> Color(0xFFC47A18)
         TableVisualState.BillPending -> Color(0xFF2F6FB1)

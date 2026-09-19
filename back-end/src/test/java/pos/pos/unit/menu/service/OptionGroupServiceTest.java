@@ -11,8 +11,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.menu.OptionGroupDeletionBlockedException;
-import pos.pos.menu.dto.CreateOptionGroupRequest;
-import pos.pos.menu.dto.OptionGroupResponse;
+import pos.pos.menu.dto.request.CreateOptionGroupRequest;
+import pos.pos.menu.dto.response.OptionGroupResponse;
 import pos.pos.menu.entity.OptionGroup;
 import pos.pos.menu.entity.OptionGroupType;
 import pos.pos.menu.entity.OptionItem;
@@ -150,7 +150,7 @@ class OptionGroupServiceTest {
         assertThatThrownBy(() -> optionGroupService.updateOptionGroup(
                 authentication(),
                 GROUP_ID,
-                pos.pos.menu.dto.UpdateOptionGroupRequest.builder()
+                pos.pos.menu.dto.update.UpdateOptionGroupRequest.builder()
                         .typeId(TYPE_ID)
                         .name("Sauces")
                         .required(false)

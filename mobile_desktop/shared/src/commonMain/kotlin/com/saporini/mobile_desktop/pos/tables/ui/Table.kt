@@ -98,10 +98,10 @@ fun Table(
 private fun tableColors(state: TableVisualState, servedProgress: Float = 0f): TableColors =
     when (state) {
         TableVisualState.Free -> TableColors(
-            surface = Color(0xFF4B522A),
-            border = Color(0xFF4B522A),
+            surface = Color(0xFFAEBE95),
+            border = Color(0xFFAEBE95),
             labelBackground = Color(0xFFF3F6EC),
-            content = Color(0xFF4B522A)
+            content = Color(0xFFAEBE95)
         )
 
         TableVisualState.Occupied -> TableColors(

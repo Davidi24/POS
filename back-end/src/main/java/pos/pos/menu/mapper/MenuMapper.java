@@ -1,15 +1,15 @@
 package pos.pos.menu.mapper;
 
 import org.springframework.stereotype.Component;
-import pos.pos.menu.dto.OptionGroupResponse;
-import pos.pos.menu.dto.OptionItemResponse;
-import pos.pos.menu.dto.MenuItemSummaryResponse;
-import pos.pos.menu.dto.MenuItemOptionGroupSummaryResponse;
-import pos.pos.menu.dto.MenuResponse;
-import pos.pos.menu.dto.OptionGroupTypeResponse;
-import pos.pos.menu.dto.MenuRestaurantSummaryResponse;
-import pos.pos.menu.dto.MenuSectionSummaryResponse;
-import pos.pos.menu.dto.MenuVariantSummaryResponse;
+import pos.pos.menu.dto.response.OptionGroupResponse;
+import pos.pos.menu.dto.response.OptionItemResponse;
+import pos.pos.menu.dto.response.MenuItemSummaryResponse;
+import pos.pos.menu.dto.response.MenuItemOptionGroupSummaryResponse;
+import pos.pos.menu.dto.response.MenuResponse;
+import pos.pos.menu.dto.response.OptionGroupTypeResponse;
+import pos.pos.menu.dto.response.MenuRestaurantSummaryResponse;
+import pos.pos.menu.dto.response.MenuSectionSummaryResponse;
+import pos.pos.menu.dto.response.MenuVariantSummaryResponse;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuItemOptionGroup;
@@ -26,16 +26,17 @@ import java.util.UUID;
 @Component
 public class MenuMapper {
 
-    public MenuResponse toMenuResponse(Menu menu) {
-        return toMenuResponse(menu, null, Map.of());
+    public MenuResponse toMenuResponse(Menu menu, Integer itemCount) {
+        return toMenuResponse(menu, null, Map.of(), itemCount);
     }
 
     public MenuResponse toMenuResponse(
             Menu menu,
             List<MenuSection> sections,
-            Map<UUID, List<MenuItem>> itemsBySectionId
+            Map<UUID, List<MenuItem>> itemsBySectionId,
+            Integer itemCount
     ) {
-        return toMenuResponse(menu, sections, itemsBySectionId, false, false, Map.of(), false, Map.of());
+        return toMenuResponse(menu, sections, itemsBySectionId, false, false, Map.of(), false, Map.of(), itemCount);
     }
 
     public MenuResponse toMenuResponse(
@@ -46,7 +47,8 @@ public class MenuMapper {
             boolean includeVariants,
             Map<UUID, List<MenuVariant>> variantsByItemId,
             boolean includeOptionGroups,
-            Map<UUID, List<MenuItemOptionGroup>> optionGroupsByItemId
+            Map<UUID, List<MenuItemOptionGroup>> optionGroupsByItemId,
+            Integer itemCount
     ) {
         if (menu == null) {
             return null;
@@ -60,6 +62,12 @@ public class MenuMapper {
                 .description(menu.getDescription())
                 .active(menu.isActive())
                 .displayOrder(menu.getDisplayOrder())
+                .availableFrom(menu.getAvailableFrom())
+                .availableUntil(menu.getAvailableUntil())
+                .availableFromDate(menu.getAvailableFromDate())
+                .availableUntilDate(menu.getAvailableUntilDate())
+                .color(menu.getColor())
+                .itemCount(itemCount)
                 .createdBy(menu.getCreatedBy())
                 .updatedBy(menu.getUpdatedBy())
                 .createdAt(menu.getCreatedAt())
@@ -139,6 +147,7 @@ public class MenuMapper {
                 .imageUrl(item.getImageUrl())
                 .available(item.isAvailable())
                 .displayOrder(item.getDisplayOrder())
+                .ingredients(List.copyOf(item.getIngredients()))
                 .variants(variants == null ? null : variants.stream().map(this::toMenuVariantSummaryResponse).toList())
                 .optionGroups(optionGroups == null ? null : optionGroups.stream().map(this::toMenuItemOptionGroupSummaryResponse).toList())
                 .build();

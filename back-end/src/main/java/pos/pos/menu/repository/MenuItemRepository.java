@@ -40,4 +40,26 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, UUID> {
     List<MenuItem> findBySectionIdAndAvailableOrderByDisplayOrderAscNameAsc(UUID sectionId, boolean available);
 
     boolean existsBySectionId(UUID sectionId);
+
+    @Query("""
+        SELECT COUNT(i)
+        FROM MenuItem i
+        JOIN i.section s
+        WHERE s.menu.id = :menuId
+    """)
+    long countByMenuId(UUID menuId);
+
+    @Query("""
+        SELECT s.menu.id AS menuId, COUNT(i) AS itemCount
+        FROM MenuItem i
+        JOIN i.section s
+        WHERE s.menu.id IN :menuIds
+        GROUP BY s.menu.id
+    """)
+    List<MenuItemCountRow> countItemsByMenuIds(List<UUID> menuIds);
+
+    interface MenuItemCountRow {
+        UUID getMenuId();
+        Long getItemCount();
+    }
 }

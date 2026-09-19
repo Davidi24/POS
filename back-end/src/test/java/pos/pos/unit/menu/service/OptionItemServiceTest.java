@@ -10,8 +10,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import pos.pos.exception.menu.OptionItemGroupMismatchException;
-import pos.pos.menu.dto.CreateOptionItemRequest;
-import pos.pos.menu.dto.OptionItemResponse;
+import pos.pos.menu.dto.request.CreateOptionItemRequest;
+import pos.pos.menu.dto.response.OptionItemResponse;
 import pos.pos.menu.entity.OptionGroup;
 import pos.pos.menu.entity.OptionGroupType;
 import pos.pos.menu.entity.OptionItem;
@@ -136,7 +136,7 @@ class OptionItemServiceTest {
                 authentication(),
                 GROUP_ID,
                 ITEM_ID,
-                pos.pos.menu.dto.UpdateOptionItemRequest.builder()
+                pos.pos.menu.dto.update.UpdateOptionItemRequest.builder()
                         .name("Bacon")
                         .available(true)
                         .displayOrder(1)

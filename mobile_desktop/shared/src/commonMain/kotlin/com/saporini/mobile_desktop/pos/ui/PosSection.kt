@@ -8,5 +8,6 @@ enum class PosSection(val label: String) {
     KITCHEN_STATUS("Kitchen Status"),
     SHIFT("Shift"),
     MY_SALES("My Sales"),
-    HISTORY("History")
+    HISTORY("History"),
+    PROFILE("Profile")
 }

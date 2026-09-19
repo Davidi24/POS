@@ -12,10 +12,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.menu.controller.OptionGroupController;
-import pos.pos.menu.dto.CreateOptionGroupRequest;
-import pos.pos.menu.dto.OptionGroupResponse;
-import pos.pos.menu.dto.OptionGroupTypeResponse;
-import pos.pos.menu.dto.UpdateOptionGroupRequest;
+import pos.pos.menu.dto.request.CreateOptionGroupRequest;
+import pos.pos.menu.dto.response.OptionGroupResponse;
+import pos.pos.menu.dto.response.OptionGroupTypeResponse;
+import pos.pos.menu.dto.update.UpdateOptionGroupRequest;
 import pos.pos.menu.service.OptionGroupService;
 import pos.pos.security.principal.AuthenticatedUser;
 

@@ -12,11 +12,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.menu.controller.MenuItemController;
-import pos.pos.menu.dto.CreateMenuItemRequest;
-import pos.pos.menu.dto.MenuItemSummaryResponse;
-import pos.pos.menu.dto.MenuVariantSummaryResponse;
-import pos.pos.menu.dto.UpdateMenuItemAvailabilityRequest;
-import pos.pos.menu.dto.UpdateMenuItemRequest;
+import pos.pos.menu.dto.request.CreateMenuItemRequest;
+import pos.pos.menu.dto.response.MenuItemSummaryResponse;
+import pos.pos.menu.dto.response.MenuVariantSummaryResponse;
+import pos.pos.menu.dto.update.UpdateMenuItemAvailabilityRequest;
+import pos.pos.menu.dto.update.UpdateMenuItemRequest;
 import pos.pos.menu.service.MenuItemService;
 import pos.pos.security.principal.AuthenticatedUser;
 
