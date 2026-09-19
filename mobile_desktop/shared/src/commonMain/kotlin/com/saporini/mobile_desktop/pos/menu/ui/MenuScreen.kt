@@ -325,7 +325,7 @@ fun MenuScreen(
                     if (deletedId != null) {
                         menuStatus = DialogActionStatus.Loading("Deleting")
                         screenModel.deleteMenu(deletedId) {
-                            menuStatus = DialogActionStatus.Success("${deletedName ?: "Menu"} deleted")
+                            menuStatus = DialogActionStatus.Removed("${deletedName ?: "Menu"} deleted")
                         }
                     }
                 },
@@ -1066,7 +1066,7 @@ private fun MenuDetailsContent(
                                         screenModel.deleteItem(menu.id, sectionId, itemId).fold(
                                             onSuccess = {
                                                 localItems = localItems.filterNot { it === deletingItem }
-                                                deleteItemStatus = DialogActionStatus.Success("${deletingItem.name} deleted")
+                                                deleteItemStatus = DialogActionStatus.Removed("${deletingItem.name} deleted")
                                             },
                                             onFailure = { error ->
                                                 deleteItemStatus = DialogActionStatus.Failed(

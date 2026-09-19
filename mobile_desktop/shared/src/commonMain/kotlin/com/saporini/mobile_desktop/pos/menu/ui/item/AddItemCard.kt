@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,8 +41,8 @@ internal fun AddItemCard(
 
     Box(
         modifier = modifier
+            .aspectRatio(1.4f)
             .fillMaxSize()
-            .heightIn(min = 220.dp)
             .padding(40.dp)
             .clip(shape)
             .background(Color(0xFFF3F3F1))

@@ -649,7 +649,7 @@ private fun DeleteSectionDialog(
                         status = DialogActionStatus.Loading("Deleting")
                         scope.launch {
                             onDeleteSection(section.id!!).fold(
-                                onSuccess = { status = DialogActionStatus.Success("${section.name} deleted") },
+                                onSuccess = { status = DialogActionStatus.Removed("${section.name} deleted") },
                                 onFailure = { error ->
                                     status = DialogActionStatus.Failed(message = error.message ?: "Could not delete this section.")
                                 }
