@@ -11,8 +11,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import pos.pos.exception.menu.MenuSectionDeletionBlockedException;
 import pos.pos.exception.menu.MenuSectionMenuMismatchException;
-import pos.pos.menu.dto.CreateMenuSectionRequest;
-import pos.pos.menu.dto.MenuSectionSummaryResponse;
+import pos.pos.menu.dto.request.CreateMenuSectionRequest;
+import pos.pos.menu.dto.response.MenuSectionSummaryResponse;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;

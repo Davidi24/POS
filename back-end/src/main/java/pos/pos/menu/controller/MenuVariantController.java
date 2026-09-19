@@ -16,9 +16,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import pos.pos.menu.dto.CreateMenuVariantRequest;
-import pos.pos.menu.dto.MenuVariantSummaryResponse;
-import pos.pos.menu.dto.UpdateMenuVariantRequest;
+import pos.pos.menu.dto.request.CreateMenuVariantRequest;
+import pos.pos.menu.dto.response.MenuVariantSummaryResponse;
+import pos.pos.menu.dto.update.UpdateMenuVariantRequest;
 import pos.pos.menu.service.MenuVariantService;
 
 import java.util.List;

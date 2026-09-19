@@ -29,6 +29,7 @@ kotlin {
 
     sourceSets {
         androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.ktor.clientOkhttp)
         }
@@ -51,6 +52,7 @@ kotlin {
             implementation(libs.ktor.clientLogging)
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             implementation(libs.kotlinx.coroutinesCore)
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
             implementation(libs.ktor.clientAuth)
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.screenmodel)
@@ -58,7 +60,7 @@ kotlin {
             implementation(libs.jna)
             implementation(libs.androidx.datastore.preferences)
             implementation(libs.tink.android)
-            implementation(compose.materialIconsExtended)
+            implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
             implementation(libs.koin.core)
             implementation(libs.koin.compose)
             implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")

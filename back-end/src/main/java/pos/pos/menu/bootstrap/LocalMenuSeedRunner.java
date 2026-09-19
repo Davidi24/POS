@@ -183,6 +183,9 @@ public class LocalMenuSeedRunner implements CommandLineRunner {
         menu.setDescription(spec.description());
         menu.setActive(spec.active());
         menu.setDisplayOrder(spec.displayOrder());
+        menu.setAvailableFrom(spec.availableFrom());
+        menu.setAvailableUntil(spec.availableUntil());
+        menu.setColor(spec.color());
         return menuRepository.save(menu);
     }
 
@@ -214,6 +217,7 @@ public class LocalMenuSeedRunner implements CommandLineRunner {
         item.setImageUrl(spec.imageUrl());
         item.setAvailable(spec.available());
         item.setDisplayOrder(spec.displayOrder());
+        item.setIngredients(spec.ingredients());
         return menuItemRepository.save(item);
     }
 

@@ -12,10 +12,10 @@ import pos.pos.exception.menu.MenuItemSectionMismatchException;
 import pos.pos.exception.menu.MenuNotFoundException;
 import pos.pos.exception.menu.MenuSectionMenuMismatchException;
 import pos.pos.exception.menu.MenuSectionNotFoundException;
-import pos.pos.menu.dto.CreateMenuItemRequest;
-import pos.pos.menu.dto.MenuItemSummaryResponse;
-import pos.pos.menu.dto.UpdateMenuItemAvailabilityRequest;
-import pos.pos.menu.dto.UpdateMenuItemRequest;
+import pos.pos.menu.dto.request.CreateMenuItemRequest;
+import pos.pos.menu.dto.response.MenuItemSummaryResponse;
+import pos.pos.menu.dto.update.UpdateMenuItemAvailabilityRequest;
+import pos.pos.menu.dto.update.UpdateMenuItemRequest;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuItemOptionGroup;
@@ -107,6 +107,7 @@ public class MenuItemService {
         item.setImageUrl(NormalizationUtils.normalize(request.getImageUrl()));
         item.setAvailable(request.getAvailable() == null || request.getAvailable());
         item.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
+        item.setIngredients(request.getIngredients());
 
         return menuMapper.toMenuItemResponse(menuItemRepository.saveAndFlush(item));
     }
@@ -131,6 +132,7 @@ public class MenuItemService {
         item.setImageUrl(NormalizationUtils.normalize(request.getImageUrl()));
         item.setAvailable(Boolean.TRUE.equals(request.getAvailable()));
         item.setDisplayOrder(request.getDisplayOrder());
+        item.setIngredients(request.getIngredients());
 
         return menuMapper.toMenuItemResponse(menuItemRepository.saveAndFlush(item));
     }

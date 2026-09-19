@@ -9,7 +9,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pos.pos.exception.menu.MenuNotFoundException;
 import pos.pos.exception.restaurant.RestaurantNotFoundException;
-import pos.pos.menu.dto.PublicMenuResponse;
+import pos.pos.menu.dto.response.PublicMenuResponse;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
@@ -126,6 +126,7 @@ class PublicMenuServiceTest {
         restaurant.setName("POS Main");
         restaurant.setActive(active);
         restaurant.setStatus(status);
+        restaurant.setTimezone("UTC");
         return restaurant;
     }
 

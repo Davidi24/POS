@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import pos.pos.menu.dto.CreateOptionGroupTypeRequest;
-import pos.pos.menu.dto.OptionGroupTypeResponse;
-import pos.pos.menu.dto.UpdateOptionGroupTypeRequest;
+import pos.pos.menu.dto.request.CreateOptionGroupTypeRequest;
+import pos.pos.menu.dto.response.OptionGroupTypeResponse;
+import pos.pos.menu.dto.update.UpdateOptionGroupTypeRequest;
 import pos.pos.menu.service.OptionGroupTypeService;
 
 import java.util.List;

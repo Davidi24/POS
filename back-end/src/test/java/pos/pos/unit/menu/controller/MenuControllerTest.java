@@ -16,11 +16,11 @@ import pos.pos.exception.menu.MenuItemSectionMismatchException;
 import pos.pos.exception.menu.MenuNotFoundException;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.menu.controller.MenuController;
-import pos.pos.menu.dto.CreateMenuRequest;
-import pos.pos.menu.dto.MenuResponse;
-import pos.pos.menu.dto.MenuRestaurantSummaryResponse;
-import pos.pos.menu.dto.UpdateMenuRequest;
-import pos.pos.menu.dto.UpdateMenuStatusRequest;
+import pos.pos.menu.dto.request.CreateMenuRequest;
+import pos.pos.menu.dto.response.MenuResponse;
+import pos.pos.menu.dto.response.MenuRestaurantSummaryResponse;
+import pos.pos.menu.dto.update.UpdateMenuRequest;
+import pos.pos.menu.dto.update.UpdateMenuStatusRequest;
 import pos.pos.menu.service.MenuService;
 import pos.pos.security.principal.AuthenticatedUser;
 
