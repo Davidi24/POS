@@ -839,6 +839,7 @@ private fun AddVariantDialog(
     var variantPriceDelta by remember { mutableStateOf("") }
     var attemptedSubmit by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
+    var addedVariant by remember { mutableStateOf<DraftVariant?>(null) }
     val trimmedName = variantName.trim()
     val priceValid = isValidPriceDelta(variantPriceDelta)
     val isDuplicate = trimmedName.isNotEmpty() &&
@@ -856,8 +857,8 @@ private fun AddVariantDialog(
             scope.launch {
                 onCreateVariant(trimmedName, parsePriceDelta(variantPriceDelta), displayOrder).fold(
                     onSuccess = { newId ->
+                        addedVariant = DraftVariant(trimmedName, formatPriceDelta(variantPriceDelta), newId)
                         status = DialogActionStatus.Success("$trimmedName added")
-                        onAdded(DraftVariant(trimmedName, formatPriceDelta(variantPriceDelta), newId))
                     },
                     onFailure = { error ->
                         status = DialogActionStatus.Failed(message = error.message ?: "Could not create this variant.")
@@ -935,7 +936,7 @@ private fun AddVariantDialog(
                     status = status,
                     onRetry = { status = DialogActionStatus.Idle },
                     onCancel = onDismiss,
-                    onSuccessSettled = {},
+                    onSuccessSettled = { addedVariant?.let(onAdded) },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -982,7 +983,7 @@ private fun EditVariantDialog(
 ) {
     val scope = rememberCoroutineScope()
     var variantName by remember(variant) { mutableStateOf(variant.name) }
-    var variantPriceDelta by remember(variant) { mutableStateOf(variant.priceDeltaLabel) }
+    var variantPriceDelta by remember(variant) { mutableStateOf(priceDeltaInputValue(variant.priceDeltaLabel)) }
     var attemptedSubmit by remember(variant) { mutableStateOf(false) }
     var status by remember(variant) { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
     val trimmedName = variantName.trim()
@@ -1160,7 +1161,7 @@ private fun DeleteVariantDialog(
                         status = DialogActionStatus.Loading("Deleting")
                         scope.launch {
                             onDeleteVariant(variant.id!!).fold(
-                                onSuccess = { status = DialogActionStatus.Success("${variant.name} deleted") },
+                                onSuccess = { status = DialogActionStatus.Removed("${variant.name} deleted") },
                                 onFailure = { error ->
                                     status = DialogActionStatus.Failed(message = error.message ?: "Could not delete this variant.")
                                 }
@@ -1204,9 +1205,9 @@ internal fun OptionsEditorDialog(
     onDismiss: () -> Unit,
     onSave: (List<DraftOptionGroup>) -> Unit
 ) {
-    val isPhoneLayout = isPhoneMenuWindow()
     var currentOptionGroups by remember { mutableStateOf(optionGroups) }
     var addOptionGroupOpen by remember { mutableStateOf(false) }
+    var optionGroupBeingEdited by remember { mutableStateOf<DraftOptionGroup?>(null) }
 
     MenuFormDialog(
         title = "Options",
@@ -1259,6 +1260,23 @@ internal fun OptionsEditorDialog(
                                 color = if (group.required) ItemEditorOlive else ItemEditorMuted
                             )
                             Spacer(Modifier.width(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.White)
+                                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(8.dp))
+                                    .clickable { optionGroupBeingEdited = group },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Edit,
+                                    contentDescription = "Edit ${group.name}",
+                                    modifier = Modifier.size(15.dp),
+                                    tint = ItemEditorInk
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
                             Box(
                                 modifier = Modifier
                                     .size(30.dp)
@@ -1320,239 +1338,343 @@ internal fun OptionsEditorDialog(
     }
 
     if (addOptionGroupOpen) {
-        var groupName by remember { mutableStateOf("") }
-        var groupRequired by remember { mutableStateOf(true) }
-        var choiceDrafts by remember { mutableStateOf(listOf(OptionChoiceInput("", ""))) }
-        val validChoices = choiceDrafts.filter { it.name.isNotBlank() }
-        val choicesValid = choiceDrafts.all { isValidPriceDelta(it.priceDelta) }
-        val canAddGroup = groupName.isNotBlank() && validChoices.isNotEmpty() && choicesValid
+        OptionGroupEditorDialog(
+            title = "Add option group",
+            existingGroups = currentOptionGroups,
+            onDismiss = { addOptionGroupOpen = false },
+            onSaved = { newGroup ->
+                currentOptionGroups = currentOptionGroups + newGroup
+                addOptionGroupOpen = false
+            }
+        )
+    }
 
-        MenuNestedDialog(
-            onDismissRequest = { addOptionGroupOpen = false },
-            containerColor = Color.White,
-            titleContentColor = ItemEditorInk,
-            textContentColor = ItemEditorMuted,
-            title = {
-                Text(
-                    text = "Add Options",
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    color = ItemEditorInk
-                )
-            },
-            text = {
-                Column(
-                    modifier = if (isPhoneLayout) Modifier else Modifier
-                        .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "A group of choices the guest picks from, like sauces or sides.",
-                        fontFamily = Inter(),
-                        fontSize = 13.sp,
-                        color = ItemEditorMuted
+    optionGroupBeingEdited?.let { editingGroup ->
+        OptionGroupEditorDialog(
+            title = "Edit option group",
+            group = editingGroup,
+            existingGroups = currentOptionGroups,
+            onDismiss = { optionGroupBeingEdited = null },
+            onSaved = { updatedGroup ->
+                currentOptionGroups = currentOptionGroups.map {
+                    if (it === editingGroup) updatedGroup else it
+                }
+                optionGroupBeingEdited = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun OptionGroupEditorDialog(
+    title: String,
+    existingGroups: List<DraftOptionGroup>,
+    onDismiss: () -> Unit,
+    onSaved: (DraftOptionGroup) -> Unit,
+    group: DraftOptionGroup? = null
+) {
+    val isPhoneLayout = isPhoneMenuWindow()
+    var groupName by remember(group) { mutableStateOf(group?.name.orEmpty()) }
+    var groupRequired by remember(group) { mutableStateOf(group?.required ?: true) }
+    var choiceDrafts by remember(group) {
+        mutableStateOf(
+            group?.choices?.map { choice ->
+                OptionChoiceInput(choice.name, priceDeltaInputValue(choice.priceDeltaLabel))
+            }?.takeIf { it.isNotEmpty() } ?: listOf(OptionChoiceInput("", ""))
+        )
+    }
+    var attemptedSubmit by remember(group) { mutableStateOf(false) }
+    val trimmedName = groupName.trim()
+    val validChoices = choiceDrafts.filter { it.name.isNotBlank() }
+    val choicesValid = choiceDrafts.all { isValidPriceDelta(it.priceDelta) }
+    val duplicateGroup = trimmedName.isNotBlank() &&
+        existingGroups.any { it !== group && it.name.equals(trimmedName, ignoreCase = true) }
+    val choiceNames = validChoices.map { it.name.trim().lowercase() }
+    val duplicateChoice = choiceNames.size != choiceNames.distinct().size
+    val canSave = trimmedName.length in 2..60 && validChoices.isNotEmpty() &&
+        choicesValid && !duplicateGroup && !duplicateChoice
+    val validationMessage = when {
+        trimmedName.isEmpty() -> "Option group name is required."
+        trimmedName.length < 2 -> "Use at least 2 characters for the group name."
+        duplicateGroup -> "An option group with this name already exists."
+        validChoices.isEmpty() -> "Add at least one choice."
+        duplicateChoice -> "Choice names in the same group must be unique."
+        !choicesValid -> "Use valid price adjustments, for example +2.00 or -1.50."
+        else -> null
+    }
+
+    fun saveGroup() {
+        if (!canSave) {
+            attemptedSubmit = true
+            return
+        }
+        onSaved(
+            DraftOptionGroup(
+                name = trimmedName,
+                required = groupRequired,
+                choices = validChoices.map { choice ->
+                    DraftOptionChoice(
+                        name = choice.name.trim(),
+                        priceDeltaLabel = formatPriceDelta(choice.priceDelta)
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        ItemEditorFieldLabel(text = "Group Name", required = true)
-                        OutlinedTextField(
-                            value = groupName,
-                            onValueChange = { groupName = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("e.g. Choose your sauce") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(8.dp),
-                            colors = itemEditorOutlinedTextFieldColors()
-                        )
-                    }
+                }
+            )
+        )
+    }
 
-                    Row(
+    MenuNestedDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        titleContentColor = ItemEditorInk,
+        textContentColor = ItemEditorMuted,
+        title = {
+            Text(
+                text = title,
+                fontFamily = Inter(),
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = ItemEditorInk
+            )
+        },
+        text = {
+            Column(
+                modifier = if (isPhoneLayout) {
+                    Modifier
+                } else {
+                    Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())
+                },
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Create a choice group guests can pick from, like sauces, sides, or doneness.",
+                    fontFamily = Inter(),
+                    fontSize = 13.sp,
+                    color = ItemEditorMuted
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ItemEditorFieldLabel(text = "Group Name", required = true)
+                    OutlinedTextField(
+                        value = groupName,
+                        onValueChange = { if (it.length <= 60) groupName = it },
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                        placeholder = { Text("e.g. Choose your sauce") },
+                        singleLine = true,
+                        isError = attemptedSubmit && (trimmedName.length < 2 || duplicateGroup),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = itemEditorOutlinedTextFieldColors()
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(ItemEditorSurface)
+                        .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
                         Text(
                             text = if (groupRequired) "Required" else "Optional",
-                            modifier = Modifier.weight(1f),
                             fontFamily = Inter(),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.sp,
                             color = ItemEditorInk
                         )
-                        Switch(
-                            checked = groupRequired,
-                            onCheckedChange = { groupRequired = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ItemEditorOlive
-                            )
+                        Text(
+                            text = if (groupRequired) {
+                                "Guests must choose from this group."
+                            } else {
+                                "Guests may skip this group."
+                            },
+                            fontFamily = Inter(),
+                            fontSize = 11.sp,
+                            color = ItemEditorMuted
                         )
                     }
+                    Switch(
+                        checked = groupRequired,
+                        onCheckedChange = { groupRequired = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = ItemEditorOlive
+                        )
+                    )
+                }
 
-                    ItemEditorFieldLabel(text = "Choices", required = true)
+                ItemEditorFieldLabel(text = "Choices", required = true)
 
-                    choiceDrafts.forEachIndexed { index, choice ->
-                        if (isPhoneLayout) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = choice.name,
-                                    onValueChange = { newValue ->
-                                        choiceDrafts = choiceDrafts.toMutableList().also {
-                                            it[index] = it[index].copy(name = newValue)
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    placeholder = { Text("Choice name") },
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = itemEditorOutlinedTextFieldColors()
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    OutlinedTextField(
-                                        value = choice.priceDelta,
-                                        onValueChange = { newValue ->
-                                            choiceDrafts = choiceDrafts.toMutableList().also {
-                                                it[index] = it[index].copy(priceDelta = newValue)
-                                            }
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        placeholder = { Text("Price adjustment (+0.00)") },
-                                        singleLine = true,
-                                        isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = itemEditorOutlinedTextFieldColors()
-                                    )
-                                    IconButton(
-                                        onClick = { choiceDrafts = choiceDrafts.filterIndexed { i, _ -> i != index } },
-                                        enabled = choiceDrafts.size > 1,
-                                        modifier = Modifier.size(44.dp)
-                                    ) {
-                                        Icon(Icons.Outlined.Close, "Remove choice", tint = ItemEditorMuted)
-                                    }
-                                }
+                choiceDrafts.forEachIndexed { index, choice ->
+                    OptionChoiceEditorRow(
+                        choice = choice,
+                        isPhone = isPhoneLayout,
+                        canRemove = choiceDrafts.size > 1,
+                        onNameChange = { newValue ->
+                            choiceDrafts = choiceDrafts.toMutableList().also {
+                                it[index] = it[index].copy(name = newValue)
                             }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedTextField(
-                                    value = choice.name,
-                                    onValueChange = { newValue ->
-                                        choiceDrafts = choiceDrafts.toMutableList().also {
-                                            it[index] = it[index].copy(name = newValue)
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1.4f),
-                                    placeholder = { Text("Choice name") },
-                                    singleLine = true,
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = itemEditorOutlinedTextFieldColors()
-                                )
-                                OutlinedTextField(
-                                    value = choice.priceDelta,
-                                    onValueChange = { newValue ->
-                                        choiceDrafts = choiceDrafts.toMutableList().also {
-                                            it[index] = it[index].copy(priceDelta = newValue)
-                                        }
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    placeholder = { Text("+0.00") },
-                                    singleLine = true,
-                                    isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = itemEditorOutlinedTextFieldColors()
-                                )
-                                IconButton(
-                                    onClick = {
-                                        if (choiceDrafts.size > 1) {
-                                            choiceDrafts = choiceDrafts.filterIndexed { i, _ -> i != index }
-                                        }
-                                    },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Close,
-                                        contentDescription = "Remove choice",
-                                        modifier = Modifier.size(15.dp),
-                                        tint = ItemEditorMuted
-                                    )
-                                }
+                        },
+                        onPriceChange = { newValue ->
+                            choiceDrafts = choiceDrafts.toMutableList().also {
+                                it[index] = it[index].copy(priceDelta = newValue)
+                            }
+                        },
+                        onRemove = {
+                            if (choiceDrafts.size > 1) {
+                                choiceDrafts = choiceDrafts.filterIndexed { i, _ -> i != index }
                             }
                         }
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(ItemEditorOlive)
-                            .clickable { choiceDrafts = choiceDrafts + OptionChoiceInput("", "") }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                            tint = Color.White
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Add another choice",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp,
-                            color = Color.White
-                        )
-                    }
+                    )
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        currentOptionGroups = currentOptionGroups + DraftOptionGroup(
-                            name = groupName.trim(),
-                            required = groupRequired,
-                            choices = validChoices.map { choice ->
-                                DraftOptionChoice(
-                                    name = choice.name.trim(),
-                                    priceDeltaLabel = formatPriceDelta(choice.priceDelta)
-                                )
-                            }
-                        )
-                        addOptionGroupOpen = false
-                    },
-                    enabled = canAddGroup,
-                    shape = RoundedCornerShape(9.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
+
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ItemEditorOlive)
+                        .clickable { choiceDrafts = choiceDrafts + OptionChoiceInput("", "") }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = Color.White
+                    )
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "Add",
+                        text = "Add another choice",
                         fontFamily = Inter(),
                         fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
                         color = Color.White
                     )
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { addOptionGroupOpen = false }) {
+
+                if (attemptedSubmit && validationMessage != null) {
                     Text(
-                        text = "Cancel",
+                        text = validationMessage,
                         fontFamily = Inter(),
-                        fontWeight = FontWeight.SemiBold,
-                        color = ItemEditorMuted
+                        fontSize = 12.sp,
+                        color = Color(0xFFB13A2F)
                     )
                 }
             }
-        )
+        },
+        confirmButton = {
+            Button(
+                onClick = { saveGroup() },
+                enabled = canSave || !attemptedSubmit,
+                shape = RoundedCornerShape(9.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
+            ) {
+                Text(
+                    text = if (group == null) "Add" else "Save",
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Cancel",
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.SemiBold,
+                    color = ItemEditorMuted
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun OptionChoiceEditorRow(
+    choice: OptionChoiceInput,
+    isPhone: Boolean,
+    canRemove: Boolean,
+    onNameChange: (String) -> Unit,
+    onPriceChange: (String) -> Unit,
+    onRemove: () -> Unit
+) {
+    if (isPhone) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = choice.name,
+                onValueChange = onNameChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Choice name") },
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp),
+                colors = itemEditorOutlinedTextFieldColors()
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = choice.priceDelta,
+                    onValueChange = onPriceChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Price adjustment (+0.00)") },
+                    singleLine = true,
+                    isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = itemEditorOutlinedTextFieldColors()
+                )
+                IconButton(
+                    onClick = onRemove,
+                    enabled = canRemove,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(Icons.Outlined.Close, "Remove choice", tint = ItemEditorMuted)
+                }
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = choice.name,
+                onValueChange = onNameChange,
+                modifier = Modifier.weight(1.4f),
+                placeholder = { Text("Choice name") },
+                singleLine = true,
+                shape = RoundedCornerShape(8.dp),
+                colors = itemEditorOutlinedTextFieldColors()
+            )
+            OutlinedTextField(
+                value = choice.priceDelta,
+                onValueChange = onPriceChange,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("+0.00") },
+                singleLine = true,
+                isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
+                shape = RoundedCornerShape(8.dp),
+                colors = itemEditorOutlinedTextFieldColors()
+            )
+            IconButton(
+                onClick = onRemove,
+                enabled = canRemove,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = "Remove choice",
+                    modifier = Modifier.size(15.dp),
+                    tint = ItemEditorMuted
+                )
+            }
+        }
     }
 }
 
@@ -1838,4 +1960,16 @@ private fun formatPriceDelta(raw: String): String {
     val centsText = if (remainder < 10) "0$remainder" else "$remainder"
     val sign = if (negative) "-" else "+"
     return "$sign$$dollars.$centsText"
+}
+
+private fun priceDeltaInputValue(label: String): String {
+    val trimmed = label.trim()
+    if (trimmed.isBlank()) return ""
+    val sign = when {
+        trimmed.startsWith("-") -> "-"
+        trimmed.startsWith("+") -> "+"
+        else -> ""
+    }
+    val number = trimmed.filter { it.isDigit() || it == '.' }
+    return if (number.isBlank()) "" else sign + number
 }

@@ -50,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -88,6 +87,7 @@ internal sealed interface DialogActionStatus {
     data object Idle : DialogActionStatus
     data class Loading(val label: String = "Saving") : DialogActionStatus
     data class Success(val title: String) : DialogActionStatus
+    data class Removed(val title: String) : DialogActionStatus
     data class Failed(val title: String = "Something went wrong", val message: String? = null) : DialogActionStatus
 }
 
@@ -130,6 +130,29 @@ internal fun DialogStatusBody(
                     AnimatedStatusIcon(
                         icon = Icons.Outlined.Check,
                         color = FormSuccessGreen,
+                        size = 96.dp,
+                        strokeWidth = 2.5.dp
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = status.title,
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    color = FormInk,
+                    textAlign = TextAlign.Center
+                )
+            }
+            is DialogActionStatus.Removed -> {
+                LaunchedEffect(status) {
+                    delay(1100)
+                    onSuccessSettled()
+                }
+                key(status) {
+                    AnimatedStatusIcon(
+                        icon = Icons.Outlined.DeleteOutline,
+                        color = FormErrorRed,
                         size = 96.dp,
                         strokeWidth = 2.5.dp
                     )
@@ -405,7 +428,7 @@ internal fun MenuFormDialog(
 @Composable
 internal fun MenuNestedDialog(
     onDismissRequest: () -> Unit,
-    shape: Shape = RectangleShape,
+    shape: Shape = RoundedCornerShape(12.dp),
     containerColor: Color = Color.White,
     titleContentColor: Color = FormInk,
     textContentColor: Color = FormMuted,

@@ -73,121 +73,255 @@ internal fun ItemDetailDialog(
         if (isPhone) {
             PhoneItemDetails(item = item, onDismiss = onDismiss)
         } else {
-            Box(
+            DesktopItemDetails(item = item, onDismiss = onDismiss)
+        }
+    }
+}
+
+@Composable
+private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.34f))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.70f)
+                .widthIn(min = 760.dp, max = 920.dp)
+                .fillMaxHeight(0.82f)
+                .shadow(24.dp, RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White)
+                .border(1.dp, Border, RoundedCornerShape(14.dp))
+        ) {
+            Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.34f))
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                Row(
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.76f)
-                        .widthIn(min = 760.dp, max = 980.dp)
-                        .fillMaxHeight(0.84f)
-                        .shadow(28.dp, RoundedCornerShape(18.dp))
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color.White)
+                        .width(242.dp)
+                        .height(162.dp)
+                        .clip(RoundedCornerShape(12.dp))
                 ) {
+                    Image(
+                        painter = painterResource(Res.drawable.auth_login_img),
+                        contentDescription = item.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    AvailabilityButton(
+                        available = item.available,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(12.dp)
+                    )
                     Column(
                         modifier = Modifier
-                            .weight(0.44f)
-                            .fillMaxHeight()
-                            .background(Color(0xFF171914))
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.52f))
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
+                        Text(
+                            text = item.category.uppercase(),
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.5.sp,
+                            color = Color.White.copy(alpha = 0.74f)
+                        )
+                        Text(
+                            text = item.name,
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            lineHeight = 20.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(
+                                text = "ITEM DETAILS",
+                                fontFamily = Inter(),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                letterSpacing = 1.sp,
+                                color = ActiveOlive
+                            )
+                            Text(
+                                text = item.category + (item.sku?.let { "  •  SKU $it" } ?: ""),
+                                fontFamily = Inter(),
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                color = MutedInk
+                            )
+                        }
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(ItemDetailSurface)
+                                .border(1.dp, Border, RoundedCornerShape(50))
+                                .clickable(onClick = onDismiss),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Image(
-                                painter = painterResource(Res.drawable.auth_login_img),
-                                contentDescription = item.name,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "Close",
+                                modifier = Modifier.size(20.dp),
+                                tint = TextInk
                             )
+                        }
+                    }
 
-                            AvailabilityButton(
-                                available = item.available,
-                                modifier = Modifier
-                                    .align(Alignment.TopStart)
-                                    .padding(18.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = item.name,
+                            modifier = Modifier.weight(1f),
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 30.sp,
+                            lineHeight = 34.sp,
+                            color = TextInk
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFF1F4EC))
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = item.price,
+                                fontFamily = Inter(),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = TextInk
                             )
+                        }
+                    }
 
-                            Column(
+                    Text(
+                        text = item.description.ifBlank { "No description added." },
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                        color = if (item.description.isNotBlank()) MutedInk else ItemDetailEmptyText
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Border)
+
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                DesktopDetailPanel(
+                    title = "Recipe / Ingredients",
+                    modifier = Modifier
+                        .weight(0.95f)
+                        .fillMaxHeight()
+                ) {
+                    if (item.ingredients.isEmpty()) {
+                        DesktopDetailEmptyText("No ingredients added.")
+                    } else {
+                        item.ingredients.forEach { ingredient ->
+                            Row(
                                 modifier = Modifier
-                                    .align(Alignment.BottomStart)
                                     .fillMaxWidth()
-                                    .background(Color.Black.copy(alpha = 0.62f))
-                                    .padding(horizontal = 22.dp, vertical = 18.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(Color.White)
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "MENU PREVIEW",
-                                    fontFamily = Inter(),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp,
-                                    letterSpacing = 1.2.sp,
-                                    color = Color.White.copy(alpha = 0.68f)
+                                Image(
+                                    painter = painterResource(Res.drawable.auth_login_img),
+                                    contentDescription = ingredient.name,
+                                    modifier = Modifier
+                                        .size(width = 40.dp, height = 34.dp)
+                                        .clip(RoundedCornerShape(7.dp)),
+                                    contentScale = ContentScale.Crop
                                 )
+                                Spacer(Modifier.width(10.dp))
                                 Text(
-                                    text = item.category,
+                                    text = ingredient.name,
+                                    modifier = Modifier.weight(1f),
                                     fontFamily = Inter(),
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp,
-                                    color = Color.White
+                                    fontSize = 13.sp,
+                                    color = TextInk
                                 )
+                                val amount = "${ingredient.quantity} ${ingredient.unit}".trim()
+                                if (amount.isNotBlank()) {
+                                    Text(
+                                        text = amount,
+                                        fontFamily = Inter(),
+                                        fontSize = 12.sp,
+                                        color = MutedInk
+                                    )
+                                }
                             }
                         }
+                    }
+                }
 
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .background(Color.White)
-                                .verticalScroll(rememberScrollState())
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(9.dp)
-                        ) {
-                            ItemDetailSectionLabel(text = "Recipe / Ingredients")
-                            if (item.ingredients.isEmpty()) {
-                                Text(
-                                    text = "No ingredients added.",
-                                    fontFamily = Inter(),
-                                    fontSize = 13.sp,
-                                    color = ItemDetailEmptyText
-                                )
-                            } else {
-                                item.ingredients.forEach { ingredient ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(ItemDetailSurface)
-                                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Image(
-                                            painter = painterResource(Res.drawable.auth_login_img),
-                                            contentDescription = ingredient.name,
-                                            modifier = Modifier
-                                                .size(width = 44.dp, height = 36.dp)
-                                                .clip(RoundedCornerShape(6.dp)),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                        Spacer(Modifier.width(10.dp))
+                Column(
+                    modifier = Modifier.weight(1.35f),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    DesktopDetailPanel(title = "Variants") {
+                        if (item.variants.isEmpty()) {
+                            DesktopDetailEmptyText("No variants added.")
+                        } else {
+                            item.variants.forEach { variant ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .background(Color.White)
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = variant.name,
+                                        modifier = Modifier.weight(1f),
+                                        fontFamily = Inter(),
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        color = TextInk
+                                    )
+                                    if (variant.priceDeltaLabel.isNotBlank()) {
                                         Text(
-                                            text = ingredient.name,
-                                            modifier = Modifier.weight(1f),
+                                            text = variant.priceDeltaLabel,
                                             fontFamily = Inter(),
-                                            fontWeight = FontWeight.SemiBold,
                                             fontSize = 12.sp,
-                                            color = TextInk
-                                        )
-                                        Text(
-                                            text = "${ingredient.quantity} ${ingredient.unit}".trim(),
-                                            fontFamily = Inter(),
-                                            fontSize = 11.sp,
                                             color = MutedInk
                                         )
                                     }
@@ -196,248 +330,94 @@ internal fun ItemDetailDialog(
                         }
                     }
 
-                    Column(
-                        modifier = Modifier
-                            .weight(0.56f)
-                            .fillMaxHeight()
-                            .background(Color.White)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 24.dp, end = 18.dp, top = 16.dp, bottom = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Text(
-                                    text = "ITEM DETAILS",
-                                    fontFamily = Inter(),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    letterSpacing = 1.sp,
-                                    color = ActiveOlive
-                                )
-                                Text(
-                                    text = "Menu item overview",
-                                    fontFamily = Inter(),
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 10.sp,
-                                    color = MutedInk
-                                )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(RoundedCornerShape(50))
-                                    .background(ItemDetailSurface)
-                                    .border(1.dp, Border, RoundedCornerShape(50))
-                                    .clickable(onClick = onDismiss),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Close,
-                                    contentDescription = "Close",
-                                    modifier = Modifier.size(18.dp),
-                                    tint = TextInk
-                                )
-                            }
-                        }
-
-                        HorizontalDivider(color = Border)
-
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 24.dp, vertical = 20.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.Top
-                            ) {
+                    DesktopDetailPanel(title = "Options") {
+                        if (item.optionGroups.isEmpty()) {
+                            DesktopDetailEmptyText("No options added.")
+                        } else {
+                            item.optionGroups.forEach { group ->
                                 Column(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .background(Color.White)
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
                                     verticalArrangement = Arrangement.spacedBy(5.dp)
                                 ) {
-                                    Text(
-                                        text = item.name,
-                                        fontFamily = Inter(),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 25.sp,
-                                        lineHeight = 29.sp,
-                                        color = TextInk
-                                    )
-                                    Text(
-                                        text = item.category + (item.sku?.let { "  •  SKU $it" } ?: ""),
-                                        fontFamily = Inter(),
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.sp,
-                                        color = MutedInk
-                                    )
-                                }
-
-                                Spacer(Modifier.width(14.dp))
-
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0xFFF1F4EC))
-                                        .padding(horizontal = 14.dp, vertical = 9.dp)
-                                ) {
-                                    Text(
-                                        text = item.price,
-                                        fontFamily = Inter(),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 19.sp,
-                                        color = TextInk
-                                    )
-                                }
-                            }
-
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(ItemDetailSurface)
-                                    .border(1.dp, Border, RoundedCornerShape(12.dp))
-                                    .padding(15.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                ItemDetailSectionLabel(text = "Description")
-                                Text(
-                                    text = item.description.ifBlank { "No description added." },
-                                    fontFamily = Inter(),
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 14.sp,
-                                    lineHeight = 20.sp,
-                                    color = if (item.description.isNotBlank()) MutedInk else ItemDetailEmptyText
-                                )
-                            }
-
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(ItemDetailSurface)
-                                    .border(1.dp, Border, RoundedCornerShape(12.dp))
-                                    .padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(9.dp)
-                            ) {
-                                ItemDetailSectionLabel(text = "Variants")
-                                if (item.variants.isEmpty()) {
-                                    Text(
-                                        text = "No variants added.",
-                                        fontFamily = Inter(),
-                                        fontSize = 13.sp,
-                                        color = ItemDetailEmptyText
-                                    )
-                                } else {
-                                    item.variants.forEach { variant ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(Color.White)
-                                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = variant.name,
-                                                modifier = Modifier.weight(1f),
-                                                fontFamily = Inter(),
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 12.sp,
-                                                color = TextInk
-                                            )
-                                            if (variant.priceDeltaLabel.isNotBlank()) {
-                                                Text(
-                                                    text = variant.priceDeltaLabel,
-                                                    fontFamily = Inter(),
-                                                    fontSize = 11.sp,
-                                                    color = MutedInk
-                                                )
-                                            }
-                                        }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = group.name,
+                                            modifier = Modifier.weight(1f),
+                                            fontFamily = Inter(),
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 13.sp,
+                                            color = TextInk
+                                        )
+                                        Text(
+                                            text = if (group.required) "Required" else "Optional",
+                                            fontFamily = Inter(),
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 11.sp,
+                                            color = if (group.required) ActiveOlive else MutedInk
+                                        )
                                     }
-                                }
-                            }
-
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(ItemDetailSurface)
-                                    .border(1.dp, Border, RoundedCornerShape(12.dp))
-                                    .padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(9.dp)
-                            ) {
-                                ItemDetailSectionLabel(text = "Options")
-                                if (item.optionGroups.isEmpty()) {
-                                    Text(
-                                        text = "No options added.",
-                                        fontFamily = Inter(),
-                                        fontSize = 13.sp,
-                                        color = ItemDetailEmptyText
-                                    )
-                                } else {
-                                    item.optionGroups.forEach { group ->
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(Color.White)
-                                                .padding(horizontal = 11.dp, vertical = 9.dp),
-                                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    text = group.name,
-                                                    modifier = Modifier.weight(1f),
-                                                    fontFamily = Inter(),
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 12.sp,
-                                                    color = TextInk
-                                                )
-                                                Text(
-                                                    text = if (group.required) "Required" else "Optional",
-                                                    fontFamily = Inter(),
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    fontSize = 10.sp,
-                                                    color = if (group.required) ActiveOlive else MutedInk
-                                                )
-                                            }
-                                            Text(
-                                                text = group.choices.joinToString(separator = "  •  ") { choice ->
-                                                    if (choice.priceDeltaLabel.isNotBlank()) {
-                                                        "${choice.name} (${choice.priceDeltaLabel})"
-                                                    } else {
-                                                        choice.name
-                                                    }
-                                                },
-                                                fontFamily = Inter(),
-                                                fontSize = 11.sp,
-                                                color = MutedInk
-                                            )
-                                        }
+                                    if (group.choices.isEmpty()) {
+                                        DesktopDetailEmptyText("No choices shown.")
+                                    } else {
+                                        Text(
+                                            text = group.choices.joinToString(separator = "  •  ") { choice ->
+                                                if (choice.priceDeltaLabel.isNotBlank()) {
+                                                    "${choice.name} (${choice.priceDeltaLabel})"
+                                                } else {
+                                                    choice.name
+                                                }
+                                            },
+                                            fontFamily = Inter(),
+                                            fontSize = 12.sp,
+                                            lineHeight = 18.sp,
+                                            color = MutedInk
+                                        )
                                     }
                                 }
                             }
                         }
-
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun DesktopDetailPanel(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(ItemDetailSurface)
+            .border(1.dp, Border, RoundedCornerShape(12.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        ItemDetailSectionLabel(title)
+        content()
+    }
+}
+
+@Composable
+private fun DesktopDetailEmptyText(text: String) {
+    Text(
+        text = text,
+        fontFamily = Inter(),
+        fontSize = 13.sp,
+        lineHeight = 19.sp,
+        color = ItemDetailEmptyText
+    )
 }
 
 @Composable
@@ -459,7 +439,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
             modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Box(Modifier.fillMaxWidth().height(if (isWidePhone) 144.dp else 190.dp).clip(RoundedCornerShape(12.dp))) {
+            Box(Modifier.fillMaxWidth().height(if (isWidePhone) 116.dp else 150.dp).clip(RoundedCornerShape(12.dp))) {
                 Image(
                     painter = painterResource(Res.drawable.auth_login_img),
                     contentDescription = item.name,
