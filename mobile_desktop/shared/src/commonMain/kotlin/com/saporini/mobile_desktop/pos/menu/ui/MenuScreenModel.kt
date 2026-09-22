@@ -302,6 +302,22 @@ class MenuScreenModel(
         }
     }
 
+    suspend fun saveAllFilterPosition(menuId: String, position: Int): Result<Unit> = runSuspendCatching {
+        val current = repository.getMenu(menuId, true, true, true, true)
+        repository.updateMenu(menuId, UpdateMenuInput(
+            code = current.code, name = current.name, description = current.description,
+            active = current.active, displayOrder = current.displayOrder,
+            availableFrom = current.availableFrom, availableUntil = current.availableUntil,
+            availableFromDate = current.availableFromDate, availableUntilDate = current.availableUntilDate,
+            color = current.color, allFilterPosition = position
+        ))
+        val refreshed = current.copy(allFilterPosition = position)
+        _state.value = _state.value.copy(
+            selectedMenu = if (_state.value.selectedMenu?.id == menuId) refreshed else _state.value.selectedMenu,
+            menus = _state.value.menus.map { if (it.id == menuId) refreshed else it }
+        )
+    }
+
     suspend fun createSection(menuId: String, name: String, displayOrder: Int): Result<MenuSection> =
         runSuspendCatching {
             repository.createSection(menuId, MenuSectionInput(name = name, displayOrder = displayOrder))

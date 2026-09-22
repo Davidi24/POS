@@ -232,6 +232,9 @@ public class MenuService {
         menu.setDescription(NormalizationUtils.normalize(request.getDescription()));
         menu.setActive(Boolean.TRUE.equals(request.getActive()));//is the menu active or not
         menu.setDisplayOrder(request.getDisplayOrder());//saves the order position of the menu
+        if (request.getAllFilterPosition() != null) {
+            menu.setAllFilterPosition(request.getAllFilterPosition());
+        }
         menu.setAvailableFrom(request.getAvailableFrom());
         menu.setAvailableUntil(request.getAvailableUntil());
         menu.setAvailableFromDate(request.getAvailableFromDate());

@@ -32,6 +32,7 @@ public class MenuResponse implements MenuViewResponse {
     private String description;
     private Boolean active;
     private Integer displayOrder;
+    private Integer allFilterPosition;
     private LocalTime availableFrom;
     private LocalTime availableUntil;
     private LocalDate availableFromDate;

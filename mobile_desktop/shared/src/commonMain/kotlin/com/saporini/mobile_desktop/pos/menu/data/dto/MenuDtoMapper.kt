@@ -42,6 +42,7 @@ fun MenuResponseDto.toDomain(): Menu {
         updatedBy = updatedBy,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        allFilterPosition = allFilterPosition,
         sections = sections.map { it.toDomain() }
     )
 }
