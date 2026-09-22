@@ -13,6 +13,12 @@ Running handoff log for AI agents (Claude, Codex, or others) working on this rep
 
 ---
 
+## 2026-09-22 15:51 (Codex, feature/menu-final-polish)
+**Did:** All can now be dragged among section filters; only Uncategorized is pinned last. All remains protected from edit/delete and item creation. Added nullable menu allFilterPosition through entity, response/update DTOs, mapper, repository/domain, screen model, and Flyway V34. Omitted field preserves saved position for older clients; default is after regular sections and before Uncategorized. Rebuilding filters uses persisted position; first real section remains the initial selection.
+**Validation:** MenuServiceTest 8 tests passed (including persistence/omitted-field preservation). JVM build and 5 focused checks passed: 2 All/filter-order tests, existing fallback order test, Compose All selection/no-creation, and immediate fallback creation after section deletion. Single worker, 1280MB Gradle heap. No DB integration run or latest Android install this turn; deploy updated backend/V34 before app persistence works.
+**Git/next:** Branched all six earlier commits from local develop onto feature/menu-final-polish for a PR targeting origin/develop. Initial HTTPS push lacked credentials, SSH had no authorized key. User requested browser login; downloaded official gh to /tmp/pos-gh after verifying its official SHA256 (initial unverified download attempt was rejected by auto-review). GitHub device sign-in is pending in exec session 52329. PR description prepared at /tmp/pos-menu-pr.md; after login push branch, create PR into develop, and attach URL. Commit this change using David <101630664+Davidi24@users.noreply.github.com>.
+
+
 ## 2026-09-22 15:32 (Codex, develop)
 **Did:** Moved Add New Item after visible menu items on phones only in MenuScreen.kt; desktop keeps the add card first and All keeps it hidden.
 **Validation:** Android assembleDebug passed with single worker/1280 MB heap. Installed POS USB update on R5CRB29848E successfully preserving data, restored backend port forwarding and launched app. No additional UI tests for this small ordering change.

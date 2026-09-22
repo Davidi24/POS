@@ -134,7 +134,7 @@ internal fun SectionManagerDialog(
     // Same "looks disabled but stays clickable" pattern as Create Menu / Edit Order:
     // reordering needs 2+ real sections, so below that the button dims but a click
     // still surfaces why instead of doing nothing.
-    val canReorderSections = workingSections.count { it.name != "All" && !it.name.isUncategorizedSection() } >= 2
+    val canReorderSections = workingSections.count { !it.name.isUncategorizedSection() } >= 2
     var reorderBlockedToken by remember { mutableStateOf(0) }
     var showReorderToast by remember { mutableStateOf(false) }
 
@@ -368,7 +368,7 @@ private fun SectionReorderList(
         fun nearestMovableSlot(position: Float, size: Int): Int? {
             if (size <= 1) return null
             val center = position + rowHeightPx / 2f
-            return (0 until size).filter { latestSections[it].name != "All" && !latestSections[it].name.isUncategorizedSection() }.minByOrNull { index ->
+            return (0 until size).filter { !latestSections[it].name.isUncategorizedSection() }.minByOrNull { index ->
                 kotlin.math.abs((slotY(index) + rowHeightPx / 2f) - center)
             }
         }
@@ -383,7 +383,7 @@ private fun SectionReorderList(
                 )
                 val isDragging = draggingSection == section.name
                 val itemCount = itemCountFor(section)
-                val canMove = mode == SectionManagerMode.REORDER && section.name != "All" && !section.name.isUncategorizedSection() && sections.size > 2
+                val canMove = mode == SectionManagerMode.REORDER && !section.name.isUncategorizedSection() && sections.count { !it.name.isUncategorizedSection() } >= 2
                 val dragModifier = if (canMove) {
                     Modifier.pointerInput(section.name, rowStepPx, isPhone) {
                         val startDrag: (Offset) -> Unit = {
@@ -492,9 +492,9 @@ private fun SectionRow(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    if (section.name == "All") Icons.Outlined.Lock else Icons.Outlined.DragIndicator,
-                    if (section.name == "All") "All stays last" else "Drag and drop ${section.name}",
-                    Modifier.size(if (section.name == "All") 17.dp else 24.dp),
+                    if (section.name.isUncategorizedSection()) Icons.Outlined.Lock else Icons.Outlined.DragIndicator,
+                    if (section.name.isUncategorizedSection()) "Uncategorized stays last" else "Drag and drop ${section.name}",
+                    Modifier.size(if (section.name.isUncategorizedSection()) 17.dp else 24.dp),
                     tint = SectionInk
                 )
             }

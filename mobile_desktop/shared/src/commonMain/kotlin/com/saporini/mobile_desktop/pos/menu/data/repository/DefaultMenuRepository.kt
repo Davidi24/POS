@@ -74,6 +74,7 @@ class DefaultMenuRepository(
         return api.updateMenu(
             menuId = menuId,
             request = UpdateMenuRequestDto(
+                allFilterPosition = input.allFilterPosition,
                 code = input.code,
                 name = input.name,
                 description = input.description,

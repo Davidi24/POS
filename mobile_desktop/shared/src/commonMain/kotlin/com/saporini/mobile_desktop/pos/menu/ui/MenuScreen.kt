@@ -4,6 +4,7 @@ import com.saporini.mobile_desktop.pos.menu.domain.model.isUncategorizedSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.withUncategorizedLast
 import com.saporini.mobile_desktop.pos.menu.domain.model.isUncategorizedSection
 import com.saporini.mobile_desktop.pos.menu.ui.section.inFilterOrder
+import com.saporini.mobile_desktop.pos.menu.ui.section.withAllFilterAt
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.animation.core.Spring
@@ -527,8 +528,8 @@ private fun MenuDetailsContent(
     val screenModel = koinInject<MenuScreenModel>()
     val scope = rememberCoroutineScope()
     var selectedCategory by remember(menu.id) { mutableStateOf("All") }
-    fun categoriesFor(value: DomainMenu) = (value.sections.filter { it.active }
-        .sortedBy { it.displayOrder }.map { it.toMenuCategory() } + MenuCategory(name = "All")).inFilterOrder()
+    fun categoriesFor(value: DomainMenu) = value.sections.filter { it.active }
+        .sortedBy { it.displayOrder }.map { it.toMenuCategory() }.withAllFilterAt(value.allFilterPosition)
     var sections by remember(menu.id) { mutableStateOf(categoriesFor(menu)) }
     var initialSectionChosen by remember(menu.id) { mutableStateOf(false) }
     var sectionManagerMode by remember(menu.id) { mutableStateOf<SectionManagerMode?>(null) }
@@ -541,7 +542,7 @@ private fun MenuDetailsContent(
             }
         )
     }
-    LaunchedEffect(menu.sections) {
+    LaunchedEffect(menu.sections, menu.allFilterPosition) {
         sections = categoriesFor(menu)
         localItems = menu.sections.flatMap { section ->
             section.items.map { it.toUiMenuItem(sectionId = section.id, category = section.name) }
@@ -1253,7 +1254,7 @@ private fun MenuDetailsContent(
                 onChangeOrder = { sectionManagerMode = SectionManagerMode.REORDER },
                 onDoneEditing = { updatedSections ->
                     sectionManagerMode = null
-                    sections = (updatedSections.filterNot { it.name == "All" } + MenuCategory(name = "All")).inFilterOrder()
+                    sections = updatedSections.inFilterOrder()
                     if (sections.none { it.name == selectedCategory }) selectedCategory = sections.firstOrNull { it.id != null }?.name ?: "All"
                 },
                 onSaveOrder = { updatedSections ->
@@ -1270,7 +1271,12 @@ private fun MenuDetailsContent(
                             }.awaitAll()
                         }
                         val failedNames = outcomes.filter { it.second.isFailure }.map { it.first.name }
-                        sections = toSave + MenuCategory(name = "All")
+                        val allPosition = updatedSections.inFilterOrder().indexOfFirst { it.name == "All" }
+                        val positionResult = if (failedNames.isEmpty()) screenModel.saveAllFilterPosition(menuId, allPosition) else null
+                        sections = updatedSections.inFilterOrder()
+                        if (positionResult?.isFailure == true) {
+                            detailToast = ActionToast("Couldn't save All position. Please try again.", isError = true)
+                        }
                         // Dialog closing + the reordered chips updating is confirmation
                         // enough on success; only speak up if something failed.
                         if (failedNames.isNotEmpty()) {

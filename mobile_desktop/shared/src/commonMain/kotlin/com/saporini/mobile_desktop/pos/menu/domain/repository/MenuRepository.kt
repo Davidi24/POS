@@ -25,6 +25,7 @@ data class CreateMenuInput(
 )
 
 data class UpdateMenuInput(
+    val allFilterPosition: Int? = null,
     val code: String? = null,
     val name: String,
     val description: String? = null,

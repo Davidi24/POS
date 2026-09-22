@@ -239,6 +239,24 @@ class MenuServiceTest {
     }
 
     @Test
+    void shouldSaveAllPositionAndPreserveItWhenOlderClientsOmitIt() {
+        Authentication authentication = authentication();
+        Menu menu = menu(restaurant(RestaurantStatus.ACTIVE));
+        given(actorScopeService.resolve(authentication)).willReturn(actorScope(false, RESTAURANT_ID));
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(java.util.Optional.of(menu));
+        given(menuRepository.saveAndFlush(menu)).willReturn(menu);
+        var request = new pos.pos.menu.dto.update.UpdateMenuRequest();
+        request.setName("Breakfast");
+        request.setActive(true);
+        request.setDisplayOrder(0);
+        request.setAllFilterPosition(1);
+        assertThat(menuService.updateMenu(authentication, MENU_ID, request).getAllFilterPosition()).isEqualTo(1);
+        assertThat(menu.getAllFilterPosition()).isEqualTo(1);
+        request.setAllFilterPosition(null);
+        assertThat(menuService.updateMenu(authentication, MENU_ID, request).getAllFilterPosition()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("updateMenuStatus should reject archived restaurants")
     void shouldRejectStatusUpdateForArchivedRestaurant() {
         Authentication authentication = authentication();

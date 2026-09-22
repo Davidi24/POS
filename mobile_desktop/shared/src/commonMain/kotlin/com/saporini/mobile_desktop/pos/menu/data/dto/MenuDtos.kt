@@ -16,6 +16,7 @@ data class MenuPageResponseDto(
 
 @Serializable
 data class MenuResponseDto(
+    val allFilterPosition: Int? = null,
     val id: String,
     val restaurant: MenuRestaurantDto? = null,
     val code: String,

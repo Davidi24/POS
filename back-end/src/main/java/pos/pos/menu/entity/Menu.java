@@ -81,6 +81,9 @@ public class Menu extends AbstractAuditedEntity {
     @Column(name = "display_order", nullable = false) //orders in which menus are shown
     private Integer displayOrder = 0;
 
+    @Column(name = "all_filter_position")
+    private Integer allFilterPosition;
+
     @Column(name = "available_from")
     private LocalTime availableFrom;
 
