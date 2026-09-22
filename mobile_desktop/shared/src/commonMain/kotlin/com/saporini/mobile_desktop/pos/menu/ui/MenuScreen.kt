@@ -592,10 +592,10 @@ private fun MenuDetailsContent(
     // section to attach to there is nowhere to persist it, so item
     // creation is blocked until at least one real section exists.
     val hasRealSection = sections.any { it.id != null && it.name != "All" }
+    val canAddToSection = canManageMenus && selectedCategory != "All"
     fun requireSectionThenOpenAddItem() {
-        if (selectedCategory == "All" && hasRealSection) {
-            detailToast = ActionToast("Select a section to add an item.", isError = true)
-        } else if (sections.any { it.id != null && it.name == selectedCategory }) {
+        if (!canAddToSection) return
+        if (sections.any { it.id != null && it.name == selectedCategory }) {
             itemDialogStatus = DialogActionStatus.Idle
             showAddItemDialog = true
         } else {
@@ -658,7 +658,7 @@ private fun MenuDetailsContent(
                     if (isWidePhone) {
                         searchField(Modifier.weight(1.2f))
                     }
-                    if (canManageMenus) {
+                    if (canAddToSection) {
                         TextButton(
                             onClick = { requireSectionThenOpenAddItem() },
                             enabled = !isReorderingItems,
@@ -796,6 +796,8 @@ private fun MenuDetailsContent(
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+            } else if (visibleItems.isEmpty() && selectedCategory == "All" && hasRealSection) {
+                Text("No menu items yet", modifier = Modifier.fillMaxWidth().padding(32.dp), textAlign = TextAlign.Center)
             } else if (visibleItems.isEmpty() && (!hasRealSection || !canManageMenus)) {
                 MenuItemsEmptyState(
                     canManage = canManageMenus,
@@ -805,7 +807,7 @@ private fun MenuDetailsContent(
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
-                val rowSlots: List<MenuItem?> = if (!canManageMenus) {
+                val rowSlots: List<MenuItem?> = if (!canAddToSection) {
                     visibleItems
                 } else {
                     listOf(null) + visibleItems
@@ -918,7 +920,7 @@ private fun MenuDetailsContent(
                     if (targetSection?.id == null) {
                         itemDialogStatus = DialogActionStatus.Failed(
                             title = "Select a section",
-                            message = "Select a section to add an item."
+                            message = "Choose an item section before saving."
                         )
                     } else {
                         val category = targetSection.name
