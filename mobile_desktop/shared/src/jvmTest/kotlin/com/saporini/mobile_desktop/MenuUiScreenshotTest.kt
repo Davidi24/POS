@@ -49,7 +49,15 @@ class MenuUiScreenshotTest {
 
     @Test fun permanentFallbackDeletion() = exercise(1280, 800, deletionFlow = true, permanentFlow = true)
 
-    private fun exercise(width: Int, height: Int, fontScale: Float = 1f, deletionFlow: Boolean = false, existingFallback: Boolean = true, selectionFlow: Boolean = false, permanentFlow: Boolean = false) {
+    @Test fun singleRowShortDesktop() = exercise(1280, 480, coverCount = 2)
+    @Test fun singleRowNormalDesktop() = exercise(1280, 800, coverCount = 2)
+    @Test fun singleRowWideDesktop() = exercise(1920, 1080, coverCount = 2)
+    @Test fun singleRowTallDesktop() = exercise(2560, 1440, coverCount = 2)
+    @Test fun singleRowNarrowDesktop() = exercise(1024, 768, coverCount = 2)
+    @Test fun singleRowWrapsToTwoRows() = exercise(900, 700, coverCount = 2)
+    @Test fun allHasNoAddActionOnPhone() = exercise(390, 844, selectionFlow = true)
+
+    private fun exercise(width: Int, height: Int, fontScale: Float = 1f, deletionFlow: Boolean = false, existingFallback: Boolean = true, selectionFlow: Boolean = false, permanentFlow: Boolean = false, coverCount: Int? = null) {
         val scheduler = TestCoroutineScheduler()
         val dispatcher = StandardTestDispatcher(scheduler)
         Dispatchers.setMain(dispatcher)
@@ -57,6 +65,7 @@ class MenuUiScreenshotTest {
         var menus = (0..5).map { index -> menu.copy(id = "menu-$index", code = "MENU_$index",
             name = listOf("Breakfast", "Lunch", "Dinner", "Drinks", "Desserts", "Seasonal specials")[index],
             color = listOf("#D6C394", "#A5B58C", "#9DBCCC")[index % 3]) }
+        if (coverCount != null) menus = menus.take(coverCount)
         if (deletionFlow) {
             menus = menus.mapIndexed { index, menu ->
                 menu.copy(
@@ -111,7 +120,7 @@ class MenuUiScreenshotTest {
         val scene = ImageComposeScene(width, height, density = Density(1f, fontScale), coroutineContext = dispatcher) {
             SaporiniTheme { MenuScreen() }
         }
-        val output = File("build/reports/menu-ui/${width}x${height}-font$fontScale${if (deletionFlow) "-deletion-$existingFallback${if (permanentFlow) "-permanent" else ""}" else if (selectionFlow) "-selection" else ""}").apply { mkdirs() }
+        val output = File("build/reports/menu-ui/${width}x${height}-font$fontScale${if (deletionFlow) "-deletion-$existingFallback${if (permanentFlow) "-permanent" else ""}" else if (selectionFlow) "-selection" else if (coverCount != null) "-single-row" else ""}").apply { mkdirs() }
         fun capture(name: String) {
             repeat(if (deletionFlow || selectionFlow) 6 else 3) {
                 if ((deletionFlow || selectionFlow) && name != "02-opening-menu") scheduler.advanceTimeBy(80)
@@ -146,6 +155,7 @@ class MenuUiScreenshotTest {
         try {
             scheduler.runCurrent()
             capture("01-menu-list")
+            if (coverCount != null) return
             // Open using the production model to exercise the real transition/loading frame.
             model.openMenu(menus.first().id)
             capture("02-opening-menu")
@@ -153,15 +163,15 @@ class MenuUiScreenshotTest {
             capture("03-menu-items")
             if (selectionFlow) {
                 assertTrue(selected("Starters"), "First section must be selected on opening")
-                click("More categories")
+                if (width >= 840) click("More categories")
                 capture("20-overflow-all-last")
                 click("All")
                 capture("21-all-selected")
                 assertTrue(selected("All"))
-                click("ADD NEW ITEM")
-                capture("22-select-section-message")
-                assertTrue(nodes().any { labelText(it).contains("Select a section to add an item.") })
-                assertTrue(nodes().none { it.config.getOrNull(SemanticsProperties.Text).orEmpty().any { text -> text.text == "Add New Item" } })
+                assertTrue(nodes().none { node -> node.config.getOrNull(SemanticsProperties.Text).orEmpty().any {
+                    it.text == "ADD NEW ITEM" || it.text == "Add Item" || it.text == "Select a section to add an item."
+                } }, "All must expose neither add-item action nor warning")
+                capture("22-all-without-add-action")
                 click("Starters")
                 capture("23-real-section-selected")
                 click("ADD NEW ITEM")

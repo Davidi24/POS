@@ -560,10 +560,11 @@ private fun MenuCoverCollection(
     val rowCount = if (itemCount == 0) 0 else (itemCount + columns - 1) / columns
     val horizontalGap = if (isPhone) 18.dp else 24.dp
     val verticalGap = 20.dp
+    val desktopLayout = desktopMenuCoverLayout(availableHeight, rowCount)
     val coverHeight = if (isPhone) {
         phoneMenuCoverHeight(availableHeight)
     } else {
-        minOf(availableHeight, 440.dp)
+        desktopLayout.height
     }
     val cardWidth = if (isPhone) {
         phoneMenuCoverWidth(availableWidth, coverHeight)
@@ -587,7 +588,7 @@ private fun MenuCoverCollection(
     } else if (rowCount == 0) {
         0.dp
     } else {
-        coverHeight * rowCount + verticalGap * (rowCount - 1)
+        coverHeight * rowCount + verticalGap * (rowCount - 1) + desktopLayout.topInset * 2
     }
 
     var draggingId by remember { mutableStateOf<String?>(null) }
@@ -634,7 +635,10 @@ private fun MenuCoverCollection(
                             bottom = phoneVerticalPadding
                         )
                     } else {
-                        Modifier
+                        Modifier.padding(
+                            top = desktopLayout.topInset,
+                            start = if (desktopLayout.centerRow) (cardWidth + horizontalGap) * (columns - itemCount) / 2f else 0.dp
+                        )
                     }
                 )
         ) {
