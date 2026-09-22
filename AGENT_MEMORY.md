@@ -13,6 +13,23 @@ Running handoff log for AI agents (Claude, Codex, or others) working on this rep
 
 ---
 
+## 2026-09-22 15:32 (Codex, develop)
+**Did:** Moved Add New Item after visible menu items on phones only in MenuScreen.kt; desktop keeps the add card first and All keeps it hidden.
+**Validation:** Android assembleDebug passed with single worker/1280 MB heap. Installed POS USB update on R5CRB29848E successfully preserving data, restored backend port forwarding and launched app. No additional UI tests for this small ordering change.
+**Next:** Ready for user review on phone; committing with existing David identity.
+
+
+## 2026-09-22 15:26 (Codex, develop)
+
+- Opened the latest desktop app from the existing built JARs with a 512 MB Java heap; PID 58200.
+- Verified the process remains running and the startup log has no output/errors. No rebuild or source changes were needed.
+
+
+## 2026-09-22 15:23 (Codex, branch: develop)
+**Did:** Installed the latest POS USB APK (final phone add-card/drag-feedback changes, commit 7e2428c) on reconnected Samsung R5CRB29848E using adb install -r; installation succeeded and existing app data preserved. Restored reverse tcp:8080 tcp:8080 and opened com.saporini.mobile_desktop.usb/com.saporini.mobile_desktop.MainActivity (launch Status: ok).
+**Validation:** Phone-side curl to http://127.0.0.1:8080/auth/me returned expected unauthenticated 401, confirming backend connectivity over USB. No source changes or rebuild required; this log only.
+**Next:** Latest app is open on phone for user review; keep USB connected and backend running.
+
 ## 2026-09-22 15:03 (Codex, branch: develop)
 **Did:** Limited final menu polish to requested phone add-card proportions and item reorder feedback. Phone Add New Item is now a full-width horizontal action (88dp outer height at normal text size, scales with font size), instead of the large near-square tile; desktop add-card appearance unchanged. Reorderable items receive actual dragging state and show the same "Hold & drag" / "Moving..." per-card feedback used by menu covers. Phone feedback appears as a white pill over the image; availability control is hidden while reordering to keep that area for drag feedback.
 **Files/modules touched:** MenuScreen.kt, item/AddItemCard.kt, item/MenuItemCard.kt, MenuUiScreenshotTest.kt, this log (also includes prior USB install handoff).
