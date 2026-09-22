@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.ui.PosSection
 
-private val BottomBarActive = Color(0xFF94A27F)
+private val BottomBarActive = Color(0xFF4F7942)
 private val BottomBarInk = Color(0xFF202426)
 private val BottomBarMuted = Color(0xFF202426)
 private val BottomBarDivider = Color(0xFFE8EBE5)

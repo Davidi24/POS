@@ -70,7 +70,7 @@ import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.brand_logo
 import org.jetbrains.compose.resources.painterResource
 
-private val PhoneCoverAccent = Color(0xFF94A27F)
+private val PhoneCoverAccent = Color(0xFF4F7942)
 private val PhoneCoverInk = Color(0xFF222426)
 
 internal fun phoneMenuCoverHeight(availableHeight: Dp): Dp =
@@ -167,17 +167,13 @@ internal fun PhoneMenuBookCover(
                     contentScale = ContentScale.Fit
                 )
                 Spacer(Modifier.height(42.dp * scale))
-                Text(
+                AutoSizeCoverTitle(
                     text = coverTitle(menu.name),
-                    fontFamily = CormorantGaramond(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = (46f * scale).sp,
-                    lineHeight = (46f * scale).sp,
+                    maxFontSize = (46f * scale).sp,
+                    minFontSize = (22f * scale).sp,
                     letterSpacing = 0.4.sp,
                     color = theme.ink,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.weight(1f))
                 Column(

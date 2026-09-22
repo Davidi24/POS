@@ -76,9 +76,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.CormorantGaramond
+import com.saporini.mobile_desktop.core.ui.HoverTooltip
 import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
@@ -96,10 +98,11 @@ import org.jetbrains.compose.resources.painterResource
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 
-private val CoverOlive = Color(0xFF94A27F)
+private val CoverOlive = Color(0xFF4F7942)
 private val CoverGold = Color(0xFFC79435)
 private val CoverInk = Color(0xFF232422)
 private val CoverMuted = Color(0xFF6D706B)
@@ -119,6 +122,26 @@ fun MenuCoverUi(
     var isReordering by remember { mutableStateOf(false) }
     var orderedMenus by remember(state.menus) {
         mutableStateOf(state.menus)
+    }
+    // Bumped each time "Edit Order" is clicked with fewer than 2 menus, so the toast's
+    // auto-dismiss timer restarts on every click instead of stacking timers.
+    var reorderBlockedToken by remember { mutableStateOf(0) }
+    var showReorderToast by remember { mutableStateOf(false) }
+
+    LaunchedEffect(reorderBlockedToken) {
+        if (reorderBlockedToken > 0) {
+            showReorderToast = true
+            delay(3000)
+            showReorderToast = false
+        }
+    }
+
+    fun tryToggleReorder() {
+        if (!isReordering && orderedMenus.size < 2) {
+            reorderBlockedToken++
+        } else {
+            isReordering = !isReordering
+        }
     }
 
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
@@ -156,7 +179,9 @@ fun MenuCoverUi(
                             MenuCoverActions(
                                 isReordering = isReordering,
                                 isPhone = true,
-                                onToggleReorder = { isReordering = !isReordering },
+                                showReorderToast = showReorderToast,
+                                enoughMenusToReorder = orderedMenus.size >= 2,
+                                onToggleReorder = { tryToggleReorder() },
                                 onAddMenu = onAddMenu,
                                 modifier = Modifier.width(widePhoneActionsWidth)
                             )
@@ -179,7 +204,9 @@ fun MenuCoverUi(
                             MenuCoverActions(
                                 isReordering = isReordering,
                                 isPhone = true,
-                                onToggleReorder = { isReordering = !isReordering },
+                                showReorderToast = showReorderToast,
+                                enoughMenusToReorder = orderedMenus.size >= 2,
+                                onToggleReorder = { tryToggleReorder() },
                                 onAddMenu = onAddMenu,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -202,7 +229,9 @@ fun MenuCoverUi(
                             MenuCoverActions(
                                 isReordering = isReordering,
                                 isPhone = false,
-                                onToggleReorder = { isReordering = !isReordering },
+                                showReorderToast = showReorderToast,
+                                enoughMenusToReorder = orderedMenus.size >= 2,
+                                onToggleReorder = { tryToggleReorder() },
                                 onAddMenu = onAddMenu
                             )
                         }
@@ -272,10 +301,16 @@ fun MenuCoverUi(
 private fun MenuCoverActions(
     isReordering: Boolean,
     isPhone: Boolean,
+    showReorderToast: Boolean,
+    enoughMenusToReorder: Boolean,
     onToggleReorder: () -> Unit,
     onAddMenu: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Looks disabled until there are enough menus to reorder, but stays clickable
+    // (enough for onToggleReorder to fire and show the "need two menus" toast) —
+    // same look-disabled-but-clickable pattern as the Create Menu button.
+    val reorderLooksDisabled = !isReordering && !enoughMenusToReorder
     val reorderPulse = rememberInfiniteTransition(label = "reorder-save-pulse")
     val reorderPulseScale by reorderPulse.animateFloat(
         initialValue = 1f,
@@ -286,8 +321,10 @@ private fun MenuCoverActions(
         ),
         label = "reorder-save-pulse-scale"
     )
+    // Box (rather than sizing the Row directly) so the toast can float above the
+    // reorder button without pushing the row or its siblings around.
+    Box(modifier = modifier) {
     Row(
-        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -301,6 +338,7 @@ private fun MenuCoverActions(
                 contentColor = if (isReordering) Color.White else CoverInk
             ),
             modifier = reorderButtonModifier
+                .alpha(if (reorderLooksDisabled) 0.45f else 1f)
                 .graphicsLayer {
                     if (isReordering && !isPhone) {
                         scaleX = reorderPulseScale
@@ -353,14 +391,20 @@ private fun MenuCoverActions(
             )
         }
     }
+
+        MenuValidationToast(
+            visible = showReorderToast,
+            message = "You need at least two menus to change the order",
+            placement = ToastPlacement.Below,
+            arrowAlignment = Alignment.Start,
+            anchorAlignment = Alignment.BottomStart,
+            offsetY = 46.dp
+        )
+    }
 }
 
-private fun menuGridColumns(width: androidx.compose.ui.unit.Dp): Int = when {
-    width >= 1320.dp -> 4
-    width >= 960.dp -> 3
-    width >= 640.dp -> 2
-    else -> 1
-}
+private fun menuGridColumns(width: androidx.compose.ui.unit.Dp): Int =
+    menuContentColumns(width, 300.dp, 24.dp)
 
 @Composable
 private fun MenuCoverSkeletonGrid(
@@ -1067,17 +1111,13 @@ private fun MenuBookCover(
                         contentScale = ContentScale.Fit
                     )
                     Spacer(Modifier.height(if (compact) 8.dp else 13.dp))
-                    Text(
+                    AutoSizeCoverTitle(
                         text = coverTitle(menu.name),
-                        fontFamily = CormorantGaramond(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = if (compact) 27.sp else 35.sp,
-                        lineHeight = if (compact) 25.sp else 32.sp,
+                        maxFontSize = if (compact) 27.sp else 35.sp,
+                        minFontSize = if (compact) 16.sp else 20.sp,
                         letterSpacing = 1.sp,
                         color = theme.ink,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
 
@@ -1141,23 +1181,33 @@ private fun MenuBookCover(
 
         if (showActions && !isReordering) {
             if (canManageMenus) {
-                IconButton(
-                    onClick = onEdit,
+                HoverTooltip(
+                    text = "Edit menu",
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = (-4).dp, y = (-2).dp)
+                        // Was y = -2.dp, which poked past this card's own top edge —
+                        // for the first grid row that lands right on the scroll
+                        // viewport's clip boundary, slicing the button's top off.
+                        // +2.dp keeps it fully inside the card, still overlapping the
+                        // corner nicely.
+                        .offset(x = (-4).dp, y = 2.dp)
                         .zIndex(3f)
-                        .size(if (compact) 34.dp else 40.dp)
-                        .shadow(4.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(Color.White)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Edit,
-                        contentDescription = "Edit ${menu.name}",
-                        modifier = Modifier.size(if (compact) 16.dp else 19.dp),
-                        tint = theme.ink
-                    )
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier
+                            .size(if (compact) 34.dp else 40.dp)
+                            .shadow(4.dp, CircleShape)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = "Edit ${menu.name}",
+                            modifier = Modifier.size(if (compact) 16.dp else 19.dp),
+                            tint = theme.ink
+                        )
+                    }
                 }
             }
 
@@ -1169,9 +1219,9 @@ private fun MenuBookCover(
                         .offset(
                             x = (-4).dp,
                             y = if (canManageMenus) {
-                                (if (compact) 34.dp else 40.dp) + 6.dp
+                                (if (compact) 34.dp else 40.dp) + 6.dp + 2.dp
                             } else {
-                                (-2).dp
+                                2.dp
                             }
                         )
                         .zIndex(3f)

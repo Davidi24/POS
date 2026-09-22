@@ -88,8 +88,8 @@ class DefaultMenuRepository(
         ).toDomain()
     }
 
-    override suspend fun deleteMenu(menuId: String) {
-        api.deleteMenu(menuId)
+    override suspend fun deleteMenu(menuId: String, deleteItems: Boolean) {
+        api.deleteMenu(menuId, deleteItems)
     }
 
     // Menu sections
@@ -128,9 +128,10 @@ class DefaultMenuRepository(
 
     override suspend fun deleteSection(
         menuId: String,
-        sectionId: String
+        sectionId: String,
+        deleteItems: Boolean
     ) {
-        api.deleteSection(menuId = menuId, sectionId = sectionId)
+        api.deleteSection(menuId = menuId, sectionId = sectionId, deleteItems = deleteItems)
     }
 
     // Menu items
@@ -174,7 +175,8 @@ class DefaultMenuRepository(
                 imageUrl = input.imageUrl,
                 available = input.available,
                 displayOrder = input.displayOrder,
-                ingredients = input.ingredients
+                ingredients = input.ingredients,
+                sectionId = input.sectionId
             )
         ).toDomain()
     }
@@ -344,6 +346,10 @@ class DefaultMenuRepository(
         ).toDomain()
     }
 
+    override suspend fun deleteOptionGroup(groupId: String) {
+        api.deleteOptionGroup(groupId)
+    }
+
     // Option items
 
     override suspend fun createOptionItem(
@@ -360,5 +366,9 @@ class DefaultMenuRepository(
                 displayOrder = input.displayOrder
             )
         ).toDomain()
+    }
+
+    override suspend fun deleteOptionItem(groupId: String, itemId: String) {
+        api.deleteOptionItem(groupId, itemId)
     }
 }

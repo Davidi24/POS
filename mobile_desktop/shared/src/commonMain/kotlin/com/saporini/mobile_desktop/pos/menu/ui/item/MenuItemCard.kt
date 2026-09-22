@@ -57,7 +57,7 @@ import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.auth_login_img
 import org.jetbrains.compose.resources.painterResource
 
-private val MenuCardActiveOlive = Color(0xFF94A27F)
+private val MenuCardActiveOlive = Color(0xFF4F7942)
 private val MenuCardTextInk = Color(0xFF222426)
 private val MenuCardMutedInk = Color(0xFF747572)
 private val MenuCardBorder = Color(0xFFE8E5E1)
@@ -80,6 +80,7 @@ internal fun MenuItemCard(
     canEdit: Boolean = true,
     modifier: Modifier = Modifier,
     isReordering: Boolean = false,
+    ingredients: List<String> = emptyList(),
     onExpand: () -> Unit = {},
     onEditMenuItem: () -> Unit = {},
     onEditVariants: () -> Unit = {},
@@ -90,6 +91,7 @@ internal fun MenuItemCard(
         PhoneMenuItemCard(
             name = name,
             description = description,
+            ingredients = ingredients,
             price = price,
             category = category,
             available = available,
@@ -190,22 +192,49 @@ internal fun MenuItemCard(
                 letterSpacing = 0.sp,
                 color = MenuCardTextInk.copy(alpha = contentAlpha),
                 maxLines = 1,
-                overflow = TextOverflow.Clip
+                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(Modifier.height(6.dp))
 
-            Text(
-                text = description,
-                fontFamily = Inter(),
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                lineHeight = 19.sp,
-                letterSpacing = 0.sp,
-                color = MenuCardMutedInk.copy(alpha = contentAlpha),
-                minLines = 2,
-                maxLines = 2
-            )
+            val ingredientsText = if (ingredients.isEmpty()) {
+                "No ingredients listed"
+            } else {
+                ingredients.joinToString(", ")
+            }
+            var ingredientsTruncated by remember(ingredientsText) { mutableStateOf(false) }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = ingredientsText,
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    letterSpacing = 0.sp,
+                    color = MenuCardMutedInk.copy(alpha = contentAlpha),
+                    minLines = 2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { ingredientsTruncated = it.hasVisualOverflow }
+                )
+                if (ingredientsTruncated) {
+                    // Sits over the ellipsized tail rather than adding a line, so every
+                    // card keeps the same fixed two-line height regardless of how many
+                    // ingredients it lists.
+                    Text(
+                        text = "See more",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .background(Color.White.copy(alpha = contentAlpha))
+                            .clickable(onClick = onExpand)
+                            .padding(start = 6.dp),
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = MenuCardActiveOlive.copy(alpha = contentAlpha)
+                    )
+                }
+            }
 
             Spacer(Modifier.height(12.dp))
 
@@ -241,6 +270,7 @@ private fun PhoneMenuItemCard(
     canEdit: Boolean,
     modifier: Modifier,
     isReordering: Boolean,
+    ingredients: List<String> = emptyList(),
     onExpand: () -> Unit,
     onEditMenuItem: () -> Unit,
     onEditVariants: () -> Unit,
@@ -321,15 +351,38 @@ private fun PhoneMenuItemCard(
 
             Spacer(Modifier.height(4.dp))
 
-            Text(
-                text = description,
-                fontFamily = Inter(),
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                color = MenuCardMutedInk.copy(alpha = contentAlpha),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            val phoneIngredientsText = if (ingredients.isEmpty()) {
+                "No ingredients listed"
+            } else {
+                ingredients.joinToString(", ")
+            }
+            var phoneIngredientsTruncated by remember(phoneIngredientsText) { mutableStateOf(false) }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = phoneIngredientsText,
+                    fontFamily = Inter(),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp,
+                    color = MenuCardMutedInk.copy(alpha = contentAlpha),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { phoneIngredientsTruncated = it.hasVisualOverflow }
+                )
+                if (phoneIngredientsTruncated) {
+                    Text(
+                        text = "See more",
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .background(Color.White.copy(alpha = contentAlpha))
+                            .clickable(onClick = onExpand)
+                            .padding(start = 6.dp),
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        color = MenuCardActiveOlive.copy(alpha = contentAlpha)
+                    )
+                }
+            }
 
             Spacer(Modifier.weight(1f))
 

@@ -19,7 +19,7 @@ object SaporiniColors {
     val BorderBeige = Color(0xFFD8CFC3)
     val DeepGreen = Color(0xFF3B422E)
     val OliveGreen = Color(0xFFAEBE95)
-    val PrimaryGreen = Color(0xFF94A27F)
+    val PrimaryGreen = Color(0xFF4F7942)
     val MutedOlive = Color(0xFF7A7A63)
     val Gold = Color(0xFFC8A577)
     val DarkGold = Color(0xFF8B6A38)

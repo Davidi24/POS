@@ -41,10 +41,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,12 +76,15 @@ import kotlinx.coroutines.delay
 private val FormInk = Color(0xFF242522)
 private val FormMuted = Color(0xFF71736E)
 private val FormBorder = Color(0xFFE2E3DE)
-private val FormGreen = Color(0xFF94A27F)
+private val FormGreen = Color(0xFF4F7942)
 private val FormErrorRed = Color(0xFFB13A2F)
 private val FormSuccessGreen = Color(0xFF2F8F4E)
 
 @Composable
-internal fun isPhoneMenuWindow(): Boolean = isPhoneWindow()
+internal fun isPhoneMenuWindow(): Boolean {
+    val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+    return isPhoneWindow() || windowWidth < 840.dp
+}
 
 /**
  * Drives the loading/success/error takeover shown inside [MenuFormDialog] and
@@ -223,6 +232,7 @@ internal fun MenuFormDialog(
     onSave: () -> Unit,
     saveLabel: String = "Save Changes",
     canSave: Boolean = true,
+    showCancel: Boolean = true,
     onDelete: (() -> Unit)? = null,
     deleteLabel: String = "Delete",
     desktopWidth: Float,
@@ -239,16 +249,49 @@ internal fun MenuFormDialog(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val isBusy = status is DialogActionStatus.Loading
+    // Outside-click/back-press dismissal is only safe while Idle: mid-flight
+    // (Loading) obviously shouldn't close, but the brief Success/Removed
+    // celebration screen shouldn't either -- some callers merge freshly-created
+    // data on `onSuccessSettled`, and dismissing early would skip that callback
+    // and silently drop data that already landed on the backend.
+    val isDismissable = status is DialogActionStatus.Idle
+
+    // Same "looks disabled but stays clickable" pattern as Create Menu: the Save
+    // button never actually disables while idle, so a click while invalid can still
+    // surface why via this toast, instead of the button just doing nothing.
+    var invalidAttemptToken by remember { mutableStateOf(0) }
+    var showValidationToast by remember { mutableStateOf(false) }
+
+    LaunchedEffect(invalidAttemptToken) {
+        if (invalidAttemptToken > 0) {
+            showValidationToast = true
+            delay(3000)
+            showValidationToast = false
+        }
+    }
+
+    fun trySave() {
+        if (canSave) {
+            if (isPhone) {
+                focusManager.clearFocus()
+                keyboard?.hide()
+            }
+            onSave()
+        } else {
+            invalidAttemptToken++
+        }
+    }
+
     Dialog(
-        onDismissRequest = { if (!isBusy) onDismiss() },
+        onDismissRequest = { if (isDismissable) onDismiss() },
         properties = DialogProperties(
-            dismissOnBackPress = !isBusy,
-            dismissOnClickOutside = !isBusy,
+            dismissOnBackPress = isDismissable,
+            dismissOnClickOutside = isDismissable,
             usePlatformDefaultWidth = false
         )
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            Box(
+            BoxWithConstraints(
                 modifier = if (isPhone) {
                     Modifier.fillMaxSize().background(Color.White).safeDrawingPadding().imePadding()
                 } else {
@@ -258,9 +301,8 @@ internal fun MenuFormDialog(
             ) {
                 Column(
                     modifier = if (isPhone) Modifier.fillMaxSize() else Modifier
-                        .fillMaxWidth(desktopWidth)
+                        .width(menuDialogWidth(maxWidth, desktopWidth, desktopMaxWidth))
                         .fillMaxHeight(desktopHeight)
-                        .widthIn(max = desktopMaxWidth)
                         .shadow(24.dp, RoundedCornerShape(10.dp))
                         .clip(RoundedCornerShape(10.dp))
                         .background(Color.White)
@@ -275,7 +317,7 @@ internal fun MenuFormDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (isPhone) {
-                            IconButton(onClick = onDismiss, enabled = !isBusy, modifier = Modifier.size(44.dp)) {
+                            IconButton(onClick = onDismiss, enabled = isDismissable, modifier = Modifier.size(44.dp)) {
                                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", tint = FormInk)
                             }
                             Spacer(Modifier.width(8.dp))
@@ -303,7 +345,7 @@ internal fun MenuFormDialog(
                             Box(
                                 modifier = Modifier.size(34.dp).clip(CircleShape)
                                     .background(Color(0xFFF7F7F5)).border(1.dp, FormBorder, CircleShape)
-                                    .clickable(enabled = !isBusy, onClick = onDismiss),
+                                    .clickable(enabled = isDismissable, onClick = onDismiss),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Outlined.Close, "Close editor", Modifier.size(18.dp), tint = FormInk)
@@ -335,18 +377,21 @@ internal fun MenuFormDialog(
                         content(isPhone)
                     }
                     HorizontalDivider(color = FormBorder)
-                    Column(
+                    // Box so the "fill in required fields" toast can float above Save
+                    // without nudging this footer's own layout.
+                    Box(
                         modifier = Modifier.fillMaxWidth().padding(
                             horizontal = if (isPhone) 20.dp else 24.dp,
                             vertical = if (isWidePhone) 6.dp else if (isPhone) 12.dp else 7.dp
                         )
                     ) {
+                    Column {
                         if (onDelete != null && isPhone) {
                             Button(
                                 onClick = onDelete,
                                 enabled = !isBusy,
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(percent = 50),
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = FormErrorRed)
                             ) {
@@ -370,7 +415,7 @@ internal fun MenuFormDialog(
                                 Button(
                                     onClick = onDelete,
                                     enabled = !isBusy,
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(percent = 50),
                                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = FormErrorRed)
                                 ) {
@@ -385,21 +430,18 @@ internal fun MenuFormDialog(
                                 }
                                 Spacer(Modifier.weight(1f))
                             }
-                            if (!isPhone) {
+                            if (!isPhone && showCancel) {
                                 TextButton(onClick = onDismiss, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)) {
                                     Text("Cancel", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = FormMuted)
                                 }
                                 Spacer(Modifier.width(10.dp))
                             }
                             Button(
-                                onClick = {
-                                    if (isPhone) {
-                                        focusManager.clearFocus()
-                                        keyboard?.hide()
-                                    }
-                                    onSave()
-                                },
-                                enabled = canSave,
+                                // Same look-disabled-but-clickable pattern as Create
+                                // Menu: stays clickable while invalid so it can surface
+                                // the validation toast instead of doing nothing.
+                                onClick = { trySave() },
+                                enabled = !isBusy,
                                 modifier = if (isPhone) {
                                     Modifier
                                         .fillMaxWidth()
@@ -407,8 +449,10 @@ internal fun MenuFormDialog(
                                 } else {
                                     Modifier
                                 },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = FormGreen),
+                                shape = RoundedCornerShape(percent = 50),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (canSave) FormGreen else FormGreen.copy(alpha = 0.45f)
+                                ),
                                 contentPadding = PaddingValues(
                                     horizontal = 18.dp,
                                     vertical = if (isPhone && !isWidePhone) 14.dp else 8.dp
@@ -417,6 +461,16 @@ internal fun MenuFormDialog(
                                 Text(saveLabel, fontFamily = Inter(), fontWeight = FontWeight.Bold)
                             }
                         }
+                    }
+
+                    MenuValidationToast(
+                        visible = showValidationToast,
+                        message = "Please fill in all required fields (*)",
+                        placement = ToastPlacement.Above,
+                        arrowAlignment = if (isPhone) Alignment.CenterHorizontally else Alignment.End,
+                        anchorAlignment = if (isPhone) Alignment.TopCenter else Alignment.TopEnd,
+                        offsetY = (-46).dp
+                    )
                     }
                 }
             }
