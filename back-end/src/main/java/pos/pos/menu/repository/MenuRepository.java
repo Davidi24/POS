@@ -92,6 +92,8 @@ public interface MenuRepository extends JpaRepository<Menu, UUID> {
             """)
     Optional<Menu> findPublicMenuByRestaurantIdAndId(UUID restaurantId, UUID menuId);
 
+    Optional<Menu> findByRestaurantIdAndCode(UUID restaurantId, String code);
+
     boolean existsByRestaurantIdAndCode(UUID restaurantId, String code);
 
     boolean existsByRestaurantIdAndCodeAndIdNot(UUID restaurantId, String code, UUID id);

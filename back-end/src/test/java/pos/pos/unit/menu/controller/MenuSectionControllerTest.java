@@ -152,7 +152,7 @@ class MenuSectionControllerTest {
         private MenuSectionSummaryResponse statusResponse;
 
         StubMenuSectionService() {
-            super(null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

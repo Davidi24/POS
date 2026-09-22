@@ -9,7 +9,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import pos.pos.exception.menu.MenuSectionDeletionBlockedException;
 import pos.pos.exception.menu.MenuSectionMenuMismatchException;
 import pos.pos.menu.dto.request.CreateMenuSectionRequest;
 import pos.pos.menu.dto.response.MenuSectionSummaryResponse;
@@ -18,9 +17,11 @@ import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
 import pos.pos.menu.mapper.MenuMapper;
 import pos.pos.menu.policy.MenuPolicy;
+import pos.pos.menu.repository.MenuItemOptionGroupRepository;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.menu.repository.MenuRepository;
 import pos.pos.menu.repository.MenuSectionRepository;
+import pos.pos.menu.repository.MenuVariantRepository;
 import pos.pos.menu.service.MenuSectionService;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
@@ -62,6 +63,15 @@ class MenuSectionServiceTest {
     @Mock
     private MenuItemRepository menuItemRepository;
 
+    @Mock
+    private MenuVariantRepository menuVariantRepository;
+
+    @Mock
+    private MenuItemOptionGroupRepository menuItemOptionGroupRepository;
+
+    @Mock
+    private pos.pos.menu.service.MenuContentTransferService contentTransfer;
+
     private MenuMapper menuMapper = new MenuMapper();
 
     private MenuPolicy menuPolicy = new MenuPolicy(new RestaurantPolicy());
@@ -76,9 +86,12 @@ class MenuSectionServiceTest {
         actorScopeService = new StubActorScopeService();
         restaurantValidationService = new StubRestaurantValidationService();
         menuSectionService = new MenuSectionService(
+                contentTransfer,
                 menuRepository,
                 menuSectionRepository,
                 menuItemRepository,
+                menuVariantRepository,
+                menuItemOptionGroupRepository,
                 menuMapper,
                 actorScopeService,
                 menuPolicy,
@@ -163,23 +176,45 @@ class MenuSectionServiceTest {
     }
 
     @Test
-    @DisplayName("deleteSection should reject sections that still have items")
-    void shouldRejectDeleteWhenItemsExist() {
+    @DisplayName("deleteSection should move items to a Uncategorized section when deleteItems is false")
+    void shouldMoveItemsToNoCategoryOnDelete() {
         Authentication authentication = authentication();
         ActorScope scope = actorScope(false, RESTAURANT_ID);
         Menu menu = menu(RestaurantStatus.ACTIVE);
         MenuSection section = section(menu);
+        MenuItem item = item(section);
 
         actorScopeService.scope = scope;
         given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(Optional.of(menu));
         given(menuSectionRepository.findById(SECTION_ID)).willReturn(Optional.of(section));
-        given(menuItemRepository.existsBySectionId(SECTION_ID)).willReturn(true);
+        given(menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(SECTION_ID)).willReturn(List.of(item));
+        menuSectionService.deleteSection(authentication, MENU_ID, SECTION_ID, false);
 
-        assertThatThrownBy(() -> menuSectionService.deleteSection(authentication, MENU_ID, SECTION_ID))
-                .isInstanceOf(MenuSectionDeletionBlockedException.class)
-                .hasMessage("Menu section cannot be deleted while it still has items");
+        verify(contentTransfer).preserveItems(section, List.of(item));
+        verify(menuSectionRepository).delete(section);
+    }
 
-        verify(menuSectionRepository, never()).delete(any(MenuSection.class));
+    @Test
+    @DisplayName("deleteSection should cascade-delete items when deleteItems is true")
+    void shouldDeleteItemsWithSectionWhenRequested() {
+        Authentication authentication = authentication();
+        ActorScope scope = actorScope(false, RESTAURANT_ID);
+        Menu menu = menu(RestaurantStatus.ACTIVE);
+        MenuSection section = section(menu);
+        MenuItem item = item(section);
+
+        actorScopeService.scope = scope;
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(Optional.of(menu));
+        given(menuSectionRepository.findById(SECTION_ID)).willReturn(Optional.of(section));
+        given(menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(SECTION_ID)).willReturn(List.of(item));
+        given(menuVariantRepository.findByMenuItemIdOrderByDisplayOrderAscNameAsc(item.getId())).willReturn(List.of());
+        given(menuItemOptionGroupRepository.findByMenuItemIdOrdered(item.getId())).willReturn(List.of());
+
+        menuSectionService.deleteSection(authentication, MENU_ID, SECTION_ID, true);
+
+        verify(menuItemRepository).deleteAll(List.of(item));
+        verify(menuSectionRepository, never()).saveAndFlush(any(MenuSection.class));
+        verify(menuSectionRepository).delete(section);
     }
 
     private Authentication authentication() {
