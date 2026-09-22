@@ -2,6 +2,7 @@
 
 package com.saporini.mobile_desktop
 
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.semantics.SemanticsActions
@@ -56,6 +57,60 @@ class MenuUiScreenshotTest {
     @Test fun singleRowNarrowDesktop() = exercise(1024, 768, coverCount = 2)
     @Test fun singleRowWrapsToTwoRows() = exercise(900, 700, coverCount = 2)
     @Test fun allHasNoAddActionOnPhone() = exercise(390, 844, selectionFlow = true)
+
+    @Test fun phoneReorderCardFeedback() {
+        val scheduler = TestCoroutineScheduler()
+        val dispatcher = StandardTestDispatcher(scheduler)
+        Dispatchers.setMain(dispatcher)
+        val moving = androidx.compose.runtime.mutableStateOf(false)
+        val scene = ImageComposeScene(390, 400, coroutineContext = dispatcher) {
+            SaporiniTheme {
+                androidx.compose.foundation.layout.Column {
+                    com.saporini.mobile_desktop.pos.menu.ui.item.AddItemCard(
+                        onClick = {}, isPhone = true,
+                        modifier = androidx.compose.ui.Modifier.fillMaxWidth()
+                    )
+                    com.saporini.mobile_desktop.pos.menu.ui.item.MenuItemCard(
+                        name = "Truffle fries", description = "Freshly prepared", price = "$6.90",
+                        category = "Starters", available = true, selected = false,
+                        isPhone = true, isReordering = true, isDragging = moving.value
+                    )
+                }
+            }
+        }
+        fun nodes(): List<SemanticsNode> {
+            fun all(node: SemanticsNode): List<SemanticsNode> = listOf(node) + node.children.flatMap(::all)
+            return scene.semanticsOwners.flatMap { all(it.unmergedRootSemanticsNode) }
+        }
+        fun label(node: SemanticsNode): String = node.config.getOrNull(SemanticsProperties.Text).orEmpty()
+            .joinToString { it.text } + node.children.joinToString { label(it) }
+        fun capture(name: String) {
+            repeat(4) {
+                scheduler.runCurrent()
+                scene.render(System.nanoTime()).close()
+                Thread.sleep(70)
+            }
+            val dir = File("build/reports/menu-ui/phone-item-polish").apply { mkdirs() }
+            val frame = scene.render(System.nanoTime())
+            try {
+                val png = requireNotNull(frame.encodeToData(EncodedImageFormat.PNG))
+                try { File(dir, "$name.png").writeBytes(png.bytes) } finally { png.close() }
+            } finally { frame.close() }
+        }
+        try {
+            capture("01-hold-and-drag")
+            val add = nodes().last { label(it).contains("ADD NEW ITEM") && it.config.getOrNull(SemanticsActions.OnClick) != null }
+            assertTrue(add.boundsInRoot.width > add.boundsInRoot.height * 2, "Phone add card must be wide and short")
+            assertTrue(nodes().any { label(it).contains("Hold & drag") })
+            moving.value = true
+            capture("02-moving")
+            assertTrue(nodes().any { label(it).contains("Moving...") })
+            assertTrue(nodes().none { label(it).contains("Hold & drag") })
+        } finally {
+            scene.close()
+            Dispatchers.resetMain()
+        }
+    }
 
     private fun exercise(width: Int, height: Int, fontScale: Float = 1f, deletionFlow: Boolean = false, existingFallback: Boolean = true, selectionFlow: Boolean = false, permanentFlow: Boolean = false, coverCount: Int? = null) {
         val scheduler = TestCoroutineScheduler()

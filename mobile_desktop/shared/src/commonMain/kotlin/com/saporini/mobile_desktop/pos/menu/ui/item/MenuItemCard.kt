@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ZoomOutMap
 import androidx.compose.material3.DropdownMenu
@@ -80,6 +81,7 @@ internal fun MenuItemCard(
     canEdit: Boolean = true,
     modifier: Modifier = Modifier,
     isReordering: Boolean = false,
+    isDragging: Boolean = false,
     ingredients: List<String> = emptyList(),
     onExpand: () -> Unit = {},
     onEditMenuItem: () -> Unit = {},
@@ -99,6 +101,7 @@ internal fun MenuItemCard(
             canEdit = canEdit,
             modifier = modifier,
             isReordering = isReordering,
+            isDragging = isDragging,
             onExpand = onExpand,
             onEditMenuItem = onEditMenuItem,
             onEditVariants = onEditVariants,
@@ -248,7 +251,9 @@ internal fun MenuItemCard(
             )
         }
 
-        if (!isReordering) {
+        if (isReordering) {
+            ItemReorderHint(isDragging, Modifier.align(Alignment.BottomEnd))
+        } else {
             ExpandImageButton(
                 onClick = onExpand,
                 modifier = Modifier
@@ -270,6 +275,7 @@ private fun PhoneMenuItemCard(
     canEdit: Boolean,
     modifier: Modifier,
     isReordering: Boolean,
+    isDragging: Boolean,
     ingredients: List<String> = emptyList(),
     onExpand: () -> Unit,
     onEditMenuItem: () -> Unit,
@@ -309,7 +315,9 @@ private fun PhoneMenuItemCard(
                 contentScale = ContentScale.Crop
             )
 
-            AvailabilityButton(
+            if (isReordering) {
+                ItemReorderHint(isDragging, Modifier.align(Alignment.BottomCenter).padding(bottom = 5.dp))
+            } else AvailabilityButton(
                 available = available,
                 compact = true,
                 onToggle = onToggleAvailability,
@@ -807,5 +815,21 @@ private fun EditItemButton(
             modifier = Modifier.size(16.dp),
             tint = MenuCardTextInk
         )
+    }
+}
+
+/** Same per-card feedback as menu-cover reordering. */
+@Composable
+private fun ItemReorderHint(isDragging: Boolean, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.clip(RoundedCornerShape(50)).background(Color.White)
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Icon(Icons.Outlined.DragIndicator, null, Modifier.size(16.dp), tint = MenuCardTextInk)
+        Text(if (isDragging) "Moving..." else "Hold & drag", fontFamily = Inter(),
+            fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MenuCardActiveOlive,
+            maxLines = 1)
     }
 }
