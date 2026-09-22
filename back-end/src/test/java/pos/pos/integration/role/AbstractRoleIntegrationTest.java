@@ -20,6 +20,7 @@ import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RolePermissionRepository;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.service.PasswordService;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserRole;
@@ -47,6 +48,7 @@ abstract class AbstractRoleIntegrationTest {
     protected static final String ADMIN_USERNAME = "roleadmin";
     protected static final String ADMIN_PASSWORD = "StrongPass123!";
     protected static final String DEFAULT_PASSWORD = "StrongPass123!";
+    private static final String ACCESS_COOKIE_NAME = "access-token";
 
     @Autowired
     protected MockMvc mockMvc;
@@ -84,7 +86,7 @@ abstract class AbstractRoleIntegrationTest {
 
     static void registerProdProperties(DynamicPropertyRegistry registry, String schema) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, schema);
-        registry.add("JWT_SECRET", () -> schema + "-jwt-secret-key-for-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> schema + "-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> schema + "-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> schema + "-email-verification-pepper");
@@ -277,7 +279,7 @@ abstract class AbstractRoleIntegrationTest {
                 .andExpect(expectedStatus)
                 .andReturn();
 
-        return bodyOf(result).get("accessToken").asText();
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
     }
 
     protected JsonNode bodyOf(MvcResult result) throws Exception {
@@ -286,6 +288,19 @@ abstract class AbstractRoleIntegrationTest {
 
     protected String messageOf(MvcResult result) throws Exception {
         return bodyOf(result).get("message").asText();
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     protected List<String> codesOf(JsonNode arrayNode) {

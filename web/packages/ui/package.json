@@ -1,0 +1,14 @@
+{
+  "name": "@pos/ui",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "peerDependencies": {
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@pos/tsconfig": "workspace:*",
+    "typescript": "latest"
+  }
+}

@@ -13,6 +13,7 @@ public enum AppRole {
     SUPER_ADMIN(
             "Super Admin",
             "System-level control across all tenants",
+            60_000L,
             false,
             true,
             EnumSet.allOf(AppPermission.class)
@@ -21,6 +22,7 @@ public enum AppRole {
     OWNER(
             "Owner",
             "Business owner - full control over the restaurant",
+            50_000L,
             false,
             true,
             EnumSet.allOf(AppPermission.class)
@@ -29,61 +31,95 @@ public enum AppRole {
     CO_OWNER(
             "Co-Owner",
             "Shares ownership with limited restrictions",
+            40_000L,
             true,
             false,
             EnumSet.of(
                     RESTAURANTS_READ, RESTAURANTS_UPDATE,
+                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE, MENUS_DELETE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
-                    MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE,
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
-                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY
+                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
+                    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
+                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
+                    KDS_READ, KDS_UPDATE
             )
     ),
 
     ADMIN(
             "Admin",
             "Store administrator - manages staff, inventory, settings and reports",
+            30_000L,
             false,
             false,
             EnumSet.of(
                     RESTAURANTS_READ, RESTAURANTS_UPDATE,
+                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE, MENUS_DELETE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
-                    MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
                     SESSIONS_MANAGE,
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
-                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY
+                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
+                    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
+                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
+                    KDS_READ, KDS_UPDATE
             )
     ),
 
     MANAGER(
             "Manager",
             "Store manager - oversees operations and staff",
+            20_000L,
             true,
             false,
             EnumSet.of(
                     RESTAURANTS_READ,
+                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE,
                     USERS_CREATE, USERS_READ, USERS_UPDATE,
-                    MENUS_READ, MENUS_CREATE, MENUS_UPDATE, MENUS_DELETE,
                     ROLES_READ,
-                    SETTINGS_READ
+                    SETTINGS_READ,
+                    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
+                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
+                    KDS_READ, KDS_UPDATE
             )
     ),
 
     WAITER(
             "Waiter",
             "Handles orders and customer service",
+            10_000L,
             true,
             false,
-            EnumSet.noneOf(AppPermission.class)
-    );
+            EnumSet.of(
+                    MENUS_READ,
+                    ORDER_READ,
+                    ORDER_CREATE,
+                    ORDER_UPDATE,
+                    ORDER_CLOSE,
+                    ORDER_DISCOUNT_APPLY,
+                    ORDER_TRANSFER
+            )
+    ),
 
-    private static final long RANK_STEP = 10_000L;
+    KITCHEN(
+            "Kitchen",
+            "Kitchen staff - views and updates kitchen display tickets",
+            5_000L,
+            false,
+            false,
+            EnumSet.of(
+                    MENUS_READ,
+                    ORDER_READ,
+                    KDS_READ,
+                    KDS_UPDATE
+            )
+    );
 
     private final String displayName;
     private final String description;
+    private final long rank;
     private final boolean assignable;
     private final boolean protectedRole;
     private final Set<AppPermission> permissions;
@@ -91,12 +127,14 @@ public enum AppRole {
     AppRole(
             String displayName,
             String description,
+            long rank,
             boolean assignable,
             boolean protectedRole,
             Set<AppPermission> permissions
     ) {
         this.displayName = displayName;
         this.description = description;
+        this.rank = rank;
         this.assignable = assignable;
         this.protectedRole = protectedRole;
         this.permissions = permissions;
@@ -104,7 +142,7 @@ public enum AppRole {
 
     public String displayName() { return displayName; }
     public String description() { return description; }
-    public long rank() { return (values().length - ordinal()) * RANK_STEP; }
+    public long rank() { return rank; }
     public boolean assignable() { return assignable; }
     public boolean protectedRole() { return protectedRole; }
     public Set<AppPermission> permissions() { return permissions; }

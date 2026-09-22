@@ -1,0 +1,548 @@
+package com.saporini.mobile_desktop.pos.menu.ui.menu
+
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.saporini.mobile_desktop.core.components.AnimatedStatusIcon
+import com.saporini.mobile_desktop.core.ui.isPhoneWindow
+import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
+import com.saporini.mobile_desktop.core.theme.Inter
+import kotlinx.coroutines.delay
+
+private val FormInk = Color(0xFF242522)
+private val FormMuted = Color(0xFF71736E)
+private val FormBorder = Color(0xFFE2E3DE)
+private val FormGreen = Color(0xFF4F7942)
+private val FormErrorRed = Color(0xFFB13A2F)
+private val FormSuccessGreen = Color(0xFF2F8F4E)
+
+@Composable
+internal fun isPhoneMenuWindow(): Boolean {
+    val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+    return isPhoneWindow() || windowWidth < 840.dp
+}
+
+/**
+ * Drives the loading/success/error takeover shown inside [MenuFormDialog] and
+ * other menu popups, matching the auth flow's ring-draw + bounce animation
+ * (see AuthStatusScreens.kt's AnimatedSuccessCheck/AnimatedLockIcon) instead
+ * of a corner toast.
+ */
+internal sealed interface DialogActionStatus {
+    data object Idle : DialogActionStatus
+    data class Loading(val label: String = "Saving") : DialogActionStatus
+    data class Success(val title: String) : DialogActionStatus
+    data class Removed(val title: String) : DialogActionStatus
+    data class Failed(val title: String = "Something went wrong", val message: String? = null) : DialogActionStatus
+}
+
+/** Full takeover body for a non-Idle [DialogActionStatus]; caller swaps this in for its normal content/footer. */
+@Composable
+internal fun DialogStatusBody(
+    status: DialogActionStatus,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+    onSuccessSettled: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        when (status) {
+            is DialogActionStatus.Loading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(46.dp),
+                    color = FormGreen,
+                    strokeWidth = 3.dp
+                )
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = "${status.label}...",
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = FormInk
+                )
+            }
+            is DialogActionStatus.Success -> {
+                LaunchedEffect(status) {
+                    delay(1300)
+                    onSuccessSettled()
+                }
+                key(status) {
+                    AnimatedStatusIcon(
+                        icon = Icons.Outlined.Check,
+                        color = FormSuccessGreen,
+                        size = 96.dp,
+                        strokeWidth = 2.5.dp
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = status.title,
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    color = FormInk,
+                    textAlign = TextAlign.Center
+                )
+            }
+            is DialogActionStatus.Removed -> {
+                LaunchedEffect(status) {
+                    delay(1100)
+                    onSuccessSettled()
+                }
+                key(status) {
+                    AnimatedStatusIcon(
+                        icon = Icons.Outlined.DeleteOutline,
+                        color = FormErrorRed,
+                        size = 96.dp,
+                        strokeWidth = 2.5.dp
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = status.title,
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    color = FormInk,
+                    textAlign = TextAlign.Center
+                )
+            }
+            is DialogActionStatus.Failed -> {
+                key(status) {
+                    AnimatedStatusIcon(
+                        icon = Icons.Outlined.Close,
+                        color = FormErrorRed,
+                        size = 96.dp,
+                        strokeWidth = 2.5.dp
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text = status.title,
+                    fontFamily = Inter(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 19.sp,
+                    color = FormInk,
+                    textAlign = TextAlign.Center
+                )
+                status.message?.let { message ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = message,
+                        fontFamily = Inter(),
+                        fontSize = 13.sp,
+                        color = FormMuted,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Spacer(Modifier.height(28.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextButton(onClick = onCancel) {
+                        Text("Cancel", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = FormMuted)
+                    }
+                    Button(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(containerColor = FormGreen),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Try Again", fontFamily = Inter(), fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            DialogActionStatus.Idle -> Unit
+        }
+    }
+}
+
+/** Main editors occupy a page on phones; secondary dialogs use MenuNestedDialog. */
+@Composable
+internal fun MenuFormDialog(
+    title: String,
+    subtitle: String? = null,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+    saveLabel: String = "Save Changes",
+    canSave: Boolean = true,
+    showCancel: Boolean = true,
+    onDelete: (() -> Unit)? = null,
+    deleteLabel: String = "Delete",
+    desktopWidth: Float,
+    desktopHeight: Float,
+    desktopMaxWidth: Dp,
+    scrollState: ScrollState = rememberScrollState(),
+    status: DialogActionStatus = DialogActionStatus.Idle,
+    onRetry: () -> Unit = {},
+    onSuccessSettled: () -> Unit = {},
+    content: @Composable ColumnScope.(isPhone: Boolean) -> Unit
+) {
+    val isPhone = isPhoneMenuWindow()
+    val isWidePhone = isWidePhoneWindow()
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val isBusy = status is DialogActionStatus.Loading
+    // Outside-click/back-press dismissal is only safe while Idle: mid-flight
+    // (Loading) obviously shouldn't close, but the brief Success/Removed
+    // celebration screen shouldn't either -- some callers merge freshly-created
+    // data on `onSuccessSettled`, and dismissing early would skip that callback
+    // and silently drop data that already landed on the backend.
+    val isDismissable = status is DialogActionStatus.Idle
+
+    // Same "looks disabled but stays clickable" pattern as Create Menu: the Save
+    // button never actually disables while idle, so a click while invalid can still
+    // surface why via this toast, instead of the button just doing nothing.
+    var invalidAttemptToken by remember { mutableStateOf(0) }
+    var showValidationToast by remember { mutableStateOf(false) }
+
+    LaunchedEffect(invalidAttemptToken) {
+        if (invalidAttemptToken > 0) {
+            showValidationToast = true
+            delay(3000)
+            showValidationToast = false
+        }
+    }
+
+    fun trySave() {
+        if (canSave) {
+            if (isPhone) {
+                focusManager.clearFocus()
+                keyboard?.hide()
+            }
+            onSave()
+        } else {
+            invalidAttemptToken++
+        }
+    }
+
+    Dialog(
+        onDismissRequest = { if (isDismissable) onDismiss() },
+        properties = DialogProperties(
+            dismissOnBackPress = isDismissable,
+            dismissOnClickOutside = isDismissable,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            BoxWithConstraints(
+                modifier = if (isPhone) {
+                    Modifier.fillMaxSize().background(Color.White).safeDrawingPadding().imePadding()
+                } else {
+                    Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.34f)).padding(24.dp)
+                },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = if (isPhone) Modifier.fillMaxSize() else Modifier
+                        .width(menuDialogWidth(maxWidth, desktopWidth, desktopMaxWidth))
+                        .fillMaxHeight(desktopHeight)
+                        .shadow(24.dp, RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White)
+                        .border(1.dp, FormBorder, RoundedCornerShape(10.dp))
+                ) {
+                    Row(
+                        modifier = if (isPhone) {
+                            Modifier.fillMaxWidth().heightIn(min = if (isWidePhone) 48.dp else 64.dp).padding(start = 8.dp, end = 20.dp)
+                        } else {
+                            Modifier.fillMaxWidth().padding(start = 24.dp, end = 18.dp, top = 8.dp, bottom = 12.dp)
+                        },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isPhone) {
+                            IconButton(onClick = onDismiss, enabled = isDismissable, modifier = Modifier.size(44.dp)) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", tint = FormInk)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                title,
+                                fontFamily = Inter(),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 20.sp,
+                                color = FormInk
+                            )
+                            subtitle?.let {
+                                Text(
+                                    it,
+                                    fontFamily = Inter(),
+                                    fontSize = 13.sp,
+                                    color = FormMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        if (!isPhone) {
+                            Box(
+                                modifier = Modifier.size(34.dp).clip(CircleShape)
+                                    .background(Color(0xFFF7F7F5)).border(1.dp, FormBorder, CircleShape)
+                                    .clickable(enabled = isDismissable, onClick = onDismiss),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Outlined.Close, "Close editor", Modifier.size(18.dp), tint = FormInk)
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = FormBorder)
+                    if (status !is DialogActionStatus.Idle) {
+                        DialogStatusBody(
+                            status = status,
+                            onRetry = onRetry,
+                            onCancel = onDismiss,
+                            onSuccessSettled = onSuccessSettled,
+                            modifier = Modifier.weight(1f).fillMaxWidth()
+                        )
+                        return@Column
+                    }
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(scrollState)
+                            .padding(
+                                horizontal = if (isPhone) 20.dp else 24.dp,
+                                vertical = if (isWidePhone) 12.dp else 18.dp
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        content(isPhone)
+                    }
+                    HorizontalDivider(color = FormBorder)
+                    // Box so the "fill in required fields" toast can float above Save
+                    // without nudging this footer's own layout.
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(
+                            horizontal = if (isPhone) 20.dp else 24.dp,
+                            vertical = if (isWidePhone) 6.dp else if (isPhone) 12.dp else 7.dp
+                        )
+                    ) {
+                    Column {
+                        if (onDelete != null && isPhone) {
+                            Button(
+                                onClick = onDelete,
+                                enabled = !isBusy,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(percent = 50),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = FormErrorRed)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.DeleteOutline,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(deleteLabel, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (onDelete != null && !isPhone) {
+                                Button(
+                                    onClick = onDelete,
+                                    enabled = !isBusy,
+                                    shape = RoundedCornerShape(percent = 50),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = FormErrorRed)
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.DeleteOutline,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = Color.White
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(deleteLabel, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                                }
+                                Spacer(Modifier.weight(1f))
+                            }
+                            if (!isPhone && showCancel) {
+                                TextButton(onClick = onDismiss, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)) {
+                                    Text("Cancel", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = FormMuted)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                            }
+                            Button(
+                                // Same look-disabled-but-clickable pattern as Create
+                                // Menu: stays clickable while invalid so it can surface
+                                // the validation toast instead of doing nothing.
+                                onClick = { trySave() },
+                                enabled = !isBusy,
+                                modifier = if (isPhone) {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = if (isWidePhone) 44.dp else 50.dp)
+                                } else {
+                                    Modifier
+                                },
+                                shape = RoundedCornerShape(percent = 50),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (canSave) FormGreen else FormGreen.copy(alpha = 0.45f)
+                                ),
+                                contentPadding = PaddingValues(
+                                    horizontal = 18.dp,
+                                    vertical = if (isPhone && !isWidePhone) 14.dp else 8.dp
+                                )
+                            ) {
+                                Text(saveLabel, fontFamily = Inter(), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    MenuValidationToast(
+                        visible = showValidationToast,
+                        message = "Please fill in all required fields (*)",
+                        placement = ToastPlacement.Above,
+                        arrowAlignment = if (isPhone) Alignment.CenterHorizontally else Alignment.End,
+                        anchorAlignment = if (isPhone) Alignment.TopCenter else Alignment.TopEnd,
+                        offsetY = (-46).dp
+                    )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A bounded popup keeps its parent editor visible and its actions above the keyboard. */
+@Composable
+internal fun MenuNestedDialog(
+    onDismissRequest: () -> Unit,
+    shape: Shape = RoundedCornerShape(12.dp),
+    containerColor: Color = Color.White,
+    titleContentColor: Color = FormInk,
+    textContentColor: Color = FormMuted,
+    title: @Composable () -> Unit,
+    text: @Composable () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    dismissButton: @Composable () -> Unit
+) {
+    val isPhone = isPhoneMenuWindow()
+    val isWidePhone = isWidePhoneWindow()
+    Dialog(onDismissRequest = onDismissRequest, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.34f))
+                .then(if (isPhone) Modifier.safeDrawingPadding().imePadding() else Modifier)
+                .padding(if (isPhone) 16.dp else 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val dialogWidth = minOf(maxWidth, if (isPhone) 420.dp else 380.dp)
+            Column(
+                modifier = Modifier.width(dialogWidth).heightIn(max = maxHeight * 0.86f)
+                    .shadow(14.dp, shape).clip(shape).background(containerColor)
+            ) {
+                Box(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = if (isWidePhone) 10.dp else 16.dp, bottom = 10.dp)) {
+                    CompositionLocalProvider(LocalContentColor provides titleContentColor) { title() }
+                }
+                Column(
+                    modifier = Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState())
+                        .padding(horizontal = 18.dp, vertical = 2.dp)
+                ) {
+                    CompositionLocalProvider(LocalContentColor provides textContentColor) { text() }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = if (isWidePhone) 3.dp else 6.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    dismissButton()
+                    Spacer(Modifier.width(6.dp))
+                    confirmButton()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun MenuFormFieldPair(
+    isPhone: Boolean,
+    first: @Composable (Modifier) -> Unit,
+    second: @Composable (Modifier) -> Unit
+) {
+    if (isPhone) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            first(Modifier.fillMaxWidth())
+            second(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            first(Modifier.weight(1f))
+            second(Modifier.weight(1f))
+        }
+    }
+}

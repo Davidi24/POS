@@ -18,6 +18,7 @@ class SecurityPathsTest {
         List<String> publicPaths = Arrays.asList(SecurityPaths.PUBLIC);
 
         assertThat(publicPaths).contains(
+                "/auth/.well-known/jwks.json",
                 "/auth/web/login",
                 "/auth/web/refresh",
                 "/auth/device/login",

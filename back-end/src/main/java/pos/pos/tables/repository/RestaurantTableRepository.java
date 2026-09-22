@@ -38,6 +38,9 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
     @EntityGraph(attributePaths = {"restaurant", "branch", "category", "mergedInto"})
     Optional<RestaurantTable> findFirstByQrCodeValueAndActiveTrue(String qrCodeValue);
 
+    @EntityGraph(attributePaths = {"restaurant", "branch", "category", "mergedInto"})
+    Optional<RestaurantTable> findByBranch_IdAndTableNumber(UUID branchId, String tableNumber);
+
     boolean existsByCategory_Id(UUID categoryId);
 
     boolean existsByMergedInto_Id(UUID tableId);

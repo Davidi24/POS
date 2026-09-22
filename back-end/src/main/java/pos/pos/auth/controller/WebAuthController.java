@@ -49,9 +49,9 @@ public class WebAuthController {
         AuthenticationResponse authResult = authLoginService.login(request, clientInfo);
 
         cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
+        cookieService.addAccessTokenCookie(httpResponse, authResult.getAccessToken());
 
         WebAuthenticationResponse response = WebAuthenticationResponse.builder()
-                .accessToken(authResult.getAccessToken())
                 .tokenType(authResult.getTokenType())
                 .expiresIn(authResult.getExpiresIn())
                 .user(authResult.getUser())
@@ -72,9 +72,9 @@ public class WebAuthController {
             AuthenticationResponse authResult = authRefreshService.refresh(refreshToken, clientInfo);
 
             cookieService.addRefreshTokenCookie(httpResponse, authResult.getRefreshToken());
+            cookieService.addAccessTokenCookie(httpResponse, authResult.getAccessToken());
 
             WebAuthenticationResponse response = WebAuthenticationResponse.builder()
-                    .accessToken(authResult.getAccessToken())
                     .tokenType(authResult.getTokenType())
                     .expiresIn(authResult.getExpiresIn())
                     .user(authResult.getUser())
@@ -83,6 +83,7 @@ public class WebAuthController {
             return ResponseEntity.ok(response);
         } catch (InvalidCredentialsException ex) {
             cookieService.clearRefreshTokenCookie(httpResponse);
+            cookieService.clearAccessTokenCookie(httpResponse);
             throw ex;
         }
     }
@@ -97,10 +98,12 @@ public class WebAuthController {
             authLogoutService.logout(refreshToken);
         } catch (InvalidCredentialsException ex) {
             cookieService.clearRefreshTokenCookie(httpResponse);
+            cookieService.clearAccessTokenCookie(httpResponse);
             return ResponseEntity.noContent().build();
         }
 
         cookieService.clearRefreshTokenCookie(httpResponse);
+        cookieService.clearAccessTokenCookie(httpResponse);
         return ResponseEntity.noContent().build();
     }
 
@@ -114,10 +117,12 @@ public class WebAuthController {
             authLogoutService.logoutAll(refreshToken);
         } catch (InvalidCredentialsException ex) {
             cookieService.clearRefreshTokenCookie(httpResponse);
+            cookieService.clearAccessTokenCookie(httpResponse);
             throw ex;
         }
 
         cookieService.clearRefreshTokenCookie(httpResponse);
+        cookieService.clearAccessTokenCookie(httpResponse);
         return ResponseEntity.noContent().build();
     }
 

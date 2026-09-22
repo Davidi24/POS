@@ -1,0 +1,10 @@
+{
+  "name": "@pos/utils",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "devDependencies": {
+    "@pos/tsconfig": "workspace:*",
+    "typescript": "latest"
+  }
+}

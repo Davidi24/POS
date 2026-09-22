@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(LOGDIR=\"/c/Users/kecid/AppData/Roaming/Code/logs/20260718T223135\"; find \"$LOGDIR\" -type d | head -100)",
+      "Read(//c/Users/kecid/AppData/Roaming/Code/logs/20260718T223135/**)",
+      "Bash(LOGDIR=\"/c/Users/kecid/AppData/Roaming/Code/logs/20260718T223135\"; ls -la \"$LOGDIR\")",
+      "Bash(LOGSROOT=\"/c/Users/kecid/AppData/Roaming/Code/logs\"; ls -1t \"$LOGSROOT\" | head -10)",
+      "Read(//c/Users/kecid/AppData/Roaming/Code/logs/**)",
+      "Bash(LOGDIR=\"/c/Users/kecid/AppData/Roaming/Code/logs/20260718T220023\"; find \"$LOGDIR\" -type f | sort)",
+      "Read(//c/Users/kecid/AppData/Roaming/Code/logs/20260718T220023/**)",
+      "PowerShell(Get-Process | Where-Object { $_.ProcessName -match \"codex\" } | Select-Object Id, ProcessName, StartTime, @{N='CPU';E={$_.CPU}}, @{N='Path';E={$_.Path}} | Format-Table -AutoSize)",
+      "PowerShell(Stop-Process -Id 40320 -Force -Confirm:$false -ErrorAction Stop)",
+      "PowerShell(\"Stopped PID 40320\")",
+      "PowerShell(Get-Process -Id 40320 -ErrorAction SilentlyContinue)",
+      "PowerShell(if \\(-not $?\\) { \"confirmed: PID 40320 no longer running\" })",
+      "PowerShell(Get-Command codex -ErrorAction SilentlyContinue)",
+      "PowerShell(npm list -g --depth=0 2>&1)",
+      "PowerShell(pip show codex 2>&1)",
+      "Bash(find \"/c/Users/kecid/AppData/Roaming/Code/logs/20260724T232130\" -iname \"*exthost*\" -o -iname \"*chatgpt*\" -o -iname \"*codex*\" 2>/dev/null)",
+      "Read(//c/Users/kecid/AppData/Roaming/Code/logs/20260724T232130/**)",
+      "Bash(find \"/c/Users/kecid/AppData/Roaming/Code/logs/20260724T232130\" -maxdepth 4 -type d 2>/dev/null)",
+      "Read(//c/Users/kecid/AppData/Roaming/Code/logs//**)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name='Code.exe'\")",
+      "Bash(grep -B2 -E \"^ProcessId\\\\s+: \\(12132|72252|17280\\)$\" \"C:\\\\Users\\\\kecid\\\\.claude\\\\projects\\\\c--David-Work-POS\\\\08b6b29f-999f-4c89-8bc7-219e7215f9aa\\\\tool-results\\\\brngl7auj.txt\")",
+      "Bash(grep -B1 -A1 'CommandLine.*Code.exe\"\\\\s*$' \"C:\\\\Users\\\\kecid\\\\.claude\\\\projects\\\\c--David-Work-POS\\\\08b6b29f-999f-4c89-8bc7-219e7215f9aa\\\\tool-results\\\\brngl7auj.txt\")",
+      "Read(//c/Users/kecid/AppData/Roaming/Code/logs/20260718T232015/window1/exthost/**)",
+      "Read(//c/Users/kecid/AppData/Roaming/Code/logs/20260718T232015/window3/exthost/**)",
+      "Read(//c/Users/kecid/AppData/Roaming/Code/logs/20260718T232015/window1/**)",
+      "Read(//c/Users/kecid/AppData/Roaming/Code/logs/20260718T232015/window3/**)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ParentProcessId=17280\")",
+      "PowerShell(Get-Process -Name Code -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object Id, MainWindowTitle)",
+      "PowerShell(Get-Process -Id 1828,77708 -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Id 1828,77708 -Force -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

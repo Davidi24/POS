@@ -25,9 +25,6 @@ public class UpdateReservationRequest {
     private UUID branchId;
     private UUID customerId;
 
-    @Size(max = 50, message = "reservationCode must be at most 50 characters")
-    private String reservationCode;
-
     private ReservationSource source;
 
     @Min(value = 1, message = "partySize must be greater than 0")

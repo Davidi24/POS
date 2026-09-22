@@ -1,6 +1,7 @@
 package pos.pos.unit.security.filter;
 
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +20,7 @@ import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.security.config.AuthCookieProperties;
 import pos.pos.security.filter.JwtAuthenticationFilter;
 import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.service.JwtService;
@@ -60,6 +62,9 @@ class JwtAuthenticationFilterTest {
     @Mock
     private UserSessionRepository userSessionRepository;
 
+    @Mock
+    private AuthCookieProperties authCookieProperties;
+
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @BeforeEach
@@ -70,7 +75,8 @@ class JwtAuthenticationFilterTest {
                 userRoleRepository,
                 roleRepository,
                 permissionRepository,
-                userSessionRepository
+                userSessionRepository,
+                authCookieProperties
         );
     }
 
@@ -156,6 +162,75 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("Should fall back to the access token cookie when the authorization header is malformed")
+    void shouldAuthenticateWithAccessTokenCookieFallback() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID tokenId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/auth/me");
+        request.setServletPath("/auth/me");
+        request.addHeader("Authorization", "Token malformed-header");
+        request.setCookies(new Cookie("access-token", "  cookie-access-token  "));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain filterChain = mock(FilterChain.class);
+
+        when(authCookieProperties.getAccessTokenName()).thenReturn("access-token");
+
+        User user = User.builder()
+                .id(userId)
+                .email("cashier@pos.local")
+                .username("cashier.one")
+                .firstName("Casey")
+                .lastName("Cashier")
+                .isActive(true)
+                .build();
+
+        UserSession session = UserSession.builder()
+                .id(UUID.randomUUID())
+                .userId(userId)
+                .tokenId(tokenId)
+                .sessionType(SessionType.PASSWORD)
+                .refreshTokenHash("hash")
+                .expiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30))
+                .build();
+
+        UserRole userRole = UserRole.builder()
+                .userId(userId)
+                .roleId(roleId)
+                .build();
+
+        Role role = Role.builder()
+                .id(roleId)
+                .code("CASHIER")
+                .name("Cashier")
+                .isActive(true)
+                .build();
+
+        when(jwtService.isValid("cookie-access-token")).thenReturn(true);
+        when(jwtService.isAccessToken("cookie-access-token")).thenReturn(true);
+        when(jwtService.extractUserId("cookie-access-token")).thenReturn(userId);
+        when(jwtService.extractTokenId("cookie-access-token")).thenReturn(tokenId);
+        when(userSessionRepository.findByTokenIdAndRevokedFalse(tokenId)).thenReturn(Optional.of(session));
+        when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
+        when(userRoleRepository.findByUserId(userId)).thenReturn(List.of(userRole));
+        when(roleRepository.findByIdIn(List.of(roleId))).thenReturn(List.of(role));
+        when(permissionRepository.findCodesByRoleIds(List.of(roleId))).thenReturn(List.of("ORDERS_READ"));
+
+        jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        assertThat(authentication).isNotNull();
+        assertThat(authentication.getPrincipal()).isInstanceOf(AuthenticatedUser.class);
+        assertThat(authentication.getAuthorities())
+                .extracting(GrantedAuthority::getAuthority)
+                .containsExactlyInAnyOrder("ROLE_CASHIER", "ORDERS_READ");
+
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
     @DisplayName("Should leave the security context empty when no active user is found")
     void shouldLeaveContextEmptyWhenUserIsMissing() throws Exception {
         UUID userId = UUID.randomUUID();
@@ -182,6 +257,20 @@ class JwtAuthenticationFilterTest {
         when(jwtService.extractTokenId("valid-access-token")).thenReturn(tokenId);
         when(userSessionRepository.findByTokenIdAndRevokedFalse(tokenId)).thenReturn(Optional.of(session));
         when(userRepository.findActiveById(userId)).thenReturn(Optional.empty());
+
+        jwtAuthenticationFilter.doFilter(request, response, filterChain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("Should continue unauthenticated when neither header nor cookie provides an access token")
+    void shouldContinueUnauthenticatedWhenNoTokenIsPresent() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/auth/me");
+        request.setServletPath("/auth/me");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain filterChain = mock(FilterChain.class);
 
         jwtAuthenticationFilter.doFilter(request, response, filterChain);
 

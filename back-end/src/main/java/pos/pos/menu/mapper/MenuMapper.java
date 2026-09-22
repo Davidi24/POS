@@ -1,13 +1,23 @@
 package pos.pos.menu.mapper;
 
 import org.springframework.stereotype.Component;
-import pos.pos.menu.dto.MenuItemSummaryResponse;
-import pos.pos.menu.dto.MenuResponse;
-import pos.pos.menu.dto.MenuRestaurantSummaryResponse;
-import pos.pos.menu.dto.MenuSectionSummaryResponse;
+import pos.pos.menu.dto.response.OptionGroupResponse;
+import pos.pos.menu.dto.response.OptionItemResponse;
+import pos.pos.menu.dto.response.MenuItemSummaryResponse;
+import pos.pos.menu.dto.response.MenuItemOptionGroupSummaryResponse;
+import pos.pos.menu.dto.response.MenuResponse;
+import pos.pos.menu.dto.response.OptionGroupTypeResponse;
+import pos.pos.menu.dto.response.MenuRestaurantSummaryResponse;
+import pos.pos.menu.dto.response.MenuSectionSummaryResponse;
+import pos.pos.menu.dto.response.MenuVariantSummaryResponse;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
+import pos.pos.menu.entity.MenuItemOptionGroup;
 import pos.pos.menu.entity.MenuSection;
+import pos.pos.menu.entity.MenuVariant;
+import pos.pos.menu.entity.OptionGroup;
+import pos.pos.menu.entity.OptionItem;
+import pos.pos.menu.entity.OptionGroupType;
 
 import java.util.List;
 import java.util.Map;
@@ -16,14 +26,29 @@ import java.util.UUID;
 @Component
 public class MenuMapper {
 
-    public MenuResponse toMenuResponse(Menu menu) {
-        return toMenuResponse(menu, null, Map.of());
+    public MenuResponse toMenuResponse(Menu menu, Integer itemCount) {
+        return toMenuResponse(menu, null, Map.of(), itemCount);
     }
 
     public MenuResponse toMenuResponse(
             Menu menu,
             List<MenuSection> sections,
-            Map<UUID, List<MenuItem>> itemsBySectionId
+            Map<UUID, List<MenuItem>> itemsBySectionId,
+            Integer itemCount
+    ) {
+        return toMenuResponse(menu, sections, itemsBySectionId, false, false, Map.of(), false, Map.of(), itemCount);
+    }
+
+    public MenuResponse toMenuResponse(
+            Menu menu,
+            List<MenuSection> sections,
+            Map<UUID, List<MenuItem>> itemsBySectionId,
+            boolean includeItems,
+            boolean includeVariants,
+            Map<UUID, List<MenuVariant>> variantsByItemId,
+            boolean includeOptionGroups,
+            Map<UUID, List<MenuItemOptionGroup>> optionGroupsByItemId,
+            Integer itemCount
     ) {
         if (menu == null) {
             return null;
@@ -37,13 +62,95 @@ public class MenuMapper {
                 .description(menu.getDescription())
                 .active(menu.isActive())
                 .displayOrder(menu.getDisplayOrder())
+                .allFilterPosition(menu.getAllFilterPosition())
+                .availableFrom(menu.getAvailableFrom())
+                .availableUntil(menu.getAvailableUntil())
+                .availableFromDate(menu.getAvailableFromDate())
+                .availableUntilDate(menu.getAvailableUntilDate())
+                .color(menu.getColor())
+                .itemCount(itemCount)
                 .createdBy(menu.getCreatedBy())
                 .updatedBy(menu.getUpdatedBy())
                 .createdAt(menu.getCreatedAt())
                 .updatedAt(menu.getUpdatedAt())
                 .sections(sections == null ? null : sections.stream()
-                        .map(section -> toSectionSummaryResponse(section, itemsBySectionId.get(section.getId())))
+                        .map(section -> toMenuSectionResponse(
+                                section,
+                                itemsBySectionId.get(section.getId()),
+                                includeItems,
+                                includeVariants,
+                                variantsByItemId,
+                                includeOptionGroups,
+                                optionGroupsByItemId
+                        ))
                         .toList())
+                .build();
+    }
+
+    public MenuSectionSummaryResponse toMenuSectionResponse(MenuSection section) {
+        return toMenuSectionResponse(section, null);
+    }
+
+    public MenuSectionSummaryResponse toMenuSectionResponse(MenuSection section, List<MenuItem> items) {
+        return toMenuSectionResponse(section, items, false, false, Map.of(), false, Map.of());
+    }
+
+    public MenuSectionSummaryResponse toMenuSectionResponse(
+            MenuSection section,
+            List<MenuItem> items,
+            boolean includeItems,
+            boolean includeVariants,
+            Map<UUID, List<MenuVariant>> variantsByItemId,
+            boolean includeOptionGroups,
+            Map<UUID, List<MenuItemOptionGroup>> optionGroupsByItemId
+    ) {
+        if (section == null) {
+            return null;
+        }
+
+        return MenuSectionSummaryResponse.builder()
+                .id(section.getId())
+                .name(section.getName())
+                .description(section.getDescription())
+                .active(section.isActive())
+                .displayOrder(section.getDisplayOrder())
+                .items(items == null
+                        ? (includeItems ? List.of() : null)
+                        : items.stream()
+                        .map(item -> toMenuItemResponse(
+                                item,
+                                includeVariants ? variantsByItemId.getOrDefault(item.getId(), List.of()) : null,
+                                includeOptionGroups ? optionGroupsByItemId.getOrDefault(item.getId(), List.of()) : null
+                        ))
+                        .toList())
+                .build();
+    }
+
+    public MenuItemSummaryResponse toMenuItemResponse(MenuItem item) {
+        return toMenuItemResponse(item, null, null);
+    }
+
+    public MenuItemSummaryResponse toMenuItemResponse(
+            MenuItem item,
+            List<MenuVariant> variants,
+            List<MenuItemOptionGroup> optionGroups
+    ) {
+        if (item == null) {
+            return null;
+        }
+
+        return MenuItemSummaryResponse.builder()
+                .id(item.getId())
+                .sku(item.getSku())
+                .name(item.getName())
+                .description(item.getDescription())
+                .basePrice(item.getBasePrice())
+                .imageUrl(item.getImageUrl())
+                .available(item.isAvailable())
+                .displayOrder(item.getDisplayOrder())
+                .ingredients(List.copyOf(item.getIngredients()))
+                .variants(variants == null ? null : variants.stream().map(this::toMenuVariantSummaryResponse).toList())
+                .optionGroups(optionGroups == null ? null : optionGroups.stream().map(this::toMenuItemOptionGroupSummaryResponse).toList())
                 .build();
     }
 
@@ -59,27 +166,85 @@ public class MenuMapper {
                 .build();
     }
 
-    private MenuSectionSummaryResponse toSectionSummaryResponse(MenuSection section, List<MenuItem> items) {
-        return MenuSectionSummaryResponse.builder()
-                .id(section.getId())
-                .name(section.getName())
-                .description(section.getDescription())
-                .active(section.isActive())
-                .displayOrder(section.getDisplayOrder())
-                .items(items == null ? null : items.stream().map(this::toItemSummaryResponse).toList())
+    public MenuVariantSummaryResponse toMenuVariantSummaryResponse(MenuVariant variant) {
+        return MenuVariantSummaryResponse.builder()
+                .id(variant.getId())
+                .name(variant.getName())
+                .sku(variant.getSku())
+                .priceDelta(variant.getPriceDelta())
+                .isDefault(variant.isDefault())
+                .active(variant.isActive())
+                .displayOrder(variant.getDisplayOrder())
                 .build();
     }
 
-    private MenuItemSummaryResponse toItemSummaryResponse(MenuItem item) {
-        return MenuItemSummaryResponse.builder()
+    public OptionGroupTypeResponse toOptionGroupTypeResponse(OptionGroupType type) {
+        if (type == null) {
+            return null;
+        }
+
+        return OptionGroupTypeResponse.builder()
+                .id(type.getId())
+                .code(type.getCode())
+                .name(type.getName())
+                .description(type.getDescription())
+                .build();
+    }
+
+    public OptionGroupResponse toOptionGroupResponse(OptionGroup group) {
+        return toOptionGroupResponse(group, null);
+    }
+
+    public OptionGroupResponse toOptionGroupResponse(OptionGroup group, List<OptionItem> items) {
+        if (group == null) {
+            return null;
+        }
+
+        return OptionGroupResponse.builder()
+                .id(group.getId())
+                .restaurantId(group.getRestaurant() == null ? null : group.getRestaurant().getId())
+                .type(toOptionGroupTypeResponse(group.getType()))
+                .name(group.getName())
+                .description(group.getDescription())
+                .minSelect(group.getMinSelect())
+                .maxSelect(group.getMaxSelect())
+                .required(group.isRequired())
+                .active(group.isActive())
+                .displayOrder(group.getDisplayOrder())
+                .items(items == null ? null : items.stream().map(this::toOptionItemResponse).toList())
+                .build();
+    }
+
+    public OptionItemResponse toOptionItemResponse(OptionItem item) {
+        if (item == null) {
+            return null;
+        }
+
+        return OptionItemResponse.builder()
                 .id(item.getId())
-                .sku(item.getSku())
+                .optionGroupId(item.getOptionGroup() == null ? null : item.getOptionGroup().getId())
+                .code(item.getCode())
                 .name(item.getName())
-                .description(item.getDescription())
-                .basePrice(item.getBasePrice())
-                .imageUrl(item.getImageUrl())
+                .priceDelta(item.getPriceDelta())
                 .available(item.isAvailable())
                 .displayOrder(item.getDisplayOrder())
+                .build();
+    }
+
+    public MenuItemOptionGroupSummaryResponse toMenuItemOptionGroupSummaryResponse(MenuItemOptionGroup link) {
+        return MenuItemOptionGroupSummaryResponse.builder()
+                .linkId(link.getId())
+                .optionGroupId(link.getOptionGroup().getId())
+                .name(link.getOptionGroup().getName())
+                .description(link.getOptionGroup().getDescription())
+                .active(link.getOptionGroup().isActive())
+                .displayOrder(link.getDisplayOrder())
+                .minSelect(link.getOptionGroup().getMinSelect())
+                .maxSelect(link.getOptionGroup().getMaxSelect())
+                .required(link.getOptionGroup().isRequired())
+                .minSelectOverride(link.getMinSelectOverride())
+                .maxSelectOverride(link.getMaxSelectOverride())
+                .requiredOverride(link.getRequiredOverride())
                 .build();
     }
 }

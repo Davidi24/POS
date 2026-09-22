@@ -3,6 +3,7 @@ package pos.pos.security.config;
 public class SecurityPaths {
 
     public static final String[] PUBLIC = {
+            "/auth/.well-known/jwks.json",
             "/auth/web/login",
             "/auth/web/refresh",
             "/auth/web/logout",

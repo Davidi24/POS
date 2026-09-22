@@ -22,10 +22,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.common.dto.PageResponse;
-import pos.pos.menu.dto.CreateMenuRequest;
-import pos.pos.menu.dto.MenuResponse;
-import pos.pos.menu.dto.UpdateMenuRequest;
-import pos.pos.menu.dto.UpdateMenuStatusRequest;
+import pos.pos.menu.dto.request.CreateMenuRequest;
+import pos.pos.menu.dto.response.MenuResponse;
+import pos.pos.menu.dto.response.MenuViewResponse;
+import pos.pos.menu.dto.update.UpdateMenuRequest;
+import pos.pos.menu.dto.update.UpdateMenuStatusRequest;
+import pos.pos.menu.mapper.MenuRoleResponseMapper;
 import pos.pos.menu.service.MenuService;
 
 import java.util.UUID;
@@ -42,7 +44,7 @@ public class MenuController {
     @GetMapping
     @PreAuthorize("hasAuthority('MENUS_READ')")
     @Operation(summary = "List menus with pagination and optional filters")
-    public ResponseEntity<PageResponse<MenuResponse>> getMenus(
+    public ResponseEntity<PageResponse<MenuViewResponse>> getMenus(
             Authentication authentication,
             @RequestParam(required = false) UUID restaurantId,
             @RequestParam(required = false) Boolean active,
@@ -53,7 +55,17 @@ public class MenuController {
             @RequestParam(defaultValue = "displayOrder") String sortBy,
             @RequestParam(defaultValue = "asc") String direction
     ) {
-        return ResponseEntity.ok(menuService.getMenus(authentication, restaurantId, active, search, page, size, sortBy, direction));
+        PageResponse<MenuResponse> response = menuService.getMenus(
+                authentication,
+                restaurantId,
+                active,
+                search,
+                page,
+                size,
+                sortBy,
+                direction
+        );
+        return ResponseEntity.ok(MenuRoleResponseMapper.forActor(authentication, response));
     }
 
     @PostMapping
@@ -70,13 +82,23 @@ public class MenuController {
     @GetMapping("/{menuId}")
     @PreAuthorize("hasAuthority('MENUS_READ')")
     @Operation(summary = "Get one menu by id")
-    public ResponseEntity<MenuResponse> getMenu(
+    public ResponseEntity<MenuViewResponse> getMenu(
             Authentication authentication,
             @PathVariable UUID menuId,
             @RequestParam(defaultValue = "false") boolean includeSections,
-            @RequestParam(defaultValue = "false") boolean includeItems
+            @RequestParam(defaultValue = "false") boolean includeItems,
+            @RequestParam(defaultValue = "false") boolean includeVariants,
+            @RequestParam(defaultValue = "false") boolean includeOptionGroups
     ) {
-        return ResponseEntity.ok(menuService.getMenu(authentication, menuId, includeSections, includeItems));
+        MenuResponse response = menuService.getMenu(
+                authentication,
+                menuId,
+                includeSections,
+                includeItems,
+                includeVariants,
+                includeOptionGroups
+        );
+        return ResponseEntity.ok(MenuRoleResponseMapper.forActor(authentication, response));
     }
 
     @PutMapping("/{menuId}")
@@ -103,12 +125,13 @@ public class MenuController {
 
     @DeleteMapping("/{menuId}")
     @PreAuthorize("hasAuthority('MENUS_DELETE')")
-    @Operation(summary = "Delete a menu")
+    @Operation(summary = "Delete a menu, either deleting its sections or moving them under \"Uncategorized\"")
     public ResponseEntity<Void> deleteMenu(
             @PathVariable UUID menuId,
+            @RequestParam(defaultValue = "false") boolean deleteItems,
             Authentication authentication
     ) {
-        menuService.deleteMenu(authentication, menuId);
+        menuService.deleteMenu(authentication, menuId, deleteItems);
         return ResponseEntity.noContent().build();
     }
 }

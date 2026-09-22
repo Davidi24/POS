@@ -33,7 +33,13 @@ import pos.pos.reservation.controller.PublicReservationController;
 import pos.pos.reservation.controller.RestaurantReservationController;
 import pos.pos.reservation.dto.ReservationAvailabilityOptionResponse;
 import pos.pos.reservation.dto.ReservationResponse;
-import pos.pos.reservation.service.ReservationService;
+import pos.pos.reservation.service.ReservationCrudService;
+import pos.pos.reservation.service.ReservationDepositService;
+import pos.pos.reservation.service.ReservationLifecycleService;
+import pos.pos.reservation.service.ReservationNoteService;
+import pos.pos.reservation.service.ReservationPublicService;
+import pos.pos.reservation.service.ReservationQueryService;
+import pos.pos.reservation.service.ReservationTableAssignmentService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;
 import pos.pos.security.principal.AuthenticatedUser;
@@ -78,7 +84,19 @@ class ReservationControllerSecurityTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private ReservationService reservationService;
+    private ReservationQueryService reservationQueryService;
+    @MockBean
+    private ReservationCrudService reservationCrudService;
+    @MockBean
+    private ReservationLifecycleService reservationLifecycleService;
+    @MockBean
+    private ReservationTableAssignmentService reservationTableAssignmentService;
+    @MockBean
+    private ReservationNoteService reservationNoteService;
+    @MockBean
+    private ReservationDepositService reservationDepositService;
+    @MockBean
+    private ReservationPublicService reservationPublicService;
 
     @MockBean
     private CustomerService customerService;
@@ -86,7 +104,7 @@ class ReservationControllerSecurityTest {
     @Test
     @DisplayName("GET reservations should allow SETTINGS_READ")
     void shouldAllowReservationReadWithSettingsReadPermission() throws Exception {
-        given(reservationService.getReservations(any(), any()))
+        given(reservationQueryService.getReservations(any(), any()))
                 .willReturn(List.of(ReservationResponse.builder().id(RESERVATION_ID).reservationCode("RES_TEST").build()));
 
         mockMvc.perform(get("/restaurants/{restaurantId}/reservations", RESTAURANT_ID)
@@ -116,13 +134,21 @@ class ReservationControllerSecurityTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("Access denied"));
 
-        verifyNoInteractions(reservationService);
+        verifyNoInteractions(
+                reservationQueryService,
+                reservationCrudService,
+                reservationLifecycleService,
+                reservationTableAssignmentService,
+                reservationNoteService,
+                reservationDepositService,
+                reservationPublicService
+        );
     }
 
     @Test
     @DisplayName("GET public availability should allow anonymous access")
     void shouldAllowAnonymousPublicAvailability() throws Exception {
-        given(reservationService.getPublicAvailability(
+        given(reservationPublicService.getPublicAvailability(
                 any(),
                 any(),
                 any(),

@@ -1,0 +1,27 @@
+{
+  "name": "@pos/superadmin",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbo",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@pos/api-client": "workspace:*",
+    "@pos/auth": "workspace:*",
+    "@pos/types": "workspace:*",
+    "@pos/ui": "workspace:*",
+    "@pos/utils": "workspace:*",
+    "next": "latest",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@pos/eslint-config": "workspace:*",
+    "@pos/tsconfig": "workspace:*",
+    "typescript": "latest"
+  }
+}

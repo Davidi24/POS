@@ -31,7 +31,12 @@ import pos.pos.reservation.dto.ReservationTimelineEventResponse;
 import pos.pos.reservation.dto.UpdateReservationDepositRequest;
 import pos.pos.reservation.dto.UpdateReservationRequest;
 import pos.pos.reservation.dto.UpdateReservationTablesRequest;
-import pos.pos.reservation.service.ReservationService;
+import pos.pos.reservation.service.ReservationCrudService;
+import pos.pos.reservation.service.ReservationDepositService;
+import pos.pos.reservation.service.ReservationLifecycleService;
+import pos.pos.reservation.service.ReservationNoteService;
+import pos.pos.reservation.service.ReservationQueryService;
+import pos.pos.reservation.service.ReservationTableAssignmentService;
 
 import java.util.List;
 import java.util.UUID;
@@ -43,7 +48,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RestaurantReservationController {
 
-    private final ReservationService reservationService;
+    private final ReservationQueryService reservationQueryService;
+    private final ReservationCrudService reservationCrudService;
+    private final ReservationLifecycleService reservationLifecycleService;
+    private final ReservationTableAssignmentService reservationTableAssignmentService;
+    private final ReservationNoteService reservationNoteService;
+    private final ReservationDepositService reservationDepositService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('SETTINGS_READ')")
@@ -52,7 +62,7 @@ public class RestaurantReservationController {
             @PathVariable UUID restaurantId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getReservations(authentication, restaurantId));
+        return ResponseEntity.ok(reservationQueryService.getReservations(authentication, restaurantId));
     }
 
     @PostMapping
@@ -64,7 +74,7 @@ public class RestaurantReservationController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(reservationService.createReservation(authentication, restaurantId, request));
+                .body(reservationCrudService.createReservation(authentication, restaurantId, request));
     }
 
     @GetMapping("/{reservationId}")
@@ -75,7 +85,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getReservation(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationQueryService.getReservation(authentication, restaurantId, reservationId));
     }
 
     @PutMapping("/{reservationId}")
@@ -87,7 +97,7 @@ public class RestaurantReservationController {
             @Valid @RequestBody ReservationRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.updateReservation(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationCrudService.updateReservation(authentication, restaurantId, reservationId, request));
     }
 
     @PatchMapping("/{reservationId}")
@@ -99,7 +109,7 @@ public class RestaurantReservationController {
             @Valid @RequestBody UpdateReservationRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.patchReservation(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationCrudService.patchReservation(authentication, restaurantId, reservationId, request));
     }
 
     @DeleteMapping("/{reservationId}")
@@ -110,7 +120,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        reservationService.deleteReservation(authentication, restaurantId, reservationId);
+        reservationCrudService.deleteReservation(authentication, restaurantId, reservationId);
         return ResponseEntity.noContent().build();
     }
 
@@ -123,7 +133,7 @@ public class RestaurantReservationController {
             @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.confirmReservation(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationLifecycleService.confirmReservation(authentication, restaurantId, reservationId, request));
     }
 
     @PostMapping("/{reservationId}/cancel")
@@ -135,7 +145,7 @@ public class RestaurantReservationController {
             @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.cancelReservation(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationLifecycleService.cancelReservation(authentication, restaurantId, reservationId, request));
     }
 
     @PostMapping("/{reservationId}/check-in")
@@ -147,7 +157,7 @@ public class RestaurantReservationController {
             @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.checkInReservation(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationLifecycleService.checkInReservation(authentication, restaurantId, reservationId, request));
     }
 
     @PostMapping("/{reservationId}/seat")
@@ -159,7 +169,7 @@ public class RestaurantReservationController {
             @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.seatReservation(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationLifecycleService.seatReservation(authentication, restaurantId, reservationId, request));
     }
 
     @PostMapping("/{reservationId}/complete")
@@ -171,7 +181,7 @@ public class RestaurantReservationController {
             @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.completeReservation(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationLifecycleService.completeReservation(authentication, restaurantId, reservationId, request));
     }
 
     @PostMapping("/{reservationId}/mark-no-show")
@@ -183,7 +193,7 @@ public class RestaurantReservationController {
             @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.markNoShow(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationLifecycleService.markNoShow(authentication, restaurantId, reservationId, request));
     }
 
     @PostMapping("/{reservationId}/reopen")
@@ -195,7 +205,7 @@ public class RestaurantReservationController {
             @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.reopenReservation(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationLifecycleService.reopenReservation(authentication, restaurantId, reservationId, request));
     }
 
     @GetMapping("/{reservationId}/tables")
@@ -206,7 +216,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getReservationTables(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationQueryService.getReservationTables(authentication, restaurantId, reservationId));
     }
 
     @PutMapping("/{reservationId}/tables")
@@ -218,7 +228,7 @@ public class RestaurantReservationController {
             @Valid @RequestBody UpdateReservationTablesRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.updateReservationTables(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationTableAssignmentService.updateReservationTables(authentication, restaurantId, reservationId, request));
     }
 
     @PostMapping("/{reservationId}/tables/{tableId}")
@@ -231,7 +241,7 @@ public class RestaurantReservationController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(reservationService.addReservationTable(authentication, restaurantId, reservationId, tableId));
+                .body(reservationTableAssignmentService.addReservationTable(authentication, restaurantId, reservationId, tableId));
     }
 
     @DeleteMapping("/{reservationId}/tables/{tableId}")
@@ -243,7 +253,7 @@ public class RestaurantReservationController {
             @PathVariable UUID tableId,
             Authentication authentication
     ) {
-        reservationService.deleteReservationTable(authentication, restaurantId, reservationId, tableId);
+        reservationTableAssignmentService.deleteReservationTable(authentication, restaurantId, reservationId, tableId);
         return ResponseEntity.noContent().build();
     }
 
@@ -256,7 +266,7 @@ public class RestaurantReservationController {
             @PathVariable UUID tableId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.markPrimaryReservationTable(authentication, restaurantId, reservationId, tableId));
+        return ResponseEntity.ok(reservationTableAssignmentService.markPrimaryReservationTable(authentication, restaurantId, reservationId, tableId));
     }
 
     @PostMapping("/{reservationId}/auto-assign-table")
@@ -267,7 +277,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.autoAssignReservationTable(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationTableAssignmentService.autoAssignReservationTable(authentication, restaurantId, reservationId));
     }
 
     @GetMapping("/{reservationId}/status-history")
@@ -278,7 +288,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getStatusHistory(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationQueryService.getStatusHistory(authentication, restaurantId, reservationId));
     }
 
     @GetMapping("/{reservationId}/timeline")
@@ -289,7 +299,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getTimeline(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationQueryService.getTimeline(authentication, restaurantId, reservationId));
     }
 
     @GetMapping("/{reservationId}/audit")
@@ -300,7 +310,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getAudit(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationQueryService.getAudit(authentication, restaurantId, reservationId));
     }
 
     @PostMapping("/{reservationId}/notes")
@@ -313,7 +323,7 @@ public class RestaurantReservationController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(reservationService.addNote(authentication, restaurantId, reservationId, request));
+                .body(reservationNoteService.addNote(authentication, restaurantId, reservationId, request));
     }
 
     @DeleteMapping("/{reservationId}/notes/{noteId}")
@@ -325,7 +335,7 @@ public class RestaurantReservationController {
             @PathVariable UUID noteId,
             Authentication authentication
     ) {
-        reservationService.deleteNote(authentication, restaurantId, reservationId, noteId);
+        reservationNoteService.deleteNote(authentication, restaurantId, reservationId, noteId);
         return ResponseEntity.noContent().build();
     }
 
@@ -337,7 +347,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.getDeposit(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationDepositService.getDeposit(authentication, restaurantId, reservationId));
     }
 
     @PutMapping("/{reservationId}/deposit")
@@ -349,7 +359,7 @@ public class RestaurantReservationController {
             @Valid @RequestBody UpdateReservationDepositRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.updateDeposit(authentication, restaurantId, reservationId, request));
+        return ResponseEntity.ok(reservationDepositService.updateDeposit(authentication, restaurantId, reservationId, request));
     }
 
     @PostMapping("/{reservationId}/deposit/pay")
@@ -360,7 +370,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.payDeposit(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationDepositService.payDeposit(authentication, restaurantId, reservationId));
     }
 
     @PostMapping("/{reservationId}/deposit/refund")
@@ -371,7 +381,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.refundDeposit(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationDepositService.refundDeposit(authentication, restaurantId, reservationId));
     }
 
     @PostMapping("/{reservationId}/deposit/waive")
@@ -382,7 +392,7 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.waiveDeposit(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationDepositService.waiveDeposit(authentication, restaurantId, reservationId));
     }
 
     @PostMapping("/{reservationId}/deposit/forfeit")
@@ -393,6 +403,6 @@ public class RestaurantReservationController {
             @PathVariable UUID reservationId,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationService.forfeitDeposit(authentication, restaurantId, reservationId));
+        return ResponseEntity.ok(reservationDepositService.forfeitDeposit(authentication, restaurantId, reservationId));
     }
 }

@@ -31,6 +31,7 @@ class AuthCookiePropertiesTest {
         void shouldBindPropertiesViaConfigurationPropertiesScan() {
             contextRunner
                     .withPropertyValues(
+                            "app.security.cookie.access-token-name=access_token",
                             "app.security.cookie.refresh-token-name=refresh_token",
                             "app.security.cookie.refresh-token-path=/auth/device",
                             "app.security.cookie.same-site=None",
@@ -40,6 +41,7 @@ class AuthCookiePropertiesTest {
                     .run(context -> {
                         assertThat(context).hasNotFailed();
                         AuthCookieProperties properties = context.getBean(AuthCookieProperties.class);
+                        assertThat(properties.getAccessTokenName()).isEqualTo("access_token");
                         assertThat(properties.getRefreshTokenName()).isEqualTo("refresh_token");
                         assertThat(properties.getRefreshTokenPath()).isEqualTo("/auth/device");
                         assertThat(properties.getSameSite()).isEqualTo("None");

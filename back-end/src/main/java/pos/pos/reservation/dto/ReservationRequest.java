@@ -26,9 +26,6 @@ public class ReservationRequest {
     private UUID branchId;
     private UUID customerId;
 
-    @Size(max = 50, message = "reservationCode must be at most 50 characters")
-    private String reservationCode;
-
     private ReservationSource source;
 
     @NotNull(message = "partySize is required")

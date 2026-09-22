@@ -1,0 +1,4 @@
+# Local runtime output
+/back-end/app*.log
+/back-end/app.pid
+/mobile_desktop/app.pid

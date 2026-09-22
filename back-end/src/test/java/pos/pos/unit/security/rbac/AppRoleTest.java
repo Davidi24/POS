@@ -15,6 +15,7 @@ class AppRoleTest {
     void shouldResolveFromCode() {
         assertThat(AppRole.fromCode("SUPER_ADMIN")).isEqualTo(AppRole.SUPER_ADMIN);
         assertThat(AppRole.fromCode("WAITER")).isEqualTo(AppRole.WAITER);
+        assertThat(AppRole.fromCode("KITCHEN")).isEqualTo(AppRole.KITCHEN);
         assertThat(AppRole.fromCode("missing")).isNull();
     }
 
@@ -24,6 +25,7 @@ class AppRoleTest {
         assertThat(AppRole.SUPER_ADMIN.rank()).isGreaterThan(AppRole.OWNER.rank());
         assertThat(AppRole.OWNER.rank()).isGreaterThan(AppRole.ADMIN.rank());
         assertThat(AppRole.ADMIN.rank()).isGreaterThan(AppRole.WAITER.rank());
+        assertThat(AppRole.WAITER.rank()).isGreaterThan(AppRole.KITCHEN.rank());
     }
 
     @Test
@@ -31,13 +33,45 @@ class AppRoleTest {
     void shouldExposeExpectedPermissions() {
         assertThat(AppRole.SUPER_ADMIN.permissions()).containsExactlyInAnyOrder(AppPermission.values());
         assertThat(AppRole.OWNER.permissions()).containsExactlyInAnyOrder(AppPermission.values());
+        assertThat(AppRole.ADMIN.permissions()).contains(
+                AppPermission.MENUS_CREATE,
+                AppPermission.MENUS_READ,
+                AppPermission.MENUS_UPDATE,
+                AppPermission.MENUS_DELETE
+        );
+        assertThat(AppRole.ADMIN.permissions()).contains(
+                AppPermission.KDS_READ,
+                AppPermission.KDS_UPDATE
+        );
         assertThat(AppRole.MANAGER.permissions()).contains(
                 AppPermission.USERS_CREATE,
                 AppPermission.ROLES_READ,
+                AppPermission.MENUS_CREATE,
                 AppPermission.MENUS_READ,
-                AppPermission.MENUS_UPDATE
+                AppPermission.MENUS_UPDATE,
+                AppPermission.ORDER_READ,
+                AppPermission.ORDER_CLOSE,
+                AppPermission.KDS_READ,
+                AppPermission.KDS_UPDATE
         );
-        assertThat(AppRole.MANAGER.permissions()).doesNotContain(AppPermission.USERS_DELETE);
-        assertThat(AppRole.WAITER.permissions()).isEmpty();
+        assertThat(AppRole.MANAGER.permissions()).doesNotContain(
+                AppPermission.USERS_DELETE,
+                AppPermission.MENUS_DELETE
+        );
+        assertThat(AppRole.WAITER.permissions()).containsExactlyInAnyOrder(
+                AppPermission.MENUS_READ,
+                AppPermission.ORDER_READ,
+                AppPermission.ORDER_CREATE,
+                AppPermission.ORDER_UPDATE,
+                AppPermission.ORDER_CLOSE,
+                AppPermission.ORDER_DISCOUNT_APPLY,
+                AppPermission.ORDER_TRANSFER
+        );
+        assertThat(AppRole.KITCHEN.permissions()).containsExactlyInAnyOrder(
+                AppPermission.MENUS_READ,
+                AppPermission.ORDER_READ,
+                AppPermission.KDS_READ,
+                AppPermission.KDS_UPDATE
+        );
     }
 }

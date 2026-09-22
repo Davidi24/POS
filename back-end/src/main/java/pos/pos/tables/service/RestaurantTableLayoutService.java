@@ -161,6 +161,12 @@ public class RestaurantTableLayoutService {
         if (item.getShape() != null) {
             table.setShape(item.getShape());
         }
+        if (item.getRotationDegrees() != null) {
+            table.setRotationDegrees(item.getRotationDegrees());
+        }
+        if (item.getLayoutScale() != null) {
+            table.setLayoutScale(item.getLayoutScale());
+        }
         table.setUpdatedBy(actorId);
     }
 
