@@ -15,7 +15,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.auth.AuthException;
-import pos.pos.exception.menu.MenuDeletionBlockedException;
 import pos.pos.menu.dto.request.CreateMenuRequest;
 import pos.pos.menu.dto.response.MenuResponse;
 import pos.pos.menu.dto.update.UpdateMenuStatusRequest;
@@ -90,6 +89,9 @@ class MenuServiceTest {
 
     @Spy
     private MenuMapper menuMapper = new MenuMapper();
+
+    @Mock
+    private pos.pos.menu.service.MenuContentTransferService contentTransfer;
 
     @InjectMocks
     private MenuService menuService;
@@ -257,22 +259,54 @@ class MenuServiceTest {
     }
 
     @Test
-    @DisplayName("deleteMenu should reject menus that still have sections")
-    void shouldRejectDeleteWhenSectionsExist() {
+    @DisplayName("deleteMenu should move sections to an Uncategorized menu when deleteItems is false")
+    void shouldMoveSectionsToUncategorizedOnDelete() {
         Authentication authentication = authentication();
         ActorScope scope = actorScope(false, RESTAURANT_ID);
         Restaurant restaurant = restaurant(RestaurantStatus.ACTIVE);
         Menu menu = menu(restaurant);
+        pos.pos.menu.entity.MenuSection section = new pos.pos.menu.entity.MenuSection();
+        section.setId(UUID.fromString("00000000-0000-0000-0000-000000000104"));
+        section.setMenu(menu);
+        section.setName("Mains");
+        section.setActive(true);
+        section.setDisplayOrder(1);
 
         given(actorScopeService.resolve(authentication)).willReturn(scope);
         given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(java.util.Optional.of(menu));
-        given(menuSectionRepository.existsByMenuId(MENU_ID)).willReturn(true);
+        given(menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(MENU_ID)).willReturn(List.of(section));
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
 
-        assertThatThrownBy(() -> menuService.deleteMenu(authentication, MENU_ID))
-                .isInstanceOf(MenuDeletionBlockedException.class)
-                .hasMessage("Menu cannot be deleted while it still has sections");
+        menuService.deleteMenu(authentication, MENU_ID, false);
 
-        verify(menuRepository, never()).delete(any(Menu.class));
+        verify(contentTransfer).preserveSections(menu, List.of(section), ACTOR_ID);
+        verify(menuRepository).delete(menu);
+    }
+
+    @Test
+    @DisplayName("deleteMenu should cascade-delete sections when deleteItems is true")
+    void shouldDeleteSectionsWithMenuWhenRequested() {
+        Authentication authentication = authentication();
+        ActorScope scope = actorScope(false, RESTAURANT_ID);
+        Restaurant restaurant = restaurant(RestaurantStatus.ACTIVE);
+        Menu menu = menu(restaurant);
+        pos.pos.menu.entity.MenuSection section = new pos.pos.menu.entity.MenuSection();
+        section.setId(UUID.fromString("00000000-0000-0000-0000-000000000104"));
+        section.setMenu(menu);
+        section.setName("Mains");
+        section.setActive(true);
+        section.setDisplayOrder(1);
+
+        given(actorScopeService.resolve(authentication)).willReturn(scope);
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(java.util.Optional.of(menu));
+        given(menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(MENU_ID)).willReturn(List.of(section));
+        given(menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId())).willReturn(List.of());
+
+        menuService.deleteMenu(authentication, MENU_ID, true);
+
+        verify(menuSectionRepository).deleteAll(List.of(section));
+        verify(menuRepository, never()).saveAndFlush(any(Menu.class));
+        verify(menuRepository).delete(menu);
     }
 
     private Authentication authentication() {

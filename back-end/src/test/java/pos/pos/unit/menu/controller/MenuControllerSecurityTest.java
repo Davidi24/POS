@@ -129,7 +129,7 @@ class MenuControllerSecurityTest {
     static class StubMenuService extends MenuService {
 
         StubMenuService() {
-            super(null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override
@@ -155,7 +155,7 @@ class MenuControllerSecurityTest {
         }
 
         @Override
-        public void deleteMenu(Authentication authentication, UUID menuId) {
+        public void deleteMenu(Authentication authentication, UUID menuId, boolean deleteItems) {
         }
     }
 
