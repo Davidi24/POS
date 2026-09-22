@@ -28,7 +28,8 @@ data class Menu(
     val updatedBy: String?,
     val createdAt: String?,
     val updatedAt: String?,
-    val sections: List<MenuSection>
+    val sections: List<MenuSection>,
+    val allFilterPosition: Int? = null
 )
 
 data class MenuRestaurant(

@@ -62,6 +62,7 @@ public class MenuMapper {
                 .description(menu.getDescription())
                 .active(menu.isActive())
                 .displayOrder(menu.getDisplayOrder())
+                .allFilterPosition(menu.getAllFilterPosition())
                 .availableFrom(menu.getAvailableFrom())
                 .availableUntil(menu.getAvailableUntil())
                 .availableFromDate(menu.getAvailableFromDate())

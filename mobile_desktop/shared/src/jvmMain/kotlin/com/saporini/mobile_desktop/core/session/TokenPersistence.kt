@@ -25,18 +25,34 @@ actual class TokenPersistence {
             file.delete()
             return
         }
-        val encrypted = Crypt32Util.cryptProtectData(token.toByteArray(Charsets.UTF_8))
-        file.writeText(Base64.getEncoder().encodeToString(encrypted))
+        val bytes = token.toByteArray(Charsets.UTF_8)
+        val payload = if (isWindows) Crypt32Util.cryptProtectData(bytes) else bytes
+        if (!isWindows) restrictToOwner(file)
+        file.writeText(Base64.getEncoder().encodeToString(payload))
     }
 
     private fun load(file: File): String? {
         if (!file.exists()) return null
         return try {
-            val encrypted = Base64.getDecoder().decode(file.readText())
-            val decrypted = Crypt32Util.cryptUnprotectData(encrypted)
+            val payload = Base64.getDecoder().decode(file.readText())
+            val decrypted = if (isWindows) Crypt32Util.cryptUnprotectData(payload) else payload
             String(decrypted, Charsets.UTF_8)
         } catch (_: Throwable) {
             null
         }
+    }
+
+    // DPAPI is Windows-only; elsewhere tokens sit in an owner-only (0600) file.
+    private fun restrictToOwner(file: File) {
+        file.createNewFile()
+        file.setReadable(false, false)
+        file.setWritable(false, false)
+        file.setReadable(true, true)
+        file.setWritable(true, true)
+    }
+
+    private companion object {
+        val isWindows: Boolean =
+            System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
     }
 }

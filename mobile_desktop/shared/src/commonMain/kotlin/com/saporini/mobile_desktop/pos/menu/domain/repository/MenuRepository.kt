@@ -25,6 +25,7 @@ data class CreateMenuInput(
 )
 
 data class UpdateMenuInput(
+    val allFilterPosition: Int? = null,
     val code: String? = null,
     val name: String,
     val description: String? = null,
@@ -52,7 +53,8 @@ data class MenuItemInput(
     val imageUrl: String? = null,
     val available: Boolean = true,
     val displayOrder: Int = 0,
-    val ingredients: List<String> = emptyList()
+    val ingredients: List<String> = emptyList(),
+    val sectionId: String? = null
 )
 
 data class MenuVariantInput(
@@ -130,7 +132,8 @@ interface MenuRepository {
     ): Menu
 
     suspend fun deleteMenu(
-        menuId: String
+        menuId: String,
+        deleteItems: Boolean = false
     )
 
     // Menu sections
@@ -148,7 +151,8 @@ interface MenuRepository {
 
     suspend fun deleteSection(
         menuId: String,
-        sectionId: String
+        sectionId: String,
+        deleteItems: Boolean = false
     )
 
     // Menu items
@@ -235,10 +239,19 @@ interface MenuRepository {
         input: CreateOptionGroupInput
     ): OptionGroup
 
+    suspend fun deleteOptionGroup(
+        groupId: String
+    )
+
     // Option items
 
     suspend fun createOptionItem(
         groupId: String,
         input: OptionItemInput
     ): OptionItem
+
+    suspend fun deleteOptionItem(
+        groupId: String,
+        itemId: String
+    )
 }

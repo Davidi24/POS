@@ -65,6 +65,10 @@ kotlin {
             implementation(libs.koin.compose)
             implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.2")
         }
+        jvmTest.dependencies {
+            // Headless Compose screenshot tests need the desktop Skia native renderer.
+            implementation(compose.desktop.currentOs)
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.ktor.clientMock)

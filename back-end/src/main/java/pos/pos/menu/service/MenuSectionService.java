@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.menu.MenuNotFoundException;
-import pos.pos.exception.menu.MenuSectionDeletionBlockedException;
+import pos.pos.exception.menu.MenuSectionDeletionRequiresConfirmationException;
 import pos.pos.exception.menu.MenuSectionMenuMismatchException;
 import pos.pos.exception.menu.MenuSectionNameAlreadyExistsException;
 import pos.pos.exception.menu.MenuSectionNotFoundException;
@@ -20,15 +20,18 @@ import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
 import pos.pos.menu.mapper.MenuMapper;
 import pos.pos.menu.policy.MenuPolicy;
+import pos.pos.menu.repository.MenuItemOptionGroupRepository;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.menu.repository.MenuRepository;
 import pos.pos.menu.repository.MenuSectionRepository;
+import pos.pos.menu.repository.MenuVariantRepository;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.service.RestaurantValidationService;
 import pos.pos.security.scope.ActorScope;
 import pos.pos.security.scope.ActorScopeService;
 import pos.pos.utils.NormalizationUtils;
+import pos.pos.menu.util.MenuNames;
 
 import java.util.List;
 import java.util.Map;
@@ -40,9 +43,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MenuSectionService {
 
+    private final MenuContentTransferService contentTransfer;
+
     private final MenuRepository menuRepository;
     private final MenuSectionRepository menuSectionRepository;
     private final MenuItemRepository menuItemRepository;
+    private final MenuVariantRepository menuVariantRepository;
+    private final MenuItemOptionGroupRepository menuItemOptionGroupRepository;
     private final MenuMapper menuMapper;
     private final ActorScopeService actorScopeService;
     private final MenuPolicy menuPolicy;
@@ -105,7 +112,7 @@ public class MenuSectionService {
         section.setName(normalizedName);
         section.setDescription(NormalizationUtils.normalize(request.getDescription()));
         section.setActive(request.getActive() == null || request.getActive());
-        section.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
+        section.setDisplayOrder(MenuNames.sectionOrder(normalizedName, request.getDisplayOrder() == null ? 0 : request.getDisplayOrder()));
 
         return menuMapper.toMenuSectionResponse(menuSectionRepository.saveAndFlush(section));
     }
@@ -127,7 +134,7 @@ public class MenuSectionService {
         section.setName(normalizedName);
         section.setDescription(NormalizationUtils.normalize(request.getDescription()));
         section.setActive(Boolean.TRUE.equals(request.getActive()));
-        section.setDisplayOrder(request.getDisplayOrder());
+        section.setDisplayOrder(MenuNames.sectionOrder(normalizedName, request.getDisplayOrder()));
 
         return menuMapper.toMenuSectionResponse(menuSectionRepository.saveAndFlush(section));
     }
@@ -148,12 +155,25 @@ public class MenuSectionService {
     }
 
     @Transactional
-    public void deleteSection(Authentication authentication, UUID menuId, UUID sectionId) {
+    public void deleteSection(Authentication authentication, UUID menuId, UUID sectionId, boolean deleteItems) {
         Menu menu = requireManageableMenu(authentication, menuId);
         assertMenuWriteAllowed(menu.getRestaurant());
         MenuSection section = requireScopedSection(menu, sectionId);
-        if (menuItemRepository.existsBySectionId(sectionId)) {
-            throw new MenuSectionDeletionBlockedException();
+
+        contentTransfer.lock(menu);
+        List<MenuItem> items = menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(sectionId);
+        if (!items.isEmpty()) {
+            if (deleteItems) {
+                for (MenuItem item : items) {
+                    menuVariantRepository.deleteAll(
+                            menuVariantRepository.findByMenuItemIdOrderByDisplayOrderAscNameAsc(item.getId()));
+                    menuItemOptionGroupRepository.deleteAll(
+                            menuItemOptionGroupRepository.findByMenuItemIdOrdered(item.getId()));
+                }
+                menuItemRepository.deleteAll(items);
+            } else {
+                contentTransfer.preserveItems(section, items);
+            }
         }
 
         menuSectionRepository.delete(section);

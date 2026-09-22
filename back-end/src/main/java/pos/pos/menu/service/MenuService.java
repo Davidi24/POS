@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.menu.MenuCodeAlreadyExistsException;
-import pos.pos.exception.menu.MenuDeletionBlockedException;
+import pos.pos.exception.menu.MenuDeletionRequiresConfirmationException;
 import pos.pos.exception.menu.MenuNotFoundException;
 import pos.pos.menu.dto.request.CreateMenuRequest;
 import pos.pos.menu.dto.response.MenuResponse;
@@ -52,6 +52,7 @@ import java.util.stream.Collectors;
 public class MenuService {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
+    private final MenuContentTransferService contentTransfer;
 
     private final MenuRepository menuRepository;
     private final MenuSectionRepository menuSectionRepository;
@@ -231,6 +232,9 @@ public class MenuService {
         menu.setDescription(NormalizationUtils.normalize(request.getDescription()));
         menu.setActive(Boolean.TRUE.equals(request.getActive()));//is the menu active or not
         menu.setDisplayOrder(request.getDisplayOrder());//saves the order position of the menu
+        if (request.getAllFilterPosition() != null) {
+            menu.setAllFilterPosition(request.getAllFilterPosition());
+        }
         menu.setAvailableFrom(request.getAvailableFrom());
         menu.setAvailableUntil(request.getAvailableUntil());
         menu.setAvailableFromDate(request.getAvailableFromDate());
@@ -255,10 +259,27 @@ public class MenuService {
 
     //checked
     @Transactional
-    public void deleteMenu(Authentication authentication, UUID menuId) {//deletes meny only if it has no sections
+    public void deleteMenu(Authentication authentication, UUID menuId, boolean deleteItems) {
         Menu menu = requireManageableMenu(authentication, menuId);
-        if (menuSectionRepository.existsByMenuId(menuId)) {
-            throw new MenuDeletionBlockedException();//if it has sections throws error
+
+        contentTransfer.lock(menu);
+        List<MenuSection> sections = menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(menuId);
+        if (!sections.isEmpty()) {
+            if (deleteItems) {
+                for (MenuSection section : sections) {
+                    for (MenuItem item : menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId())) {
+                        menuVariantRepository.deleteAll(
+                                menuVariantRepository.findByMenuItemIdOrderByDisplayOrderAscNameAsc(item.getId()));
+                        menuItemOptionGroupRepository.deleteAll(
+                                menuItemOptionGroupRepository.findByMenuItemIdOrdered(item.getId()));
+                    }
+                    menuItemRepository.deleteAll(
+                            menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId()));
+                }
+                menuSectionRepository.deleteAll(sections);
+            } else {
+                contentTransfer.preserveSections(menu, sections, restaurantScopeService.currentUserId(authentication));
+            }
         }
 
         menuRepository.delete(menu);

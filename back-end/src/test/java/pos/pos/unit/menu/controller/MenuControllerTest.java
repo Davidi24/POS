@@ -235,7 +235,7 @@ class MenuControllerTest {
         private boolean lastIncludeOptionGroups;
 
         StubMenuService() {
-            super(null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

@@ -113,16 +113,21 @@ class MenuScreenModel(
         _state.value = _state.value.copy(selectedMenu = null)
     }
 
-    fun deleteMenu(menuId: String, onSuccess: () -> Unit = {}) {
+    fun deleteMenu(menuId: String, deleteItems: Boolean = false, onSuccess: () -> Unit = {}) {
         screenModelScope.launch {
             try {
-                repository.deleteMenu(menuId)
+                repository.deleteMenu(menuId, deleteItems)
                 _state.value = _state.value.copy(
                     menus = _state.value.menus.filterNot { it.id == menuId },
                     totalElements = (_state.value.totalElements - 1).coerceAtLeast(0),
                     errorMessage = null
                 )
                 onSuccess()
+                if (!deleteItems) {
+                    // Sections may have moved to an auto-created "Uncategorized" menu that
+                    // this session doesn't know about yet -- refresh to pick it up.
+                    loadMenus()
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -297,6 +302,22 @@ class MenuScreenModel(
         }
     }
 
+    suspend fun saveAllFilterPosition(menuId: String, position: Int): Result<Unit> = runSuspendCatching {
+        val current = repository.getMenu(menuId, true, true, true, true)
+        repository.updateMenu(menuId, UpdateMenuInput(
+            code = current.code, name = current.name, description = current.description,
+            active = current.active, displayOrder = current.displayOrder,
+            availableFrom = current.availableFrom, availableUntil = current.availableUntil,
+            availableFromDate = current.availableFromDate, availableUntilDate = current.availableUntilDate,
+            color = current.color, allFilterPosition = position
+        ))
+        val refreshed = current.copy(allFilterPosition = position)
+        _state.value = _state.value.copy(
+            selectedMenu = if (_state.value.selectedMenu?.id == menuId) refreshed else _state.value.selectedMenu,
+            menus = _state.value.menus.map { if (it.id == menuId) refreshed else it }
+        )
+    }
+
     suspend fun createSection(menuId: String, name: String, displayOrder: Int): Result<MenuSection> =
         runSuspendCatching {
             repository.createSection(menuId, MenuSectionInput(name = name, displayOrder = displayOrder))
@@ -311,8 +332,19 @@ class MenuScreenModel(
         repository.updateSection(menuId, sectionId, MenuSectionInput(name = name, displayOrder = displayOrder))
     }
 
-    suspend fun deleteSection(menuId: String, sectionId: String): Result<Unit> =
-        runSuspendCatching { repository.deleteSection(menuId, sectionId) }
+    suspend fun deleteSection(menuId: String, sectionId: String, deleteItems: Boolean): Result<com.saporini.mobile_desktop.pos.menu.domain.model.Menu> =
+        runSuspendCatching {
+            repository.deleteSection(menuId, sectionId, deleteItems)
+            // Refresh in place before reporting success. openMenu briefly replaces the
+            // detail with a list summary and can leave dialog-local state stale.
+            val refreshed = repository.getMenu(menuId, true, true, true, true)
+            _state.value = _state.value.copy(
+                selectedMenu = if (_state.value.selectedMenu?.id == menuId) refreshed else _state.value.selectedMenu,
+                menus = _state.value.menus.map { if (it.id == menuId) refreshed else it },
+                errorMessage = null
+            )
+            refreshed
+        }
 
     suspend fun createItem(menuId: String, sectionId: String, input: MenuItemInput): Result<MenuItem> =
         runSuspendCatching { repository.createItem(menuId, sectionId, input) }
@@ -366,48 +398,90 @@ class MenuScreenModel(
     // this item (see AGENT_MEMORY.md for the trade-off). The steps run
     // sequentially inside one Result -- if any step fails, the whole
     // save is reported as failed rather than silently half-applied.
-    suspend fun replaceItemOptionGroups(
+    suspend fun addItemOptionGroup(
         menuId: String,
         sectionId: String,
         itemId: String,
-        previousLinkIds: List<String>,
-        groups: List<DraftOptionGroup>
-    ): Result<Unit> = runSuspendCatching {
+        group: DraftOptionGroup,
+        displayOrder: Int
+    ): Result<DraftOptionGroup> = runSuspendCatching {
         val restaurantId = sessionManager.currentUser.value?.restaurantId
             ?: throw IllegalStateException("No restaurant is assigned to this user")
 
-        previousLinkIds.forEach { linkId ->
-            repository.deleteItemOptionGroup(menuId, sectionId, itemId, linkId)
-        }
         val typeId = repository.getOptionGroupTypes().firstOrNull()?.id
             ?: repository.createOptionGroupType(OptionGroupTypeInput(name = "General")).id
-        groups.forEachIndexed { index, group ->
-            val createdGroup = repository.createOptionGroup(
-                CreateOptionGroupInput(
-                    restaurantId = restaurantId,
-                    typeId = typeId,
-                    name = group.name,
-                    minSelect = if (group.required) 1 else 0,
-                    maxSelect = group.choices.size,
-                    required = group.required,
-                    displayOrder = index
-                )
+        val createdGroup = repository.createOptionGroup(
+            CreateOptionGroupInput(
+                restaurantId = restaurantId,
+                typeId = typeId,
+                name = group.name,
+                minSelect = if (group.required) 1 else 0,
+                maxSelect = group.choices.size,
+                required = group.required,
+                displayOrder = displayOrder
             )
-            group.choices.forEachIndexed { choiceIndex, choice ->
-                val priceDelta = choice.priceDeltaLabel
-                    .filter { it.isDigit() || it == '.' }
-                    .toDoubleOrNull() ?: 0.0
-                repository.createOptionItem(
-                    createdGroup.id,
-                    OptionItemInput(name = choice.name, priceDelta = priceDelta, displayOrder = choiceIndex)
-                )
+        )
+        val createdChoices = group.choices.mapIndexed { choiceIndex, choice ->
+            val priceDelta = choice.priceDeltaLabel
+                .filter { it.isDigit() || it == '.' }
+                .toDoubleOrNull() ?: 0.0
+            val createdItem = repository.createOptionItem(
+                createdGroup.id,
+                OptionItemInput(name = choice.name, priceDelta = priceDelta, displayOrder = choiceIndex)
+            )
+            choice.copy(id = createdItem.id)
+        }
+        val link = repository.createItemOptionGroup(
+            menuId,
+            sectionId,
+            itemId,
+            CreateMenuItemOptionGroupInput(optionGroupId = createdGroup.id, displayOrder = displayOrder)
+        )
+        group.copy(choices = createdChoices, linkId = link.linkId, optionGroupId = createdGroup.id)
+    }
+
+    suspend fun updateItemOptionGroup(
+        menuId: String,
+        sectionId: String,
+        itemId: String,
+        existing: DraftOptionGroup,
+        updated: DraftOptionGroup,
+        displayOrder: Int
+    ): Result<DraftOptionGroup> = runSuspendCatching {
+        // No partial-update path for a group's choices yet -- delete the old
+        // group/items/link and recreate fresh, same as a plain add.
+        deleteItemOptionGroupInternal(menuId, sectionId, itemId, existing)
+        addItemOptionGroup(menuId, sectionId, itemId, updated, displayOrder).getOrThrow()
+    }
+
+    suspend fun deleteItemOptionGroup(
+        menuId: String,
+        sectionId: String,
+        itemId: String,
+        group: DraftOptionGroup
+    ): Result<Unit> = runSuspendCatching {
+        deleteItemOptionGroupInternal(menuId, sectionId, itemId, group)
+    }
+
+    private suspend fun deleteItemOptionGroupInternal(
+        menuId: String,
+        sectionId: String,
+        itemId: String,
+        group: DraftOptionGroup
+    ) {
+        val groupId = group.optionGroupId
+        group.choices.forEach { choice ->
+            val choiceId = choice.id
+            if (choiceId != null && groupId != null) {
+                repository.deleteOptionItem(groupId, choiceId)
             }
-            repository.createItemOptionGroup(
-                menuId,
-                sectionId,
-                itemId,
-                CreateMenuItemOptionGroupInput(optionGroupId = createdGroup.id, displayOrder = index)
-            )
+        }
+        val linkId = group.linkId
+        if (linkId != null) {
+            repository.deleteItemOptionGroup(menuId, sectionId, itemId, linkId)
+        }
+        if (groupId != null) {
+            repository.deleteOptionGroup(groupId)
         }
     }
 }

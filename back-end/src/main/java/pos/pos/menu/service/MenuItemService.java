@@ -125,6 +125,11 @@ public class MenuItemService {
         MenuSection section = requireScopedSection(menu, sectionId);
         MenuItem item = requireScopedItem(section, itemId);
 
+        UUID targetSectionId = request.getSectionId();
+        if (targetSectionId != null && !targetSectionId.equals(sectionId)) {
+            item.setSection(requireScopedSection(menu, targetSectionId));
+        }
+
         item.setSku(NormalizationUtils.normalizeUpper(request.getSku()));
         item.setName(NormalizationUtils.normalize(request.getName()));
         item.setDescription(NormalizationUtils.normalize(request.getDescription()));

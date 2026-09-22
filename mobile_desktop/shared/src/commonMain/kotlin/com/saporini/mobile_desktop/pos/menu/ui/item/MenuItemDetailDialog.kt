@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -38,6 +39,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -49,12 +51,13 @@ import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.auth_login_img
 import org.jetbrains.compose.resources.painterResource
 
-private val ActiveOlive = Color(0xFF94A27F)
+private val ActiveOlive = Color(0xFF4F7942)
 private val TextInk = Color(0xFF222426)
 private val MutedInk = Color(0xFF747572)
 private val Border = Color(0xFFE8E5E1)
 private val ItemDetailSurface = Color(0xFFF7F7F5)
 private val ItemDetailEmptyText = Color(0xFFC7C8C2)
+private val ItemDetailDangerText = Color(0xFFB13A2F)
 
 @Composable
 internal fun ItemDetailDialog(
@@ -80,17 +83,19 @@ internal fun ItemDetailDialog(
 
 @Composable
 private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.34f))
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
+        // Prefer 70% of the window, but never exceed what's actually available:
+        // a hard min here clipped the dialog on windows narrower than ~808dp.
+        val dialogWidth = minOf(maxWidth, 920.dp, maxOf(maxWidth * 0.70f, 760.dp))
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.70f)
-                .widthIn(min = 760.dp, max = 920.dp)
+                .width(dialogWidth)
                 .fillMaxHeight(0.82f)
                 .shadow(24.dp, RoundedCornerShape(14.dp))
                 .clip(RoundedCornerShape(14.dp))
@@ -144,7 +149,9 @@ private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
                             lineHeight = 20.sp,
-                            color = Color.White
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -171,7 +178,9 @@ private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                                 fontFamily = Inter(),
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
-                                color = MutedInk
+                                color = MutedInk,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         Box(
@@ -196,40 +205,57 @@ private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.Top
                     ) {
-                        Text(
-                            text = item.name,
+                        Column(
                             modifier = Modifier.weight(1f),
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 30.sp,
-                            lineHeight = 34.sp,
-                            color = TextInk
-                        )
-                        Spacer(Modifier.width(16.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFF1F4EC))
-                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            ItemDetailSectionLabel("Title")
                             Text(
-                                text = item.price,
+                                text = item.name,
                                 fontFamily = Inter(),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 20.sp,
-                                color = TextInk
+                                fontSize = 30.sp,
+                                lineHeight = 34.sp,
+                                color = TextInk,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            ItemDetailSectionLabel("Price")
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0xFFF1F4EC))
+                                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = item.price,
+                                    fontFamily = Inter(),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp,
+                                    color = TextInk
+                                )
+                            }
                         }
                     }
 
-                    Text(
-                        text = item.description.ifBlank { "No description added." },
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp,
-                        lineHeight = 22.sp,
-                        color = if (item.description.isNotBlank()) MutedInk else ItemDetailEmptyText
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ItemDetailSectionLabel("Description")
+                        Text(
+                            text = item.description.ifBlank { "No description added." },
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp,
+                            lineHeight = 22.sp,
+                            color = if (item.description.isNotBlank()) MutedInk else ItemDetailEmptyText,
+                            // Header isn't scrollable -- an unbounded description would
+                            // squeeze the panels below it.
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -276,7 +302,9 @@ private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                                     fontFamily = Inter(),
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.sp,
-                                    color = TextInk
+                                    color = TextInk,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 val amount = "${ingredient.quantity} ${ingredient.unit}".trim()
                                 if (amount.isNotBlank()) {
@@ -293,44 +321,64 @@ private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                 }
 
                 Column(
-                    modifier = Modifier.weight(1.35f),
+                    modifier = Modifier.weight(1.35f).fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    DesktopDetailPanel(title = "Variants") {
+                    DesktopDetailPanel(title = "Variants", modifier = Modifier.weight(1f)) {
                         if (item.variants.isEmpty()) {
                             DesktopDetailEmptyText("No variants added.")
                         } else {
                             item.variants.forEach { variant ->
-                                Row(
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(9.dp))
                                         .background(Color.White)
                                         .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
-                                    Text(
-                                        text = variant.name,
-                                        modifier = Modifier.weight(1f),
-                                        fontFamily = Inter(),
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp,
-                                        color = TextInk
-                                    )
-                                    if (variant.priceDeltaLabel.isNotBlank()) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Text(
-                                            text = variant.priceDeltaLabel,
+                                            text = variant.name,
+                                            modifier = Modifier.weight(1f),
                                             fontFamily = Inter(),
-                                            fontSize = 12.sp,
-                                            color = MutedInk
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 13.sp,
+                                            color = TextInk,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
                                         )
+                                        // priceDeltaLabel already carries its +/- sign
+                                        // (see MenuScreen.kt's formatPriceDelta).
+                                        if (variant.priceDeltaLabel.isNotBlank()) {
+                                            Text(
+                                                text = variant.priceDeltaLabel,
+                                                fontFamily = Inter(),
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 12.sp,
+                                                color = if (variant.priceDeltaLabel.startsWith("-")) {
+                                                    ItemDetailDangerText
+                                                } else {
+                                                    ActiveOlive
+                                                }
+                                            )
+                                        }
                                     }
+                                    Text(
+                                        text = "Total: ${formatDetailPrice(item.basePrice + parseSignedPriceDelta(variant.priceDeltaLabel))}",
+                                        fontFamily = Inter(),
+                                        fontSize = 11.sp,
+                                        color = MutedInk
+                                    )
                                 }
                             }
                         }
                     }
 
-                    DesktopDetailPanel(title = "Options") {
+                    DesktopDetailPanel(title = "Options", modifier = Modifier.weight(1f)) {
                         if (item.optionGroups.isEmpty()) {
                             DesktopDetailEmptyText("No options added.")
                         } else {
@@ -353,7 +401,9 @@ private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                                             fontFamily = Inter(),
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 13.sp,
-                                            color = TextInk
+                                            color = TextInk,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
                                             text = if (group.required) "Required" else "Optional",
@@ -377,7 +427,9 @@ private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                                             fontFamily = Inter(),
                                             fontSize = 12.sp,
                                             lineHeight = 18.sp,
-                                            color = MutedInk
+                                            color = MutedInk,
+                                            maxLines = 4,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }
@@ -405,7 +457,12 @@ private fun DesktopDetailPanel(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         ItemDetailSectionLabel(title)
-        content()
+        Column(
+            modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            content()
+        }
     }
 }
 
@@ -536,4 +593,20 @@ private fun ItemDetailSectionLabel(text: String) {
         letterSpacing = 0.5.sp,
         color = MutedInk
     )
+}
+
+/** Reads back a signed delta like "+$2.50" or "-$1.00" into a plain number. */
+private fun parseSignedPriceDelta(label: String): Double {
+    val trimmed = label.trim()
+    if (trimmed.isBlank()) return 0.0
+    val negative = trimmed.startsWith("-")
+    val magnitude = trimmed.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: return 0.0
+    return if (negative) -magnitude else magnitude
+}
+
+private fun formatDetailPrice(price: Double): String {
+    val cents = kotlin.math.round(price * 100).toLong()
+    val dollars = cents / 100
+    val remainder = (cents % 100).let { if (it < 0) -it else it }
+    return "$$dollars.${remainder.toString().padStart(2, '0')}"
 }

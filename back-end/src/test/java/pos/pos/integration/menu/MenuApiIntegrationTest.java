@@ -151,6 +151,71 @@ class MenuApiIntegrationTest {
     private final AtomicInteger ipSequence = new AtomicInteger(200);
 
     @Test
+    void preservesCollidingItemsAndKeepsFallbackLastAfterMoreSectionsAreAdded() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("preserve-items", admin.getId());
+        Menu menu = createMenu(restaurant, "dinner", "Dinner", true, 0, admin.getId());
+        MenuSection fallback = createSection(menu, "Uncategorized", null, false, 0);
+        MenuSection source = createSection(menu, "Mains", null, true, 9000);
+        MenuSection other = createSection(menu, "Desserts", null, true, 5000);
+        createItem(fallback, "SOUP", "Soup", new BigDecimal("8.00"), true, 0);
+        MenuItem moved = createItem(source, "SOUP", "Soup", new BigDecimal("12.50"), true, 0);
+        String token = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "PRESERVE-ITEMS");
+        mockMvc.perform(delete("/menus/{menuId}/sections/{sectionId}", menu.getId(), source.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))).andExpect(status().isNoContent());
+        menuItemRepository.flush();
+        MenuItem saved = menuItemRepository.findById(moved.getId()).orElseThrow();
+        assertThat(saved.getName()).isEqualTo("Soup (2)");
+        assertThat(saved.getSku()).isEqualTo("SOUP");
+        assertThat(saved.getBasePrice()).isEqualByComparingTo("12.50");
+        assertThat(saved.getSection().getId()).isEqualTo(fallback.getId());
+        assertThat(fallback.isActive()).isTrue();
+        createSection(menu, "Later", null, true, Integer.MAX_VALUE);
+        menuSectionRepository.flush();
+        assertThat(menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(menu.getId()))
+                .extracting(MenuSection::getName).containsExactly("Desserts", "Later", "Uncategorized");
+    }
+
+    @Test
+    void preservesSectionsWithLongDuplicateNamesAcrossRepeatedMenuDeletions() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("preserve-sections", admin.getId());
+        Menu fallback = createMenu(restaurant, "UNCATEGORIZED", "Uncategorized", true, 0, admin.getId());
+        String name = "A".repeat(150);
+        createSection(fallback, name, null, true, 0);
+        Menu first = createMenu(restaurant, "first", "First", true, 1, admin.getId());
+        Menu second = createMenu(restaurant, "second", "Second", true, 2, admin.getId());
+        MenuSection firstSection = createSection(first, name, null, true, 0);
+        MenuSection secondSection = createSection(second, name, null, true, 0);
+        MenuItem firstItem = createItem(firstSection, "SAME", "Soup", new BigDecimal("5.00"), true, 0);
+        MenuItem secondItem = createItem(secondSection, "SAME", "Soup", new BigDecimal("7.00"), true, 0);
+        String token = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "PRESERVE-SECTIONS");
+        for (Menu source : List.of(first, second)) {
+            mockMvc.perform(delete("/menus/{menuId}", source.getId())
+                    .header(HttpHeaders.AUTHORIZATION, bearer(token))).andExpect(status().isNoContent());
+            menuRepository.flush();
+        }
+        assertThat(firstSection.getName()).hasSize(150).endsWith(" (2)");
+        assertThat(secondSection.getName()).hasSize(150).endsWith(" (3)");
+        assertThat(firstItem.getSection().getMenu().getId()).isEqualTo(fallback.getId());
+        assertThat(secondItem.getSection().getMenu().getId()).isEqualTo(fallback.getId());
+        assertThat(menuItemRepository.findById(firstItem.getId())).isPresent();
+        assertThat(menuItemRepository.findById(secondItem.getId())).isPresent();
+    }
+
+    @Test
+    void refusesToPreserveItemsIntoTheSectionBeingDeleted() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("protect-fallback", admin.getId());
+        Menu menu = createMenu(restaurant, "dinner", "Dinner", true, 0, admin.getId());
+        MenuSection fallback = createSection(menu, "Uncategorized", null, true, 0);
+        createItem(fallback, "SOUP", "Soup", new BigDecimal("8.00"), true, 0);
+        String token = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "PROTECT-FALLBACK");
+        mockMvc.perform(delete("/menus/{menuId}/sections/{sectionId}", menu.getId(), fallback.getId())
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))).andExpect(status().isConflict());
+    }
+
+    @Test
     @DisplayName("Menu OpenAPI group exposes the menu endpoints")
     void shouldExposeMenuEndpointsInOpenApiGroup() throws Exception {
         MvcResult result = mockMvc.perform(get("/v3/api-docs/Menus"))
@@ -406,28 +471,48 @@ class MenuApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("MENU-007 deletes menus without dependents and rejects delete when sections exist")
-    void shouldDeleteMenusWithoutDependentsAndRejectDeleteWhenSectionsExist() throws Exception {
+    @DisplayName("MENU-007 deletes menus without dependents and moves sections to Uncategorized by default")
+    void shouldDeleteMenusAndMoveSectionsByDefault() throws Exception {
         User admin = adminUser();
         Restaurant restaurant = createRestaurant("delete", admin.getId());
-        Menu blocked = createMenu(restaurant, "blocked", "Blocked Menu", true, 1, admin.getId());
+        Menu withSections = createMenu(restaurant, "withsections", "With Sections Menu", true, 1, admin.getId());
         Menu clear = createMenu(restaurant, "clear", "Clear Menu", true, 2, admin.getId());
-        createSection(blocked, "Mains", "Main dishes", true, 1);
+        MenuSection mains = createSection(withSections, "Mains", "Main dishes", true, 1);
 
         String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "MENU-DELETE");
 
-        MvcResult blockedDelete = mockMvc.perform(delete("/menus/{menuId}", blocked.getId())
+        mockMvc.perform(delete("/menus/{menuId}", withSections.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
-                .andExpect(status().isConflict())
-                .andReturn();
+                .andExpect(status().isNoContent());
 
         mockMvc.perform(delete("/menus/{menuId}", clear.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
                 .andExpect(status().isNoContent());
 
-        assertThat(messageOf(blockedDelete)).isEqualTo("Menu cannot be deleted while it still has sections");
-        assertThat(menuRepository.findById(blocked.getId())).isPresent();
+        assertThat(menuRepository.findById(withSections.getId())).isEmpty();
         assertThat(menuRepository.findById(clear.getId())).isEmpty();
+
+        MenuSection movedSection = menuSectionRepository.findById(mains.getId()).orElseThrow();
+        assertThat(movedSection.getMenu().getName()).isEqualTo("Uncategorized");
+    }
+
+    @Test
+    @DisplayName("MENU-008 deletes a menu along with its sections when deleteItems is true")
+    void shouldDeleteMenuWithSectionsWhenRequested() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("delete-cascade", admin.getId());
+        Menu menu = createMenu(restaurant, "cascade", "Cascade Menu", true, 1, admin.getId());
+        MenuSection section = createSection(menu, "Mains", "Main dishes", true, 1);
+
+        String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "MENU-DELETE-CASCADE");
+
+        mockMvc.perform(delete("/menus/{menuId}", menu.getId())
+                        .queryParam("deleteItems", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isNoContent());
+
+        assertThat(menuRepository.findById(menu.getId())).isEmpty();
+        assertThat(menuSectionRepository.findById(section.getId())).isEmpty();
     }
 
     @Test
@@ -583,29 +668,50 @@ class MenuApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("MENU-SECTION-008 deletes clear sections and returns conflict when items still exist")
-    void shouldDeleteSectionsAndRejectBlockedDeletes() throws Exception {
+    @DisplayName("MENU-SECTION-008 deletes clear sections and moves items to Uncategorized by default")
+    void shouldDeleteSectionsAndMoveItemsByDefault() throws Exception {
         User admin = adminUser();
         Restaurant restaurant = createRestaurant("sections-delete", admin.getId());
         Menu menu = createMenu(restaurant, "breakfast", "Breakfast Menu", true, 1, admin.getId());
-        MenuSection blocked = createSection(menu, "Blocked", "Has items", true, 1);
+        MenuSection withItems = createSection(menu, "With Items", "Has items", true, 1);
         MenuSection clear = createSection(menu, "Clear", "No items", true, 2);
-        createItem(blocked, "BLK-001", "Blocked Item", new BigDecimal("9.50"), true, 1);
+        MenuItem item = createItem(withItems, "BLK-001", "Moved Item", new BigDecimal("9.50"), true, 1);
 
         String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "MENU-SECTIONS-DELETE");
 
-        MvcResult blockedDeleteResult = mockMvc.perform(delete("/menus/{menuId}/sections/{sectionId}", menu.getId(), blocked.getId())
+        mockMvc.perform(delete("/menus/{menuId}/sections/{sectionId}", menu.getId(), withItems.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
-                .andExpect(status().isConflict())
-                .andReturn();
+                .andExpect(status().isNoContent());
 
         mockMvc.perform(delete("/menus/{menuId}/sections/{sectionId}", menu.getId(), clear.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
                 .andExpect(status().isNoContent());
 
-        assertThat(messageOf(blockedDeleteResult)).isEqualTo("Menu section cannot be deleted while it still has items");
-        assertThat(menuSectionRepository.findById(blocked.getId())).isPresent();
+        assertThat(menuSectionRepository.findById(withItems.getId())).isEmpty();
         assertThat(menuSectionRepository.findById(clear.getId())).isEmpty();
+
+        MenuItem movedItem = menuItemRepository.findById(item.getId()).orElseThrow();
+        assertThat(movedItem.getSection().getName()).isEqualTo("Uncategorized");
+    }
+
+    @Test
+    @DisplayName("MENU-SECTION-009 deletes a section along with its items when deleteItems is true")
+    void shouldDeleteSectionWithItemsWhenRequested() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("sections-delete-cascade", admin.getId());
+        Menu menu = createMenu(restaurant, "breakfast", "Breakfast Menu", true, 1, admin.getId());
+        MenuSection section = createSection(menu, "Cascade", "Has items", true, 1);
+        MenuItem item = createItem(section, "CAS-001", "Cascade Item", new BigDecimal("9.50"), true, 1);
+
+        String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "MENU-SECTIONS-DELETE-CASCADE");
+
+        mockMvc.perform(delete("/menus/{menuId}/sections/{sectionId}", menu.getId(), section.getId())
+                        .queryParam("deleteItems", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isNoContent());
+
+        assertThat(menuSectionRepository.findById(section.getId())).isEmpty();
+        assertThat(menuItemRepository.findById(item.getId())).isEmpty();
     }
 
     @Test
