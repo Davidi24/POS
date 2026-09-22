@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.CormorantGaramond
 
-private val ActiveOlive = Color(0xFF94A27F)
+private val ActiveOlive = Color(0xFF4F7942)
 
 @Composable
 internal fun AddItemCard(
@@ -41,7 +41,7 @@ internal fun AddItemCard(
 
     Box(
         modifier = modifier
-            .aspectRatio(1.4f)
+            .aspectRatio(1.05f)
             .fillMaxSize()
             .padding(40.dp)
             .clip(shape)
