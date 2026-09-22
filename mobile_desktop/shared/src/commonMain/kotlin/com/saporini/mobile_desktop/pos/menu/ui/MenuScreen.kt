@@ -831,6 +831,7 @@ private fun MenuDetailsContent(
                             rowChunk.forEach { item ->
                                 if (item == null) {
                                     AddItemCard(
+                                        isPhone = isPhone,
                                         onClick = { requireSectionThenOpenAddItem() },
                                         modifier = Modifier.weight(1f)
                                     )
@@ -1550,6 +1551,7 @@ private fun ReorderableMenuItemGrid(
                         selected = false,
                         isPhone = isPhone,
                         isReordering = true,
+                        isDragging = isDragging,
                         modifier = Modifier
                             .width(cardWidth)
                             .height(cardHeight)
