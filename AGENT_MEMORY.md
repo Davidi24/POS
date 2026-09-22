@@ -13,6 +13,11 @@ Running handoff log for AI agents (Claude, Codex, or others) working on this rep
 
 ---
 
+## 2026-09-22 15:52 (Codex, feature/menu-final-polish)
+**Done:** All-ordering change committed as David in 0bbda23. GitHub browser sign-in completed as Davidi24, HTTPS Git authentication configured, branch pushed. Created and verified OPEN PR https://github.com/Davidi24/POS/pull/96 from feature/menu-final-polish into develop; attached it to this task. Nothing merged. All focused checks passed as recorded below.
+**Next:** User reviews PR #96. Final All-position code requires backend migration V34 and a new app build/install; running phone/desktop have the previous version.
+
+
 ## 2026-09-22 15:51 (Codex, feature/menu-final-polish)
 **Did:** All can now be dragged among section filters; only Uncategorized is pinned last. All remains protected from edit/delete and item creation. Added nullable menu allFilterPosition through entity, response/update DTOs, mapper, repository/domain, screen model, and Flyway V34. Omitted field preserves saved position for older clients; default is after regular sections and before Uncategorized. Rebuilding filters uses persisted position; first real section remains the initial selection.
 **Validation:** MenuServiceTest 8 tests passed (including persistence/omitted-field preservation). JVM build and 5 focused checks passed: 2 All/filter-order tests, existing fallback order test, Compose All selection/no-creation, and immediate fallback creation after section deletion. Single worker, 1280MB Gradle heap. No DB integration run or latest Android install this turn; deploy updated backend/V34 before app persistence works.
