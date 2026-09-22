@@ -56,7 +56,7 @@ import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.pos_simple_logo
 import org.jetbrains.compose.resources.painterResource
 
-private val ActiveOlive = Color(0xFF94A27F)
+private val ActiveOlive = Color(0xFF4F7942)
 private val Ink = Color(0xFF202426)
 private val MutedInk = Color(0xFF3D4342)
 private val OnlineGreen = Color(0xFF18C637)

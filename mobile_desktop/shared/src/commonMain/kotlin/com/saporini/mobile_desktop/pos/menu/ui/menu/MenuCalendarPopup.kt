@@ -48,7 +48,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
 import kotlin.time.Clock
 
-private val CalendarOlive = Color(0xFF94A27F)
+private val CalendarOlive = Color(0xFF4F7942)
 private val CalendarInk = Color(0xFF242522)
 
 @Composable

@@ -34,11 +34,13 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FileUpload
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -72,6 +74,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.pos.menu.ui.MenuCategory
 import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogActionStatus
 import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogStatusBody
 import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuFormDialog
@@ -87,7 +90,7 @@ import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.auth_login_img
 import org.jetbrains.compose.resources.painterResource
 
-private val ItemEditorOlive = Color(0xFF94A27F)
+private val ItemEditorOlive = Color(0xFF4F7942)
 private val ItemEditorInk = Color(0xFF242522)
 private val ItemEditorMuted = Color(0xFF71736E)
 private val ItemEditorBorder = Color(0xFFE2E3DE)
@@ -108,13 +111,16 @@ data class DraftVariant(
 
 data class DraftOptionChoice(
     val name: String,
-    val priceDeltaLabel: String
+    val priceDeltaLabel: String,
+    val id: String? = null
 )
 
 data class DraftOptionGroup(
     val name: String,
     val required: Boolean,
-    val choices: List<DraftOptionChoice>
+    val choices: List<DraftOptionChoice>,
+    val linkId: String? = null,
+    val optionGroupId: String? = null
 )
 
 data class EditableMenuItem(
@@ -164,10 +170,6 @@ private val MockIngredients = listOf(
     MockIngredient("sugar", "Sugar", "g", "Pantry")
 )
 
-private val ItemEditorUnitOptions = listOf(
-    "g", "kg", "ml", "l", "pcs", "oz", "lb", "tbsp", "tsp"
-)
-
 private val IngredientCategories = listOf(
     "All", "Produce", "Dairy", "Meat", "Pantry", "Spices"
 )
@@ -175,6 +177,12 @@ private val IngredientCategories = listOf(
 @Composable
 internal fun ItemEditorDialog(
     existingItem: EditableMenuItem? = null,
+    // Which section a new item lands in — shown as a subtitle so it's clear before
+    // saving; irrelevant (and unused) once editing an item that already has one.
+    sectionName: String? = null,
+    // Only used while editing: lets the item be moved to a different section.
+    sections: List<MenuCategory> = emptyList(),
+    currentSectionId: String? = null,
     status: DialogActionStatus = DialogActionStatus.Idle,
     onRetry: () -> Unit = {},
     onSuccessSettled: () -> Unit = {},
@@ -187,10 +195,13 @@ internal fun ItemEditorDialog(
         description: String?,
         imageFileName: String?,
         available: Boolean,
-        ingredients: List<DraftIngredient>
+        ingredients: List<DraftIngredient>,
+        sectionId: String?
     ) -> Unit
 ) {
     val isEditing = existingItem != null
+    val movableSections = remember(sections) { sections.filter { it.name != "All" && it.id != null } }
+    var selectedSectionId by remember(currentSectionId) { mutableStateOf(currentSectionId) }
 
     var name by remember { mutableStateOf(existingItem?.name.orEmpty()) }
     var basePrice by remember { mutableStateOf(existingItem?.priceLabel?.let { extractPriceValue(it) }.orEmpty()) }
@@ -231,6 +242,7 @@ internal fun ItemEditorDialog(
 
     MenuFormDialog(
         title = if (isEditing) "Edit Item" else "Add New Item",
+        subtitle = if (!isEditing) sectionName?.let { "Adding to $it" } else null,
         onDismiss = onDismiss,
         onSave = {
             onSave(
@@ -240,7 +252,8 @@ internal fun ItemEditorDialog(
                 description.trim().takeIf { it.isNotEmpty() },
                 selectedImageName,
                 available,
-                selectedIngredients.map { DraftIngredient(it.name, it.quantity, it.unit) }
+                selectedIngredients.map { DraftIngredient(it.name, it.quantity, it.unit) },
+                if (isEditing && selectedSectionId != currentSectionId) selectedSectionId else null
             )
         },
         saveLabel = if (isEditing) "Save Changes" else "Add Item",
@@ -286,6 +299,63 @@ internal fun ItemEditorDialog(
             shape = RoundedCornerShape(9.dp),
             colors = itemEditorOutlinedTextFieldColors()
         )
+
+        if (isEditing && movableSections.size > 1) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ItemEditorFieldLabel(text = "Category")
+                var categoryMenuOpen by remember { mutableStateOf(false) }
+                val selectedSectionName = movableSections.firstOrNull { it.id == selectedSectionId }?.name
+                    ?: sectionName.orEmpty()
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(Color.White)
+                            .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+                            .clickable { categoryMenuOpen = true }
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = selectedSectionName,
+                            modifier = Modifier.weight(1f),
+                            fontFamily = Inter(),
+                            fontSize = 14.sp,
+                            color = ItemEditorInk,
+                            // Row is a fixed 56dp: without this a long section name
+                            // wraps and gets clipped mid-line.
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Icon(
+                            imageVector = Icons.Outlined.ExpandMore,
+                            contentDescription = null,
+                            tint = ItemEditorMuted
+                        )
+                    }
+                    DropdownMenu(expanded = categoryMenuOpen, onDismissRequest = { categoryMenuOpen = false }) {
+                        movableSections.forEach { section ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        section.name,
+                                        fontFamily = Inter(),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                onClick = {
+                                    selectedSectionId = section.id
+                                    categoryMenuOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         MenuFormFieldPair(
             isPhone = isPhone,
@@ -513,8 +583,11 @@ internal fun ItemEditorDialog(
 
     pendingIngredient?.let { ingredient ->
         var popupQuantity by remember(ingredient) { mutableStateOf("") }
-        var popupUnit by remember(ingredient) { mutableStateOf(ingredient.defaultUnit) }
-        var unitDropdownOpen by remember(ingredient) { mutableStateOf(false) }
+        // Locked to the ingredient's inventory unit — there's no unit-conversion logic
+        // anywhere in the app, so letting a recipe use a different unit than the one
+        // Inventory tracks stock in would silently break stock deduction, cost-per-dish,
+        // and low-stock alerts. If unit conversion gets built later, this can reopen.
+        val popupUnit = ingredient.defaultUnit
 
         MenuNestedDialog(
             onDismissRequest = { pendingIngredient = null },
@@ -573,13 +646,15 @@ internal fun ItemEditorDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             ItemEditorFieldLabel(text = "Unit", required = true)
+                            // Read-only — set by this ingredient's Inventory unit, not
+                            // editable here (see note above).
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .border(1.dp, Color.Black, RoundedCornerShape(8.dp))
-                                    .clickable { unitDropdownOpen = !unitDropdownOpen }
+                                    .background(ItemEditorSurface)
+                                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(8.dp))
                                     .padding(horizontal = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -588,39 +663,7 @@ internal fun ItemEditorDialog(
                                     modifier = Modifier.weight(1f),
                                     fontFamily = Inter(),
                                     fontSize = 14.sp,
-                                    color = ItemEditorInk
-                                )
-                                Icon(
-                                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                                    contentDescription = "Choose unit",
-                                    modifier = Modifier.size(18.dp),
-                                    tint = ItemEditorMuted
-                                )
-                            }
-                        }
-                    }
-                    if (unitDropdownOpen) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(ItemEditorSurface)
-                                .border(1.dp, ItemEditorBorder, RoundedCornerShape(8.dp))
-                                .padding(vertical = 4.dp)
-                        ) {
-                            ItemEditorUnitOptions.forEach { unitOption ->
-                                Text(
-                                    text = unitOption,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            popupUnit = unitOption
-                                            unitDropdownOpen = false
-                                        }
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                                    fontFamily = Inter(),
-                                    fontSize = 14.sp,
-                                    color = if (unitOption == popupUnit) ItemEditorOlive else ItemEditorInk
+                                    color = ItemEditorMuted
                                 )
                             }
                         }
@@ -628,7 +671,7 @@ internal fun ItemEditorDialog(
                 }
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         selectedIngredients = selectedIngredients + SelectedIngredientRow(
                             id = ingredient.id,
@@ -638,13 +681,15 @@ internal fun ItemEditorDialog(
                         )
                         pendingIngredient = null
                     },
-                    enabled = popupQuantity.isNotBlank()
+                    enabled = popupQuantity.isNotBlank(),
+                    shape = RoundedCornerShape(percent = 50),
+                    colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
                 ) {
                     Text(
                         text = "Add",
                         fontFamily = Inter(),
                         fontWeight = FontWeight.SemiBold,
-                        color = ItemEditorOlive
+                        color = Color.White
                     )
                 }
             },
@@ -683,6 +728,7 @@ internal fun VariantEditorDialog(
         onDismiss = { onDoneEditing(currentVariants) },
         onSave = { onDoneEditing(currentVariants) },
         saveLabel = "Done",
+        showCancel = false,
         desktopWidth = 0.46f,
         desktopHeight = 0.72f,
         desktopMaxWidth = 480.dp
@@ -761,10 +807,13 @@ internal fun VariantEditorDialog(
             }
         }
 
+        // Outlined, matching the "+" add button used for sections — not a filled
+        // color, so it doesn't compete with the primary Done action.
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(9.dp))
-                .background(ItemEditorOlive)
+                .background(Color.White)
+                .border(1.dp, ItemEditorInk, RoundedCornerShape(9.dp))
                 .clickable { addVariantOpen = true }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -774,14 +823,14 @@ internal fun VariantEditorDialog(
                 imageVector = Icons.Outlined.Add,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = Color.White
+                tint = ItemEditorInk
             )
             Text(
                 text = "Add Variant",
                 fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
-                color = Color.White
+                color = ItemEditorInk
             )
         }
     }
@@ -869,7 +918,7 @@ private fun AddVariantDialog(
     }
 
     MenuNestedDialog(
-        onDismissRequest = { if (!isBusy) onDismiss() },
+        onDismissRequest = { if (isIdle) onDismiss() },
         containerColor = Color.White,
         titleContentColor = ItemEditorInk,
         textContentColor = ItemEditorMuted,
@@ -945,7 +994,7 @@ private fun AddVariantDialog(
             if (isIdle) {
                 Button(
                     onClick = { submit() },
-                    shape = RoundedCornerShape(9.dp),
+                    shape = RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
                 ) {
                     Text(
@@ -1012,7 +1061,7 @@ private fun EditVariantDialog(
     }
 
     MenuNestedDialog(
-        onDismissRequest = { if (!isBusy) onDismiss() },
+        onDismissRequest = { if (isIdle) onDismiss() },
         containerColor = Color.White,
         titleContentColor = ItemEditorInk,
         textContentColor = ItemEditorMuted,
@@ -1083,7 +1132,7 @@ private fun EditVariantDialog(
             if (isIdle) {
                 Button(
                     onClick = { submit() },
-                    shape = RoundedCornerShape(9.dp),
+                    shape = RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
                 ) {
                     Text(
@@ -1123,7 +1172,7 @@ private fun DeleteVariantDialog(
     val isIdle = status is DialogActionStatus.Idle
 
     MenuNestedDialog(
-        onDismissRequest = { if (!isBusy) onDismiss() },
+        onDismissRequest = { if (isIdle) onDismiss() },
         containerColor = Color.White,
         titleContentColor = ItemEditorInk,
         textContentColor = ItemEditorMuted,
@@ -1133,7 +1182,9 @@ private fun DeleteVariantDialog(
                 fontFamily = Inter(),
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
-                color = ItemEditorInk
+                color = ItemEditorInk,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         },
         text = {
@@ -1168,7 +1219,93 @@ private fun DeleteVariantDialog(
                             )
                         }
                     },
-                    shape = RoundedCornerShape(9.dp),
+                    shape = RoundedCornerShape(percent = 50),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
+                ) {
+                    Text(
+                        text = "Delete",
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            if (isIdle) {
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        text = "Cancel",
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = ItemEditorMuted
+                    )
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteOptionGroupDialog(
+    group: DraftOptionGroup,
+    onDismiss: () -> Unit,
+    onDeleteGroup: suspend (group: DraftOptionGroup) -> Result<Unit>,
+    onDeleted: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var status by remember { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
+    val isIdle = status is DialogActionStatus.Idle
+
+    MenuNestedDialog(
+        onDismissRequest = { if (isIdle) onDismiss() },
+        containerColor = Color.White,
+        titleContentColor = ItemEditorInk,
+        textContentColor = ItemEditorMuted,
+        title = {
+            Text(
+                text = "Delete ${group.name}?",
+                fontFamily = Inter(),
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = ItemEditorInk,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        text = {
+            if (isIdle) {
+                Text(
+                    text = "Are you sure you want to delete this option group?",
+                    fontFamily = Inter(),
+                    fontSize = 13.sp,
+                    color = ItemEditorMuted
+                )
+            } else {
+                DialogStatusBody(
+                    status = status,
+                    onRetry = { status = DialogActionStatus.Idle },
+                    onCancel = onDismiss,
+                    onSuccessSettled = onDeleted,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            if (isIdle) {
+                Button(
+                    onClick = {
+                        status = DialogActionStatus.Loading("Deleting")
+                        scope.launch {
+                            onDeleteGroup(group).fold(
+                                onSuccess = { status = DialogActionStatus.Removed("${group.name} deleted") },
+                                onFailure = { error ->
+                                    status = DialogActionStatus.Failed(message = error.message ?: "Could not delete this option group.")
+                                }
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
                 ) {
                     Text(
@@ -1199,27 +1336,27 @@ private fun DeleteVariantDialog(
 internal fun OptionsEditorDialog(
     itemName: String,
     optionGroups: List<DraftOptionGroup>,
-    status: DialogActionStatus = DialogActionStatus.Idle,
-    onRetry: () -> Unit = {},
-    onSuccessSettled: () -> Unit = {},
     onDismiss: () -> Unit,
-    onSave: (List<DraftOptionGroup>) -> Unit
+    onDoneEditing: (List<DraftOptionGroup>) -> Unit,
+    onCreateGroup: suspend (group: DraftOptionGroup, displayOrder: Int) -> Result<DraftOptionGroup>,
+    onUpdateGroup: suspend (existing: DraftOptionGroup, updated: DraftOptionGroup, displayOrder: Int) -> Result<DraftOptionGroup>,
+    onDeleteGroup: suspend (group: DraftOptionGroup) -> Result<Unit>
 ) {
     var currentOptionGroups by remember { mutableStateOf(optionGroups) }
     var addOptionGroupOpen by remember { mutableStateOf(false) }
     var optionGroupBeingEdited by remember { mutableStateOf<DraftOptionGroup?>(null) }
+    var optionGroupToDelete by remember { mutableStateOf<DraftOptionGroup?>(null) }
 
     MenuFormDialog(
         title = "Options",
         subtitle = itemName,
-        onDismiss = onDismiss,
-        onSave = { onSave(currentOptionGroups) },
+        onDismiss = { onDoneEditing(currentOptionGroups) },
+        onSave = { onDoneEditing(currentOptionGroups) },
+        saveLabel = "Done",
+        showCancel = false,
         desktopWidth = 0.46f,
         desktopHeight = 0.72f,
-        desktopMaxWidth = 480.dp,
-        status = status,
-        onRetry = onRetry,
-        onSuccessSettled = onSuccessSettled
+        desktopMaxWidth = 480.dp
     ) { _ ->
         if (currentOptionGroups.isEmpty()) {
             Text(
@@ -1282,9 +1419,7 @@ internal fun OptionsEditorDialog(
                                     .size(30.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(Color(0xFFB13A2F))
-                                    .clickable {
-                                        currentOptionGroups = currentOptionGroups.filterNot { it.name == group.name }
-                                    },
+                                    .clickable { optionGroupToDelete = group },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -1312,10 +1447,13 @@ internal fun OptionsEditorDialog(
             }
         }
 
+        // Outlined, matching the "+" add button used for sections — not a filled
+        // color, so it doesn't compete with the primary Done action.
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(9.dp))
-                .background(ItemEditorOlive)
+                .background(Color.White)
+                .border(1.dp, ItemEditorInk, RoundedCornerShape(9.dp))
                 .clickable { addOptionGroupOpen = true }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1325,14 +1463,14 @@ internal fun OptionsEditorDialog(
                 imageVector = Icons.Outlined.Add,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = Color.White
+                tint = ItemEditorInk
             )
             Text(
                 text = "Add Options",
                 fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp,
-                color = Color.White
+                color = ItemEditorInk
             )
         }
     }
@@ -1341,7 +1479,9 @@ internal fun OptionsEditorDialog(
         OptionGroupEditorDialog(
             title = "Add option group",
             existingGroups = currentOptionGroups,
+            displayOrder = currentOptionGroups.size,
             onDismiss = { addOptionGroupOpen = false },
+            onSubmit = { draft, displayOrder -> onCreateGroup(draft, displayOrder) },
             onSaved = { newGroup ->
                 currentOptionGroups = currentOptionGroups + newGroup
                 addOptionGroupOpen = false
@@ -1354,12 +1494,26 @@ internal fun OptionsEditorDialog(
             title = "Edit option group",
             group = editingGroup,
             existingGroups = currentOptionGroups,
+            displayOrder = currentOptionGroups.indexOfFirst { it === editingGroup }.coerceAtLeast(0),
             onDismiss = { optionGroupBeingEdited = null },
+            onSubmit = { draft, displayOrder -> onUpdateGroup(editingGroup, draft, displayOrder) },
             onSaved = { updatedGroup ->
                 currentOptionGroups = currentOptionGroups.map {
                     if (it === editingGroup) updatedGroup else it
                 }
                 optionGroupBeingEdited = null
+            }
+        )
+    }
+
+    optionGroupToDelete?.let { group ->
+        DeleteOptionGroupDialog(
+            group = group,
+            onDismiss = { optionGroupToDelete = null },
+            onDeleteGroup = onDeleteGroup,
+            onDeleted = {
+                currentOptionGroups = currentOptionGroups.filterNot { it === group }
+                optionGroupToDelete = null
             }
         )
     }
@@ -1369,11 +1523,14 @@ internal fun OptionsEditorDialog(
 private fun OptionGroupEditorDialog(
     title: String,
     existingGroups: List<DraftOptionGroup>,
+    displayOrder: Int,
     onDismiss: () -> Unit,
+    onSubmit: suspend (draft: DraftOptionGroup, displayOrder: Int) -> Result<DraftOptionGroup>,
     onSaved: (DraftOptionGroup) -> Unit,
     group: DraftOptionGroup? = null
 ) {
     val isPhoneLayout = isPhoneMenuWindow()
+    val scope = rememberCoroutineScope()
     var groupName by remember(group) { mutableStateOf(group?.name.orEmpty()) }
     var groupRequired by remember(group) { mutableStateOf(group?.required ?: true) }
     var choiceDrafts by remember(group) {
@@ -1384,6 +1541,10 @@ private fun OptionGroupEditorDialog(
         )
     }
     var attemptedSubmit by remember(group) { mutableStateOf(false) }
+    var status by remember(group) { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
+    var savedGroup by remember(group) { mutableStateOf<DraftOptionGroup?>(null) }
+    val isBusy = status is DialogActionStatus.Loading
+    val isIdle = status is DialogActionStatus.Idle
     val trimmedName = groupName.trim()
     val validChoices = choiceDrafts.filter { it.name.isNotBlank() }
     val choicesValid = choiceDrafts.all { isValidPriceDelta(it.priceDelta) }
@@ -1408,22 +1569,35 @@ private fun OptionGroupEditorDialog(
             attemptedSubmit = true
             return
         }
-        onSaved(
-            DraftOptionGroup(
-                name = trimmedName,
-                required = groupRequired,
-                choices = validChoices.map { choice ->
-                    DraftOptionChoice(
-                        name = choice.name.trim(),
-                        priceDeltaLabel = formatPriceDelta(choice.priceDelta)
+        if (isBusy) return
+        val draft = DraftOptionGroup(
+            name = trimmedName,
+            required = groupRequired,
+            choices = validChoices.map { choice ->
+                DraftOptionChoice(
+                    name = choice.name.trim(),
+                    priceDeltaLabel = formatPriceDelta(choice.priceDelta)
+                )
+            }
+        )
+        status = DialogActionStatus.Loading(if (group == null) "Adding" else "Saving")
+        scope.launch {
+            onSubmit(draft, displayOrder).fold(
+                onSuccess = { saved ->
+                    savedGroup = saved
+                    status = DialogActionStatus.Success("$trimmedName ${if (group == null) "added" else "saved"}")
+                },
+                onFailure = { error ->
+                    status = DialogActionStatus.Failed(
+                        message = error.message ?: "Could not save this option group."
                     )
                 }
             )
-        )
+        }
     }
 
     MenuNestedDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (isIdle) onDismiss() },
         containerColor = Color.White,
         titleContentColor = ItemEditorInk,
         textContentColor = ItemEditorMuted,
@@ -1437,6 +1611,15 @@ private fun OptionGroupEditorDialog(
             )
         },
         text = {
+            if (!isIdle) {
+                DialogStatusBody(
+                    status = status,
+                    onRetry = { status = DialogActionStatus.Idle },
+                    onCancel = onDismiss,
+                    onSuccessSettled = { savedGroup?.let(onSaved) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
             Column(
                 modifier = if (isPhoneLayout) {
                     Modifier
@@ -1561,30 +1744,35 @@ private fun OptionGroupEditorDialog(
                     )
                 }
             }
+            }
         },
         confirmButton = {
-            Button(
-                onClick = { saveGroup() },
-                enabled = canSave || !attemptedSubmit,
-                shape = RoundedCornerShape(9.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
-            ) {
-                Text(
-                    text = if (group == null) "Add" else "Save",
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White
-                )
+            if (isIdle) {
+                Button(
+                    onClick = { saveGroup() },
+                    enabled = canSave || !attemptedSubmit,
+                    shape = RoundedCornerShape(percent = 50),
+                    colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
+                ) {
+                    Text(
+                        text = if (group == null) "Add" else "Save",
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = "Cancel",
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.SemiBold,
-                    color = ItemEditorMuted
-                )
+            if (isIdle) {
+                TextButton(onClick = onDismiss) {
+                    Text(
+                        text = "Cancel",
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = ItemEditorMuted
+                    )
+                }
             }
         }
     )
@@ -1729,8 +1917,7 @@ private fun IngredientCommandPalette(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth(if (isPhone) 1f else 0.55f)
-                    .widthIn(max = 560.dp)
+                    .width(minOf(maxWidth, 560.dp))
                     .heightIn(max = if (isPhone) minOf(480.dp, maxHeight * 0.9f) else 480.dp)
                     .shadow(24.dp, RoundedCornerShape(14.dp))
                     .clip(RoundedCornerShape(14.dp))

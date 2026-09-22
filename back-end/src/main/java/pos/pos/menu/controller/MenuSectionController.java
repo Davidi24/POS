@@ -97,13 +97,14 @@ public class MenuSectionController {
 
     @DeleteMapping("/{sectionId}")
     @PreAuthorize("hasAuthority('MENUS_DELETE')")
-    @Operation(summary = "Delete a section")
+    @Operation(summary = "Delete a section, either deleting its items or moving them under \"Uncategorized\"")
     public ResponseEntity<Void> deleteSection(
             Authentication authentication,
             @PathVariable UUID menuId,
-            @PathVariable UUID sectionId
+            @PathVariable UUID sectionId,
+            @RequestParam(defaultValue = "false") boolean deleteItems
     ) {
-        menuSectionService.deleteSection(authentication, menuId, sectionId);
+        menuSectionService.deleteSection(authentication, menuId, sectionId, deleteItems);
         return ResponseEntity.noContent().build();
     }
 }

@@ -20,6 +20,7 @@ data class CreateMenuRequestDto(
 
 @Serializable
 data class UpdateMenuRequestDto(
+    val allFilterPosition: Int? = null,
     val code: String? = null,
     val name: String,
     val description: String? = null,
@@ -79,7 +80,8 @@ data class UpdateMenuItemRequestDto(
     val imageUrl: String? = null,
     val available: Boolean,
     val displayOrder: Int,
-    val ingredients: List<String> = emptyList()
+    val ingredients: List<String> = emptyList(),
+    val sectionId: String? = null
 )
 
 @Serializable

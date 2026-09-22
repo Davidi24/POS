@@ -91,9 +91,12 @@ class MenuApi(
     }
 
     suspend fun deleteMenu(
-        menuId: String
+        menuId: String,
+        deleteItems: Boolean = false
     ) {
-        client.delete(endpoint("/menus/$menuId"))
+        client.delete(endpoint("/menus/$menuId")) {
+            parameter("deleteItems", deleteItems)
+        }
     }
 
     // Menu sections
@@ -125,11 +128,14 @@ class MenuApi(
 
     suspend fun deleteSection(
         menuId: String,
-        sectionId: String
+        sectionId: String,
+        deleteItems: Boolean = false
     ) {
         client.delete(
             endpoint("/menus/$menuId/sections/$sectionId")
-        )
+        ) {
+            parameter("deleteItems", deleteItems)
+        }
     }
 
     // Menu items
@@ -308,6 +314,10 @@ class MenuApi(
         }.body()
     }
 
+    suspend fun deleteOptionGroup(groupId: String) {
+        client.delete(endpoint("/option-groups/$groupId"))
+    }
+
     // Option items
 
     suspend fun createOptionItem(
@@ -320,5 +330,9 @@ class MenuApi(
             contentType(ContentType.Application.Json)
             setBody(request)
         }.body()
+    }
+
+    suspend fun deleteOptionItem(groupId: String, itemId: String) {
+        client.delete(endpoint("/option-groups/$groupId/items/$itemId"))
     }
 }

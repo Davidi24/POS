@@ -39,6 +39,9 @@ public class UpdateMenuRequest {
     @Min(value = 0, message = "displayOrder must be greater than or equal to 0")
     private Integer displayOrder;
 
+    @Min(value = 0, message = "allFilterPosition must be greater than or equal to 0")
+    private Integer allFilterPosition;
+
     private LocalTime availableFrom;
 
     private LocalTime availableUntil;

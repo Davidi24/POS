@@ -5,8 +5,10 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,7 +34,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,15 +46,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.core.ui.HoverTooltip
 import com.saporini.mobile_desktop.pos.menu.ui.MenuCategory
+import kotlinx.coroutines.delay
 
-private val ActiveOlive = Color(0xFF94A27F)
+private val ActiveOlive = Color(0xFF4F7942)
 private val TextInk = Color(0xFF222426)
 private val Border = Color(0xFFE8E5E1)
 private val SkeletonBlock = Color(0xFFDADADA)
@@ -81,42 +93,58 @@ internal fun CategoryButtons(
     val visibleItems = if (hasOverflow) fixedItems + listOfNotNull(visibleTail) else items
     val overflowItems = items.filterNot { it in visibleItems }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
         visibleItems.forEach { item ->
             val isSelected = item.name == selected
-            TextButton(
-                onClick = { onSelected(item.name) },
-                modifier = Modifier
-                    .height(46.dp)
-                    .width(if (item.name == "All") 78.dp else 128.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSelected) ActiveOlive else Color.White)
-                    .border(1.dp, Border, RoundedCornerShape(8.dp)),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp),
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = if (isSelected) Color.White else TextInk
-                )
+            // Chips already have a fixed max width; only when a long name actually gets
+            // ellipsized here do we offer a way to read it in full (hover, desktop-only —
+            // there's no touch equivalent for this fixed-width variant).
+            var isTruncated by remember(item.name) { mutableStateOf(false) }
+
+            HoverTooltip(
+                text = item.name,
+                enabled = isTruncated
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                TextButton(
+                    onClick = { onSelected(item.name) },
+                    modifier = Modifier
+                        .height(46.dp)
+                        .semantics { this.selected = isSelected }
+                        .width(if (item.name == "All") 78.dp else 128.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) ActiveOlive else Color.White)
+                        .border(1.dp, Border, RoundedCornerShape(8.dp)),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp),
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = if (isSelected) Color.White else TextInk
+                    )
                 ) {
-                    Icon(
-                        imageVector = item.icon.icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = if (isSelected) Color.White else TextInk
-                    )
-                    Text(
-                        text = item.name,
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        letterSpacing = 0.sp,
-                        maxLines = 1,
-                        softWrap = false
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = item.icon.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = if (isSelected) Color.White else TextInk
+                        )
+                        Text(
+                            text = item.name,
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            letterSpacing = 0.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                            onTextLayout = { isTruncated = it.hasVisualOverflow }
+                        )
+                    }
                 }
             }
         }
@@ -200,6 +228,7 @@ internal fun CategoryButtons(
  * Phone equivalent of [CategoryButtons]: a horizontally scrolling row of
  * section chips plus the manage-sections icon.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun PhoneCategoryFilterRow(
     sections: List<MenuCategory>,
@@ -219,37 +248,60 @@ internal fun PhoneCategoryFilterRow(
     ) {
         sections.forEach { section ->
             val selected = selectedCategory == section.name
-            TextButton(
-                onClick = { if (!isReorderingItems) onSelect(section.name) },
-                modifier = Modifier
-                    .heightIn(min = 44.dp)
-                    .background(
-                        if (selected) ActiveOlive else Color.White,
-                        RoundedCornerShape(8.dp)
+            // Capped width (was unbounded) so one long section name can't stretch the
+            // whole scrolling row; long-press reveals the full name, but only when it's
+            // actually been cut off — there's no hover on touch, so this is the
+            // equivalent of CategoryButtons' hover-to-reveal on desktop.
+            var isTruncated by remember(section.name) { mutableStateOf(false) }
+            var showFullName by remember(section.name) { mutableStateOf(false) }
+
+            LaunchedEffect(showFullName) {
+                if (showFullName) {
+                    delay(2000)
+                    showFullName = false
+                }
+            }
+
+            Box {
+                Row(
+                    modifier = Modifier
+                        .heightIn(min = 44.dp)
+                        .semantics { this.selected = selected }
+                        .widthIn(max = 150.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (selected) ActiveOlive else Color.White)
+                        .border(
+                            1.dp,
+                            if (selected) ActiveOlive else Border,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .combinedClickable(
+                            onClick = { if (!isReorderingItems) onSelect(section.name) },
+                            onLongClick = { if (isTruncated) showFullName = true }
+                        )
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = section.icon.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = if (selected) Color.White else TextInk
                     )
-                    .border(
-                        1.dp,
-                        if (selected) ActiveOlive else Border,
-                        RoundedCornerShape(8.dp)
-                    ),
-                contentPadding = PaddingValues(horizontal = 14.dp),
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = if (selected) Color.White else TextInk
-                )
-            ) {
-                Icon(
-                    imageVector = section.icon.icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = if (selected) Color.White else TextInk
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    section.name,
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        section.name,
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = if (selected) Color.White else TextInk,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { isTruncated = it.hasVisualOverflow }
+                    )
+                }
+
+                ChipNameRevealPopup(visible = showFullName, text = section.name)
             }
         }
         if (canManage) {
@@ -273,6 +325,29 @@ internal fun PhoneCategoryFilterRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * Long-press reveal for [PhoneCategoryFilterRow]'s truncated chip names — touch's
+ * equivalent of [HoverTooltip] on desktop. A Popup so it never nudges the scrolling
+ * chip row's own layout while it's shown.
+ */
+@Composable
+private fun ChipNameRevealPopup(visible: Boolean, text: String) {
+    if (!visible) return
+    Popup(alignment = Alignment.TopStart, offset = IntOffset(0, -110)) {
+        Text(
+            text = text,
+            modifier = Modifier
+                .shadow(4.dp, RoundedCornerShape(6.dp))
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xFF232422))
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            fontFamily = Inter(),
+            fontSize = 12.sp,
+            color = Color.White
+        )
     }
 }
 

@@ -13,6 +13,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -44,4 +45,7 @@ public class UpdateMenuItemRequest {
     private Integer displayOrder;
 
     private List<String> ingredients;
+
+    /** When set to a section other than the current one, moves the item there. */
+    private UUID sectionId;
 }

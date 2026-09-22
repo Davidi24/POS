@@ -56,7 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
 
-private val ActiveOlive = Color(0xFF94A27F)
+private val ActiveOlive = Color(0xFF4F7942)
 private val Ink = Color(0xFF202124)
 private val Muted = Color(0xFF6E716C)
 private val Border = Color(0xFFE7E1DC)

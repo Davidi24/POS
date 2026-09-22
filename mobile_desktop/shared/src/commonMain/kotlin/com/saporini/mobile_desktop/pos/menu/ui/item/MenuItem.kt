@@ -17,6 +17,5 @@ internal data class MenuItem(
     val id: String? = null,
     val sectionId: String? = null,
     val basePrice: Double = 0.0,
-    val displayOrder: Int = 0,
-    val optionGroupLinkIds: List<String> = emptyList()
+    val displayOrder: Int = 0
 )

@@ -1,5 +1,11 @@
 package com.saporini.mobile_desktop.pos.menu.ui.menu
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -32,6 +39,7 @@ import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,6 +53,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,25 +63,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
 import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
+import kotlinx.coroutines.delay
 
-private val EditorOlive = Color(0xFF94A27F)
+private val EditorOlive = Color(0xFF4F7942)
 private val EditorInk = Color(0xFF242522)
 private val EditorMuted = Color(0xFF71736E)
 private val EditorBorder = Color(0xFFE2E3DE)
 private val EditorSurface = Color(0xFFF7F7F5)
+private val EditorErrorBg = Color(0xFFFFF1EF)
+private val EditorErrorText = Color(0xFFD6453D)
 
 private data class MenuColorSuggestion(
     val name: String,
@@ -100,7 +117,7 @@ internal fun MenuEditorDialog(
     onRetry: () -> Unit = {},
     onSuccessSettled: () -> Unit = {},
     onDismiss: () -> Unit,
-    onDeleteMenu: () -> Unit = { },
+    onDeleteMenu: (deleteItems: Boolean) -> Unit = { },
     onSave: (
         name: String,
         description: String?,
@@ -144,6 +161,14 @@ internal fun MenuEditorDialog(
         )
     }
     var showDeleteConfirm by remember(menu?.id) { mutableStateOf(false) }
+    val isUncategorized = menu?.code == "UNCATEGORIZED"
+    var deleteItemsChecked by remember(menu?.id) { mutableStateOf(false) }
+    val deleteContents = isUncategorized || deleteItemsChecked
+    var attemptedSubmit by remember(menu?.id) { mutableStateOf(false) }
+    // Bumped on every failed click so the toast's auto-dismiss timer restarts each time,
+    // even if the user clicks again before the previous 3s window has finished.
+    var invalidAttemptToken by remember(menu?.id) { mutableStateOf(0) }
+    var toastVisible by remember(menu?.id) { mutableStateOf(false) }
 
     val isEditing = menu != null
     val isSaving = status is DialogActionStatus.Loading
@@ -154,16 +179,47 @@ internal fun MenuEditorDialog(
     val untilDateIsValid = availableYearRound || isValidIsoDate(availableUntilDate)
     val dateOrderIsValid = availableYearRound ||
         (fromDateIsValid && untilDateIsValid && availableFromDate <= availableUntilDate)
-    val canSave = name.isNotBlank() &&
+    val requirementsMet = name.isNotBlank() &&
         colorIsValid &&
         fromIsValid &&
         untilIsValid &&
         fromDateIsValid &&
         untilDateIsValid &&
-        dateOrderIsValid &&
-        !isSaving
+        dateOrderIsValid
+    val canSave = requirementsMet && !isSaving
+    val nameError = attemptedSubmit && name.isBlank()
+    val showValidationMessage = toastVisible && attemptedSubmit && !requirementsMet
     val previewFrom = availableFrom.takeIf { !availableAllDay && isValidTime(it) }
     val previewUntil = availableUntil.takeIf { !availableAllDay && isValidTime(it) }
+
+    // Auto-dismiss the toast ~3s after the most recent failed attempt; a new failed
+    // click restarts the window instead of stacking timers.
+    LaunchedEffect(invalidAttemptToken) {
+        if (invalidAttemptToken > 0) {
+            toastVisible = true
+            delay(3000)
+            toastVisible = false
+        }
+    }
+
+    fun trySave() {
+        if (requirementsMet) {
+            attemptedSubmit = false
+            onSave(
+                name.trim(),
+                description.trim().takeIf { it.isNotEmpty() },
+                active,
+                availableFrom.takeIf { !availableAllDay },
+                availableUntil.takeIf { !availableAllDay },
+                availableFromDate.takeIf { !availableYearRound },
+                availableUntilDate.takeIf { !availableYearRound },
+                normalizeHexInput(selectedColor)
+            )
+        } else {
+            attemptedSubmit = true
+            invalidAttemptToken++
+        }
+    }
 
     val isPhone = isPhoneMenuWindow()
     Dialog(
@@ -175,9 +231,11 @@ internal fun MenuEditorDialog(
         )
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            if (status !is DialogActionStatus.Idle) {
+            if (status !is DialogActionStatus.Idle && isPhone) {
+                // Desktop keeps its panel mounted and swaps the body in place (see the
+                // `else` branch below) instead of collapsing to a small takeover card.
                 MenuEditorStatusTakeover(
-                    isPhone = isPhone,
+                    isPhone = true,
                     status = status,
                     onRetry = onRetry,
                     onCancel = onDismiss,
@@ -187,22 +245,15 @@ internal fun MenuEditorDialog(
                 PhoneMenuEditorPage(
                     isEditing = isEditing,
                     isSaving = isSaving,
-                    canSave = canSave,
+                    requirementsMet = requirementsMet,
+                    showValidationMessage = showValidationMessage,
                     errorMessage = null,
                     onDismiss = onDismiss,
                     onDeleteMenu = { showDeleteConfirm = true },
-                    onSave = {
-                        onSave(
-                            name.trim(),
-                            description.trim().takeIf { it.isNotEmpty() },
-                            active,
-                            availableFrom.takeIf { !availableAllDay },
-                            availableUntil.takeIf { !availableAllDay },
-                            availableFromDate.takeIf { !availableYearRound },
-                            availableUntilDate.takeIf { !availableYearRound },
-                            normalizeHexInput(selectedColor)
-                        )
-                    },
+                    // Same look-disabled-but-clickable pattern as desktop: goes through
+                    // trySave() so an invalid click surfaces the toast instead of the
+                    // disabled button silently doing nothing.
+                    onSave = { trySave() },
                     fields = {
                         MenuEditorFields(
                             name = name,
@@ -230,6 +281,7 @@ internal fun MenuEditorDialog(
                             dateOrderIsValid = dateOrderIsValid,
                             isSaving = isSaving,
                             errorMessage = null,
+                            nameError = nameError,
                             stackFields = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -258,9 +310,9 @@ internal fun MenuEditorDialog(
                 ) {
                     Column(
                         modifier = Modifier
+                            .widthIn(max = 1180.dp)
                             .fillMaxWidth(0.94f)
                             .fillMaxHeight(0.9f)
-                            .widthIn(max = 1180.dp)
                             .shadow(24.dp, RoundedCornerShape(20.dp))
                             .clip(RoundedCornerShape(20.dp))
                             .background(Color.White)
@@ -308,7 +360,17 @@ internal fun MenuEditorDialog(
                         ) {
                             val wideLayout = maxWidth >= 860.dp
 
-                            if (wideLayout) {
+                            if (status !is DialogActionStatus.Idle) {
+                                // Same-size panel: only this body swaps to the
+                                // loading/success/error content, the card never resizes.
+                                DialogStatusBody(
+                                    status = status,
+                                    onRetry = onRetry,
+                                    onCancel = onDismiss,
+                                    onSuccessSettled = onSuccessSettled,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else if (wideLayout) {
                                 Row(
                                     modifier = Modifier.fillMaxSize()
                                 ) {
@@ -338,6 +400,7 @@ internal fun MenuEditorDialog(
                                         dateOrderIsValid = dateOrderIsValid,
                                         isSaving = isSaving,
                                         errorMessage = null,
+                                        nameError = nameError,
                                         modifier = Modifier
                                             .weight(1.15f)
                                             .fillMaxHeight()
@@ -413,6 +476,7 @@ internal fun MenuEditorDialog(
                                         dateOrderIsValid = dateOrderIsValid,
                                         isSaving = isSaving,
                                         errorMessage = null,
+                                        nameError = nameError,
                                         modifier = Modifier.fillMaxWidth()
                                     )
 
@@ -434,91 +498,107 @@ internal fun MenuEditorDialog(
                             }
                         }
 
-                        HorizontalDivider(
-                            modifier = Modifier.fillMaxWidth(),
-                            thickness = 1.dp,
-                            color = EditorBorder
-                        )
+                        // Footer (delete/cancel/save) only makes sense while the form is
+                        // showing; the status body above already has its own actions.
+                        if (status is DialogActionStatus.Idle) {
+                            HorizontalDivider(
+                                modifier = Modifier.fillMaxWidth(),
+                                thickness = 1.dp,
+                                color = EditorBorder
+                            )
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 7.dp),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (isEditing) {
-                                Button(
-                                    onClick = { showDeleteConfirm = true },
-                                    enabled = !isSaving,
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                                    shape = RoundedCornerShape(9.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
+                            // Box so the validation toast can float above the button row
+                            // without pushing it down or resizing the panel.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 7.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.DeleteOutline,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                        tint = Color.White
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = "Delete Menu",
-                                        fontFamily = Inter(),
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                }
-                            }
+                                    if (isEditing) {
+                                        Button(
+                                            onClick = { showDeleteConfirm = true },
+                                            enabled = !isSaving,
+                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                            shape = RoundedCornerShape(percent = 50),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.DeleteOutline,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                                tint = Color.White
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                text = "Delete Menu",
+                                                fontFamily = Inter(),
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
 
-                            Spacer(Modifier.weight(1f))
+                                    Spacer(Modifier.weight(1f))
 
-                            TextButton(
-                                onClick = onDismiss,
-                                enabled = !isSaving,
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = "Cancel",
-                                    fontFamily = Inter(),
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = EditorMuted
-                                )
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Button(
-                                onClick = {
-                                    onSave(
-                                        name.trim(),
-                                        description.trim().takeIf { it.isNotEmpty() },
-                                        active,
-                                        availableFrom.takeIf { !availableAllDay },
-                                        availableUntil.takeIf { !availableAllDay },
-                                        availableFromDate.takeIf { !availableYearRound },
-                                        availableUntilDate.takeIf { !availableYearRound },
-                                        normalizeHexInput(selectedColor)
-                                    )
-                                },
-                                enabled = canSave,
-                                colors = ButtonDefaults.buttonColors(containerColor = EditorOlive),
-                                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp)
-                            ) {
-                                if (isSaving) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(18.dp),
-                                        color = Color.White,
-                                        strokeWidth = 2.dp
-                                    )
-                                    Spacer(Modifier.width(9.dp))
+                                    TextButton(
+                                        onClick = onDismiss,
+                                        enabled = !isSaving,
+                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = "Cancel",
+                                            fontFamily = Inter(),
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = EditorMuted
+                                        )
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Button(
+                                        onClick = { trySave() },
+                                        // Stays clickable even when required fields are
+                                        // empty (enabled=true), so the click can still
+                                        // trigger trySave()'s validation toast below — it
+                                        // only *looks* disabled (dimmed) until then.
+                                        enabled = !isSaving,
+                                        shape = RoundedCornerShape(percent = 50),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (requirementsMet) EditorOlive else EditorOlive.copy(alpha = 0.45f),
+                                            disabledContainerColor = if (requirementsMet) EditorOlive else EditorOlive.copy(alpha = 0.45f)
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)
+                                    ) {
+                                        if (isSaving) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                color = Color.White,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(Modifier.width(9.dp))
+                                        }
+                                        Text(
+                                            text = when {
+                                                isSaving -> "Saving"
+                                                isEditing -> "Save Changes"
+                                                else -> "Create Menu"
+                                            },
+                                            fontFamily = Inter(),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
-                                Text(
-                                    text = when {
-                                        isSaving -> "Saving"
-                                        isEditing -> "Save Changes"
-                                        else -> "Create Menu"
-                                    },
-                                    fontFamily = Inter(),
-                                    fontWeight = FontWeight.Bold
+
+                                MenuValidationToast(
+                                    visible = showValidationMessage,
+                                    message = "Please fill in all required fields (*)",
+                                    placement = ToastPlacement.Above,
+                                    arrowAlignment = Alignment.End,
+                                    anchorAlignment = Alignment.TopEnd,
+                                    offsetY = (-46).dp
                                 )
                             }
                         }
@@ -529,6 +609,10 @@ internal fun MenuEditorDialog(
     }
 
     if (showDeleteConfirm) {
+        // `menu` here is often just the list summary (opened via "Edit Menu" from the
+        // cover list), whose `sections` is never populated -- only the detail fetch
+        // (via openMenu) includes it. So this can't gate on a live section/item count;
+        // always show the choice instead of hiding it based on stale/empty data.
         MenuNestedDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = {
@@ -541,21 +625,61 @@ internal fun MenuEditorDialog(
                 )
             },
             text = {
-                Text(
-                    text = "Are you sure you want to delete this menu? This cannot be undone.",
-                    fontFamily = Inter(),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp,
-                    color = EditorMuted
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val message = if (deleteContents) {
+                        "Are you sure? This menu and everything inside it will be permanently deleted."
+                    } else {
+                        "Are you sure? The menu will be removed. If it has any sections or items and you " +
+                            "don't check the box below, you can still find them in the \"Uncategorized\" menu."
+                    }
+                    Text(message, fontFamily = Inter(), fontSize = 14.sp, lineHeight = 20.sp, color = EditorMuted)
+                    if (!isUncategorized) Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { deleteItemsChecked = !deleteItemsChecked }
+                            .padding(vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(if (deleteItemsChecked) Color(0xFFB13A2F) else Color.White)
+                                .border(
+                                    width = if (deleteItemsChecked) 1.dp else 1.5.dp,
+                                    color = if (deleteItemsChecked) Color(0xFFB13A2F) else Color(0xFF8B8F87),
+                                    shape = RoundedCornerShape(5.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (deleteItemsChecked) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp),
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = "Also delete everything inside this menu",
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = EditorInk
+                        )
+                    }
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         showDeleteConfirm = false
-                        onDeleteMenu()
+                        onDeleteMenu(deleteContents)
                     },
-                    shape = RoundedCornerShape(9.dp),
+                    shape = RoundedCornerShape(percent = 50),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
                 ) {
                     Text(
@@ -577,6 +701,120 @@ internal fun MenuEditorDialog(
                 }
             }
         )
+    }
+}
+
+/** Where a [MenuValidationToast] sits relative to the button that triggered it. */
+internal enum class ToastPlacement { Above, Below }
+
+/**
+ * Small floating bubble telling the user why an action can't go through yet (missing
+ * required fields, an action needing more items to make sense, etc). Fades/scales in
+ * near whichever button triggered it, with a small arrow pointing back at that button,
+ * then auto-dismisses (driven by the caller's `visible` flag) without shifting any
+ * surrounding layout. Shared across menu forms — internal (not private) so other files
+ * in this package can reuse it instead of each rebuilding their own toast.
+ *
+ * Defined as its own composable (rather than inline where it's used) so the plain,
+ * receiver-less [AnimatedVisibility] overload resolves unambiguously — called from
+ * inside nested Column/Row scopes, the compiler otherwise prefers their scoped
+ * AnimatedVisibility extensions over this one.
+ */
+@Composable
+internal fun MenuValidationToast(
+    visible: Boolean,
+    message: String,
+    anchorAlignment: Alignment,
+    offsetY: Dp,
+    placement: ToastPlacement = ToastPlacement.Above,
+    arrowAlignment: Alignment.Horizontal = Alignment.Start
+) {
+    // Two-stage visibility (popupVisible outlives contentVisible by one exit-animation
+    // beat) so the bubble can fade out instead of just vanishing when `visible` flips.
+    var popupVisible by remember { mutableStateOf(false) }
+    var contentVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(visible) {
+        if (visible) {
+            popupVisible = true
+            contentVisible = true
+        } else if (popupVisible) {
+            contentVisible = false
+            delay(200)
+            popupVisible = false
+        }
+    }
+
+    if (!popupVisible) return
+
+    // A Popup renders in its own layer, positioned relative to this composable's
+    // location, without ever contributing to the enclosing layout's measured size —
+    // unlike a plain Box+align sibling, showing/hiding it can't nudge the button
+    // row that anchors it.
+    val density = LocalDensity.current
+    Popup(
+        alignment = anchorAlignment,
+        offset = with(density) { IntOffset(0, offsetY.roundToPx()) }
+    ) {
+        AnimatedVisibility(
+            visible = contentVisible,
+            enter = fadeIn(tween(180)) + scaleIn(initialScale = 0.9f, animationSpec = tween(180)),
+            exit = fadeOut(tween(200)) + scaleOut(targetScale = 0.9f, animationSpec = tween(200))
+        ) {
+            val tailNearStart = arrowAlignment == Alignment.Start
+            Box(
+                modifier = Modifier.padding(
+                    top = if (placement == ToastPlacement.Below) 6.dp else 0.dp,
+                    bottom = if (placement == ToastPlacement.Above) 6.dp else 0.dp
+                )
+            ) {
+                // Tail: a 45°-rotated square, half tucked behind the bubble (below,
+                // z-order-wise) and half poking past its edge — reads as a triangle
+                // fused straight into the bubble, no gap or seam.
+                Box(
+                    modifier = Modifier
+                        .align(
+                            when {
+                                placement == ToastPlacement.Below && tailNearStart -> Alignment.TopStart
+                                placement == ToastPlacement.Below -> Alignment.TopEnd
+                                tailNearStart -> Alignment.BottomStart
+                                else -> Alignment.BottomEnd
+                            }
+                        )
+                        .padding(
+                            start = if (tailNearStart) 18.dp else 0.dp,
+                            end = if (tailNearStart) 0.dp else 18.dp
+                        )
+                        .offset(y = if (placement == ToastPlacement.Below) (-6).dp else 6.dp)
+                        .size(12.dp)
+                        .graphicsLayer { rotationZ = 45f }
+                        .background(EditorErrorBg, RoundedCornerShape(2.dp))
+                )
+                Row(
+                    modifier = Modifier
+                        .shadow(6.dp, RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(EditorErrorBg)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ErrorOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp),
+                        tint = EditorErrorText
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = message,
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = EditorErrorText
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -602,8 +840,8 @@ private fun MenuEditorStatusTakeover(
                 Modifier.fillMaxSize()
             } else {
                 Modifier
-                    .fillMaxWidth(0.5f)
                     .widthIn(max = 420.dp)
+                    .fillMaxWidth(0.9f)
                     .shadow(24.dp, RoundedCornerShape(20.dp))
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color.White)
@@ -626,7 +864,8 @@ private fun MenuEditorStatusTakeover(
 private fun PhoneMenuEditorPage(
     isEditing: Boolean,
     isSaving: Boolean,
-    canSave: Boolean,
+    requirementsMet: Boolean,
+    showValidationMessage: Boolean,
     errorMessage: String?,
     onDismiss: () -> Unit,
     onDeleteMenu: () -> Unit,
@@ -691,7 +930,7 @@ private fun PhoneMenuEditorPage(
                     onClick = onDeleteMenu,
                     enabled = !isSaving,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    shape = RoundedCornerShape(9.dp),
+                    shape = RoundedCornerShape(percent = 50),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
                 ) {
                     Icon(
@@ -712,8 +951,12 @@ private fun PhoneMenuEditorPage(
         }
 
         HorizontalDivider(color = EditorBorder)
+        // Box so the validation toast can float above the button without nudging
+        // this footer's own layout (same pattern as the desktop path).
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = if (isWidePhone) 6.dp else 12.dp)
+        ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = if (isWidePhone) 6.dp else 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             errorMessage?.let { message ->
@@ -730,15 +973,20 @@ private fun PhoneMenuEditorPage(
                 )
             }
             Button(
+                // Same look-disabled-but-clickable pattern as desktop: always
+                // clickable while idle, so an invalid tap surfaces the toast
+                // instead of the button silently doing nothing.
                 onClick = {
                     focusManager.clearFocus()
                     keyboardController?.hide()
                     onSave()
                 },
-                enabled = canSave,
+                enabled = !isSaving,
                 modifier = Modifier.fillMaxWidth().heightIn(min = if (isWidePhone) 44.dp else 50.dp),
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = EditorOlive),
+                shape = RoundedCornerShape(percent = 50),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (requirementsMet) EditorOlive else EditorOlive.copy(alpha = 0.45f).compositeOver(Color.White)
+                ),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = if (isWidePhone) 8.dp else 14.dp)
             ) {
                 if (isSaving) {
@@ -760,6 +1008,16 @@ private fun PhoneMenuEditorPage(
                     fontSize = 15.sp
                 )
             }
+        }
+
+            MenuValidationToast(
+                visible = showValidationMessage,
+                message = "Please fill in all required fields (*)",
+                placement = ToastPlacement.Above,
+                arrowAlignment = Alignment.CenterHorizontally,
+                anchorAlignment = Alignment.TopCenter,
+                offsetY = (-46).dp
+            )
         }
     }
 }
@@ -908,6 +1166,7 @@ private fun MenuEditorFields(
     dateOrderIsValid: Boolean,
     isSaving: Boolean,
     errorMessage: String?,
+    nameError: Boolean = false,
     stackFields: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -920,7 +1179,7 @@ private fun MenuEditorFields(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                EditorFieldLabel(text = "Menu name", required = true)
+                EditorFieldLabel(text = "Menu name", required = true, error = nameError)
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = if (active) "Active" else "Inactive",
@@ -948,13 +1207,22 @@ private fun MenuEditorFields(
                 placeholder = { Text("For example: Dinner Menu") },
                 singleLine = true,
                 enabled = !isSaving,
+                isError = nameError,
                 shape = RoundedCornerShape(9.dp),
                 colors = editorOutlinedTextFieldColors()
             )
+            if (nameError) {
+                Text(
+                    text = "Menu name is required.",
+                    fontFamily = Inter(),
+                    fontSize = 12.sp,
+                    color = Color(0xFFD6453D)
+                )
+            }
         }
 
         AvailabilityCheckbox(
-            label = "Available year-round",
+            label = "Available all year",
             checked = availableYearRound,
             enabled = !isSaving,
             onCheckedChange = onAvailableYearRoundChange
@@ -1068,12 +1336,12 @@ private fun MenuEditorFields(
             )
         }
 
-        EditorFieldLabel(text = "Description")
+        EditorFieldLabel(text = "Notes")
         OutlinedTextField(
             value = description,
             onValueChange = onDescriptionChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Describe when or how this menu is used") },
+            placeholder = { Text("Add any notes about when or how this menu is used") },
             minLines = 4,
             maxLines = 6,
             enabled = !isSaving,
@@ -1272,7 +1540,8 @@ private fun MenuColorSwatch(
 @Composable
 private fun EditorFieldLabel(
     text: String,
-    required: Boolean = false
+    required: Boolean = false,
+    error: Boolean = false
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -1280,7 +1549,7 @@ private fun EditorFieldLabel(
             fontFamily = Inter(),
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp,
-            color = EditorInk
+            color = if (error) Color(0xFFD6453D) else EditorInk
         )
         if (required) {
             Text(
