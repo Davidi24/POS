@@ -807,10 +807,10 @@ private fun MenuDetailsContent(
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
-                val rowSlots: List<MenuItem?> = if (!canAddToSection) {
-                    visibleItems
-                } else {
-                    listOf(null) + visibleItems
+                val rowSlots: List<MenuItem?> = when {
+                    !canAddToSection -> visibleItems
+                    isPhone -> visibleItems + listOf(null)
+                    else -> listOf(null) + visibleItems
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
