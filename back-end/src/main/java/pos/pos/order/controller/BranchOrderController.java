@@ -36,6 +36,16 @@ public class BranchOrderController {
 
     private final OrderQueryService orderQueryService;
     private final OrderCommandService orderCommandService;
+    private final pos.pos.order.realtime.OrderChangeNotifier orderChangeNotifier;
+
+    @GetMapping(value = "/orders/events", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @Operation(summary = "Subscribe to branch order changes")
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter orderEvents(
+            @PathVariable UUID restaurantId, @PathVariable UUID branchId,
+            Authentication authentication) {
+        return orderChangeNotifier.subscribe(authentication, restaurantId, branchId);
+    }
 
     @GetMapping("/orders")
     @PreAuthorize("hasAuthority('ORDER_READ')")

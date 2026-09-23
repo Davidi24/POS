@@ -325,6 +325,8 @@ public class OrderWorkflowService {
         Reservation reservation = orderSupport.resolveReservation(restaurantId, request.getReservationId());
         orderDomainSupport.requireReservationBranch(reservation, branch);
 
+        // Refresh the old branch as well once the transfer transaction commits.
+        orderSupport.notifyOrderBranchChanged(order);
         order.setBranch(branch);
         order.setRestaurantTable(request.getTableId() == null ? null : orderSupport.resolveTable(branch.getId(), request.getTableId()));
         order.setReservation(reservation);
