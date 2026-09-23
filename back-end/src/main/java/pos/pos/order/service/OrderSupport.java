@@ -95,6 +95,7 @@ public class OrderSupport {
     private final SettingsRepository settingsRepository;
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
+    private final pos.pos.order.realtime.OrderChangeNotifier orderChangeNotifier;
 
     public Order requireOrder(UUID restaurantId, UUID orderId) {
         boolean writing = org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
@@ -365,12 +366,18 @@ public class OrderSupport {
 
     public Order saveOrder(Order order) {
         try {
-            return orderRepository.saveAndFlush(order);
+            Order saved = orderRepository.saveAndFlush(order);
+            notifyOrderBranchChanged(saved);
+            return saved;
         } catch (DataIntegrityViolationException ex) {
             throw new AuthException("Order update violates a data constraint", HttpStatus.BAD_REQUEST);
         } catch (IllegalStateException ex) {
             throw new AuthException(ex.getMessage(), HttpStatus.BAD_REQUEST);
         }
+    }
+
+    public void notifyOrderBranchChanged(Order order) {
+        orderChangeNotifier.changedAfterCommit(order.getRestaurant().getId(), order.getBranch().getId());
     }
 
     public void addEvent(Order order, OrderEventType eventType, String note, UUID actorId) {
