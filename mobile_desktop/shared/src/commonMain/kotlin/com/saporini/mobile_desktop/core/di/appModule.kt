@@ -38,6 +38,20 @@ private val appModule = module {
         )
     }
 
+    single { com.saporini.mobile_desktop.pos.orders.data.api.OrderCatalogApi(client = get()) }
+    single<com.saporini.mobile_desktop.pos.orders.domain.repository.OrderCatalogRepository> {
+        com.saporini.mobile_desktop.pos.orders.data.repository.DefaultOrderCatalogRepository(api = get())
+    }
+    single { com.saporini.mobile_desktop.pos.orders.data.api.OrderApi(client = get()) }
+    single<com.saporini.mobile_desktop.pos.orders.domain.repository.OrderRepository> {
+        com.saporini.mobile_desktop.pos.orders.data.repository.DefaultOrderRepository(api = get())
+    }
+    factory {
+        com.saporini.mobile_desktop.pos.orders.ui.OrdersScreenModel(
+            repository = get(), sessionManager = get(), catalogRepository = get(), tableRepository = get()
+        )
+    }
+
     single { MenuApi(client = get()) }
 
     single<MenuRepository> {
