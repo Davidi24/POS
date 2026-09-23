@@ -1,6 +1,5 @@
 package pos.pos.order.service;
 
-import com.github.f4b6a3.uuid.UuidCreator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -98,7 +97,9 @@ public class OrderSupport {
     private final OrderMapper orderMapper;
 
     public Order requireOrder(UUID restaurantId, UUID orderId) {
-        return orderRepository.findByIdAndRestaurant_Id(orderId, restaurantId)
+        boolean writing = org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly();
+        return (writing ? orderRepository.findForUpdate(orderId, restaurantId) : orderRepository.findByIdAndRestaurant_Id(orderId, restaurantId))
                 .orElseThrow(OrderNotFoundException::new);
     }
 
@@ -348,9 +349,10 @@ public class OrderSupport {
         }
 
         for (int attempt = 0; attempt < ORDER_NUMBER_ATTEMPTS; attempt++) {
-            String suffix = UuidCreator.getTimeOrdered().toString()
+            // Truncating a time-ordered UUID repeats the same timestamp prefix during bursts.
+            String suffix = UUID.randomUUID().toString()
                     .replace("-", "")
-                    .substring(0, 8)
+                    .substring(0, 12)
                     .toUpperCase();
             String candidate = prefix + "-" + suffix;
             if (!orderRepository.existsByRestaurant_IdAndOrderNumber(restaurant.getId(), candidate)) {
@@ -407,21 +409,40 @@ public class OrderSupport {
         MenuItem menuItem = requireMenuItem(order.getRestaurant().getId(), request.getMenuItemId());
         MenuVariant variant = resolveVariant(menuItem, request.getVariantId());
 
+        boolean sameItem = lineItem.getMenuItem() != null && Objects.equals(lineItem.getMenuItem().getId(), menuItem.getId());
+        boolean sameVariant = Objects.equals(lineItem.getVariant() == null ? null : lineItem.getVariant().getId(), variant == null ? null : variant.getId());
+        var oldOptions = new java.util.HashMap<UUID, OrderItemOption>();
+        lineItem.getOptions().forEach(o -> oldOptions.put(o.getOptionItem().getId(), o));
         lineItem.setMenuItem(menuItem);
         lineItem.setVariant(variant);
-        lineItem.setItemNameSnapshot(menuItem.getName());
-        lineItem.setVariantNameSnapshot(variant == null ? null : variant.getName());
-        lineItem.setSkuSnapshot(variant != null && variant.getSku() != null ? variant.getSku() : menuItem.getSku());
+        if (!sameItem) {
+            lineItem.setItemNameSnapshot(menuItem.getName());
+            lineItem.setUnitPriceSnapshot(defaultMoney(menuItem.getBasePrice()));
+        }
+        if (!sameItem || !sameVariant) {
+            lineItem.setVariantPriceDeltaSnapshot(variant == null ? ZERO : defaultSignedMoney(variant.getPriceDelta()));
+            lineItem.setVariantNameSnapshot(variant == null ? null : variant.getName());
+            lineItem.setSkuSnapshot(variant != null && variant.getSku() != null ? variant.getSku() : menuItem.getSku());
+        }
         lineItem.setQuantity(request.getQuantity());
-        lineItem.setUnitPriceSnapshot(defaultMoney(menuItem.getBasePrice()));
         lineItem.setStatus(lineItem.getStatus() == null ? OrderLineItemStatus.PENDING : lineItem.getStatus());
         lineItem.setNotes(request.getNotes());
-
         if (replaceOptions) {
-            lineItem.getOptions().clear();
-            addOptions(order, lineItem, request.getOptions());
+            var requested = request.getOptions() == null ? java.util.List.<CreateOrderItemOptionRequest>of() : request.getOptions();
+            requireDistinctIds(requested.stream().map(CreateOrderItemOptionRequest::getOptionItemId).toList(), "Duplicate options");
+            var requestedIds = requested.stream().map(CreateOrderItemOptionRequest::getOptionItemId).collect(java.util.stream.Collectors.toSet());
+            new ArrayList<>(lineItem.getOptions()).stream().filter(o -> !sameItem || !requestedIds.contains(o.getOptionItem().getId())).forEach(lineItem::removeOption);
+            for (var selected : requested) {
+                OrderItemOption previous = sameItem ? oldOptions.get(selected.getOptionItemId()) : null;
+                if (previous == null) lineItem.addOption(buildOption(order, lineItem, selected));
+                else {
+                    requireOptionItem(order.getRestaurant().getId(), menuItem.getId(), selected.getOptionItemId());
+                    previous.setQuantity(selected.getQuantity() == null ? 1 : selected.getQuantity());
+                    previous.setNotes(selected.getNotes());
+                }
+            }
         }
-
+        validateOptionSelection(lineItem);
         refreshLineItemPricing(lineItem);
     }
 
@@ -454,6 +475,26 @@ public class OrderSupport {
         option.setQuantity(request.getQuantity() == null ? 1 : request.getQuantity());
         option.setNotes(request.getNotes());
         return option;
+    }
+
+    /** Validate the final selection, including per-item overrides; quantities do not bypass distinct-choice limits. */
+    public void validateOptionSelection(OrderLineItem line) {
+        requireDistinctIds(line.getOptions().stream().map(o -> o.getOptionItem().getId()).toList(), "Duplicate options");
+        for (var link : line.getMenuItem().getOptionGroups()) {
+            var group = link.getOptionGroup();
+            long count = line.getOptions().stream().filter(o -> Objects.equals(o.getOptionItem().getOptionGroup().getId(), group.getId())).count();
+            if (!group.isActive()) {
+                if (count > 0) throw new AuthException("Option group is inactive", HttpStatus.BAD_REQUEST);
+                continue;
+            }
+            Integer min = link.getMinSelectOverride() != null ? link.getMinSelectOverride() : group.getMinSelect();
+            Integer max = link.getMaxSelectOverride() != null ? link.getMaxSelectOverride() : group.getMaxSelect();
+            boolean required = link.getRequiredOverride() != null ? link.getRequiredOverride() : group.isRequired();
+            int minimum = Math.max(min == null ? 0 : min, required ? 1 : 0);
+            if (count < minimum || (max != null && count > max)) {
+                throw new AuthException("Check option selections for " + group.getName() + " (minimum " + minimum + ", maximum " + (max == null ? "unlimited" : max) + ")", HttpStatus.BAD_REQUEST);
+            }
+        }
     }
 
     public void replaceDiscounts(Order order, List<CreateOrderDiscountRequest> requests, UUID actorId) {
@@ -491,13 +532,13 @@ public class OrderSupport {
 
     public void refreshLineItemPricing(OrderLineItem lineItem) {
         BigDecimal baseUnitPrice = defaultMoney(lineItem.getUnitPriceSnapshot());
-        BigDecimal variantDelta = lineItem.getVariant() == null ? ZERO : defaultSignedMoney(lineItem.getVariant().getPriceDelta());
+        BigDecimal variantDelta = defaultSignedMoney(lineItem.getVariantPriceDeltaSnapshot());
         BigDecimal optionDelta = lineItem.getOptions().stream()
                 .map(option -> defaultSignedMoney(option.getPriceDeltaSnapshot())
                         .multiply(BigDecimal.valueOf(option.getQuantity())))
                 .reduce(ZERO, BigDecimal::add);
 
-        BigDecimal priceDeltaTotal = variantDelta.multiply(BigDecimal.valueOf(lineItem.getQuantity())).add(optionDelta);
+        BigDecimal priceDeltaTotal = variantDelta.multiply(BigDecimal.valueOf(lineItem.getQuantity())).add(optionDelta.multiply(BigDecimal.valueOf(lineItem.isOptionsPerUnit() ? lineItem.getQuantity() : 1)));
         BigDecimal gross = baseUnitPrice.multiply(BigDecimal.valueOf(lineItem.getQuantity())).add(priceDeltaTotal);
 
         lineItem.setPriceDeltaTotal(money(priceDeltaTotal));
@@ -507,6 +548,11 @@ public class OrderSupport {
     }
 
     public void recalculateTotals(Order order) {
+        if (order.getTaxRateSnapshot() == null) {
+            var settings = loadSettings(order.getRestaurant());
+            order.setTaxRateSnapshot(defaultMoney(settings.getOrderTaxRate()));
+            order.setTaxInclusiveSnapshot(settings.isOrderTaxInclusive());
+        }
         BigDecimal subtotal = ZERO;
         for (OrderLineItem lineItem : order.getLineItems()) {
             refreshLineItemPricing(lineItem);
@@ -527,9 +573,28 @@ public class OrderSupport {
         }
 
         BigDecimal taxTotal = ZERO;
+        BigDecimal allocatedDiscount = ZERO;
+        BigDecimal remainingGross = subtotal;
+        List<OrderLineItem> active = activeLineItems(order);
+        for (int index = 0; index < active.size(); index++) {
+            OrderLineItem line = active.get(index);
+            BigDecimal gross = grossAmount(line);
+            BigDecimal lineDiscount = index == active.size() - 1 ? discountTotal.subtract(allocatedDiscount)
+                    : proportionalAmount(discountTotal.subtract(allocatedDiscount), gross, remainingGross);
+            // Bound allocations to each line; carry any rounding remainder to following lines.
+            lineDiscount = lineDiscount.min(gross).min(discountTotal.subtract(allocatedDiscount)).max(ZERO);
+            allocatedDiscount = allocatedDiscount.add(lineDiscount);
+            remainingGross = remainingGross.subtract(gross);
+            BigDecimal taxable = maxZero(gross.subtract(lineDiscount));
+            BigDecimal rate = order.getTaxRateSnapshot();
+            BigDecimal lineTax = taxable.multiply(rate).divide(order.isTaxInclusiveSnapshot() ? ONE_HUNDRED.add(rate) : ONE_HUNDRED, 2, RoundingMode.HALF_UP);
+            line.setDiscountTotal(money(lineDiscount)); line.setTaxTotal(lineTax);
+            line.setLineTotal(money(taxable.add(order.isTaxInclusiveSnapshot() ? ZERO : lineTax)));
+            taxTotal = taxTotal.add(lineTax);
+        }
         BigDecimal discountedSubtotal = maxZero(subtotal.subtract(discountTotal));
         BigDecimal serviceChargeTotal = calculateServiceCharge(order.getRestaurant(), discountedSubtotal);
-        BigDecimal total = discountedSubtotal.add(taxTotal).add(serviceChargeTotal);
+        BigDecimal total = discountedSubtotal.add(order.isTaxInclusiveSnapshot() ? ZERO : taxTotal).add(serviceChargeTotal);
 
         order.setSubtotal(money(subtotal));
         order.setDiscountTotal(money(discountTotal));
@@ -541,7 +606,7 @@ public class OrderSupport {
 
     public void refreshOrderFulfillment(Order order) {
         if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.VOIDED) {
-            order.setFulfillmentStatus(OrderFulfillmentStatus.CANCELLED);
+            // Cancellation belongs to OrderStatus; retain the last service progress.
             return;
         }
 
@@ -564,9 +629,7 @@ public class OrderSupport {
         );
 
         if (allFulfilled) {
-            order.setFulfillmentStatus(order.getOrderType() == OrderType.DELIVERY
-                    ? OrderFulfillmentStatus.DELIVERED
-                    : OrderFulfillmentStatus.FULFILLED);
+            order.setFulfillmentStatus(OrderFulfillmentStatus.FULFILLED);
             return;
         }
         if (allReadyOrFulfilled) {
@@ -583,6 +646,12 @@ public class OrderSupport {
         }
 
         order.setFulfillmentStatus(OrderFulfillmentStatus.PENDING);
+    }
+
+    public BigDecimal splitDiscountAmount(Order order, Collection<OrderLineItem> selected, OrderDiscount discount) {
+        BigDecimal source = activeLineItems(order).stream().map(this::grossAmount).reduce(ZERO, BigDecimal::add);
+        BigDecimal target = selected.stream().map(this::grossAmount).reduce(ZERO, BigDecimal::add);
+        return proportionalAmount(discount.getAmountApplied(), target, source);
     }
 
     public BigDecimal splitAllocatedDiscountTotal(Order order, Collection<OrderLineItem> selectedLineItems) {
@@ -602,6 +671,8 @@ public class OrderSupport {
         OrderLineItem clone = new OrderLineItem();
         clone.setMenuItem(sourceLineItem.getMenuItem());
         clone.setVariant(sourceLineItem.getVariant());
+        clone.setVariantPriceDeltaSnapshot(sourceLineItem.getVariantPriceDeltaSnapshot());
+        clone.setOptionsPerUnit(sourceLineItem.isOptionsPerUnit());
         clone.setItemNameSnapshot(sourceLineItem.getItemNameSnapshot());
         clone.setVariantNameSnapshot(sourceLineItem.getVariantNameSnapshot());
         clone.setSkuSnapshot(sourceLineItem.getSkuSnapshot());

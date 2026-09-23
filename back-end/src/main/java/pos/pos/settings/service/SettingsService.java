@@ -138,6 +138,9 @@ public class SettingsService {
         SettingsContext context = loadSettingsContext(authentication, restaurantId);
         Settings settings = context.settings();
 
+        if (request.getOrderTaxRate() != null) settings.setOrderTaxRate(request.getOrderTaxRate());
+        if (request.getOrderTaxInclusive() != null) settings.setOrderTaxInclusive(request.getOrderTaxInclusive());
+
         applyBilling(
                 settings,
                 request.getServiceChargeEnabled(),

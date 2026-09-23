@@ -127,6 +127,13 @@ public class Order extends AbstractAuditedEntity {
     @Column(name = "currency", nullable = false, length = 3, columnDefinition = "char(3)")
     private String currency;
 
+    @Column(name = "tax_rate_snapshot", nullable = false, precision = 7, scale = 4)
+    private BigDecimal taxRateSnapshot;
+
+    @Column(name = "tax_inclusive_snapshot", nullable = false)
+    private boolean taxInclusiveSnapshot;
+
+
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, length = 30)
     private OrderType orderType = OrderType.DINE_IN;
@@ -276,6 +283,7 @@ public class Order extends AbstractAuditedEntity {
         subtotal = defaultMoney(subtotal);
         discountTotal = defaultMoney(discountTotal);
         taxTotal = defaultMoney(taxTotal);
+        taxRateSnapshot = defaultMoney(taxRateSnapshot);
         serviceChargeTotal = defaultMoney(serviceChargeTotal);
         total = defaultMoney(total);
 
@@ -362,18 +370,6 @@ public class Order extends AbstractAuditedEntity {
             if (!Objects.equals(reservation.getCustomer().getId(), customer.getId())) {
                 throw new IllegalStateException("order customer must match reservation customer");
             }
-        }
-
-        if (status == OrderStatus.CANCELLED || status == OrderStatus.VOIDED) {
-            if (fulfillmentStatus != OrderFulfillmentStatus.CANCELLED) {
-                throw new IllegalStateException("cancelled or voided orders must use CANCELLED fulfillmentStatus");
-            }
-        }
-
-        if (fulfillmentStatus == OrderFulfillmentStatus.CANCELLED
-                && status != OrderStatus.CANCELLED
-                && status != OrderStatus.VOIDED) {
-            throw new IllegalStateException("CANCELLED fulfillmentStatus requires CANCELLED or VOIDED order status");
         }
     }
 

@@ -98,6 +98,12 @@ public class OrderLineItem extends AbstractTimestampedEntity {
     @Column(name = "unit_price_snapshot", nullable = false, precision = 19, scale = 2)
     private BigDecimal unitPriceSnapshot = BigDecimal.ZERO;
 
+    @Column(name = "variant_price_delta_snapshot", nullable = false, precision = 19, scale = 2)
+    private BigDecimal variantPriceDeltaSnapshot = BigDecimal.ZERO;
+
+    @Column(name = "options_per_unit", nullable = false)
+    private boolean optionsPerUnit = true;
+
     @Column(name = "price_delta_total", nullable = false, precision = 19, scale = 2)
     private BigDecimal priceDeltaTotal = BigDecimal.ZERO;
 
@@ -119,6 +125,7 @@ public class OrderLineItem extends AbstractTimestampedEntity {
 
     @OneToMany(mappedBy = "orderLineItem", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
+    @org.hibernate.annotations.BatchSize(size = 50)
     private List<OrderItemOption> options = new ArrayList<>();
 
     @OneToMany(mappedBy = "orderLineItem")

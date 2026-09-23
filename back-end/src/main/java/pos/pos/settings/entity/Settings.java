@@ -120,6 +120,12 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "service_charge_value", precision = 12, scale = 2)
     private BigDecimal serviceChargeValue;
 
+    @Column(name = "order_tax_rate", nullable = false, precision = 7, scale = 4)
+    private BigDecimal orderTaxRate = BigDecimal.ZERO;
+
+    @Column(name = "order_tax_inclusive", nullable = false)
+    private boolean orderTaxInclusive = false;
+
     // if you want to round the amount like 10.291 dollar to make 290 dollar
     @Column(name = "cash_rounding_enabled", nullable = false)
     private boolean cashRoundingEnabled = false;

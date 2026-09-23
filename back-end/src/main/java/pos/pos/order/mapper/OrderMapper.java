@@ -47,6 +47,7 @@ public class OrderMapper {
                 .customerName(order.getCustomer() == null ? null : order.getCustomer().displayName())
                 .orderNumber(order.getOrderNumber())
                 .currency(order.getCurrency())
+                .taxInclusive(order.isTaxInclusiveSnapshot())
                 .orderType(order.getOrderType())
                 .source(order.getSource())
                 .status(order.getStatus())
@@ -59,6 +60,7 @@ public class OrderMapper {
                 .taxTotal(order.getTaxTotal())
                 .serviceChargeTotal(order.getServiceChargeTotal())
                 .total(order.getTotal())
+                .itemCount(quantityTotal(order))
                 .openedAt(order.getOpenedAt())
                 .closedAt(order.getClosedAt())
                 .createdAt(order.getCreatedAt())
@@ -218,6 +220,17 @@ public class OrderMapper {
                 .sorted(Comparator.comparing(OrderLineItem::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(this::toLineItemResponse)
                 .toList();
+    }
+
+    private Integer quantityTotal(Order order) {
+        if (order == null || order.getLineItems() == null) {
+            return 0;
+        }
+        return order.getLineItems().stream()
+                .filter(lineItem -> lineItem.getStatus() != OrderLineItemStatus.CANCELLED)
+                .filter(lineItem -> lineItem.getStatus() != OrderLineItemStatus.VOIDED)
+                .mapToInt(OrderLineItem::getQuantity)
+                .sum();
     }
 
     public List<OrderItemOptionResponse> mapOptions(List<OrderItemOption> options) {

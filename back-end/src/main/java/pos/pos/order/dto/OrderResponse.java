@@ -36,6 +36,7 @@ public class OrderResponse {
     private String customerName;
     private String orderNumber;
     private String currency;
+    private boolean taxInclusive;
     private OrderType orderType;
     private OrderSource source;
     private OrderStatus status;
@@ -48,6 +49,7 @@ public class OrderResponse {
     private BigDecimal taxTotal;
     private BigDecimal serviceChargeTotal;
     private BigDecimal total;
+    private Integer itemCount;
     private OffsetDateTime openedAt;
     private OffsetDateTime closedAt;
     private OffsetDateTime createdAt;

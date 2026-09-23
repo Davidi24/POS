@@ -233,7 +233,10 @@ public class OrderQueryService {
             previewOrder.addLineItem(orderSupport.cloneLineItem(lineItem));
         }
         for (OrderDiscount discount : order.getDiscounts()) {
-            previewOrder.addDiscount(orderSupport.cloneDiscount(discount, discount.getAmountApplied(), order.getUpdatedBy()));
+            OrderDiscount allocated = orderSupport.cloneDiscount(discount, discount.getAmountApplied(), order.getUpdatedBy());
+            allocated.setDiscountType(pos.pos.order.enums.OrderDiscountType.FIXED_AMOUNT);
+            allocated.setDiscountValue(orderSupport.splitDiscountAmount(order, selectedLineItems, discount));
+            previewOrder.addDiscount(allocated);
         }
         orderSupport.recalculateTotals(previewOrder);
 
@@ -255,6 +258,8 @@ public class OrderQueryService {
         previewOrder.setRestaurant(order.getRestaurant());
         previewOrder.setBranch(order.getBranch());
         previewOrder.setCurrency(order.getCurrency());
+        previewOrder.setTaxRateSnapshot(order.getTaxRateSnapshot());
+        previewOrder.setTaxInclusiveSnapshot(order.isTaxInclusiveSnapshot());
         previewOrder.setOrderType(order.getOrderType());
         previewOrder.setSource(order.getSource());
         previewOrder.setStatus(OrderStatus.OPEN);
