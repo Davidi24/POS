@@ -13,7 +13,10 @@ import pos.pos.exception.order.OrderDiscountNotFoundException;
 import pos.pos.exception.order.OrderItemOptionNotFoundException;
 import pos.pos.exception.order.OrderLineItemNotFoundException;
 import pos.pos.exception.order.OrderNotFoundException;
+import pos.pos.exception.inventory.InventoryLocationNotFoundException;
 import pos.pos.exception.reservation.ReservationNotFoundException;
+import pos.pos.inventory.entity.InventoryLocation;
+import pos.pos.inventory.repository.InventoryLocationRepository;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuVariant;
 import pos.pos.menu.entity.OptionItem;
@@ -90,6 +93,7 @@ public class OrderSupport {
     private final CustomerRepository customerRepository;
     private final ReservationRepository reservationRepository;
     private final RestaurantTableRepository restaurantTableRepository;
+    private final InventoryLocationRepository inventoryLocationRepository;
     private final MenuItemRepository menuItemRepository;
     private final MenuVariantRepository menuVariantRepository;
     private final OptionItemRepository optionItemRepository;
@@ -252,6 +256,18 @@ public class OrderSupport {
         return optionItem;
     }
 
+    // Nullable on purpose -- a line item with no location chosen just means inventory
+    // reservation gets silently skipped for it (OrderInventoryIntegrationService's call),
+    // not that order creation fails.
+    public InventoryLocation resolveLocation(UUID restaurantId, UUID locationId) {
+        if (locationId == null) {
+            return null;
+        }
+
+        return inventoryLocationRepository.findByIdAndRestaurant_Id(locationId, restaurantId)
+                .orElseThrow(InventoryLocationNotFoundException::new);
+    }
+
     public OrderLineItem requireLineItem(Order order, UUID lineItemId) {
         return order.getLineItems().stream()
                 .filter(lineItem -> Objects.equals(lineItem.getId(), lineItemId))
@@ -406,9 +422,11 @@ public class OrderSupport {
     ) {
         MenuItem menuItem = requireMenuItem(order.getRestaurant().getId(), request.getMenuItemId());
         MenuVariant variant = resolveVariant(menuItem, request.getVariantId());
+        InventoryLocation location = resolveLocation(order.getRestaurant().getId(), request.getLocationId());
 
         lineItem.setMenuItem(menuItem);
         lineItem.setVariant(variant);
+        lineItem.setLocation(location);
         lineItem.setItemNameSnapshot(menuItem.getName());
         lineItem.setVariantNameSnapshot(variant == null ? null : variant.getName());
         lineItem.setSkuSnapshot(variant != null && variant.getSku() != null ? variant.getSku() : menuItem.getSku());
@@ -602,6 +620,7 @@ public class OrderSupport {
         OrderLineItem clone = new OrderLineItem();
         clone.setMenuItem(sourceLineItem.getMenuItem());
         clone.setVariant(sourceLineItem.getVariant());
+        clone.setLocation(sourceLineItem.getLocation());
         clone.setItemNameSnapshot(sourceLineItem.getItemNameSnapshot());
         clone.setVariantNameSnapshot(sourceLineItem.getVariantNameSnapshot());
         clone.setSkuSnapshot(sourceLineItem.getSkuSnapshot());

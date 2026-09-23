@@ -1,11 +1,14 @@
 package pos.pos.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.inventory.service.OrderInventoryIntegrationService;
 import pos.pos.kds.service.KdsOrderSyncService;
 import pos.pos.order.dto.OrderActionRequest;
 import pos.pos.order.dto.OrderMergeRequest;
@@ -39,6 +42,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderWorkflowService {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderWorkflowService.class);
+
     private static final EnumSet<OrderPaymentStatus> CLOSED_PAYMENT_STATUSES = EnumSet.of(
             OrderPaymentStatus.PAID,
             OrderPaymentStatus.REFUNDED,
@@ -49,6 +54,7 @@ public class OrderWorkflowService {
     private final OrderSupport orderSupport;
     private final OrderDomainSupport orderDomainSupport;
     private final KdsOrderSyncService kdsOrderSyncService;
+    private final OrderInventoryIntegrationService orderInventoryIntegrationService;
 
     @Transactional
     public OrderResponse openOrder(Authentication authentication, UUID restaurantId, UUID orderId, OrderActionRequest request) {
@@ -112,14 +118,16 @@ public class OrderWorkflowService {
         Order order = orderSupport.requireOrder(restaurantId, orderId);
         orderDomainSupport.assertOrderEditable(order);
 
-        order.getLineItems().stream()
+        List<OrderLineItem> lineItemsToFulfill = order.getLineItems().stream()
                 .filter(orderSupport::isFinanciallyActive)
-                .forEach(lineItem -> lineItem.setStatus(OrderLineItemStatus.FULFILLED));
+                .toList();
+        lineItemsToFulfill.forEach(lineItem -> lineItem.setStatus(OrderLineItemStatus.FULFILLED));
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.FULFILLED, orderDomainSupport.firstNote(request, "Order fulfilled"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
         kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
+        lineItemsToFulfill.forEach(lineItem -> tryDeduct(authentication, lineItem));
         return orderSupport.toResponse(order);
     }
 
@@ -174,16 +182,19 @@ public class OrderWorkflowService {
             throw new AuthException("Paid orders cannot be cancelled", HttpStatus.BAD_REQUEST);
         }
 
+        List<OrderLineItem> lineItemsToCancel = order.getLineItems().stream()
+                .filter(orderSupport::isFinanciallyActive)
+                .toList();
+
         order.setStatus(OrderStatus.CANCELLED);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
-        order.getLineItems().stream()
-                .filter(orderSupport::isFinanciallyActive)
-                .forEach(lineItem -> lineItem.setStatus(OrderLineItemStatus.CANCELLED));
+        lineItemsToCancel.forEach(lineItem -> lineItem.setStatus(OrderLineItemStatus.CANCELLED));
         orderSupport.recalculateTotals(order);
         orderDomainSupport.applyStatusSideEffects(order);
         orderSupport.addEvent(order, OrderEventType.CANCELLED, orderDomainSupport.firstNote(request, "Order cancelled"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
         kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy(), request == null ? null : request.getReason());
+        lineItemsToCancel.forEach(lineItem -> tryRelease(authentication, lineItem));
         return orderSupport.toResponse(order);
     }
 
@@ -193,20 +204,23 @@ public class OrderWorkflowService {
         Order order = orderSupport.requireOrder(restaurantId, orderId);
         orderSupport.requireVoidReasonIfNeeded(order, request == null ? null : request.getReason());
 
+        List<OrderLineItem> lineItemsToVoid = order.getLineItems().stream()
+                .filter(orderSupport::isFinanciallyActive)
+                .toList();
+
         order.setStatus(OrderStatus.VOIDED);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         order.setPaymentStatus(OrderPaymentStatus.VOIDED);
-        order.getLineItems().stream()
-                .filter(orderSupport::isFinanciallyActive)
-                .forEach(lineItem -> {
-                    lineItem.setStatus(OrderLineItemStatus.VOIDED);
-                    orderSupport.appendReasonToLineItem(lineItem, request == null ? null : request.getReason());
-                });
+        lineItemsToVoid.forEach(lineItem -> {
+            lineItem.setStatus(OrderLineItemStatus.VOIDED);
+            orderSupport.appendReasonToLineItem(lineItem, request == null ? null : request.getReason());
+        });
         orderSupport.recalculateTotals(order);
         orderDomainSupport.applyStatusSideEffects(order);
         orderSupport.addEvent(order, OrderEventType.VOIDED, orderDomainSupport.firstNote(request, "Order voided"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
         kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy(), request == null ? null : request.getReason());
+        lineItemsToVoid.forEach(lineItem -> tryRelease(authentication, lineItem));
         return orderSupport.toResponse(order);
     }
 
@@ -233,6 +247,14 @@ public class OrderWorkflowService {
         }
         kdsOrderSyncService.assertNoTicketHistory(targetOrder, "Orders with KDS ticket history cannot be merged");
         kdsOrderSyncService.assertNoTicketHistory(sourceOrder, "Orders with KDS ticket history cannot be merged");
+        // Merge hard-deletes the source order's line items (orphanRemoval) after cloning them
+        // onto the target -- if any already have InventoryMovement history, that delete would
+        // fail with a raw foreign key violation instead of a clean error. Reservations
+        // themselves don't need transferring: committedQuantity lives on InventoryLevel per
+        // (location, item), not per line item, so it stays correct regardless of which order
+        // row the line item ends up under.
+        orderInventoryIntegrationService.assertNoInventoryHistory(targetOrder, "Orders with inventory movement history cannot be merged");
+        orderInventoryIntegrationService.assertNoInventoryHistory(sourceOrder, "Orders with inventory movement history cannot be merged");
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         for (OrderLineItem lineItem : orderSupport.activeLineItems(sourceOrder)) {
@@ -376,6 +398,8 @@ public class OrderWorkflowService {
             throw new AuthException("Split bills are disabled for this restaurant", HttpStatus.BAD_REQUEST);
         }
         kdsOrderSyncService.assertNoLineItemHistory(sourceOrder, "Orders with KDS ticket history cannot be split");
+        // Same orphanRemoval hard-delete risk as merge -- see the comment there.
+        orderInventoryIntegrationService.assertNoInventoryHistory(sourceOrder, "Orders with inventory movement history cannot be split");
 
         List<OrderLineItem> selectedLineItems = orderDomainSupport.resolveSplitLineItems(sourceOrder, request.getLineItemIds());
         if (selectedLineItems.size() >= orderSupport.activeLineItems(sourceOrder).size()) {
@@ -437,5 +461,24 @@ public class OrderWorkflowService {
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.addEvent(order, OrderEventType.PAYMENT_UPDATED, note, order.getUpdatedBy());
         return orderSupport.toResponse(orderSupport.saveOrder(order));
+    }
+
+    // Inventory bookkeeping must never block or fail a real order action -- see
+    // OrderInventoryIntegrationService's class comment for why these are simple try/catch
+    // wrappers around REQUIRES_NEW calls rather than letting exceptions propagate.
+    private void tryDeduct(Authentication authentication, OrderLineItem lineItem) {
+        try {
+            orderInventoryIntegrationService.deductForFulfillment(authentication, lineItem);
+        } catch (Exception ex) {
+            log.warn("Inventory deduction failed for order line item {}: {}", lineItem.getId(), ex.getMessage());
+        }
+    }
+
+    private void tryRelease(Authentication authentication, OrderLineItem lineItem) {
+        try {
+            orderInventoryIntegrationService.releaseOrReverseForLineItem(authentication, lineItem);
+        } catch (Exception ex) {
+            log.warn("Inventory release/reversal failed for order line item {}: {}", lineItem.getId(), ex.getMessage());
+        }
     }
 }

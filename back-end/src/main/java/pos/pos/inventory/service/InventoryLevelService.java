@@ -159,16 +159,7 @@ public class InventoryLevelService {
     // instead of any endpoint being able to set onHandQuantity directly.
     @Transactional
     InventoryLevel upsertLevel(InventoryLocation location, InventoryItem item, BigDecimal quantityDelta) {
-        //Get the Inventor Level Created, if it does not exist a level create a new one and return it
-        InventoryLevel level = inventoryLevelRepository
-                .findByLocation_IdAndInventoryItem_Id(location.getId(), item.getId())
-                .orElseGet(() -> {
-                    InventoryLevel created = new InventoryLevel();
-                    created.setLocation(location);
-                    created.setInventoryItem(item);
-                    created.setOnHandQuantity(BigDecimal.ZERO);
-                    return created;
-                });
+        InventoryLevel level = findOrCreateLevel(location, item);
 
         // updates the onhand quantity and sets the last Movement
         BigDecimal currentOnHand = level.getOnHandQuantity() == null ? BigDecimal.ZERO : level.getOnHandQuantity();
@@ -183,7 +174,46 @@ public class InventoryLevelService {
     // quantity actually changed (a line can have zero variance and still count as "checked").
     @Transactional
     InventoryLevel markCounted(InventoryLocation location, InventoryItem item, OffsetDateTime countedAt) {
-        InventoryLevel level = inventoryLevelRepository
+        InventoryLevel level = findOrCreateLevel(location, item);
+
+        level.setLastCountedAt(countedAt);
+        return inventoryLevelRepository.saveAndFlush(level);
+    }
+
+    // Internal use only. Meant to be called when an order line item is created/added: marks
+    // that quantity as "spoken for" without touching onHandQuantity yet -- nothing has
+    // physically left the shelf. Clamped at zero same as releaseReservedQuantity, for the same
+    // reason: never let a caller push committedQuantity negative and trip the check constraint.
+    @Transactional
+    InventoryLevel reserveQuantity(InventoryLocation location, InventoryItem item, BigDecimal quantity) {
+        InventoryLevel level = findOrCreateLevel(location, item);
+
+        BigDecimal currentCommitted = level.getCommittedQuantity() == null ? BigDecimal.ZERO : level.getCommittedQuantity();
+        level.setCommittedQuantity(currentCommitted.add(quantity).max(BigDecimal.ZERO));
+
+        return inventoryLevelRepository.saveAndFlush(level);
+    }
+
+    // Internal use only. Meant to be called when a reservation is used up by a real deduction,
+    // or let go entirely because the line item was voided/cancelled before fulfillment.
+    // Clamped at zero: quantity here comes from a fresh recipe expansion at release time, which
+    // could differ slightly from what was reserved originally if the recipe changed in between --
+    // clamping avoids ever pushing committedQuantity negative rather than trying to guess.
+    @Transactional
+    InventoryLevel releaseReservedQuantity(InventoryLocation location, InventoryItem item, BigDecimal quantity) {
+        InventoryLevel level = findOrCreateLevel(location, item);
+
+        BigDecimal currentCommitted = level.getCommittedQuantity() == null ? BigDecimal.ZERO : level.getCommittedQuantity();
+        level.setCommittedQuantity(currentCommitted.subtract(quantity).max(BigDecimal.ZERO));
+
+        return inventoryLevelRepository.saveAndFlush(level);
+    }
+
+    // Shared by upsertLevel/markCounted/reserveQuantity/releaseReservedQuantity: every internal
+    // mutation needs the level row for a (location, item) pair, creating it on first touch
+    // rather than requiring some earlier "registration" step.
+    private InventoryLevel findOrCreateLevel(InventoryLocation location, InventoryItem item) {
+        return inventoryLevelRepository
                 .findByLocation_IdAndInventoryItem_Id(location.getId(), item.getId())
                 .orElseGet(() -> {
                     InventoryLevel created = new InventoryLevel();
@@ -192,9 +222,6 @@ public class InventoryLevelService {
                     created.setOnHandQuantity(BigDecimal.ZERO);
                     return created;
                 });
-
-        level.setLastCountedAt(countedAt);
-        return inventoryLevelRepository.saveAndFlush(level);
     }
 
     // Internal use only. Meant to be called by InventoryCountService to pre-fill a new count

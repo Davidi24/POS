@@ -17,6 +17,7 @@ import pos.pos.order.entity.OrderLineItem;
 import pos.pos.order.enums.OrderLineItemStatus;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -147,6 +148,8 @@ public class OrderMapper {
                 .id(lineItem.getId())
                 .menuItemId(lineItem.getMenuItem() == null ? null : lineItem.getMenuItem().getId())
                 .variantId(lineItem.getVariant() == null ? null : lineItem.getVariant().getId())
+                .locationId(lineItem.getLocation() == null ? null : lineItem.getLocation().getId())
+                .locationName(lineItem.getLocation() == null ? null : lineItem.getLocation().getName())
                 .itemNameSnapshot(lineItem.getItemNameSnapshot())
                 .variantNameSnapshot(lineItem.getVariantNameSnapshot())
                 .skuSnapshot(lineItem.getSkuSnapshot())
@@ -234,7 +237,7 @@ public class OrderMapper {
                 .toList();
     }
 
-    public List<OrderEventResponse> mapEvents(List<OrderEvent> events) {
+    public List<OrderEventResponse> mapEvents(Collection<OrderEvent> events) {
         return events == null ? List.of() : events.stream()
                 .sorted(Comparator.comparing(OrderEvent::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
                 .map(this::toEventResponse)

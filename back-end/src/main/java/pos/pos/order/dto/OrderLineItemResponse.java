@@ -22,6 +22,8 @@ public class OrderLineItemResponse {
     private UUID id;
     private UUID menuItemId;
     private UUID variantId;
+    private UUID locationId;
+    private String locationName;
     private String itemNameSnapshot;
     private String variantNameSnapshot;
     private String skuSnapshot;
