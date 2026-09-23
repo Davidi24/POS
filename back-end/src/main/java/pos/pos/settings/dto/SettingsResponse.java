@@ -33,6 +33,8 @@ public class SettingsResponse {
     private Boolean serviceChargeEnabled;
     private ServiceChargeType serviceChargeType;
     private BigDecimal serviceChargeValue;
+    private BigDecimal orderTaxRate;
+    private Boolean orderTaxInclusive;
     private Boolean cashRoundingEnabled;
     private BigDecimal cashRoundingIncrement;
     private Boolean allowSplitBills;

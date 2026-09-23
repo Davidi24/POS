@@ -7,7 +7,6 @@ import pos.pos.exception.auth.AuthException;
 import pos.pos.order.dto.OrderActionRequest;
 import pos.pos.order.entity.Order;
 import pos.pos.order.entity.OrderLineItem;
-import pos.pos.order.enums.OrderFulfillmentStatus;
 import pos.pos.order.enums.OrderPaymentStatus;
 import pos.pos.order.enums.OrderStatus;
 import pos.pos.order.enums.OrderType;
@@ -43,9 +42,6 @@ public class OrderDomainSupport {
         }
         if (order.getStatus() != OrderStatus.CLOSED) {
             order.setClosedAt(null);
-        }
-        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.VOIDED) {
-            order.setFulfillmentStatus(OrderFulfillmentStatus.CANCELLED);
         }
         if (order.getStatus() == OrderStatus.VOIDED) {
             order.setPaymentStatus(OrderPaymentStatus.VOIDED);

@@ -99,7 +99,6 @@ public class OrderWorkflowService {
                 .forEach(lineItem -> lineItem.setStatus(OrderLineItemStatus.READY));
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
-        order.setFulfillmentStatus(OrderFulfillmentStatus.READY);
         orderSupport.addEvent(order, OrderEventType.READY, orderDomainSupport.firstNote(request, "Order marked ready"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
         kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
@@ -175,6 +174,7 @@ public class OrderWorkflowService {
         }
 
         order.setStatus(OrderStatus.CANCELLED);
+        orderDomainSupport.applyStatusSideEffects(order);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         order.getLineItems().stream()
                 .filter(orderSupport::isFinanciallyActive)
@@ -194,6 +194,7 @@ public class OrderWorkflowService {
         orderSupport.requireVoidReasonIfNeeded(order, request == null ? null : request.getReason());
 
         order.setStatus(OrderStatus.VOIDED);
+        orderDomainSupport.applyStatusSideEffects(order);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         order.setPaymentStatus(OrderPaymentStatus.VOIDED);
         order.getLineItems().stream()
@@ -228,6 +229,11 @@ public class OrderWorkflowService {
         if (!Objects.equals(targetOrder.getBranch().getId(), sourceOrder.getBranch().getId())) {
             throw new AuthException("Orders must belong to the same branch to be merged", HttpStatus.BAD_REQUEST);
         }
+        if (!Objects.equals(sourceOrder.getCurrency(), targetOrder.getCurrency())
+                || sourceOrder.getTaxRateSnapshot().compareTo(targetOrder.getTaxRateSnapshot()) != 0
+                || sourceOrder.isTaxInclusiveSnapshot() != targetOrder.isTaxInclusiveSnapshot()) {
+            throw new AuthException("Orders with different currencies or tax policies cannot be merged", HttpStatus.BAD_REQUEST);
+        }
         if (!orderSupport.loadOrderRules(targetOrder.getRestaurant()).isMergeOrdersEnabled()) {
             throw new AuthException("Order merging is disabled for this restaurant", HttpStatus.BAD_REQUEST);
         }
@@ -238,8 +244,17 @@ public class OrderWorkflowService {
         for (OrderLineItem lineItem : orderSupport.activeLineItems(sourceOrder)) {
             targetOrder.addLineItem(orderSupport.cloneLineItem(lineItem));
         }
+        // A merge preserves each order's applied discount; percentages must not spread
+        // onto the other order's items when their subtotals are combined.
+        for (OrderDiscount discount : targetOrder.getDiscounts()) {
+            discount.setDiscountType(pos.pos.order.enums.OrderDiscountType.FIXED_AMOUNT);
+            discount.setDiscountValue(discount.getAmountApplied());
+        }
         for (OrderDiscount discount : sourceOrder.getDiscounts()) {
-            targetOrder.addDiscount(orderSupport.cloneDiscount(discount, discount.getAmountApplied(), actorId));
+            OrderDiscount allocated = orderSupport.cloneDiscount(discount, discount.getAmountApplied(), actorId);
+            allocated.setDiscountType(pos.pos.order.enums.OrderDiscountType.FIXED_AMOUNT);
+            allocated.setDiscountValue(discount.getAmountApplied());
+            targetOrder.addDiscount(allocated);
         }
 
         new ArrayList<>(sourceOrder.getLineItems()).forEach(sourceOrder::removeLineItem);
@@ -393,10 +408,10 @@ public class OrderWorkflowService {
         newOrder.setCustomer(sourceOrder.getCustomer());
         newOrder.setCreatedBy(actorId);
         newOrder.setUpdatedBy(actorId);
-        newOrder.setOrderNumber(request.getNewOrderNumber() == null
-                ? orderSupport.nextOrderNumber(sourceOrder.getRestaurant())
-                : request.getNewOrderNumber());
+        newOrder.setOrderNumber(orderSupport.nextOrderNumber(sourceOrder.getRestaurant()));
         newOrder.setCurrency(sourceOrder.getCurrency());
+        newOrder.setTaxRateSnapshot(sourceOrder.getTaxRateSnapshot());
+        newOrder.setTaxInclusiveSnapshot(sourceOrder.isTaxInclusiveSnapshot());
         newOrder.setOrderType(sourceOrder.getOrderType());
         newOrder.setSource(sourceOrder.getSource());
         newOrder.setStatus(OrderStatus.OPEN);
@@ -405,12 +420,18 @@ public class OrderWorkflowService {
         newOrder.setNotes(request.getNotes() == null ? sourceOrder.getNotes() : request.getNotes());
         newOrder.setOpenedAt(OffsetDateTime.now(ZoneOffset.UTC));
 
+        for (OrderDiscount discount : sourceOrder.getDiscounts()) {
+            var amount = orderSupport.splitDiscountAmount(sourceOrder, selectedLineItems, discount);
+            OrderDiscount allocated = orderSupport.cloneDiscount(discount, amount, actorId);
+            allocated.setDiscountType(pos.pos.order.enums.OrderDiscountType.FIXED_AMOUNT);
+            allocated.setDiscountValue(amount);
+            newOrder.addDiscount(allocated);
+            discount.setDiscountType(pos.pos.order.enums.OrderDiscountType.FIXED_AMOUNT);
+            discount.setDiscountValue(discount.getAmountApplied().subtract(amount));
+        }
         for (OrderLineItem lineItem : selectedLineItems) {
             newOrder.addLineItem(orderSupport.cloneLineItem(lineItem));
             sourceOrder.removeLineItem(lineItem);
-        }
-        for (OrderDiscount discount : sourceOrder.getDiscounts()) {
-            newOrder.addDiscount(orderSupport.cloneDiscount(discount, discount.getAmountApplied(), actorId));
         }
 
         sourceOrder.setUpdatedBy(actorId);

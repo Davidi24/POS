@@ -37,6 +37,8 @@ public class SettingsMapper {
                 .serviceChargeEnabled(settings.isServiceChargeEnabled())
                 .serviceChargeType(settings.getServiceChargeType())
                 .serviceChargeValue(settings.getServiceChargeValue())
+                .orderTaxRate(settings.getOrderTaxRate())
+                .orderTaxInclusive(settings.isOrderTaxInclusive())
                 .cashRoundingEnabled(settings.isCashRoundingEnabled())
                 .cashRoundingIncrement(settings.getCashRoundingIncrement())
                 .allowSplitBills(settings.isAllowSplitBills())

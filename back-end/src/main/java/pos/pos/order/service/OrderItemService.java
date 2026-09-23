@@ -236,8 +236,10 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        kdsOrderSyncService.assertLineItemMutable(lineItem, "Sent items cannot change options");
         OrderItemOption option = orderSupport.buildOption(order, lineItem, request);
         lineItem.addOption(option);
+        orderSupport.validateOptionSelection(lineItem);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, "Order item option added", order.getUpdatedBy());
@@ -263,6 +265,7 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        kdsOrderSyncService.assertLineItemMutable(lineItem, "Sent items cannot change options");
         OrderItemOption option = orderSupport.requireOption(lineItem, optionId);
         OrderItemOption replacement = orderSupport.buildOption(order, lineItem, request);
         option.setOptionItem(replacement.getOptionItem());
@@ -271,6 +274,7 @@ public class OrderItemService {
         option.setQuantity(replacement.getQuantity());
         option.setNotes(replacement.getNotes());
 
+        orderSupport.validateOptionSelection(lineItem);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, "Order item option updated", order.getUpdatedBy());
@@ -295,7 +299,9 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        kdsOrderSyncService.assertLineItemMutable(lineItem, "Sent items cannot change options");
         lineItem.removeOption(orderSupport.requireOption(lineItem, optionId));
+        orderSupport.validateOptionSelection(lineItem);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, "Order item option removed", order.getUpdatedBy());
