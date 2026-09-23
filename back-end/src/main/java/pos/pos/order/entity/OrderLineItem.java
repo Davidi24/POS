@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractTimestampedEntity;
+import pos.pos.inventory.entity.InventoryLocation;
 import pos.pos.inventory.entity.InventoryMovement;
 import pos.pos.kds.entity.KdsTicketItem;
 import pos.pos.menu.entity.MenuItem;
@@ -117,8 +118,21 @@ public class OrderLineItem extends AbstractTimestampedEntity {
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
 
+    // Which InventoryLocation this item's ingredients get reserved/deducted from. Nullable for
+    // now (backward compatibility with existing rows and callers that don't send it yet), but
+    // required going forward once the ordering client always supplies it.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "location_id",
+            columnDefinition = "uuid",
+            foreignKey = @ForeignKey(name = "fk_order_line_items_location")
+    )
+    private InventoryLocation location;
+
     @OneToMany(mappedBy = "orderLineItem", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
+    // Keep distinct unsaved options; load separately from the order's other bags.
+    @org.hibernate.annotations.BatchSize(size = 50)
     private List<OrderItemOption> options = new ArrayList<>();
 
     @OneToMany(mappedBy = "orderLineItem")
@@ -214,6 +228,12 @@ public class OrderLineItem extends AbstractTimestampedEntity {
                     menuItem.getSection().getMenu().getRestaurant().getId()
             )) {
                 throw new IllegalStateException("order line item must stay within one restaurant");
+            }
+        }
+
+        if (order != null && order.getRestaurant() != null && location != null && location.getRestaurant() != null) {
+            if (!Objects.equals(order.getRestaurant().getId(), location.getRestaurant().getId())) {
+                throw new IllegalStateException("order line item location must belong to the same restaurant");
             }
         }
     }

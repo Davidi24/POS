@@ -1,11 +1,14 @@
 package pos.pos.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.inventory.service.OrderInventoryIntegrationService;
 import pos.pos.kds.service.KdsOrderSyncService;
 import pos.pos.order.dto.CreateOrderDiscountRequest;
 import pos.pos.order.dto.CreateOrderItemOptionRequest;
@@ -33,10 +36,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderItemService {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderItemService.class);
+
     private final RestaurantScopeService restaurantScopeService;
     private final OrderSupport orderSupport;
     private final OrderDomainSupport orderDomainSupport;
     private final KdsOrderSyncService kdsOrderSyncService;
+    private final OrderInventoryIntegrationService orderInventoryIntegrationService;
 
     @Transactional
     public OrderLineItemResponse addItem(
@@ -55,6 +61,7 @@ public class OrderItemService {
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_ADDED, "Order item added", order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        tryReserve(authentication, lineItem);
 
         return orderSupport.toLineItemResponse(lineItem);
     }
@@ -155,6 +162,10 @@ public class OrderItemService {
         orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, "Order item status updated", order.getUpdatedBy());
         orderSupport.saveOrder(order);
         kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
+        if (request.getStatus() == OrderLineItemStatus.FULFILLED) {
+            log.info("[inventory] updateItemStatus reached FULFILLED branch for lineItem={} location={}", lineItem.getId(), lineItem.getLocation() == null ? "null" : lineItem.getLocation().getId());
+            tryDeduct(authentication, lineItem);
+        }
 
         return orderSupport.toLineItemResponse(lineItem);
     }
@@ -219,6 +230,7 @@ public class OrderItemService {
         orderSupport.addEvent(order, OrderEventType.ITEM_VOIDED, orderDomainSupport.firstNote(request, "Order item voided"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
         kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy(), request == null ? null : request.getReason());
+        tryRelease(authentication, lineItem);
 
         return orderSupport.toLineItemResponse(lineItem);
     }
@@ -403,7 +415,38 @@ public class OrderItemService {
         orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, note, order.getUpdatedBy());
         orderSupport.saveOrder(order);
         kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
+        if (status == OrderLineItemStatus.FULFILLED) {
+            log.info("[inventory] changeItemStatus reached FULFILLED branch for lineItem={} location={}", lineItem.getId(), lineItem.getLocation() == null ? "null" : lineItem.getLocation().getId());
+            tryDeduct(authentication, lineItem);
+        }
 
         return orderSupport.toLineItemResponse(lineItem);
+    }
+
+    // Inventory bookkeeping must never block or fail a real order action -- see
+    // OrderInventoryIntegrationService's class comment for why these are simple try/catch
+    // wrappers around REQUIRES_NEW calls rather than letting exceptions propagate.
+    private void tryReserve(Authentication authentication, OrderLineItem lineItem) {
+        try {
+            orderInventoryIntegrationService.reserveForLineItem(authentication, lineItem);
+        } catch (Exception ex) {
+            log.warn("Inventory reservation failed for order line item {}: {}", lineItem.getId(), ex.getMessage(), ex);
+        }
+    }
+
+    private void tryDeduct(Authentication authentication, OrderLineItem lineItem) {
+        try {
+            orderInventoryIntegrationService.deductForFulfillment(authentication, lineItem);
+        } catch (Exception ex) {
+            log.warn("Inventory deduction failed for order line item {}: {}", lineItem.getId(), ex.getMessage(), ex);
+        }
+    }
+
+    private void tryRelease(Authentication authentication, OrderLineItem lineItem) {
+        try {
+            orderInventoryIntegrationService.releaseOrReverseForLineItem(authentication, lineItem);
+        } catch (Exception ex) {
+            log.warn("Inventory release/reversal failed for order line item {}: {}", lineItem.getId(), ex.getMessage());
+        }
     }
 }

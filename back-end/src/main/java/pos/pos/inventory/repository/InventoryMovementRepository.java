@@ -14,6 +14,11 @@ public interface InventoryMovementRepository extends JpaRepository<InventoryMove
 
     Optional<InventoryMovement> findByIdAndInventoryItem_Restaurant_Id(UUID id, UUID restaurantId);
 
+    // Used by OrderInventoryIntegrationService to check what's already happened to a specific
+    // line item (idempotency on deduction, deciding reverse-vs-release on void/cancel) and to
+    // guard split/merge against hard-deleting a line item that still has movement history.
+    List<InventoryMovement> findAllByOrderLineItem_IdOrderByOccurredAtAsc(UUID orderLineItemId);
+
     // Backs GET /inventory/movements. orderLineItemId, movementType, and itemId are all optional
     // and combine with AND semantics -- whichever ones are non-null narrow the result together.
     // A single query like this is what lets every filter combination (including none, and all

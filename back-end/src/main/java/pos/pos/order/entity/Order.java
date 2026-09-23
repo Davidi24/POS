@@ -39,8 +39,10 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Entity
 @Table(
@@ -200,11 +202,14 @@ public class Order extends AbstractAuditedEntity {
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
+    @org.hibernate.annotations.BatchSize(size = 50)
     private List<OrderDiscount> discounts = new ArrayList<>();
 
+    // Events load separately. OrderRepository joins only lineItems; using a Set here
+    // does not make it safe to also join the discounts and options List collections.
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt DESC")
-    private List<OrderEvent> events = new ArrayList<>();
+    private Set<OrderEvent> events = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "order")
     @OrderBy("paidAt ASC")

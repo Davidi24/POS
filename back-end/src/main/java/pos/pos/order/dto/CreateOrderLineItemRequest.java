@@ -24,6 +24,11 @@ public class CreateOrderLineItemRequest {
 
     private UUID variantId;
 
+    // Which InventoryLocation this item's ingredients should be reserved/deducted from.
+    // Nullable for now (backward compatibility) -- if omitted, inventory reservation is
+    // silently skipped for this line item rather than blocking order creation.
+    private UUID locationId;
+
     @NotNull(message = "quantity is required")
     @Min(value = 1, message = "quantity must be greater than 0")
     private Integer quantity;

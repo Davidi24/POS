@@ -2,7 +2,11 @@ package pos.pos.unit.order.entity;
 
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import pos.pos.order.repository.OrderRepository;
+import pos.pos.order.mapper.OrderMapper;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -56,9 +60,13 @@ class OrderEntityPersistenceTest extends AbstractTestProfilePostgresTest {
     @Autowired
     private EntityManager entityManager;
 
-    @Test
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 2, 3})
     @DisplayName("Should persist the order graph with normalized snapshots and linked relationships")
-    void shouldPersistTheOrderGraphWithNormalizedSnapshotsAndLinkedRelationships() {
+    void shouldPersistTheOrderGraphWithNormalizedSnapshotsAndLinkedRelationships(int finder) {
         Restaurant restaurant = restaurant();
         entityManager.persist(restaurant);
 
@@ -137,6 +145,14 @@ class OrderEntityPersistenceTest extends AbstractTestProfilePostgresTest {
         option.setNotes("  on half  ");
         lineItem.addOption(option);
 
+        OptionItem secondOptionItem = optionItem(optionGroup);
+        secondOptionItem.setCode("extra-sauce");
+        secondOptionItem.setName("Extra Sauce");
+        entityManager.persist(secondOptionItem);
+        OrderItemOption secondOption = new OrderItemOption();
+        secondOption.setOptionItem(secondOptionItem);
+        lineItem.addOption(secondOption);
+
         OrderDiscount discount = new OrderDiscount();
         discount.setName("  Happy Hour  ");
         discount.setDiscountType(OrderDiscountType.PERCENTAGE);
@@ -150,13 +166,31 @@ class OrderEntityPersistenceTest extends AbstractTestProfilePostgresTest {
 
         order.addLineItem(lineItem);
         order.addDiscount(discount);
+        OrderDiscount secondDiscount = new OrderDiscount();
+        secondDiscount.setName("Loyalty");
+        secondDiscount.setDiscountType(OrderDiscountType.PERCENTAGE);
+        secondDiscount.setDiscountValue(BigDecimal.ONE);
+        secondDiscount.setAmountApplied(BigDecimal.ONE);
+        order.addDiscount(secondDiscount);
         order.addEvent(event);
 
         entityManager.persist(order);
         entityManager.flush();
         entityManager.clear();
 
-        Order storedOrder = entityManager.find(Order.class, order.getId());
+        // Exercise every graph from a fresh persistence context, including nested options.
+        Order storedOrder = switch (finder) {
+            case 0 -> orderRepository.findByIdAndRestaurant_Id(order.getId(), restaurant.getId()).orElseThrow();
+            case 1 -> orderRepository.findByRestaurant_IdAndOrderNumber(restaurant.getId(), "ORD-1001").orElseThrow();
+            case 2 -> orderRepository.findTopByOrderNumberOrderByCreatedAtDesc("ORD-1001").orElseThrow();
+            default -> orderRepository.findTopByRestaurantTable_IdAndStatusInOrderByOpenedAtDesc(
+                    restaurantTable.getId(), List.of(OrderStatus.CLOSED)).orElseThrow();
+        };
+        var response = new OrderMapper().toResponse(storedOrder);
+        assertThat(response.getLineItems()).hasSize(1);
+        assertThat(response.getLineItems().get(0).getOptions()).hasSize(2);
+        assertThat(response.getDiscounts()).hasSize(2);
+        assertThat(response.getEvents()).hasSize(1);
         OrderLineItem storedLineItem = entityManager.find(OrderLineItem.class, lineItem.getId());
         OrderItemOption storedOption = entityManager.find(OrderItemOption.class, option.getId());
         OrderDiscount storedDiscount = entityManager.find(OrderDiscount.class, discount.getId());
@@ -190,6 +224,15 @@ class OrderEntityPersistenceTest extends AbstractTestProfilePostgresTest {
 
         assertThat(storedEvent.getNote()).isEqualTo("opened from qr order");
         assertThat(storedEvent.getCreatedAt()).isNotNull();
+
+        // Existing write paths must still mutate and remove children after the split fetch.
+        storedOption.setNotes("Updated after fetch");
+        storedOrder.removeDiscount(storedDiscount);
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(entityManager.find(OrderItemOption.class, option.getId()).getNotes())
+                .isEqualTo("Updated after fetch");
+        assertThat(entityManager.find(OrderDiscount.class, discount.getId())).isNull();
     }
 
     private Restaurant restaurant() {

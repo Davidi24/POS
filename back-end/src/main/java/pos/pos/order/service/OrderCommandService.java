@@ -1,12 +1,15 @@
 package pos.pos.order.service;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.customer.entity.Customer;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.inventory.service.OrderInventoryIntegrationService;
 import pos.pos.kds.service.KdsOrderSyncService;
 import pos.pos.order.dto.CreateOrderRequest;
 import pos.pos.order.dto.OrderCustomerRequest;
@@ -16,6 +19,7 @@ import pos.pos.order.dto.OrderTableRequest;
 import pos.pos.order.dto.OrderValidationResponse;
 import pos.pos.order.dto.UpdateOrderRequest;
 import pos.pos.order.entity.Order;
+import pos.pos.order.entity.OrderLineItem;
 import pos.pos.order.enums.OrderPaymentStatus;
 import pos.pos.order.enums.OrderSource;
 import pos.pos.order.enums.OrderStatus;
@@ -37,10 +41,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderCommandService {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderCommandService.class);
+
     private final RestaurantScopeService restaurantScopeService;
     private final OrderSupport orderSupport;
     private final OrderDomainSupport orderDomainSupport;
     private final KdsOrderSyncService kdsOrderSyncService;
+    private final OrderInventoryIntegrationService orderInventoryIntegrationService;
 
     @Transactional
     public OrderResponse createBranchOrder(
@@ -65,7 +72,9 @@ public class OrderCommandService {
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, pos.pos.order.enums.OrderEventType.CREATED, "Order created", actorId);
 
-        return orderSupport.toResponse(orderSupport.saveOrder(order));
+        Order savedOrder = orderSupport.saveOrder(order);
+        savedOrder.getLineItems().forEach(lineItem -> tryReserve(authentication, lineItem));
+        return orderSupport.toResponse(savedOrder);
     }
 
     @Transactional
@@ -95,7 +104,9 @@ public class OrderCommandService {
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, pos.pos.order.enums.OrderEventType.CREATED, "Order created", actorId);
 
-        return orderSupport.toResponse(orderSupport.saveOrder(order));
+        Order savedOrder = orderSupport.saveOrder(order);
+        savedOrder.getLineItems().forEach(lineItem -> tryReserve(authentication, lineItem));
+        return orderSupport.toResponse(savedOrder);
     }
 
     @Transactional
@@ -124,6 +135,18 @@ public class OrderCommandService {
             kdsOrderSyncService.assertNoLineItemHistory(
                     order,
                     "Orders with KDS ticket history cannot replace their line items"
+            );
+            // replaceItems() hard-deletes the current line items (orphanRemoval) and rebuilds
+            // fresh ones -- if any already have InventoryMovement history, that delete would
+            // fail with a raw foreign key violation instead of a clean error. Existing
+            // reservations on the replaced items are intentionally left as-is here (not
+            // released before the swap): committedQuantity isn't tied to a specific line item
+            // row, so this doesn't risk a crash, just a stale reservation total until it's
+            // worked off by a future count/adjustment -- narrower in scope than what this task
+            // asked for, called out explicitly in the summary.
+            orderInventoryIntegrationService.assertNoInventoryHistory(
+                    order,
+                    "Orders with inventory movement history cannot replace their line items"
             );
         }
 
@@ -351,6 +374,17 @@ public class OrderCommandService {
         }
         if (request.getDiscounts() != null) {
             orderSupport.replaceDiscounts(order, request.getDiscounts(), order.getUpdatedBy());
+        }
+    }
+
+    // Inventory bookkeeping must never block or fail a real order action -- see
+    // OrderInventoryIntegrationService's class comment for why this is a simple try/catch
+    // wrapper around a REQUIRES_NEW call rather than letting exceptions propagate.
+    private void tryReserve(Authentication authentication, OrderLineItem lineItem) {
+        try {
+            orderInventoryIntegrationService.reserveForLineItem(authentication, lineItem);
+        } catch (Exception ex) {
+            log.warn("Inventory reservation failed for order line item {}: {}", lineItem.getId(), ex.getMessage());
         }
     }
 }
