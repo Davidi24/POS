@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import pos.pos.exception.menu.MenuItemDeletionBlockedException;
 import pos.pos.exception.menu.MenuItemSectionMismatchException;
 import pos.pos.menu.dto.request.CreateMenuItemRequest;
+import pos.pos.menu.dto.update.UpdateMenuItemRequest;
 import pos.pos.menu.dto.response.MenuItemSummaryResponse;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
@@ -75,6 +76,9 @@ class MenuItemServiceTest {
     @Mock
     private MenuItemOptionGroupRepository menuItemOptionGroupRepository;
 
+    @Mock
+    private pos.pos.menu.service.OnlineMenuService onlineMenuService;
+
     private final MenuMapper menuMapper = new MenuMapper();
     private final MenuPolicy menuPolicy = new MenuPolicy(new RestaurantPolicy());
     private MenuItemService menuItemService;
@@ -95,8 +99,14 @@ class MenuItemServiceTest {
                 menuMapper,
                 actorScopeService,
                 menuPolicy,
-                restaurantValidationService
+                restaurantValidationService,
+                onlineMenuService
         );
+        // Placement itself is covered in OnlineMenuServiceTest; here it just records where the dish went.
+        org.mockito.Mockito.lenient().doAnswer(call -> {
+            ((MenuItem) call.getArgument(0)).setOnlineSection(call.getArgument(1));
+            return null;
+        }).when(onlineMenuService).place(any(), any());
     }
 
     @Test
@@ -160,8 +170,62 @@ class MenuItemServiceTest {
         assertThat(saved.getDescription()).isEqualTo("Signature burger");
         assertThat(saved.getImageUrl()).isEqualTo("https://img.example/burger");
         assertThat(saved.isAvailable()).isTrue();
+        assertThat(saved.isSendToKitchen()).isTrue();
+        // New dishes stay on the staff menu until someone switches them on for online.
+        assertThat(saved.isShowOnline()).isFalse();
         assertThat(saved.getDisplayOrder()).isZero();
         assertThat(response.getId()).isEqualTo(ITEM_ID);
+        assertThat(response.getSendToKitchen()).isTrue();
+    }
+
+    @Test
+    @DisplayName("createItem should keep counter items like a cola away from the kitchen")
+    void shouldCreateCounterItem() {
+        Menu menu = menu(RestaurantStatus.ACTIVE);
+        MenuSection section = section(menu);
+        CreateMenuItemRequest request = CreateMenuItemRequest.builder()
+                .name("Cola")
+                .basePrice(new BigDecimal("2.50"))
+                .sendToKitchen(false)
+                .build();
+
+        actorScopeService.scope = actorScope(false, RESTAURANT_ID);
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(Optional.of(menu));
+        given(menuSectionRepository.findById(SECTION_ID)).willReturn(Optional.of(section));
+        given(menuItemRepository.saveAndFlush(any(MenuItem.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        MenuItemSummaryResponse response = menuItemService.createItem(authentication(), MENU_ID, SECTION_ID, request);
+
+        assertThat(response.getSendToKitchen()).isFalse();
+    }
+
+    @Test
+    @DisplayName("updateItem should keep sendToKitchen when an older client leaves it out, and change it when sent")
+    void shouldKeepOrChangeSendToKitchenOnUpdate() {
+        Menu menu = menu(RestaurantStatus.ACTIVE);
+        MenuSection section = section(menu);
+        MenuItem existing = item(section);
+        existing.setSendToKitchen(false);
+        UpdateMenuItemRequest.UpdateMenuItemRequestBuilder request = UpdateMenuItemRequest.builder()
+                .name("Cola")
+                .basePrice(new BigDecimal("2.50"))
+                .available(true)
+                .displayOrder(1);
+
+        actorScopeService.scope = actorScope(false, RESTAURANT_ID);
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(Optional.of(menu));
+        given(menuSectionRepository.findById(SECTION_ID)).willReturn(Optional.of(section));
+        given(menuItemRepository.findById(ITEM_ID)).willReturn(Optional.of(existing));
+        given(menuItemRepository.saveAndFlush(any(MenuItem.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        existing.setOnlineSection(new pos.pos.menu.entity.OnlineMenuSection());
+        menuItemService.updateItem(authentication(), MENU_ID, SECTION_ID, ITEM_ID, request.build());
+        assertThat(existing.isSendToKitchen()).isFalse();
+        assertThat(existing.isShowOnline()).isTrue();
+
+        menuItemService.updateItem(authentication(), MENU_ID, SECTION_ID, ITEM_ID, request.sendToKitchen(true).showOnline(false).build());
+        assertThat(existing.isSendToKitchen()).isTrue();
+        assertThat(existing.isShowOnline()).isFalse();
     }
 
     @Test
@@ -205,6 +269,57 @@ class MenuItemServiceTest {
                 .hasMessage("Menu item cannot be deleted while it still has variants or option groups");
 
         verify(menuItemRepository, never()).delete(any(MenuItem.class));
+    }
+
+    @Test
+    @DisplayName("createItem with Show in online menu should place the dish in the online section named like its own section")
+    void shouldPlaceNewDishInSameNamedOnlineSection() {
+        Menu menu = menu(RestaurantStatus.ACTIVE);
+        MenuSection section = section(menu);
+        pos.pos.menu.entity.OnlineMenuSection onlinePasta = new pos.pos.menu.entity.OnlineMenuSection();
+        onlinePasta.setName(section.getName());
+
+        actorScopeService.scope = actorScope(false, RESTAURANT_ID);
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(Optional.of(menu));
+        given(menuSectionRepository.findById(SECTION_ID)).willReturn(Optional.of(section));
+        given(onlineMenuService.resolveSection(menu.getRestaurant(), null, section.getName())).willReturn(onlinePasta);
+        given(menuItemRepository.saveAndFlush(any(MenuItem.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        MenuItemSummaryResponse response = menuItemService.createItem(authentication(), MENU_ID, SECTION_ID, CreateMenuItemRequest.builder()
+                .name("Carbonara")
+                .basePrice(new BigDecimal("14.00"))
+                .showOnline(true)
+                .build());
+
+        assertThat(response.getShowOnline()).isTrue();
+        assertThat(response.getOnlineSectionName()).isEqualTo(section.getName());
+    }
+
+    @Test
+    @DisplayName("updateItem with a custom online section name should use that section")
+    void shouldMoveDishToCustomOnlineSection() {
+        Menu menu = menu(RestaurantStatus.ACTIVE);
+        MenuSection section = section(menu);
+        MenuItem existing = item(section);
+        pos.pos.menu.entity.OnlineMenuSection favourites = new pos.pos.menu.entity.OnlineMenuSection();
+        favourites.setName("Chef's favourites");
+
+        actorScopeService.scope = actorScope(false, RESTAURANT_ID);
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(Optional.of(menu));
+        given(menuSectionRepository.findById(SECTION_ID)).willReturn(Optional.of(section));
+        given(menuItemRepository.findById(ITEM_ID)).willReturn(Optional.of(existing));
+        given(onlineMenuService.resolveSection(menu.getRestaurant(), null, "Chef's favourites")).willReturn(favourites);
+        given(menuItemRepository.saveAndFlush(any(MenuItem.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        menuItemService.updateItem(authentication(), MENU_ID, SECTION_ID, ITEM_ID, UpdateMenuItemRequest.builder()
+                .name("House Burger")
+                .basePrice(new BigDecimal("12.50"))
+                .available(true)
+                .displayOrder(1)
+                .onlineSectionName("Chef's favourites")
+                .build());
+
+        assertThat(existing.getOnlineSection()).isSameAs(favourites);
     }
 
     private Authentication authentication() {

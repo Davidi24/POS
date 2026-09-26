@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
@@ -75,6 +76,19 @@ public class MenuItem extends AbstractTimestampedEntity {
     @Column(name = "is_available", nullable = false)
     private boolean available = true;
 
+    // Off for items served straight from the counter (e.g. a bottled cola): they never reach the kitchen or KDS.
+    @Column(name = "send_to_kitchen", nullable = false)
+    private boolean sendToKitchen = true;
+
+    // Where the dish sits in the online menu (the website); null means staff menu only.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "online_section_id", columnDefinition = "uuid", foreignKey = @ForeignKey(name = "fk_menu_items_online_section"))
+    private OnlineMenuSection onlineSection;
+
+    // Position inside its online section.
+    @Column(name = "online_display_order", nullable = false)
+    private int onlineDisplayOrder = 0;
+
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
 
@@ -118,6 +132,11 @@ public class MenuItem extends AbstractTimestampedEntity {
         description = NormalizationUtils.normalize(description);
         imageUrl = NormalizationUtils.normalize(imageUrl);
         ingredients = normalizeIngredients(ingredients);
+    }
+
+    // "Show in online menu": customers see the dish once it has an online section.
+    public boolean isShowOnline() {
+        return onlineSection != null;
     }
 
     private static List<String> normalizeIngredients(List<String> values) {

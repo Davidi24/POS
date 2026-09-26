@@ -53,7 +53,8 @@ internal fun <T> MenuSearchBox(
     itemPrice: (T) -> String,
     itemAvailable: (T) -> Boolean,
     onSuggestionClick: (T) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 52.dp
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -77,7 +78,8 @@ internal fun <T> MenuSearchBox(
                 expanded = value.isNotBlank()
             },
             placeholder = "Search menu items",
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            height = height
         )
 
         // Query non-blank but nothing matched is a real, distinct outcome from "haven't

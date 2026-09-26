@@ -6,6 +6,8 @@ import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItem
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuVariant
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenu
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.repository.CreateMenuInput
 import com.saporini.mobile_desktop.pos.menu.domain.repository.CreateMenuItemOptionGroupInput
 import com.saporini.mobile_desktop.pos.menu.domain.repository.CreateOptionGroupInput
@@ -345,6 +347,29 @@ class MenuScreenModel(
             )
             refreshed
         }
+
+    // --- Online menu: a preview of what customers see, plus its own sections ------
+
+    suspend fun loadOnlineMenu(): Result<OnlineMenu> =
+        runSuspendCatching { repository.getOnlineMenu(requireRestaurantId()) }
+
+    suspend fun loadOnlineMenuSections(): Result<List<OnlineMenuSection>> =
+        runSuspendCatching { repository.getOnlineMenuSections(requireRestaurantId()) }
+
+    suspend fun renameOnlineMenuSection(sectionId: String, name: String): Result<OnlineMenuSection> =
+        runSuspendCatching { repository.renameOnlineMenuSection(requireRestaurantId(), sectionId, name) }
+
+    suspend fun reorderOnlineMenuSections(sectionIds: List<String>): Result<List<OnlineMenuSection>> =
+        runSuspendCatching { repository.reorderOnlineMenuSections(requireRestaurantId(), sectionIds) }
+
+    suspend fun reorderOnlineMenuItems(sectionId: String, itemIds: List<String>): Result<OnlineMenu> =
+        runSuspendCatching { repository.reorderOnlineMenuItems(requireRestaurantId(), sectionId, itemIds) }
+
+    suspend fun deleteOnlineMenuSection(sectionId: String): Result<Unit> =
+        runSuspendCatching { repository.deleteOnlineMenuSection(requireRestaurantId(), sectionId) }
+
+    private fun requireRestaurantId(): String =
+        sessionManager.currentUser.value?.restaurantId ?: error("No restaurant is assigned to this user")
 
     suspend fun createItem(menuId: String, sectionId: String, input: MenuItemInput): Result<MenuItem> =
         runSuspendCatching { repository.createItem(menuId, sectionId, input) }

@@ -6,6 +6,8 @@ import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItemOptionGroup
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuPage
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuVariant
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenu
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroup
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroupType
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionItem
@@ -52,6 +54,13 @@ data class MenuItemInput(
     val basePrice: Double,
     val imageUrl: String? = null,
     val available: Boolean = true,
+    // Off for counter items like a cola. Null leaves an existing item's setting unchanged.
+    val sendToKitchen: Boolean? = null,
+    // On: the dish appears in the customer-facing online menu. Null leaves an existing item's setting unchanged.
+    val showOnline: Boolean? = null,
+    // Which online section: an existing one by id, or by name (reused if it exists, created otherwise).
+    val onlineSectionId: String? = null,
+    val onlineSectionName: String? = null,
     val displayOrder: Int = 0,
     val ingredients: List<String> = emptyList(),
     val sectionId: String? = null
@@ -101,6 +110,15 @@ data class OptionItemInput(
 )
 
 interface MenuRepository {
+
+    // Online menu
+    suspend fun getOnlineMenu(restaurantId: String): OnlineMenu
+    suspend fun getOnlineMenuSections(restaurantId: String): List<OnlineMenuSection>
+    suspend fun renameOnlineMenuSection(restaurantId: String, sectionId: String, name: String): OnlineMenuSection
+    suspend fun reorderOnlineMenuSections(restaurantId: String, sectionIds: List<String>): List<OnlineMenuSection>
+    suspend fun reorderOnlineMenuItems(restaurantId: String, sectionId: String, itemIds: List<String>): OnlineMenu
+    suspend fun deleteOnlineMenuSection(restaurantId: String, sectionId: String)
+
 
     // Menus
 

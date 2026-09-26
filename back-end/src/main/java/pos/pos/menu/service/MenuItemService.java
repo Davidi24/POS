@@ -51,6 +51,7 @@ public class MenuItemService {
     private final ActorScopeService actorScopeService;
     private final MenuPolicy menuPolicy;
     private final RestaurantValidationService restaurantValidationService;
+    private final OnlineMenuService onlineMenuService;
 
     @Transactional(readOnly = true)
     public List<MenuItemSummaryResponse> getItems(
@@ -106,6 +107,8 @@ public class MenuItemService {
         item.setBasePrice(request.getBasePrice());
         item.setImageUrl(NormalizationUtils.normalize(request.getImageUrl()));
         item.setAvailable(request.getAvailable() == null || request.getAvailable());
+        item.setSendToKitchen(request.getSendToKitchen() == null || request.getSendToKitchen());
+        applyOnlinePlacement(menu, item, request.getShowOnline(), request.getOnlineSectionId(), request.getOnlineSectionName());
         item.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
         item.setIngredients(request.getIngredients());
 
@@ -136,6 +139,10 @@ public class MenuItemService {
         item.setBasePrice(request.getBasePrice());
         item.setImageUrl(NormalizationUtils.normalize(request.getImageUrl()));
         item.setAvailable(Boolean.TRUE.equals(request.getAvailable()));
+        if (request.getSendToKitchen() != null) {
+            item.setSendToKitchen(request.getSendToKitchen());
+        }
+        applyOnlinePlacement(menu, item, request.getShowOnline(), request.getOnlineSectionId(), request.getOnlineSectionName());
         item.setDisplayOrder(request.getDisplayOrder());
         item.setIngredients(request.getIngredients());
 
@@ -170,6 +177,9 @@ public class MenuItemService {
         }
 
         menuItemRepository.delete(item);
+        if (item.getOnlineSection() != null) {
+            onlineMenuService.removeIfEmpty(item.getOnlineSection(), item);
+        }
     }
 
     private MenuItemSummaryResponse toMenuItemResponse(MenuItem item, boolean includeVariants, boolean includeOptionGroups) {
@@ -187,6 +197,24 @@ public class MenuItemService {
         Menu menu = findExistingMenu(menuId);
         menuPolicy.assertCanAccess(scope, menu);
         return menu;
+    }
+
+    // "Show in online menu": off takes the dish offline; on (or naming a section) places it in that online section,
+    // defaulting to one named like the dish's own section. Nothing given keeps the current placement.
+    private void applyOnlinePlacement(Menu menu, MenuItem item, Boolean showOnline, UUID onlineSectionId, String onlineSectionName) {
+        if (Boolean.FALSE.equals(showOnline)) {
+            onlineMenuService.place(item, null);
+            return;
+        }
+        boolean sectionGiven = onlineSectionId != null || (onlineSectionName != null && !onlineSectionName.isBlank());
+        if (!Boolean.TRUE.equals(showOnline) && !sectionGiven) {
+            return;
+        }
+        onlineMenuService.place(item, onlineMenuService.resolveSection(
+                menu.getRestaurant(),
+                onlineSectionId,
+                sectionGiven ? onlineSectionName : item.getSection().getName()
+        ));
     }
 
     private Menu requireManageableMenu(Authentication authentication, UUID menuId) {
