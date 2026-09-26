@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import pos.pos.tables.enums.TableShape;
 import pos.pos.tables.enums.TableStatus;
+import pos.pos.order.enums.OrderFulfillmentStatus;
+import pos.pos.order.enums.OrderStatus;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -36,5 +38,13 @@ public class TableLayoutItemResponse {
     private TableStatus status;
     private Integer guestCount;
     private OffsetDateTime seatedAt;
+    private OffsetDateTime nextReservationStart;
+    private OffsetDateTime nextReservationEnd;
+    private String nextReservationCode;
+    private String nextReservationName;
+    private UUID currentOrderId;
+    private String currentOrderNumber;
+    private OrderStatus currentOrderStatus;
+    private OrderFulfillmentStatus currentOrderFulfillmentStatus;
     private Boolean active;
 }

@@ -38,6 +38,17 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     """)
     Optional<User> findActiveById(UUID userId);
 
+    // Active staff of a restaurant who work in this branch (or aren't tied to one branch).
+    @Query("""
+        SELECT u.id
+        FROM User u
+        WHERE u.restaurantId = :restaurantId
+          AND u.deletedAt IS NULL
+          AND u.isActive = true
+          AND (u.defaultBranchId IS NULL OR u.defaultBranchId = :branchId)
+    """)
+    java.util.List<UUID> findActiveStaffIds(UUID restaurantId, UUID branchId);
+
     @Query(
             value = """
             SELECT u

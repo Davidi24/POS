@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import pos.pos.customer.entity.Customer;
 import pos.pos.reservation.dto.ReservationAvailabilitySearchRequest;
 import pos.pos.customer.repository.CustomerRepository;
+import pos.pos.order.repository.OrderRepository;
 import pos.pos.reservation.dto.ReservationRequest;
 import pos.pos.reservation.dto.ReservationResponse;
 import pos.pos.reservation.dto.UpdateReservationDepositRequest;
@@ -66,6 +67,13 @@ class ReservationServicesTest {
     private static final UUID TABLE_ID_THREE = UUID.fromString("00000000-0000-0000-0000-000000000808");
 
     @Mock
+    private pos.pos.user.repository.UserRepository userRepository;
+    @Mock
+    private pos.pos.settings.repository.SettingsReservationRuleRepository settingsReservationRuleRepository;
+    @Mock
+    private pos.pos.reservation.service.ReservationNotifications reservationNotifications;
+
+    @Mock
     private RestaurantScopeService restaurantScopeService;
     @Mock
     private BranchRepository branchRepository;
@@ -83,6 +91,8 @@ class ReservationServicesTest {
     private RestaurantTableRepository restaurantTableRepository;
     @Mock
     private TableCategoryRepository tableCategoryRepository;
+    @Mock
+    private OrderRepository orderRepository;
     @Spy
     private RestaurantTableMapper restaurantTableMapper;
     @Spy
@@ -98,7 +108,9 @@ class ReservationServicesTest {
         RestaurantTableSupport restaurantTableSupport = new RestaurantTableSupport(
                 restaurantTableRepository,
                 tableCategoryRepository,
-                restaurantTableMapper
+                restaurantTableMapper,
+                reservationTableAssignmentRepository,
+                orderRepository
         );
         ReservationSupport reservationSupport = new ReservationSupport(
                 restaurantScopeService,
@@ -106,11 +118,15 @@ class ReservationServicesTest {
                 customerRepository,
                 reservationRepository,
                 reservationNoteRepository,
-                reservationMapper
+                reservationMapper,
+                userRepository
         );
+        pos.pos.reservation.service.ReservationRuleResolver reservationRuleResolver =
+                new pos.pos.reservation.service.ReservationRuleResolver(settingsReservationRuleRepository);
         ReservationAvailabilitySupport reservationAvailabilitySupport = new ReservationAvailabilitySupport(
                 reservationRepository,
-                restaurantTableSupport
+                restaurantTableSupport,
+                reservationRuleResolver
         );
         ReservationTableAssignmentService reservationTableAssignmentService = new ReservationTableAssignmentService(
                 restaurantScopeService,
@@ -126,17 +142,22 @@ class ReservationServicesTest {
                 reservationNoteRepository,
                 restaurantTableSupport,
                 reservationAvailabilitySupport,
-                reservationSupport
+                reservationSupport,
+                reservationRuleResolver
         );
         reservationCrudService = new ReservationCrudService(
                 restaurantScopeService,
                 reservationRepository,
                 reservationSupport,
-                reservationTableAssignmentService
+                reservationTableAssignmentService,
+                reservationNotifications,
+                event -> { }
         );
         reservationLifecycleService = new ReservationLifecycleService(
                 restaurantScopeService,
-                reservationSupport
+                reservationSupport,
+                reservationNotifications,
+                event -> { }
         );
         reservationDepositService = new ReservationDepositService(
                 restaurantScopeService,
@@ -192,6 +213,120 @@ class ReservationServicesTest {
         assertThat(response.getTableAssignments()).hasSize(1);
         assertThat(response.getTableAssignments().get(0).getTableId()).isEqualTo(TABLE_ID);
         assertThat(response.getTableAssignments().get(0).getPrimary()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should lock the chosen tables before checking them for overlapping bookings")
+    void shouldLockTablesBeforeOverlapCheck() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Branch branch = branch(restaurant);
+        RestaurantTable table = table(branch);
+
+        when(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(restaurantScopeService.requireManageableBranch(authentication, RESTAURANT_ID, BRANCH_ID)).thenReturn(branch);
+        when(restaurantScopeService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(reservationRepository.existsByRestaurant_IdAndReservationCode(eq(RESTAURANT_ID), any())).thenReturn(false);
+        when(restaurantTableRepository.findAllByBranch_IdOrderByFloorAscNameAsc(BRANCH_ID)).thenReturn(List.of(table));
+        when(reservationRepository.findAllByBranch_IdAndStatusInAndReservationStartLessThanAndReservationEndGreaterThanOrderByReservationStartAsc(
+                eq(BRANCH_ID), any(), any(), any()
+        )).thenReturn(List.of());
+        when(reservationRepository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        reservationCrudService.createReservation(authentication, RESTAURANT_ID, ReservationRequest.builder()
+                .branchId(BRANCH_ID)
+                .partySize(2)
+                .contactName("Emma Wilson")
+                .reservationStart(OffsetDateTime.parse("2026-05-10T18:00:00Z"))
+                .reservationEnd(OffsetDateTime.parse("2026-05-10T20:00:00Z"))
+                .initialTableIds(List.of(TABLE_ID))
+                .primaryTableId(TABLE_ID)
+                .build());
+
+        // A second booking for the same table waits on this lock, then its overlap check sees the first booking.
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(restaurantTableRepository, reservationRepository);
+        order.verify(restaurantTableRepository).lockTablesForBooking(BRANCH_ID, java.util.Set.of(TABLE_ID));
+        order.verify(reservationRepository).findAllByBranch_IdAndStatusInAndReservationStartLessThanAndReservationEndGreaterThanOrderByReservationStartAsc(
+                eq(BRANCH_ID), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should keep the rule's buffer free around bookings when checking a table")
+    void shouldApplyRuleBufferToOverlapCheck() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Branch branch = branch(restaurant);
+        RestaurantTable table = table(branch);
+        pos.pos.settings.entity.SettingsReservationRule rule = new pos.pos.settings.entity.SettingsReservationRule();
+        rule.setRuleName("Dinner");
+        rule.setBufferMinutes(15);
+
+        when(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(restaurantScopeService.requireManageableBranch(authentication, RESTAURANT_ID, BRANCH_ID)).thenReturn(branch);
+        when(restaurantScopeService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(reservationRepository.existsByRestaurant_IdAndReservationCode(eq(RESTAURANT_ID), any())).thenReturn(false);
+        when(restaurantTableRepository.findAllByBranch_IdOrderByFloorAscNameAsc(BRANCH_ID)).thenReturn(List.of(table));
+        when(settingsReservationRuleRepository.findAllBySettings_Restaurant_IdOrderByPriorityAscCreatedAtAsc(RESTAURANT_ID)).thenReturn(List.of(rule));
+        when(reservationRepository.findAllByBranch_IdAndStatusInAndReservationStartLessThanAndReservationEndGreaterThanOrderByReservationStartAsc(
+                eq(BRANCH_ID), any(), any(), any()
+        )).thenReturn(List.of());
+        when(reservationRepository.saveAndFlush(any(Reservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        reservationCrudService.createReservation(authentication, RESTAURANT_ID, ReservationRequest.builder()
+                .branchId(BRANCH_ID)
+                .partySize(2)
+                .contactName("Emma Wilson")
+                .reservationStart(OffsetDateTime.parse("2026-05-10T18:00:00Z"))
+                .reservationEnd(OffsetDateTime.parse("2026-05-10T20:00:00Z"))
+                .initialTableIds(List.of(TABLE_ID))
+                .primaryTableId(TABLE_ID)
+                .build());
+
+        // Bookings ending after 17:45 or starting before 20:15 count as overlapping.
+        org.mockito.Mockito.verify(reservationRepository).findAllByBranch_IdAndStatusInAndReservationStartLessThanAndReservationEndGreaterThanOrderByReservationStartAsc(
+                eq(BRANCH_ID), any(),
+                eq(OffsetDateTime.parse("2026-05-10T20:15:00Z")),
+                eq(OffsetDateTime.parse("2026-05-10T17:45:00Z")));
+    }
+
+    @Test
+    @DisplayName("Should refuse a table that another booking holds in the same time window")
+    void shouldRejectOverlappingTable() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Branch branch = branch(restaurant);
+        RestaurantTable table = table(branch);
+
+        Reservation existing = new Reservation();
+        existing.setId(UUID.fromString("00000000-0000-0000-0000-000000000899"));
+        existing.setStatus(ReservationStatus.CONFIRMED);
+        existing.setReservationStart(OffsetDateTime.parse("2026-05-10T17:30:00Z"));
+        existing.setReservationEnd(OffsetDateTime.parse("2026-05-10T19:30:00Z"));
+        pos.pos.reservation.entity.ReservationTableAssignment held = new pos.pos.reservation.entity.ReservationTableAssignment();
+        held.setRestaurantTable(table);
+        held.setPrimaryAssignment(true);
+        existing.addTableAssignment(held);
+
+        when(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(restaurantScopeService.requireManageableBranch(authentication, RESTAURANT_ID, BRANCH_ID)).thenReturn(branch);
+        when(restaurantScopeService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(reservationRepository.existsByRestaurant_IdAndReservationCode(eq(RESTAURANT_ID), any())).thenReturn(false);
+        when(restaurantTableRepository.findAllByBranch_IdOrderByFloorAscNameAsc(BRANCH_ID)).thenReturn(List.of(table));
+        when(reservationRepository.findAllByBranch_IdAndStatusInAndReservationStartLessThanAndReservationEndGreaterThanOrderByReservationStartAsc(
+                eq(BRANCH_ID), any(), any(), any()
+        )).thenReturn(List.of(existing));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> reservationCrudService.createReservation(authentication, RESTAURANT_ID, ReservationRequest.builder()
+                        .branchId(BRANCH_ID)
+                        .partySize(2)
+                        .contactName("Emma Wilson")
+                        .reservationStart(OffsetDateTime.parse("2026-05-10T18:00:00Z"))
+                        .reservationEnd(OffsetDateTime.parse("2026-05-10T20:00:00Z"))
+                        .initialTableIds(List.of(TABLE_ID))
+                        .primaryTableId(TABLE_ID)
+                        .build()))
+                .hasMessageContaining("overlap");
+        org.mockito.Mockito.verify(reservationRepository, org.mockito.Mockito.never()).saveAndFlush(any(Reservation.class));
     }
 
     @Test

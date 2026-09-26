@@ -80,6 +80,8 @@ data class OrderLineItemResponseDto(
     val taxTotal: OrderDecimal,
     val lineTotal: OrderDecimal,
     val status: OrderLineItemStatus,
+    // Older servers don't send it; every item went to the kitchen before counter items existed.
+    val sendToKitchen: Boolean = true,
     val notes: String? = null,
     val options: List<OrderItemOptionResponseDto>? = null,
     val createdAt: String,

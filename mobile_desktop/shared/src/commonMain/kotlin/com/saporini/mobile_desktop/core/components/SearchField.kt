@@ -21,6 +21,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
@@ -31,16 +33,19 @@ fun SearchField(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     placeholder: String = "Search",
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    height: Dp = 52.dp
 ) {
     val textColor = Color(0xFF222426)
     val borderColor = Color(0xFFE8E5E1)
     val placeholderColor = Color(0xFF91918F)
+    val compact = height < 52.dp
+    val textSize = if (compact) 12.sp else 14.sp
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(52.dp)
+            .height(height)
             .clip(RoundedCornerShape(8.dp))
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))
             .padding(horizontal = 15.dp),
@@ -49,11 +54,11 @@ fun SearchField(
         Icon(
             imageVector = Icons.Outlined.Search,
             contentDescription = null,
-            modifier = Modifier.size(21.dp),
+            modifier = Modifier.size(if (compact) 18.dp else 21.dp),
             tint = Color(0xFF303236)
         )
 
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(if (compact) 10.dp else 14.dp))
 
         BasicTextField(
             value = query,
@@ -64,7 +69,7 @@ fun SearchField(
             textStyle = TextStyle(
                 fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
+                fontSize = textSize,
                 letterSpacing = 0.sp,
                 color = textColor
             ),
@@ -74,9 +79,11 @@ fun SearchField(
                         text = placeholder,
                         fontFamily = Inter(),
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
+                        fontSize = textSize,
                         letterSpacing = 0.sp,
-                        color = placeholderColor
+                        color = placeholderColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 

@@ -23,6 +23,8 @@ import pos.pos.settings.dto.UpdateSettingsDefaultBranchRequest;
 import pos.pos.settings.dto.UpdateSettingsLocalizationRequest;
 import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
 import pos.pos.settings.dto.UpdateSettingsSequencePrefixesRequest;
+import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
+import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.service.SettingsService;
 
 import java.util.UUID;
@@ -110,6 +112,28 @@ public class SettingsController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(settingsService.updateOrderChannels(authentication, restaurantId, request));
+    }
+
+    @PatchMapping("/staff-permissions")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Update which staff roles Admins may manage (Owner and Co-Owner only)")
+    public ResponseEntity<SettingsResponse> updateStaffPermissions(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody UpdateSettingsStaffPermissionsRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updateStaffPermissions(authentication, restaurantId, request));
+    }
+
+    @PatchMapping("/pre-orders")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Turn reservation pre-orders on or off and set when they go to the kitchen")
+    public ResponseEntity<SettingsResponse> updatePreOrders(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody UpdateSettingsPreOrdersRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updatePreOrders(authentication, restaurantId, request));
     }
 
     @PostMapping("/reset")

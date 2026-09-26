@@ -1,6 +1,6 @@
 package pos.pos.reservation.service;
 
-import com.github.f4b6a3.uuid.UuidCreator;
+import pos.pos.user.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -52,12 +52,15 @@ import java.util.UUID;
 @lombok.RequiredArgsConstructor
 public class ReservationSupport {
 
+    public static final int MAX_RESERVATION_HOURS = 24;
+
     private final RestaurantScopeService restaurantScopeService;
     private final BranchRepository branchRepository;
     private final CustomerRepository customerRepository;
     private final ReservationRepository reservationRepository;
     private final ReservationNoteRepository reservationNoteRepository;
     private final ReservationMapper reservationMapper;
+    private final UserRepository userRepository;
 
     public Reservation requireReservation(UUID restaurantId, UUID reservationId) {
         return reservationRepository.findByIdAndRestaurant_Id(reservationId, restaurantId)
@@ -161,11 +164,31 @@ public class ReservationSupport {
     }
 
     public List<ReservationNoteResponse> mapNotes(List<ReservationNote> notes) {
-        return notes.stream().map(reservationMapper::toNoteResponse).toList();
+        return withAuthorNames(notes.stream().map(reservationMapper::toNoteResponse).toList());
     }
 
     public ReservationNoteResponse toNoteResponse(ReservationNote note) {
-        return reservationMapper.toNoteResponse(note);
+        return withAuthorNames(List.of(reservationMapper.toNoteResponse(note))).getFirst();
+    }
+
+    // Staff see who wrote a note, not just a user id.
+    private List<ReservationNoteResponse> withAuthorNames(List<ReservationNoteResponse> notes) {
+        java.util.Set<UUID> authorIds = notes.stream()
+                .map(ReservationNoteResponse::getCreatedBy)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        if (authorIds.isEmpty()) {
+            return notes;
+        }
+        java.util.Map<UUID, String> names = new java.util.HashMap<>();
+        userRepository.findAllById(authorIds).forEach(user -> {
+            String fullName = java.util.stream.Stream.of(user.getFirstName(), user.getLastName())
+                    .filter(part -> part != null && !part.isBlank())
+                    .collect(java.util.stream.Collectors.joining(" "));
+            names.put(user.getId(), fullName.isBlank() ? user.getUsername() : fullName);
+        });
+        notes.forEach(note -> note.setCreatedByName(names.get(note.getCreatedBy())));
+        return notes;
     }
 
     public ReservationDepositResponse toDepositResponse(Reservation reservation) {
@@ -218,6 +241,9 @@ public class ReservationSupport {
         requireCompleteWindow(reservationStart, reservationEnd);
         if (!reservationEnd.isAfter(reservationStart)) {
             throw new AuthException("reservationEnd must be after reservationStart", HttpStatus.BAD_REQUEST);
+        }
+        if (reservationEnd.isAfter(reservationStart.plusHours(MAX_RESERVATION_HOURS))) {
+            throw new AuthException("A reservation can last at most " + MAX_RESERVATION_HOURS + " hours", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -299,9 +325,9 @@ public class ReservationSupport {
                 request.getContactEmail(),
                 reservation.getCustomer() == null ? null : reservation.getCustomer().getEmail()
         ));
-        reservation.setSeatingPreference(request.getSeatingPreference());
-        reservation.setSpecialRequests(request.getSpecialRequests());
-        reservation.setInternalNotes(request.getInternalNotes());
+        reservation.setSeatingPreference(NormalizationUtils.normalize(request.getSeatingPreference()));
+        reservation.setSpecialRequests(NormalizationUtils.normalize(request.getSpecialRequests()));
+        reservation.setInternalNotes(NormalizationUtils.normalize(request.getInternalNotes()));
         reservation.setUpdatedBy(actorId);
         applyDepositFields(reservation, request.getDepositRequired(), request.getDepositAmount(), creating);
         validateReservationWindow(request.getReservationStart(), request.getReservationEnd());
@@ -321,22 +347,27 @@ public class ReservationSupport {
             reservation.setReservationEnd(request.getReservationEnd());
         }
         if (request.getContactName() != null) {
-            reservation.setContactName(request.getContactName());
+            String contactName = NormalizationUtils.normalize(request.getContactName());
+            if (contactName == null && reservation.getCustomer() == null) {
+                throw new AuthException("contactName must not be blank", HttpStatus.BAD_REQUEST);
+            }
+            reservation.setContactName(contactName);
         }
+        // An empty value clears the field; whitespace is trimmed away.
         if (request.getContactPhone() != null) {
-            reservation.setContactPhone(request.getContactPhone());
+            reservation.setContactPhone(NormalizationUtils.normalize(request.getContactPhone()));
         }
         if (request.getContactEmail() != null) {
-            reservation.setContactEmail(request.getContactEmail());
+            reservation.setContactEmail(NormalizationUtils.normalize(request.getContactEmail()));
         }
         if (request.getSeatingPreference() != null) {
-            reservation.setSeatingPreference(request.getSeatingPreference());
+            reservation.setSeatingPreference(NormalizationUtils.normalize(request.getSeatingPreference()));
         }
         if (request.getSpecialRequests() != null) {
-            reservation.setSpecialRequests(request.getSpecialRequests());
+            reservation.setSpecialRequests(NormalizationUtils.normalize(request.getSpecialRequests()));
         }
         if (request.getInternalNotes() != null) {
-            reservation.setInternalNotes(request.getInternalNotes());
+            reservation.setInternalNotes(NormalizationUtils.normalize(request.getInternalNotes()));
         }
         if (request.getDepositRequired() != null || request.getDepositAmount() != null) {
             applyDepositFields(
@@ -394,7 +425,8 @@ public class ReservationSupport {
     }
 
     public String firstNonBlank(String firstValue, String fallbackValue) {
-        return NormalizationUtils.normalize(firstValue) == null ? fallbackValue : firstValue;
+        String normalized = NormalizationUtils.normalize(firstValue);
+        return normalized == null ? fallbackValue : normalized;
     }
 
     public record TimeWindow(OffsetDateTime from, OffsetDateTime to) {
@@ -402,7 +434,9 @@ public class ReservationSupport {
 
     private String generateReservationCode(UUID restaurantId) {
         for (int attempt = 0; attempt < 10; attempt++) {
-            String candidate = "RES_" + UuidCreator.getTimeOrdered().toString().replace("-", "").substring(0, 8).toUpperCase();
+            // Random, not time-ordered: a time-ordered UUID's first 8 characters stay the same for ~27 seconds,
+            // so bookings made close together all got the same code and creation failed.
+            String candidate = "RES_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
             if (!reservationRepository.existsByRestaurant_IdAndReservationCode(restaurantId, candidate)) {
                 return candidate;
             }

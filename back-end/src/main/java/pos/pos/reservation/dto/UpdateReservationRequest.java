@@ -1,7 +1,10 @@
 package pos.pos.reservation.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,6 +31,7 @@ public class UpdateReservationRequest {
     private ReservationSource source;
 
     @Min(value = 1, message = "partySize must be greater than 0")
+    @Max(value = 500, message = "partySize must be at most 500")
     private Integer partySize;
 
     private OffsetDateTime reservationStart;
@@ -37,16 +41,22 @@ public class UpdateReservationRequest {
     private String contactName;
 
     @Size(max = 50, message = "contactPhone must be at most 50 characters")
+    @Pattern(regexp = "^$|^(?=.{5,50}$)\\+?[0-9 ()./-]+$", message = "contactPhone may contain only digits, spaces, + ( ) . / -")
     private String contactPhone;
 
     @Size(max = 150, message = "contactEmail must be at most 150 characters")
+    @Email(message = "contactEmail must be a valid email address")
     private String contactEmail;
 
     @Size(max = 50, message = "seatingPreference must be at most 50 characters")
     private String seatingPreference;
 
+    @Size(max = 2000, message = "specialRequests must be at most 2000 characters")
     private String specialRequests;
+
+    @Size(max = 2000, message = "internalNotes must be at most 2000 characters")
     private String internalNotes;
+
     private Boolean depositRequired;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "depositAmount must not be negative")

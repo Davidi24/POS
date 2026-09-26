@@ -44,7 +44,8 @@ public enum AppRole {
                     SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
                     ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
-                    KDS_READ, KDS_UPDATE
+                    KDS_READ, KDS_UPDATE,
+                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS
             )
     ),
 
@@ -52,7 +53,7 @@ public enum AppRole {
             "Admin",
             "Store administrator - manages staff, inventory, settings and reports",
             30_000L,
-            false,
+            true,
             false,
             EnumSet.of(
                     RESTAURANTS_READ, RESTAURANTS_UPDATE,
@@ -64,10 +65,12 @@ public enum AppRole {
                     SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
                     ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
-                    KDS_READ, KDS_UPDATE
+                    KDS_READ, KDS_UPDATE,
+                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS
             )
     ),
 
+    // Only Owner and Co-Owner hand out or manage Managers, unless the restaurant lets Admins do it too.
     MANAGER(
             "Manager",
             "Store manager - oversees operations and staff",
@@ -82,8 +85,10 @@ public enum AppRole {
                     SETTINGS_READ,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
                     ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
-                    KDS_READ, KDS_UPDATE
-            )
+                    KDS_READ, KDS_UPDATE,
+                    POS_ACCESS, ADMIN_ACCESS
+            ),
+            CO_OWNER
     ),
 
     WAITER(
@@ -99,8 +104,29 @@ public enum AppRole {
                     ORDER_UPDATE,
                     ORDER_CLOSE,
                     ORDER_DISCOUNT_APPLY,
-                    ORDER_TRANSFER
+                    ORDER_TRANSFER,
+                    POS_ACCESS
             )
+    ),
+
+    // Read-only everywhere; only Owner, Co-Owner and Admin hand it out.
+    VIEWER(
+            "Viewer",
+            "Read-only access - sees POS, kitchen display and admin hub without changing anything",
+            7_500L,
+            true,
+            false,
+            EnumSet.of(
+                    RESTAURANTS_READ,
+                    MENUS_READ,
+                    USERS_READ,
+                    ROLES_READ,
+                    SETTINGS_READ,
+                    ORDER_READ,
+                    KDS_READ,
+                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS
+            ),
+            ADMIN
     ),
 
     KITCHEN(
@@ -113,7 +139,8 @@ public enum AppRole {
                     MENUS_READ,
                     ORDER_READ,
                     KDS_READ,
-                    KDS_UPDATE
+                    KDS_UPDATE,
+                    KDS_ACCESS
             )
     );
 
@@ -123,6 +150,8 @@ public enum AppRole {
     private final boolean assignable;
     private final boolean protectedRole;
     private final Set<AppPermission> permissions;
+    // The lowest role allowed to hand this role out or manage people who hold it; null means any higher-ranked role.
+    private final AppRole lowestManagingRole;
 
     AppRole(
             String displayName,
@@ -132,12 +161,25 @@ public enum AppRole {
             boolean protectedRole,
             Set<AppPermission> permissions
     ) {
+        this(displayName, description, rank, assignable, protectedRole, permissions, null);
+    }
+
+    AppRole(
+            String displayName,
+            String description,
+            long rank,
+            boolean assignable,
+            boolean protectedRole,
+            Set<AppPermission> permissions,
+            AppRole lowestManagingRole
+    ) {
         this.displayName = displayName;
         this.description = description;
         this.rank = rank;
         this.assignable = assignable;
         this.protectedRole = protectedRole;
         this.permissions = permissions;
+        this.lowestManagingRole = lowestManagingRole;
     }
 
     public String displayName() { return displayName; }
@@ -146,6 +188,7 @@ public enum AppRole {
     public boolean assignable() { return assignable; }
     public boolean protectedRole() { return protectedRole; }
     public Set<AppPermission> permissions() { return permissions; }
+    public AppRole lowestManagingRole() { return lowestManagingRole; }
 
     public static AppRole fromCode(String code) {
         for (AppRole role : values()) {

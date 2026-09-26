@@ -77,6 +77,7 @@ public class OrderWorkflowService {
         order.getLineItems().stream()
                 .filter(orderSupport::isFinanciallyActive)
                 .filter(lineItem -> lineItem.getStatus() == OrderLineItemStatus.PENDING)
+                .filter(OrderLineItem::goesToKitchen)
                 .forEach(lineItem -> lineItem.setStatus(OrderLineItemStatus.FIRED));
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         order.setFulfillmentStatus(OrderFulfillmentStatus.IN_PREPARATION);

@@ -4,6 +4,7 @@ import com.saporini.mobile_desktop.pos.tables.domain.model.BranchTableLayout
 import com.saporini.mobile_desktop.pos.tables.domain.model.FloorLayout
 import com.saporini.mobile_desktop.pos.tables.domain.model.LayoutTable
 import com.saporini.mobile_desktop.pos.tables.domain.model.LayoutTableStatus
+import com.saporini.mobile_desktop.pos.tables.domain.model.TableSection
 import kotlinx.coroutines.flow.Flow
 
 data class TableLayoutChange(
@@ -88,9 +89,55 @@ interface TableLayoutRepository {
         previousPrimaryTableIds: List<String> = emptyList()
     ): BranchTableLayout
 
+    suspend fun separateTable(
+        restaurantId: String,
+        branchId: String,
+        primaryTableId: String
+    ): BranchTableLayout
+
     suspend fun deleteTable(
         restaurantId: String,
         branchId: String,
         tableId: String
+    )
+
+    suspend fun getTableSections(
+        restaurantId: String,
+        branchId: String
+    ): List<TableSection>
+
+    suspend fun saveTableSection(
+        restaurantId: String,
+        branchId: String,
+        sectionId: String?,
+        name: String,
+        displayOrder: Int,
+        tableIds: Set<String>
+    ): TableSection
+
+    suspend fun deleteTableSection(
+        restaurantId: String,
+        branchId: String,
+        sectionId: String
+    )
+
+    suspend fun setTableSectionTables(
+        restaurantId: String,
+        branchId: String,
+        sectionId: String,
+        tableIds: Set<String>
+    )
+
+    suspend fun getFreeTableIds(
+        restaurantId: String,
+        branchId: String,
+        from: String,
+        to: String
+    ): Set<String>
+
+    suspend fun reorderTableSections(
+        restaurantId: String,
+        branchId: String,
+        sectionIds: List<String>
     )
 }

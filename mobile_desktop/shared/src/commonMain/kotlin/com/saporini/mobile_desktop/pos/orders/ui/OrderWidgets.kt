@@ -28,6 +28,8 @@ internal fun String.orderTime(): String = runCatching { Instant.parse(this).toLo
 internal val OrderStatus.showsFulfillmentProgress get() = this != OrderStatus.CANCELLED && this != OrderStatus.VOIDED
 internal val Order.editable get() = status == OrderStatus.OPEN || status == OrderStatus.DRAFT
 internal val OrderLineItem.active get() = status != OrderLineItemStatus.CANCELLED && status != OrderLineItemStatus.VOIDED
+// Not sent yet and meant for the kitchen; counter items (e.g. a cola) never count as waiting for the kitchen.
+internal val OrderLineItem.awaitingKitchen get() = status == OrderLineItemStatus.PENDING && sendToKitchen
 
 @Composable internal fun OrderText(text: String, size: Int = 14, bold: Boolean = false, color: Color = OrderInk, modifier: Modifier = Modifier) {
     Text(text, modifier, maxLines = 4, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, fontFamily = Inter(), fontSize = size.sp, fontWeight = if(bold) FontWeight.SemiBold else FontWeight.Normal, color = color)

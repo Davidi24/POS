@@ -6,6 +6,13 @@ import org.springframework.stereotype.Component;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.tables.RestaurantTableNotFoundException;
 import pos.pos.exception.tables.TableCategoryNotFoundException;
+import pos.pos.order.entity.Order;
+import pos.pos.order.enums.OrderStatus;
+import pos.pos.order.repository.OrderRepository;
+import pos.pos.reservation.entity.Reservation;
+import pos.pos.reservation.entity.ReservationTableAssignment;
+import pos.pos.reservation.enums.ReservationStatus;
+import pos.pos.reservation.repository.ReservationTableAssignmentRepository;
 import pos.pos.tables.dto.FloorRenameRequest;
 import pos.pos.tables.dto.FloorSummaryResponse;
 import pos.pos.tables.dto.TableAvailabilityResponse;
@@ -20,8 +27,12 @@ import pos.pos.tables.repository.RestaurantTableRepository;
 import pos.pos.tables.repository.TableCategoryRepository;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.function.Function;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,6 +50,8 @@ public class RestaurantTableSupport {
     private final RestaurantTableRepository restaurantTableRepository;
     private final TableCategoryRepository tableCategoryRepository;
     private final RestaurantTableMapper restaurantTableMapper;
+    private final ReservationTableAssignmentRepository reservationTableAssignmentRepository;
+    private final OrderRepository orderRepository;
 
     // Loads all tables for a specific branch.
     // Also builds:
@@ -107,12 +120,14 @@ public class RestaurantTableSupport {
     }
 
     public TableLayoutResponse buildLayoutResponse(BranchTableSnapshot snapshot) {
+        Map<UUID, ReservationTableAssignment> nextReservationsByTableId = loadNextReservationAssignments(snapshot.tables());
+        Map<UUID, Order> currentOrdersByTableId = loadCurrentOrders(snapshot.tables());
         return TableLayoutResponse.builder()
                 .restaurantId(snapshot.restaurantId())
                 .branchId(snapshot.branchId())
                 .floors(summarizeFloors(snapshot.tables()))
                 .tables(snapshot.tables().stream()
-                        .map(table -> toLayoutResponseItem(table, snapshot.childrenByParentId()))
+                        .map(table -> toLayoutResponseItem(table, snapshot.childrenByParentId(), nextReservationsByTableId, currentOrdersByTableId))
                         .toList())
                 .build();
     }
@@ -184,12 +199,89 @@ public class RestaurantTableSupport {
 
     // same as toResponse function just return different DTO( simpler one)
     public TableLayoutItemResponse toLayoutResponseItem(RestaurantTable table, Map<UUID, List<RestaurantTable>> childrenByParentId) {
+        return toLayoutResponseItem(table, childrenByParentId, Map.of(), Map.of());
+    }
+
+    public TableLayoutItemResponse toLayoutResponseItem(
+            RestaurantTable table,
+            Map<UUID, List<RestaurantTable>> childrenByParentId,
+            Map<UUID, ReservationTableAssignment> nextReservationsByTableId,
+            Map<UUID, Order> currentOrdersByTableId
+    ) {
         List<RestaurantTable> mergedChildren = mergedChildren(table, childrenByParentId);
-        return restaurantTableMapper.toLayoutItemResponse(
+        TableLayoutItemResponse response = restaurantTableMapper.toLayoutItemResponse(
                 table,
                 mergedChildren.stream().map(RestaurantTable::getId).toList(),
                 effectiveCapacity(table, mergedChildren)
         );
+        ReservationTableAssignment nextReservationAssignment = nextReservationsByTableId.get(table.getId());
+        if (nextReservationAssignment != null && nextReservationAssignment.getReservation() != null) {
+            Reservation reservation = nextReservationAssignment.getReservation();
+            response.setNextReservationStart(reservation.getReservationStart());
+            response.setNextReservationEnd(reservation.getReservationEnd());
+            response.setNextReservationCode(reservation.getReservationCode());
+            response.setNextReservationName(reservation.getContactName());
+        }
+        Order currentOrder = currentOrdersByTableId.get(table.getId());
+        if (currentOrder != null) {
+            response.setCurrentOrderId(currentOrder.getId());
+            response.setCurrentOrderNumber(currentOrder.getOrderNumber());
+            response.setCurrentOrderStatus(currentOrder.getStatus());
+            response.setCurrentOrderFulfillmentStatus(currentOrder.getFulfillmentStatus());
+        }
+        return response;
+    }
+
+    private Map<UUID, Order> loadCurrentOrders(List<RestaurantTable> tables) {
+        List<UUID> tableIds = tables.stream()
+                .map(RestaurantTable::getId)
+                .toList();
+        if (tableIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return orderRepository.findAllByRestaurantTable_IdInAndStatusInOrderByOpenedAtAsc(
+                        tableIds,
+                        List.of(OrderStatus.DRAFT, OrderStatus.OPEN)
+                )
+                .stream()
+                .filter(order -> order.getRestaurantTable() != null)
+                .collect(Collectors.toMap(
+                        order -> order.getRestaurantTable().getId(),
+                        Function.identity(),
+                        (existing, replacement) -> replacement,
+                        LinkedHashMap::new
+                ));
+    }
+
+    private Map<UUID, ReservationTableAssignment> loadNextReservationAssignments(List<RestaurantTable> tables) {
+        List<UUID> tableIds = tables.stream()
+                .map(RestaurantTable::getId)
+                .toList();
+        if (tableIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return reservationTableAssignmentRepository.findUpcomingByTableIds(
+                        tableIds,
+                        EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN),
+                        OffsetDateTime.now(ZoneOffset.UTC)
+                )
+                .stream()
+                .collect(Collectors.toMap(
+                        assignment -> assignment.getRestaurantTable().getId(),
+                        Function.identity(),
+                        (existing, ignored) -> existing,
+                        LinkedHashMap::new
+                ));
+    }
+
+    // Holds these tables until the transaction ends, so two bookings can't take the same table at once.
+    public void lockTablesForBooking(UUID branchId, Collection<UUID> tableIds) {
+        if (tableIds.isEmpty()) {
+            return;
+        }
+        restaurantTableRepository.lockTablesForBooking(branchId, new LinkedHashSet<>(tableIds));
     }
 
     public Map<UUID, RestaurantTable> loadTablesForUpdate(UUID branchId, Collection<UUID> tableIds) {

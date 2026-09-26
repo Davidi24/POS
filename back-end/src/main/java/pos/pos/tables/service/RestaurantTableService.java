@@ -5,6 +5,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.order.entity.Order;
+import pos.pos.order.enums.OrderEventType;
+import pos.pos.order.enums.OrderPaymentStatus;
+import pos.pos.order.enums.OrderStatus;
+import pos.pos.order.repository.OrderRepository;
+import pos.pos.order.service.OrderSupport;
 import pos.pos.reservation.repository.ReservationTableAssignmentRepository;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.service.RestaurantScopeService;
@@ -29,6 +35,8 @@ import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -42,6 +50,8 @@ public class RestaurantTableService {
     private final RestaurantTableSupport restaurantTableSupport;
     private final RestaurantTableLayoutService restaurantTableLayoutService;
     private final RestaurantTableAvailabilityService restaurantTableAvailabilityService;
+    private final OrderRepository orderRepository;
+    private final OrderSupport orderSupport;
 
     /**
      * First, we check if the logged-in user is allowed to access this restaurant branch.
@@ -327,9 +337,13 @@ public class RestaurantTableService {
             TableMergeRequest request
     ) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
-        RestaurantTable primaryTable = restaurantTableSupport.requireTable(branchId, tableId);
+        RestaurantTable primaryTable = requireTableForUpdate(branchId, tableId);
         if (primaryTable.getMergedInto() != null) {
-            throw new AuthException("Cannot merge tables into a table that is already merged into another table", HttpStatus.BAD_REQUEST);
+            throw new AuthException(
+                    primaryTable.getTableNumber() + " is already merged with "
+                            + primaryTable.getMergedInto().getTableNumber() + ". Edit the existing table group instead.",
+                    HttpStatus.CONFLICT
+            );
         }
 
         Set<UUID> uniqueIds = new LinkedHashSet<>(request.getTableIds());
@@ -341,19 +355,28 @@ public class RestaurantTableService {
             throw new AuthException("tableIds must not contain duplicates", HttpStatus.BAD_REQUEST);
         }
 
-        List<RestaurantTable> mergeTargets = restaurantTableRepository.findAllByBranch_IdAndIdIn(branchId, uniqueIds);
+        List<RestaurantTable> mergeTargets = restaurantTableRepository.findAllByBranchIdAndIdsForUpdate(branchId, uniqueIds);
         if (mergeTargets.size() != uniqueIds.size()) {
             throw new AuthException("tableIds must all belong to this branch", HttpStatus.BAD_REQUEST);
         }
 
-        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        validateMergeParticipant(primaryTable);
         for (RestaurantTable mergeTarget : mergeTargets) {
             validateMergeTarget(mergeTarget);
+            validateMergeParticipant(mergeTarget);
+            if (!Objects.equals(primaryTable.getFloor(), mergeTarget.getFloor())) {
+                throw new AuthException("Tables on different floors cannot be merged.", HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        for (RestaurantTable mergeTarget : mergeTargets) {
             mergeTarget.setMergedInto(primaryTable);
             mergeTarget.setUpdatedBy(actorId);
         }
 
         restaurantTableSupport.saveTables(mergeTargets);
+        moveOpenOrdersToMergedPrimary(primaryTable, mergeTargets, actorId);
         return restaurantTableSupport.toResponse(primaryTable, restaurantTableSupport.loadChildMap(tableId));
     }
 
@@ -388,7 +411,7 @@ public class RestaurantTableService {
             Integer guestCount
     ) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
-        RestaurantTable table = restaurantTableSupport.requireTable(branchId, tableId);
+        RestaurantTable table = requireTableForUpdate(branchId, tableId);
         if (status == TableStatus.OCCUPIED) {
             if (guestCount == null || guestCount <= 0) {
                 throw new AuthException(
@@ -412,21 +435,86 @@ public class RestaurantTableService {
         );
     }
 
+    private RestaurantTable requireTableForUpdate(UUID branchId, UUID tableId) {
+        return restaurantTableRepository.findByIdAndBranchIdForUpdate(tableId, branchId)
+                .orElseThrow(pos.pos.exception.tables.RestaurantTableNotFoundException::new);
+    }
+
+    private void moveOpenOrdersToMergedPrimary(
+            RestaurantTable primaryTable,
+            List<RestaurantTable> mergeTargets,
+            UUID actorId
+    ) {
+        List<UUID> childTableIds = mergeTargets.stream()
+                .map(RestaurantTable::getId)
+                .toList();
+        if (childTableIds.isEmpty()) {
+            return;
+        }
+
+        List<Order> childTableOrders = orderRepository.findAllByRestaurantTable_IdInAndStatusInOrderByOpenedAtAsc(
+                childTableIds,
+                List.of(OrderStatus.DRAFT, OrderStatus.OPEN)
+        );
+        for (Order order : childTableOrders) {
+            if (order.getRestaurantTable() != null && Objects.equals(order.getRestaurantTable().getId(), primaryTable.getId())) {
+                continue;
+            }
+            order.setRestaurantTable(primaryTable);
+            order.setUpdatedBy(actorId);
+            orderSupport.addEvent(
+                    order,
+                    OrderEventType.TABLE_CHANGED,
+                    "Table merged into " + primaryTable.getTableNumber(),
+                    actorId
+            );
+            orderSupport.saveOrder(order);
+        }
+    }
+
     private void validateMergeTarget(RestaurantTable mergeTarget) {
         if (!mergeTarget.isActive()) {
             throw new AuthException("Cannot merge an inactive table", HttpStatus.BAD_REQUEST);
         }
 
         if (mergeTarget.getMergedInto() != null) {
-            throw new AuthException("Cannot merge a table that is already merged into another table", HttpStatus.BAD_REQUEST);
+            throw new AuthException(
+                    mergeTarget.getTableNumber() + " is already merged with "
+                            + mergeTarget.getMergedInto().getTableNumber() + ". Edit the existing table group instead.",
+                    HttpStatus.CONFLICT
+            );
         }
 
         if (restaurantTableRepository.existsByMergedInto_Id(mergeTarget.getId())) {
-            throw new AuthException("Cannot merge a table that already has merged child tables", HttpStatus.BAD_REQUEST);
+            throw new AuthException(
+                    mergeTarget.getTableNumber() + " already has merged tables. Edit the existing table group instead.",
+                    HttpStatus.CONFLICT
+            );
+        }
+    }
+
+    /**
+     * Rules that apply uniformly to every table in a merge attempt (the primary
+     * and every target): blocked/under-maintenance tables, tables waiting to be
+     * cleared, and tables with a payment already underway can't be merged.
+     */
+    private void validateMergeParticipant(RestaurantTable table) {
+        if (table.getStatus() == TableStatus.MAINTENANCE || table.getStatus() == TableStatus.OUT_OF_SERVICE) {
+            throw new AuthException(table.getTableNumber() + " is unavailable and cannot be merged.", HttpStatus.BAD_REQUEST);
         }
 
-        if (mergeTarget.getStatus() == TableStatus.MAINTENANCE || mergeTarget.getStatus() == TableStatus.OUT_OF_SERVICE) {
-            throw new AuthException("Cannot merge a table that is blocked or under maintenance", HttpStatus.BAD_REQUEST);
+        if (table.getStatus() == TableStatus.DIRTY) {
+            throw new AuthException(table.getTableNumber() + " is waiting to be cleared before it can be merged.", HttpStatus.BAD_REQUEST);
+        }
+
+        Optional<Order> openOrder = orderRepository.findTopByRestaurantTable_IdAndStatusInOrderByOpenedAtDesc(
+                table.getId(), List.of(OrderStatus.OPEN)
+        );
+        if (openOrder.isPresent() && openOrder.get().getPaymentStatus() == OrderPaymentStatus.PARTIALLY_PAID) {
+            throw new AuthException(
+                    "Payment has started for " + table.getTableNumber() + ". Finish or cancel payment before merging.",
+                    HttpStatus.CONFLICT
+            );
         }
     }
 

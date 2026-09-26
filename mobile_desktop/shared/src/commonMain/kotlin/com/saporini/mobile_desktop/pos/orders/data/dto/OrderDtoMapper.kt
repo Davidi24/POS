@@ -197,6 +197,7 @@ internal fun OrderLineItemResponseDto.toDomain(): OrderLineItem = OrderLineItem(
     taxTotal = taxTotal,
     lineTotal = lineTotal,
     status = status,
+    sendToKitchen = sendToKitchen,
     notes = notes,
     options = options?.map { it.toDomain() },
     createdAt = createdAt,

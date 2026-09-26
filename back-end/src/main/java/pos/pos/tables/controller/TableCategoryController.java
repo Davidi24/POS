@@ -22,6 +22,7 @@ import pos.pos.tables.dto.ReorderTableCategoriesRequest;
 import pos.pos.tables.dto.TableCategoryRequest;
 import pos.pos.tables.dto.TableCategoryResponse;
 import pos.pos.tables.dto.UpdateTableCategoryStatusRequest;
+import pos.pos.tables.dto.UpdateTableCategoryTablesRequest;
 import pos.pos.tables.service.TableCategoryService;
 
 import java.util.List;
@@ -108,6 +109,19 @@ public class TableCategoryController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(tableCategoryService.reorderTableCategories(authentication, restaurantId, branchId, request));
+    }
+
+    @PutMapping("/{categoryId}/tables")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Replace the tables assigned to a branch table category")
+    public ResponseEntity<TableCategoryResponse> replaceTableCategoryTables(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            @PathVariable UUID categoryId,
+            @Valid @RequestBody UpdateTableCategoryTablesRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(tableCategoryService.replaceTableCategoryTables(authentication, restaurantId, branchId, categoryId, request));
     }
 
     @DeleteMapping("/{categoryId}")

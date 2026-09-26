@@ -1,5 +1,7 @@
 package com.saporini.mobile_desktop.pos.ui
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -48,8 +50,35 @@ object PosScreen : Screen {
         var selected by remember { mutableStateOf(PosSection.TABLES) }
         var showAddItemModal by remember { mutableStateOf(false) }
         var showPaymentScreen by remember { mutableStateOf(false) }
+        var focusTableNumber by remember { mutableStateOf<String?>(null) }
+        var focusReservationId by remember { mutableStateOf<String?>(null) }
+        val notificationCenter = org.koin.compose.getKoin().getOrNull<com.saporini.mobile_desktop.notifications.NotificationCenter>()
+        // A clicked notification that points at a reservation opens it in Reservations.
+        val openRequest = notificationCenter?.openRequest?.collectAsState()?.value
+        LaunchedEffect(openRequest) {
+            val request = openRequest ?: return@LaunchedEffect
+            if (request.referenceType == "RESERVATION") {
+                selected = PosSection.RESERVATIONS
+                showPaymentScreen = false
+                focusReservationId = request.referenceId
+            }
+            notificationCenter.openHandled()
+        }
+        // New notifications that arrive while the app is open pop up briefly in the bottom-left corner.
+        var arrivals by remember { mutableStateOf<List<com.saporini.mobile_desktop.notifications.StaffNotification>>(emptyList()) }
+        LaunchedEffect(notificationCenter) {
+            notificationCenter?.arrivals?.collect { notification ->
+                arrivals = (arrivals.filterNot { it.id == notification.id } + notification).takeLast(3)
+            }
+        }
         val sessionManager = koinInject<SessionManager>()
         val currentUser by sessionManager.currentUser.collectAsState()
+        val navigator = cafe.adriel.voyager.navigator.LocalNavigator.current
+        // Users who can open more than one workspace get a way back to the picker.
+        val backToWorkspaces: (() -> Unit)? =
+            if ((currentUser?.let { com.saporini.mobile_desktop.core.session.accessibleWorkspaces(it) }?.size ?: 0) > 1) {
+                { if (navigator?.pop() != true) navigator?.replaceAll(com.saporini.mobile_desktop.workspace.ui.WorkspacePickerScreen) }
+            } else null
         val canEditTableLayout =
             "SETTINGS_UPDATE" in currentUser?.permissions.orEmpty() ||
                 "MANAGER" in currentUser?.roles.orEmpty()
@@ -66,6 +95,7 @@ object PosScreen : Screen {
                             showPaymentScreen = false
                         },
                         onLogout = { sessionManager.signOut() },
+                        onBackToWorkspaces = backToWorkspaces,
                         logo = {
                             Image(
                                 painter = painterResource(Res.drawable.pos_simple_logo),
@@ -86,7 +116,10 @@ object PosScreen : Screen {
                         PosSection.TABLES -> TablesScreen(
                             modifier = Modifier.weight(1f),
                             canEditLayout = canEditTableLayout,
-                            onAddItemsRequested = { showAddItemModal = true }
+                            onAddItemsRequested = { showAddItemModal = true },
+                            onGoToOrders = { selected = PosSection.ORDERS },
+                            focusTableNumber = focusTableNumber,
+                            onFocusHandled = { focusTableNumber = null }
                         )
                         PosSection.ORDERS -> OrdersScreen(
                             modifier = Modifier.weight(1f),
@@ -95,7 +128,15 @@ object PosScreen : Screen {
                                 showPaymentScreen = true
                             }
                         )
-                        PosSection.RESERVATIONS -> ReservationsScreen(Modifier.weight(1f))
+                        PosSection.RESERVATIONS -> ReservationsScreen(
+                            modifier = Modifier.weight(1f),
+                            focusReservationId = focusReservationId,
+                            onFocusHandled = { focusReservationId = null },
+                            onGoToTable = { tableNumber ->
+                                focusTableNumber = tableNumber
+                                selected = PosSection.TABLES
+                            }
+                        )
                         PosSection.MENU -> MenuScreen(Modifier.weight(1f))
                         PosSection.KITCHEN_STATUS -> KitchenStatusScreen(Modifier.weight(1f))
                         PosSection.MY_SALES -> MySalesScreen(Modifier.weight(1f))
@@ -117,9 +158,18 @@ object PosScreen : Screen {
                             selected = it
                             showPaymentScreen = false
                         },
+                        onBackToWorkspaces = backToWorkspaces,
                         onLogout = { sessionManager.signOut() }
                     )
                 }
+            }
+
+            if (arrivals.isNotEmpty()) {
+                com.saporini.mobile_desktop.notifications.NotificationArrivalQueue(
+                    notifications = arrivals,
+                    onDismiss = { id -> arrivals = arrivals.filterNot { it.id == id } },
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 28.dp, bottom = if (isPhoneLayout) 96.dp else 28.dp)
+                )
             }
 
             if (showAddItemModal) {

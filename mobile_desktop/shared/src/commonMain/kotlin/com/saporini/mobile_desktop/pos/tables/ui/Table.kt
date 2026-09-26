@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -95,43 +96,25 @@ fun Table(
     }
 }
 
-private fun tableColors(state: TableVisualState, servedProgress: Float = 0f): TableColors =
-    when (state) {
-        TableVisualState.Free -> TableColors(
-            surface = Color(0xFFAEBE95),
-            border = Color(0xFFAEBE95),
-            labelBackground = Color(0xFFF3F6EC),
-            content = Color(0xFFAEBE95)
-        )
+// Table status colors from the Saporine Italiano palette ("Table & Order Colors"); Free keeps the darker brand green.
+internal fun tableStatusColor(state: TableVisualState): Color = when (state) {
+    TableVisualState.Free -> Color(0xFF147A25)
+    // Same burnt orange as the Orders "in preparation" badge.
+    TableVisualState.Occupied -> Color(0xFFD15F00)
+    TableVisualState.Reserved -> Color(0xFF8B5CF6)
+    TableVisualState.BillPending -> Color(0xFF3B82F6)
+    TableVisualState.Unavailable -> Color(0xFF6B7280)
+}
 
-        TableVisualState.Occupied -> TableColors(
-            surface = Color(0xFFB85E3B),
-            border = Color(0xFFB85E3B),
-            labelBackground = Color(0xFFFFF3EE),
-            content = Color(0xFFB85E3B)
-        )
-
-        TableVisualState.Reserved -> TableColors(
-            surface = Color(0xFFC47A18),
-            border = Color(0xFFC47A18),
-            labelBackground = Color(0xFFFFF7E8),
-            content = Color(0xFFC47A18)
-        )
-
-        TableVisualState.BillPending -> TableColors(
-            surface = Color(0xFF2F6FB1),
-            border = Color(0xFF2F6FB1),
-            labelBackground = Color(0xFFEEF6FF),
-            content = Color(0xFF2F6FB1)
-        )
-
-        TableVisualState.Unavailable -> TableColors(
-            surface = Color(0xFF777777),
-            border = Color(0xFF777777),
-            labelBackground = Color(0xFFF2F2F2),
-            content = Color(0xFF4A4A4A)
-        )
-    }
+private fun tableColors(state: TableVisualState, servedProgress: Float = 0f): TableColors {
+    val color = tableStatusColor(state)
+    return TableColors(
+        surface = color,
+        border = color,
+        labelBackground = color.copy(alpha = .14f).compositeOver(Color.White),
+        content = color
+    )
+}
 
 @Composable
 private fun SquareTable(

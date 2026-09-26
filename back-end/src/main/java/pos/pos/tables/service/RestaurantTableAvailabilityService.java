@@ -55,7 +55,7 @@ public class RestaurantTableAvailabilityService {
         Map<UUID, List<UUID>> overlappingReservationIdsByTableId = loadOverlappingReservationIds(branchId, window);
 
         return snapshot.tables().stream()
-                .map(table -> toAvailabilityResponse(table, snapshot.childrenByParentId(), overlappingReservationIdsByTableId, partySize))
+                .map(table -> toAvailabilityResponse(table, snapshot.childrenByParentId(), overlappingReservationIdsByTableId, partySize, window.from()))
                 .toList();
     }
 
@@ -92,7 +92,7 @@ public class RestaurantTableAvailabilityService {
 
         AvailabilityWindow window = resolveAvailabilityWindow(from, to);
         Map<UUID, List<UUID>> overlappingReservationIdsByTableId = loadOverlappingReservationIds(branchId, window);
-        return toAvailabilityResponse(table, snapshot.childrenByParentId(), overlappingReservationIdsByTableId, partySize);
+        return toAvailabilityResponse(table, snapshot.childrenByParentId(), overlappingReservationIdsByTableId, partySize, window.from());
     }
 
     private AvailabilityWindow resolveAvailabilityWindow(OffsetDateTime from, OffsetDateTime to) {
@@ -135,15 +135,21 @@ public class RestaurantTableAvailabilityService {
             RestaurantTable table,
             Map<UUID, List<RestaurantTable>> childrenByParentId,
             Map<UUID, List<UUID>> overlappingReservationIdsByTableId,
-            Integer partySize
+            Integer partySize,
+            OffsetDateTime windowStart
     ) {
-        List<RestaurantTable> mergedChildren = restaurantTableSupport.mergedChildren(table, childrenByParentId);
+        boolean liveStateApplies = TableStatusWindowPolicy.currentStatusApplies(windowStart);
+        // Merges are today's arrangement; for a later window every table stands on its own.
+        List<RestaurantTable> mergedChildren = liveStateApplies
+                ? restaurantTableSupport.mergedChildren(table, childrenByParentId)
+                : List.of();
         int effectiveCapacity = restaurantTableSupport.effectiveCapacity(table, mergedChildren);
         List<UUID> overlappingReservationIds = collectOverlappingReservationIds(table, mergedChildren, overlappingReservationIdsByTableId);
         boolean operationallyAvailable = table.isActive()
                 && table.getMergedInto() == null
                 && table.getStatus() == TableStatus.AVAILABLE;
-        boolean availableForRequestedWindow = operationallyAvailable
+        boolean availableForRequestedWindow = table.isActive()
+                && (!liveStateApplies || (table.getMergedInto() == null && table.getStatus() == TableStatus.AVAILABLE))
                 && (partySize == null || effectiveCapacity >= partySize)
                 && overlappingReservationIds.isEmpty();
 

@@ -13,9 +13,13 @@ import pos.pos.exception.auth.AuthException;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.security.principal.AuthenticatedUser;
+import pos.pos.security.rbac.AppRole;
+import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.settings.dto.SettingsResponse;
 import pos.pos.settings.dto.UpdateSettingsBillingRequest;
 import pos.pos.settings.dto.UpdateSettingsDefaultBranchRequest;
+import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
+import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.entity.Settings;
 import pos.pos.settings.mapper.SettingsMapper;
 import pos.pos.settings.service.SettingsAuditService;
@@ -50,6 +54,9 @@ class SettingsServiceTest {
 
     @Mock
     private SettingsAuditService settingsAuditService;
+
+    @Mock
+    private RoleHierarchyService roleHierarchyService;
 
     @InjectMocks
     private SettingsService settingsService;
@@ -220,6 +227,71 @@ class SettingsServiceTest {
         assertThat(settings.getUpdatedBy()).isEqualTo(ACTOR_ID);
         verify(settingsDomainSupport).resolveBranch(RESTAURANT_ID, branch.getId());
         verify(settingsAuditService).log(eq(restaurant), eq(branch), eq("SETTINGS"), isNull(), eq("UPDATE_DEFAULT_BRANCH"), anyString(), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("Should refuse Admins changing the staff permissions switch")
+    void shouldRefuseAdminsChangingStaffPermissions() {
+        Authentication authentication = authentication();
+        UpdateSettingsStaffPermissionsRequest request = UpdateSettingsStaffPermissionsRequest.builder()
+                .adminsCanManageManagers(true)
+                .build();
+
+        when(roleHierarchyService.actorRank(authentication)).thenReturn(AppRole.ADMIN.rank());
+
+        assertThatThrownBy(() -> settingsService.updateStaffPermissions(authentication, RESTAURANT_ID, request))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Only the Owner or a Co-Owner can change staff permissions");
+
+        verify(settingsDomainSupport, never()).saveSettings(any(Settings.class));
+    }
+
+    @Test
+    @DisplayName("Should let a Co-Owner allow Admins to manage Managers")
+    void shouldLetCoOwnerAllowAdminsToManageManagers() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+        UpdateSettingsStaffPermissionsRequest request = UpdateSettingsStaffPermissionsRequest.builder()
+                .adminsCanManageManagers(true)
+                .build();
+
+        when(roleHierarchyService.actorRank(authentication)).thenReturn(AppRole.CO_OWNER.rank());
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+        when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+
+        settingsService.updateStaffPermissions(authentication, RESTAURANT_ID, request);
+
+        assertThat(settings.isAdminsCanManageManagers()).isTrue();
+        verify(settingsAuditService).log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_STAFF_PERMISSIONS"), anyString(), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("Should turn pre-orders on with the chosen kitchen lead time")
+    void shouldUpdatePreOrderSettings() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+        when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+
+        settingsService.updatePreOrders(authentication, RESTAURANT_ID, UpdateSettingsPreOrdersRequest.builder()
+                .preOrdersEnabled(true)
+                .preOrderLeadMinutes(25)
+                .build());
+
+        assertThat(settings.isPreOrdersEnabled()).isTrue();
+        assertThat(settings.getPreOrderLeadMinutes()).isEqualTo(25);
+        verify(settingsAuditService).log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_PRE_ORDERS"), anyString(), eq(ACTOR_ID));
     }
 
     private Authentication authentication() {

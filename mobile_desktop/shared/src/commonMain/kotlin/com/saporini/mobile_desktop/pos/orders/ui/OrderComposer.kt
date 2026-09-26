@@ -95,7 +95,7 @@ import kotlinx.coroutines.launch
             if(phone) OrderButton("View order · ${order.lineItems.orEmpty().filter { it.active }.sumOf { it.quantity }} items · ${order.total.money(order.currency)}", modifier = Modifier.fillMaxWidth()) { showCart = true }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onBack, Modifier.weight(1f), enabled = !state.isSaving) { Text("Done · saved") }
-                OrderButton("Send to kitchen", !state.isSaving && !state.needsReconciliation && order.lineItems.orEmpty().any { it.status == OrderLineItemStatus.PENDING }, Modifier.weight(1f)) { confirmSend = true }
+                OrderButton("Send to kitchen", !state.isSaving && !state.needsReconciliation && order.lineItems.orEmpty().any { it.awaitingKitchen }, Modifier.weight(1f)) { confirmSend = true }
             }
         }
     }

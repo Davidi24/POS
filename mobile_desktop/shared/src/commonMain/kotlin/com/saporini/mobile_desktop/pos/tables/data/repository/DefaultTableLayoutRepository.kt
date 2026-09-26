@@ -1,5 +1,9 @@
 package com.saporini.mobile_desktop.pos.tables.data.repository
 
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.async
+import com.saporini.mobile_desktop.pos.tables.data.dto.TableCategoryRequestDto
+import com.saporini.mobile_desktop.pos.tables.domain.model.TableSection
 import com.saporini.mobile_desktop.core.network.ApiConfig
 import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.pos.tables.data.api.TableLayoutApi
@@ -384,6 +388,119 @@ class DefaultTableLayoutRepository(
         }
         return saved
     }
+
+    override suspend fun separateTable(
+        restaurantId: String,
+        branchId: String,
+        primaryTableId: String
+    ): BranchTableLayout {
+        api.unmergeTables(
+            restaurantId = restaurantId,
+            branchId = branchId,
+            primaryTableId = primaryTableId
+        )
+
+        val saved = api.getTableLayout(
+            restaurantId = restaurantId,
+            branchId = branchId
+        ).toDomain()
+        cacheMutex.withLock {
+            tableLayoutsByBranch[
+                BranchKey(restaurantId, branchId)
+            ] = saved
+        }
+        return saved
+    }
+
+    override suspend fun getTableSections(
+        restaurantId: String,
+        branchId: String
+    ): List<TableSection> = coroutineScope {
+        val categories = async { api.getTableCategories(restaurantId, branchId) }
+        val tables = async { api.getTables(restaurantId, branchId) }
+        val tableIdsByCategory = tables.await()
+            .filter { it.categoryId != null }
+            .groupBy({ it.categoryId!! }, { it.id })
+        categories.await().map { category ->
+            TableSection(
+                id = category.id,
+                code = category.code,
+                name = category.name,
+                displayOrder = category.displayOrder,
+                tableIds = tableIdsByCategory[category.id].orEmpty().toSet()
+            )
+        }
+    }
+
+    override suspend fun saveTableSection(
+        restaurantId: String,
+        branchId: String,
+        sectionId: String?,
+        name: String,
+        displayOrder: Int,
+        tableIds: Set<String>
+    ): TableSection {
+        val request = TableCategoryRequestDto(
+            code = name.toSectionCode(),
+            name = name,
+            defaultCapacity = 2,
+            displayOrder = displayOrder,
+            active = true
+        )
+        val saved = if (sectionId == null) {
+            api.createTableCategory(restaurantId, branchId, request)
+        } else {
+            api.updateTableCategory(restaurantId, branchId, sectionId, request)
+        }
+        api.replaceTableCategoryTables(restaurantId, branchId, saved.id, tableIds.toList())
+        return TableSection(
+            id = saved.id,
+            code = saved.code,
+            name = saved.name,
+            displayOrder = saved.displayOrder,
+            tableIds = tableIds
+        )
+    }
+
+    override suspend fun deleteTableSection(
+        restaurantId: String,
+        branchId: String,
+        sectionId: String
+    ) {
+        // The backend refuses to delete a category that still has tables.
+        api.replaceTableCategoryTables(restaurantId, branchId, sectionId, emptyList())
+        api.deleteTableCategory(restaurantId, branchId, sectionId)
+    }
+
+    override suspend fun setTableSectionTables(
+        restaurantId: String,
+        branchId: String,
+        sectionId: String,
+        tableIds: Set<String>
+    ) {
+        api.replaceTableCategoryTables(restaurantId, branchId, sectionId, tableIds.toList())
+    }
+
+    override suspend fun getFreeTableIds(
+        restaurantId: String,
+        branchId: String,
+        from: String,
+        to: String
+    ): Set<String> = api.getAvailableTables(restaurantId, branchId, from, to)
+        .filter { it.availableForRequestedWindow != false }
+        .map { it.tableId }
+        .toSet()
+
+    override suspend fun reorderTableSections(
+        restaurantId: String,
+        branchId: String,
+        sectionIds: List<String>
+    ) {
+        api.reorderTableCategories(restaurantId, branchId, sectionIds)
+    }
+
+    private fun String.toSectionCode(): String =
+        trim().uppercase().replace(Regex("[^A-Z0-9]+"), "_").trim('_').take(50).ifEmpty { "SECTION" }
 
     private fun replaceCachedFloor(
         key: BranchKey,

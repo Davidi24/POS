@@ -11,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.order.repository.OrderRepository;
+import pos.pos.order.service.OrderSupport;
 import pos.pos.reservation.repository.ReservationTableAssignmentRepository;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
@@ -76,6 +78,12 @@ class RestaurantTableServiceTest {
     @Mock
     private RestaurantTableAvailabilityService restaurantTableAvailabilityService;
 
+    @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
+    private OrderSupport orderSupport;
+
     @Spy
     private RestaurantTableMapper restaurantTableMapper;
 
@@ -86,7 +94,9 @@ class RestaurantTableServiceTest {
         RestaurantTableSupport restaurantTableSupport = new RestaurantTableSupport(
                 restaurantTableRepository,
                 tableCategoryRepository,
-                restaurantTableMapper
+                restaurantTableMapper,
+                reservationTableAssignmentRepository,
+                orderRepository
         );
         restaurantTableService = new RestaurantTableService(
                 restaurantScopeService,
@@ -94,7 +104,9 @@ class RestaurantTableServiceTest {
                 reservationTableAssignmentRepository,
                 restaurantTableSupport,
                 restaurantTableLayoutService,
-                restaurantTableAvailabilityService
+                restaurantTableAvailabilityService,
+                orderRepository,
+                orderSupport
         );
     }
 

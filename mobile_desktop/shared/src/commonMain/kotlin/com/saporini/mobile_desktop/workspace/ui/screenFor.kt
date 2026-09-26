@@ -12,6 +12,7 @@ fun screenFor(workspace: Workspace): Screen = when (workspace) {
     Workspace.POS -> PosScreen
     Workspace.KDS -> KdsScreen
     Workspace.ADMIN -> AdminScreen
+    Workspace.RESTAURANTS -> RestaurantsWorkspaceScreen
 }
 
 fun resolveStartScreen(user: CurrentUserResponse): Screen {

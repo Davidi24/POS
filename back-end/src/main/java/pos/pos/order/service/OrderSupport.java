@@ -608,7 +608,24 @@ public class OrderSupport {
         order.setTaxTotal(money(taxTotal));
         order.setServiceChargeTotal(money(serviceChargeTotal));
         order.setTotal(money(total));
+        refreshPrepaidPaymentStatus(order);
         refreshOrderFulfillment(order);
+    }
+
+    // Orders with money paid in advance are PAID while it covers the total and PARTIALLY_PAID once more is ordered.
+    // Refunded/voided states and orders without a prepayment are left alone.
+    public void refreshPrepaidPaymentStatus(Order order) {
+        BigDecimal prepaid = defaultMoney(order.getPrepaidTotal());
+        if (prepaid.signum() <= 0) {
+            return;
+        }
+        if (!EnumSet.of(OrderPaymentStatus.UNPAID, OrderPaymentStatus.PARTIALLY_PAID, OrderPaymentStatus.PAID)
+                .contains(order.getPaymentStatus())) {
+            return;
+        }
+        order.setPaymentStatus(prepaid.compareTo(defaultMoney(order.getTotal())) >= 0
+                ? OrderPaymentStatus.PAID
+                : OrderPaymentStatus.PARTIALLY_PAID);
     }
 
     public void refreshOrderFulfillment(Order order) {
@@ -624,8 +641,11 @@ public class OrderSupport {
         }
 
         boolean allFulfilled = activeLineItems.stream().allMatch(lineItem -> lineItem.getStatus() == OrderLineItemStatus.FULFILLED);
+        // Counter items (not sent to the kitchen) are ready to serve as soon as they're ordered.
         boolean allReadyOrFulfilled = activeLineItems.stream().allMatch(lineItem ->
-                lineItem.getStatus() == OrderLineItemStatus.READY || lineItem.getStatus() == OrderLineItemStatus.FULFILLED
+                lineItem.getStatus() == OrderLineItemStatus.READY
+                        || lineItem.getStatus() == OrderLineItemStatus.FULFILLED
+                        || (lineItem.getStatus() == OrderLineItemStatus.PENDING && !lineItem.goesToKitchen())
         );
         boolean anyFulfilled = activeLineItems.stream().anyMatch(lineItem -> lineItem.getStatus() == OrderLineItemStatus.FULFILLED);
         boolean anyProgress = activeLineItems.stream().anyMatch(lineItem ->

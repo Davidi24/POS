@@ -4,6 +4,7 @@ import com.saporini.mobile_desktop.pos.orders.data.api.OrderApi
 import com.saporini.mobile_desktop.pos.orders.data.dto.*
 import com.saporini.mobile_desktop.pos.orders.data.repository.DefaultOrderRepository
 import com.saporini.mobile_desktop.pos.orders.domain.model.*
+import com.saporini.mobile_desktop.pos.orders.ui.awaitingKitchen
 import com.saporini.mobile_desktop.pos.orders.ui.showsFulfillmentProgress
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.*
@@ -19,6 +20,21 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class OrderDataContractTest {
+
+    @Test fun counterItemsNeverCountAsWaitingForTheKitchen() {
+        fun line(extra: String) = orderJson.decodeFromString<OrderLineItemResponseDto>("""
+            {"id":"line-1","menuItemId":"item-1","itemNameSnapshot":"Cola","quantity":1,"unitPriceSnapshot":2.50,
+             "priceDeltaTotal":0,"discountTotal":0,"taxTotal":0,"lineTotal":2.50,"status":"PENDING",
+             "createdAt":"2026-09-26T10:00:00Z","updatedAt":"2026-09-26T10:00:00Z"$extra}
+        """).toDomain()
+        // Servers from before counter items existed don't send the flag: every item still goes to the kitchen.
+        val legacy = line("")
+        assertTrue(legacy.sendToKitchen)
+        assertTrue(legacy.awaitingKitchen)
+        val cola = line(""","sendToKitchen":false""")
+        assertFalse(cola.sendToKitchen)
+        assertFalse(cola.awaitingKitchen)
+    }
 
     @Test fun serviceProgressDecodesForEveryOrderTypeAndLifecycle() {
         for (type in OrderType.entries) {

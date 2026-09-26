@@ -175,6 +175,10 @@ public class Order extends AbstractAuditedEntity {
     @Column(name = "total", nullable = false, precision = 19, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
+    // Paid before the order existed (e.g. an online pre-order); covers the total, or part of it if more was ordered at the table.
+    @Column(name = "prepaid_total", nullable = false, precision = 19, scale = 2)
+    private BigDecimal prepaidTotal = BigDecimal.ZERO;
+
     @Column(name = "opened_at", nullable = false, columnDefinition = "timestamptz")
     private OffsetDateTime openedAt;
 
@@ -286,6 +290,7 @@ public class Order extends AbstractAuditedEntity {
         taxRateSnapshot = defaultMoney(taxRateSnapshot);
         serviceChargeTotal = defaultMoney(serviceChargeTotal);
         total = defaultMoney(total);
+        prepaidTotal = defaultMoney(prepaidTotal);
 
         if (openedAt == null) {
             openedAt = OffsetDateTime.now(ZoneOffset.UTC);
@@ -307,6 +312,7 @@ public class Order extends AbstractAuditedEntity {
         validateMoney(taxTotal, "taxTotal");
         validateMoney(serviceChargeTotal, "serviceChargeTotal");
         validateMoney(total, "total");
+        validateMoney(prepaidTotal, "prepaidTotal");
 
         if (currency == null || currency.length() != 3) {
             throw new IllegalStateException("currency must be a 3-letter code");

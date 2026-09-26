@@ -5,6 +5,16 @@ import com.saporini.mobile_desktop.pos.tables.domain.model.LayoutTableShape
 import com.saporini.mobile_desktop.pos.tables.domain.model.LayoutTableStatus
 
 fun LayoutTable.toUiTable(): FloorPlanTable {
+    val hasCurrentOrder = currentOrderNumber != null
+    val visualState = when (status) {
+        LayoutTableStatus.AVAILABLE -> if (hasCurrentOrder) TableVisualState.Occupied else TableVisualState.Free
+        LayoutTableStatus.RESERVED -> if (hasCurrentOrder) TableVisualState.Occupied else TableVisualState.Reserved
+        LayoutTableStatus.OCCUPIED -> TableVisualState.Occupied
+        LayoutTableStatus.DIRTY,
+        LayoutTableStatus.MAINTENANCE,
+        LayoutTableStatus.OUT_OF_SERVICE -> TableVisualState.Unavailable
+    }
+
     return FloorPlanTable(
         id = id,
         x = positionX ?: 0.5f,
@@ -15,16 +25,16 @@ fun LayoutTable.toUiTable(): FloorPlanTable {
         },
         seatCount = capacity,
         label = tableNumber,
-        state = when (status) {
-            LayoutTableStatus.AVAILABLE -> TableVisualState.Free
-            LayoutTableStatus.RESERVED -> TableVisualState.Reserved
-            LayoutTableStatus.OCCUPIED -> TableVisualState.Occupied
-            LayoutTableStatus.DIRTY,
-            LayoutTableStatus.MAINTENANCE,
-            LayoutTableStatus.OUT_OF_SERVICE -> TableVisualState.Unavailable
-        },
+        state = visualState,
+        orderLabel = currentOrderNumber,
+        orderId = currentOrderId,
+        statusText = currentOrderFulfillmentStatus?.toTableStatusText(),
         guestCount = guestCount,
         seatedAt = seatedAt,
+        nextReservationStart = nextReservationStart,
+        nextReservationEnd = nextReservationEnd,
+        nextReservationCode = nextReservationCode,
+        nextReservationName = nextReservationName,
         scale = scale,
         rotationDegrees = rotationDegrees,
         floorName = floor ?: "Unassigned",
@@ -63,6 +73,21 @@ fun FloorPlanTable.toDomainTable(original: LayoutTable?): LayoutTable {
         },
         guestCount = original?.guestCount ?: guestCount,
         seatedAt = original?.seatedAt ?: seatedAt,
+        nextReservationStart = original?.nextReservationStart ?: nextReservationStart,
+        nextReservationEnd = original?.nextReservationEnd ?: nextReservationEnd,
+        nextReservationCode = original?.nextReservationCode ?: nextReservationCode,
+        nextReservationName = original?.nextReservationName ?: nextReservationName,
+        currentOrderId = original?.currentOrderId ?: orderId,
+        currentOrderNumber = original?.currentOrderNumber ?: orderLabel,
+        currentOrderStatus = original?.currentOrderStatus,
+        currentOrderFulfillmentStatus = original?.currentOrderFulfillmentStatus,
         active = active
     )
+}
+
+private fun String.toTableStatusText(): String {
+    return lowercase()
+        .split('_')
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { word -> word.replaceFirstChar { char -> char.uppercase() } }
 }

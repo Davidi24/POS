@@ -49,6 +49,7 @@ public class OrderResponse {
     private BigDecimal taxTotal;
     private BigDecimal serviceChargeTotal;
     private BigDecimal total;
+    private BigDecimal prepaidTotal;
     private Integer itemCount;
     private OffsetDateTime openedAt;
     private OffsetDateTime closedAt;

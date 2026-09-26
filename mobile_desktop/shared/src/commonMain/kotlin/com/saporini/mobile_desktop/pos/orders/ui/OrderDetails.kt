@@ -82,7 +82,7 @@ import com.saporini.mobile_desktop.pos.orders.domain.model.*
         }
         if(order.editable && state.can("ORDER_UPDATE")) {
             OrderButton("+  Add or edit items", !state.isSaving && !state.needsReconciliation, Modifier.fillMaxWidth(), onEdit)
-            if(order.lineItems.orEmpty().any { it.status == OrderLineItemStatus.PENDING }) OrderButton("Send pending items to kitchen", !state.isSaving && !state.needsReconciliation, Modifier.fillMaxWidth()) { onAction("Send to kitchen") }
+            if(order.lineItems.orEmpty().any { it.awaitingKitchen }) OrderButton("Send pending items to kitchen", !state.isSaving && !state.needsReconciliation, Modifier.fillMaxWidth()) { onAction("Send to kitchen") }
         }
         if(onFull != null) OutlinedButton(onFull, Modifier.fillMaxWidth()) { Text("View full order  →") }
     }

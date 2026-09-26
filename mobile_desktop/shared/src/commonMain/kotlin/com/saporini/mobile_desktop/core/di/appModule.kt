@@ -15,6 +15,10 @@ import com.saporini.mobile_desktop.pos.menu.data.api.MenuApi
 import com.saporini.mobile_desktop.pos.menu.data.repository.DefaultMenuRepository
 import com.saporini.mobile_desktop.pos.menu.domain.repository.MenuRepository
 import com.saporini.mobile_desktop.pos.menu.ui.MenuScreenModel
+import com.saporini.mobile_desktop.pos.reservations.data.api.ReservationApi
+import com.saporini.mobile_desktop.pos.reservations.data.repository.DefaultReservationRepository
+import com.saporini.mobile_desktop.pos.reservations.domain.repository.ReservationRepository
+import com.saporini.mobile_desktop.pos.reservations.ui.ReservationsScreenModel
 
 //to be understood
 private val appModule = module {
@@ -34,6 +38,7 @@ private val appModule = module {
     factory {
         TablesScreenModel(
             repository = get(),
+            orderRepository = get(),
             sessionManager = get()
         )
     }
@@ -51,6 +56,24 @@ private val appModule = module {
             repository = get(), sessionManager = get(), catalogRepository = get(), tableRepository = get()
         )
     }
+
+
+    single { ReservationApi(client = get()) }
+
+    single<ReservationRepository> {
+        DefaultReservationRepository(api = get())
+    }
+
+    factory {
+        ReservationsScreenModel(
+            repository = get(),
+            sessionManager = get(),
+            tableLayoutRepository = get()
+        )
+    }
+
+    single { com.saporini.mobile_desktop.notifications.NotificationApi(client = get()) }
+    single { com.saporini.mobile_desktop.notifications.NotificationCenter(api = get(), sessionManager = get()) }
 
     single { MenuApi(client = get()) }
 
@@ -71,5 +94,4 @@ fun initKoin() {
         modules(appModule)
     }
 }
-
 
