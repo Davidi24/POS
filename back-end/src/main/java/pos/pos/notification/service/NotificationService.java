@@ -80,6 +80,21 @@ public class NotificationService {
     }
 
     @Transactional
+    public int markAllRead(Authentication authentication, UUID restaurantId, UUID branchId) {
+        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        if (branchId != null) {
+            restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
+        }
+        return notificationRepository.markAllRead(
+                restaurantId,
+                actorScopeService.currentUserId(authentication),
+                branchId,
+                OffsetDateTime.now(ZoneOffset.UTC),
+                pos.pos.notification.enums.NotificationStatus.READ
+        );
+    }
+
+    @Transactional
     public NotificationResponse markRead(Authentication authentication, UUID restaurantId, UUID notificationId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
         UUID currentUserId = actorScopeService.currentUserId(authentication);

@@ -72,7 +72,7 @@ public class KdsOrderSyncService {
 
             Optional<KdsTicketItem> activeTicketItem = kdsSupport.findActiveTicketItem(lineItem.getId());
             KdsStationRouting routing = routingByMenuItemId.get(lineItem.getMenuItem().getId());
-            if (activeTicketItem.isEmpty() && routing == null) {
+            if (activeTicketItem.isEmpty() && (routing == null || !lineItem.goesToKitchen())) {
                 continue;
             }
 

@@ -17,8 +17,8 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
               and (n.recipientUser is null or n.recipientUser.id = :userId)
               and (:branchId is null or n.branch is null or n.branch.id = :branchId)
               and (:channel is null or n.channel = :channel)
-              and (:topicPrefix is null or upper(n.eventCode) like concat(:topicPrefix, '%'))
-              and (:eventCode is null or upper(n.eventCode) = :eventCode)
+              and (cast(:topicPrefix as String) is null or upper(n.eventCode) like concat(cast(:topicPrefix as String), '%'))
+              and (cast(:eventCode as String) is null or upper(n.eventCode) = cast(:eventCode as String))
               and (:personalOnly = false or n.recipientUser.id = :userId)
               and (:unreadOnly = false or (n.recipientUser.id = :userId and n.readAt is null))
             """)
@@ -35,4 +35,22 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     );
 
     java.util.Optional<Notification> findByIdAndRestaurant_Id(UUID id, UUID restaurantId);
+
+    // Marks every unread personal notification of a user as read (optionally only for one branch).
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("""
+            update Notification n
+               set n.readAt = :readAt, n.status = :readStatus
+             where n.restaurant.id = :restaurantId
+               and n.recipientUser.id = :userId
+               and n.readAt is null
+               and (:branchId is null or n.branch.id = :branchId)
+            """)
+    int markAllRead(
+            UUID restaurantId,
+            UUID userId,
+            UUID branchId,
+            java.time.OffsetDateTime readAt,
+            pos.pos.notification.enums.NotificationStatus readStatus
+    );
 }

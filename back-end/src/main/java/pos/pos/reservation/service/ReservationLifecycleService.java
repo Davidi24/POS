@@ -1,5 +1,6 @@
 package pos.pos.reservation.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -9,6 +10,7 @@ import pos.pos.reservation.dto.ReservationActionRequest;
 import pos.pos.reservation.dto.ReservationResponse;
 import pos.pos.reservation.entity.Reservation;
 import pos.pos.reservation.enums.ReservationStatus;
+import pos.pos.reservation.event.ReservationStatusChangedEvent;
 import pos.pos.restaurant.service.RestaurantScopeService;
 
 import java.time.OffsetDateTime;
@@ -20,8 +22,12 @@ import java.util.UUID;
 @lombok.RequiredArgsConstructor
 public class ReservationLifecycleService {
 
+    public static final java.time.Duration CHECK_IN_OPENS_BEFORE = java.time.Duration.ofHours(2);
+
     private final RestaurantScopeService restaurantScopeService;
     private final ReservationSupport reservationSupport;
+    private final ReservationNotifications reservationNotifications;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public ReservationResponse confirmReservation(
@@ -112,14 +118,19 @@ public class ReservationLifecycleService {
             if (!EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED).contains(currentStatus)) {
                 throw new AuthException("Reservation can only be checked in from PENDING or CONFIRMED", HttpStatus.BAD_REQUEST);
             }
+            // Guests can arrive a bit early, but not days ahead.
+            if (reservation.getReservationStart() != null && now.isBefore(reservation.getReservationStart().minus(CHECK_IN_OPENS_BEFORE))) {
+                throw new AuthException("Check-in opens " + CHECK_IN_OPENS_BEFORE.toHours() + " hours before the reservation starts", HttpStatus.BAD_REQUEST);
+            }
             reservation.setStatus(ReservationStatus.CHECKED_IN);
             if (reservation.getConfirmedAt() == null) {
                 reservation.setConfirmedAt(now);
             }
             reservation.setCheckedInAt(now);
         } else if (targetStatus == ReservationStatus.SEATED) {
-            if (!EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN).contains(currentStatus)) {
-                throw new AuthException("Reservation can only be seated from PENDING, CONFIRMED, or CHECKED_IN", HttpStatus.BAD_REQUEST);
+            // Guests are checked in at the host stand first; only then can a table seat them.
+            if (currentStatus != ReservationStatus.CHECKED_IN) {
+                throw new AuthException("Check the reservation in before seating the guests", HttpStatus.BAD_REQUEST);
             }
             reservation.setStatus(ReservationStatus.SEATED);
             if (reservation.getConfirmedAt() == null) {
@@ -164,6 +175,18 @@ public class ReservationLifecycleService {
         }
 
         reservationSupport.addStatusHistory(reservation, currentStatus, reservation.getStatus(), reason, actorId);
+        announceStatusChange(reservation, currentStatus, actorId);
+    }
+
+    // Lets other modules (e.g. pre-orders) follow the booking; for status changes made outside transitionReservation too.
+    public void announceStatusChange(Reservation reservation, ReservationStatus previousStatus, UUID actorId) {
+        events.publishEvent(new ReservationStatusChangedEvent(
+                reservation.getId(),
+                reservation.getRestaurant() == null ? null : reservation.getRestaurant().getId(),
+                previousStatus,
+                reservation.getStatus(),
+                actorId
+        ));
     }
 
     private ReservationResponse transitionReservation(
@@ -178,7 +201,11 @@ public class ReservationLifecycleService {
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         transitionReservation(reservation, targetStatus, request == null ? null : request.getReason(), actorId);
         reservation.setUpdatedBy(actorId);
-        return reservationSupport.toResponse(reservationSupport.saveReservation(reservation));
+        Reservation saved = reservationSupport.saveReservation(reservation);
+        if (targetStatus == ReservationStatus.CANCELLED) {
+            reservationNotifications.cancelled(saved, actorId);
+        }
+        return reservationSupport.toResponse(saved);
     }
 
     private void assertPendingStatus(ReservationStatus currentStatus) {

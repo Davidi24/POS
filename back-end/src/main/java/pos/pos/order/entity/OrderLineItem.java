@@ -145,6 +145,11 @@ public class OrderLineItem extends AbstractTimestampedEntity {
         option.setOrderLineItem(this);
     }
 
+    // Follows the menu item's current setting; counter items (e.g. a bottled cola) are served directly instead.
+    public boolean goesToKitchen() {
+        return menuItem == null || menuItem.isSendToKitchen();
+    }
+
     public void removeOption(OrderItemOption option) {
         if (option == null) {
             return;

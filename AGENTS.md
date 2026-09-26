@@ -24,3 +24,14 @@ POS is a multi-module point-of-sale system:
 
 ## Conventions
 Fill in and expand this section as you discover build/test/lint commands, code style rules, and other repo-specific conventions. Keep this section stable reference material; put day-to-day change history in `AGENT_MEMORY.md`, not here.
+
+### Backend
+- Build the runnable jar with `./mvnw -o package -Dmaven.test.skip=true`. `-DskipTests` does NOT skip tests here (the pom wires surefire's `skipTests` to `${skip.unit.tests}`).
+- Local backend runs as `java -jar target/pos-0.0.1-SNAPSHOT.jar` from `back-end/` against the podman `pos-db` container (db `pos_local`, user `pos_user`). The local schema is `foundation_local`, and Flyway history is `foundation_local.flyway_schema_history`.
+- Stop the running backend before (or right after) rebuilding the jar. A running process whose jar was replaced starts answering 500s.
+- Repository/persistence tests use Testcontainers, which can't find a Docker environment on this podman host, so they error locally. Unit tests with mocks run fine.
+- Roles and permissions are seeded from `AppRole`/`AppPermission` on every startup (`SuperAdminBootstrapRunner`). It updates role flags and ADDS missing permissions, but never removes a permission from a role.
+- App workspaces (POS/KDS/Admin) are gated only by the `POS_ACCESS`/`KDS_ACCESS`/`ADMIN_ACCESS` permissions. Restaurants is Super Admin only.
+- Other modules follow reservations through events in `pos.pos.reservation.event` (`ReservationStatusChangedEvent`, `ReservationDeletingEvent`) rather than being called from reservation services. Publish via `ReservationLifecycleService.announceStatusChange` for any status change made outside `transitionReservation`.
+- Short codes and numbers shown to people (reservation codes, order numbers, KDS ticket numbers) must use random bits (`UUID.randomUUID()`). Truncated time-ordered UUIDs repeat for ~27 s and collide.
+- For JPA child collections with a unique key (e.g. KDS routings), update matching rows in place. Removing and re-adding the same key makes Hibernate insert before it deletes, which violates the constraint.

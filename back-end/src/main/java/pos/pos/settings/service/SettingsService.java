@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
+import pos.pos.security.rbac.AppRole;
+import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.settings.dto.SettingsResponse;
 import pos.pos.settings.dto.UpdateRestaurantSettingsRequest;
 import pos.pos.settings.dto.UpdateSettingsBillingRequest;
@@ -15,6 +17,8 @@ import pos.pos.settings.dto.UpdateSettingsDefaultBranchRequest;
 import pos.pos.settings.dto.UpdateSettingsLocalizationRequest;
 import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
 import pos.pos.settings.dto.UpdateSettingsSequencePrefixesRequest;
+import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
+import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.entity.Settings;
 import pos.pos.settings.enums.ServiceChargeType;
 import pos.pos.settings.enums.WeekStartDay;
@@ -33,6 +37,7 @@ public class SettingsService {
     private final SettingsDomainSupport settingsDomainSupport;
     private final SettingsMapper settingsMapper;
     private final SettingsAuditService settingsAuditService;
+    private final RoleHierarchyService roleHierarchyService;
 
     @Transactional
     public SettingsResponse getSettings(Authentication authentication, UUID restaurantId) {
@@ -184,6 +189,50 @@ public class SettingsService {
                 null,
                 "UPDATE_ORDER_CHANNELS",
                 "Updated order channel settings"
+        );
+    }
+
+    @Transactional
+    public SettingsResponse updateStaffPermissions(
+            Authentication authentication,
+            UUID restaurantId,
+            UpdateSettingsStaffPermissionsRequest request
+    ) {
+        // Admins hold SETTINGS_UPDATE too, so this switch needs an explicit Owner/Co-Owner check or they could grant it to themselves.
+        if (roleHierarchyService.actorRank(authentication) < AppRole.CO_OWNER.rank()) {
+            throw new AuthException("Only the Owner or a Co-Owner can change staff permissions", HttpStatus.FORBIDDEN);
+        }
+
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setAdminsCanManageManagers(request.getAdminsCanManageManagers());
+
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_STAFF_PERMISSIONS",
+                "Updated staff permissions"
+        );
+    }
+
+    @Transactional
+    public SettingsResponse updatePreOrders(
+            Authentication authentication,
+            UUID restaurantId,
+            UpdateSettingsPreOrdersRequest request
+    ) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setPreOrdersEnabled(request.getPreOrdersEnabled());
+        settings.setPreOrderLeadMinutes(request.getPreOrderLeadMinutes());
+
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_PRE_ORDERS",
+                "Updated reservation pre-order settings"
         );
     }
 

@@ -33,6 +33,7 @@ public class ReservationPublicService {
     private final ReservationAvailabilitySupport reservationAvailabilitySupport;
     private final ReservationLifecycleService reservationLifecycleService;
     private final ReservationSupport reservationSupport;
+    private final ReservationNotifications reservationNotifications;
 
     @Transactional(readOnly = true)
     public List<ReservationAvailabilityOptionResponse> getPublicAvailability(
@@ -71,10 +72,9 @@ public class ReservationPublicService {
 
         reservationSupport.applyPublicReservationRequest(reservation, request);
         reservationSupport.addStatusHistory(reservation, null, ReservationStatus.PENDING, "Reservation created", null);
-        return reservationSupport.toPublicResponse(
-                reservationSupport.saveReservation(reservation),
-                reservation.getTableAssignments()
-        );
+        Reservation saved = reservationSupport.saveReservation(reservation);
+        reservationNotifications.created(saved, null, true);
+        return reservationSupport.toPublicResponse(saved, reservation.getTableAssignments());
     }
 
     @Transactional(readOnly = true)
@@ -93,6 +93,7 @@ public class ReservationPublicService {
                 null
         );
         reservationSupport.saveReservation(reservation);
+        reservationNotifications.cancelled(reservation, null);
         return reservationSupport.toPublicResponse(reservation, reservation.getTableAssignments());
     }
 

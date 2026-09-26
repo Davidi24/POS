@@ -1,5 +1,9 @@
 package pos.pos.reservation.service;
 
+import pos.pos.utils.NormalizationUtils;
+
+import org.springframework.data.domain.PageRequest;
+
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +50,7 @@ public class ReservationQueryService {
             ReservationStatus.CHECKED_IN,
             ReservationStatus.SEATED
     );
+    private static final int MAX_UPCOMING_LIMIT = 100;
     private static final int DEFAULT_AVAILABILITY_LIMIT = 10;
     private static final int DEFAULT_RECOMMENDATION_LIMIT = 3;
 
@@ -57,6 +62,7 @@ public class ReservationQueryService {
     private final RestaurantTableSupport restaurantTableSupport;
     private final ReservationAvailabilitySupport reservationAvailabilitySupport;
     private final ReservationSupport reservationSupport;
+    private final ReservationRuleResolver reservationRuleResolver;
 
     @Transactional(readOnly = true)
     public List<ReservationResponse> getReservations(Authentication authentication, UUID restaurantId) {
@@ -152,13 +158,14 @@ public class ReservationQueryService {
             Integer limit
     ) {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
-        int resolvedLimit = limit == null || limit <= 0 ? 20 : limit;
+        int resolvedLimit = limit == null || limit <= 0 ? 20 : Math.min(limit, MAX_UPCOMING_LIMIT);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        return reservationRepository.findAllByBranch_IdOrderByReservationStartAsc(branchId).stream()
-                .filter(reservation -> !reservation.getReservationStart().isBefore(now))
-                .filter(reservation -> UPCOMING_STATUSES.contains(reservation.getStatus()))
-                .limit(resolvedLimit)
+        List<UUID> ids = reservationRepository.findUpcomingIds(branchId, UPCOMING_STATUSES, now, PageRequest.of(0, resolvedLimit));
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return reservationRepository.findAllByIdInOrderByReservationStartAsc(ids).stream()
                 .map(reservationSupport::toResponse)
                 .toList();
     }
@@ -226,11 +233,29 @@ public class ReservationQueryService {
                 .completedCount(reservationSupport.countByStatus(reservations, ReservationStatus.COMPLETED))
                 .cancelledCount(reservationSupport.countByStatus(reservations, ReservationStatus.CANCELLED))
                 .noShowCount(reservationSupport.countByStatus(reservations, ReservationStatus.NO_SHOW))
-                .upcomingCount((int) reservationRepository.findAllByBranch_IdOrderByReservationStartAsc(branchId).stream()
-                        .filter(reservation -> !reservation.getReservationStart().isBefore(OffsetDateTime.now(ZoneOffset.UTC)))
-                        .filter(reservation -> UPCOMING_STATUSES.contains(reservation.getStatus()))
-                        .count())
+                .upcomingCount((int) reservationRepository.countByBranch_IdAndStatusInAndReservationStartGreaterThanEqual(
+                        branchId, UPCOMING_STATUSES, OffsetDateTime.now(ZoneOffset.UTC)))
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public pos.pos.reservation.dto.ReservationSettingsResponse getReservationSettings(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID branchId
+    ) {
+        Branch branch = restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
+        var response = pos.pos.reservation.dto.ReservationSettingsResponse.builder()
+                .branchId(branchId)
+                .timezone(reservationSupport.restaurantZone(branch.getRestaurant()).getId());
+        reservationRuleResolver.activeRule(branch, OffsetDateTime.now(ZoneOffset.UTC)).ifPresent(rule -> response
+                .ruleName(rule.getRuleName())
+                .defaultDurationMinutes(rule.getDefaultDurationMinutes())
+                .bufferMinutes(rule.getBufferMinutes())
+                .minPartySize(rule.getMinPartySize())
+                .maxPartySize(rule.getMaxPartySize())
+                .advanceBookingDays(rule.getAdvanceBookingDays()));
+        return response.build();
     }
 
     @Transactional(readOnly = true)
@@ -240,20 +265,26 @@ public class ReservationQueryService {
             UUID branchId,
             OffsetDateTime from,
             OffsetDateTime to,
-            Integer partySize
+            Integer partySize,
+            String floor
     ) {
         Branch branch = restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         ReservationSupport.TimeWindow window = reservationSupport.resolveCapacityWindow(from, to);
+        // Optional: count only one floor, so the numbers match the floor plan on screen.
+        String onlyFloor = NormalizationUtils.normalize(floor);
         RestaurantTableSupport.BranchTableSnapshot snapshot = restaurantTableSupport.loadBranchTables(restaurantId, branchId);
         List<RestaurantTable> rootTables = snapshot.tables().stream()
                 .filter(table -> table.getMergedInto() == null)
+                .filter(table -> onlyFloor == null || onlyFloor.equalsIgnoreCase(table.getFloor()))
                 .toList();
         List<ReservationAvailabilitySupport.AvailableRootTable> availableRootTables = reservationAvailabilitySupport.loadAvailableRootTables(
                 branch,
                 snapshot,
                 window.from(),
                 window.to()
-        );
+        ).stream()
+                .filter(available -> onlyFloor == null || onlyFloor.equalsIgnoreCase(available.table().getFloor()))
+                .toList();
 
         return ReservationCapacityResponse.builder()
                 .branchId(branchId)

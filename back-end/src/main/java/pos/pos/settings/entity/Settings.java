@@ -154,6 +154,18 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "enable_delivery", nullable = false)
     private boolean enableDelivery = false;
 
+    // Off: only Owner and Co-Owner create, edit and delete Managers. On: Admins can too. Only Owner and Co-Owner flip it.
+    @Column(name = "admins_can_manage_managers", nullable = false)
+    private boolean adminsCanManageManagers = false;
+
+    // Guests may order dishes with their reservation; off until the restaurant opts in.
+    @Column(name = "pre_orders_enabled", nullable = false)
+    private boolean preOrdersEnabled = false;
+
+    // How many minutes before the booking a pre-order goes to the kitchen; until then it can still be changed or refunded.
+    @Column(name = "pre_order_lead_minutes", nullable = false)
+    private int preOrderLeadMinutes = 15;
+
     @OneToOne(mappedBy = "settings", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private SettingsReceipt receiptSettings;
 

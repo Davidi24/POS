@@ -1,5 +1,6 @@
 package pos.pos.reservation.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +10,7 @@ import pos.pos.reservation.dto.ReservationResponse;
 import pos.pos.reservation.dto.UpdateReservationRequest;
 import pos.pos.reservation.entity.Reservation;
 import pos.pos.reservation.enums.ReservationStatus;
+import pos.pos.reservation.event.ReservationDeletingEvent;
 import pos.pos.reservation.repository.ReservationRepository;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
@@ -24,6 +26,8 @@ public class ReservationCrudService {
     private final ReservationRepository reservationRepository;
     private final ReservationSupport reservationSupport;
     private final ReservationTableAssignmentService reservationTableAssignmentService;
+    private final ReservationNotifications reservationNotifications;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public ReservationResponse createReservation(Authentication authentication, UUID restaurantId, ReservationRequest request) {
@@ -55,7 +59,9 @@ public class ReservationCrudService {
             );
         }
 
-        return reservationSupport.toResponse(reservationSupport.saveReservation(reservation));
+        Reservation saved = reservationSupport.saveReservation(reservation);
+        reservationNotifications.created(saved, actorId, false);
+        return reservationSupport.toResponse(saved);
     }
 
     @Transactional
@@ -114,6 +120,9 @@ public class ReservationCrudService {
                     request.getPrimaryTableId(),
                     actorId
             );
+        } else if (request.getReservationStart() != null || request.getReservationEnd() != null || request.getPartySize() != null) {
+            // New time or party size must still fit the tables it already has.
+            reservationTableAssignmentService.revalidateCurrentTables(reservation);
         }
 
         return reservationSupport.toResponse(reservationSupport.saveReservation(reservation));
@@ -122,7 +131,9 @@ public class ReservationCrudService {
     @Transactional
     public void deleteReservation(Authentication authentication, UUID restaurantId, UUID reservationId) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
-        reservationRepository.delete(reservationSupport.requireReservation(restaurantId, reservationId));
+        Reservation reservation = reservationSupport.requireReservation(restaurantId, reservationId);
+        events.publishEvent(new ReservationDeletingEvent(reservation.getId(), restaurantId));
+        reservationRepository.delete(reservation);
         reservationRepository.flush();
     }
 }

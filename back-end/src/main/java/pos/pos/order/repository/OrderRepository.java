@@ -31,6 +31,12 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @EntityGraph(attributePaths = {"customer", "restaurantTable"})
     List<Order> findAllByBranch_IdAndStatusInOrderByOpenedAtDesc(UUID branchId, Collection<OrderStatus> statuses);
 
+    @EntityGraph(attributePaths = {"branch", "customer", "restaurantTable"})
+    List<Order> findAllByRestaurantTable_IdInAndStatusInOrderByOpenedAtAsc(
+            Collection<UUID> tableIds,
+            Collection<OrderStatus> statuses
+    );
+
     @EntityGraph(attributePaths = {"customer", "restaurantTable"})
     List<Order> findAllByBranch_IdAndOpenedAtBetweenOrderByOpenedAtDesc(
             UUID branchId,

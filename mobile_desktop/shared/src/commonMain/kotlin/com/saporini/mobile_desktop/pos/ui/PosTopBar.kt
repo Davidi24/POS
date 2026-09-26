@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.pos.ui.shell
 
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +24,6 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.NotificationsNone
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.RestaurantMenu
 import androidx.compose.material.icons.outlined.TableRestaurant
 import androidx.compose.material3.Badge
@@ -66,8 +66,7 @@ internal val OverflowSections = listOf(
     PosSection.KITCHEN_STATUS,
     PosSection.SHIFT,
     PosSection.MY_SALES,
-    PosSection.HISTORY,
-    PosSection.PROFILE
+    PosSection.HISTORY
 )
 
 @Composable
@@ -93,7 +92,7 @@ fun PosPhoneTopBar(initials: String) {
             ) {
                 OnlineStatus(textColor = ActiveOlive)
                 LanguageSelector()
-                NotificationButton(count = 3)
+                com.saporini.mobile_desktop.notifications.NotificationBell(tint = MutedInk)
                 Box(
                     modifier = Modifier
                         .size(34.dp)
@@ -115,15 +114,73 @@ fun PosPhoneTopBar(initials: String) {
     }
 }
 
+// How much room the top bar has. FULL is the desktop look and is never changed by the smaller tiers.
+private enum class TopBarTier { FULL, MEDIUM, COMPACT }
+
+private val LocalTopBarTier = androidx.compose.runtime.staticCompositionLocalOf { TopBarTier.FULL }
+
 @Composable
 fun PosTopBar(
     selected: PosSection,
     onSelect: (PosSection) -> Unit,
     onLogout: () -> Unit,
     logo: @Composable () -> Unit,
+    onBackToWorkspaces: (() -> Unit)? = null,
 ) {
     var menuSlotSection by remember { mutableStateOf(PosSection.MENU) }
 
+    WorkspaceTopBar(onLogout = onLogout, logo = logo, onBackToWorkspaces = onBackToWorkspaces) {
+        PosNavItem(
+            section = PosSection.TABLES,
+            icon = Icons.Outlined.TableRestaurant,
+            selected = selected == PosSection.TABLES,
+            onClick = onSelect
+        )
+        PosNavItem(
+            section = PosSection.ORDERS,
+            icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+            selected = selected == PosSection.ORDERS,
+            onClick = onSelect
+        )
+        PosNavItem(
+            section = PosSection.RESERVATIONS,
+            icon = Icons.AutoMirrored.Outlined.EventNote,
+            selected = selected == PosSection.RESERVATIONS,
+            onClick = onSelect
+        )
+        PosNavItem(
+            section = menuSlotSection,
+            icon = menuSlotSection.icon(),
+            selected = selected == menuSlotSection,
+            onClick = onSelect
+        )
+
+        MoreNavItem(
+            menuSlotSection = menuSlotSection,
+            selectedSection = selected,
+            onSelect = { section ->
+                menuSlotSection = section
+                onSelect(section)
+            }
+        )
+    }
+}
+
+// Desktop top bar frame shared by the POS and KDS workspaces; each workspace passes in its own tabs.
+@Composable
+internal fun WorkspaceTopBar(
+    onLogout: () -> Unit,
+    logo: @Composable () -> Unit,
+    onBackToWorkspaces: (() -> Unit)? = null,
+    navItems: @Composable () -> Unit,
+) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+    val tier = when {
+        maxWidth >= 1100.dp -> TopBarTier.FULL
+        maxWidth >= 900.dp -> TopBarTier.MEDIUM
+        else -> TopBarTier.COMPACT
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalTopBarTier provides tier) {
     Surface(
         color = Color.White,
         tonalElevation = 0.dp,
@@ -133,12 +190,19 @@ fun PosTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp)
-                .padding(start = 18.dp, end = 18.dp),
+                .padding(start = if (tier == TopBarTier.FULL) 18.dp else 10.dp, end = if (tier == TopBarTier.FULL) 18.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Only for users with more than one workspace: back to "Choose your workspace".
+                onBackToWorkspaces?.let { back ->
+                    IconButton(onClick = back, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.Reply, "Back to workspaces", Modifier.size(26.dp), tint = Ink)
+                    }
+                    Spacer(Modifier.width(2.dp))
+                }
                 Box(
-                    modifier = Modifier.size(width = 52.dp, height = 42.dp),
+                    modifier = Modifier.size(width = if (tier == TopBarTier.FULL) 52.dp else 40.dp, height = 42.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     logo()
@@ -146,39 +210,7 @@ fun PosTopBar(
 
                 Spacer(Modifier.width(4.dp))
 
-                PosNavItem(
-                    section = PosSection.TABLES,
-                    icon = Icons.Outlined.TableRestaurant,
-                    selected = selected == PosSection.TABLES,
-                    onClick = onSelect
-                )
-                PosNavItem(
-                    section = PosSection.ORDERS,
-                    icon = Icons.AutoMirrored.Outlined.ReceiptLong,
-                    selected = selected == PosSection.ORDERS,
-                    onClick = onSelect
-                )
-                PosNavItem(
-                    section = PosSection.RESERVATIONS,
-                    icon = Icons.AutoMirrored.Outlined.EventNote,
-                    selected = selected == PosSection.RESERVATIONS,
-                    onClick = onSelect
-                )
-                PosNavItem(
-                    section = menuSlotSection,
-                    icon = menuSlotSection.icon(),
-                    selected = selected == menuSlotSection,
-                    onClick = onSelect
-                )
-
-                MoreNavItem(
-                    menuSlotSection = menuSlotSection,
-                    selectedSection = selected,
-                    onSelect = { section ->
-                        menuSlotSection = section
-                        onSelect(section)
-                    }
-                )
+                navItems()
             }
 
             Spacer(Modifier.weight(1f))
@@ -187,14 +219,14 @@ fun PosTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OnlineStatus()
+                OnlineStatus(showLabel = tier == TopBarTier.FULL)
                 LanguageSelector()
-                NotificationButton(count = 3)
+                com.saporini.mobile_desktop.notifications.NotificationBell(tint = MutedInk)
             }
 
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(if (tier == TopBarTier.FULL) 14.dp else 6.dp))
             TopBarSeparator()
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(if (tier == TopBarTier.FULL) 14.dp else 6.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -205,6 +237,8 @@ fun PosTopBar(
             }
         }
     }
+    }
+    }
 }
 
 @Composable
@@ -214,35 +248,69 @@ private fun PosNavItem(
     selected: Boolean,
     onClick: (PosSection) -> Unit
 ) {
+    TopBarNavItem(label = section.label, icon = icon, selected = selected, onClick = { onClick(section) })
+}
+
+@Composable
+internal fun TopBarNavItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
     val color = if (selected) ActiveOlive else Ink
+    val tier = LocalTopBarTier.current
+
+    if (tier == TopBarTier.COMPACT) {
+        // Narrow window: icon with a small label underneath, like the phone bar.
+        Box(Modifier.height(72.dp).padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
+            TextButton(
+                onClick = onClick,
+                shape = RoundedCornerShape(4.dp),
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = color)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(22.dp), tint = color)
+                    Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp, color = color, maxLines = 1)
+                }
+            }
+            Box(
+                modifier = Modifier.align(Alignment.BottomCenter).width(64.dp).height(4.dp)
+                    .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
+                    .background(if (selected) ActiveOlive else Color.Transparent)
+            )
+        }
+        return
+    }
 
     Box(
         modifier = Modifier
             .height(72.dp)
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = if (tier == TopBarTier.FULL) 6.dp else 2.dp),
         contentAlignment = Alignment.Center
     ) {
         TextButton(
-            onClick = { onClick(section) },
+            onClick = onClick,
             shape = RoundedCornerShape(4.dp),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
             colors = ButtonDefaults.textButtonColors(contentColor = color)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(if (tier == TopBarTier.FULL) 10.dp else 7.dp)
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    modifier = Modifier.size(23.dp),
+                    modifier = Modifier.size(if (tier == TopBarTier.FULL) 23.dp else 21.dp),
                     tint = color
                 )
                 Text(
-                    text = section.label,
+                    text = label,
                     fontFamily = Inter(),
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
+                    fontSize = if (tier == TopBarTier.FULL) 16.sp else 14.sp,
                     letterSpacing = 0.sp,
                     color = color
                 )
@@ -251,7 +319,7 @@ private fun PosNavItem(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .width(if (selected) 118.dp else 118.dp)
+                .width(if (tier == TopBarTier.FULL) 118.dp else 96.dp)
                 .height(4.dp)
                 .clip(RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
                 .background(if (selected) ActiveOlive else Color.Transparent)
@@ -275,7 +343,7 @@ private fun MoreNavItem(
     Box(
         modifier = Modifier
             .height(72.dp)
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = if (LocalTopBarTier.current == TopBarTier.FULL) 6.dp else 2.dp),
         contentAlignment = Alignment.Center
     ) {
         TextButton(
@@ -292,7 +360,7 @@ private fun MoreNavItem(
                     text = "More",
                     fontFamily = Inter(),
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
+                    fontSize = when (LocalTopBarTier.current) { TopBarTier.FULL -> 16.sp; TopBarTier.MEDIUM -> 14.sp; TopBarTier.COMPACT -> 12.sp },
                     letterSpacing = 0.sp,
                     color = Ink
                 )
@@ -372,7 +440,7 @@ private fun NotificationButton(count: Int) {
 }
 
 @Composable
-private fun OnlineStatus(textColor: Color = Ink) {
+internal fun OnlineStatus(textColor: Color = Ink, showLabel: Boolean = true) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -383,7 +451,7 @@ private fun OnlineStatus(textColor: Color = Ink) {
                 .clip(CircleShape)
                 .background(OnlineGreen)
         )
-        Text(
+        if (showLabel) Text(
             text = "Online",
             fontFamily = Inter(),
             fontWeight = FontWeight.SemiBold,
@@ -414,7 +482,7 @@ private enum class LanguageOption(
 }
 
 @Composable
-private fun LanguageSelector() {
+internal fun LanguageSelector() {
     var expanded by remember { mutableStateOf(false) }
     var selectedLanguage by remember { mutableStateOf(LanguageOption.ENGLISH) }
 
@@ -508,7 +576,6 @@ internal fun PosSection.icon(): ImageVector = when (this) {
     PosSection.SHIFT -> Icons.AutoMirrored.Outlined.EventNote
     PosSection.MY_SALES -> Icons.AutoMirrored.Outlined.ReceiptLong
     PosSection.HISTORY -> Icons.AutoMirrored.Outlined.EventNote
-    PosSection.PROFILE -> Icons.Outlined.Person
 }
 
 @Composable

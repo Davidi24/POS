@@ -93,6 +93,8 @@ data class OrderLineItem(
     val taxTotal: OrderDecimal,
     val lineTotal: OrderDecimal,
     val status: OrderLineItemStatus,
+    // False for counter items like a cola: served directly, never sent to the kitchen.
+    val sendToKitchen: Boolean = true,
     val notes: String? = null,
     val options: List<OrderItemOption>? = null,
     val createdAt: String,

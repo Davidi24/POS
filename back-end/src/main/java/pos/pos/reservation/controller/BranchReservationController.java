@@ -19,6 +19,7 @@ import pos.pos.reservation.dto.ReservationAvailabilityOptionResponse;
 import pos.pos.reservation.dto.ReservationAvailabilitySearchRequest;
 import pos.pos.reservation.dto.ReservationCapacityResponse;
 import pos.pos.reservation.dto.ReservationResponse;
+import pos.pos.reservation.dto.ReservationSettingsResponse;
 import pos.pos.reservation.dto.ReservationSummaryResponse;
 import pos.pos.reservation.dto.ReservationValidationRequest;
 import pos.pos.reservation.dto.ReservationValidationResponse;
@@ -143,9 +144,21 @@ public class BranchReservationController {
             @RequestParam(required = false) OffsetDateTime from,
             @RequestParam(required = false) OffsetDateTime to,
             @RequestParam(required = false) Integer partySize,
+            @RequestParam(required = false) String floor,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationQueryService.getReservationCapacity(authentication, restaurantId, branchId, from, to, partySize));
+        return ResponseEntity.ok(reservationQueryService.getReservationCapacity(authentication, restaurantId, branchId, from, to, partySize, floor));
+    }
+
+    @GetMapping("/settings")
+    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @Operation(summary = "Get the settings staff need for reservations, such as the restaurant time zone")
+    public ResponseEntity<ReservationSettingsResponse> getReservationSettings(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(reservationQueryService.getReservationSettings(authentication, restaurantId, branchId));
     }
 
     @PostMapping("/validate")

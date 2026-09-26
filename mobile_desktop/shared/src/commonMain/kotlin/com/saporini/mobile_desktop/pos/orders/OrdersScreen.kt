@@ -1,5 +1,8 @@
 package com.saporini.mobile_desktop.pos.orders
 
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.alpha
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
@@ -22,11 +25,10 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.text.TextStyle
 import com.saporini.mobile_desktop.pos.menu.ui.item.AddItemCard
-import androidx.compose.foundation.VerticalScrollbar
+import com.saporini.mobile_desktop.core.ui.PlatformVerticalScrollbar
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -61,6 +63,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.RoomService
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.FormatListBulleted
@@ -186,6 +189,9 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier) {
                             modifier = Modifier.weight(if(compact) 1f else 1.65f).fillMaxHeight(),
                             onCreate = { creating = true }
                         )
+                    } else if (visible.isEmpty()) {
+                        // First load: the list's cards as pulsing grey shapes.
+                        OrdersListSkeleton(Modifier.weight(if(compact) 1f else 1.65f).fillMaxHeight())
                     } else {
                         OrdersListPanel(
                             orders = visible,
@@ -356,8 +362,8 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                                 OrderListPill(Icons.Outlined.TableRestaurant, order.tableName ?: order.tableNumber?.let { "Table $it" } ?: "Table -", modifier = Modifier.widthIn(min = 70.dp, max = 96.dp))
                                 Spacer(Modifier.weight(1f))
                                 Button(
-                                    onClick = { if(activeItems.any { it.status == OrderLineItemStatus.PENDING } && !state.isSaving) onSendAll() },
-                                    enabled = canWrite && !editorDirty && activeItems.any { it.status == OrderLineItemStatus.PENDING },
+                                    onClick = { if(activeItems.any { it.awaitingKitchen } && !state.isSaving) onSendAll() },
+                                    enabled = canWrite && !editorDirty && activeItems.any { it.awaitingKitchen },
                                     modifier = Modifier.height(42.dp),
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = OrderGreen),
@@ -404,7 +410,7 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                                                         sent = line.id in sentIds || line.status != OrderLineItemStatus.PENDING,
                                                         canSend = canWrite && !editorDirty,
                                                         onSend = {
-                                                            if (canWrite && !editorDirty && line.status == OrderLineItemStatus.PENDING && line.id !in sentIds) {
+                                                            if (canWrite && !editorDirty && line.awaitingKitchen && line.id !in sentIds) {
                                                                 sendingId = line.id
                                                                 sendError = null
                                                                 scope.launch {
@@ -420,7 +426,7 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                                                     )
                                                 }
                                             }
-                                            VerticalScrollbar(rememberScrollbarAdapter(listState), Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp))
+                                            PlatformVerticalScrollbar(listState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp))
                                         }
                                         sendError?.let { OrderError(it) { sendError = null; model.clearError() } }
                                         if (editorDirty) Text("Save your changes before sending items to the kitchen", fontFamily = Inter(), fontSize = 11.sp, color = OrderMuted)
@@ -559,7 +565,7 @@ private fun OrderKitchenSendDialog(order: Order, model: OrdersScreenModel, onDis
     var error by remember { mutableStateOf<String?>(null) }
     val busy = submitting || state.isSaving
     val canSend = order.editable && state.can("ORDER_UPDATE") && !busy && !state.needsReconciliation &&
-        order.lineItems.orEmpty().any { it.status == OrderLineItemStatus.PENDING }
+        order.lineItems.orEmpty().any { it.awaitingKitchen }
     Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(
         usePlatformDefaultWidth = false, dismissOnBackPress = !busy, dismissOnClickOutside = false
     )) {
@@ -1116,7 +1122,7 @@ private fun OrderAddItemDetails(item: OrderCatalogItem?, onClose: () -> Unit, ca
                     }
                 }
             }
-            VerticalScrollbar(rememberScrollbarAdapter(detailsScrollState), Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp))
+            PlatformVerticalScrollbar(detailsScrollState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp))
         }
         HorizontalDivider(color = OrderBorder)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
@@ -1214,7 +1220,14 @@ private fun Double.toOrderMoney(currency: String): String {
                 OrderEditSmallIconText(Icons.Outlined.ChatBubbleOutline, line.notes?.takeIf { it.isNotBlank() } ?: "No notes", OrderMuted)
             }
             Text(line.lineTotal.money(currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = OrderInk, modifier = Modifier.width(76.dp).padding(end = 18.dp), textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Clip)
-            Surface(onClick = onSend, enabled = canSend && !sent && line.status == OrderLineItemStatus.PENDING, shape = RoundedCornerShape(10.dp), color = OrderBackground, modifier = Modifier.width(150.dp).height(38.dp)) {
+            if (!line.sendToKitchen) {
+                // Counter items are served directly; the waiter marks them served from the item editor.
+                Row(Modifier.width(150.dp).height(38.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    Icon(Icons.Outlined.RoomService, null, Modifier.size(17.dp), tint = OrderMuted)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Serve directly", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = OrderMuted, maxLines = 1)
+                }
+            } else Surface(onClick = onSend, enabled = canSend && !sent && line.status == OrderLineItemStatus.PENDING, shape = RoundedCornerShape(10.dp), color = OrderBackground, modifier = Modifier.width(150.dp).height(38.dp)) {
                 Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     if (sending) CircularProgressIndicator(Modifier.size(18.dp), color = OrderGreen, strokeWidth = 2.dp)
                     else {
@@ -1366,7 +1379,8 @@ private fun Double.toOrderMoney(currency: String): String {
                 Box {
                     OrderStatusSelectField(baseline.status, enabled = enabled && !dirty) { picker = "status" }
                     DropdownMenu(expanded = picker == "status", onDismissRequest = { picker = null }) {
-                        listOf(OrderLineItemStatus.FIRED, OrderLineItemStatus.PREPARING, OrderLineItemStatus.READY, OrderLineItemStatus.FULFILLED).forEach { status ->
+                        (if (baseline.sendToKitchen) listOf(OrderLineItemStatus.FIRED, OrderLineItemStatus.PREPARING, OrderLineItemStatus.READY, OrderLineItemStatus.FULFILLED)
+                            else listOf(OrderLineItemStatus.READY, OrderLineItemStatus.FULFILLED)).forEach { status ->
                             DropdownMenuItem(text = { OrderItemProgressBadge(status) }, enabled = status != baseline.status, onClick = { changeStatus(status) })
                         }
                     }
@@ -1384,7 +1398,7 @@ private fun Double.toOrderMoney(currency: String): String {
                     }
                 }
             }
-            VerticalScrollbar(rememberScrollbarAdapter(scroll), Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp))
+            PlatformVerticalScrollbar(scroll, Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp))
         }
         HorizontalDivider(color = OrderBorder)
         if (state.needsReconciliation) Text("Check the last change in the order before trying again.", fontFamily = Inter(), fontSize = 11.sp, color = Color(0xFFB13A2F))
@@ -1585,7 +1599,7 @@ private fun OrderLineItem.orderItemSubtitle(): String {
     var submitting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val busy = submitting || state.isSaving
-    val hasPendingItems = order.lineItems.orEmpty().any { it.status == OrderLineItemStatus.PENDING }
+    val hasPendingItems = order.lineItems.orEmpty().any { it.awaitingKitchen }
     val hasItems = order.lineItems.orEmpty().any { it.active }
     val steps = listOf("Send to kitchen", "Mark ready", "Mark fulfilled", "Close order")
     fun available(action: String): Boolean = order.editable && !busy && !state.needsReconciliation && when (action) {
@@ -1818,8 +1832,7 @@ private fun OrdersListPanel(
                     OrderListCard(row, selectedId == row.id, compact) { onSelect(row.id) }
                 }
             }
-            VerticalScrollbar(
-                adapter = rememberScrollbarAdapter(listState),
+            PlatformVerticalScrollbar(state = listState,
                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp).padding(vertical = 10.dp)
             )
         }
@@ -1902,9 +1915,9 @@ private fun OrdersListPanel(
                         if (order.status.showsFulfillmentProgress) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.width(78.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Column(Modifier.width(102.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                             OrderListIconText(Icons.Outlined.Schedule, order.openedAt.elapsedLabel(), color = OrderGreen, bold = true)
-                            Text("Opened ${order.openedAt.orderTime()}", fontFamily = Inter(), fontSize = 12.sp, color = OrderMuted, maxLines = 1)
+                            Text("Opened at ${order.openedAt.orderTime()}", fontFamily = Inter(), fontSize = 12.sp, color = OrderMuted, maxLines = 1)
                         }
                         Text(
                             order.total.money(order.currency),
@@ -2124,8 +2137,7 @@ private fun OrdersListPanel(
                 HorizontalDivider(color = OrderBorder)
             }
         }
-        VerticalScrollbar(
-            adapter = rememberScrollbarAdapter(listState),
+        PlatformVerticalScrollbar(state = listState,
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp).padding(vertical = 10.dp)
         )
     }
@@ -2296,3 +2308,32 @@ private fun String.elapsedLabel(): String = runCatching {
         if(rest == 0L) "${hours}h" else "${hours}h ${rest}m"
     }
 }.getOrDefault("")
+
+@Composable
+private fun OrdersListSkeleton(modifier: Modifier) {
+    val alpha = com.saporini.mobile_desktop.core.components.rememberSkeletonAlpha("orders-list")
+    Surface(modifier.alpha(alpha), shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, OrderBorder)) {
+        Column(Modifier.fillMaxSize().padding(8.dp).clipToBounds(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(6) {
+                Column(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(1.dp, OrderBorder, RoundedCornerShape(10.dp)).padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.width(64.dp).height(16.dp))
+                        Spacer(Modifier.weight(1f))
+                        com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.width(40.dp).height(11.dp), com.saporini.mobile_desktop.core.components.SkeletonLight)
+                    }
+                    com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.width(96.dp).height(30.dp), com.saporini.mobile_desktop.core.components.SkeletonLight, RoundedCornerShape(8.dp))
+                    com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.width(150.dp).height(11.dp), com.saporini.mobile_desktop.core.components.SkeletonLight)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.width(52.dp).height(22.dp), com.saporini.mobile_desktop.core.components.SkeletonLight, RoundedCornerShape(50))
+                        com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.width(96.dp).height(22.dp), com.saporini.mobile_desktop.core.components.SkeletonLight, RoundedCornerShape(50))
+                        Spacer(Modifier.weight(1f))
+                        com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.width(60.dp).height(16.dp))
+                    }
+                }
+            }
+        }
+    }
+}

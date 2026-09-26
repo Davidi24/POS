@@ -27,48 +27,61 @@ internal fun OrdersToolbar(
     history: Boolean, onHistoryChange: (Boolean) -> Unit
 ) {
     val phone = isPhoneWindow()
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val barWidth = maxOf(maxWidth, 950.dp)
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-            Row(Modifier.width(barWidth), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Orders", fontFamily = Inter(), fontWeight = FontWeight.Bold,
-                    fontSize = if (phone) 18.sp else 20.sp, color = Color(0xFF232422))
-                Spacer(Modifier.weight(1f))
-                HeaderDropdown(if (history) "History" else "Open orders", Icons.Outlined.ReceiptLong, Modifier.width(166.dp)) { close ->
-                    DropdownMenuItem(
-                        text = { HeaderText(if (history) "Open orders" else "History") },
-                        onClick = { onHistoryChange(!history); close() }
-                    )
-                }
-                Surface(
-                    modifier = Modifier.width(156.dp).height(52.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color.White,
-                    border = BorderStroke(1.dp, Color(0xFFE8E5E1))
-                ) {
-                    Row(Modifier.padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        listOf(false to "All", true to "Mine").forEach { (mine, label) ->
-                            val selected = mineOnly == mine
-                            Surface(
-                                onClick = { onMineChange(mine) },
-                                modifier = Modifier.weight(1f).fillMaxHeight(),
-                                shape = RoundedCornerShape(6.dp),
-                                color = if (selected) Color(0xFF4F7942) else Color.White
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    HeaderText(label, color = if (selected) Color.White else Color(0xFF222426))
-                                }
-                            }
+    val title: @Composable () -> Unit = {
+        Text("Orders", fontFamily = Inter(), fontWeight = FontWeight.Bold,
+            fontSize = if (phone) 18.sp else 20.sp, color = Color(0xFF232422))
+    }
+    val controls: @Composable () -> Unit = {
+        HeaderDropdown(if (history) "History" else "Open orders", Icons.Outlined.ReceiptLong, Modifier.width(146.dp)) { close ->
+            DropdownMenuItem(
+                text = { HeaderText(if (history) "Open orders" else "History") },
+                onClick = { onHistoryChange(!history); close() }
+            )
+        }
+        Surface(
+            modifier = Modifier.width(132.dp).height(44.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFFE8E5E1))
+        ) {
+            Row(Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                listOf(false to "All", true to "Mine").forEach { (mine, label) ->
+                    val selected = mineOnly == mine
+                    Surface(
+                        onClick = { onMineChange(mine) },
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (selected) Color(0xFF4F7942) else Color.White
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            HeaderText(label, color = if (selected) Color.White else Color(0xFF222426))
                         }
                     }
                 }
-                HeaderDropdown(progress?.label() ?: "Order progress", Icons.Outlined.Restaurant, Modifier.width(190.dp), progress?.let(::progressColor)) { close ->
-                    DropdownMenuItem(text = { HeaderText("All progress") }, onClick = { onProgressChange(null); close() })
-                    OrderFulfillmentStatus.entries.forEach { status ->
-                        DropdownMenuItem(text = { HeaderText(status.label()) }, leadingIcon = { ProgressDot(progressColor(status)) }, onClick = { onProgressChange(status); close() })
-                    }
+            }
+        }
+        HeaderDropdown(progress?.label() ?: "Order progress", Icons.Outlined.Restaurant, Modifier.width(170.dp), progress?.let(::progressColor)) { close ->
+            DropdownMenuItem(text = { HeaderText("All progress") }, onClick = { onProgressChange(null); close() })
+            OrderFulfillmentStatus.entries.forEach { status ->
+                DropdownMenuItem(text = { HeaderText(status.label()) }, leadingIcon = { ProgressDot(progressColor(status)) }, onClick = { onProgressChange(status); close() })
+            }
+        }
+        SearchField(query, onQueryChange, Modifier.width(240.dp), placeholder = "Search orders", height = 44.dp)
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth >= 950.dp) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                title()
+                Spacer(Modifier.weight(1f))
+                controls()
+            }
+        } else {
+            // Narrow: the title on its own line, the filters scroll sideways under it.
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                title()
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    controls()
                 }
-                SearchField(query, onQueryChange, Modifier.width(280.dp), placeholder = "Search orders")
             }
         }
     }
@@ -78,12 +91,12 @@ internal fun OrdersToolbar(
 private fun HeaderDropdown(label: String, icon: ImageVector, modifier: Modifier, tint: Color? = null, choices: @Composable ColumnScope.(() -> Unit) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
-        Surface(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().height(52.dp),
+        Surface(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().height(44.dp),
             shape = RoundedCornerShape(8.dp), color = Color.White, border = BorderStroke(1.dp, Color(0xFFE8E5E1))) {
-            Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (tint != null) ProgressDot(tint) else Icon(icon, null, Modifier.size(20.dp), tint = Color(0xFF222426))
+            Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (tint != null) ProgressDot(tint) else Icon(icon, null, Modifier.size(18.dp), tint = Color(0xFF222426))
                 HeaderText(label, Modifier.weight(1f), tint ?: Color(0xFF222426))
-                Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp), tint = Color(0xFF222426))
+                Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp), tint = Color(0xFF222426))
             }
         }
         DropdownMenu(expanded, { expanded = false }, modifier = Modifier.background(Color.White)) { choices { expanded = false } }
@@ -91,7 +104,7 @@ private fun HeaderDropdown(label: String, icon: ImageVector, modifier: Modifier,
 }
 
 @Composable private fun HeaderText(text: String, modifier: Modifier = Modifier, color: Color = Color(0xFF222426)) {
-    Text(text, modifier, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = color, maxLines = 1)
+    Text(text, modifier, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = color, maxLines = 1)
 }
 @Composable private fun ProgressDot(color: Color) { Box(Modifier.size(9.dp).background(color, RoundedCornerShape(50))) }
 private fun progressColor(status: OrderFulfillmentStatus): Color = when (status) {

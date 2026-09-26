@@ -1,6 +1,5 @@
 package pos.pos.kds.service;
 
-import com.github.f4b6a3.uuid.UuidCreator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -184,7 +183,9 @@ public class KdsSupport {
         }
 
         for (int attempt = 0; attempt < TICKET_NUMBER_ATTEMPTS; attempt++) {
-            String suffix = UuidCreator.getTimeOrdered().toString()
+            // Random, not time-ordered: a time-ordered UUID's first 8 characters stay the same for ~27 seconds,
+            // so tickets created close together collided and sending to the kitchen failed.
+            String suffix = UUID.randomUUID().toString()
                     .replace("-", "")
                     .substring(0, 8)
                     .toUpperCase();

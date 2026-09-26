@@ -9,10 +9,12 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import pos.pos.order.repository.OrderRepository;
 import pos.pos.reservation.entity.Reservation;
 import pos.pos.reservation.entity.ReservationTableAssignment;
 import pos.pos.reservation.enums.ReservationStatus;
 import pos.pos.reservation.repository.ReservationRepository;
+import pos.pos.reservation.repository.ReservationTableAssignmentRepository;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
@@ -58,6 +60,12 @@ class RestaurantTableAvailabilityServiceTest {
     @Mock
     private TableCategoryRepository tableCategoryRepository;
 
+    @Mock
+    private ReservationTableAssignmentRepository reservationTableAssignmentRepository;
+
+    @Mock
+    private OrderRepository orderRepository;
+
     @Spy
     private RestaurantTableMapper restaurantTableMapper;
 
@@ -68,7 +76,9 @@ class RestaurantTableAvailabilityServiceTest {
         RestaurantTableSupport restaurantTableSupport = new RestaurantTableSupport(
                 restaurantTableRepository,
                 tableCategoryRepository,
-                restaurantTableMapper
+                restaurantTableMapper,
+                reservationTableAssignmentRepository,
+                orderRepository
         );
         restaurantTableAvailabilityService = new RestaurantTableAvailabilityService(
                 restaurantScopeService,

@@ -9,6 +9,7 @@ import pos.pos.reservation.repository.ReservationRepository;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.tables.entity.RestaurantTable;
 import pos.pos.tables.enums.TableStatus;
+import pos.pos.tables.service.TableStatusWindowPolicy;
 import pos.pos.tables.service.RestaurantTableSupport;
 
 import java.time.OffsetDateTime;
@@ -40,6 +41,7 @@ public class ReservationAvailabilitySupport {
 
     private final ReservationRepository reservationRepository;
     private final RestaurantTableSupport restaurantTableSupport;
+    private final ReservationRuleResolver reservationRuleResolver;
 
     List<ReservationAvailabilityOptionResponse> availabilityOptionsForBranch(
             Branch branch,
@@ -82,15 +84,23 @@ public class ReservationAvailabilitySupport {
                 branch.getRestaurant().getId(),
                 branch.getId()
         );
-        Map<UUID, RestaurantTable> selectedTables = requireSelectableTables(snapshot, uniqueTableIds);
+        Map<UUID, RestaurantTable> selectedTables = requireSelectableTables(snapshot, uniqueTableIds, reservationStart);
 
         UUID resolvedPrimaryTableId = primaryTableId == null ? uniqueTableIds.getFirst() : primaryTableId;
         if (!selectedTables.containsKey(resolvedPrimaryTableId)) {
             throw new AuthException("primaryTableId must reference one of the selected tableIds", HttpStatus.BAD_REQUEST);
         }
 
+        // Lock the chosen tables (and tables merged into them) before checking for overlaps.
+        // A second booking for the same table waits here, then sees the first one and gets a conflict.
+        Set<UUID> tablesToLock = new java.util.TreeSet<>(selectedTables.keySet());
+        for (UUID tableId : selectedTables.keySet()) {
+            snapshot.childrenByParentId().getOrDefault(tableId, List.of()).forEach(child -> tablesToLock.add(child.getId()));
+        }
+        restaurantTableSupport.lockTablesForBooking(branch.getId(), tablesToLock);
+
         Set<UUID> unavailableTableIds = overlappingAssignedTableIds(
-                branch.getId(),
+                branch,
                 reservationStart,
                 reservationEnd,
                 reservationId
@@ -145,19 +155,22 @@ public class ReservationAvailabilitySupport {
             OffsetDateTime reservationEnd
     ) {
         Set<UUID> unavailableTableIds = overlappingAssignedTableIds(
-                branch.getId(),
+                branch,
                 reservationStart,
                 reservationEnd,
                 null
         );
 
+        // Live merges and statuses only matter close to now; later windows treat every table on its own.
+        boolean liveStateApplies = TableStatusWindowPolicy.currentStatusApplies(reservationStart);
         return snapshot.tables().stream()
-                // It keeps only root/main tables.
-                .filter(table -> table.getMergedInto() == null)
+                .filter(table -> !liveStateApplies || table.getMergedInto() == null)
                 .filter(RestaurantTable::isActive)
-                .filter(table -> table.getStatus() == TableStatus.AVAILABLE)
+                .filter(table -> !liveStateApplies || table.getStatus() == TableStatus.AVAILABLE)
                 .map(table -> {
-                    List<RestaurantTable> children = snapshot.childrenByParentId().getOrDefault(table.getId(), List.of());
+                    List<RestaurantTable> children = liveStateApplies
+                            ? snapshot.childrenByParentId().getOrDefault(table.getId(), List.of())
+                            : List.of();
                     boolean blocked = unavailableTableIds.contains(table.getId())
                             || children.stream().anyMatch(child -> unavailableTableIds.contains(child.getId()));
                     if (blocked) {
@@ -165,12 +178,15 @@ public class ReservationAvailabilitySupport {
                     }
                     return new AvailableRootTable(
                             table,
-                            restaurantTableSupport.effectiveCapacity(table, children)
+                            restaurantTableSupport.effectiveCapacity(table, children),
+                            groupPriority(table)
                     );
                 })
                 .filter(Objects::nonNull)
+                // Tables from the highest-priority group are explored first.
                 .sorted(Comparator
-                        .comparingInt(AvailableRootTable::effectiveCapacity)
+                        .comparingInt(AvailableRootTable::groupPriority)
+                        .thenComparingInt(AvailableRootTable::effectiveCapacity)
                         .thenComparing(table -> table.table().getTableNumber(), String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
@@ -182,16 +198,18 @@ public class ReservationAvailabilitySupport {
     // New reservation:      18:00 - 20:00
     // Overlap exists → table is unavailable
     private Set<UUID> overlappingAssignedTableIds(
-            UUID branchId,
+            Branch branch,
             OffsetDateTime reservationStart,
             OffsetDateTime reservationEnd,
             UUID currentReservationId
     ) {
+        // The rule's buffer keeps free time around every booking, so the next party can't sit down too early.
+        java.time.Duration buffer = reservationRuleResolver.buffer(branch, reservationStart);
         return reservationRepository.findAllByBranch_IdAndStatusInAndReservationStartLessThanAndReservationEndGreaterThanOrderByReservationStartAsc(
-                        branchId,
+                        branch.getId(),
                         BLOCKING_STATUSES,
-                        reservationEnd,
-                        reservationStart
+                        reservationEnd.plus(buffer),
+                        reservationStart.minus(buffer)
                 ).stream()
                 .filter(reservation -> !Objects.equals(reservation.getId(), currentReservationId))
                 .flatMap(reservation -> reservation.getTableAssignments().stream())
@@ -229,7 +247,9 @@ public class ReservationAvailabilitySupport {
         //Table 5 capacity 8     ✅ okay: 1 table, 2 extra seats
         return combinations.stream()
                 .sorted(Comparator //Java Comparator sorts ascending by default.
-                        .comparingInt(TableCombination::tableCount) // this check how many tables it has compare to the other object and renders them if equal it goes to the other check if nto the two other check are not visited
+                        // Groups ordered first in "Group tables" are preferred; ungrouped tables come last.
+                        .comparingInt(TableCombination::groupPriority)
+                        .thenComparingInt(TableCombination::tableCount) // this check how many tables it has compare to the other object and renders them if equal it goes to the other check if nto the two other check are not visited
                         .thenComparingInt(combination -> combination.totalCapacity() - partySize)
                         .thenComparing(TableCombination::tableNumbersKey, String.CASE_INSENSITIVE_ORDER)) // this compares the strings because "T1|T3" comes before "T1|T4"
                 .limit(limit)
@@ -246,7 +266,8 @@ public class ReservationAvailabilitySupport {
 
     private Map<UUID, RestaurantTable> requireSelectableTables(
             RestaurantTableSupport.BranchTableSnapshot snapshot,
-            Collection<UUID> tableIds
+            Collection<UUID> tableIds,
+            OffsetDateTime reservationStart
     ) {
         Map<UUID, RestaurantTable> tablesById = snapshot.tablesById();
         Map<UUID, RestaurantTable> selectedTables = new LinkedHashMap<>();
@@ -255,13 +276,13 @@ public class ReservationAvailabilitySupport {
             if (table == null) {
                 throw new AuthException("tableIds must only reference tables in this branch", HttpStatus.BAD_REQUEST);
             }
-            if (table.getMergedInto() != null) {
+            if (TableStatusWindowPolicy.currentStatusApplies(reservationStart) && table.getMergedInto() != null) {
                 throw new AuthException("Merged child tables cannot be assigned directly", HttpStatus.BAD_REQUEST);
             }
             if (!table.isActive()) {
                 throw new AuthException("Inactive tables cannot be assigned", HttpStatus.BAD_REQUEST);
             }
-            if (table.getStatus() != TableStatus.AVAILABLE) {
+            if (TableStatusWindowPolicy.currentStatusApplies(reservationStart) && table.getStatus() != TableStatus.AVAILABLE) {
                 throw new AuthException("Only AVAILABLE tables can be assigned", HttpStatus.BAD_REQUEST);
             }
             selectedTables.put(tableId, table);
@@ -292,7 +313,8 @@ public class ReservationAvailabilitySupport {
                         tableNumbers,
                         currentSelection.size(),
                         currentCapacity,
-                        String.join("|", tableNumbers)
+                        String.join("|", tableNumbers),
+                        currentSelection.stream().mapToInt(AvailableRootTable::groupPriority).max().orElse(Integer.MAX_VALUE)
                 ));
             }
             return;
@@ -350,8 +372,13 @@ public class ReservationAvailabilitySupport {
 
     record AvailableRootTable(
             RestaurantTable table,
-            int effectiveCapacity
+            int effectiveCapacity,
+            int groupPriority
     ) {
+    }
+
+    private static int groupPriority(RestaurantTable table) {
+        return table.getCategory() == null ? Integer.MAX_VALUE : table.getCategory().getDisplayOrder();
     }
 
     private record TableCombination(
@@ -359,7 +386,8 @@ public class ReservationAvailabilitySupport {
             List<String> tableNumbers,
             int tableCount,
             int totalCapacity,
-            String tableNumbersKey
+            String tableNumbersKey,
+            int groupPriority
     ) {
     }
 }

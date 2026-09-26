@@ -35,6 +35,14 @@ data class TableLayoutItemResponseDto(
     val status: String,
     val guestCount: Int? = null,
     val seatedAt: String? = null,
+    val nextReservationStart: String? = null,
+    val nextReservationEnd: String? = null,
+    val nextReservationCode: String? = null,
+    val nextReservationName: String? = null,
+    val currentOrderId: String? = null,
+    val currentOrderNumber: String? = null,
+    val currentOrderStatus: String? = null,
+    val currentOrderFulfillmentStatus: String? = null,
     val active: Boolean
 )
 

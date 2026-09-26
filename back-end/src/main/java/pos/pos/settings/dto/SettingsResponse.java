@@ -43,6 +43,9 @@ public class SettingsResponse {
     private Boolean enableQrOrdering;
     private Boolean enableTakeaway;
     private Boolean enableDelivery;
+    private Boolean adminsCanManageManagers;
+    private Boolean preOrdersEnabled;
+    private Integer preOrderLeadMinutes;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private UUID createdBy;

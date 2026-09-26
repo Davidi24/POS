@@ -47,7 +47,12 @@ public enum AppPermission {
     ORDER_AUDIT("Audit Orders", "View order audit trails and operational history"),
 
     KDS_READ("View Kitchen Display", "View kitchen display stations, boards, and tickets"),
-    KDS_UPDATE("Update Kitchen Display", "Update kitchen display ticket and item workflow state");
+    KDS_UPDATE("Update Kitchen Display", "Update kitchen display ticket and item workflow state"),
+
+    // Which app workspaces a user can open. These only gate entry; what they can do inside comes from the permissions above.
+    POS_ACCESS("Open POS", "Open the POS workspace"),
+    KDS_ACCESS("Open Kitchen Display", "Open the kitchen display workspace"),
+    ADMIN_ACCESS("Open Admin Hub", "Open the admin hub workspace");
 
 
     private final String displayName;

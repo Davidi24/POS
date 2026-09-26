@@ -20,6 +20,7 @@ data class TableRequestDto(
 @Serializable
 data class TableResponseDto(
     val id: String,
+    val categoryId: String? = null,
     val mergedIntoTableId: String? = null,
     val mergedTableIds: List<String> = emptyList(),
     val tableNumber: String,
@@ -47,4 +48,40 @@ data class UpdateTableStatusRequestDto(
 @Serializable
 data class TableMergeRequestDto(
     val tableIds: List<String>
+)
+
+@Serializable
+data class TableCategoryResponseDto(
+    val id: String,
+    val code: String,
+    val name: String,
+    val displayOrder: Int = 0,
+    val active: Boolean = true
+)
+
+@Serializable
+data class TableCategoryRequestDto(
+    val code: String,
+    val name: String,
+    val defaultCapacity: Int,
+    val displayOrder: Int,
+    val active: Boolean
+)
+
+@Serializable
+data class UpdateTableCategoryTablesRequestDto(
+    val tableIds: List<String>
+)
+
+@Serializable
+data class TableAvailabilityDto(
+    val tableId: String,
+    val tableNumber: String,
+    val floor: String? = null,
+    val availableForRequestedWindow: Boolean? = null
+)
+
+@Serializable
+data class ReorderTableCategoriesRequestDto(
+    val categoryIds: List<String>
 )

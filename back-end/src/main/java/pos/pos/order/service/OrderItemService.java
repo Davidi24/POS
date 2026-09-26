@@ -149,6 +149,7 @@ public class OrderItemService {
         }
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        assertKitchenStatusAllowed(lineItem, request.getStatus());
         lineItem.setStatus(request.getStatus());
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
@@ -403,6 +404,7 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        assertKitchenStatusAllowed(lineItem, status);
         lineItem.setStatus(status);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
@@ -411,5 +413,15 @@ public class OrderItemService {
         kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
 
         return orderSupport.toLineItemResponse(lineItem);
+    }
+
+    // Sent/preparing only make sense for kitchen items; counter items go straight from pending to ready or served.
+    private void assertKitchenStatusAllowed(OrderLineItem lineItem, OrderLineItemStatus status) {
+        if ((status == OrderLineItemStatus.FIRED || status == OrderLineItemStatus.PREPARING) && !lineItem.goesToKitchen()) {
+            throw new AuthException(
+                    lineItem.getItemNameSnapshot() + " is served directly and is not sent to the kitchen",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
     }
 }
