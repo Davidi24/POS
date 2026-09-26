@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.pos.menu.ui
 
+import com.saporini.mobile_desktop.pos.menu.ui.online.OnlineMenuContent
 import com.saporini.mobile_desktop.pos.menu.domain.model.isUncategorizedSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.withUncategorizedLast
 import com.saporini.mobile_desktop.pos.menu.domain.model.isUncategorizedSection
@@ -222,6 +223,10 @@ private fun DomainMenuItem.toUiMenuItem(sectionId: String, category: String): Me
         price = formatPrice(basePrice),
         category = category,
         available = available,
+        sendToKitchen = sendToKitchen,
+        showOnline = showOnline,
+        onlineSectionId = onlineSectionId,
+        onlineSectionName = onlineSectionName,
         sku = sku,
         ingredients = ingredients.map { DraftIngredient(name = it, quantity = "", unit = "") },
         variants = variants.map {
@@ -256,10 +261,23 @@ fun MenuScreen(
     var showMenuEditor by remember { mutableStateOf(false) }
     var menuBeingEdited by remember { mutableStateOf<DomainMenu?>(null) }
     var menuStatus by remember { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
+    var showOnlineMenu by remember { mutableStateOf(false) }
+    var onlineItemCount by remember { mutableStateOf(0) }
     val selectedMenu = menuState.selectedMenu
+
+    LaunchedEffect(screenModel, showOnlineMenu) {
+        if (!showOnlineMenu) {
+            screenModel.loadOnlineMenu().onSuccess { onlineMenu ->
+                onlineItemCount = onlineMenu.sections.sumOf { it.items.size }
+            }
+        }
+    }
 
     PlatformBackHandler(enabled = selectedMenu != null && !showMenuEditor) {
         screenModel.closeMenu()
+    }
+    PlatformBackHandler(enabled = showOnlineMenu && selectedMenu == null) {
+        showOnlineMenu = false
     }
 
     // createMenu/updateMenu/deleteMenu predate the Result<T> pattern used
@@ -290,15 +308,24 @@ fun MenuScreen(
             "MENUS_CREATE" in currentUser?.permissions.orEmpty()
 
     Box(modifier = modifier.fillMaxSize()) {
-        if (selectedMenu == null) {
+        if (showOnlineMenu && selectedMenu == null) {
+            OnlineMenuContent(
+                model = screenModel,
+                canManageMenus = canManageMenus,
+                onBack = { showOnlineMenu = false },
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (selectedMenu == null) {
             MenuCoverUi(
                 state = menuState,
                 canManageMenus = canManageMenus,
+                onlineItemCount = onlineItemCount,
                 profileInitials = listOfNotNull(
                     currentUser?.firstName?.trim()?.firstOrNull(),
                     currentUser?.lastName?.trim()?.firstOrNull()
                 ).joinToString("").uppercase().ifEmpty { "?" },
                 onOpenMenu = screenModel::openMenu,
+                onOpenOnlineMenu = { showOnlineMenu = true },
                 onAddMenu = {
                     screenModel.clearError()
                     menuBeingEdited = null
@@ -716,12 +743,12 @@ private fun MenuDetailsContent(
                 ) {
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier.size(46.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = "Back to all menus",
-                            modifier = Modifier.size(30.dp),
+                            modifier = Modifier.size(24.dp),
                             tint = TextInk
                         )
                     }
@@ -755,7 +782,8 @@ private fun MenuDetailsContent(
                             selectedCategory = item.category.takeIf { cat -> sections.any { it.name == cat } } ?: "All"
                             selectedSearchItemName = item.name
                         },
-                        modifier = Modifier.width(280.dp)
+                        modifier = Modifier.width(240.dp),
+                        height = 44.dp
                     )
                 }
             }
@@ -917,7 +945,8 @@ private fun MenuDetailsContent(
                     showAddItemDialog = false
                     itemDialogStatus = DialogActionStatus.Idle
                 },
-                onSave = { name, priceLabel, sku, description, imageFileName, available, ingredients, _ ->
+                loadOnlineSections = screenModel::loadOnlineMenuSections,
+                onSave = { name, priceLabel, sku, description, imageFileName, available, sendToKitchen, online, ingredients, _ ->
                     val targetSection = sections.firstOrNull { it.name == selectedCategory && it.id != null }
                     if (targetSection?.id == null) {
                         itemDialogStatus = DialogActionStatus.Failed(
@@ -938,6 +967,10 @@ private fun MenuDetailsContent(
                                     description = description,
                                     basePrice = basePrice,
                                     available = available,
+                                    sendToKitchen = sendToKitchen,
+                                    showOnline = online.show,
+                                    onlineSectionId = online.sectionId,
+                                    onlineSectionName = online.sectionName,
                                     displayOrder = localItems.count { it.category == category },
                                     ingredients = ingredients.toBackendIngredients()
                                 )
@@ -968,8 +1001,14 @@ private fun MenuDetailsContent(
                         description = editingItem.description.takeIf { it.isNotBlank() },
                         imageFileName = editingItem.imageFileName,
                         available = editingItem.available,
+                        sendToKitchen = editingItem.sendToKitchen,
+                        showOnline = editingItem.showOnline,
+                        onlineSectionId = editingItem.onlineSectionId,
+                        onlineSectionName = editingItem.onlineSectionName,
                         ingredients = editingItem.ingredients
                     ),
+                    sectionName = editingItem.category,
+                    loadOnlineSections = screenModel::loadOnlineMenuSections,
                     sections = sections,
                     currentSectionId = editingItem.sectionId,
                     status = itemDialogStatus,
@@ -991,7 +1030,7 @@ private fun MenuDetailsContent(
                         itemPendingDelete = editingItem
                         deleteItemStatus = DialogActionStatus.Idle
                     },
-                    onSave = { name, priceLabel, sku, description, imageFileName, available, ingredients, newSectionId ->
+                    onSave = { name, priceLabel, sku, description, imageFileName, available, sendToKitchen, online, ingredients, newSectionId ->
                         val basePrice = parsePrice(priceLabel)
                         val sectionId = editingItem.sectionId
                         val itemId = editingItem.id
@@ -1008,6 +1047,10 @@ private fun MenuDetailsContent(
                                         description = description,
                                         basePrice = basePrice,
                                         available = available,
+                                        sendToKitchen = sendToKitchen,
+                                        showOnline = online.show,
+                                        onlineSectionId = online.sectionId,
+                                        onlineSectionName = online.sectionName,
                                         displayOrder = editingItem.displayOrder,
                                         ingredients = ingredients.toBackendIngredients(),
                                         sectionId = newSectionId
@@ -1383,6 +1426,7 @@ private fun MenuDetailsContent(
                                                         description = item.description,
                                                         basePrice = item.basePrice,
                                                         available = item.available,
+                                                        sendToKitchen = item.sendToKitchen,
                                                         displayOrder = index,
                                                         ingredients = item.ingredients.toBackendIngredients()
                                                     )
@@ -1484,7 +1528,7 @@ private fun MenuDetailsContent(
 
 
 @Composable
-private fun ReorderableMenuItemGrid(
+internal fun ReorderableMenuItemGrid(
     items: List<MenuItem>,
     columns: Int,
     isPhone: Boolean = false,

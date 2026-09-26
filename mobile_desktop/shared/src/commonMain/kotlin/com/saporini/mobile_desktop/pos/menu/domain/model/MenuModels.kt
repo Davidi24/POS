@@ -58,7 +58,14 @@ data class MenuItem(
     val displayOrder: Int,
     val ingredients: List<String>,
     val variants: List<MenuVariant>,
-    val optionGroups: List<MenuItemOptionGroup>
+    val optionGroups: List<MenuItemOptionGroup>,
+    // False for counter items like a cola: served directly, never sent to the kitchen.
+    val sendToKitchen: Boolean = true,
+    // True when customers see it in the online menu; otherwise it's staff menu only.
+    val showOnline: Boolean = false,
+    // The online menu section it sits in, when it's online.
+    val onlineSectionId: String? = null,
+    val onlineSectionName: String? = null
 )
 
 data class MenuVariant(
@@ -124,4 +131,41 @@ data class OptionItem(
     val priceDelta: Double,
     val available: Boolean,
     val displayOrder: Int
+)
+
+// The online menu (website): its own sections, filled with dishes that point at them.
+data class OnlineMenuSection(
+    val id: String,
+    val name: String,
+    val displayOrder: Int,
+    val itemCount: Long
+)
+
+data class OnlineMenu(
+    val sections: List<OnlineMenuSectionView>
+)
+
+data class OnlineMenuSectionView(
+    val id: String,
+    val name: String,
+    val items: List<OnlineMenuDish>
+)
+
+data class OnlineMenuDish(
+    val id: String,
+    val sku: String?,
+    val name: String,
+    val description: String?,
+    val basePrice: Double,
+    val imageUrl: String?,
+    val ingredients: List<String>,
+    val available: Boolean,
+    val sendToKitchen: Boolean,
+    val displayOrder: Int,
+    // Where it lives in the staff menus, e.g. "Dinner · Pasta".
+    val menuName: String?,
+    val menuSectionName: String?,
+    // False when customers can't see it right now (e.g. sold out).
+    val visible: Boolean,
+    val hiddenReason: String?
 )

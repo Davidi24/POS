@@ -152,6 +152,10 @@ class DefaultMenuRepository(
                 basePrice = input.basePrice,
                 imageUrl = input.imageUrl,
                 available = input.available,
+                sendToKitchen = input.sendToKitchen,
+                showOnline = input.showOnline,
+                onlineSectionId = input.onlineSectionId,
+                onlineSectionName = input.onlineSectionName,
                 displayOrder = input.displayOrder,
                 ingredients = input.ingredients
             )
@@ -175,6 +179,10 @@ class DefaultMenuRepository(
                 basePrice = input.basePrice,
                 imageUrl = input.imageUrl,
                 available = input.available,
+                sendToKitchen = input.sendToKitchen,
+                showOnline = input.showOnline,
+                onlineSectionId = input.onlineSectionId,
+                onlineSectionName = input.onlineSectionName,
                 displayOrder = input.displayOrder,
                 ingredients = input.ingredients,
                 sectionId = input.sectionId
@@ -371,5 +379,24 @@ class DefaultMenuRepository(
 
     override suspend fun deleteOptionItem(groupId: String, itemId: String) {
         api.deleteOptionItem(groupId, itemId)
+    }
+
+    override suspend fun getOnlineMenu(restaurantId: String): OnlineMenu =
+        api.getOnlineMenu(restaurantId).toDomain()
+
+    override suspend fun getOnlineMenuSections(restaurantId: String): List<OnlineMenuSection> =
+        api.getOnlineMenuSections(restaurantId).map { it.toDomain() }
+
+    override suspend fun renameOnlineMenuSection(restaurantId: String, sectionId: String, name: String): OnlineMenuSection =
+        api.renameOnlineMenuSection(restaurantId, sectionId, RenameOnlineMenuSectionRequestDto(name)).toDomain()
+
+    override suspend fun reorderOnlineMenuSections(restaurantId: String, sectionIds: List<String>): List<OnlineMenuSection> =
+        api.reorderOnlineMenuSections(restaurantId, ReorderOnlineMenuSectionsRequestDto(sectionIds)).map { it.toDomain() }
+
+    override suspend fun reorderOnlineMenuItems(restaurantId: String, sectionId: String, itemIds: List<String>): OnlineMenu =
+        api.reorderOnlineMenuItems(restaurantId, sectionId, ReorderOnlineMenuItemsRequestDto(itemIds)).toDomain()
+
+    override suspend fun deleteOnlineMenuSection(restaurantId: String, sectionId: String) {
+        api.deleteOnlineMenuSection(restaurantId, sectionId)
     }
 }

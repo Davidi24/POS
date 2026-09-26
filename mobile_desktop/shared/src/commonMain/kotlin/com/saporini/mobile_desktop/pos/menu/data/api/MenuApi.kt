@@ -335,4 +335,34 @@ class MenuApi(
     suspend fun deleteOptionItem(groupId: String, itemId: String) {
         client.delete(endpoint("/option-groups/$groupId/items/$itemId"))
     }
+
+    // Online menu
+
+    suspend fun getOnlineMenu(restaurantId: String): OnlineMenuDto =
+        client.get(endpoint("/restaurants/$restaurantId/online-menu")).body()
+
+    suspend fun getOnlineMenuSections(restaurantId: String): List<OnlineMenuSectionDto> =
+        client.get(endpoint("/restaurants/$restaurantId/online-menu/sections")).body()
+
+    suspend fun renameOnlineMenuSection(restaurantId: String, sectionId: String, request: RenameOnlineMenuSectionRequestDto): OnlineMenuSectionDto =
+        client.patch(endpoint("/restaurants/$restaurantId/online-menu/sections/$sectionId")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun reorderOnlineMenuSections(restaurantId: String, request: ReorderOnlineMenuSectionsRequestDto): List<OnlineMenuSectionDto> =
+        client.put(endpoint("/restaurants/$restaurantId/online-menu/sections/order")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun reorderOnlineMenuItems(restaurantId: String, sectionId: String, request: ReorderOnlineMenuItemsRequestDto): OnlineMenuDto =
+        client.put(endpoint("/restaurants/$restaurantId/online-menu/sections/$sectionId/items/order")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun deleteOnlineMenuSection(restaurantId: String, sectionId: String) {
+        client.delete(endpoint("/restaurants/$restaurantId/online-menu/sections/$sectionId"))
+    }
 }

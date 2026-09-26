@@ -62,4 +62,22 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, UUID> {
         UUID getMenuId();
         Long getItemCount();
     }
+
+    // Every dish placed in the restaurant's online menu, with its staff menu and section for the visibility checks.
+    @Query("""
+            select i from MenuItem i
+            join fetch i.section s
+            join fetch s.menu m
+            join fetch i.onlineSection o
+            where o.restaurant.id = :restaurantId
+            order by i.onlineDisplayOrder asc, i.name asc
+            """)
+    List<MenuItem> findOnlineByRestaurantId(UUID restaurantId);
+
+    long countByOnlineSection_Id(UUID onlineSectionId);
+
+    List<MenuItem> findByOnlineSection_Id(UUID onlineSectionId);
+
+    @Query("select coalesce(max(i.onlineDisplayOrder), -1) from MenuItem i where i.onlineSection.id = :onlineSectionId")
+    int findMaxOnlineDisplayOrder(UUID onlineSectionId);
 }

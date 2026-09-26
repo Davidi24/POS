@@ -2,6 +2,7 @@ package pos.pos.menu.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.menu.MenuNotFoundException;
 import pos.pos.exception.restaurant.RestaurantNotFoundException;
 import pos.pos.menu.dto.response.PublicMenuResponse;
@@ -34,6 +35,7 @@ public class PublicMenuService {
     private final MenuItemRepository menuItemRepository;
     private final PublicMenuMapper publicMenuMapper;
 
+    @Transactional(readOnly = true)
     public List<PublicMenuResponse> getMenus(UUID restaurantId) {
         Restaurant restaurant = findPublicRestaurant(restaurantId);
         LocalDate today = LocalDate.now(ZoneId.of(restaurant.getTimezone()));
@@ -43,6 +45,8 @@ public class PublicMenuService {
                 .toList();
     }
 
+    // Read-only transaction: the mapper reads lazy collections (e.g. ingredients) and open-in-view is off.
+    @Transactional(readOnly = true)
     public PublicMenuResponse getMenu(UUID restaurantId, UUID menuId, boolean includeSections, boolean includeItems) {
         Restaurant restaurant = findPublicRestaurant(restaurantId);
         Menu menu = menuRepository.findPublicMenuByRestaurantIdAndId(restaurantId, menuId)
@@ -56,14 +60,19 @@ public class PublicMenuService {
         }
 
         List<MenuSection> sections = menuSectionRepository.findByMenuIdAndActiveTrueOrderByDisplayOrderAscNameAsc(menuId);
+        // Customers only see dishes staff switched on for the online menu.
         Map<UUID, List<MenuItem>> itemsBySectionId = includeItems
                 ? menuItemRepository.findByMenuIdAndAvailableTrueOrdered(menuId).stream()
+                .filter(MenuItem::isShowOnline)
                 .collect(Collectors.groupingBy(
                         item -> item.getSection().getId(),
                         Collectors.mapping(Function.identity(), Collectors.toList())
                 ))
                 : Map.of();
 
+        if (includeItems) {
+            sections = sections.stream().filter(section -> itemsBySectionId.containsKey(section.getId())).toList();
+        }
         return publicMenuMapper.toMenuResponse(menu, sections, itemsBySectionId);
     }
 

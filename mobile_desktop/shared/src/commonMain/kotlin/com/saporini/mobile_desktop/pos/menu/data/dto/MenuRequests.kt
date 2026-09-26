@@ -67,6 +67,10 @@ data class CreateMenuItemRequestDto(
     val basePrice: Double,
     val imageUrl: String? = null,
     val available: Boolean? = null,
+    val sendToKitchen: Boolean? = null,
+    val showOnline: Boolean? = null,
+    val onlineSectionId: String? = null,
+    val onlineSectionName: String? = null,
     val displayOrder: Int? = null,
     val ingredients: List<String> = emptyList()
 )
@@ -79,6 +83,10 @@ data class UpdateMenuItemRequestDto(
     val basePrice: Double,
     val imageUrl: String? = null,
     val available: Boolean,
+    val sendToKitchen: Boolean? = null,
+    val showOnline: Boolean? = null,
+    val onlineSectionId: String? = null,
+    val onlineSectionName: String? = null,
     val displayOrder: Int,
     val ingredients: List<String> = emptyList(),
     val sectionId: String? = null
@@ -193,4 +201,14 @@ data class UpdateOptionItemRequestDto(
 @Serializable
 data class UpdateOptionItemAvailabilityRequestDto(
     val available: Boolean
+)
+
+@Serializable
+data class RenameOnlineMenuSectionRequestDto(
+    val name: String
+)
+
+@Serializable
+data class ReorderOnlineMenuSectionsRequestDto(
+    val sectionIds: List<String>
 )

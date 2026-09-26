@@ -13,6 +13,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -37,6 +38,19 @@ public class CreateMenuItemRequest {
     private String imageUrl;
 
     private Boolean available;
+
+    /** Defaults to true when omitted. */
+    private Boolean sendToKitchen;
+
+    /** Defaults to false (staff menu only) when omitted. */
+    private Boolean showOnline;
+
+    /** Online section to place the dish in; wins over onlineSectionName. */
+    private UUID onlineSectionId;
+
+    /** Online section by name: reused if one exists (any case), created otherwise. Defaults to the dish's own section name. */
+    @Size(max = 150, message = "onlineSectionName must be at most 150 characters")
+    private String onlineSectionName;
 
     @Min(value = 0, message = "displayOrder must be greater than or equal to 0")
     private Integer displayOrder;

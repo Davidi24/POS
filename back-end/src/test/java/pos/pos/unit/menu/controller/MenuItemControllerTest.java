@@ -156,7 +156,7 @@ class MenuItemControllerTest {
         private MenuItemSummaryResponse availabilityResponse;
 
         StubMenuItemService() {
-            super(null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

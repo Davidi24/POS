@@ -40,6 +40,19 @@ public class UpdateMenuItemRequest {
     @NotNull(message = "available is required")
     private Boolean available;
 
+    /** Keeps the current value when omitted, so older clients don't reset it. */
+    private Boolean sendToKitchen;
+
+    /** Keeps the current value when omitted (unless an online section is given, which also switches it on). */
+    private Boolean showOnline;
+
+    /** Online section to place the dish in; wins over onlineSectionName. */
+    private UUID onlineSectionId;
+
+    /** Online section by name: reused if one exists (any case), created otherwise. */
+    @Size(max = 150, message = "onlineSectionName must be at most 150 characters")
+    private String onlineSectionName;
+
     @NotNull(message = "displayOrder is required")
     @Min(value = 0, message = "displayOrder must be greater than or equal to 0")
     private Integer displayOrder;

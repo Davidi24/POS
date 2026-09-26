@@ -95,7 +95,8 @@ class MenuSectionServiceTest {
                 menuMapper,
                 actorScopeService,
                 menuPolicy,
-                restaurantValidationService
+                restaurantValidationService,
+                org.mockito.Mockito.mock(pos.pos.menu.service.OnlineMenuService.class)
         );
     }
 

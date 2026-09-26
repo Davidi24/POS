@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.pos.menu.ui.menu
 
+import androidx.compose.material.icons.outlined.Public
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -111,10 +112,12 @@ private val CoverMuted = Color(0xFF6D706B)
 fun MenuCoverUi(
     state: MenuUiState,
     canManageMenus: Boolean,
+    onlineItemCount: Int = 0,
     onOpenMenu: (String) -> Unit,
     onAddMenu: () -> Unit,
     onEditMenu: (Menu) -> Unit,
     onRetry: () -> Unit,
+    onOpenOnlineMenu: () -> Unit = {},
     modifier: Modifier = Modifier,
     deletingMenuId: String? = null,
     profileInitials: String = "?"
@@ -149,7 +152,8 @@ fun MenuCoverUi(
         val isWidePhone = isWidePhoneWindow()
         val widePhoneActionsWidth = minOf(360.dp, maxWidth * 0.55f)
         Column(Modifier.fillMaxSize()) {
-            if (isPhone) {
+            // Only when the app itself is in phone mode; wider windows already show the main top bar.
+            if (isPhone && com.saporini.mobile_desktop.core.ui.isPhoneWindow()) {
                 PosPhoneTopBar(initials = profileInitials)
             }
             Column(
@@ -288,7 +292,9 @@ fun MenuCoverUi(
                             onReorder = { orderedMenus = it },
                             onOpenMenu = onOpenMenu,
                             onEditMenu = onEditMenu,
-                            onAddMenu = onAddMenu
+                            onAddMenu = onAddMenu,
+                            onOpenOnlineMenu = onOpenOnlineMenu,
+                            onlineItemCount = onlineItemCount
                         )
                     }
                 }
@@ -328,8 +334,9 @@ private fun MenuCoverActions(
         horizontalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val reorderButtonModifier = if (isPhone) Modifier.weight(0.82f).height(38.dp) else Modifier
-        val createButtonModifier = if (isPhone) Modifier.weight(1.18f).height(44.dp) else Modifier
+        val sharedButtonHeight = if (isPhone) 40.dp else 48.dp
+        val reorderButtonModifier = if (isPhone) Modifier.weight(0.82f).height(sharedButtonHeight) else Modifier.height(sharedButtonHeight)
+        val createButtonModifier = if (isPhone) Modifier.weight(1.18f).height(sharedButtonHeight) else Modifier.height(sharedButtonHeight)
         TextButton(
             onClick = onToggleReorder,
             shape = RoundedCornerShape(if (isPhone) 5.dp else 8.dp),
@@ -363,7 +370,7 @@ private fun MenuCoverActions(
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                text = if (isReordering) "Save Changes" else "Edit Order",
+                text = if (isReordering) "Save Positions" else "Change Positions",
                 fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = if (isPhone) 12.sp else 14.sp,
@@ -394,7 +401,7 @@ private fun MenuCoverActions(
 
         MenuValidationToast(
             visible = showReorderToast,
-            message = "You need at least two menus to change the order",
+            message = "You need at least two menus to change positions",
             placement = ToastPlacement.Below,
             arrowAlignment = Alignment.Start,
             anchorAlignment = Alignment.BottomStart,
@@ -463,7 +470,7 @@ private fun MenuCoverSkeleton(
 
     Box(
         modifier = modifier
-            .padding(top = 8.dp, end = 28.dp)
+            .padding(top = 8.dp)
             .clip(shape)
             .background(Color(0xFFF3F3F3))
     ) {
@@ -554,9 +561,13 @@ private fun MenuCoverCollection(
     onReorder: (List<Menu>) -> Unit,
     onOpenMenu: (String) -> Unit,
     onEditMenu: (Menu) -> Unit,
-    onAddMenu: () -> Unit
+    onAddMenu: () -> Unit,
+    onOpenOnlineMenu: () -> Unit,
+    onlineItemCount: Int
 ) {
-    val itemCount = menus.size + if (isReordering || !canManageMenus) 0 else 1
+    // Menus, then the Online menu preview (hidden while reordering), then "Add menu" for managers.
+    val showOnlineCover = !isReordering
+    val itemCount = menus.size + (if (showOnlineCover) 1 else 0) + if (isReordering || !canManageMenus) 0 else 1
     val rowCount = if (itemCount == 0) 0 else (itemCount + columns - 1) / columns
     val horizontalGap = if (isPhone) 18.dp else 24.dp
     val verticalGap = 20.dp
@@ -858,8 +869,23 @@ private fun MenuCoverCollection(
                 }
             }
 
+            if (showOnlineCover) {
+                val onlineSlot = slotPosition(menus.size)
+                OnlineMenuCover(
+                    compact = compact,
+                    itemCount = onlineItemCount,
+                    onClick = onOpenOnlineMenu,
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(onlineSlot.x.roundToInt(), onlineSlot.y.roundToInt())
+                        }
+                        .width(cardWidth)
+                        .height(coverHeight)
+                )
+            }
+
             if (!isReordering && canManageMenus) {
-                val addSlot = slotPosition(menus.size)
+                val addSlot = slotPosition(menus.size + if (showOnlineCover) 1 else 0)
                 AddMenuCover(
                     compact = compact,
                     onClick = onAddMenu,
@@ -999,7 +1025,7 @@ private fun MenuBookCover(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 8.dp, end = 28.dp)
+                .padding(top = 8.dp)
                 .graphicsLayer {
                     scaleX = dragScale
                     scaleY = dragScale
@@ -1189,11 +1215,8 @@ private fun MenuBookCover(
                     text = "Edit menu",
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        // Was y = -2.dp, which poked past this card's own top edge —
-                        // for the first grid row that lands right on the scroll
-                        // viewport's clip boundary, slicing the button's top off.
-                        // +2.dp keeps it fully inside the card, still overlapping the
-                        // corner nicely.
+                        // Keep a small right inset so the edit action sits on the book
+                        // face and remains clear of the menu grid's clipping boundary.
                         .offset(x = (-4).dp, y = 2.dp)
                         .zIndex(3f)
                 ) {
@@ -1364,6 +1387,136 @@ private fun CoverMetadataRow(
 }
 
 @Composable
+private fun OnlineMenuCover(
+    compact: Boolean,
+    itemCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Purple is reserved for the Online Menu; it is deliberately not part of the
+    // selectable palette used by regular menu covers.
+    val theme = MenuCoverTheme(
+        background = Color(0xFFE3DDF1),
+        texture = Color(0xFF7563A2),
+        ink = Color(0xFF382D50)
+    )
+    val cardShape = RoundedCornerShape(
+        topStart = 0.dp,
+        topEnd = 18.dp,
+        bottomEnd = 18.dp,
+        bottomStart = 0.dp
+    )
+
+    Box(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 8.dp)
+                .shadow(13.dp, cardShape, clip = false, spotColor = Color(0x44141414))
+                .clip(cardShape)
+                .clickable(onClick = onClick)
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                drawRect(theme.background)
+                var x = -size.height * 0.08f
+                while (x < size.width) {
+                    drawLine(
+                        color = theme.texture.copy(alpha = 0.16f),
+                        start = Offset(x, 0f),
+                        end = Offset(x + size.height * 0.14f, size.height),
+                        strokeWidth = 1.2f
+                    )
+                    x += 8f
+                }
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        listOf(Color.White.copy(alpha = 0.12f), Color.Transparent, Color.Black.copy(alpha = 0.06f))
+                    )
+                )
+            }
+
+            Box(
+                modifier = Modifier.align(Alignment.CenterStart)
+                    .width(if (compact) 38.dp else 44.dp)
+                    .fillMaxHeight()
+                    .background(Brush.horizontalGradient(listOf(Color(0xFF151616), Color(0xFF393B39), Color(0xFF111212))))
+            ) {
+                Canvas(Modifier.fillMaxSize()) {
+                    drawLine(Color(0xFF050505), Offset(size.width - 1f, 0f), Offset(size.width - 1f, size.height), 2f)
+                    drawLine(
+                        color = Color(0xFF898989),
+                        start = Offset(size.width - 9f, 0f),
+                        end = Offset(size.width - 9f, size.height),
+                        strokeWidth = 2f,
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 10f))
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.fillMaxSize().padding(
+                    start = if (compact) 62.dp else 72.dp,
+                    end = if (compact) 16.dp else 22.dp,
+                    top = if (compact) 18.dp else 26.dp,
+                    bottom = if (compact) 14.dp else 20.dp
+                ),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                AutoSizeCoverTitle(
+                    text = "ONLINE MENU",
+                    maxFontSize = if (compact) 27.sp else 35.sp,
+                    minFontSize = if (compact) 16.sp else 20.sp,
+                    letterSpacing = 1.sp,
+                    color = theme.ink,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Box(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Public,
+                        contentDescription = "Online menu",
+                        modifier = Modifier.size(if (compact) 68.dp else 92.dp),
+                        tint = theme.ink
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CoverMetadataRow(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.FormatListBulleted,
+                                contentDescription = null,
+                                modifier = Modifier.size(if (compact) 16.dp else 20.dp)
+                            )
+                        },
+                        text = "$itemCount ${if (itemCount == 1) "item" else "items"}",
+                        color = theme.ink,
+                        compact = compact
+                    )
+                    Spacer(Modifier.height(if (compact) 14.dp else 20.dp))
+                    HorizontalDivider(color = theme.ink.copy(alpha = 0.7f))
+                    Spacer(Modifier.height(if (compact) 9.dp else 15.dp))
+                    Text(
+                        text = "OPEN MENU  →",
+                        fontFamily = Inter(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = if (compact) 12.sp else 15.sp,
+                        letterSpacing = 0.4.sp,
+                        color = theme.ink
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun AddMenuCover(
     compact: Boolean,
     onClick: () -> Unit,
@@ -1373,7 +1526,7 @@ private fun AddMenuCover(
 
     Box(
         modifier = modifier
-            .padding(40.dp)
+            .padding(top = 8.dp)
             .clip(shape)
             .background(Color(0xFFF3F3F1))
             .clickable(onClick = onClick),

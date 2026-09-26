@@ -64,6 +64,7 @@ public class MenuService {
     private final MenuPolicy menuPolicy;
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantValidationService restaurantValidationService;
+    private final OnlineMenuService onlineMenuService;
 
     //returns a paginated, filtered, sorted list of menus that the logged-in user is allowed to see.
     @Transactional(readOnly = true)
@@ -277,6 +278,7 @@ public class MenuService {
                             menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId()));
                 }
                 menuSectionRepository.deleteAll(sections);
+                onlineMenuService.removeEmptySections(menu.getRestaurant().getId());
             } else {
                 contentTransfer.preserveSections(menu, sections, restaurantScopeService.currentUserId(authentication));
             }
