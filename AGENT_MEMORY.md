@@ -1,11 +1,18 @@
 # Agent Memory — POS
 
 ## 2026-09-26 (Codex, feature/orders)
+**Did:** Committed the pending work in `13cfcfd` (menu-specific online-menu changes) and `4d00cb6` (remaining connected POS changes). Fast-forwarded local `develop` and `feature/menu-final-polish` to the same tip as `feature/orders`.
+**Why:** User asked to commit the accumulated changes and keep the local branches synchronized.
+**Verified/runtime:** Worktree clean after the two feature commits. Local branch heads were aligned; no remote push was performed. Tests were not run, per user instruction. Desktop app remains running after a successful compile/relaunch.
+**Files/modules touched:** AGENT_MEMORY.md; branch refs for `develop` and `feature/menu-final-polish`.
+**Left open / next steps:** Push the synchronized branches only if requested.
+
+## 2026-09-26 (Codex, feature/orders)
 **Did:** Removed the 28dp trailing inset from regular, online, and skeleton menu covers; expanded the Create Menu cover to the same allocated size; changed the cover action label to Change Positions / Save Positions and set it to the same height as Create Menu. Moved cover edit/info actions to the upper-right with a 4dp safe inset. Pinned the phone section-edit button outside the horizontally scrolling chip strip so it remains fully visible while chips scroll.
 **Why:** User requested no trailing white space, consistent cover/create sizing, a clearer position-change label, and no clipped edit controls.
 **Verified/runtime:** `mobile_desktop ./gradlew :desktopApp:compileKotlin --no-daemon --max-workers=2` passed with existing warnings; tests were not run. Desktop app relaunched and `:desktopApp:run` remains active. CUA app inventory did not surface native windows, so no live screenshot verification was available.
 **Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/menu/ui/menu/MenuCoverUi.kt`, `pos/menu/ui/section/CategoryFilterBar.kt`, `pos/menu/ui/online/OnlineMenuContent.kt`, AGENT_MEMORY.md.
-**Left open / next steps:** Commit the pending feature work and synchronize the local branches as requested.
+**Left open / next steps:** None.
 
 ## 2026-09-26 (Codex, feature/orders)
 **Did:** Fixed Online Menu dish reordering availability so the action remains visible when the selected section has at least two dishes, regardless of the active search filter. Shifted regular menu edit and info cover actions 28dp inward to keep them on the visible book face rather than in the cover wrapper's right margin.
