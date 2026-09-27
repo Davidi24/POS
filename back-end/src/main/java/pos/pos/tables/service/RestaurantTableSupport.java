@@ -52,6 +52,13 @@ public class RestaurantTableSupport {
     private final RestaurantTableMapper restaurantTableMapper;
     private final ReservationTableAssignmentRepository reservationTableAssignmentRepository;
     private final OrderRepository orderRepository;
+    private pos.pos.reservation.service.ReservationPolicy reservationPolicy;
+
+    // Optional so the table module works on its own (and in tests); gives each booking's hold time.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setReservationPolicy(pos.pos.reservation.service.ReservationPolicy reservationPolicy) {
+        this.reservationPolicy = reservationPolicy;
+    }
 
     // Loads all tables for a specific branch.
     // Also builds:
@@ -221,6 +228,18 @@ public class RestaurantTableSupport {
             response.setNextReservationEnd(reservation.getReservationEnd());
             response.setNextReservationCode(reservation.getReservationCode());
             response.setNextReservationName(reservation.getContactName());
+            response.setNextReservationId(reservation.getId());
+            response.setNextReservationStatus(reservation.getStatus());
+            response.setNextReservationPartySize(reservation.getPartySize());
+            response.setNextReservationArrivedGuests(reservation.getArrivedGuests());
+            response.setNextReservationHoldUntil(reservationPolicy == null
+                    ? reservation.getHoldUntil()
+                    : reservationPolicy.holdUntil(reservation));
+            if (reservationPolicy != null && response.getNextReservationHoldUntil() != null) {
+                var values = reservationPolicy.values(reservation.getRestaurant());
+                response.setNextReservationHoldWarningAt(response.getNextReservationHoldUntil()
+                        .minusMinutes(Math.max(0, values.holdMinutes() - values.holdWarningMinutes())));
+            }
         }
         Order currentOrder = currentOrdersByTableId.get(table.getId());
         if (currentOrder != null) {

@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -49,6 +51,13 @@ class ReservationsScreenModel(
     private val refreshMutex = Mutex()
     private var revision = 0L
     private var listRevision = 0L
+    private var loadedReservationsPage = 0
+    // Arrivals feed paging. `arrivalsFrom` stays fixed between refreshes so "load more" continues the same list.
+    private val arrivalsMutex = Mutex()
+    private var arrivalPagesLoaded = 0
+    private var arrivalsFrom: String? = null
+    private var arrivalsFloor: String? = null
+    private var requestedArrivalsFloor: String? = null
     private var detailRevision = 0L
     private var detailJob: Job? = null
 
@@ -71,7 +80,7 @@ class ReservationsScreenModel(
                     // Times are shown in the restaurant's zone; fall back to this computer's if it can't be loaded.
                     val settings = runCatching { repository.getReservationSettings(scope.restaurantId, scope.branchId) }.getOrNull()
                     RestaurantTime.use(settings?.timezone)
-                    _state.update { it.copy(rules = settings?.rules ?: ReservationRules.NONE) }
+                    _state.update { it.copy(rules = settings?.rules ?: ReservationRules.NONE, policy = settings?.policy ?: ReservationPolicy()) }
                     refresh()
                 }
             }
@@ -80,8 +89,62 @@ class ReservationsScreenModel(
 
     fun setFilter(filter: ReservationListFilter) {
         listRevision++
-        _state.update { it.copy(filter = filter, availabilityOptions = emptyList(), validation = null) }
+        loadedReservationsPage = 0
+        _state.update { it.copy(filter = filter, availabilityOptions = emptyList(), validation = null, hasMoreReservations = false, isLoadingMoreReservations = false) }
         refresh()
+    }
+
+    fun loadMoreReservations(): Job = work.launch {
+        val state = _state.value
+        if (!state.hasMoreReservations || state.isLoadingMoreReservations) return@launch
+        val filter = state.filter
+        if (filter.mode != ReservationListMode.TODAY && filter.mode != ReservationListMode.CALENDAR) return@launch
+        val scope = try { requireScope(READ_PERMISSION) } catch (error: Exception) {
+            _state.update { it.copy(error = failure(error, false)) }
+            return@launch
+        }
+        val token = revision
+        val requestRevision = listRevision
+        _state.update { it.copy(isLoadingMoreReservations = true, loadMoreReservationsFailed = false) }
+        // Waits for a refresh in progress, so the next page follows the pages it reloaded.
+        refreshMutex.lock()
+        try {
+            if (!_state.value.hasMoreReservations || requestRevision != listRevision) return@launch
+            val requestedPage = loadedReservationsPage + 1
+            val result = when (filter.mode) {
+                ReservationListMode.TODAY -> repository.getTodayReservationsPage(scope.restaurantId, scope.branchId, requestedPage, RESERVATION_PAGE_SIZE)
+                ReservationListMode.CALENDAR -> repository.getBranchReservationCalendarPage(scope.restaurantId, scope.branchId, filter.from, filter.to, requestedPage, RESERVATION_PAGE_SIZE)
+                else -> return@launch
+            }
+            if (!isCurrent(token, scope) || requestRevision != listRevision || _state.value.filter != filter) return@launch
+            loadedReservationsPage = result.page
+            _state.update { current ->
+                val existingIds = current.reservations.mapTo(hashSetOf()) { it.id }
+                current.copy(
+                    reservations = current.reservations + result.items.filterNot { it.id in existingIds },
+                    hasMoreReservations = result.hasNext,
+                    isLoadingMoreReservations = false,
+                    error = null
+                )
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            if (isCurrent(token, scope) && requestRevision == listRevision) {
+                _state.update { it.copy(error = failure(error, false), loadMoreReservationsFailed = true) }
+            }
+        } finally {
+            refreshMutex.unlock()
+            if (requestRevision == listRevision) _state.update { it.copy(isLoadingMoreReservations = false) }
+        }
+    }
+
+    fun loadAllReservationPages(): Job = work.launch {
+        while (_state.value.hasMoreReservations && !_state.value.isLoadingMoreReservations && !_state.value.loadMoreReservationsFailed) {
+            val before = _state.value.reservations.size
+            loadMoreReservations().join()
+            if (_state.value.error != null || _state.value.reservations.size == before) break
+        }
     }
 
     fun setSearchQuery(query: String) {
@@ -153,10 +216,19 @@ class ReservationsScreenModel(
                 return false
             }
             val filter = _state.value.filter
+            // Reload every page already loaded (not just the first), so rows the user scrolled to stay put.
+            val lastPageShown = loadedReservationsPage
+            var lastPageLoaded = 0
             _state.update { it.copy(isLoading = true) }
             try {
+                var hasMoreReservations = false
                 val reservations = when (filter.mode) {
-                    ReservationListMode.TODAY -> repository.getTodayReservations(scope.restaurantId, scope.branchId)
+                    ReservationListMode.TODAY -> loadPages(lastPageShown) { page ->
+                        repository.getTodayReservationsPage(scope.restaurantId, scope.branchId, page, RESERVATION_PAGE_SIZE)
+                    }.also {
+                        hasMoreReservations = it.hasNext
+                        lastPageLoaded = it.lastPage
+                    }.items
                     ReservationListMode.UPCOMING -> repository.getUpcomingReservations(scope.restaurantId, scope.branchId, filter.upcomingLimit)
                     ReservationListMode.RANGE -> repository.getBranchReservations(
                         restaurantId = scope.restaurantId,
@@ -166,7 +238,12 @@ class ReservationsScreenModel(
                         status = filter.status,
                         customerId = filter.customerId
                     )
-                    ReservationListMode.CALENDAR -> repository.getBranchReservationCalendar(scope.restaurantId, scope.branchId, filter.from, filter.to)
+                    ReservationListMode.CALENDAR -> loadPages(lastPageShown) { page ->
+                        repository.getBranchReservationCalendarPage(scope.restaurantId, scope.branchId, filter.from, filter.to, page, RESERVATION_PAGE_SIZE)
+                    }.also {
+                        hasMoreReservations = it.hasNext
+                        lastPageLoaded = it.lastPage
+                    }.items
                     ReservationListMode.ALL -> repository.getBranchReservations(
                         restaurantId = scope.restaurantId,
                         branchId = scope.branchId,
@@ -177,9 +254,12 @@ class ReservationsScreenModel(
                     )
                 }
                 if (!isCurrent(token, scope) || requestRevision != listRevision) return false
+                loadedReservationsPage = lastPageLoaded
                 _state.update {
                     it.copy(
                         reservations = reservations,
+                        hasMoreReservations = hasMoreReservations,
+                        loadMoreReservationsFailed = false,
                         lastRefreshedAt = Clock.System.now().toString(),
                         error = if (it.needsReconciliation) it.error else null,
                         refreshWarning = null
@@ -254,8 +334,9 @@ class ReservationsScreenModel(
         }
     }
 
-    fun loadSummary(from: String? = _state.value.filter.from, to: String? = _state.value.filter.to): Job = work.launch {
-        query(READ_PERMISSION) { scope -> repository.getReservationSummary(scope.restaurantId, scope.branchId, from, to) }
+    // With a floor, the numbers cover that floor's bookings plus those without a table.
+    fun loadSummary(from: String? = _state.value.filter.from, to: String? = _state.value.filter.to, floor: String? = null): Job = work.launch {
+        query(READ_PERMISSION) { scope -> repository.getReservationSummary(scope.restaurantId, scope.branchId, from, to, floor) }
             .onSuccess { summary -> _state.update { it.copy(summary = summary, error = null) } }
             .onFailure { error -> _state.update { it.copy(error = operationFailure(error)) } }
     }
@@ -300,6 +381,77 @@ class ReservationsScreenModel(
         }
 
     // Next bookings from now on, across days (for the Overview "Later" list).
+    // Reloads the Arriving feed from 15 minutes ago, as many pages as are shown now (one after a floor change),
+    // and swaps the list in one go so the screen keeps its scroll position.
+    fun refreshArrivals(floor: String?): Job = work.launch {
+        requestedArrivalsFloor = floor
+        arrivalsMutex.withLock {
+            val fresh = floor != arrivalsFloor || !_state.value.arrivalsLoaded
+            val lastPage = if (fresh) 0 else (arrivalPagesLoaded - 1).coerceAtLeast(0)
+            val from = (Clock.System.now() - ARRIVAL_GRACE).toString()
+            query(READ_PERMISSION) { scope ->
+                loadPages(lastPage) { page -> repository.getArrivalsPage(scope.restaurantId, scope.branchId, from, floor, page, RESERVATION_PAGE_SIZE) }
+            }.onSuccess { loaded ->
+                arrivalsFrom = from
+                arrivalsFloor = floor
+                arrivalPagesLoaded = loaded.lastPage + 1
+                _state.update {
+                    it.copy(arrivals = loaded.items, arrivalsLoaded = true, hasMoreArrivals = loaded.hasNext, loadMoreArrivalsFailed = false)
+                }
+            }.onFailure {
+                // A feed already shown stays as it is until the next refresh. Without a first page, the list
+                // stops waiting and offers "Try again".
+                if (arrivalsFrom == null) _state.update { it.copy(arrivalsLoaded = true, hasMoreArrivals = true, loadMoreArrivalsFailed = true) }
+            }
+        }
+    }
+
+    // Next page of the Arriving feed, continuing the list the last refresh started.
+    fun loadMoreArrivals(): Job = work.launch {
+        val state = _state.value
+        if (!state.hasMoreArrivals || state.isLoadingMoreArrivals) return@launch
+        _state.update { it.copy(isLoadingMoreArrivals = true, loadMoreArrivalsFailed = false) }
+        try {
+            // The first page never arrived: start the feed again.
+            if (arrivalsFrom == null) {
+                refreshArrivals(requestedArrivalsFloor).join()
+                return@launch
+            }
+            arrivalsMutex.withLock {
+                val from = arrivalsFrom ?: return@withLock
+                if (!_state.value.hasMoreArrivals) return@withLock
+                val floor = arrivalsFloor
+                val page = arrivalPagesLoaded
+                query(READ_PERMISSION) { scope -> repository.getArrivalsPage(scope.restaurantId, scope.branchId, from, floor, page, RESERVATION_PAGE_SIZE) }
+                    .onSuccess { result ->
+                        arrivalPagesLoaded = page + 1
+                        _state.update { current ->
+                            val shown = current.arrivals.mapTo(hashSetOf()) { it.id }
+                            current.copy(arrivals = current.arrivals + result.items.filterNot { it.id in shown }, hasMoreArrivals = result.hasNext)
+                        }
+                    }
+                    .onFailure { _state.update { it.copy(loadMoreArrivalsFailed = true) } }
+            }
+        } finally {
+            _state.update { it.copy(isLoadingMoreArrivals = false) }
+        }
+    }
+
+    // Pages 0..lastPage in order, stopping early when the list runs out; a row that moved between pages shows once.
+    private suspend fun loadPages(lastPage: Int, fetch: suspend (Int) -> ReservationPage): LoadedPages {
+        val items = ArrayList<Reservation>()
+        val seen = HashSet<String>()
+        var page = 0
+        while (true) {
+            val result = fetch(page)
+            result.items.forEach { if (seen.add(it.id)) items += it }
+            if (!result.hasNext || page >= lastPage) return LoadedPages(items, page, result.hasNext)
+            page++
+        }
+    }
+
+    private class LoadedPages(val items: List<Reservation>, val lastPage: Int, val hasNext: Boolean)
+
     suspend fun upcomingReservations(limit: Int): Result<List<Reservation>> =
         query(READ_PERMISSION) { scope -> repository.getUpcomingReservations(scope.restaurantId, scope.branchId, limit) }
 
@@ -311,9 +463,19 @@ class ReservationsScreenModel(
         return if (error == null) Result.success(Unit) else Result.failure(Exception(error.message))
     }
 
+    // Staff bookings are confirmed when a table fits; otherwise the server keeps them as a request.
     fun createReservation(request: ReservationInput): Job = mutateReservation(
         request.contactName?.takeIf(String::isNotBlank)?.let { "Reservation created for $it" } ?: "Reservation created",
-        selectResult = true
+        selectResult = true,
+        describe = { saved ->
+            val done = saved.contactName?.takeIf(String::isNotBlank)?.let { "Reservation created for $it" } ?: "Reservation created"
+            when {
+                saved.status != ReservationStatus.PENDING -> done
+                saved.partySize >= _state.value.policy.approvalGroupSize ->
+                    "Saved as a request: groups of ${_state.value.policy.approvalGroupSize} or more need approval"
+                else -> "Saved as a request: no table is free for the whole booking"
+            }
+        }
     ) { scope ->
         repository.createReservation(scope.restaurantId, request.copy(branchId = request.branchId ?: scope.branchId))
     }
@@ -372,9 +534,42 @@ class ReservationsScreenModel(
         repository.cancelReservation(scope.restaurantId, id, input)
     }
 
-    fun checkInReservation(reservationId: String, reason: String? = null): Job = lifecycle("Reservation checked in", reservationId, reason) { scope, id, input ->
-        repository.checkInReservation(scope.restaurantId, id, input)
+    // "Guest arrived": everyone, or how many of the group are here so far.
+    fun checkInReservation(reservationId: String, reason: String? = null, arrivedGuests: Int? = null): Job =
+        mutateReservation(withGuest("Guest arrived", reservationId)) { scope ->
+            repository.checkInReservation(scope.restaurantId, reservationId, ReservationActionInput(reason = reason, arrivedGuests = arrivedGuests))
+        }
+
+    fun updateArrivedGuests(reservationId: String, arrivedGuests: Int, reason: String? = null): Job =
+        mutateReservation(withGuest("$arrivedGuests arrived", reservationId)) { scope ->
+            repository.updateArrivedGuests(scope.restaurantId, reservationId, ReservationActionInput(reason = reason, arrivedGuests = arrivedGuests))
+        }
+
+    fun undoSeatReservation(reservationId: String, reason: String? = null): Job = lifecycle("Seating undone", reservationId, reason) { scope, id, input ->
+        repository.undoSeatReservation(scope.restaurantId, id, input)
     }
+
+    fun extendHold(reservationId: String, minutes: Int, reason: String? = null): Job =
+        mutateReservation(withGuest("Table held $minutes min longer", reservationId)) { scope ->
+            repository.extendHold(scope.restaurantId, reservationId, minutes, reason)
+        }
+
+    fun confirmAttendance(reservationId: String, reason: String? = null): Job =
+        mutateReservation(withGuest("Attendance confirmed", reservationId)) { scope ->
+            repository.confirmAttendance(scope.restaurantId, reservationId, reason)
+        }
+
+    fun clearNoShowWarning(reservationId: String, reason: String): Job =
+        mutateReservation(withGuest("No-show warning cleared", reservationId)) { scope ->
+            repository.clearNoShowWarning(scope.restaurantId, reservationId, reason)
+        }
+
+    suspend fun guestHistory(reservationId: String): Result<GuestHistory> =
+        query(READ_PERMISSION) { scope -> repository.getGuestHistory(scope.restaurantId, reservationId) }
+
+    // Late guests: do they still fit at their table until the booking ends, or where else they could sit.
+    suspend fun seatingCheck(reservationId: String): Result<ReservationSeatingCheck> =
+        query(READ_PERMISSION) { scope -> repository.getSeatingCheck(scope.restaurantId, reservationId) }
 
     fun seatReservation(reservationId: String, reason: String? = null): Job = lifecycle("Reservation seated", reservationId, reason) { scope, id, input ->
         repository.seatReservation(scope.restaurantId, id, input)
@@ -491,9 +686,10 @@ class ReservationsScreenModel(
     private fun mutateReservation(
         operation: String,
         selectResult: Boolean = false,
+        describe: (Reservation) -> String = { operation },
         action: suspend (ReservationsScope) -> Reservation
     ): Job = work.launch {
-        mutate(WRITE_PERMISSION, operation) { scope -> action(scope) }
+        mutate(WRITE_PERMISSION, operation, describe) { scope -> action(scope) }
             .onSuccess { reservation -> applyReservationMutation(reservation, selectResult) }
     }
 
@@ -506,20 +702,7 @@ class ReservationsScreenModel(
 
     private suspend fun fetchDetails(scope: ReservationsScope, token: Long, id: String, detailToken: Long) {
         try {
-            val details = coroutineScope {
-                val reservation = async { repository.getReservation(scope.restaurantId, id) }
-                val notes = async { runCatching { repository.getAudit(scope.restaurantId, id).notes }.getOrDefault(emptyList()) }
-                val history = async { runCatching { repository.getStatusHistory(scope.restaurantId, id) }.getOrDefault(emptyList()) }
-                val timeline = async { runCatching { repository.getTimeline(scope.restaurantId, id) }.getOrDefault(emptyList()) }
-                val deposit = async { runCatching { repository.getDeposit(scope.restaurantId, id) }.getOrNull() }
-                DetailBundle(
-                    reservation = reservation.await(),
-                    notes = notes.await(),
-                    statusHistory = history.await(),
-                    timeline = timeline.await(),
-                    deposit = deposit.await()
-                )
-            }
+            val details = repository.getReservationDetails(scope.restaurantId, id)
             require(details.reservation.restaurantId == scope.restaurantId && details.reservation.branchId == scope.branchId) {
                 "Reservation belongs to another branch"
             }
@@ -527,9 +710,10 @@ class ReservationsScreenModel(
                 _state.update {
                     it.copy(
                         selectedReservation = details.reservation,
-                        notes = details.notes,
-                        statusHistory = details.statusHistory,
+                        notes = details.audit.notes,
+                        statusHistory = details.audit.statusHistory,
                         timeline = details.timeline,
+                        audit = details.audit,
                         deposit = details.deposit,
                         error = null
                     )
@@ -565,6 +749,8 @@ class ReservationsScreenModel(
     internal suspend fun <T> mutate(
         permission: String,
         operation: String,
+        // The message once it's saved, when it depends on the result (e.g. a booking saved as a request).
+        describe: (T) -> String = { operation },
         action: suspend (ReservationsScope) -> T
     ): Result<T> {
         if (!mutationMutex.tryLock()) {
@@ -583,8 +769,9 @@ class ReservationsScreenModel(
             started = true
             val result = action(scope)
             if (!isCurrent(token, scope)) throw CancellationException("Reservation session changed")
-            _state.update { it.copy(lastSuccessfulOperation = operation) }
-            _notices.tryEmit(ReservationNotice(operation, isError = false))
+            val message = describe(result)
+            _state.update { it.copy(lastSuccessfulOperation = message) }
+            _notices.tryEmit(ReservationNotice(message, isError = false))
             val refreshed = refreshNow(allowWhileSaving = true)
             if (!isCurrent(token, scope)) throw CancellationException("Reservation session changed")
             if (!refreshed) _state.update { it.copy(error = null, refreshWarning = "Change saved. Refresh to load the latest reservations.") }
@@ -682,17 +869,16 @@ class ReservationsScreenModel(
         work.cancel()
     }
 
-    private data class DetailBundle(
-        val reservation: Reservation,
-        val notes: List<ReservationNote>,
-        val statusHistory: List<ReservationStatusHistory>,
-        val timeline: List<ReservationTimelineEvent>,
-        val deposit: ReservationDeposit?
-    )
-
-    private companion object {
-        const val READ_PERMISSION = "SETTINGS_READ"
-        const val WRITE_PERMISSION = "SETTINGS_UPDATE"
+    companion object {
+        const val READ_PERMISSION = "RESERVATION_READ"
+        const val WRITE_PERMISSION = "RESERVATION_MANAGE"
+        // Fix bookings after the staff time limits or from an earlier day (Manager and above by default).
+        const val CORRECT_PERMISSION = "RESERVATION_CORRECT"
+        // Accept requests from big groups.
+        const val APPROVE_PERMISSION = "RESERVATION_APPROVE"
+        const val RESERVATION_PAGE_SIZE = 100
+        // A guest up to 15 minutes late still shows as arriving.
+        private val ARRIVAL_GRACE = 15.minutes
     }
 }
 

@@ -81,7 +81,19 @@ data class ReservationsUiState(
     val lastSuccessfulOperation: String? = null,
     val tableGroups: List<ReservationTableGroup> = emptyList(),
     val floors: List<String> = emptyList(),
-    val rules: ReservationRules = ReservationRules.NONE
+    val hasMoreReservations: Boolean = false,
+    val isLoadingMoreReservations: Boolean = false,
+    val rules: ReservationRules = ReservationRules.NONE,
+    // Admin Hub reservation timers (hold, late, check-in, correction windows).
+    val policy: ReservationPolicy = ReservationPolicy(),
+    // The last "load more" failed: lists stop loading on scroll and offer "Try again" instead.
+    val loadMoreReservationsFailed: Boolean = false,
+    // Overview "Arriving" feed: guests still to come from 15 minutes ago on, soonest first, loaded page by page.
+    val arrivals: List<Reservation> = emptyList(),
+    val arrivalsLoaded: Boolean = false,
+    val hasMoreArrivals: Boolean = false,
+    val isLoadingMoreArrivals: Boolean = false,
+    val loadMoreArrivalsFailed: Boolean = false
 ) {
     val visibleReservations: List<Reservation>
         get() {

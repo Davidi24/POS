@@ -11,7 +11,9 @@ enum class ReservationStatus {
     SEATED,
     COMPLETED,
     CANCELLED,
-    NO_SHOW
+    NO_SHOW,
+    // A request nobody answered before the booking time; never counted as a no-show.
+    EXPIRED
 }
 
 @Serializable
@@ -64,6 +66,21 @@ data class Reservation(
     val seatedAt: String? = null,
     val completedAt: String? = null,
     val noShowAt: String? = null,
+    val expiredAt: String? = null,
+    // When the table stops waiting for late guests (booking time + hold, or later if staff held it longer).
+    val holdUntil: String? = null,
+    // "3 of 6 arrived"; null until check-in.
+    val arrivedGuests: Int? = null,
+    // Never seated before the booking ended, or still open from an earlier day: staff decide what happened.
+    val needsReview: Boolean = false,
+    val reviewReason: String? = null,
+    // "✓ Attendance confirmed" (by STAFF after a call or by the GUEST), and for confirmed bookings whether it's due:
+    // CONFIRMED, WAITING, CONFIRM_NOW (booked less than 2 h ahead) or NOT_CONFIRMED (deadline passed).
+    val attendanceConfirmedAt: String? = null,
+    val attendanceConfirmedVia: String? = null,
+    val attendance: String? = null,
+    // The guest's no-shows since a manager last cleared the warning.
+    val guestNoShows: Int? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val tableAssignments: List<ReservationTableAssignment> = emptyList()
@@ -132,6 +149,23 @@ data class ReservationAudit(
     val tableAssignments: List<ReservationTableAssignment> = emptyList()
 )
 
+data class ReservationDetails(
+    val reservation: Reservation,
+    val audit: ReservationAudit,
+    val timeline: List<ReservationTimelineEvent>,
+    val deposit: ReservationDeposit
+)
+
+data class ReservationPage(
+    val items: List<Reservation>,
+    val page: Int,
+    val size: Int,
+    val totalElements: Long,
+    val totalPages: Int,
+    val hasNext: Boolean,
+    val hasPrevious: Boolean
+)
+
 data class ReservationDeposit(
     val reservationId: String,
     val depositRequired: Boolean? = null,
@@ -168,7 +202,47 @@ data class ReservationSummary(
     val completedCount: Int = 0,
     val cancelledCount: Int = 0,
     val noShowCount: Int = 0,
-    val upcomingCount: Int = 0
+    val upcomingCount: Int = 0,
+    // Null when the server doesn't send them yet; the screen then counts from its own list.
+    // Guests of every booking still on (pending to completed), and of those not arrived yet.
+    val presentGuests: Int? = null,
+    val guestsToArrive: Int? = null,
+    // Pending to seated bookings without a table.
+    val unassignedCount: Int? = null,
+    // Pending or confirmed bookings from 15 minutes ago to 2 hours ahead.
+    val arrivingSoonCount: Int? = null,
+    val arrivingSoonGuests: Int? = null,
+    // Requests nobody answered in time, and visits staff must look at.
+    val expiredCount: Int? = null,
+    val needsReviewCount: Int? = null,
+    val attendanceNotConfirmedCount: Int? = null,
+    val notConfirmedDueCount: Int? = null,
+    val bigGroupCount: Int? = null
+)
+
+// A guest's no-shows (the warning on their bookings) and the times a manager cleared it.
+data class GuestHistory(
+    val noShowCount: Int = 0,
+    val warningFrom: Int = 1,
+    val noShows: List<GuestNoShow> = emptyList(),
+    val clears: List<GuestNoShowClear> = emptyList()
+)
+
+data class GuestNoShow(val reservationId: String, val reservationCode: String?, val reservationStart: String?, val partySize: Int?)
+
+data class GuestNoShowClear(val clearedAt: String?, val reason: String?)
+
+// A walk-in group waiting at the door for a table.
+data class WaitlistEntry(
+    val id: String,
+    val guestName: String,
+    val contactPhone: String? = null,
+    val partySize: Int,
+    val note: String? = null,
+    val createdAt: String? = null,
+    val waitedMinutes: Int = 0,
+    val tableFreeNow: Boolean = false,
+    val tableFreeAround: String? = null
 )
 
 data class ReservationCapacity(
@@ -201,7 +275,9 @@ data class ReservationInput(
     val depositRequired: Boolean? = null,
     val depositAmount: OrderDecimal? = null,
     val initialTableIds: List<String>? = null,
-    val primaryTableId: String? = null
+    val primaryTableId: String? = null,
+    // Same-day phone bookings: the guest already said they're coming ("✓ Attendance confirmed").
+    val attendanceConfirmed: Boolean? = null
 )
 
 data class UpdateReservationInput(
@@ -224,7 +300,18 @@ data class UpdateReservationInput(
 )
 
 data class ReservationActionInput(
-    val reason: String? = null
+    val reason: String? = null,
+    // Check-in and "N of M arrived": how many of the group are here; null means everyone.
+    val arrivedGuests: Int? = null
+)
+
+// Late guests keep their end time: do they still fit at their tables, and where else they could sit.
+data class ReservationSeatingCheck(
+    val minutesLeft: Int = 0,
+    val nextBookingStart: String? = null,
+    val nextBookingName: String? = null,
+    val fitsAtTables: Boolean = false,
+    val alternatives: List<ReservationAvailabilityOption> = emptyList()
 )
 
 data class ReservationTablesInput(
@@ -252,7 +339,33 @@ data class ReservationValidationInput(
     val primaryTableId: String? = null
 )
 
-data class ReservationSettings(val timezone: String?, val rules: ReservationRules)
+data class ReservationSettings(
+    val timezone: String?,
+    val rules: ReservationRules,
+    val policy: ReservationPolicy = ReservationPolicy()
+)
+
+// Admin Hub → Settings → Reservations: the timers and limits the server enforces, with the agreed defaults.
+data class ReservationPolicy(
+    val largeGroupFrom: Int = 5,
+    val largeGroupExtraMinutes: Int = 15,
+    val approvalGroupSize: Int = 7,
+    val holdMinutes: Int = 30,
+    val holdWarningMinutes: Int = 20,
+    val lateAfterMinutes: Int = 15,
+    val checkInOpensMinutes: Int = 120,
+    val reopenWindowMinutes: Int = 60,
+    val undoSeatMinutes: Int = 15,
+    val runningLateMaxMinutes: Int = 30,
+    val serviceDayStartHour: Int = 6,
+    val sameDayConfirmMinutes: Int = 120,
+    val noShowWarningFrom: Int = 1,
+    val confirmReminderTime: String = "15:00"
+) {
+    // 2 h, or 2 h 15 for groups of 5 or more.
+    fun bookingMinutes(rules: ReservationRules, guests: Int): Int =
+        rules.defaultDurationMinutes + if (guests >= largeGroupFrom) largeGroupExtraMinutes else 0
+}
 
 // The restaurant's booking rule. For staff these are defaults and limits to warn about, not hard stops.
 data class ReservationRules(
@@ -264,7 +377,7 @@ data class ReservationRules(
     val advanceBookingDays: Int?
 ) {
     companion object {
-        // Used while no rule is set: two-hour bookings, 1–20 guests, no booking window.
-        val NONE = ReservationRules(null, 120, 0, 1, 20, null)
+        // Used while no rule is set: two-hour bookings with 5 minutes' cleaning, 1–20 guests, no booking window.
+        val NONE = ReservationRules(null, 120, 5, 1, 20, null)
     }
 }

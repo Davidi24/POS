@@ -42,9 +42,11 @@ public enum AppRole {
                     SESSIONS_MANAGE,
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
                     SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
+                    RESERVATION_READ, RESERVATION_MANAGE, RESERVATION_APPROVE, RESERVATION_CORRECT,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
                     ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
                     KDS_READ, KDS_UPDATE,
+                    SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
                     POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS
             )
     ),
@@ -63,9 +65,11 @@ public enum AppRole {
                     SESSIONS_MANAGE,
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
                     SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
+                    RESERVATION_READ, RESERVATION_MANAGE, RESERVATION_APPROVE, RESERVATION_CORRECT,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
                     ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
                     KDS_READ, KDS_UPDATE,
+                    SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
                     POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS
             )
     ),
@@ -83,9 +87,11 @@ public enum AppRole {
                     USERS_CREATE, USERS_READ, USERS_UPDATE,
                     ROLES_READ,
                     SETTINGS_READ,
+                    RESERVATION_READ, RESERVATION_MANAGE, RESERVATION_APPROVE, RESERVATION_CORRECT,
                     ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
                     ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
                     KDS_READ, KDS_UPDATE,
+                    SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
                     POS_ACCESS, ADMIN_ACCESS
             ),
             CO_OWNER
@@ -99,12 +105,15 @@ public enum AppRole {
             false,
             EnumSet.of(
                     MENUS_READ,
+                    RESERVATION_READ,
+                    RESERVATION_MANAGE,
                     ORDER_READ,
                     ORDER_CREATE,
                     ORDER_UPDATE,
                     ORDER_CLOSE,
                     ORDER_DISCOUNT_APPLY,
                     ORDER_TRANSFER,
+                    SHIFT_SELF,
                     POS_ACCESS
             )
     ),
@@ -122,6 +131,7 @@ public enum AppRole {
                     USERS_READ,
                     ROLES_READ,
                     SETTINGS_READ,
+                    RESERVATION_READ,
                     ORDER_READ,
                     KDS_READ,
                     POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS

@@ -23,7 +23,8 @@ data class ReservationRequestDto(
     val depositRequired: Boolean? = null,
     val depositAmount: OrderDecimal? = null,
     val initialTableIds: List<String>? = null,
-    val primaryTableId: String? = null
+    val primaryTableId: String? = null,
+    val attendanceConfirmed: Boolean? = null
 )
 
 @Serializable
@@ -76,9 +77,37 @@ data class ReservationResponseDto(
     val seatedAt: String? = null,
     val completedAt: String? = null,
     val noShowAt: String? = null,
+    val expiredAt: String? = null,
+    val holdUntil: String? = null,
+    val arrivedGuests: Int? = null,
+    val needsReview: Boolean? = null,
+    val reviewReason: String? = null,
+    val attendanceConfirmedAt: String? = null,
+    val attendanceConfirmedVia: String? = null,
+    val attendance: String? = null,
+    val guestNoShows: Int? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val tableAssignments: List<ReservationTableAssignmentResponseDto>? = null
+)
+
+@Serializable
+data class ReservationDetailsResponseDto(
+    val reservation: ReservationResponseDto,
+    val audit: ReservationAuditResponseDto? = null,
+    val timeline: List<ReservationTimelineEventResponseDto> = emptyList(),
+    val deposit: ReservationDepositResponseDto? = null
+)
+
+@Serializable
+data class ReservationPageResponseDto(
+    val items: List<ReservationResponseDto> = emptyList(),
+    val page: Int = 0,
+    val size: Int = 100,
+    val totalElements: Long = 0,
+    val totalPages: Int = 0,
+    val hasNext: Boolean = false,
+    val hasPrevious: Boolean = false
 )
 
 @Serializable
@@ -96,7 +125,23 @@ data class ReservationTableAssignmentResponseDto(
 
 @Serializable
 data class ReservationActionRequestDto(
+    val reason: String? = null,
+    val arrivedGuests: Int? = null
+)
+
+@Serializable
+data class ExtendReservationHoldRequestDto(
+    val minutes: Int,
     val reason: String? = null
+)
+
+@Serializable
+data class ReservationSeatingCheckResponseDto(
+    val minutesLeft: Int? = null,
+    val nextBookingStart: String? = null,
+    val nextBookingName: String? = null,
+    val fitsAtTables: Boolean? = null,
+    val alternatives: List<ReservationAvailabilityOptionResponseDto> = emptyList()
 )
 
 @Serializable
@@ -184,7 +229,17 @@ data class ReservationSummaryResponseDto(
     val completedCount: Int? = null,
     val cancelledCount: Int? = null,
     val noShowCount: Int? = null,
-    val upcomingCount: Int? = null
+    val upcomingCount: Int? = null,
+    val presentGuests: Int? = null,
+    val guestsToArrive: Int? = null,
+    val expiredCount: Int? = null,
+    val needsReviewCount: Int? = null,
+    val attendanceNotConfirmedCount: Int? = null,
+    val notConfirmedDueCount: Int? = null,
+    val bigGroupCount: Int? = null,
+    val unassignedCount: Int? = null,
+    val arrivingSoonCount: Int? = null,
+    val arrivingSoonGuests: Int? = null
 )
 
 @Serializable
@@ -196,8 +251,55 @@ data class ReservationSettingsResponseDto(
     val bufferMinutes: Int? = null,
     val minPartySize: Int? = null,
     val maxPartySize: Int? = null,
-    val advanceBookingDays: Int? = null
+    val advanceBookingDays: Int? = null,
+    val largeGroupFrom: Int? = null,
+    val largeGroupExtraMinutes: Int? = null,
+    val approvalGroupSize: Int? = null,
+    val holdMinutes: Int? = null,
+    val holdWarningMinutes: Int? = null,
+    val lateAfterMinutes: Int? = null,
+    val checkInOpensMinutes: Int? = null,
+    val reopenWindowMinutes: Int? = null,
+    val undoSeatMinutes: Int? = null,
+    val runningLateMaxMinutes: Int? = null,
+    val serviceDayStartHour: Int? = null,
+    val sameDayConfirmMinutes: Int? = null,
+    val noShowWarningFrom: Int? = null,
+    val confirmReminderTime: String? = null
 )
+
+@Serializable
+data class GuestHistoryResponseDto(
+    val noShowCount: Int? = null,
+    val warningFrom: Int? = null,
+    val noShows: List<GuestNoShowDto> = emptyList(),
+    val clears: List<GuestNoShowClearDto> = emptyList()
+)
+
+@Serializable
+data class GuestNoShowDto(val reservationId: String, val reservationCode: String? = null, val reservationStart: String? = null, val partySize: Int? = null)
+
+@Serializable
+data class GuestNoShowClearDto(val clearedAt: String? = null, val reason: String? = null)
+
+@Serializable
+data class WaitlistEntryResponseDto(
+    val id: String,
+    val guestName: String,
+    val contactPhone: String? = null,
+    val partySize: Int,
+    val note: String? = null,
+    val createdAt: String? = null,
+    val waitedMinutes: Int? = null,
+    val tableFreeNow: Boolean? = null,
+    val tableFreeAround: String? = null
+)
+
+@Serializable
+data class WaitlistEntryRequestDto(val guestName: String, val contactPhone: String? = null, val partySize: Int, val note: String? = null)
+
+@Serializable
+data class SeatWaitlistEntryRequestDto(val tableId: String)
 
 @Serializable
 data class ReservationCapacityResponseDto(

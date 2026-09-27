@@ -9,6 +9,7 @@ import pos.pos.settings.enums.ServiceChargeType;
 import pos.pos.settings.enums.WeekStartDay;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -46,6 +47,22 @@ public class SettingsResponse {
     private Boolean adminsCanManageManagers;
     private Boolean preOrdersEnabled;
     private Integer preOrderLeadMinutes;
+    private Integer largeGroupFrom;
+    private Integer largeGroupExtraMinutes;
+    private Integer approvalGroupSize;
+    private Integer holdMinutes;
+    private Integer holdWarningMinutes;
+    private Integer checkInOpensMinutes;
+    private LocalTime confirmReminderTime;
+    private Integer sameDayConfirmMinutes;
+    private Integer attendanceCallMinutes;
+    private Integer reopenWindowMinutes;
+    private Integer undoSeatMinutes;
+    private Integer runningLateMaxMinutes;
+    private Integer lateAfterMinutes;
+    private Integer guestReminderHours;
+    private Integer noShowWarningFrom;
+    private Integer depositFromGuests;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private UUID createdBy;

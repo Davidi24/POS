@@ -33,7 +33,7 @@ class ReservationInputRulesTest {
     private static ValidatorFactory factory;
     private static Validator validator;
 
-    private final ReservationSupport support = new ReservationSupport(null, null, null, null, null, null, null);
+    private final ReservationSupport support = new ReservationSupport(null, null, null, null, null, null, null, null);
 
     @BeforeAll
     static void setUpValidator() {

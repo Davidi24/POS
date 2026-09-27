@@ -157,6 +157,7 @@ import kotlin.math.max
 import kotlin.time.Clock
 
 private val Olive = Color(0xFF4F7942)
+private const val ALL_FLOORS_PICKED = "__all_floors__"
 private val Ink = Color(0xFF242522)
 private val Muted = Color(0xFF747672)
 private val LightMuted = Color(0xFF959792)
@@ -179,7 +180,8 @@ internal val StatusDotColors = linkedMapOf(
     "Seated" to Color(0xFF4F7942),
     "Completed" to Color(0xFF8A8D88),
     "Cancelled" to Color(0xFFB13A2F),
-    "No show" to Color(0xFF8E5A52)
+    "No show" to Color(0xFF8E5A52),
+    "Request expired" to Color(0xFF9A9C97)
 )
 private val MinHourWidth = 150.dp
 private val TimelineGutter = 24.dp
@@ -236,8 +238,11 @@ fun ReservationsScreen(
         }
     }
 
+    val policy = model.state.collectAsState().value.policy
     Box(modifier.fillMaxSize()) {
-        ReservationsCalendarContent(model = model, onGoToTable = onGoToTable, modifier = Modifier.fillMaxSize())
+        androidx.compose.runtime.CompositionLocalProvider(LocalReservationPolicy provides policy) {
+            ReservationsCalendarContent(model = model, onGoToTable = onGoToTable, modifier = Modifier.fillMaxSize())
+        }
         TableNotificationQueue(
             notifications = notices,
             onDismiss = { id -> notices = notices.filterNot { it.id == id } },
@@ -286,13 +291,6 @@ private fun ReservationsCalendarContent(
             ServiceTime(19 * 60)
         }
     }
-    LaunchedEffect(selectedDate, clockNow, restaurantZone) {
-        val zone = RestaurantTime.zone
-        model.loadSummary(
-            LocalDateTime(selectedDate, LocalTime(START_HOUR.toInt(), 0)).toInstant(zone).toString(),
-            LocalDateTime(selectedDate.plus(DatePeriod(days = 1)), LocalTime(END_HOUR.toInt() - 24, 0)).toInstant(zone).toString()
-        )
-    }
     var selectedArea by remember { mutableStateOf("All areas") }
     var selectedStatus by remember { mutableStateOf("All statuses") }
     var newButtonPosition by rememberSaveable { mutableStateOf(.84f) }
@@ -307,11 +305,14 @@ private fun ReservationsCalendarContent(
     }
     val events = realEvents
     val areaChoices = listOf("All areas") + tableGroups.map { it.name } + "Unassigned"
-    // One floor at a time: the first floor until another is picked; the filter is hidden with a single floor.
-    val selectedFloor = pickedFloor?.takeIf { it in state.floors } ?: state.floors.firstOrNull()
+    // Historical overview can include every floor; elsewhere retain the existing first-floor default.
+    val allFloorsSelected = pickedFloor == ALL_FLOORS_PICKED && selectedDate < serviceDateOf(clockNow, restaurantZone)
+    val selectedFloor = if (allFloorsSelected) null else pickedFloor?.takeIf { it in state.floors } ?: state.floors.firstOrNull()
     val floorChoices = if (state.floors.size > 1) state.floors else emptyList()
+    val calendarFloorChoices = if (allFloorsSelected) listOf("All floors") + floorChoices else floorChoices
     val calendarRows = remember(tableGroups, selectedArea, selectedFloor, events) {
         val unassignedCount = events.count { it.rowId == "unassigned" }
+        val unassignedSection = CalendarRow.Section("Unassigned", hiddenItemLabel = "reservation")
         val unassignedRow = CalendarRow.Resource(
             "unassigned", "Unassigned",
             "$unassignedCount ${if (unassignedCount == 1) "reservation" else "reservations"}",
@@ -331,7 +332,7 @@ private fun ReservationsCalendarContent(
             }
         }
         val showUnassigned = selectedArea == "All areas" || selectedArea == "Unassigned"
-        (if (showUnassigned) listOf(unassignedRow) else emptyList()) +
+        (if (showUnassigned) listOf(unassignedSection, unassignedRow) else emptyList()) +
             (if (selectedArea == "Unassigned") emptyList() else groupRows)
     }
     val query = state.searchQuery.trim()
@@ -355,11 +356,21 @@ private fun ReservationsCalendarContent(
     LaunchedEffect(clockNow, selectedFloor, state.lastRefreshedAt) {
         model.loadCapacity(clockNow.toString(), (clockNow + 2.hours).toString(), floor = selectedFloor)
     }
-    // The overview uses the same filters as the calendar.
-    // Reload the next bookings whenever the list reloads (every minute and after each change).
-    val laterReservations by produceState(emptyList<Reservation>(), state.lastRefreshedAt, state.reservations) {
-        value = model.upcomingReservations(LATER_FETCH_LIMIT).getOrNull() ?: value
+    // The overview's numbers and its Arriving feed follow the floor on screen (all of them with a single floor), and
+    // reload with every refresh: every minute and after each change. The feed keeps the pages already shown.
+    val overviewFloor = selectedFloor.takeIf { state.floors.size > 1 }
+    LaunchedEffect(selectedDate, restaurantZone, overviewFloor, state.lastRefreshedAt) {
+        val zone = RestaurantTime.zone
+        model.loadSummary(
+            LocalDateTime(selectedDate, LocalTime(START_HOUR.toInt(), 0)).toInstant(zone).toString(),
+            LocalDateTime(selectedDate.plus(DatePeriod(days = 1)), LocalTime(END_HOUR.toInt() - 24, 0)).toInstant(zone).toString(),
+            overviewFloor
+        )
     }
+    LaunchedEffect(model, state.lastRefreshedAt, overviewFloor) {
+        model.refreshArrivals(overviewFloor)
+    }
+    // The overview uses the same filters as the calendar.
     fun matchesFilters(reservation: Reservation): Boolean {
         val tables = reservation.tableAssignments.mapNotNull { it.tableNumber }
         return (selectedStatus == "All statuses" || reservation.status.statusLabel() == selectedStatus) &&
@@ -381,10 +392,6 @@ private fun ReservationsCalendarContent(
             selectedFloor == null || tables.isEmpty() || tables.any { floorOfTable[it] == selectedFloor }
         }
     }
-    // The "Later" list follows the same filters as the rest of the overview.
-    val filteredLater = remember(laterReservations, selectedStatus, selectedArea, selectedFloor, query, areaByTable, floorOfTable) {
-        laterReservations.filter(::matchesFilters)
-    }
 
     // Reservations opens on the overview; the calendar slides in, like adding items in Orders.
     val pages = rememberPagerState(pageCount = { 2 })
@@ -400,12 +407,19 @@ private fun ReservationsCalendarContent(
         ) { page ->
             if (page == 0) {
                 ReservationOverviewScreen(
-                    later = filteredLater,
+                    arrivals = state.arrivals,
+                    arrivalsPaging = ListPaging(
+                        hasMore = state.hasMoreArrivals,
+                        loading = state.isLoadingMoreArrivals,
+                        failed = state.loadMoreArrivalsFailed,
+                        onLoadMore = { model.loadMoreArrivals() },
+                        ready = state.arrivalsLoaded
+                    ),
                     date = selectedDate,
                     onDateChange = { selectedDate = it },
                     floors = state.floors,
                     floor = selectedFloor,
-                    onFloorChange = { pickedFloor = it },
+                    onFloorChange = { pickedFloor = if (it == "All floors") ALL_FLOORS_PICKED else it },
                     selectedArea = selectedArea,
                     areaChoices = areaChoices,
                     onAreaChange = { selectedArea = it },
@@ -416,15 +430,22 @@ private fun ReservationsCalendarContent(
                     now = clockNow,
                     reservations = floorReservations,
                     listed = overviewReservations,
-                    // The server summary covers the whole branch, so with several floors the counts come from the list.
-                    summary = if (state.floors.size > 1) null else state.summary,
+                    // Counted by the server for the whole day on the floor on screen.
+                    summary = state.summary,
                     capacity = state.capacity,
                     loading = state.isLoading,
                     // Until the first answer arrives the page shows its skeleton.
                     firstLoad = state.lastRefreshedAt == null && state.error == null,
                     onOpenReservation = model::selectReservation,
+                    dayPaging = ListPaging(
+                        hasMore = state.hasMoreReservations,
+                        loading = state.isLoadingMoreReservations,
+                        failed = state.loadMoreReservationsFailed,
+                        onLoadMore = { model.loadMoreReservations() }
+                    ),
                     onOpenCalendar = {
                         model.closeReservationDetails()
+                        model.loadAllReservationPages()
                         calendarOpen = true
                     },
                     modifier = Modifier.fillMaxSize()
@@ -443,9 +464,9 @@ private fun ReservationsCalendarContent(
                 ReservationsCalendarToolbar(
                     selectedDate = selectedDate,
                     onDateSelected = { selectedDate = it },
-                    selectedFloor = selectedFloor.orEmpty(),
-                    floorChoices = floorChoices,
-                    onFloorChange = { pickedFloor = it },
+                    selectedFloor = if (allFloorsSelected) "All floors" else selectedFloor.orEmpty(),
+                    floorChoices = calendarFloorChoices,
+                    onFloorChange = { pickedFloor = if (it == "All floors") ALL_FLOORS_PICKED else it },
                     selectedArea = selectedArea,
                     areaChoices = areaChoices,
                     onAreaChange = { selectedArea = it },
@@ -844,6 +865,7 @@ private fun ReservationCalendar(
                                     title = row.title,
                                     collapsed = row.sectionKey() in collapsedSections,
                                     tableCount = hiddenTableCounts[row.sectionKey()] ?: 0,
+                                    hiddenItemLabel = row.hiddenItemLabel,
                                     onToggle = {
                                         val key = row.sectionKey()
                                         collapsedSections = if (key in collapsedSections) collapsedSections - key else collapsedSections + key
@@ -991,6 +1013,7 @@ private fun orderRowsByReservations(
             .filter { (_, tables, _) -> tables.isNotEmpty() }
             .sortedWith(
                 compareByDescending<Triple<CalendarRow.Section, List<CalendarRow.Resource>, Int>> { it.third }
+                    .thenBy { it.first.title != "Unassigned" }
                     .thenBy { it.first.title == OTHER_TABLES_GROUP }
             )
             .forEach { (section, tables, _) ->
@@ -1093,6 +1116,7 @@ private fun CalendarSectionRow(
     detail: String,
     collapsed: Boolean,
     tableCount: Int,
+    hiddenItemLabel: String,
     onToggle: () -> Unit
 ) {
     val arrowRotation by animateFloatAsState(if (collapsed) -90f else 0f, tween(220), label = "section-arrow")
@@ -1121,7 +1145,7 @@ private fun CalendarSectionRow(
             color = Olive
         )
         Text(
-            text = " · $detail" + if (collapsed) " · $tableCount ${if (tableCount == 1) "table" else "tables"} hidden" else "",
+            text = " · $detail" + if (collapsed) " · $tableCount ${if (tableCount == 1) hiddenItemLabel else "${hiddenItemLabel}s"} hidden" else "",
             fontFamily = Inter(),
             fontWeight = FontWeight.Medium,
             fontSize = 11.sp,
@@ -1131,7 +1155,7 @@ private fun CalendarSectionRow(
     }
 }
 
-private fun CalendarRow.Section.sectionKey(): String = "$title-$emptyTables"
+private fun CalendarRow.Section.sectionKey(): String = "$title-$emptyTables-$hiddenItemLabel"
 
 private fun tableCountBySection(rows: List<CalendarRow>): Map<String, Int> {
     val counts = mutableMapOf<String, Int>()
@@ -1653,6 +1677,7 @@ private fun ReservationStatus.statusLabel(): String = when (this) {
     ReservationStatus.COMPLETED -> "Completed"
     ReservationStatus.CANCELLED -> "Cancelled"
     ReservationStatus.NO_SHOW -> "No show"
+    ReservationStatus.EXPIRED -> "Request expired"
 }
 
 private fun ReservationStatus.style(): EventStyle = when (this) {
@@ -1662,6 +1687,7 @@ private fun ReservationStatus.style(): EventStyle = when (this) {
     ReservationStatus.SEATED -> EventStyle(Color(0xFF4F7942), Color(0xFF4F7942))
     ReservationStatus.COMPLETED -> EventStyle(Color(0xFFE5E7E3), Color(0xFFD4D7D1))
     ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW -> EventStyle(Color(0xFFF0E2DE), Color(0xFFD0A39A))
+    ReservationStatus.EXPIRED -> EventStyle(Color(0xFFEDEDEB), Color(0xFFCFCFCB))
 }
 
 private fun LocalDate.calendarLabel(): String = "${dayOfWeek.shortName()}, ${monthName()} $day, $year"
@@ -1693,7 +1719,11 @@ private fun LocalDate.monthName(): String = when (monthNumber) {
 
 
 private sealed class CalendarRow {
-    data class Section(val title: String, val emptyTables: Boolean = false) : CalendarRow()
+    data class Section(
+        val title: String,
+        val emptyTables: Boolean = false,
+        val hiddenItemLabel: String = "table"
+    ) : CalendarRow()
     data class Resource(
         val id: String,
         val title: String,
@@ -1781,7 +1811,6 @@ private fun searchRows(rows: List<CalendarRow>, events: List<CalendarEvent>, que
     }
 }
 
-private const val LATER_FETCH_LIMIT = 30
 
 private val PastBlockBackground = Color(0xFFEDEEEB)
 private val PastBlockBorder = Color(0xFFD9DBD6)

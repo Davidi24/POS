@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import pos.pos.common.dto.PageResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
@@ -40,7 +41,7 @@ public class BranchReservationController {
     private final ReservationQueryService reservationQueryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "List branch reservations")
     public ResponseEntity<List<ReservationResponse>> getBranchReservations(
             @PathVariable UUID restaurantId,
@@ -63,31 +64,50 @@ public class BranchReservationController {
     }
 
     @GetMapping("/calendar")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Get branch reservation calendar")
-    public ResponseEntity<List<ReservationResponse>> getBranchReservationCalendar(
+    public ResponseEntity<PageResponse<ReservationResponse>> getBranchReservationCalendar(
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
             @RequestParam(required = false) OffsetDateTime from,
             @RequestParam(required = false) OffsetDateTime to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationQueryService.getBranchReservationCalendar(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(reservationQueryService.getBranchReservationCalendar(authentication, restaurantId, branchId, from, to, page, size));
     }
 
     @GetMapping("/today")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "List today's branch reservations")
-    public ResponseEntity<List<ReservationResponse>> getTodayReservations(
+    public ResponseEntity<PageResponse<ReservationResponse>> getTodayReservations(
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationQueryService.getTodayReservations(authentication, restaurantId, branchId));
+        return ResponseEntity.ok(reservationQueryService.getTodayReservations(authentication, restaurantId, branchId, page, size));
+    }
+
+    @GetMapping("/arrivals")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
+    @Operation(summary = "Page through guests still to arrive (pending or confirmed), soonest first")
+    public ResponseEntity<PageResponse<ReservationResponse>> getArrivals(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            @RequestParam(required = false) OffsetDateTime from,
+            @RequestParam(required = false) String floor,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "100") int size,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(reservationQueryService.getArrivals(authentication, restaurantId, branchId, from, floor, page, size));
     }
 
     @GetMapping("/upcoming")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "List upcoming branch reservations")
     public ResponseEntity<List<ReservationResponse>> getUpcomingReservations(
             @PathVariable UUID restaurantId,
@@ -99,7 +119,7 @@ public class BranchReservationController {
     }
 
     @PostMapping("/availability/search")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Search reservation table combinations")
     public ResponseEntity<List<ReservationAvailabilityOptionResponse>> searchAvailability(
             @PathVariable UUID restaurantId,
@@ -111,7 +131,7 @@ public class BranchReservationController {
     }
 
     @PostMapping("/availability/recommend")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Recommend reservation table combinations")
     public ResponseEntity<List<ReservationAvailabilityOptionResponse>> recommendAvailability(
             @PathVariable UUID restaurantId,
@@ -123,20 +143,21 @@ public class BranchReservationController {
     }
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Get reservation summary for a branch")
     public ResponseEntity<ReservationSummaryResponse> getReservationSummary(
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
             @RequestParam(required = false) OffsetDateTime from,
             @RequestParam(required = false) OffsetDateTime to,
+            @RequestParam(required = false) String floor,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationQueryService.getReservationSummary(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(reservationQueryService.getReservationSummary(authentication, restaurantId, branchId, from, to, floor));
     }
 
     @GetMapping("/capacity")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Get reservation capacity overview for a branch")
     public ResponseEntity<ReservationCapacityResponse> getReservationCapacity(
             @PathVariable UUID restaurantId,
@@ -151,7 +172,7 @@ public class BranchReservationController {
     }
 
     @GetMapping("/settings")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Get the settings staff need for reservations, such as the restaurant time zone")
     public ResponseEntity<ReservationSettingsResponse> getReservationSettings(
             @PathVariable UUID restaurantId,
@@ -162,7 +183,7 @@ public class BranchReservationController {
     }
 
     @PostMapping("/validate")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Validate a requested reservation window and table selection")
     public ResponseEntity<ReservationValidationResponse> validateReservation(
             @PathVariable UUID restaurantId,

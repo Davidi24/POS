@@ -37,7 +37,8 @@ public class PreOrderReservationListener {
     // Same transaction as the status change, so both commit or neither does.
     @EventListener
     public void onBookingEnded(ReservationStatusChangedEvent event) {
-        boolean cancelled = event.newStatus() == ReservationStatus.CANCELLED;
+        // An unanswered request that expired is handled like a cancel: the guest isn't to blame.
+        boolean cancelled = event.newStatus() == ReservationStatus.CANCELLED || event.newStatus() == ReservationStatus.EXPIRED;
         if (!cancelled && event.newStatus() != ReservationStatus.NO_SHOW) {
             return;
         }

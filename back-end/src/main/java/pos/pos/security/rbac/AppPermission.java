@@ -4,6 +4,10 @@ package pos.pos.security.rbac;
 // Display fields are metadata used for seeding and admin-facing descriptions.
 public enum AppPermission {
 
+    SHIFT_SELF("My Shifts", "View own schedule and clock in, take breaks and clock out"),
+    SHIFT_READ("View Shifts", "View branch staff schedules and attendance"),
+    SHIFT_MANAGE("Manage Shifts", "Schedule shifts and correct staff attendance with an audit trail"),
+
     USERS_CREATE("Create Users", "Create new user accounts"),
     USERS_READ("View Users", "View user accounts"),
     USERS_UPDATE("Update Users", "Update user accounts"),
@@ -34,6 +38,11 @@ public enum AppPermission {
     SETTINGS_IMPORT("Import Settings", "Import restaurant settings"),
     SETTINGS_TEMPLATE_MANAGE("Manage Settings Templates", "Create, update and delete settings templates"),
     SETTINGS_TEMPLATE_APPLY("Apply Settings Templates", "Apply settings templates to restaurants"),
+
+    RESERVATION_READ("View Reservations", "View bookings, requests and the waitlist"),
+    RESERVATION_MANAGE("Manage Reservations", "Create and change bookings, check guests in, seat them and cancel"),
+    RESERVATION_APPROVE("Approve Bookings", "Accept or decline booking requests, including big groups"),
+    RESERVATION_CORRECT("Correct Reservations", "Fix bookings after the staff time limits or from an earlier day, with a reason"),
 
     ORDER_READ("View Orders", "View restaurant orders and order activity"),
     ORDER_CREATE("Create Orders", "Create new restaurant orders"),

@@ -50,8 +50,14 @@ class ReservationStatusEventTest {
         when(reservationSupport.requireReservation(RESTAURANT_ID, RESERVATION_ID)).thenReturn(reservation);
         when(reservationSupport.saveReservation(reservation)).thenReturn(reservation);
         when(restaurantScopeService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(reservationSupport.restaurantZone(restaurant)).thenReturn(ZoneOffset.UTC);
 
-        new ReservationLifecycleService(restaurantScopeService, reservationSupport, reservationNotifications, events)
+        pos.pos.reservation.service.ReservationPolicy policy = new pos.pos.reservation.service.ReservationPolicy(
+                org.mockito.Mockito.mock(pos.pos.settings.repository.SettingsRepository.class),
+                new pos.pos.reservation.service.ReservationRuleResolver(
+                        org.mockito.Mockito.mock(pos.pos.settings.repository.SettingsReservationRuleRepository.class)));
+        new ReservationLifecycleService(restaurantScopeService, reservationSupport, reservationNotifications, policy,
+                null, null, null, null, events)
                 .cancelReservation(authentication, RESTAURANT_ID, RESERVATION_ID, null);
 
         ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);

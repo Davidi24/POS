@@ -215,7 +215,7 @@ fun BoxScope.TableDetailsModal(
         MenuNestedDialog(
             onDismissRequest = { showSeparateConfirm = false },
             title = { Text("Separate Table $tableTitle?", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
-            text = { Text("Splits this group back into individual tables. The party and its order stay on the table you started with.", fontFamily = Inter()) },
+            text = { Text("Splits this group back into individual tables. The guests and their order stay on the table you started with.", fontFamily = Inter()) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -290,7 +290,8 @@ private fun ActionList(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         when (table.state) {
-            TableVisualState.Free -> {
+            // A late booking's table is still free to seat (its guests, or others once the hold ends).
+            TableVisualState.Free, TableVisualState.HoldEnding -> {
                 DialogActionButton(
                     text = "Seat customers", icon = Icons.Filled.Groups,
                     modifier = Modifier.fillMaxWidth().height(50.dp), dark = true,
@@ -508,6 +509,7 @@ private fun FloorPlanTable.statusLabel(): String =
         TableVisualState.Free -> "Free"
         TableVisualState.Occupied -> if (orderLabel == null) "Seated" else "In Progress"
         TableVisualState.Reserved -> "Reserved"
+        TableVisualState.HoldEnding -> "Hold ends soon"
         TableVisualState.BillPending -> "Bill Pending"
         TableVisualState.Unavailable -> "Unavailable"
     }

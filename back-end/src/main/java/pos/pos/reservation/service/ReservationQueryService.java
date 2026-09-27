@@ -3,12 +3,17 @@ package pos.pos.reservation.service;
 import pos.pos.utils.NormalizationUtils;
 
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.reservation.dto.ReservationAuditResponse;
+import pos.pos.reservation.dto.ReservationDetailsResponse;
+import pos.pos.reservation.dto.ReservationDepositResponse;
+import pos.pos.reservation.dto.ReservationNoteResponse;
 import pos.pos.reservation.dto.ReservationAvailabilityOptionResponse;
 import pos.pos.reservation.dto.ReservationAvailabilitySearchRequest;
 import pos.pos.reservation.dto.ReservationCapacityResponse;
@@ -17,9 +22,11 @@ import pos.pos.reservation.dto.ReservationStatusHistoryResponse;
 import pos.pos.reservation.dto.ReservationSummaryResponse;
 import pos.pos.reservation.dto.ReservationTableAssignmentResponse;
 import pos.pos.reservation.dto.ReservationTimelineEventResponse;
+import pos.pos.common.dto.PageResponse;
 import pos.pos.reservation.dto.ReservationValidationRequest;
 import pos.pos.reservation.dto.ReservationValidationResponse;
 import pos.pos.reservation.entity.Reservation;
+import pos.pos.reservation.entity.ReservationTableAssignment;
 import pos.pos.reservation.enums.ReservationStatus;
 import pos.pos.reservation.repository.ReservationNoteRepository;
 import pos.pos.reservation.repository.ReservationRepository;
@@ -51,6 +58,31 @@ public class ReservationQueryService {
             ReservationStatus.SEATED
     );
     private static final int MAX_UPCOMING_LIMIT = 100;
+    private static final int DEFAULT_RESERVATION_PAGE_SIZE = 100;
+    private static final int MAX_RESERVATION_PAGE_SIZE = 100;
+    // Guests still expected: the arrivals feed and the "to arrive" numbers.
+    private static final EnumSet<ReservationStatus> ARRIVING_STATUSES = EnumSet.of(
+            ReservationStatus.PENDING,
+            ReservationStatus.CONFIRMED
+    );
+    // Booked, not cancelled or no-show: what the day's reservation and guest totals count.
+    private static final EnumSet<ReservationStatus> PRESENT_STATUSES = EnumSet.of(
+            ReservationStatus.PENDING,
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.CHECKED_IN,
+            ReservationStatus.SEATED,
+            ReservationStatus.COMPLETED
+    );
+    // Still holding (or about to hold) a table: what "without a table" counts.
+    private static final EnumSet<ReservationStatus> NEEDS_TABLE_STATUSES = EnumSet.of(
+            ReservationStatus.PENDING,
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.CHECKED_IN,
+            ReservationStatus.SEATED
+    );
+    // "Arriving soon": a guest up to 15 minutes late still counts, up to 2 hours ahead.
+    private static final java.time.Duration ARRIVING_GRACE = java.time.Duration.ofMinutes(15);
+    private static final java.time.Duration ARRIVING_SOON_WINDOW = java.time.Duration.ofHours(2);
     private static final int DEFAULT_AVAILABILITY_LIMIT = 10;
     private static final int DEFAULT_RECOMMENDATION_LIMIT = 3;
 
@@ -63,19 +95,87 @@ public class ReservationQueryService {
     private final ReservationAvailabilitySupport reservationAvailabilitySupport;
     private final ReservationSupport reservationSupport;
     private final ReservationRuleResolver reservationRuleResolver;
+    private final ReservationPolicy reservationPolicy;
+    private final pos.pos.reservation.repository.ReservationEventRepository reservationEventRepository;
 
     @Transactional(readOnly = true)
     public List<ReservationResponse> getReservations(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
-        return reservationRepository.findAllByRestaurant_IdOrderByReservationStartDesc(restaurantId).stream()
-                .map(reservationSupport::toResponse)
-                .toList();
+        return reservationSupport.toResponses(reservationRepository.findAllByRestaurant_IdOrderByReservationStartDesc(restaurantId));
     }
 
     @Transactional(readOnly = true)
     public ReservationResponse getReservation(Authentication authentication, UUID restaurantId, UUID reservationId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
         return reservationSupport.toResponse(reservationSupport.requireReservation(restaurantId, reservationId));
+    }
+
+    @Transactional(readOnly = true)
+    public ReservationDetailsResponse getReservationDetails(Authentication authentication, UUID restaurantId, UUID reservationId) {
+        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        Reservation reservation = reservationSupport.requireReservation(restaurantId, reservationId);
+        List<ReservationStatusHistoryResponse> history = reservationSupport.mapStatusHistory(
+                reservationStatusHistoryRepository.findAllByReservation_IdOrderByChangedAtDesc(reservationId)
+        );
+        List<ReservationNoteResponse> notes = reservationSupport.mapNotes(
+                reservationNoteRepository.findAllByReservation_IdOrderByCreatedAtAsc(reservationId)
+        );
+        List<ReservationTableAssignment> assignmentEntities = reservationTableAssignmentRepository
+                .findAllByReservation_IdOrderByPrimaryAssignmentDescAssignedAtAsc(reservationId);
+        List<ReservationTableAssignmentResponse> assignments = assignmentEntities.stream()
+                .map(reservationSupport::toTableAssignmentResponse)
+                .toList();
+        ReservationAuditResponse audit = reservationSupport.toAuditResponse(
+                reservation,
+                history,
+                notes,
+                assignments
+        );
+        ReservationDepositResponse deposit = reservationSupport.toDepositResponse(reservation);
+        ReservationResponse response = reservationSupport.toResponse(reservation);
+
+        List<ReservationTimelineEventResponse> timeline = new ArrayList<>();
+        timeline.add(ReservationTimelineEventResponse.builder()
+                .id(reservation.getId())
+                .type("CREATED")
+                .occurredAt(reservation.getCreatedAt())
+                .actorId(reservation.getCreatedBy())
+                .message("Reservation created")
+                .build());
+        history.forEach(entry -> timeline.add(ReservationTimelineEventResponse.builder()
+                .id(entry.getId())
+                .type("STATUS_CHANGE")
+                .occurredAt(entry.getChangedAt())
+                .actorId(entry.getChangedBy())
+                .message(entry.getReason() == null ? "Status changed to " + entry.getNewStatus() : entry.getReason())
+                .oldStatus(entry.getOldStatus())
+                .newStatus(entry.getNewStatus())
+                .build()));
+        assignmentEntities.forEach(assignment -> timeline.add(ReservationTimelineEventResponse.builder()
+                        .id(assignment.getId())
+                        .type("TABLE_ASSIGNED")
+                        .occurredAt(assignment.getAssignedAt())
+                        .actorId(assignment.getAssignedBy())
+                        .message("Assigned table " + assignment.getRestaurantTable().getTableNumber())
+                        .relatedTableId(assignment.getRestaurantTable().getId())
+                        .build()));
+        notes.forEach(note -> timeline.add(ReservationTimelineEventResponse.builder()
+                        .id(note.getId())
+                        .type("NOTE_ADDED")
+                        .occurredAt(note.getCreatedAt())
+                        .actorId(note.getCreatedBy())
+                        .message(note.getNote())
+                        .relatedNoteId(note.getId())
+                        .build()));
+        timeline.addAll(eventTimeline(reservationId));
+        timeline.sort(Comparator.comparing(ReservationTimelineEventResponse::getOccurredAt).reversed());
+
+        return ReservationDetailsResponse.builder()
+                .reservation(response)
+                .audit(audit)
+                .timeline(timeline)
+                .deposit(deposit)
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -91,23 +191,24 @@ public class ReservationQueryService {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         List<Reservation> reservations = loadBranchReservations(branchId, from, to);
 
-        return reservations.stream()
+        return reservationSupport.toResponses(reservations.stream()
                 .filter(reservation -> status == null || reservation.getStatus() == status)
                 .filter(reservation -> customerId == null || Objects.equals(
                         reservation.getCustomer() == null ? null : reservation.getCustomer().getId(),
                         customerId
                 ))
-                .map(reservationSupport::toResponse)
-                .toList();
+                .toList());
     }
 
     @Transactional(readOnly = true)
-    public List<ReservationResponse> getBranchReservationCalendar(
+    public PageResponse<ReservationResponse> getBranchReservationCalendar(
             Authentication authentication,
             UUID restaurantId,
             UUID branchId,
             OffsetDateTime from,
-            OffsetDateTime to
+            OffsetDateTime to,
+            int page,
+            int size
     ) {
         Branch branch = restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         OffsetDateTime resolvedFrom = from;
@@ -125,29 +226,64 @@ public class ReservationQueryService {
             reservationSupport.requireCompleteWindow(resolvedFrom, resolvedTo);
         }
 
-        return reservationRepository.findAllByBranch_IdAndReservationStartBetweenOrderByReservationStartAsc(
-                        branchId,
-                        resolvedFrom,
-                        resolvedTo
-                ).stream()
-                .map(reservationSupport::toResponse)
-                .toList();
+        return getReservationPage(branchId, resolvedFrom, resolvedTo, page, size);
     }
 
     @Transactional(readOnly = true)
-    public List<ReservationResponse> getTodayReservations(Authentication authentication, UUID restaurantId, UUID branchId) {
+    public PageResponse<ReservationResponse> getTodayReservations(Authentication authentication, UUID restaurantId, UUID branchId, int page, int size) {
         Branch branch = restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         ReservationSupport.TimeWindow window = reservationSupport.dayWindow(
                 branch,
                 LocalDate.now(reservationSupport.restaurantZone(branch.getRestaurant()))
         );
-        return reservationRepository.findAllByBranch_IdAndReservationStartBetweenOrderByReservationStartAsc(
-                        branchId,
-                        window.from(),
-                        window.to()
-                ).stream()
-                .map(reservationSupport::toResponse)
-                .toList();
+        return getReservationPage(branchId, window.from(), window.to(), page, size);
+    }
+
+    // Guests still to come (pending or confirmed) from a moment on, soonest first, one page at a time. Defaults to
+    // 15 minutes ago so late guests stay listed. With a floor, only that floor's bookings plus those without a table.
+    @Transactional(readOnly = true)
+    public PageResponse<ReservationResponse> getArrivals(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID branchId,
+            OffsetDateTime from,
+            String floor,
+            int page,
+            int size
+    ) {
+        restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
+        OffsetDateTime resolvedFrom = from != null ? from : OffsetDateTime.now(ZoneOffset.UTC).minus(ARRIVING_GRACE);
+        String onlyFloor = NormalizationUtils.normalize(floor);
+        PageRequest pageRequest = PageRequest.of(Math.max(0, page), resolvePageSize(size));
+        Page<UUID> ids = onlyFloor == null
+                ? reservationRepository.findUpcomingIdPage(branchId, ARRIVING_STATUSES, resolvedFrom, pageRequest)
+                : reservationRepository.findUpcomingIdPageOnFloor(branchId, ARRIVING_STATUSES, resolvedFrom, onlyFloor, pageRequest);
+        return toReservationPage(ids);
+    }
+
+    private int resolvePageSize(int size) {
+        return size <= 0 ? DEFAULT_RESERVATION_PAGE_SIZE : Math.min(size, MAX_RESERVATION_PAGE_SIZE);
+    }
+
+    private PageResponse<ReservationResponse> getReservationPage(UUID branchId, OffsetDateTime from, OffsetDateTime to, int page, int size) {
+        Page<UUID> ids = reservationRepository.findReservationIdsForBranchInWindow(
+                branchId, from, to, PageRequest.of(Math.max(0, page), resolvePageSize(size))
+        );
+        return toReservationPage(ids);
+    }
+
+    // Loads the full rows for one page of ids, keeping the page's order.
+    private PageResponse<ReservationResponse> toReservationPage(Page<UUID> ids) {
+        if (ids.isEmpty()) {
+            return PageResponse.from(new PageImpl<>(List.of(), ids.getPageable(), ids.getTotalElements()));
+        }
+        var byId = reservationRepository.findAllByIdInOrderByReservationStartAsc(ids.getContent()).stream()
+                .collect(java.util.stream.Collectors.toMap(Reservation::getId, reservation -> reservation));
+        List<ReservationResponse> items = reservationSupport.toResponses(ids.getContent().stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .toList());
+        return PageResponse.from(new PageImpl<>(items, ids.getPageable(), ids.getTotalElements()));
     }
 
     @Transactional(readOnly = true)
@@ -165,9 +301,7 @@ public class ReservationQueryService {
         if (ids.isEmpty()) {
             return List.of();
         }
-        return reservationRepository.findAllByIdInOrderByReservationStartAsc(ids).stream()
-                .map(reservationSupport::toResponse)
-                .toList();
+        return reservationSupport.toResponses(reservationRepository.findAllByIdInOrderByReservationStartAsc(ids));
     }
 
     @Transactional(readOnly = true)
@@ -210,15 +344,25 @@ public class ReservationQueryService {
             UUID restaurantId,
             UUID branchId,
             OffsetDateTime from,
-            OffsetDateTime to
+            OffsetDateTime to,
+            String floor
     ) {
         Branch branch = restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         ReservationSupport.TimeWindow window = reservationSupport.resolveSummaryWindow(branch, from, to);
+        String onlyFloor = NormalizationUtils.normalize(floor);
         List<Reservation> reservations = reservationRepository.findAllByBranch_IdAndReservationStartBetweenOrderByReservationStartAsc(
                 branchId,
                 window.from(),
                 window.to()
-        );
+        ).stream().filter(reservation -> onlyFloor == null || isOnFloor(reservation, onlyFloor)).toList();
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime soonFrom = now.minus(ARRIVING_GRACE);
+        OffsetDateTime soonTo = now.plus(ARRIVING_SOON_WINDOW);
+        List<Reservation> arrivingSoon = reservations.stream()
+                .filter(reservation -> ARRIVING_STATUSES.contains(reservation.getStatus()))
+                .filter(reservation -> !reservation.getReservationStart().isBefore(soonFrom)
+                        && !reservation.getReservationStart().isAfter(soonTo))
+                .toList();
 
         return ReservationSummaryResponse.builder()
                 .branchId(branchId)
@@ -233,9 +377,47 @@ public class ReservationQueryService {
                 .completedCount(reservationSupport.countByStatus(reservations, ReservationStatus.COMPLETED))
                 .cancelledCount(reservationSupport.countByStatus(reservations, ReservationStatus.CANCELLED))
                 .noShowCount(reservationSupport.countByStatus(reservations, ReservationStatus.NO_SHOW))
+                .expiredCount(reservationSupport.countByStatus(reservations, ReservationStatus.EXPIRED))
+                .attendanceNotConfirmedCount((int) reservations.stream()
+                        .filter(reservation -> reservation.getStatus() == ReservationStatus.CONFIRMED && reservation.getAttendanceConfirmedAt() == null)
+                        .count())
+                .notConfirmedDueCount((int) reservations.stream()
+                        .filter(reservation -> "NOT_CONFIRMED".equals(reservationSupport.attendance(reservation, now)))
+                        .count())
+                .bigGroupCount((int) reservations.stream()
+                        .filter(reservation -> ARRIVING_STATUSES.contains(reservation.getStatus()))
+                        .filter(reservation -> reservation.getPartySize() >= reservationPolicy.values(branch.getRestaurant()).approvalGroupSize())
+                        .count())
+                .needsReviewCount((int) reservations.stream()
+                        .filter(reservation -> reservationSupport.reviewReason(reservation, now) != null)
+                        .count()
+                        + (int) reservationRepository.countByBranch_IdAndStatusInAndReservationStartLessThan(
+                                branchId, EnumSet.of(ReservationStatus.CHECKED_IN, ReservationStatus.SEATED), window.from()))
                 .upcomingCount((int) reservationRepository.countByBranch_IdAndStatusInAndReservationStartGreaterThanEqual(
                         branchId, UPCOMING_STATUSES, OffsetDateTime.now(ZoneOffset.UTC)))
+                .presentGuests(guests(reservations, PRESENT_STATUSES))
+                .guestsToArrive(guests(reservations, ARRIVING_STATUSES))
+                .unassignedCount((int) reservations.stream()
+                        .filter(reservation -> NEEDS_TABLE_STATUSES.contains(reservation.getStatus()))
+                        .filter(reservation -> reservation.getTableAssignments().isEmpty())
+                        .count())
+                .arrivingSoonCount(arrivingSoon.size())
+                .arrivingSoonGuests(arrivingSoon.stream().mapToInt(Reservation::getPartySize).sum())
                 .build();
+    }
+
+    // Same floor rule as the arrivals feed: one of its tables is on the floor, or it has no table yet.
+    private static boolean isOnFloor(Reservation reservation, String floor) {
+        return reservation.getTableAssignments().isEmpty() || reservation.getTableAssignments().stream()
+                .anyMatch(assignment -> assignment.getRestaurantTable() != null
+                        && floor.equalsIgnoreCase(assignment.getRestaurantTable().getFloor()));
+    }
+
+    private static int guests(List<Reservation> reservations, EnumSet<ReservationStatus> statuses) {
+        return reservations.stream()
+                .filter(reservation -> statuses.contains(reservation.getStatus()))
+                .mapToInt(Reservation::getPartySize)
+                .sum();
     }
 
     @Transactional(readOnly = true)
@@ -245,17 +427,73 @@ public class ReservationQueryService {
             UUID branchId
     ) {
         Branch branch = restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        ReservationPolicy.Values values = reservationPolicy.values(branch.getRestaurant());
         var response = pos.pos.reservation.dto.ReservationSettingsResponse.builder()
                 .branchId(branchId)
-                .timezone(reservationSupport.restaurantZone(branch.getRestaurant()).getId());
-        reservationRuleResolver.activeRule(branch, OffsetDateTime.now(ZoneOffset.UTC)).ifPresent(rule -> response
+                .timezone(reservationSupport.restaurantZone(branch.getRestaurant()).getId())
+                .defaultDurationMinutes(reservationRuleResolver.durationMinutes(branch, now))
+                .bufferMinutes((int) reservationRuleResolver.buffer(branch, now).toMinutes())
+                .largeGroupFrom(values.largeGroupFrom())
+                .largeGroupExtraMinutes(values.largeGroupExtraMinutes())
+                .approvalGroupSize(values.approvalGroupSize())
+                .holdMinutes(values.holdMinutes())
+                .holdWarningMinutes(values.holdWarningMinutes())
+                .lateAfterMinutes(values.lateAfterMinutes())
+                .checkInOpensMinutes(values.checkInOpensMinutes())
+                .reopenWindowMinutes(values.reopenWindowMinutes())
+                .undoSeatMinutes(values.undoSeatMinutes())
+                .runningLateMaxMinutes(values.runningLateMaxMinutes())
+                .sameDayConfirmMinutes(values.sameDayConfirmMinutes())
+                .attendanceCallMinutes(values.attendanceCallMinutes())
+                .confirmReminderTime(values.confirmReminderTime() == null ? null : values.confirmReminderTime().toString())
+                .noShowWarningFrom(values.noShowWarningFrom())
+                .serviceDayStartHour(ReservationPolicy.SERVICE_DAY_START_HOUR);
+        reservationRuleResolver.activeRule(branch, now).ifPresent(rule -> response
                 .ruleName(rule.getRuleName())
-                .defaultDurationMinutes(rule.getDefaultDurationMinutes())
-                .bufferMinutes(rule.getBufferMinutes())
                 .minPartySize(rule.getMinPartySize())
                 .maxPartySize(rule.getMaxPartySize())
                 .advanceBookingDays(rule.getAdvanceBookingDays()));
         return response.build();
+    }
+
+    // Late guests keep their end time: do they still fit at their tables, and where else could they sit.
+    @Transactional(readOnly = true)
+    public pos.pos.reservation.dto.ReservationSeatingCheckResponse getSeatingCheck(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID reservationId
+    ) {
+        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        Reservation reservation = reservationSupport.requireReservation(restaurantId, reservationId);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime from = reservation.getReservationStart().isAfter(now) ? reservation.getReservationStart() : now;
+        OffsetDateTime end = reservation.getReservationEnd();
+        long minutesLeft = Math.max(0, java.time.Duration.between(from, end).toMinutes());
+
+        List<UUID> tableIds = reservation.getTableAssignments().stream()
+                .map(assignment -> assignment.getRestaurantTable().getId())
+                .toList();
+        Reservation next = tableIds.isEmpty() ? null : reservationTableAssignmentRepository
+                .findUpcomingByTableIds(tableIds, EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN), from)
+                .stream()
+                .map(ReservationTableAssignment::getReservation)
+                .filter(other -> !other.getId().equals(reservation.getId()))
+                .filter(other -> !other.getReservationStart().isBefore(reservation.getReservationStart()))
+                .min(java.util.Comparator.comparing(Reservation::getReservationStart))
+                .orElse(null);
+        java.time.Duration buffer = reservationRuleResolver.buffer(reservation.getBranch(), from);
+        boolean fits = !tableIds.isEmpty() && (next == null || !next.getReservationStart().minus(buffer).isBefore(end));
+        List<ReservationAvailabilityOptionResponse> alternatives = fits || !end.isAfter(from)
+                ? List.of()
+                : reservationAvailabilitySupport.availabilityOptionsForBranch(reservation.getBranch(), from, end, reservation.getPartySize(), 3);
+        return pos.pos.reservation.dto.ReservationSeatingCheckResponse.builder()
+                .minutesLeft((int) minutesLeft)
+                .nextBookingStart(next == null ? null : next.getReservationStart())
+                .nextBookingName(next == null ? null : next.getContactName())
+                .fitsAtTables(fits)
+                .alternatives(alternatives)
+                .build();
     }
 
     @Transactional(readOnly = true)
@@ -455,8 +693,22 @@ public class ReservationQueryService {
                         .build())
         );
 
+        timeline.addAll(eventTimeline(reservationId));
         return timeline.stream()
                 .sorted(Comparator.comparing(ReservationTimelineEventResponse::getOccurredAt).reversed())
+                .toList();
+    }
+
+    // Changes that aren't a status change: "Table held until 19:45 · Called: traffic", "1 → 2 of 2 arrived".
+    private List<ReservationTimelineEventResponse> eventTimeline(UUID reservationId) {
+        return reservationEventRepository.findAllByReservation_IdOrderByCreatedAtAsc(reservationId).stream()
+                .map(event -> ReservationTimelineEventResponse.builder()
+                        .id(event.getId())
+                        .type(event.getType().name())
+                        .occurredAt(event.getCreatedAt())
+                        .actorId(event.getActorId())
+                        .message(event.getReason() == null ? event.getDetail() : event.getDetail() + " · " + event.getReason())
+                        .build())
                 .toList();
     }
 

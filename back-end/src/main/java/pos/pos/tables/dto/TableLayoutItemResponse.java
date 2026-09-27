@@ -1,5 +1,7 @@
 package pos.pos.tables.dto;
 
+import pos.pos.reservation.enums.ReservationStatus;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -42,6 +44,14 @@ public class TableLayoutItemResponse {
     private OffsetDateTime nextReservationEnd;
     private String nextReservationCode;
     private String nextReservationName;
+    // For the floor plan's booking states: "Hold ends in 10 min", "Waiting for table", "3 of 6 arrived".
+    private UUID nextReservationId;
+    private ReservationStatus nextReservationStatus;
+    private OffsetDateTime nextReservationHoldUntil;
+    // From then the table shows "Hold ends in N min" (the hold minus the warning, e.g. 10 min before it ends).
+    private OffsetDateTime nextReservationHoldWarningAt;
+    private Integer nextReservationPartySize;
+    private Integer nextReservationArrivedGuests;
     private UUID currentOrderId;
     private String currentOrderNumber;
     private OrderStatus currentOrderStatus;

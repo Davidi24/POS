@@ -30,6 +30,8 @@ import kotlinx.datetime.*
         model.catalog?.getTables()?.fold({ tables = it.tables.filter { t -> t.active && t.mergedIntoTableId == null } }, { error = it.message })
         if(state.can("SETTINGS_READ")) {
             model.catalog?.getCustomers()?.fold({ customers = it }, { error = it.message })
+        }
+        if(state.can("RESERVATION_READ")) {
             model.catalog?.getReservations()?.fold({ reservations = it }, { error = it.message })
         }
         loading = false
@@ -44,6 +46,8 @@ import kotlinx.datetime.*
         OrderField("Guests", guestCount, { guestCount = it })
         if(state.can("SETTINGS_READ") && existing == null) {
             OrderChoice("Customer", customers.firstOrNull { it.id == customer }?.fullName ?: "Walk-in guest", listOf("" to "Walk-in guest") + customers.map { it.id to it.fullName }, { customer = it.takeIf(String::isNotBlank) })
+        }
+        if(state.can("RESERVATION_READ") && existing == null) {
             if(type == OrderType.DINE_IN) OrderChoice("Reservation", reservations.firstOrNull { it.id == reservation }?.reservationCode ?: "None", listOf("" to "None") + reservations.map { it.id to "${it.reservationCode} · ${it.customerName ?: it.contactName.orEmpty()}" }, { id -> reservation = id.takeIf(String::isNotBlank); reservations.firstOrNull { it.id == id }?.let { customer = it.customerId; guestCount = it.partySize.toString() } })
         }
         OrderField("Order note (optional)", note, { note = it }, singleLine = false)

@@ -39,7 +39,7 @@ public class ReservationRequest {
     @NotNull(message = "reservationStart is required")
     private OffsetDateTime reservationStart;
 
-    @NotNull(message = "reservationEnd is required")
+    // Empty: the booking length from settings (2 h, or 2 h 15 for groups of 5 or more).
     private OffsetDateTime reservationEnd;
 
     @Size(max = 150, message = "contactName must be at most 150 characters")
@@ -69,4 +69,7 @@ public class ReservationRequest {
 
     private List<UUID> initialTableIds;
     private UUID primaryTableId;
+
+    // The guest confirmed on the phone that they're coming (same-day bookings): marks "✓ Attendance confirmed".
+    private Boolean attendanceConfirmed;
 }

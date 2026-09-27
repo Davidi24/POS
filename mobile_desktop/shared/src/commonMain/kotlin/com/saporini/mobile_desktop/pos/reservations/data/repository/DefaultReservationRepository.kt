@@ -1,6 +1,8 @@
 package com.saporini.mobile_desktop.pos.reservations.data.repository
 
 import com.saporini.mobile_desktop.pos.reservations.data.api.ReservationApi
+import com.saporini.mobile_desktop.pos.reservations.data.dto.ExtendReservationHoldRequestDto
+import com.saporini.mobile_desktop.pos.reservations.data.dto.ReservationActionRequestDto
 import com.saporini.mobile_desktop.pos.reservations.data.dto.ReservationNoteRequestDto
 import com.saporini.mobile_desktop.pos.reservations.data.dto.toDomain
 import com.saporini.mobile_desktop.pos.reservations.data.dto.toDto
@@ -27,19 +29,33 @@ class DefaultReservationRepository(
         branchId: String,
         from: String?,
         to: String?
-    ): List<Reservation> = api.getBranchReservationCalendar(restaurantId, branchId, from, to).map { it.toDomain() }
+    ): List<Reservation> = api.getBranchReservationCalendar(restaurantId, branchId, from, to, 0, 100).items.map { it.toDomain() }
+
+    override suspend fun getBranchReservationCalendarPage(
+        restaurantId: String, branchId: String, from: String?, to: String?, page: Int, size: Int
+    ): ReservationPage = api.getBranchReservationCalendar(restaurantId, branchId, from, to, page, size).toDomain()
 
     override suspend fun getTodayReservations(restaurantId: String, branchId: String): List<Reservation> =
-        api.getTodayReservations(restaurantId, branchId).map { it.toDomain() }
+        api.getTodayReservations(restaurantId, branchId).items.map { it.toDomain() }
+
+    override suspend fun getTodayReservationsPage(restaurantId: String, branchId: String, page: Int, size: Int): ReservationPage =
+        api.getTodayReservations(restaurantId, branchId, page, size).toDomain()
 
     override suspend fun getUpcomingReservations(restaurantId: String, branchId: String, limit: Int?): List<Reservation> =
         api.getUpcomingReservations(restaurantId, branchId, limit).map { it.toDomain() }
+
+    override suspend fun getArrivalsPage(
+        restaurantId: String, branchId: String, from: String?, floor: String?, page: Int, size: Int
+    ): ReservationPage = api.getArrivals(restaurantId, branchId, from, floor, page, size).toDomain()
 
     override suspend fun createReservation(restaurantId: String, request: ReservationInput): Reservation =
         api.createReservation(restaurantId, request.toDto()).toDomain()
 
     override suspend fun getReservation(restaurantId: String, reservationId: String): Reservation =
         api.getReservation(restaurantId, reservationId).toDomain()
+
+    override suspend fun getReservationDetails(restaurantId: String, reservationId: String): ReservationDetails =
+        api.getReservationDetails(restaurantId, reservationId).toDomain()
 
     override suspend fun updateReservation(restaurantId: String, reservationId: String, request: ReservationInput): Reservation =
         api.updateReservation(restaurantId, reservationId, request.toDto()).toDomain()
@@ -70,6 +86,27 @@ class DefaultReservationRepository(
 
     override suspend fun reopenReservation(restaurantId: String, reservationId: String, request: ReservationActionInput): Reservation =
         api.reopenReservation(restaurantId, reservationId, request.toDto()).toDomain()
+
+    override suspend fun undoSeatReservation(restaurantId: String, reservationId: String, request: ReservationActionInput): Reservation =
+        api.undoSeatReservation(restaurantId, reservationId, request.toDto()).toDomain()
+
+    override suspend fun updateArrivedGuests(restaurantId: String, reservationId: String, request: ReservationActionInput): Reservation =
+        api.updateArrivedGuests(restaurantId, reservationId, request.toDto()).toDomain()
+
+    override suspend fun extendHold(restaurantId: String, reservationId: String, minutes: Int, reason: String?): Reservation =
+        api.extendHold(restaurantId, reservationId, ExtendReservationHoldRequestDto(minutes, reason)).toDomain()
+
+    override suspend fun getSeatingCheck(restaurantId: String, reservationId: String): ReservationSeatingCheck =
+        api.getSeatingCheck(restaurantId, reservationId).toDomain()
+
+    override suspend fun confirmAttendance(restaurantId: String, reservationId: String, reason: String?): Reservation =
+        api.confirmAttendance(restaurantId, reservationId, ReservationActionRequestDto(reason = reason)).toDomain()
+
+    override suspend fun getGuestHistory(restaurantId: String, reservationId: String): GuestHistory =
+        api.getGuestHistory(restaurantId, reservationId).toDomain()
+
+    override suspend fun clearNoShowWarning(restaurantId: String, reservationId: String, reason: String): Reservation =
+        api.clearNoShowWarning(restaurantId, reservationId, ReservationActionRequestDto(reason = reason)).toDomain()
 
     override suspend fun getReservationTables(restaurantId: String, reservationId: String): List<ReservationTableAssignment> =
         api.getReservationTables(restaurantId, reservationId).map { it.toDomain() }
@@ -128,23 +165,38 @@ class DefaultReservationRepository(
     override suspend fun recommendAvailability(restaurantId: String, branchId: String, request: ReservationAvailabilitySearchInput): List<ReservationAvailabilityOption> =
         api.recommendAvailability(restaurantId, branchId, request.toDto()).map { it.toDomain() }
 
-    override suspend fun getReservationSummary(restaurantId: String, branchId: String, from: String?, to: String?): ReservationSummary =
-        api.getReservationSummary(restaurantId, branchId, from, to).toDomain()
+    override suspend fun getReservationSummary(restaurantId: String, branchId: String, from: String?, to: String?, floor: String?): ReservationSummary =
+        api.getReservationSummary(restaurantId, branchId, from, to, floor).toDomain()
 
     override suspend fun getReservationSettings(restaurantId: String, branchId: String): ReservationSettings =
         api.getReservationSettings(restaurantId, branchId).let { dto ->
+            val defaults = ReservationPolicy()
             ReservationSettings(
                 timezone = dto.timezone,
-                rules = dto.ruleName?.let {
-                    ReservationRules(
-                        name = it,
-                        defaultDurationMinutes = dto.defaultDurationMinutes ?: ReservationRules.NONE.defaultDurationMinutes,
-                        bufferMinutes = dto.bufferMinutes ?: 0,
-                        minPartySize = dto.minPartySize ?: 1,
-                        maxPartySize = dto.maxPartySize ?: ReservationRules.NONE.maxPartySize,
-                        advanceBookingDays = dto.advanceBookingDays
-                    )
-                } ?: ReservationRules.NONE
+                rules = ReservationRules(
+                    name = dto.ruleName,
+                    defaultDurationMinutes = dto.defaultDurationMinutes ?: ReservationRules.NONE.defaultDurationMinutes,
+                    bufferMinutes = dto.bufferMinutes ?: ReservationRules.NONE.bufferMinutes,
+                    minPartySize = dto.minPartySize ?: 1,
+                    maxPartySize = dto.maxPartySize ?: ReservationRules.NONE.maxPartySize,
+                    advanceBookingDays = dto.advanceBookingDays
+                ),
+                policy = ReservationPolicy(
+                    largeGroupFrom = dto.largeGroupFrom ?: defaults.largeGroupFrom,
+                    largeGroupExtraMinutes = dto.largeGroupExtraMinutes ?: defaults.largeGroupExtraMinutes,
+                    approvalGroupSize = dto.approvalGroupSize ?: defaults.approvalGroupSize,
+                    holdMinutes = dto.holdMinutes ?: defaults.holdMinutes,
+                    holdWarningMinutes = dto.holdWarningMinutes ?: defaults.holdWarningMinutes,
+                    lateAfterMinutes = dto.lateAfterMinutes ?: defaults.lateAfterMinutes,
+                    checkInOpensMinutes = dto.checkInOpensMinutes ?: defaults.checkInOpensMinutes,
+                    reopenWindowMinutes = dto.reopenWindowMinutes ?: defaults.reopenWindowMinutes,
+                    undoSeatMinutes = dto.undoSeatMinutes ?: defaults.undoSeatMinutes,
+                    runningLateMaxMinutes = dto.runningLateMaxMinutes ?: defaults.runningLateMaxMinutes,
+                    serviceDayStartHour = dto.serviceDayStartHour ?: defaults.serviceDayStartHour,
+                    sameDayConfirmMinutes = dto.sameDayConfirmMinutes ?: defaults.sameDayConfirmMinutes,
+                    noShowWarningFrom = dto.noShowWarningFrom ?: defaults.noShowWarningFrom,
+                    confirmReminderTime = dto.confirmReminderTime?.take(5) ?: defaults.confirmReminderTime
+                )
             )
         }
 

@@ -160,6 +160,28 @@ public class Reservation extends AbstractAuditedEntity {
     @Column(name = "no_show_at", columnDefinition = "timestamptz")
     private OffsetDateTime noShowAt;
 
+    @Column(name = "expired_at", columnDefinition = "timestamptz")
+    private OffsetDateTime expiredAt;
+
+    // Staff kept the table longer for a late guest; empty means the booking time plus the hold setting.
+    @Column(name = "hold_until", columnDefinition = "timestamptz")
+    private OffsetDateTime holdUntil;
+
+    // "3 of 6 arrived": set on check-in while the rest of the group is still coming.
+    @Column(name = "arrived_guests")
+    private Integer arrivedGuests;
+
+    // "✓ Attendance confirmed": a mark on a confirmed booking, not a status.
+    @Column(name = "attendance_confirmed_at", columnDefinition = "timestamptz")
+    private OffsetDateTime attendanceConfirmedAt;
+
+    @Column(name = "attendance_confirmed_by", columnDefinition = "uuid")
+    private java.util.UUID attendanceConfirmedBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "attendance_confirmed_via", length = 20)
+    private pos.pos.reservation.enums.AttendanceConfirmedVia attendanceConfirmedVia;
+
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("changedAt DESC")
     private List<ReservationStatusHistory> statusHistory = new ArrayList<>();
@@ -296,6 +318,18 @@ public class Reservation extends AbstractAuditedEntity {
 
         if (noShowAt != null && status != ReservationStatus.NO_SHOW) {
             throw new IllegalStateException("noShowAt requires NO_SHOW status");
+        }
+
+        if (expiredAt != null && status != ReservationStatus.EXPIRED) {
+            throw new IllegalStateException("expiredAt requires EXPIRED status");
+        }
+
+        if (arrivedGuests != null && arrivedGuests <= 0) {
+            throw new IllegalStateException("arrivedGuests must be greater than zero");
+        }
+
+        if (holdUntil != null && reservationStart != null && !holdUntil.isAfter(reservationStart)) {
+            throw new IllegalStateException("holdUntil must be after reservationStart");
         }
 
         if (completedAt != null && status != ReservationStatus.COMPLETED) {

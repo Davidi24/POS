@@ -35,3 +35,11 @@ Fill in and expand this section as you discover build/test/lint commands, code s
 - Other modules follow reservations through events in `pos.pos.reservation.event` (`ReservationStatusChangedEvent`, `ReservationDeletingEvent`) rather than being called from reservation services. Publish via `ReservationLifecycleService.announceStatusChange` for any status change made outside `transitionReservation`.
 - Short codes and numbers shown to people (reservation codes, order numbers, KDS ticket numbers) must use random bits (`UUID.randomUUID()`). Truncated time-ordered UUIDs repeat for ~27 s and collide.
 - For JPA child collections with a unique key (e.g. KDS routings), update matching rows in place. Removing and re-adding the same key makes Hibernate insert before it deletes, which violates the constraint.
+- Local super admin for API checks: see `bootstrap.super-admin` in `application-local.yml`; log in with `POST /auth/device/login` `{identifier, password}`. After a reboot, run `podman start pos-db pos-mailhog` before starting the backend.
+
+### App (mobile_desktop)
+- Settings: every value a restaurant might change (durations, buffers, reminder times, hold/grace minutes, thresholds, deadlines) must be editable in the **Admin Hub settings**, with the agreed value as the default. Never hard-code these (user rule).
+- UI wording: never use "party"/"parties" in on-screen text (the user reads it as a celebration). Say "booking" or "group" (e.g. "Biggest booking: 3 guests", "Big groups (6+)"). Code names like `partySize` are fine.
+- Build/check without tests: `./gradlew :desktopApp:compileKotlin`; test sources: `./gradlew :shared:compileTestKotlinJvm`. Launch: `./gradlew :desktopApp:run` (main class `com.saporini.mobile_desktop.MainKt`). When restarting, find PIDs and kill them in a separate command from the one that relaunches Gradle; a `grep`/`pkill` pattern like `desktopApp:run` also matches your own shell.
+- Paged reservation lists: a refresh must reload every page already loaded (never drop back to page 0), so screens keep their scroll position. Long lists use `LazyColumn` keyed by id and load the next page near the end, with a manual "Try again" after a failure.
+- Overview numbers come from the server summary (`/summary`, optionally per `floor`), never from a partially loaded list.

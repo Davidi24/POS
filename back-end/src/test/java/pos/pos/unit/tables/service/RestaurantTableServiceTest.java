@@ -84,6 +84,9 @@ class RestaurantTableServiceTest {
     @Mock
     private OrderSupport orderSupport;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher events;
+
     @Spy
     private RestaurantTableMapper restaurantTableMapper;
 
@@ -100,6 +103,7 @@ class RestaurantTableServiceTest {
         );
         restaurantTableService = new RestaurantTableService(
                 restaurantScopeService,
+                events,
                 restaurantTableRepository,
                 reservationTableAssignmentRepository,
                 restaurantTableSupport,
@@ -163,7 +167,7 @@ class RestaurantTableServiceTest {
         )).thenReturn(branch);
         when(restaurantScopeService.currentUserId(authentication))
                 .thenReturn(ACTOR_ID);
-        when(restaurantTableRepository.findByIdAndBranch_Id(
+        when(restaurantTableRepository.findByIdAndBranchIdForUpdate(
                 PRIMARY_TABLE_ID,
                 BRANCH_ID
         )).thenReturn(Optional.of(table));
@@ -198,7 +202,7 @@ class RestaurantTableServiceTest {
 
         when(restaurantScopeService.requireManageableBranch(authentication, RESTAURANT_ID, BRANCH_ID)).thenReturn(branch);
         when(restaurantScopeService.currentUserId(authentication)).thenReturn(ACTOR_ID);
-        when(restaurantTableRepository.findByIdAndBranch_Id(PRIMARY_TABLE_ID, BRANCH_ID)).thenReturn(Optional.of(primaryTable));
+        when(restaurantTableRepository.findByIdAndBranchIdForUpdate(PRIMARY_TABLE_ID, BRANCH_ID)).thenReturn(Optional.of(primaryTable));
         when(restaurantTableRepository.findAllByBranch_IdAndIdIn(eq(BRANCH_ID), anyCollection()))
                 .thenReturn(List.of(firstChild, secondChild));
         when(restaurantTableRepository.existsByMergedInto_Id(CHILD_TABLE_ID)).thenReturn(false);

@@ -18,6 +18,7 @@ import pos.pos.settings.dto.UpdateSettingsLocalizationRequest;
 import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
 import pos.pos.settings.dto.UpdateSettingsSequencePrefixesRequest;
 import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
+import pos.pos.settings.dto.UpdateSettingsReservationPolicyRequest;
 import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.entity.Settings;
 import pos.pos.settings.enums.ServiceChargeType;
@@ -237,6 +238,47 @@ public class SettingsService {
     }
 
     @Transactional
+    public SettingsResponse updateReservationPolicy(
+            Authentication authentication,
+            UUID restaurantId,
+            UpdateSettingsReservationPolicyRequest request
+    ) {
+        // The "hold ends" warning has to come before the hold itself runs out.
+        if (request.getHoldWarningMinutes() >= request.getHoldMinutes()) {
+            throw new AuthException("The hold warning must come before the hold ends", HttpStatus.BAD_REQUEST);
+        }
+        if (request.getLateAfterMinutes() >= request.getHoldMinutes()) {
+            throw new AuthException("A guest must count as late before the hold ends", HttpStatus.BAD_REQUEST);
+        }
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setLargeGroupFrom(request.getLargeGroupFrom());
+        settings.setLargeGroupExtraMinutes(request.getLargeGroupExtraMinutes());
+        settings.setApprovalGroupSize(request.getApprovalGroupSize());
+        settings.setHoldMinutes(request.getHoldMinutes());
+        settings.setHoldWarningMinutes(request.getHoldWarningMinutes());
+        settings.setCheckInOpensMinutes(request.getCheckInOpensMinutes());
+        settings.setConfirmReminderTime(request.getConfirmReminderTime());
+        settings.setSameDayConfirmMinutes(request.getSameDayConfirmMinutes());
+        settings.setAttendanceCallMinutes(request.getAttendanceCallMinutes());
+        settings.setReopenWindowMinutes(request.getReopenWindowMinutes());
+        settings.setUndoSeatMinutes(request.getUndoSeatMinutes());
+        settings.setRunningLateMaxMinutes(request.getRunningLateMaxMinutes());
+        settings.setLateAfterMinutes(request.getLateAfterMinutes());
+        settings.setGuestReminderHours(request.getGuestReminderHours());
+        settings.setNoShowWarningFrom(request.getNoShowWarningFrom());
+        settings.setDepositFromGuests(request.getDepositFromGuests());
+
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_RESERVATION_POLICY",
+                "Updated reservation policy settings"
+        );
+    }
+
+    @Transactional
     public SettingsResponse resetSettings(Authentication authentication, UUID restaurantId) {
         SettingsContext context = loadSettingsContext(authentication, restaurantId);
         Settings settings = context.settings();
@@ -377,6 +419,28 @@ public class SettingsService {
                 defaults.isEnableTakeaway(),
                 defaults.isEnableDelivery()
         );
+        applyReservationPolicyDefaults(settings, defaults);
+    }
+
+    private void applyReservationPolicyDefaults(Settings settings, Settings defaults) {
+        settings.setPreOrdersEnabled(defaults.isPreOrdersEnabled());
+        settings.setPreOrderLeadMinutes(defaults.getPreOrderLeadMinutes());
+        settings.setLargeGroupFrom(defaults.getLargeGroupFrom());
+        settings.setLargeGroupExtraMinutes(defaults.getLargeGroupExtraMinutes());
+        settings.setApprovalGroupSize(defaults.getApprovalGroupSize());
+        settings.setHoldMinutes(defaults.getHoldMinutes());
+        settings.setHoldWarningMinutes(defaults.getHoldWarningMinutes());
+        settings.setCheckInOpensMinutes(defaults.getCheckInOpensMinutes());
+        settings.setConfirmReminderTime(defaults.getConfirmReminderTime());
+        settings.setSameDayConfirmMinutes(defaults.getSameDayConfirmMinutes());
+        settings.setAttendanceCallMinutes(defaults.getAttendanceCallMinutes());
+        settings.setReopenWindowMinutes(defaults.getReopenWindowMinutes());
+        settings.setUndoSeatMinutes(defaults.getUndoSeatMinutes());
+        settings.setRunningLateMaxMinutes(defaults.getRunningLateMaxMinutes());
+        settings.setLateAfterMinutes(defaults.getLateAfterMinutes());
+        settings.setGuestReminderHours(defaults.getGuestReminderHours());
+        settings.setNoShowWarningFrom(defaults.getNoShowWarningFrom());
+        settings.setDepositFromGuests(defaults.getDepositFromGuests());
     }
 
     private void validateLocalization(String defaultLanguage, String dateFormat, String timeFormat) {

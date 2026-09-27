@@ -27,6 +27,7 @@ import pos.pos.settings.enums.WeekStartDay;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -164,7 +165,67 @@ public class Settings extends AbstractAuditedEntity {
 
     // How many minutes before the booking a pre-order goes to the kitchen; until then it can still be changed or refunded.
     @Column(name = "pre_order_lead_minutes", nullable = false)
-    private int preOrderLeadMinutes = 15;
+    private int preOrderLeadMinutes = 30;
+
+    // Reservation policy (Admin Hub → Settings → Reservations). Groups of largeGroupFrom+ get extra table time.
+    @Column(name = "large_group_from", nullable = false)
+    private int largeGroupFrom = 5;
+
+    @Column(name = "large_group_extra_minutes", nullable = false)
+    private int largeGroupExtraMinutes = 15;
+
+    // Bookings of this many guests or more need staff approval.
+    @Column(name = "approval_group_size", nullable = false)
+    private int approvalGroupSize = 7;
+
+    // A late guest's table is held this long after the start; the "hold ends" warning shows at holdWarningMinutes.
+    @Column(name = "hold_minutes", nullable = false)
+    private int holdMinutes = 30;
+
+    @Column(name = "hold_warning_minutes", nullable = false)
+    private int holdWarningMinutes = 20;
+
+    @Column(name = "check_in_opens_minutes", nullable = false)
+    private int checkInOpensMinutes = 120;
+
+    // When managers are told the day before about bookings still waiting for attendance confirmation.
+    @Column(name = "confirm_reminder_time", nullable = false)
+    private LocalTime confirmReminderTime = LocalTime.of(15, 0);
+
+    // Same-day bookings: attendance should be confirmed this long before the start.
+    @Column(name = "same_day_confirm_minutes", nullable = false)
+    private int sameDayConfirmMinutes = 120;
+
+    // No attendance reply this long before the start: staff are asked to call.
+    @Column(name = "attendance_call_minutes", nullable = false)
+    private int attendanceCallMinutes = 120;
+
+    // Staff may reopen a cancelled / no-show booking within this window; after it, a manager with a reason.
+    @Column(name = "reopen_window_minutes", nullable = false)
+    private int reopenWindowMinutes = 60;
+
+    @Column(name = "undo_seat_minutes", nullable = false)
+    private int undoSeatMinutes = 15;
+
+    // How much extra hold a guest can ask for with "I'm running late".
+    @Column(name = "running_late_max_minutes", nullable = false)
+    private int runningLateMaxMinutes = 30;
+
+    // A guest counts as late this long after the booking time.
+    @Column(name = "late_after_minutes", nullable = false)
+    private int lateAfterMinutes = 15;
+
+    // How long before the booking the guest gets "Still coming? [Confirm] [Cancel]".
+    @Column(name = "guest_reminder_hours", nullable = false)
+    private int guestReminderHours = 24;
+
+    // Staff are warned about a guest's new booking from this many no-shows.
+    @Column(name = "no_show_warning_from", nullable = false)
+    private int noShowWarningFrom = 1;
+
+    // When deposits are on, bookings from this many guests pay one.
+    @Column(name = "deposit_from_guests", nullable = false)
+    private int depositFromGuests = 7;
 
     @OneToOne(mappedBy = "settings", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private SettingsReceipt receiptSettings;

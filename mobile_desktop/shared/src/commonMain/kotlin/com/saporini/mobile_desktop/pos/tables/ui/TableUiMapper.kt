@@ -4,11 +4,27 @@ import com.saporini.mobile_desktop.pos.tables.domain.model.LayoutTable
 import com.saporini.mobile_desktop.pos.tables.domain.model.LayoutTableShape
 import com.saporini.mobile_desktop.pos.tables.domain.model.LayoutTableStatus
 
-fun LayoutTable.toUiTable(): FloorPlanTable {
+fun LayoutTable.toUiTable(now: kotlin.time.Instant = kotlin.time.Clock.System.now()): FloorPlanTable {
     val hasCurrentOrder = currentOrderNumber != null
+    // A confirmed booking's guests are late and the table's hold is running out (the warning time from settings).
+    val holdEndsInMinutes = if (!hasCurrentOrder && nextReservationStatus == "CONFIRMED") {
+        val warningAt = nextReservationHoldWarningAt?.let { runCatching { kotlin.time.Instant.parse(it) }.getOrNull() }
+        val holdUntil = nextReservationHoldUntil?.let { runCatching { kotlin.time.Instant.parse(it) }.getOrNull() }
+        if (warningAt != null && holdUntil != null && now >= warningAt && now < holdUntil) {
+            (holdUntil - now).inWholeMinutes.coerceAtLeast(1)
+        } else null
+    } else null
     val visualState = when (status) {
-        LayoutTableStatus.AVAILABLE -> if (hasCurrentOrder) TableVisualState.Occupied else TableVisualState.Free
-        LayoutTableStatus.RESERVED -> if (hasCurrentOrder) TableVisualState.Occupied else TableVisualState.Reserved
+        LayoutTableStatus.AVAILABLE -> when {
+            hasCurrentOrder -> TableVisualState.Occupied
+            holdEndsInMinutes != null -> TableVisualState.HoldEnding
+            else -> TableVisualState.Free
+        }
+        LayoutTableStatus.RESERVED -> when {
+            hasCurrentOrder -> TableVisualState.Occupied
+            holdEndsInMinutes != null -> TableVisualState.HoldEnding
+            else -> TableVisualState.Reserved
+        }
         LayoutTableStatus.OCCUPIED -> TableVisualState.Occupied
         LayoutTableStatus.DIRTY,
         LayoutTableStatus.MAINTENANCE,
@@ -28,7 +44,7 @@ fun LayoutTable.toUiTable(): FloorPlanTable {
         state = visualState,
         orderLabel = currentOrderNumber,
         orderId = currentOrderId,
-        statusText = currentOrderFulfillmentStatus?.toTableStatusText(),
+        statusText = holdEndsInMinutes?.let { "Hold ends in $it min" } ?: currentOrderFulfillmentStatus?.toTableStatusText(),
         guestCount = guestCount,
         seatedAt = seatedAt,
         nextReservationStart = nextReservationStart,
@@ -65,7 +81,7 @@ fun FloorPlanTable.toDomainTable(original: LayoutTable?): LayoutTable {
             }
         },
         status = original?.status ?: when (state) {
-            TableVisualState.Free -> LayoutTableStatus.AVAILABLE
+            TableVisualState.Free, TableVisualState.HoldEnding -> LayoutTableStatus.AVAILABLE
             TableVisualState.Reserved -> LayoutTableStatus.RESERVED
             TableVisualState.Occupied,
             TableVisualState.BillPending -> LayoutTableStatus.OCCUPIED

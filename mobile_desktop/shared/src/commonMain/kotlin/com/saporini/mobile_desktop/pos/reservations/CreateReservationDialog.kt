@@ -228,14 +228,23 @@ internal fun CreateReservationDialog(
     val initialWhen = remember { defaultWhen(initialDate, Clock.System.now(), zone) }
     var date by remember { mutableStateOf(initialWhen.first) }
     var start by remember { mutableStateOf(initialWhen.second) }
-    // The booking length starts from the restaurant's rule (two hours when there is none).
+    // The booking length comes from settings: 2 h, or 2 h 15 for groups of 5 or more.
     val rules = modelState.rules
-    var end by remember { mutableStateOf(TimeSlots.firstOrNull { it.toMinutes() >= initialWhen.second.toMinutes() + rules.defaultDurationMinutes } ?: TimeSlots.last()) }
+    val policy = modelState.policy
+    var end by remember { mutableStateOf(TimeSlots.firstOrNull { it.toMinutes() >= initialWhen.second.toMinutes() + policy.bookingMinutes(rules, 2) } ?: TimeSlots.last()) }
+    // Once staff pick an end time themselves, the group size no longer changes it.
+    var endTouched by remember { mutableStateOf(false) }
+    LaunchedEffect(guests, start, rules, policy) {
+        if (endTouched) return@LaunchedEffect
+        end = TimeSlots.firstOrNull { it.toMinutes() >= start.toMinutes() + policy.bookingMinutes(rules, guests) } ?: TimeSlots.last()
+    }
     var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var noteTags by remember { mutableStateOf<List<String>>(emptyList()) }
+    // Booked by phone for the next 24 hours: the guest just said they're coming (✓ Attendance confirmed).
+    var confirmedOnPhone by remember { mutableStateOf(true) }
     var tableMode by remember { mutableStateOf(TableMode.SUGGEST) }
     var options by remember { mutableStateOf<List<ReservationAvailabilityOption>>(emptyList()) }
     var optionsLoading by remember { mutableStateOf(false) }
@@ -263,6 +272,7 @@ internal fun CreateReservationDialog(
     val timesValid = end > start
     val nowInstant = Clock.System.now()
     val startsInPast = start.at(date).toInstant(zone) < nowInstant
+    val soonBooking = start.at(date).toInstant(zone) - nowInstant < kotlin.time.Duration.parse("24h")
 
     LaunchedEffect(guests, date, start, end, planTableIds) {
         if (!timesValid) return@LaunchedEffect
@@ -364,7 +374,8 @@ internal fun CreateReservationDialog(
                     contactEmail = email.trim().ifBlank { null },
                     specialRequests = combinedNote(noteTags, note),
                     initialTableIds = chosenTableIds.ifEmpty { null },
-                    primaryTableId = chosenPrimary
+                    primaryTableId = chosenPrimary,
+                    attendanceConfirmed = confirmedOnPhone.takeIf { soonBooking }
                 )
             ).onSuccess { onCreated(date) }
                 .onFailure { saveError = it.message ?: "Could not create the reservation." }
@@ -510,7 +521,10 @@ internal fun CreateReservationDialog(
                                         Icons.Outlined.AccessTime, end.label(),
                                         TimeSlots.filter { it > start }.map { it.label() },
                                         isError = attempted && timeError != null
-                                    ) { picked -> end = TimeSlots.first { it > start && it.label() == picked } }
+                                    ) { picked ->
+                                        end = TimeSlots.first { it > start && it.label() == picked }
+                                        endTouched = true
+                                    }
                                 }
                                     }
                                     if (narrow) {
@@ -554,6 +568,23 @@ internal fun CreateReservationDialog(
                                             noteTags = if (tag in noteTags) noteTags - tag else noteTags + tag
                                         })
                                         NoteBox(note, "Anything else? Write your own note…") { note = it.take(NOTE_LIMIT) }
+                                    }
+                                    if (soonBooking) {
+                                        Row(
+                                            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { confirmedOnPhone = !confirmedOnPhone }
+                                                .padding(vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            androidx.compose.material3.Checkbox(
+                                                checked = confirmedOnPhone, onCheckedChange = { confirmedOnPhone = it },
+                                                colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = FormGreen)
+                                            )
+                                            Column {
+                                                Text("The guest confirmed they're coming", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = FormInk)
+                                                Text("Marks \"✓ Attendance confirmed\", so nobody has to call them again", fontFamily = Inter(), fontSize = 12.sp, color = FormMuted)
+                                            }
+                                        }
                                     }
                                 }
                                 STEP_TABLE -> {
