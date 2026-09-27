@@ -32,6 +32,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.compositeOver
+import kotlinx.coroutines.delay
+import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuValidationToast
+import com.saporini.mobile_desktop.pos.menu.ui.menu.ToastPlacement
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -264,7 +269,19 @@ internal fun OnlineMenuContent(
             }
         }
 
-        if (canManageMenus && currentMenu != null && currentMenu.sections.isNotEmpty() && reorderableItemCount >= 2) {
+        // Always there for managers, like in the other menus; with fewer than 2 dishes it's faded and says why.
+        if (canManageMenus && currentMenu != null && currentMenu.sections.isNotEmpty()) {
+            val enoughToReorder = reorderableItemCount >= 2
+            var reorderHintToken by remember { mutableIntStateOf(0) }
+            var showReorderHint by remember { mutableStateOf(false) }
+            LaunchedEffect(reorderHintToken) {
+                if (reorderHintToken > 0) {
+                    showReorderHint = true
+                    delay(3000)
+                    showReorderHint = false
+                }
+            }
+            Box(Modifier.align(Alignment.BottomEnd).padding(if (isPhone) 12.dp else 18.dp)) {
             TextButton(
                 onClick = {
                     if (isReorderingItems) {
@@ -283,20 +300,39 @@ internal fun OnlineMenuContent(
                             if (failure != null) actionError = failure?.message ?: "Couldn't save dish order"
                             busy = false
                         }
+                    } else if (!enoughToReorder) {
+                        reorderHintToken++
                     } else {
                         searchQuery = ""
                         selectedSearchItemName = null
                         isReorderingItems = true
                     }
                 },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(if (isPhone) 12.dp else 18.dp)
+                modifier = Modifier
                     .height(if (isPhone) 40.dp else 44.dp).shadow(12.dp, RoundedCornerShape(9.dp))
-                    .clip(RoundedCornerShape(9.dp)).background(if (isReorderingItems) Ink else Olive),
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(
+                        when {
+                            isReorderingItems -> Ink
+                            enoughToReorder -> Olive
+                            // Faded, but opaque so the shadow doesn't show through.
+                            else -> Olive.copy(alpha = 0.45f).compositeOver(Color.White)
+                        }
+                    ),
                 contentPadding = PaddingValues(horizontal = if (isPhone) 10.dp else 16.dp),
                 enabled = !busy
             ) {
                 Icon(Icons.Outlined.DragIndicator, null, Modifier.padding(end = 7.dp).height(18.dp), tint = Color.White)
                 Text(if (isReorderingItems) "Save order" else "Change items position", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (isPhone) 12.sp else 13.sp, color = Color.White)
+            }
+                MenuValidationToast(
+                    visible = showReorderHint,
+                    message = "Add at least 2 dishes in this section before you can change their order.",
+                    placement = ToastPlacement.Above,
+                    arrowAlignment = Alignment.End,
+                    anchorAlignment = Alignment.TopEnd,
+                    offsetY = (-46).dp
+                )
             }
         }
         if (busy) CircularProgressIndicator(Modifier.align(Alignment.TopEnd).padding(14.dp).height(20.dp), color = Olive, strokeWidth = 2.dp)

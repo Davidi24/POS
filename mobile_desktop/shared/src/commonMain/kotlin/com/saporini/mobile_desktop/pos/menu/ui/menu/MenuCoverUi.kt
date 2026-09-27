@@ -164,7 +164,7 @@ fun MenuCoverUi(
                         start = if (isPhone) 0.dp else 28.dp,
                         end = if (isPhone) 0.dp else 28.dp,
                         top = if (isWidePhone) 8.dp else if (isPhone) 16.dp else 20.dp,
-                        bottom = if (isPhone) 0.dp else 20.dp
+                        bottom = 0.dp
                     )
             ) {
                 if (isWidePhone) {
@@ -428,7 +428,7 @@ private fun MenuCoverSkeletonGrid(
         ),
         label = "menu-cover-skeleton-alpha"
     )
-    val coverHeight = minOf(availableHeight, 440.dp)
+    val coverHeight = minOf(availableHeight, 480.dp)
 
     Column(
         modifier = Modifier
@@ -440,8 +440,9 @@ private fun MenuCoverSkeletonGrid(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(coverHeight),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
+                    .height(coverHeight)
+                    .padding(end = CoverActionOverhang),
+                horizontalArrangement = Arrangement.spacedBy(32.dp)
             ) {
                 repeat(columns) {
                     MenuCoverSkeleton(
@@ -470,7 +471,7 @@ private fun MenuCoverSkeleton(
 
     Box(
         modifier = modifier
-            .padding(top = 8.dp)
+            .padding(top = CoverFaceTop)
             .clip(shape)
             .background(Color(0xFFF3F3F3))
     ) {
@@ -569,7 +570,7 @@ private fun MenuCoverCollection(
     val showOnlineCover = !isReordering
     val itemCount = menus.size + (if (showOnlineCover) 1 else 0) + if (isReordering || !canManageMenus) 0 else 1
     val rowCount = if (itemCount == 0) 0 else (itemCount + columns - 1) / columns
-    val horizontalGap = if (isPhone) 18.dp else 24.dp
+    val horizontalGap = if (isPhone) 26.dp else 32.dp
     val verticalGap = 20.dp
     val desktopLayout = desktopMenuCoverLayout(availableHeight, rowCount)
     val coverHeight = if (isPhone) {
@@ -580,7 +581,7 @@ private fun MenuCoverCollection(
     val cardWidth = if (isPhone) {
         phoneMenuCoverWidth(availableWidth, coverHeight)
     } else {
-        (availableWidth - horizontalGap * (columns - 1)) / columns
+        (availableWidth - CoverActionOverhang - horizontalGap * (columns - 1)) / columns
     }
     val contentWidth = if (isPhone && itemCount > 0) {
         cardWidth * itemCount + horizontalGap * (itemCount - 1) + 40.dp
@@ -590,16 +591,18 @@ private fun MenuCoverCollection(
     val scrollState = rememberScrollState()
     val compact = coverHeight < 390.dp
     val phoneVerticalPadding = if (isPhone && availableHeight > coverHeight) {
-        ((availableHeight - coverHeight) / 2f).coerceAtLeast(4.dp)
+        ((availableHeight - coverHeight) / 2f).coerceAtLeast(CoverActionOverhang)
     } else {
-        4.dp
+        CoverActionOverhang
     }
     val contentHeight = if (isPhone) {
         maxOf(availableHeight, coverHeight + phoneVerticalPadding * 2)
     } else if (rowCount == 0) {
         0.dp
     } else {
-        coverHeight * rowCount + verticalGap * (rowCount - 1) + desktopLayout.topInset * 2
+        // Room after the last row, so scrolling to the end doesn't leave it pressed against the bottom edge.
+        coverHeight * rowCount + verticalGap * (rowCount - 1) + desktopLayout.topInset * 2 +
+            if (desktopLayout.centerRow) 0.dp else DesktopGridEndSpace
     }
 
     var draggingId by remember { mutableStateOf<String?>(null) }
@@ -1025,7 +1028,7 @@ private fun MenuBookCover(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 8.dp)
+                .padding(top = CoverFaceTop)
                 .graphicsLayer {
                     scaleX = dragScale
                     scaleY = dragScale
@@ -1209,15 +1212,17 @@ private fun MenuBookCover(
             }
         }
 
+        // The edit button sits on the book face's top-right corner, sticking out CoverActionOverhang past the top
+        // and right edges; the info button (when there's a description) sits right below it, lined up.
+        val actionSize = if (compact) 34.dp else 40.dp
+        val actionTop = CoverFaceTop - CoverActionOverhang
         if (showActions && !isReordering) {
             if (canManageMenus) {
                 HoverTooltip(
                     text = "Edit menu",
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        // Keep a small right inset so the edit action sits on the book
-                        // face and remains clear of the menu grid's clipping boundary.
-                        .offset(x = (-4).dp, y = 2.dp)
+                        .offset(x = CoverActionOverhang, y = actionTop)
                         .zIndex(3f)
                 ) {
                     IconButton(
@@ -1244,12 +1249,8 @@ private fun MenuBookCover(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .offset(
-                            x = (-4).dp,
-                            y = if (canManageMenus) {
-                                (if (compact) 34.dp else 40.dp) + 6.dp + 2.dp
-                            } else {
-                                2.dp
-                            }
+                            x = CoverActionOverhang,
+                            y = actionTop + if (canManageMenus) actionSize + 8.dp else 0.dp
                         )
                         .zIndex(3f)
                         .size(if (compact) 34.dp else 40.dp)
@@ -1411,7 +1412,7 @@ private fun OnlineMenuCover(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 8.dp)
+                .padding(top = CoverFaceTop)
                 .shadow(13.dp, cardShape, clip = false, spotColor = Color(0x44141414))
                 .clip(cardShape)
                 .clickable(onClick = onClick)
@@ -1524,9 +1525,10 @@ private fun AddMenuCover(
 ) {
     val shape = RoundedCornerShape(18.dp)
 
+    // A smaller card centred in its slot, 40dp in from every side (as it was before the online menu cover came).
     Box(
         modifier = modifier
-            .padding(top = 8.dp)
+            .padding(40.dp)
             .clip(shape)
             .background(Color(0xFFF3F3F1))
             .clickable(onClick = onClick),
@@ -1571,6 +1573,17 @@ private fun AddMenuCover(
         }
     }
 }
+
+// Space above every cover's face (book, online, create, skeleton): room for the edit button that
+// straddles the face's top-right corner, and it keeps all covers lined up.
+private val CoverFaceTop = 20.dp
+
+// How far the corner buttons stick out past a cover's top and right edges (the rest of the button is on the
+// cover). The grid keeps this much room on the right, so the buttons are never clipped or touching.
+internal val CoverActionOverhang = 10.dp
+
+// Empty space after the last row of the desktop grid.
+private val DesktopGridEndSpace = 32.dp
 
 internal data class MenuCoverTheme(
     val background: Color,

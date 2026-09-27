@@ -12,6 +12,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -93,8 +94,9 @@ internal fun CategoryButtons(
     val visibleItems = if (hasOverflow) fixedItems + listOfNotNull(visibleTail) else items
     val overflowItems = items.filterNot { it in visibleItems }
 
+    // The end padding keeps the last button's border clear of the scrolling row's edge.
     Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        modifier = Modifier.horizontalScroll(rememberScrollState()).padding(end = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         visibleItems.forEach { item ->
@@ -208,10 +210,13 @@ internal fun CategoryButtons(
         }
 
         if (canManage) {
-            IconButton(
-                onClick = onManageSections,
+            // A plain 44dp box: an IconButton here insists on a 48dp touch area and spills past its slot, which the
+            // scrolling row then cut off on the right.
+            Box(
                 modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))
                     .background(Color.White).border(1.dp, Border, RoundedCornerShape(8.dp))
+                    .clickable(onClick = onManageSections),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Outlined.Edit,
