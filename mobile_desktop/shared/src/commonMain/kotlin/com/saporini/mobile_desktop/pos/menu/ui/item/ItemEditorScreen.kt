@@ -227,13 +227,20 @@ private fun ItemEditorSwitchRow(
     }
 }
 
-// Asked when "Show in online menu" is switched on: which online section the dish goes into. It offers the section
-// named like the dish's own section (reusing it if the online menu already has one, creating it otherwise), or any
-// other name, which again reuses an existing online section with that name or creates a new one.
+// Asked when "Show in online menu" is switched on: which online section the dish goes into. Three kinds of choice:
+// the section named like the dish's own section (reused if the online menu has it, created otherwise), any existing
+// online section, or a new name (which still reuses an existing section if the name matches one).
+private sealed interface OnlineSectionPick {
+    data object Same : OnlineSectionPick
+    data class Existing(val section: OnlineMenuSection) : OnlineSectionPick
+    data object New : OnlineSectionPick
+}
+
 @Composable
 private fun OnlineSectionChooserDialog(
     dishName: String,
     staffSectionName: String?,
+    currentOnlineSectionId: String?,
     currentOnlineSectionName: String?,
     loadSections: suspend () -> Result<List<OnlineMenuSection>>,
     onDismiss: () -> Unit,
@@ -252,14 +259,32 @@ private fun OnlineSectionChooserDialog(
 
     val sameName = staffSectionName?.trim()?.takeIf { it.isNotEmpty() }
     val sameExisting = sameName?.let { wanted -> sections?.firstOrNull { it.name.equals(wanted, ignoreCase = true) } }
-    // Starts on the same-named section unless the dish already sits in a differently named online section.
-    var useSame by remember {
-        mutableStateOf(sameName != null && (currentOnlineSectionName == null || currentOnlineSectionName.equals(sameName, ignoreCase = true)))
+    // The same-named section already has its own choice above, so the list shows every other one.
+    val otherSections = sections.orEmpty().filter { it.id != sameExisting?.id }
+    var pick by remember { mutableStateOf<OnlineSectionPick?>(null) }
+    var customName by remember { mutableStateOf("") }
+    // Once the sections are in: start on where the dish is now, else the same-named section, else the first one.
+    LaunchedEffect(sections) {
+        val loaded = sections ?: return@LaunchedEffect
+        if (pick != null) return@LaunchedEffect
+        val current = loaded.firstOrNull { it.id == currentOnlineSectionId }
+            ?: currentOnlineSectionName?.let { name -> loaded.firstOrNull { it.name.equals(name, ignoreCase = true) } }
+        pick = when {
+            current != null && current.id == sameExisting?.id -> OnlineSectionPick.Same
+            current != null -> OnlineSectionPick.Existing(current)
+            sameName != null -> OnlineSectionPick.Same
+            loaded.isNotEmpty() -> OnlineSectionPick.Existing(loaded.first())
+            else -> OnlineSectionPick.New
+        }
     }
-    var customName by remember { mutableStateOf(if (useSame) "" else currentOnlineSectionName.orEmpty()) }
     val customTrimmed = customName.trim()
     val customExisting = sections?.firstOrNull { it.name.equals(customTrimmed, ignoreCase = true) }
-    val canConfirm = sections != null && if (useSame) sameName != null else customTrimmed.isNotEmpty()
+    val canConfirm = sections != null && when (val chosen = pick) {
+        OnlineSectionPick.Same -> sameName != null
+        is OnlineSectionPick.Existing -> true
+        OnlineSectionPick.New -> customTrimmed.isNotEmpty()
+        null -> false
+    }
 
     MenuNestedDialog(
         onDismissRequest = onDismiss,
@@ -267,7 +292,10 @@ private fun OnlineSectionChooserDialog(
         titleContentColor = ItemEditorInk,
         textContentColor = ItemEditorMuted,
         title = {
-            Text("Add to online menu", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = ItemEditorInk)
+            Text(
+                if (currentOnlineSectionName == null) "Add to online menu" else "Online section",
+                fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = ItemEditorInk
+            )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -291,19 +319,35 @@ private fun OnlineSectionChooserDialog(
                     else -> {
                         if (sameName != null) {
                             OnlineSectionChoice(
-                                selected = useSame,
+                                selected = pick == OnlineSectionPick.Same,
                                 title = if (sameExisting != null) "Same section as here: ${sameExisting.name}" else "Create \u201C$sameName\u201D in the online menu",
-                                subtitle = if (sameExisting != null) "Already in the online menu" else "Same name as its section here",
-                                onClick = { useSame = true }
+                                subtitle = if (sameExisting != null) sectionCountLabel(sameExisting) else "Same name as its section here",
+                                onClick = { pick = OnlineSectionPick.Same }
                             )
                         }
+                        if (otherSections.isNotEmpty()) {
+                            ItemEditorFieldLabel(text = "Existing online sections")
+                            Column(
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 230.dp).verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                otherSections.forEach { section ->
+                                    OnlineSectionChoice(
+                                        selected = (pick as? OnlineSectionPick.Existing)?.section?.id == section.id,
+                                        title = section.name,
+                                        subtitle = sectionCountLabel(section),
+                                        onClick = { pick = OnlineSectionPick.Existing(section) }
+                                    )
+                                }
+                            }
+                        }
                         OnlineSectionChoice(
-                            selected = !useSame,
-                            title = "Another name",
-                            subtitle = "Pick an online section or type a new one",
-                            onClick = { useSame = false }
+                            selected = pick == OnlineSectionPick.New,
+                            title = "New section",
+                            subtitle = "Type a name for a new online section",
+                            onClick = { pick = OnlineSectionPick.New }
                         )
-                        if (!useSame) {
+                        if (pick == OnlineSectionPick.New) {
                             OutlinedTextField(
                                 value = customName,
                                 onValueChange = { if (it.length <= 150) customName = it },
@@ -313,37 +357,9 @@ private fun OnlineSectionChooserDialog(
                                 shape = RoundedCornerShape(8.dp),
                                 colors = itemEditorOutlinedTextFieldColors()
                             )
-                            if (loaded.isNotEmpty()) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    loaded.forEach { section ->
-                                        val picked = section.name.equals(customTrimmed, ignoreCase = true)
-                                        Text(
-                                            text = section.name,
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(50))
-                                                .background(if (picked) ItemEditorOlive else ItemEditorSurface)
-                                                .border(1.dp, if (picked) ItemEditorOlive else ItemEditorBorder, RoundedCornerShape(50))
-                                                .clickable { customName = section.name }
-                                                .padding(horizontal = 10.dp, vertical = 5.dp),
-                                            fontFamily = Inter(),
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 12.sp,
-                                            color = if (picked) Color.White else ItemEditorInk,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-                            }
-                            if (customTrimmed.isNotEmpty()) {
+                            if (customExisting != null) {
                                 Text(
-                                    text = if (customExisting != null) {
-                                        "Goes into the existing online section \u201C${customExisting.name}\u201D"
-                                    } else {
-                                        "Creates a new online section \u201C$customTrimmed\u201D"
-                                    },
+                                    text = "The online menu already has \u201C${customExisting.name}\u201D, so the dish goes there",
                                     fontFamily = Inter(),
                                     fontSize = 12.sp,
                                     color = ItemEditorMuted
@@ -357,17 +373,21 @@ private fun OnlineSectionChooserDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (useSame && sameName != null) {
-                        onConfirm(sameExisting?.id, sameExisting?.name ?: sameName)
-                    } else {
-                        onConfirm(customExisting?.id, customExisting?.name ?: customTrimmed)
+                    when (val chosen = pick) {
+                        OnlineSectionPick.Same -> if (sameName != null) onConfirm(sameExisting?.id, sameExisting?.name ?: sameName)
+                        is OnlineSectionPick.Existing -> onConfirm(chosen.section.id, chosen.section.name)
+                        OnlineSectionPick.New -> onConfirm(customExisting?.id, customExisting?.name ?: customTrimmed)
+                        null -> Unit
                     }
                 },
                 enabled = canConfirm,
                 shape = RoundedCornerShape(percent = 50),
                 colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
             ) {
-                Text("Add to online menu", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text(
+                    if (currentOnlineSectionName == null) "Add to online menu" else "Save",
+                    fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White
+                )
             }
         },
         dismissButton = {
@@ -376,6 +396,12 @@ private fun OnlineSectionChooserDialog(
             }
         }
     )
+}
+
+private fun sectionCountLabel(section: OnlineMenuSection): String = when (section.itemCount) {
+    0L -> "No dishes yet"
+    1L -> "1 dish"
+    else -> "${section.itemCount} dishes"
 }
 
 @Composable
@@ -710,6 +736,7 @@ internal fun ItemEditorDialog(
             OnlineSectionChooserDialog(
                 dishName = name.trim().ifEmpty { "this dish" },
                 staffSectionName = staffSectionName,
+                currentOnlineSectionId = onlineSectionId,
                 currentOnlineSectionName = onlineSectionName,
                 loadSections = loadOnlineSections,
                 onDismiss = { onlineChooserOpen = false },
