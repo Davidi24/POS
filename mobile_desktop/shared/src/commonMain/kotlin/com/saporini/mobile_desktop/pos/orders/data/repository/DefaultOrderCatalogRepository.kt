@@ -33,5 +33,5 @@ class DefaultOrderCatalogRepository(private val api: OrderCatalogApi) : OrderCat
         return OrderItemChoices(item, groups)
     }
     override suspend fun getCustomers(restaurantId: String) = api.getCustomers(restaurantId).filter { it.active }
-    override suspend fun getReservations(restaurantId: String, branchId: String) = api.getReservations(restaurantId, branchId).filter { it.status !in setOf("CANCELLED", "NO_SHOW", "COMPLETED") }
+    override suspend fun getReservations(restaurantId: String, branchId: String) = api.getReservations(restaurantId, branchId).filter { it.status !in setOf("CANCELLED", "NO_SHOW", "COMPLETED", "EXPIRED") }
 }

@@ -97,4 +97,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
             "lineItems.variant"
     })
     Optional<Order> findTopByOrderNumberOrderByCreatedAtDesc(String orderNumber);
+
+    // Whether a booking already has orders (or payments on them) at its table.
+    boolean existsByReservation_IdAndStatusIn(UUID reservationId, Collection<OrderStatus> statuses);
 }

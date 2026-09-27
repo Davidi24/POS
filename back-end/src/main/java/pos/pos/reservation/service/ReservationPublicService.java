@@ -86,11 +86,14 @@ public class ReservationPublicService {
     @Transactional
     public PublicReservationResponse cancelPublicReservation(String reservationCode, ReservationActionRequest request) {
         Reservation reservation = reservationSupport.requirePublicReservation(reservationCode);
-        reservationLifecycleService.transitionReservation(
+        // Guests cancel for free any time before they arrive; after that only staff can.
+        if (reservation.getStatus() != ReservationStatus.PENDING && reservation.getStatus() != ReservationStatus.CONFIRMED) {
+            throw new AuthException("This booking can't be cancelled online anymore", HttpStatus.BAD_REQUEST);
+        }
+        reservationLifecycleService.cancel(
                 reservation,
-                ReservationStatus.CANCELLED,
-                request == null ? null : request.getReason(),
-                null
+                request == null || request.getReason() == null || request.getReason().isBlank() ? "Cancelled by the guest" : request.getReason().trim(),
+                ReservationActor.system(null)
         );
         reservationSupport.saveReservation(reservation);
         reservationNotifications.cancelled(reservation, null);

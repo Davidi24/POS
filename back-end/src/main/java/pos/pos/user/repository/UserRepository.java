@@ -49,6 +49,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     """)
     java.util.List<UUID> findActiveStaffIds(UUID restaurantId, UUID branchId);
 
+    // The same staff, only those whose role has this permission (e.g. managers who approve bookings).
+    @Query("""
+        SELECT DISTINCT u.id
+        FROM User u, UserRole ur, RolePermission rp, Permission p
+        WHERE ur.userId = u.id AND rp.roleId = ur.roleId AND p.id = rp.permissionId AND p.code = :permission
+          AND u.restaurantId = :restaurantId
+          AND u.deletedAt IS NULL
+          AND u.isActive = true
+          AND (u.defaultBranchId IS NULL OR u.defaultBranchId = :branchId)
+    """)
+    java.util.List<UUID> findActiveStaffIdsWithPermission(UUID restaurantId, UUID branchId, String permission);
+
     @Query(
             value = """
             SELECT u

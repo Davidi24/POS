@@ -16,4 +16,8 @@ public class ReservationActionRequest {
 
     @Size(max = 1000, message = "reason must be at most 1000 characters")
     private String reason;
+
+    // Check-in and "N of M arrived": how many of the group are here. Empty means everyone.
+    @jakarta.validation.constraints.Min(value = 1, message = "arrivedGuests must be at least 1")
+    private Integer arrivedGuests;
 }

@@ -23,6 +23,8 @@ import com.saporini.mobile_desktop.pos.reservations.ui.ReservationsScreenModel
 //to be understood
 private val appModule = module {
     single { SessionManager() }
+    single<com.saporini.mobile_desktop.pos.shifts.ShiftRepository> { com.saporini.mobile_desktop.pos.shifts.ShiftApi(get()) }
+    factory { com.saporini.mobile_desktop.pos.shifts.ShiftScreenModel(get(), get()) }
     single { createHttpClient(get()) }
     single { AuthRepository(client = get()) }
     single { TableLayoutApi(client = get()) }
@@ -76,6 +78,7 @@ private val appModule = module {
     single { com.saporini.mobile_desktop.notifications.NotificationCenter(api = get(), sessionManager = get()) }
 
     single { MenuApi(client = get()) }
+    single { com.saporini.mobile_desktop.admin.settings.SettingsApi(client = get()) }
 
     single<MenuRepository> {
         DefaultMenuRepository(api = get())

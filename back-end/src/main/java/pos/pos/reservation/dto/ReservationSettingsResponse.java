@@ -26,4 +26,21 @@ public class ReservationSettingsResponse {
     private Integer minPartySize;
     private Integer maxPartySize;
     private Integer advanceBookingDays;
+
+    // Admin Hub → Settings → Reservations, so the app shows the same timers the server enforces.
+    private Integer largeGroupFrom;
+    private Integer largeGroupExtraMinutes;
+    private Integer approvalGroupSize;
+    private Integer holdMinutes;
+    private Integer holdWarningMinutes;
+    private Integer lateAfterMinutes;
+    private Integer checkInOpensMinutes;
+    private Integer reopenWindowMinutes;
+    private Integer undoSeatMinutes;
+    private Integer runningLateMaxMinutes;
+    private Integer sameDayConfirmMinutes;
+    private Integer attendanceCallMinutes;
+    private String confirmReminderTime;
+    private Integer noShowWarningFrom;
+    private Integer serviceDayStartHour;
 }

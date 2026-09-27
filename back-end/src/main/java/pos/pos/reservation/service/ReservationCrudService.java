@@ -1,10 +1,12 @@
 package pos.pos.reservation.service;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.customer.entity.Customer;
+import pos.pos.exception.auth.AuthException;
 import pos.pos.reservation.dto.ReservationRequest;
 import pos.pos.reservation.dto.ReservationResponse;
 import pos.pos.reservation.dto.UpdateReservationRequest;
@@ -16,6 +18,9 @@ import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Service
@@ -27,6 +32,9 @@ public class ReservationCrudService {
     private final ReservationSupport reservationSupport;
     private final ReservationTableAssignmentService reservationTableAssignmentService;
     private final ReservationNotifications reservationNotifications;
+    private final ReservationPolicy reservationPolicy;
+    private final ReservationAvailabilitySupport reservationAvailabilitySupport;
+    private final GuestNoShowCounter guestNoShowCounter;
     private final ApplicationEventPublisher events;
 
     @Transactional
@@ -44,8 +52,7 @@ public class ReservationCrudService {
         reservation.setCreatedBy(actorId);
         reservation.setUpdatedBy(actorId);
 
-        reservationSupport.applyReservationRequest(reservation, request, actorId, true);
-        reservationSupport.addStatusHistory(reservation, null, ReservationStatus.PENDING, "Reservation created", actorId);
+        reservationSupport.applyReservationRequest(reservation, request, actorId, true, endOf(branch, request));
 
         // this check if the tables that will be assigned to this reservation can be like maybe there is
         // another reservation there ... after that it clears the previous connection like the previous reservation
@@ -59,9 +66,68 @@ public class ReservationCrudService {
             );
         }
 
+        ReservationActor actor = ReservationActor.of(authentication, actorId);
+        decideStatus(reservation, actor);
+        if (Boolean.TRUE.equals(request.getAttendanceConfirmed()) && reservation.getStatus() == ReservationStatus.CONFIRMED) {
+            reservation.setAttendanceConfirmedAt(OffsetDateTime.now(ZoneOffset.UTC));
+            reservation.setAttendanceConfirmedBy(actorId);
+            reservation.setAttendanceConfirmedVia(pos.pos.reservation.enums.AttendanceConfirmedVia.STAFF);
+        }
+
         Reservation saved = reservationSupport.saveReservation(reservation);
         reservationNotifications.created(saved, actorId, false);
+        // From the guest's first no-show (Admin Hub setting), staff are warned when they book again.
+        int noShows = guestNoShowCounter.noShowsOf(saved).size();
+        if (noShows > 0 && noShows >= reservationPolicy.values(restaurant).noShowWarningFrom()) {
+            reservationNotifications.noShowWarning(saved, noShows, actorId);
+        }
         return reservationSupport.toResponse(saved);
+    }
+
+    // Staff take bookings on the phone or at the door: confirmed straight away when a table fits the whole visit.
+    // Otherwise it's a request staff answer later: no table free then, or a big group that needs someone who can
+    // approve bookings.
+    private void decideStatus(Reservation reservation, ReservationActor actor) {
+        int approvalFrom = reservationPolicy.values(reservation.getRestaurant()).approvalGroupSize();
+        boolean needsApproval = reservation.getPartySize() >= approvalFrom && !actor.canApprove();
+        boolean tableFree = !reservation.getTableAssignments().isEmpty() || !reservationAvailabilitySupport.availabilityOptionsForBranch(
+                reservation.getBranch(),
+                reservation.getReservationStart(),
+                reservation.getReservationEnd(),
+                reservation.getPartySize(),
+                1
+        ).isEmpty();
+        if (!needsApproval && tableFree) {
+            reservation.setStatus(ReservationStatus.CONFIRMED);
+            reservation.setConfirmedAt(OffsetDateTime.now(ZoneOffset.UTC));
+            reservationSupport.addStatusHistory(reservation, null, ReservationStatus.CONFIRMED, "Booked by staff", actor.id());
+            return;
+        }
+        String reason = needsApproval
+                ? "Request: bookings of " + approvalFrom + " or more guests need approval"
+                : "Request: no table is free for the whole booking";
+        reservationSupport.addStatusHistory(reservation, null, ReservationStatus.PENDING, reason, actor.id());
+    }
+
+    private OffsetDateTime endOf(Branch branch, ReservationRequest request) {
+        if (request.getReservationEnd() != null || request.getReservationStart() == null) {
+            return request.getReservationEnd();
+        }
+        return request.getReservationStart().plus(
+                reservationPolicy.bookingLength(branch, request.getReservationStart(), request.getPartySize()));
+    }
+
+    // A booking from an earlier service day is a correction: only a manager may change it.
+    private void requireCurrentDayOrCorrection(Authentication authentication, Reservation reservation) {
+        ZoneId zone = reservationSupport.restaurantZone(reservation.getRestaurant());
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (reservationPolicy.serviceDate(reservation.getReservationStart(), zone).isBefore(reservationPolicy.serviceDate(now, zone))
+                && !ReservationActor.of(authentication, null).canCorrect()) {
+            throw new AuthException(
+                    "This booking is from an earlier day. Only a manager can change it now",
+                    HttpStatus.FORBIDDEN
+            );
+        }
     }
 
     @Transactional
@@ -73,6 +139,7 @@ public class ReservationCrudService {
     ) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         Reservation reservation = reservationSupport.requireReservation(restaurantId, reservationId);
+        requireCurrentDayOrCorrection(authentication, reservation);
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         Branch branch = reservationSupport.resolveManagedBranch(authentication, restaurantId, request.getBranchId(), reservation.getBranch().getId());
         Customer customer = reservationSupport.resolveCustomer(restaurantId, request.getCustomerId());
@@ -81,7 +148,7 @@ public class ReservationCrudService {
         reservation.setCustomer(customer);
         reservation.setUpdatedBy(actorId);
 
-        reservationSupport.applyReservationRequest(reservation, request, actorId, false);
+        reservationSupport.applyReservationRequest(reservation, request, actorId, false, endOf(branch, request));
         if (request.getInitialTableIds() != null) {
             reservationTableAssignmentService.replaceReservationTables(
                     reservation,
@@ -103,6 +170,7 @@ public class ReservationCrudService {
     ) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         Reservation reservation = reservationSupport.requireReservation(restaurantId, reservationId);
+        requireCurrentDayOrCorrection(authentication, reservation);
         UUID actorId = restaurantScopeService.currentUserId(authentication);
 
         if (request.getBranchId() != null) {

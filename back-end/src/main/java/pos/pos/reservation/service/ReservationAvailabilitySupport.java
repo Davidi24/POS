@@ -191,6 +191,11 @@ public class ReservationAvailabilitySupport {
                 .toList();
     }
 
+    // Tables another live booking holds in this window (cleaning time included).
+    public Set<UUID> takenTableIds(Branch branch, OffsetDateTime start, OffsetDateTime end, UUID currentReservationId) {
+        return overlappingAssignedTableIds(branch, start, end, currentReservationId);
+    }
+
     // It finds table IDs that are already reserved in the same time window.
     // Meaning: it checks if another reservation overlaps with the requested start/end time, then collects the tables used by those reservations.
     // Example:

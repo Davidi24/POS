@@ -19,6 +19,7 @@ import pos.pos.settings.dto.SettingsResponse;
 import pos.pos.settings.dto.UpdateSettingsBillingRequest;
 import pos.pos.settings.dto.UpdateSettingsDefaultBranchRequest;
 import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
+import pos.pos.settings.dto.UpdateSettingsReservationPolicyRequest;
 import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.entity.Settings;
 import pos.pos.settings.mapper.SettingsMapper;
@@ -27,6 +28,7 @@ import pos.pos.settings.service.SettingsDomainSupport;
 import pos.pos.settings.service.SettingsService;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -292,6 +294,114 @@ class SettingsServiceTest {
         assertThat(settings.isPreOrdersEnabled()).isTrue();
         assertThat(settings.getPreOrderLeadMinutes()).isEqualTo(25);
         verify(settingsAuditService).log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_PRE_ORDERS"), anyString(), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("Should save the reservation times and limits")
+    void shouldUpdateReservationPolicy() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+        when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+
+        settingsService.updateReservationPolicy(authentication, RESTAURANT_ID, reservationPolicy()
+                .holdMinutes(45)
+                .holdWarningMinutes(35)
+                .lateAfterMinutes(10)
+                .confirmReminderTime(LocalTime.of(16, 30))
+                .guestReminderHours(48)
+                .noShowWarningFrom(2)
+                .depositFromGuests(10)
+                .build());
+
+        assertThat(settings.getHoldMinutes()).isEqualTo(45);
+        assertThat(settings.getHoldWarningMinutes()).isEqualTo(35);
+        assertThat(settings.getLateAfterMinutes()).isEqualTo(10);
+        assertThat(settings.getConfirmReminderTime()).isEqualTo(LocalTime.of(16, 30));
+        assertThat(settings.getGuestReminderHours()).isEqualTo(48);
+        assertThat(settings.getNoShowWarningFrom()).isEqualTo(2);
+        assertThat(settings.getDepositFromGuests()).isEqualTo(10);
+        assertThat(settings.getUndoSeatMinutes()).isEqualTo(15);
+        verify(settingsAuditService).log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_RESERVATION_POLICY"), anyString(), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("Should refuse a hold warning that is not before the hold ends")
+    void shouldRejectHoldWarningAfterHold() {
+        UpdateSettingsReservationPolicyRequest request = reservationPolicy().holdMinutes(30).holdWarningMinutes(30).build();
+
+        assertThatThrownBy(() -> settingsService.updateReservationPolicy(authentication(), RESTAURANT_ID, request))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("The hold warning must come before the hold ends");
+        verify(settingsDomainSupport, never()).saveSettings(any());
+    }
+
+    @Test
+    @DisplayName("Should refuse marking guests late only after the hold ends")
+    void shouldRejectLateAfterHold() {
+        UpdateSettingsReservationPolicyRequest request = reservationPolicy().holdMinutes(30).lateAfterMinutes(30).build();
+
+        assertThatThrownBy(() -> settingsService.updateReservationPolicy(authentication(), RESTAURANT_ID, request))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("A guest must count as late before the hold ends");
+        verify(settingsDomainSupport, never()).saveSettings(any());
+    }
+
+    @Test
+    @DisplayName("Should put the reservation times back to the agreed defaults on reset")
+    void shouldResetReservationPolicy() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+        settings.setHoldMinutes(60);
+        settings.setHoldWarningMinutes(50);
+        settings.setLargeGroupFrom(8);
+        settings.setConfirmReminderTime(LocalTime.of(9, 0));
+        settings.setNoShowWarningFrom(3);
+        settings.setPreOrderLeadMinutes(90);
+
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+        when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+
+        settingsService.resetSettings(authentication, RESTAURANT_ID);
+
+        assertThat(settings.getHoldMinutes()).isEqualTo(30);
+        assertThat(settings.getHoldWarningMinutes()).isEqualTo(20);
+        assertThat(settings.getLargeGroupFrom()).isEqualTo(5);
+        assertThat(settings.getConfirmReminderTime()).isEqualTo(LocalTime.of(15, 0));
+        assertThat(settings.getNoShowWarningFrom()).isEqualTo(1);
+        assertThat(settings.getPreOrderLeadMinutes()).isEqualTo(30);
+    }
+
+    // The agreed defaults; each test changes what it needs.
+    private UpdateSettingsReservationPolicyRequest.UpdateSettingsReservationPolicyRequestBuilder reservationPolicy() {
+        return UpdateSettingsReservationPolicyRequest.builder()
+                .largeGroupFrom(5)
+                .largeGroupExtraMinutes(15)
+                .approvalGroupSize(7)
+                .holdMinutes(30)
+                .holdWarningMinutes(20)
+                .checkInOpensMinutes(120)
+                .confirmReminderTime(LocalTime.of(15, 0))
+                .sameDayConfirmMinutes(120)
+                .attendanceCallMinutes(120)
+                .reopenWindowMinutes(60)
+                .undoSeatMinutes(15)
+                .runningLateMaxMinutes(30)
+                .lateAfterMinutes(15)
+                .guestReminderHours(24)
+                .noShowWarningFrom(1)
+                .depositFromGuests(7);
     }
 
     private Authentication authentication() {

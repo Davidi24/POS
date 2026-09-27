@@ -1,5 +1,838 @@
 # Agent Memory — POS
 
+## 2026-09-27 (Codex, feature/orders) — Admin navigation matches POS
+**Did:** Updated only `admin/ui/AdminNavBar.kt` to match the existing POS desktop More control: trailing chevron, identical font/spacing, white 10dp popup with text-only entries, matching compact/medium/full sizing, and the selected overflow section promoted into the fourth tab (Devices moves into More). All Admin Hub pages use this bar. Kitchen and phone navigation already reuse the POS frame/item components and matching menu styling.
+**Constraint:** User explicitly requested no POS changes. SHA-256 comparison confirmed `PosTopBar.kt`, `PosBottomBar.kt`, and `PosScreen.kt` unchanged during this task. Admin More and menu text were compared directly with POS source after section/width substitutions and match exactly.
+**Verified/runtime:** Desktop Kotlin build passed; `git diff --check` passed. Desktop app relaunched successfully (`/tmp/admin-pos-navigation-app.log`, PID 218558). No additional tests added for this navigation styling change; visual review remains with the user.
+**Scope:** No backend, reservation-rule, or settings-page edits. Ongoing reservation work by the other agent was left intact.
+
+## 2026-09-27 (Claude, feature/orders) — Reservation rules PHASE 1 done (built + tested)
+- **DB:** V49 (`hold_until`, `arrived_guests`, `expired_at`, status EXPIRED in both check constraints), V50 (`reservation_events`: non-status changes with who/why).
+- **Permissions:** new RESERVATION_READ / MANAGE / APPROVE / CORRECT. Waiter: read+manage; Manager/Admin/Co-Owner/Owner: all; Viewer: read.
+  - The reservation endpoints use them now instead of SETTINGS_READ/UPDATE. The app's order form loads bookings with RESERVATION_READ.
+- **Rules:** `ReservationLifecycleService`, with values from `ReservationPolicy` (Admin Hub settings, 15 s cache).
+  - Staff bookings: CONFIRMED when a table fits the whole visit (tables given or availability found). PENDING (request) when no table, or 7+ without APPROVE.
+  - Default end: 2 h, or 2 h 15 for 5+.
+  - Check-in opens 2 h before. Check-in works without a table. `arrivedGuests` ("3 of 6"), with an arrived-guests endpoint.
+  - Seat needs a table and marks the tables OCCUPIED. Undo seat: 15 min for staff, then CORRECT + reason; never with orders.
+  - Complete: only from SEATED. Cancel from CHECKED_IN needs a reason; SEATED can't be cancelled.
+  - No-show: only CONFIRMED and after start.
+  - Reopen: back to CONFIRMED (or PENDING if never accepted); gives a new hold if the old one passed; drops tables taken meanwhile (TABLES_RELEASED event).
+  - A booking from an earlier service day (06:00–02:00) needs CORRECT + reason for any change.
+  - Extend hold (`/extend-hold`): moves only the hold, never past the end.
+  - `/seating-check`: minutes left, the next booking on its tables, other free tables.
+- **Job:** `ReservationNoShowJob`: CONFIRMED past the effective hold → NO_SHOW; PENDING past start (or its reopened hold) → EXPIRED (not a no-show). Never touches CHECKED_IN/SEATED.
+- **Response:** `holdUntil`, `arrivedGuests`, `expiredAt`, `needsReview` + `reviewReason`. Summary has `expiredCount`, `needsReviewCount`.
+- **Tables:** `RestaurantTableService.updateOperationalStatus` publishes `TableStatusChangedEvent`. `ReservationTableListener`: occupying a checked-in booking's table seats it; clearing a seated booking's table completes it ("Table cleared").
+  - Layout items carry `nextReservationStatus/HoldUntil/HoldWarningAt/PartySize/ArrivedGuests`. The app shows a yellow "Hold ends in N min" table (`TableVisualState.HoldEnding`, #EAB308).
+- **App:** `BookingRules.kt` (actions, correction rules, labels) and `BookingActionDialogs.kt` (reason prompt, arrived count, hold longer).
+  - `ReservationDetailsPanel` actions rewritten: Accept/Decline, Guest arrived, Seat (pick a table if none), Undo seat, Finish, Left without ordering, Hold longer, No show, Cancel, Left before seated, Reopen.
+  - Also in the panel: a "Needs review" card, and a late-guest seating card with "Move to T5". History shows the events.
+  - Cards: "Hold ends in N min", "N of M arrived", "Waiting for table", "Needs review". The create dialog's end follows group size. A request shows "Saved as a request: …".
+- **Tests (run, passing):** backend reservation/settings/tables/preorder unit tests. New: `ReservationRulesTest` (19), the rewritten `ReservationNoShowJobTest`, `ReservationTableListenerTest`. App: `BookingRulesTest`, `ReservationsPagingTest`, `SettingsSpecTest`.
+  - Live API journey: 28/28 (script in the session scratchpad `phase1_check.py`; test bookings deleted).
+  - Pre-existing failures NOT from this work: `OrderControllerSecurityTest` (missing `OrderChangeNotifier` bean), 3 `OrderPricingSafetyTest`, `RestaurantTableServiceTest` merge (stubs vs Codex's newer merge check), persistence tests (Testcontainers).
+  - Fixed stale stubs in `RestaurantTableServiceTest` (seat), `ReservationCodeTest`, `ReservationStatusEventTest`.
+
+## 2026-09-27 (Claude, feature/orders) — IN PROGRESS: reservation rules phases 1–4
+**User gave the build command for phases 1–4.** Claiming migrations **V49–V56**. Codex: use V57+ for anything new. Also avoid editing `pos/pos/reservation/**`, `pos/pos/preorder/**` and the app's `pos/reservations/**` while this entry says IN PROGRESS.
+
+## 2026-09-27 (Claude, feature/orders) — Settings → Reservations page finished
+**V48 applied** (`V48__reservation_policy_more_settings.sql`, schema at v48). Codex: use V49+.
+- **User approved the Settings grid**, then asked to finish only the Reservations settings. Other categories (Orders, Tables, Payments) are first drafts; they're untouched and still need a go.
+- **Backend:**
+  - New `settings` columns, also added to the `/reservation-policy` PATCH: `late_after_minutes` 15, `guest_reminder_hours` 24, `no_show_warning_from` 1, `deposit_from_guests` 7.
+  - The PATCH rejects late >= hold ("A guest must count as late before the hold ends"), plus the earlier warning >= hold check.
+  - Reset (`POST /settings/reset`) now also restores the reservation policy and pre-order values; before, it skipped them.
+  - The rule's `cancellationWindowHours` (unused by booking logic) is now shown as the deposit refund deadline (24h).
+- **App (`admin/settings/`):** Reservations page sections: Booking length, Who can book, Online bookings, Arrival and late guests, Confirming attendance, No-shows, Corrections, Deposit for big groups.
+  - `SettingsCategory.problem()` explains live in the save bar (and blocks Save) when the smallest booking > largest, hold warning or late >= hold, or a deposit is missing its type/amount or is over 100%.
+  - Inputs reset after save/discard. Decimals aren't reformatted while typing. A number typed out of range goes back on blur. Times are stored as HH:mm:00.
+- **Tests written, not run (user rule):**
+  - `SettingsServiceTest`: 4 new tests (policy save, two ordering refusals, reset).
+  - `jvmTest/.../admin/SettingsSpecTest.kt`: edits, checks, endpoints and bodies, via MockEngine.
+  - Both compile. API checked by hand: new fields read back, late >= hold gives 400.
+- **Still not built:** the reservation rules phases 1–4 (nothing reads these settings yet). Occasions/events management belongs to phase 3. Waiting for the user's command.
+
+## 2026-09-27 (Claude, feature/orders)
+**User: show the Settings grid first; wait for their "go" before doing anything else on settings.** The grid is built and the app was relaunched for them to review it. The "left to do" items in the entry below are on hold until they approve the grid.
+
+## 2026-09-27 (Claude, feature/orders) — Admin Hub Settings (in progress)
+**V47 is applied** (`V47__reservation_policy_settings.sql`, schema now at v47). Codex: use V48+.
+- **Backend:** new `settings` columns for reservation policy (large group from 5 / +15 min, approval from 7, hold 30, hold warning 20, check-in opens 120, reminder 15:00, same-day confirm 120, attendance call 120, reopen 60, undo seat 15, running late max 30). `pre_order_lead_minutes` default is now 30. New `PATCH /restaurants/{id}/settings/reservation-policy` (rejects warning >= hold). Reservation-rule entity defaults: 120 min, buffer 5, auto-confirm on.
+- **Checked by hand:** GET settings returns the defaults; the invalid PATCH gives 400. Backend restarted from my build (log in the session scratchpad); this stopped the backend Codex had started from `/tmp/shift-admin-backend-runtime.log`.
+- **App:** `admin/settings/` has `SettingsApi`, `SettingsSpec` (categories, sections, fields, save groups) and `AdminSettingsScreen` (grid of 8 categories, then one page per category with a save bar). It's wired to `AdminSection.SETTINGS` and registered in Koin. Compiles.
+- **Pages with settings:** Reservations, Orders & kitchen, Tables, Payments & receipts. Devices, Shifts and Notifications show "nothing to set yet". Online booking is disabled ("Later").
+- **Left to do:** client checks before saving (smallest <= largest booking; a deposit needs a type and an amount); stop decimal inputs reformatting while typing; reset a number typed out of range when the field loses focus. Then launch the app and look at it. After that: Devices & printing (printers). Shifts and Notifications contents still need deciding with the user.
+- **The reservation rules (phases 1–4) are NOT started.** These settings are only stored; nothing reads them yet. Still waiting for the user's build command.
+
+## 2026-09-27 (Claude, feature/orders) — IN PROGRESS
+**Claiming migration V47** for the reservation-policy settings columns on `settings` (Admin Hub Settings build). Codex: use V48+ for anything new.
+
+## 2026-09-27 (Claude, feature/orders)
+**Build plan rule (user): test each phase before moving to the next, then check the whole booking journey at the end.**
+- **Phase 1:** statuses, timers, table availability, correction permissions.
+- **Phase 2:** reminders, large-group attendance confirmation, requests, waitlist.
+- **Phase 3:** occasions, special menus, events.
+- **Phase 4:** website bookings, messages, payments, refunds.
+- **End:** a full end-to-end booking journey check.
+- **Each phase includes its Admin Hub settings** (every time/limit/threshold with its agreed default), so it's production ready. This overrides the general "tests only at the very end" preference for this reservation build.
+- Still open: deposit deadline default (24h?), and whether normal bookings use the 7+ attendance steps.
+- **Do not start until the user gives the build command.**
+
+## 2026-09-27 (Claude, feature/orders)
+**Change to the build plan (user): correcting a no-show updates the guest's history.**
+- **Derive the no-show count from the guest's reservations whose current status is NO_SHOW.** Don't store a counter, so corrections update it automatically.
+- **Marked by mistake, or the guest arrived after all:** correcting the booking (reopen / "Guest arrived") removes it from the count. The original change stays in the status history/audit.
+- **The guest really didn't come:** a manager can **clear the warning** with a reason. This stores a per-guest "warning cleared at" time plus who and why; the NO_SHOW records remain.
+- **A later no-show** after that time shows a new warning. The warning counts only no-shows after the last clear.
+- This replaces the earlier "manager clears the record" wording: clearing hides the warning, it never deletes history.
+- **Still open:** the deposit deadline default (24h suggested), and whether normal bookings use the 7+ attendance steps. Still waiting for the build command.
+
+## 2026-09-27 (Claude, feature/orders)
+**Change to the build plan (user): cancelling and refunding are explained separately.**
+- **Nothing paid:** the guest cancels with no charge.
+- **Food, extras or a deposit already paid:** before the guest confirms the cancel, show how much is refunded, how much is kept, and why, line by line per paid part. E.g. "€49.10 back: food pre-order €50 minus the card fee".
+- **The button always says "Cancel booking"**, never "Cancel for free".
+- **Separate refund rules per paid part** (each refunds minus the card fee before its deadline; kept after it or on a no show; Owner goodwill partial refund possible):
+  - **Pre-ordered food:** until it goes to the kitchen (default 30 min before).
+  - **Extras** (cake, decoration): until that item's own "order before" deadline.
+  - **Deposit** (7+, optional): its own deadline, **not** the kitchen rule. My suggested default: 24h before (Admin Hub setting); asked the user to confirm.
+- Still waiting for the build command. Still open: do normal bookings use the 7+ attendance steps?
+
+## 2026-09-27 (Claude, feature/orders)
+**Change to the build plan (user): correction permissions.**
+1. **Reopen a CANCELLED or NO_SHOW booking:** staff with reservation permission within **1 hour of that status change** (use the status-history time, i.e. `cancelledAt` / `noShowAt`). After that, a manager must approve and give a reason.
+2. **Undo seating (SEATED → CHECKED_IN):** staff within **15 minutes** (Admin Hub setting; the default changes from the earlier 5 min), **only if no orders or payments are attached**. After that time, or when orders/payments are attached, a manager must handle it.
+3. **Correcting a booking from an earlier service day:** any change always needs a manager and a reason.
+- Still waiting for the build command. Still open: do normal bookings use the same attendance steps as 7+?
+
+## 2026-09-27 (Claude, feature/orders)
+**Change to the build plan (user): check in without a table.**
+- "Guest arrived" works even if their table is gone (e.g. they arrived late and it was given away): the booking becomes **CHECKED_IN** and shows **"Waiting for table"**. Staff choose a free table → SEATED when one frees up.
+- **CHECKED_IN = they're here; SEATED = they have a table.** Check-in must not require a table.
+- **Always use the existing reservation, never a new walk-in**: a new walk-in would leave the booking wrongly as No show and count the guests twice.
+- The original table is not guaranteed after the hold expires.
+- This replaces "Guest arrived on a No show: if the table is taken, pick another first".
+- **My addition, not yet confirmed:** checked-in guests waiting for a table also show at the top of the walk-in waitlist box, marked "has a booking".
+- **Still open from before:** do normal bookings (under 7) use the same attendance steps 2–5 as big groups?
+- Still waiting for the build command.
+
+## 2026-09-27 (Claude, feature/orders)
+**Change to the build plan (user): attendance confirmation for large groups (7+).**
+1. Staff approve the request → CONFIRMED.
+2. The day before, the guest gets "Your table for 8 guests is booked tomorrow at 19:00. Please confirm you're still coming." with [Confirm attendance] [Cancel booking].
+3. The guest confirms → a small **✓ Attendance confirmed** mark (extra info, NOT a status; stays CONFIRMED).
+4. Still no reply 2 hours before → staff are notified to call. **Never auto-cancel for no reply.**
+5. Same-day booking confirmed during a phone call → staff mark attendance confirmed immediately; no need to ask again.
+- **Rename:** my "✓ Reconfirmed" is now **"✓ Attendance confirmed"** throughout the plan. This replaces "staff call big groups the day before" with step 4.
+- **Open:** do normal bookings (under 7) use the same steps 2–5? I suggested yes, one rule for all, and asked the user.
+- Still waiting for the build command.
+
+## 2026-09-27 (Claude, feature/orders)
+**Change to the build plan (user): extending the hold ≠ extending the booking.**
+- **Extend the hold** (the guest calls "we'll arrive at 19:40" on a 19:00–21:00 booking): staff keep the table until e.g. 19:45.
+  - Only the hold timers move: "Hold ends in 10 min" at 19:35, No show at 19:45.
+  - The booking **still ends at 21:00**. The guest's message is "we'll wait longer for you, but your booking still finishes at 9 pm".
+  - Needs a hold-until time on the reservation (e.g. `holdUntil`, default start + the 30 min setting).
+- **Extend the end** (stay past 21:00) is a separate action. The app checks the table's next booking plus 5 min cleaning: free → extend; not free → suggest another table, or staff decline.
+- **The website "I'm running late" button** only extends the hold (max +30 min, once), never the end.
+- Still waiting for the build command.
+
+## 2026-09-27 (Claude, feature/orders)
+**Change to the build plan (user): staff bookings are CONFIRMED immediately only when a suitable table is available.**
+- **Group under 7, table free** → CONFIRMED right away.
+- **Group under 7, no table free** → PENDING request. The app suggests nearby free times (reuse the create dialog's nearest-free-start search) for staff to offer on the call.
+- **7+ guests** → needs approval. Staff **with approval permission** can approve and confirm during the call → CONFIRMED; otherwise it stays PENDING.
+  - A new permission, e.g. RESERVATION_APPROVE. My suggested default holders: Manager and above; the Owner can grant it to others (not yet confirmed by the user).
+- **Availability must cover the full visit plus cleaning**: start → start + booking length (2h, or 2h15 for 5+) + 5 min cleaning. Not just the arrival slot. Check `ReservationAvailabilitySupport` and the rule's `bufferMinutes` against this.
+- The same availability rule decides the website's instant confirm vs request (phase 4).
+- Still waiting for the build command.
+
+## 2026-09-27 (Claude, feature/orders)
+**Change to the build plan (user): a PENDING request never becomes No show.** Pending now means the restaurant hasn't accepted yet, so a no-show would wrongly blame the guest.
+- **CONFIRMED + guest doesn't arrive:** NO_SHOW when the hold expires; counts in the guest's no-show history.
+- **PENDING + staff never answered:** **Request expired**, a new end state (e.g. EXPIRED, or DECLINED with an "expired" reason). It is **not** a no-show and is never added to the history.
+  - Suggested timing: it expires at the booking start time, and the guest is emailed "Sorry, we couldn't confirm your request".
+  - Staff can still check in a pending request if the guest arrives before then.
+- **Fixes to the plan I sent:**
+  - `ReservationNoShowJob` must only take CONFIRMED (not PENDING) for auto no-show; today its WAITING set includes PENDING.
+  - The manual "mark No show" also only applies to CONFIRMED.
+  - The earlier "requests wait until answered or cancelled" now ends at the booking time with "Request expired".
+- Still waiting for the build command.
+
+## 2026-09-27 (Claude, feature/orders)
+**Decision (user): importing an existing item into a special menu makes a COPY.** A price change in the original menu doesn't change the copy, and the other way round. With this, every reservation-rule question from today's discussion is answered, except private events (deferred). **Waiting for the user's command before building anything.**
+
+## 2026-09-27 (Claude, feature/orders)
+**Decision (user): occasion add-ons live in the Menu, not in settings.**
+- When creating a menu, it can be a **special menu** (e.g. "Occasion extras"; the event menus are special menus too).
+- Inside a special menu the admin can **create new items** (decoration, flowers) or **import existing items** from other menus, via an "import existing" option next to create, like picking existing items when adding one.
+- Occasion bookings offer the items of that special menu, with each item's deadline and occasion link.
+- **Open:** is an imported item the same item (a price change applies everywhere) or a copy with its own price? My suggestion: a copy.
+- Reminder: don't build any of this until the user gives the command.
+
+## 2026-09-27 (Claude, feature/orders)
+**Decisions on the small open points (user):**
+- **Event nights:** "only the special menu" vs "special + normal menu" is a per-event setting in the Admin Hub.
+- **Cleaning time between bookings: 5 min** (Admin Hub setting). The +15 min for 5+ guests is extra table time, so 5+ = 2h15 + 5 min cleaning.
+- **Day-before reminder at 15:00**, changeable in settings.
+- **Goodwill partial refunds: Owner only for now, or whoever the Owner allows** (a grantable permission).
+- **"Hold ends in 10 min" table colour: yellow #EAB308.** Picked by me; the user will say if they don't like it.
+- **Still open:** add-ons as menu items vs separate extras. I'm explaining it again; the user didn't follow the question.
+**IMPORTANT: do NOT start building any of these reservation rules until the user explicitly gives the command.**
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): big groups.**
+- **Every booking of 7+ guests needs staff approval**, occasion or not. The website sends it as a request, like "no free table". The threshold is an Admin Hub setting.
+- **Deposit for 7+ is optional, an Admin Hub setting, off by default** ("mostly no deposit"). When on: paid online, refunded minus the card fee if cancelled in time, kept on a no show; same rules as pre-orders.
+- **Big groups may pre-order online if they want**, with the same pre-order rules (refund minus fee before the kitchen dispatch; no refund after that or on a no show; Owner goodwill partial refund).
+- Staff call big groups the day before (shown in To do), on top of the normal ✓ Reconfirmed reminder.
+**All parked topics are now discussed** except private events (type 2), deferred "later if needed".
+**Small open points** to settle when building:
+- add-ons as menu items vs separate extras;
+- a per-event switch "only the special menu" vs "special + normal menu";
+- whether the +15 min for 5+ guests is table time or cleaning;
+- the 15:00 reminder time (placeholder);
+- whether Co-Owner can also give goodwill refunds;
+- the colour for "Hold ends in 10 min".
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): paid add-on refunds use the same rule as pre-orders.**
+- Cancel before the add-on's own "order before" deadline (set per add-on in the Admin Hub, e.g. cake 2 days before) → refund minus the card fee.
+- After that, or a no show → no refund. The Owner may give a goodwill partial refund (audited).
+- Guest text states only the policy, e.g. "Cancel before 12 Feb to get the cake money back (minus the card fee)."
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): pre-order cancelled after it went to the kitchen.**
+- **No refund**, same as a no show.
+- **The Owner may give a goodwill partial refund**, never the full amount: a manual action saved in the audit (who, amount, reason). Whether Co-Owner can too is not asked yet; the user said "owner".
+- **Guest-facing text states only the policy**, never the goodwill option. E.g. at payment and in emails: "Cancel before 18:30 to get your money back (minus the card fee). After that there's no refund." The time is the kitchen dispatch time.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): pre-order money rules.**
+- **No show → no refund.**
+- **Guest cancels → refund minus the payment provider's fee.** The provider (e.g. Stripe, ~1.5% + €0.25 for EU cards; depends on the provider chosen) doesn't return its fee on refunds, so the restaurant loses nothing.
+  - Show it at payment, e.g. "If you cancel, you get €40 back minus the card fee (€0.85)".
+  - This needs a fee calculation per payment when the payment provider is added.
+- **Open question:** a cancel after the pre-order has gone to the kitchen (the auto dispatch time, suggested 30 min before, an Admin Hub setting) — refund minus fee, or no refund? My suggestion: no refund.
+- Existing `pos.pos.preorder` code still has "paid by default" and the older refund-before-kitchen rule. Update it when payments are built.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): special events, type 3 — the restaurant's own nights** (New Year's Eve, Valentine's…).
+- **An event = a special menu available that day. Bookings stay normal:** no pre-order, no online payment, same booking rules. Guests order from the special menu at the table.
+- **Admin Hub → Events:** name, date(s), icon (e.g. ❤️ Valentine's, 14 Feb), and the special menu. Reuse the menu date availability (`Menu.availableFromDate` / `availableUntilDate`), so the menu shows in the POS only that day.
+- Bookings on that date automatically show the event icon; the website shows a banner (e.g. "❤️ Valentine's evening, special menu").
+- **My suggestion, not yet answered:** a per-event switch in the Admin Hub, "only the special menu" vs "special + normal menu" that evening.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): occasion add-ons.**
+- Besides free options (candles, song, quiet table), an occasion booking can have **add-ons** (e.g. cake €25, prosecco €30, flowers €15, decoration €20).
+- **Admin sets them in the Admin Hub settings:** name, price, which occasions they appear for, how early they must be ordered (e.g. cake 2 days before; the website hides it after that), and quantity.
+- **Paid add-ons must be paid online by the guest** at booking. Needs the online payment provider (website phase; `payment` module has entities only).
+  - Phone bookings with a paid add-on → the guest gets a payment link by email/SMS; the add-on shows "Waiting for payment" until paid.
+- On the day: listed on the booking and in the To do box so staff prepare them. They reach the kitchen/bar at the right moment (e.g. the cake at dessert) and show on the bill as already paid.
+- **Refund on cancel:** decide together with the pre-order cancellation discussion (same question).
+- **Still open:** add-ons as menu items marked "for occasions" (my suggestion: prices, KDS and reports work already) vs separate extras. Also: 7+ approval for every booking or only occasion bookings.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): special events, type 1 — an occasion on a normal booking.**
+- **Scope:** the user chose types 1 (occasion) and 3 (the restaurant's own events). Type 2 (private events: weddings, company dinners, full buyouts) is deferred, "later if needed".
+- **Occasion field** (optional, staff and website booking forms). Each occasion has **its own icon and its own options**. Starting set, editable in the **Admin Hub**:
+  - 🎂 Birthday: cake (ours / guest brings one), candles, birthday song, decoration.
+  - ❤️ Anniversary: flowers, prosecco/champagne, dessert with a message.
+  - 💍 Engagement/proposal: surprise (ring hidden), flowers, champagne, quiet table.
+  - 🎓 Graduation: cake, decoration, champagne.
+  - 🌹 Date night: quiet/window table, candles.
+  - 💼 Business: quiet table, invoice with company details.
+  - ✨ Other: free text.
+  - Plus a free note (e.g. "Cake with 30 candles at dessert", "It's a surprise").
+- **Shown on:** the reservation card (icon + tag), the table on the floor plan (icon), a check-in reminder, the KDS dessert/relevant ticket (note), and the future-day To do → "Special requests" count.
+- **More than 6 guests (7+) on an occasion booking → staff must check/approve** (a request, like "no free table"), never instant.
+- **Open question:** does the 7+ approval also apply to big groups without an occasion? Earlier I proposed 9+ for big groups and the user hadn't answered.
+- Otherwise it's a normal booking: same rules and length.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): booking length.** Every booking takes **2 hours**; groups of **5 or more get +15 min** (2h15). This is simpler than my per-size table, which was rejected. It applies to availability checks, suggested times, website bookings and staff bookings; staff can still change one booking's end time by hand.
+**Rule (user): everything a restaurant can change lives in the Admin Hub settings, with the agreed defaults.** Added to `AGENTS.md`. For the reservation rules that means at least:
+- booking length (2h) and the extra for 5+ guests (+15 min);
+- no-show hold (30 min) and the "hold ends" warning (20 min);
+- the day-before reminder time (15:00) and the same-day confirm deadline (2h);
+- the reopen window (1h) and the undo-seat window (5 min);
+- the running-late limit (+30 min) and check-in opening (2h before).
+Today some of these are constants in code (`ReservationNoShowJob.GRACE`, `ReservationLifecycleService.CHECK_IN_OPENS_BEFORE`, the rule's `defaultDurationMinutes` / `bufferMinutes`); move them to settings when building.
+**Idea list done:** all 8 ideas discussed. Card/deposit and big groups / special events are parked for later.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): walk-in waitlist**, following my 4 steps as proposed.
+1. When every table is taken, staff add the walk-in to the waitlist: name, phone, group size, time added (e.g. "Maria · 4 guests · 18:40").
+2. The list shows how long each guest has waited and a rough "table free around HH:MM", based on when seated tables are expected to finish.
+3. When a fitting table frees up, staff pick them. A "Your table is ready" text goes out once an SMS provider exists; until then staff call them. One-tap seat from the list.
+4. If they leave, staff remove them. It's never recorded as a no-show.
+- **Placement:** a small "Waitlist" box on today's Reservations overview and on the Tables screen.
+- **Not the same as the website request:** a request is for a future day or time and online; the waitlist is walk-ins at the door now.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): part of a group arrived.**
+- No new status. The booking is **CHECKED_IN** with an arrived count, e.g. "3 of 6 arrived"; later "6 of 6". Needs a field such as `arrivedGuests` on the reservation, and "Guest arrived" asks for how many.
+- Staff can **seat them right away**; SEATED keeps showing "3 of 6" until the rest come.
+- **The no-show timer stops** at the first arrival (a checked-in booking is never a No show). Reports count arrived vs booked guests.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): late guests and the "Running late" button.**
+- **"I'm running late" in the guest's email** (with Confirm/Cancel, website phase): pick 10/15/20 min. Staff see "Running N min late" + a notification, and the hold is extended (same as staff extending it after a call).
+  - Limits I proposed, not objected to: once per booking, max +30 min, only before the hold expires.
+  - The extension only goes through if their table (or another free one) can still take them; otherwise the guest sees "We can hold your table until HH:MM".
+- **A late guest keeps the original end time** (less time at the table). On arrival or on "running late", the app checks that table's next booking:
+  - it fits → seat them, and staff see "Next booking at this table at HH:MM · Xh Ym left";
+  - they need more time or it doesn't fit → the app suggests another table free for their full duration, and staff choose;
+  - nothing fits → staff are warned and decide (shorter stay or not).
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): no-show history on the guest.**
+- From a guest's **first** no-show, every new booking by that guest (matched by customer, or by email/phone for online bookings) **notifies staff** and shows a warning on the booking, e.g. "⚠ 1 no-show before" (count and dates in the guest profile).
+- **Manager and above** can clear the record. The clear action is saved in the audit (who, when, reason) and never silently deletes history.
+- **No automatic restriction.** My suggestion (after 3 no-shows, online bookings become requests) was not adopted; staff decide.
+
+## 2026-09-27 (Claude, feature/orders)
+**Decision (user): cancelling is always free.** No cancellation cut-off and no "Late cancel" mark; a guest can cancel any time. The only exception is bookings with a food pre-order: the user wants to discuss those later, so treat the earlier pre-order refund rule (refund if cancelled before it goes to the kitchen) as still open. Idea 3 (card or deposit) is parked with big groups / special events for a later discussion.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): website booking with no free table → request.**
+- **No table free at booking time:** the website doesn't refuse. The booking becomes a **PENDING request**, and the guest sees/gets: "Your reservation request has been sent. We'll let you know as soon as a table is free."
+- **Staff see requests** waiting for an answer (e.g. in the To do box).
+  - **Accept** (assign a table) → CONFIRMED + "Your table is confirmed ✓".
+  - **Decline** → the guest gets "Sorry, we're full that day".
+- **A table frees up** (a cancellation etc.): the app **notifies staff**, and they decide. It does **not** auto-confirm the oldest request.
+- **No automatic decline and no automatic cancel on silence.**
+  - The guest gets the reminder ("See you tomorrow? [Confirm] [Cancel]"). Cancel → CANCELLED.
+  - **No reply → nothing changes**: the booking or request stays as it is.
+  - This applies both to confirmed bookings (the ✓ Reconfirmed mark just stays missing, which gives the "Not confirmed" flag) and to waiting requests (they stay PENDING until staff answer or the guest cancels).
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): answers to the open questions on the two-step confirm.**
+- **Staff-made bookings** (phone / in person): staff check availability and tell the guest → **CONFIRMED right away**. This replaces the earlier "every new booking starts PENDING" for staff bookings.
+- **Website bookings:** instantly CONFIRMED when a table is free, and the guest gets an email/text "Your table is confirmed ✓".
+- **All bookings** get the day-before "See you tomorrow? [Confirm] [Cancel]" → ✓ Reconfirmed mark. The day-before / 2h / "Not confirmed" rules check that mark.
+- **Big groups and special events:** deferred; to be discussed later. For now only normal bookings.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user decision, not implemented): two kinds of "confirm".** This updates the FINAL reservation rules entry below.
+- **Step 1, booking accepted (restaurant → guest), instant:** an online booking with a free table is accepted immediately → **CONFIRMED**, and the guest gets a "Your table is confirmed ✓" email.
+  - Only special cases go to **PENDING** for the restaurant to approve: very big groups (threshold still to decide, e.g. more than the largest table or 8+), or cases where no single table fits.
+  - Staff accept or decline; the guest is emailed either way.
+  - Pending should be answered within hours, not days.
+- **Step 2, "Still coming?" (guest → restaurant), the day before:** a reminder email/text: "See you tomorrow? [Confirm] [Cancel]".
+  - Confirm does **not** change the status; it adds a **✓ Reconfirmed** mark (by the guest via the link, or by staff after a call). Cancel → CANCELLED.
+  - Timing: bookings made more than 24h ahead get a "booking received/confirmed" email right away (with a cancel link), then the reminder 24h before. Bookings made less than 24h ahead get one email straight away with Confirm/Cancel.
+- **Knock-on effect on the earlier rules:** "confirm by the day before", the 15:00 reminder to managers, the 2h rule, "Confirm now" and the red "Not confirmed" warning now check the **✓ Reconfirmed mark**, not the PENDING status. PENDING now only means "restaurant hasn't accepted yet".
+- **Open question for the user:** do staff-made bookings (phone / in person) become CONFIRMED right away, since staff are the restaurant accepting them, then only need ✓ Reconfirmed? The earlier decision said they start PENDING.
+- **Needs:** email sending (exists), a public Confirm/Cancel page (website phase), and optionally an SMS provider later.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user requested, not implemented): FINAL reservation rules.** This replaces the earlier to-do entries from today on confirmation rules, no-show steps, undoing a No show, and after check-in/seating; where they differ, this one wins. Agreed with the user after review.
+
+**Statuses:**
+- **Pending:** every new booking, any channel, same-day included → Confirmed, Checked in, Cancelled, No show.
+- **Confirmed:** staff confirm (later also the guest via a link) → Checked in, Cancelled, No show.
+- **Checked in:** "Guest arrived", allowed from 2h before, or from No show (rules below) → Seated, or Cancelled with a reason ("Left before seating"). Never No show, never auto-cancelled.
+- **Seated** → Completed; Undo seat → Checked in (rules below). No Cancel.
+- **Completed:** only when staff mark them finished or close the table visit. **Paying the bill does not complete it** (today nothing auto-completes; keep it that way).
+- **Cancelled:** from Pending/Confirmed, or from Checked in with a reason → Reopen.
+- **No show:** only from Pending/Confirmed, automatically when the hold expires or set by staff → Reopen, or "Guest arrived".
+
+**Timeline:**
+- **Confirmation deadline:**
+  - Booked on an earlier day: confirm by the day before. Reminder to managers at 15:00 the day before (time adjustable); tomorrow's "Pending to confirm" To do row turns red.
+  - Booked the same day, 2h or more ahead: confirm at least 2h before start.
+  - Booked less than 2h ahead: orange "Confirm now" immediately. Red only if still unconfirmed when due.
+- **Deadline passed, still Pending:** red "Not confirmed" badge, a warning at the top, a manager notification. The booking is kept, never auto-cancelled.
+- **Check-in opens** 2h before.
+- **15 min late:** shows "N min late" under Previous → Still active.
+- **Guest calls to say they're late:** staff can **extend the hold** (e.g. +15 min); every timer below shifts with it.
+- **Hold ends in 10 min** (default start+20): the table shows **"Hold ends in 10 min"**; the details say "Reservation hold expires in 10 min". This replaces the "About to be free" name.
+- **Hold expires** (default start+30): No show (Pending/Confirmed only). The hold is released, but the table only becomes Free if nobody is sitting at it.
+- **Booking end while still Checked in:** a **"Needs review"** flag (a flag, not a status; also listed in To do). Staff pick Seated, or Cancelled "Left before seating". Change `ReservationNoShowJob`'s never-seated rule to raise this flag instead of setting NO_SHOW.
+- **02:00 (end of the restaurant's day):** it only decides a booking's date and never ends an active visit. Visits left open from an earlier day get "Needs review" and are never auto-completed.
+
+**Corrections and permissions:**
+- **Reopen** (No show / Cancelled): back to Pending or Confirmed. Within 1h: staff with reservation permission. After 1h: Manager+ with a required reason. Never takes back a table that has been given away.
+- **"Guest arrived" on a No show:** straight to Checked in; same 1h / Manager rule. If the table is taken, pick another.
+- **Undo seat:** within exactly 5 min, staff with reservation permission; after that Manager+ with a reason. If orders or payments are already linked, a manager must resolve them first.
+- **Cancel after check-in:** staff with reservation permission, reason required.
+- **Seated guests leave without ordering:** Complete with a reason ("Left without ordering").
+- **Every change** records who, when and why in the status history.
+
+**Still to choose (ideas from OpenTable/Resy/SevenRooms, not agreed):** guest confirm/cancel link; free-cancellation cut-off; card or deposit for groups and busy nights; no-show history on the guest profile; "running late" button; partly arrived groups; waitlist; table time by group size.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user requested, not implemented): after check-in and after seating.**
+- **Checked in:** can never become No show; No show means "never came".
+  - Allow **Cancel from CHECKED_IN with a reason** (e.g. "Left before being seated", "Waited too long").
+  - Change `ReservationNoShowJob`'s never-seated rule (`findCheckedInPastEnd`, `NEVER_SEATED_REASON`) so a booking checked in but never seated by the end becomes **CANCELLED** with reason "Left before being seated", not NO_SHOW.
+- **Seated:** no Cancel.
+  - Guests who leave without ordering → **COMPLETED with a reason** ("Left without ordering").
+  - Add an **"Undo seat"** (SEATED → CHECKED_IN) for when the wrong booking was seated. Any reservation staff within ~5 minutes of seating; after that Manager+ with a reason, same pattern as the No show undo rule.
+- **Where it touches:** `ReservationLifecycleService.transitionReservation` (sources for CANCELLED and the new undo transition), the no-show job, request DTOs (reasons), app detail actions, and tests.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user requested, not implemented): rules for undoing a No show.**
+- **Today:** `ReservationLifecycleService.reopenReservation` moves NO_SHOW (or CANCELLED) back to PENDING, with no time limit and no role check beyond the reservation write permission (`SETTINGS_UPDATE`). `ReservationNoShowJob` skips bookings already reopened from no-show.
+- **New rules (user decisions):**
+  1. **Within 1 hour** of the booking becoming NO_SHOW (use `noShowAt`), staff who can manage reservations may reopen it or mark the guest arrived. My reading of the user's "maximum one hour"; confirm when building.
+  2. **After that hour**, only **Manager and above** (role rank via `RoleHierarchyService`) can change it, and a **reason is required**. The user's example: "we forgot to check the guest in".
+  3. **"Guest arrived" is one action:** NO_SHOW → CHECKED_IN directly. Today it takes a reopen to PENDING and then a check-in. The transition must accept NO_SHOW as a source for CHECKED_IN under these rules (the 2h check-in-opens rule is irrelevant here).
+  4. Reopening because it was a mistake still goes back to PENDING/CONFIRMED.
+  5. **The table may have been given away by then:** if the booking's table is now taken, the app asks for another table before checking in.
+  6. **Record who and why** in status history (`addStatusHistory` reason), including for the within-an-hour case when a reason is given.
+- **Where it touches:** `ReservationLifecycleService` (source/time/role checks), reopen/check-in request DTOs (a reason, required after 1h), the app's reservation detail actions ("Guest arrived" on a No show booking, a reason dialog, a table pick if taken), and tests.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user requested, not implemented): no-show steps for a reserved table.** The guest hasn't arrived (booking still PENDING/CONFIRMED, not checked in):
+1. **0–20 min after the start:** the table stays **Reserved** (purple, as now).
+2. **At 20 min:** the table shows a new **"About to be free"** state: its own look on the floor plan and table list (e.g. a warning variant of Reserved with "free in 10 min"). This tells staff they can soon give it away. The booking itself stays on the reservations list, flagged late (today it already shows "20 min late" in Previous).
+3. **At 30 min:** the booking becomes **No show** and the table is **Free**. This is already how it works: `ReservationNoShowJob` uses `GRACE = 30 min`, and once the booking is NO_SHOW the table stops showing it as its next reservation. Keep the 30 min, and keep the 20 min step aligned with it (e.g. `GRACE - 10 min`).
+
+**Where it touches:**
+- Backend: `RestaurantTableSupport.toLayoutResponseItem` / `TableLayoutItemResponse`, e.g. a `nextReservationLateSince` field or an "about to be free" flag computed from `nextReservationStart` + 20 min while the booking isn't checked in.
+- App: `tables/ui/Table.kt` gets a new `TableVisualState` with a colour (pick with the user; current palette Free #147A25, Occupied #D15F00, Reserved #8B5CF6, Bill pending #3B82F6, Unavailable #6B7280).
+- Notifications: optionally notify the waiter/host at 20 min.
+
+## 2026-09-27 (Claude, feature/orders)
+**To do (user requested, not implemented): reservation confirmation rules.** Agreed with the user in discussion.
+1. **Every new reservation starts PENDING.** No exceptions: staff-made and same-day bookings too. This is already how `ReservationCrudService` / `ReservationPublicService` create them; keep it.
+2. **Confirmation deadline.**
+   - Booked on an earlier day: confirm by the day before.
+   - Booked on the same day: confirm at least 2 hours before its start.
+   - Past the deadline and still PENDING, it counts as "not confirmed" (hard warning).
+3. **Reminder the day before.** In the afternoon (my suggestion 15:00; the user didn't fix a time), managers get a notification like "N bookings for tomorrow are still not confirmed". In the future-day overview, "Pending to confirm" in the "To do before the day" box turns red while it's above 0.
+4. **Hard warning on the day** for bookings past the deadline and still PENDING:
+   - a red "Not confirmed" badge on today's list instead of the orange Pending badge;
+   - a warning at the top of the overview, e.g. "2 bookings today were never confirmed";
+   - a notification to managers when a booking passes its deadline unconfirmed (same-day ones 2h before start).
+5. **If it's never confirmed, keep it and flag it.** No auto-cancel and no freeing its table: the guest may still come, and check-in straight from PENDING stays allowed. The existing auto no-show 30 min after start (`ReservationNoShowJob`) still applies.
+
+**Where it touches:**
+- Backend: a scheduled job for the day-before reminder and the deadline notifications (like `ReservationNoShowJob` + `ReservationNotifications`). Optionally a `confirmationOverdue` flag in `ReservationResponse` / summary, so the app and later the website agree.
+- App: `ReservationOverviewScreen` (badge, warning, red To do row) and `ReservationCard` status pill.
+
+## 2026-09-27 (Claude, feature/orders)
+**Note for Codex:** at 18:20 the desktop build was broken by in-progress Shifts work. `ShiftAdminCalendar.kt` calls `ShiftMessage` and `ShiftPanel`, which are `private` in `ShiftScreen.kt` (and before that, `ShiftScreen.kt` referenced `ShiftAdminCalendar` before the file existed). I didn't touch the Shifts files. I left a background loop that relaunches the desktop app as soon as `:desktopApp:compileKotlin` passes. The user can't open the app until then.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Removed the word "party" from on-screen text (user: it reads like a celebration; use "booking" or "group").
+- **Future-day overview:** "Biggest booking: N guests", "Big groups (6+)", "No groups of 6 or more…".
+- **Tables:** `TableDetailsModal` split dialog now reads "The guests and their order stay…". `TablesScreen` merge dialog reads "Merge them into one group?" / "Merge into one group".
+- **Convention:** added to `AGENTS.md` (App section).
+- **Tests:** no test strings referenced the old text.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `.../pos/tables/ui/TableDetailsModal.kt`, `.../pos/tables/ui/TablesScreen.kt`, `AGENTS.md`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Removed "Ordered online" from the future-day "To do before the day" box (user: it isn't a to-do). The box now has Pending to confirm, No table, Big parties (6+) and Special requests; "Clear" no longer touches `onlineOnly`. Today's By status panel still has its "Ordered online" row. Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Future-day Reservations overview (user agreed to my proposal), in `ReservationOverviewScreen.kt`. `isFuture = !isToday && !isPast`; Codex's past-day branch and today are unchanged.
+- **Cards** (`futureCard0..2` + existing `card3`):
+  - **Bookings:** pending+confirmed count, suffix "booked", detail "N confirmed · N pending · N cancelled".
+  - **Guests expected:** the largest party.
+  - **Busiest time:** the hour with most bookings, with booking and guest counts.
+  - **Without a table:** the existing card.
+  - Numbers show "–" until `dayDataComplete`.
+- **Right column:** a new `todoList` box, "To do before the day", above Codex's `reservationsByTime`. Its rows use `StatusCountRow`, are clickable filters that combine, and share a "Clear":
+  - **Pending to confirm:** status filter.
+  - **No table:** area Unassigned.
+  - **Big parties (`BIG_PARTY_SIZE` = 6+):** local `bigOnly`.
+  - **Special requests:** local `requestsOnly`; `specialRequests` or `internalNotes` not blank.
+  - **Ordered online:** `onlineOnly`.
+- **List:** without filters it shows only PENDING/CONFIRMED, grouped under `HourGroupLabel` rows ("19:00 · 6 reservations · 14 guests"). With filters it's the usual flat list; the title and empty messages cover the new filters.
+- **Phone/tablet:** the future cards 2×2, then the list, To do, By time.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Added an "Ordered online" row under "No table" in the overview's By status panel (user request), in `ReservationOverviewScreen.kt`.
+- **Meaning:** bookings with `source` in `OnlineSources` (WEB, MOBILE, THIRD_PARTY), the same definition as Codex's past-day "Online bookings / N ordered online" card. It is NOT pre-orders: `ReservationResponse` has no pre-order flag; that would need a backend field if the user meant food ordered ahead.
+- **Behaviour:** globe icon, purple `OnlineColor`, and the count covers every status that day. It toggles a local `onlineOnly` filter (`remember(date)`) that combines with status / No table / hour. The list title adds "Ordered online", "Clear" resets it, and it has its own empty message.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** The user reported "can't reach backend". The backend (my 11:28 start) had been shut down cleanly at 15:44, probably by Codex while rebuilding for the Shifts work (V46). A 15:51 jar existed but was never started, so the backend was down for ~2h.
+- Rebuilt with `./mvnw -o package -Dmaven.test.skip=true` (already up to date) and started `java -jar target/pos-0.0.1-SNAPSHOT.jar`. Schema at version 46; login and `/arrivals` checked OK.
+- The log is in my scratchpad (`backend.log`).
+- **For any agent:** if you stop the backend to rebuild, start it again afterwards; the desktop app shows "can't reach backend" otherwise.
+**Files/modules touched:** `AGENT_MEMORY.md` only.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Three reservations overview tweaks (user), in `ReservationOverviewScreen.kt`.
+1. **Past-day "Reservations by time" hour rows now look clickable.** This is Codex's panel; I only replaced its inline row with a new `HourRow`.
+   - Bordered white card with a chevron.
+   - Hover tint and hand cursor (`hoverable` + `pointerHoverIcon(PointerIcon.Hand)`).
+   - Picked hour: green border, `FormGreenSoft` fill and a filled check.
+   - Empty hours: greyed out and not clickable.
+   - A "Pick an hour to see its reservations" hint under the title.
+   - Behaviour unchanged (`selectedHour` toggle).
+2. **The list opens with Arriving in focus again.** The day list loads page by page and each page added Previous rows under the anchor, pushing Arriving down to the "Previous rows filling the box" layout.
+   - The positioning effect is now keyed on `previousRowCount` and re-applies (Previous pinned, "N previous above" line, Arriving) whenever Previous grows.
+   - It stops once `userMoved` is set. That happens on user-input scroll (in the `NestedScrollConnection`) or any section click (`startMotion`).
+   - It uses `headerPx` when known, otherwise measures the Previous header once.
+3. **The "N previous reservations above" pill is no longer clickable** (plain `Surface`, no `onClick`).
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Codex, feature/orders) — Shifts
+**Did:** Built the shift workflow end to end, preserving the POS form/button/card style. POS → Shift is personal clock-in, break/resume, clock-out, schedule/history and details. Admin Hub → Shifts (manager and above by default) provides a weekly calendar, staff/status filters, schedule/create/edit/cancel/missed actions, recorded attendance corrections with required reasons, and review of unclosed/overdue shifts. Responsive desktop/phone layouts and dialogs; read failures, loading, duplicate-click guards, polling, and stale-edit protection included. Other Admin navigation remains available through More to fit the existing top bar.
+**Backend:** Added SHIFT_SELF/READ/MANAGE permissions; waiter gets SELF, manager/admin/co-owner/owner/super-admin manage. No new viewer permission. Branch/restaurant and ownership checks; actual work time excludes unpaid breaks; overnight/timezone handling; reasons and before/after audit logs; per-staff transaction locks and optimistic versions. Clock-in automatically links eligible schedules even while viewing another week. Corrections validate actual attendance overlap and preserve break intervals. V46 permits unstarted scheduled shifts and adds unique active-shift/open-break indexes. No invented payroll, overtime policy, or sales totals.
+**Files/modules:** `back-end/.../shift/{entity,repository,dto,service,controller}`, `security/rbac/AppPermission.java`, `AppRole.java`, migration V46; `mobile_desktop/.../pos/shifts`, POS/Admin routing/navigation and Koin registration; shift unit/model/screenshot tests.
+**Verified:** Backend package passed with 50 focused unit/role tests (25 shift tests). Desktop compilation plus 7 model and 6 headless screenshot tests passed; visually reviewed desktop/phone screens and schedule dialogs. Live local PostgreSQL/API workflow passed 17 checks, including permissions, overlaps, clock-in/break/resume/out, correction, cancellation, version conflicts, concurrent double clock-in, saved audit trail, and own-history isolation. Temporary QA staff/shifts/notifications were removed. Migration V46 applied locally; backend rebuilt/restarted using `/tmp/shift-backend-runtime.log`; desktop relaunch uses `/tmp/shift-app-runtime.log`. Screenshot previews in `mobile_desktop/shared/build/reports/shifts/`.
+**Scope/limits:** Verified locally, not deployed to production. Manual attendance corrections retain recorded breaks; automatic missed marking/payroll rules are intentionally absent. Native desktop UI automation unavailable; verified screen rendering via headless Compose and API workflow separately. Preserve existing unrelated reservation/menu dirty changes. Sandbox bwrap errors on the visualization root required escalated exec for local builds/edits. `view_image` had the same sandbox problem; image previews were read via base64 from exec.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Extended the past-date “Reservations by time” panel to display hourly rows starting at 08:00, including empty hours through the last booking. Clicking an hour highlights it and filters the reservation list to that hour; clicking it again or using Clear removes the hour filter. The date remains beside the list title.
+**Verified/runtime:** `:desktopApp:compileKotlin` passed; `git diff --check` passed. Relaunched the desktop app. No tests run.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+**Left open / next steps:** User to review the clickable hourly view.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Final reservations-overview polish (the user said this finishes the overview list), in `ReservationOverviewScreen.kt`:
+- **Bottom header copy (`sectionBelow`) fixed:** it used to show the first below-view section anywhere, so after reopening Previous a "Later" copy covered the real Arriving header sitting at the bottom edge.
+  - It now takes the next section header after `firstVisibleItemIndex` only, and shows its copy only while that real header is still below (or cut off at) the bottom. It never covers another header.
+- **`focusSection` is now two visible steps** (user: switching from Arriving to Later should be smooth and understandable):
+  - **Step 1:** fold the other open sections (rows fade out). If the header at the top belongs to the folding section and was pinned, `scrollToItem` keeps it in place.
+  - **Step 2:** after `FOLD_STEP_MILLIS` (240ms), `animateScrollToItem(target, -(headerPx + spacing))` to sit under the header above, then open the target so its rows fade in underneath.
+  - Header indices after the fold come from `laterIndexFor` / `tomorrowIndexFor` with the new open flags.
+Compiled (a Kotlin daemon clash with a concurrent Codex build needed one retry) and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** For past dates in the Reservations overview, replaced the right-side status and walk-in panels with a scrollable “Reservations by time” panel. It groups the full day’s bookings by reservation start hour, shows booking count and booked guest count, and scales a bar against the busiest hour. It waits until all reservation pages load before showing the breakdown. Today’s sidebar remains unchanged.
+**Verified/runtime:** `:desktopApp:compileKotlin` passed (Gradle had concurrent build-cache contention and used its fallback compiler); `git diff --check` passed. Relaunched the desktop app. No tests run.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+**Left open / next steps:** User to review the first visual pass.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Reopening Previous now matches the user's reference screenshot. The box fills with the latest previous reservations, then the "N previous above" line, with the Arriving header at the bottom edge. `toggleSection`, after two frames: `scrollToItem(headerIndex + previousRowCount + 1, -(viewportHeight - headerPx))`, i.e. the rest header's bottom sits on the viewport end. The initial screen position is unchanged (Previous pinned, line, Arriving). Compiled (one retry after a Kotlin daemon failure, likely a concurrent Codex build) and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** More reservations overview fixes (user), in `ReservationOverviewScreen.kt`:
+- **Previous reopens "where I am" = at its start, which is its bottom.** The user reads it upward, latest to earliest. After two frames, `toggleSection` now runs `scrollToItem(headerIndex + previousRowCount, -(headerPx + spacing))`, landing exactly like the initial screen: Previous pinned, the "N previous above" line, then Arriving. This replaces my previous "scroll to the top of Previous" change, which was a misread. Opening Arriving/Later still glides to that section's own start (`focusSection`).
+- **Bottom overlay generalized** from Later-only (`laterBelow`) to `sectionBelow`: the first of Arriving/Upcoming, Later, Tomorrow whose header is still below the view keeps a copy pinned at the bottom (e.g. Arriving while scrolled up into Previous). Clicking it → `focusSection(that)`.
+- **Crash hardening for "adding a reservation":** the user saw a crash earlier but couldn't reproduce it, and its log was lost. I couldn't pin a cause: the backend only logged broken pipes, and no reservation was inserted today. The only crash path my LazyColumn introduced is duplicate keys, so the day list and arrivals feed are now `distinctBy { it.id }` before splitting into sections. Earlier ids are already excluded from feed rows.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Three fixes to today's Previous section (user), in `ReservationOverviewScreen.kt`. This is the same file Codex is working in (past-day cards and `showFloor` on `ReservationCard`); my edits don't touch Codex's parts.
+1. **Rows only animate right after a user fold/open.**
+   - Why: `smoothItem()` animated every change, so refreshes and the clock (a booking moving from Arriving into Previous) replayed motion by themselves ("the opening animation plays more than once").
+   - Now: `smoothItem(animateRows)` passes null specs unless `animateRows`. `startMotion()` sets it true in `fold` / `toggleSection` / `focusSection` / open-on-scroll, and a `LaunchedEffect(motion)` clears it after 700ms.
+2. **Opening Previous shows its start.** `toggleSection` open path: `scrollToItem(headerIndex)` instantly, then re-checks after two frames that the header is still first (it was `animateScrollToItem`, and the user saw it land at the end).
+3. **Previous is split into two groups.**
+   - **Top:** finished reservations (`FinishedStatuses`: COMPLETED, NO_SHOW), `fadedAlpha = FinishedAlpha` (0.45).
+   - **Divider:** a `StillActiveLine` ("Still active" + hairline).
+   - **Bottom:** still-going reservations (checked in, seated, late pending/confirmed), `StillActiveAlpha` (0.72).
+   - `ReservationCard` got a `fadedAlpha` param (after Codex's `showFloor`).
+   - `previousRowCount` (rows + optional line + "above" pill) now drives `restHeaderIndex` and the open position.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Made the past-date Reservations header keep “Reservations” bold while showing the selected date beside it in smaller gray text. Added an “All floors” choice only for past dates; when selected, past reservation rows show each assigned table’s floor. The Online bookings detail now reads “N ordered online.”
+**Verified/runtime:** `:desktopApp:compileKotlin` passed; relaunched the desktop app. `git diff --check` passed. No tests run.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationOverviewScreen.kt`, `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationsScreen.kt`, `AGENT_MEMORY.md`.
+**Left open / next steps:** None.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Made the past-date Reservations card readable by moving the completed count beside the total and leaving cancelled/no-show/open counts on the shorter detail line. The Online bookings card now shows its count out of the day's total bookings.
+**Verified/runtime:** `:desktopApp:compileKotlin` passed; rebuilt and relaunched the desktop app. `git diff --check` passed. No tests run.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+**Left open / next steps:** None.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** For past dates only, changed the four Reservations overview summary cards to show total bookings with completed/cancelled/no-show/open counts, guests who arrived versus all booked guests, online bookings and their share, and the peak reservation start hour. Moved the selected date into the Reservations list title on the left. Today cards and the right-side panels are unchanged.
+**Verified/runtime:** `:desktopApp:compileKotlin` passed; launched the rebuilt desktop app with `:desktopApp:run`. `git diff --check` passed. No tests run.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+**Left open / next steps:** None.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Widened only the Reservations overview date filter from 176dp to 208dp so the selected date has room to display fully.
+**Verified/runtime:** `:desktopApp:compileKotlin` passed; launched the desktop app with the updated UI. No tests run.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+**Left open / next steps:** None.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Reduced the Reservations overview date filter slightly from 208dp to 200dp at the user’s request.
+**Verified/runtime:** `git diff --check` passed; `:desktopApp:run` rebuilt successfully and launched the updated desktop app.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+**Left open / next steps:** None.
+
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Corrected the last entry. The user wanted the section header bars to look a bit wider than the reservation cards under them, not taller. In `ReservationOverviewScreen.kt`:
+- **Header padding** is back to 12×9dp.
+- **Cards under a section header** (Previous, Arriving/Upcoming, Later, Tomorrow rows, plus the compact empty message) are now inset horizontally by `SectionRowInset = 10dp`. The headers stay full width.
+- **Plain other-day list** (no headers, `restHeader == null`): not inset (`rowInset = 0`).
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Made the reservations overview section header bars (Previous / Arriving / Later / Tomorrow, `DayGroupHeader`) a little taller: padding went from 12×9dp to 14×12dp. The user asked for the "container of arriving, previous and later a little wider", which I read as the header bars; if they meant the whole list box, narrow the 320dp right column instead. Pinned-header geometry reads `headerPx` at runtime, so nothing else needed changing. Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Four menu fixes (user):
+1. **Cover edit/info buttons a bit further inside.** `CoverActionOverhang` is now 10dp (was 20, half a button). Desktop offset `x = CoverActionOverhang`, `y = CoverFaceTop - CoverActionOverhang`. Phone offset `(10dp, -10dp)` via the same constant. The grid still reserves that overhang on the right.
+2. **"Add new menu" restored to its pre-13cfcfd look:** full slot size with `.padding(40.dp)` all round, so it's smaller and centred. Codex's online-menu commit had changed it to `padding(top = 8dp)`. My `DesktopCoverGrowth` height trim is removed.
+3. **Section row's edit (pencil) button was cut on the right:** a Material3 `IconButton` with `size(44.dp)` still takes a 48dp minimum touch size and spilled past its slot, and the `horizontalScroll` row clipped it. `CategoryButtons` now draws it as a plain clickable 44dp `Box`, and the row has 2dp end padding. The phone row wasn't affected (the button there is outside the scroller).
+4. **Online menu "Change items position" button always shows for managers** (Codex hid it under 2 dishes). With fewer than 2 it's faded (`compositeOver`) and shows `MenuValidationToast` "Add at least 2 dishes in this section…", same as `MenuScreen`.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/menu/ui/menu/MenuCoverUi.kt`, `PhoneMenuCoverUi.kt`, `.../menu/ui/section/CategoryFilterBar.kt`, `.../menu/ui/online/OnlineMenuContent.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Closing a section no longer moves anything (user: "if Later is up and I close it, it stays up; I can close all three"). In `ReservationOverviewScreen.kt`:
+- **`clickSection`:** clicking an open section → `fold()` only (it no longer switches to another section), so all sections can be closed. Clicking a closed one still `focusSection`s it (opens it alone and glides it up).
+- **End space while the last section is closed:** before, closing the last section left nothing under it, so the LazyColumn clamped and pulled the list down. Now, while the last section is closed (Tomorrow, else Later, else Arriving/Upcoming), an `end-space` Spacer item of (list height − header height − 8dp) is appended, so any header can stay at the top.
+  - The list height comes from `LazyListContainer(onListHeight = …)` (`onSizeChanged` on the LazyColumn); it avoids reading `layoutInfo` in composition.
+  - The spacer disappears once the last section opens, e.g. when auto-opened by scrolling.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Overview list sections now open one at a time (user: clicking Later when it was open jumped to the top instead of moving smoothly; they want Arriving and Later never both open by click, but scrolling should open the next section). In `ReservationOverviewScreen.kt`:
+- **New `ListSection` enum** (ARRIVING, LATER, TOMORROW). Later and Tomorrow now start closed.
+- **`clickSection`:**
+  - Clicking a closed section → `focusSection(it)`.
+  - Clicking the open section → switches to the next one (Later after Arriving, Arriving after the others), or just `fold()`s it when it's the only one.
+  - Previous is independent and still uses `toggleSection`.
+- **`focusSection(target)`:** records the target header's screen Y (visible offset, 0 if above, or `viewportEnd - headerPx` for the bottom copy), then opens only the target. It then runs `scrollToItem(newIndex, -screenY)` in the same frame, so nothing jumps while the rows above fold away. Finally `animateScrollToItem(newIndex, -(headerPx + spacing))`, so the target lands under the pinned header above it.
+  - `laterIndexFor(arrivingOpen)` / `tomorrowIndexFor(...)` compute the post-change indices.
+- **Open on scroll:** a `NestedScrollConnection.onPreScroll` (user input, scrolling down) on the `LazyListContainer` (new `scrollConnection` param) opens a closed section whose header is fully in view in the lower half of the viewport. That keeps the Arriving header sitting at the top after clicking Later from reopening itself.
+- **Bottom Later copy:** clicking it → `focusSection(LATER)`.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** The user's final shape for the overview list sections, in `ReservationOverviewScreen.kt`.
+- **Previous is sticky again, and the pill stays:** the previous-header is a `stickyHeader` and the "N previous reservations above" `EarlierDivider` item is kept.
+- **On open:** `scrollToItem(0)` to measure the Previous header, then `scrollToItem(1 + earlier.size, -(headerHeight + spacing))`. Previous sits pinned at the top with the pill, then the Arriving header, right under it.
+- **Expanding a section glides it to the top** (`toggleSection` → `bringToTop`: `animateScrollToItem(headerIndex, -(headerPx + spacing))`), stopping just under the section before it, whose header stays pinned: Previous over Arriving, Arriving over Later, Later/Arriving over Tomorrow.
+  - Collapsing still uses `fold()` (a pinned header keeps its place).
+  - The bottom "Later" copy opens Later and brings it up the same way.
+- **Header height:** `headerPx` is recorded by `PinnedHeader(onHeight = …)` via `onSizeChanged`. Every sticky header has the same height.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Corrected the previous entry's changes to what the user actually wants, in `ReservationOverviewScreen.kt`.
+- **"N previous reservations above" pill restored:** the `EarlierDivider` composable and the `previous-hint` item after the Previous rows are back. The list opens on it again (`scrollToItem(1 + earlier.size)`, once per `LazyListState` via `positioned`).
+- **Previous header is a normal `item` now, not a `stickyHeader`:** on open, Previous stays out of sight (nothing is pinned above the pill) until the user scrolls up to it. Arriving and Later are still sticky, and the Later bottom overlay (`laterBelow`) stays.
+- **Index formula:** `restHeaderIndex` is back to `1 + earlier.size + 1` when Previous is open.
+- **Don't:** pin the Previous header, or remove the pill.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Expanded Admin Hub navigation with Users, Permissions, and Audit Logs. Desktop shows all seven sections in the top bar. Phone keeps Inventory, Suppliers, Devices, and Settings in the bottom bar and places Users, Permissions, and Audit Logs under More to preserve tab width. All Admin sections still display placeholder labels.
+**Verified:** `mobile_desktop ./gradlew :desktopApp:compileKotlin --no-daemon --max-workers=2` passed. No tests run.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/admin/ui/AdminScreen.kt`, `AdminNavBar.kt`, `AdminSection.kt`, `AGENT_MEMORY.md`.
+**Left open / next steps:** Admin section screens are not implemented yet; user will provide additional sections later.
+
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Overview list, two more tweaks (user), in `ReservationOverviewScreen.kt`.
+- **Removed the "N previous reservations above" pill** (the `EarlierDivider` composable and the `previous-hint` item). On open, a one-time `positioned` effect per `LazyListState` runs `scrollToItem(restHeaderIndex)` then `scrollBy(-(header.size + mainAxisItemSpacing))`. The pinned Previous header then sits exactly above the Arriving header, covering the last previous row; scrolling up reveals the previous rows under it. It is skipped if the user already scrolled, while loading, or when Previous is folded.
+  - `restHeaderIndex` = `1 + earlier.size` (no hint item any more).
+- **Later header "sticks" at the bottom while below:** Compose's sticky headers only pin to the top (`StickyItemsPlacement.StickToTopPlacement`). A `derivedStateOf` `laterBelow` shows a copy of the Later header via `LazyListContainer(bottomOverlay = …)`, drawn over the list's bottom edge, until the real header is fully in view at the same spot. Clicking the copy runs `animateScrollToItem(laterHeaderIndex)`. The overlay uses `PinnedHeader`, the same strip as the real header, so the hand-over doesn't shift.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Two overview-list fixes (user), in `ReservationOverviewScreen.kt`.
+1. **Folding a pinned header no longer jumps.** Cause: LazyColumn anchors on the first visible item's key; when that row sits in the folded section it disappears and the list lands further down. Fix: `fold(headerIndex, toggle)` scrolls back to the header after toggling, but only if the header was pinned (`headerIndex < firstVisibleItemIndex`).
+   - Header indices are computed from the section layout: `restHeaderIndex`, `laterHeaderIndex`, `tomorrowHeaderIndex`. If items are added or reordered before a header, update those formulas.
+2. **Later = the rest of today only**, with no day sub-groups; `DaySubHeader` and `collapsedDays` are removed.
+   - **Tomorrow:** a "Tomorrow · <date>" pinned, foldable section appears only from `TOMORROW_FROM_HOUR` = 22:00 today until the service date flips (06:00). The service day is 06:00–02:00, per `START_HOUR`/`END_HOUR`.
+   - **Further ahead:** bookings beyond that aren't listed.
+   - **Paging:** the arrivals feed stops paging once its last loaded booking is past the last day shown (`feedPastShown` → `paging.copy(hasMore = false)`), so it doesn't auto-load future days nobody sees.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Sticky section headers in the reservations overview list (user request).
+- **Pinned headers:** Previous, Arriving (next 2 hours)/Upcoming, and Later are `stickyHeader`s (Compose 1.11, the stable `(Int)` overload), wrapped in `PinnedHeader`, an opaque white strip. The next section's header pushes the pinned one away.
+- **Later section:** "Later" is now a real foldable section header (`laterOpen`) instead of a text label. Its count reads "N+ reservations" while the feed has more pages (new `countText` param on `DayGroupHeader`).
+- **Day groups:** the days inside Later use a lighter `DaySubHeader` (transparent, smaller) so the two levels read apart.
+- **On open:** the list still scrolls to the previous-hint item. The pinned "Previous" header then sits over that pill, directly above the Arriving header, which acts as the "there's more above" cue.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Added an Admin-only workspace nav matching KDS/POS shared frames: desktop top bar and phone bottom bar, with Inventory, Suppliers, Devices and Settings tabs. Each tab selects and displays its placeholder label; top bar supports sign-out and switch-workspace when available. No POS or KDS behavior changed.
+**Verified:** `mobile_desktop ./gradlew :desktopApp:compileKotlin --no-daemon --max-workers=2` passed. No tests run.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/admin/ui/AdminScreen.kt`, `AdminNavBar.kt` (new), `AdminSection.kt` (new), `AGENT_MEMORY.md`.
+**Left open / next steps:** Admin sections remain placeholders until their screens are implemented.
+
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Five user tweaks.
+- **Reservations overview (`ReservationOverviewScreen.kt`):**
+  - **Folding animates:** every lazy row is wrapped in `Box(smoothItem())` (`Modifier.animateItem`, same specs as Codex's calendar rows: fade in 260/60, placement 380 FastOutSlowIn, fade out 200). A new `FoldArrow` rotates one down-arrow (0° ↔ −90°) instead of swapping icons, in both `DayGroupHeader` and `ListHeader`.
+  - **Sections are today-only:** Previous / Arriving (next 2 hours) / Upcoming / Later. Another day is one plain list of every non-cancelled booking, all faded (`passed = pastDay`) when the date is before today.
+  - **Other-day header:** titled "Reservations" (was "Bookings") with the full date on the right (`LazyListContainer` now passes an `action` slot) and a count. The empty text is now "No reservations this day".
+- **Menu grid (`MenuCoverUi.kt`):**
+  - **"Add new menu":** back to its old desktop height (`coverHeight - DesktopCoverGrowth`, 40dp), since only the menus were meant to grow.
+  - **End space:** the desktop grid gets `DesktopGridEndSpace = 32dp` of scrollable room after the last row (not for the single centred row). This is inside the scroll content, unlike the fixed bottom padding removed earlier.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `mobile_desktop/.../pos/menu/ui/menu/MenuCoverUi.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Overview list sections (user: earlier ones in their own category, not inside "Arriving (next 2 hours)"). In `ReservationOverviewScreen.kt` the list is now split into foldable `DayGroupHeader` sections:
+- **"Previous":** a new `muted` grey header style over faded cards. At its end, `EarlierDivider` reads "↑ N previous reservations above".
+- **"Arriving (next 2 hours)":** today's feed. On other days and in filters, the rest is headed "Upcoming", but only when a Previous section exists.
+- **"Later":** the day groups, unchanged.
+
+The box header is now "Today" (feed) / "Bookings" (other day) / the filter label. Only filters show a box count; sections show their own. The fold moved from the box header to the section header, and the old "N hidden. Show them" row is gone. The list still opens at the previous-hint item (`scrollToItem(1 + earlier.size)`, since the Previous header is item 0). `LazyListContainer`'s `open`/`onToggle` params are now unused by callers. Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Reservations overview list: earlier bookings now sit above the rest (user request), in `ReservationOverviewScreen.kt`.
+- **What counts as earlier:** "Passed" = status in `PassedStatuses` (CHECKED_IN, SEATED, COMPLETED, NO_SHOW), or start more than 15 min ago. Cancelled bookings still show only under their filter.
+- **Layout:** earlier rows sit at the top of the list, faded (`ReservationCard(passed = true)` → alpha 0.5). They read "N min late" when still pending/confirmed, else "until HH:mm". Then an `EarlierDivider` pill, "↑ N earlier reservations above" (click → `animateScrollToItem(0)`), then the upcoming rows (feed / day rows), then Later.
+- **Scroll position:** on open, each view's `LazyListState` scrolls to the divider (`scrollToItem(earlier.size)`), so the list starts at the next guest and earlier ones are one scroll up.
+- **Data:** earlier rows come from the day list (`reservations`, or `listed` when filtering). The day list now always auto-loads its remaining pages (it used to only while filtering). Feed rows/Later drop ids already in earlier, since the feed and day list refresh one after the other and LazyColumn keys must be unique.
+- **Filter view:** passed matches go up too; the count covers all matches. Other days: all non-cancelled bookings, split the same way (a past day is all "earlier", with no empty message).
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Made the "Next 2 hours" card icon bigger (user request). `overview_next_hours.png` has more transparent padding than the other card pictures: its content is 53% of the image, against 57–68% for the others. `SummaryCard` got an `imageScale` param that applies `Modifier.scale` inside the same 52dp slot, so the layout is unchanged; card2 passes 1.3f. Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Reservations overview paging, done properly (user: "Show more" threw them back to the top, and could it get heavy?). Root causes:
+- `refreshNow()` reset to page 0 every 60s, dropping loaded pages; this also broke the calendar after `loadAllReservationPages`.
+- The list wasn't lazy.
+- Cards and "next 2 hours" were computed from the first 100 of the day, so they were wrong late in a busy day or with several floors.
+
+**Backend:**
+- `GET …/branches/{b}/reservations/arrivals?from&floor&page&size`: `PageResponse` of PENDING/CONFIRMED from `from` (default now−15min), ordered by start then id.
+  - Queries: `ReservationRepository.findUpcomingIdPage` / `findUpcomingIdPageOnFloor`.
+  - Floor rule: a table on that floor, or no table at all (same as the app).
+- `GET …/summary` takes an optional `floor` and returns new fields: `presentGuests`, `guestsToArrive`, `unassignedCount`, `arrivingSoonCount`/`arrivingSoonGuests` (now−15min..now+2h).
+- `ReservationQueryService.getReservationPage` was split into `resolvePageSize` + `toReservationPage` (shared).
+
+**App model (`ReservationsScreenModel`):**
+- `refreshNow` reloads pages 0..`loadedReservationsPage` via `loadPages()`.
+- `loadMoreReservations` now waits on `refreshMutex`.
+- New arrivals feed: `refreshArrivals(floor)` reloads the pages already shown, swapped in one go; `loadMoreArrivals()` continues with the same `from`.
+- New state (appended with defaults): `loadMoreReservationsFailed`, `arrivals`, `arrivalsLoaded`, `hasMoreArrivals`, `isLoadingMoreArrivals`, `loadMoreArrivalsFailed`.
+- A failed first arrivals page ends up "ready + failed" (Try again), never an endless spinner.
+- `ReservationSummary`'s new fields are nullable; the cards fall back to list counts on an older backend.
+- Repository/API: `getArrivalsPage` (interface default for fakes); `getReservationSummary` got `floor`.
+
+**App UI:**
+- `ReservationOverviewScreen` takes `arrivals` + `arrivalsPaging: ListPaging` + `dayPaging: ListPaging` (replaces `later` and the three load-more params); the `showAllLoaded` view switch is gone.
+- Today without filters: the list is the Arriving feed ("Arriving (next 2 hours)", foldable, plus "Later" day groups, no 20 cap).
+- A status/area/search filter auto-loads the rest of the day's pages.
+- New `LazyListContainer` (a `LazyColumn` keyed by reservation id), shared `ListHeader` and `LoadMoreFooter`. The next page auto-loads when the end is within `LOAD_AHEAD_ITEMS=6`; the pill is the manual fallback and shows "Couldn't load more. Try again" after a failure.
+- Phone/tablet: the list box is `heightIn(max 560/640)` because the page scrolls.
+- Cards always use the server summary for the floor on screen: `overviewFloor = selectedFloor` only when there are >1 floors. The summary reloads on `lastRefreshedAt` and floor changes (no longer on the 30s clock tick). Arrivals reload on `lastRefreshedAt` and floor changes.
+- Removed `LATER_FETCH_LIMIT`, `filteredLater` and `LATER_SHOWN`.
+
+**Tests (written, NOT run):**
+- Backend `unit/reservation/service/ReservationArrivalsAndSummaryTest`.
+- App `jvmTest/.../reservations/ReservationsPagingTest`.
+- `AppScreenshotTest` proxy now answers `getArrivalsPage`/`getTodayReservationsPage`/`getBranchReservationCalendarPage`.
+- Backend `test-compile` and app `compileTestKotlinJvm` pass.
+
+**Verified live:** the machine had rebooted, so I restarted podman `pos-db`/`pos-mailhog`, rebuilt the jar and started the backend. `arrivals` returned 100+69 (hasNext correct); the floor filters gave 162/158; `summary` had total 200 and 193 per floor. Relaunched the desktop app.
+**Files/modules touched:**
+- Backend: `BranchReservationController`, `ReservationQueryService`, `ReservationRepository`, `ReservationSummaryResponse`.
+- App: reservations `ReservationApi`, `ReservationDtos`, `ReservationDtoMapper`, `ReservationModels`, `ReservationRepository` (domain), `DefaultReservationRepository`, `ReservationsUiState`, `ReservationsScreenModel`, `ReservationsScreen`, `ReservationOverviewScreen`.
+- Tests: the new test files above and `AppScreenshotTest`.
+**Left open:** Run the new tests with the rest at the end.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Restyled the reservations overview "Load more reservations" button (user didn't like it). It was a full-width grey box; now it's a centred white pill with a light green border between two hairline dividers: a down-arrow icon and "Show more reservations". While loading it shows a 14dp spinner and "Loading more…". The behaviour is unchanged: `showAllLoaded = true` and `onLoadMoreReservations()`. Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Reservations overview filtering moved into the "By status" box (user request), in `ReservationOverviewScreen.kt`:
+- **Toolbar:** removed the status `HeaderDropdown` from the overview's toolbar. The calendar toolbar still has its own, and `selectedStatus` is shared with it.
+- **Status rows:** clickable. Tapping one sets `selectedStatus`; tapping it again clears to "All statuses". The selected row gets its status colour tint, a 1.5dp border, bold text and a filled check.
+- **"No table" row:** added below a divider, with a count equal to the "Without a table" card. It toggles the existing area filter `"Unassigned"` (tables empty), so it combines with a status (e.g. Pending + No table) and stays in sync with the Area dropdown.
+- **"Clear" action:** appears in the By status header while a status or No table is active; it only resets the area if it was Unassigned.
+- **List title:** now names every filter, e.g. "Pending · No table".
+- **Signatures:** `OverviewContent` takes `onStatusChange`/`onAreaChange` (both call sites updated). `ListContainer` got an optional `action` slot. `StatusCountRow` got `selected`/`onClick`.
+Compiled and relaunched desktop; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Reservations overview "Arriving" panel (user request): in today's default view (not filtering, no "Load more" all-day list), the title reads "Arriving (next 2 hours)" and the header folds that list.
+- **Header:** clickable, with a chevron at the right after the count badge, like `DayGroupHeader`.
+- **Folded:** shows a "N reservations in the next 2 hours hidden. Show them" line; the "Later" day groups and Load More stay.
+- **Implementation:** `ListContainer` got optional `open`/`onToggle` params (other lists are unaffected). The fold state is `remember(date)` (open by default). Targeted edits only, in `ReservationOverviewScreen.kt`, which also has Codex's uncommitted pagination/details changes.
+Compiled and relaunched desktop (I stopped the running app, likely Codex's relaunch, to restart it); no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Updated the Reservations overview summary cards: the large reservation and guest counts now stand alone; reservation detail shows `done/total done · cancelled · no show`, and guest detail shows `arrived/total arrived`.
+**Verified/runtime:** Shared/JVM and desktop app compilation passed. No tests were run. Relaunched the desktop app; `:desktopApp:run` is active.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationOverviewScreen.kt`, AGENT_MEMORY.md.
+**Left open / next steps:** User can visually confirm the updated counts on the Reservations overview.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Made the Reservations calendar's Unassigned lane collapsible using the same section arrow/header behavior as table groups. Kept Unassigned pinned above floor groups and changed its collapsed summary to say how many reservations are hidden.
+**Verified/runtime:** `:shared:compileKotlinJvm` and `:desktopApp:compileKotlin` passed; no tests run per user preference. Relaunched the desktop app; `:desktopApp:run` is active. `git diff --check` passed for the changed reservations screen.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationsScreen.kt`, AGENT_MEMORY.md.
+**Left open / next steps:** User can visually confirm the Unassigned section foldout in the calendar.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Third round of menu cover button placement. The user wants the edit pencil centered on the cover's top-right corner (half above, half past the right edge) on every device. The height from the previous round is kept.
+- **Desktop (`MenuCoverUi.kt`):** the edit button is at `offset(x = actionSize/2, y = CoverFaceTop - actionSize/2)` from TopEnd. Info sits directly below it, on the same right edge; `actionInset` is gone. New `internal val CoverActionOverhang = 20.dp`: the desktop card width now subtracts it, so the right column's buttons aren't clipped (a `verticalScroll` only allows 15dp of horizontal overflow). The desktop gap is 32dp (was 24), the phone gap 26dp (was 18), and the phone vertical padding is at least 20dp (was 4), so the overhanging buttons never touch the next cover or get clipped. The skeleton grid matches (480dp height, 32dp gap, end padding).
+- **Phone (`PhoneMenuCoverUi.kt`):** moved the edit/info Column (and the reorder badge) out of the clipped face `Box` into the `BoxWithConstraints` scope, at `offset(x = 19dp, y = -19dp)` (`PhoneCoverActionSize = 38.dp`).
+Compiled and relaunched desktop; no tests run. Gotcha: don't kill with `[d]esktopApp:run` in a command that also starts `./gradlew :desktopApp:run`, because the pattern matches your own shell (exit 144).
+**Files/modules touched:** `mobile_desktop/.../pos/menu/ui/menu/MenuCoverUi.kt`, `PhoneMenuCoverUi.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Second round of menu cover polish (user screenshots: "a little bigger height" and "button more top right, half inside half out"):
+- **Taller desktop covers:** `desktopMenuCoverLayout` in `pos/menu/ui/menu/MenuLayoutMetrics.kt` now uses a 480dp max height (was 440) and 560dp for a single centered row (was 520). `MenuLayoutMetricsTest` doesn't assert these values.
+- **Edit button straddles the face's top edge:** in `MenuCoverUi.kt`, a new `private val CoverFaceTop = 20.dp` replaces the old `.padding(top = 8.dp)` on all four covers (`MenuCoverSkeleton`, `MenuBookCover`, `OnlineMenuCover`, `AddMenuCover`), so they stay aligned and the button isn't clipped on the first grid row. The edit button is at `offset(x = -12dp (compact 10dp), y = CoverFaceTop - actionSize/2)`, centered on the face's top edge near the right corner. Info sits `actionSize + 8dp` below it, or takes its place when the user can't manage menus. Phone cover unchanged.
+Compiled and relaunched the desktop app; no tests run. Didn't touch Codex's uncommitted reservation files.
+**Files/modules touched:** `mobile_desktop/.../pos/menu/ui/menu/MenuCoverUi.kt`, `MenuLayoutMetrics.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Added `GET /restaurants/{restaurantId}/reservations/{reservationId}/details`, aggregating the reservation, audit (notes/status history/table assignments), timeline, and deposit. The desktop detail panel now loads it with one request. Added page-based `PageResponse` results (100 max per request) for branch `/today` and `/calendar`; the overview has a Load More action and the calendar fetches additional pages when opened.
+**Test data:** Inserted 200 synthetic reservations for 2026-09-27 into the local `pos_local` database, Local Demo Bistro / Main Branch. They have mixed PENDING/CONFIRMED/CANCELLED statuses, varied party sizes/sources, deposit examples, status-history rows, and 14 table assignments across Main and 1st Floor. Codes use `PAGINATION-DEMO-20260927-`; names use `Pagination Demo Guest`. These are local DB rows, not migrations or committed fixtures.
+**Verified/runtime:** Backend package compile passed with Maven tests skipped. Desktop shared/JVM and app compile passed; I stopped a redundant follow-up incremental compile while a concurrent desktop compile was active. Tests were not run, per the user's preference. Rebuilt backend is running on port 8080; desktop app run remains active for manual testing.
+**Left open / next steps:** Manual visual/API verification by the user. Local synthetic reservations can be removed later by matching the `PAGINATION-DEMO-20260927-` reservation-code prefix, along with their status-history/table-assignment child rows.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** Menu cover grid polish (user screenshot request), in `pos/menu/ui/menu/MenuCoverUi.kt` only:
+- **Bottom padding:** removed the desktop 20dp bottom padding under the cover grid, so covers scroll to the bottom edge (phone was already 0).
+- **Edit/info buttons:** on desktop `MenuBookCover` they now sit inside the book face's top-right corner (face starts 8dp down): inset 14dp (compact 10dp) from the right and from the face top. Info sits 8dp below edit, or takes edit's spot when the user can't manage menus. Previously the offset was (-4, 2), which hung over the rounded corner (Codex's "4dp safe inset" change). The phone cover already placed them inside (padding top 14, end 10) and is unchanged.
+Compiled and relaunched the desktop app; no tests run. Codex has uncommitted reservation changes in the tree; I didn't touch those files.
+**Files/modules touched:** `mobile_desktop/.../pos/menu/ui/menu/MenuCoverUi.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Claude, feature/orders)
+**Did:** "Show in online menu" chooser (`OnlineSectionChooserDialog` in `pos/menu/ui/item/ItemEditorScreen.kt`) now lets the user pick any existing online section directly (user request). Three kinds of choice:
+- **Same section:** "Same section as here: X" (with its dish count) if the online menu has it, else "Create “X” in the online menu".
+- **Existing online sections:** a scrollable radio list of every other online section with dish counts.
+- **New section:** text field; a matching existing name is reused, and the dialog says so.
+Preselection: the dish's current online section, else the same-named one, else the first existing. The title and button read "Online section"/"Save" when the dish is already online. The call site now also passes `currentOnlineSectionId`. UNCOMMITTED (only this file differs from HEAD).
+**Context:** Codex worked on the online menu in parallel and committed `13cfcfd` (online sections + reordering, including my V44/V45 backend work: `OnlineMenuService.place`/`removeIfEmpty`/`removeEmptySections`, dish order, `PUT …/online-menu/sections/{id}/items/order`) and `4d00cb6`. Codex's `ui/online/OnlineMenuContent.kt` already makes the Online menu look like a normal menu (rename/reorder sections, reorder dishes, no add/edit/delete), so I did NOT redo that.
+**Runtime:** the backend was still on V44 (started 23:02), so dish reorder would have 404'd. Rebuilt and restarted it: V45 applied. Relaunched the desktop app. Compiled; no tests run.
+**Files/modules touched:** `mobile_desktop/.../pos/menu/ui/item/ItemEditorScreen.kt`, `AGENT_MEMORY.md`.
+
+## 2026-09-27 (Codex, feature/orders)
+**To do (user requested, not implemented):** Add a reservation-details aggregate API for opening the reservation panel. It should return the reservation plus the panel's supporting details (deposit, notes/audit, status history, and timeline) in one initial client request. Keep individual endpoints for actions or later refreshes; consider lazy-loading/paginating history and timeline if their payloads grow. Also make assigned floor/area visible with the reservation and let staff view or filter reservations by floor/area; include table assignment location in the aggregate response. Paginate reservation lists (for example, 100 rows per page) and request further pages on scroll; return an explicit `hasMore`/next cursor so the app knows when to stop. Keep the initial list scoped to today and apply status/date/floor filters server-side where practical.
+**Why:** The current app opens the panel with five parallel GET requests; user and assistant agreed to use one aggregate request for initial details loading. User also wants to identify which reservations are on each floor/area and avoid loading an unbounded number of bookings at once.
+**Files/modules:** Backend reservation controller/service/response DTO and mobile reservation API/DTO/repository/screen model and reservation overview UI.
+**Left open / next steps:** Implement when requested; this entry records the task and is not implementation.
+
 ## 2026-09-26 (Codex, feature/orders)
 **Did:** Committed the pending work in `13cfcfd` (menu-specific online-menu changes) and `4d00cb6` (remaining connected POS changes). Fast-forwarded local `develop` and `feature/menu-final-polish` to the same tip as `feature/orders`.
 **Why:** User asked to commit the accumulated changes and keep the local branches synchronized.
@@ -1248,3 +2081,15 @@ Running handoff log for AI agents (Claude, Codex, or others) working on this rep
 **Verified/runtime:** `mobile_desktop ./gradlew :desktopApp:compileKotlin --no-daemon --max-workers=2` passed with existing warnings. Desktop app relaunched and reached `:desktopApp:run`.
 **Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/tables/ui/TablesScreen.kt`, AGENT_MEMORY.md.
 **Left open / next steps:** Visual confirmation pending on user's side.
+
+## 2026-09-27 (Codex, feature/orders)
+**Did:** Reduced the Reservations overview date filter from 200dp to 190dp as requested.
+**Verified/runtime:** Confirmed the source now uses 190dp. Per user request, did not rebuild or relaunch; the running app still shows its previous build.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/reservations/ReservationOverviewScreen.kt`, `AGENT_MEMORY.md`.
+**Left open / next steps:** User will ask follow-up questions.
+
+## 2026-09-27 — Admin Hub Shifts redesign
+**Did:** Reworked the manager Shifts page to use the app's existing POS/Admin typography, navigation, and calendar control styling. Added Week, Month, Time-grid, and List views; employee search and staff/role/status filters; selectable week/month dates; a selected-day summary and shift list; and click-to-create on empty day/time slots. Kept the waiter-facing POS shift page separate. Admin Hub now opens on Shifts.
+**Backend:** Shift board staff now include their existing role names so role filtering uses real roster data.
+**Verified/runtime:** Desktop Kotlin compile passed (existing warnings only); backend packaged and started; local board roster smoke check returned 8 staff records with roles; `git diff --check` passed. Relaunched desktop app with the rebuilt UI; visual screenshot inspection remains pending user review.
+**Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/admin/ui/AdminScreen.kt`, `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/shifts/`, `back-end/src/main/java/pos/pos/shift/`, related shift API/model and screenshot fixture files.

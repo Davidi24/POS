@@ -1,5 +1,6 @@
 package pos.pos.tables.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ import pos.pos.tables.dto.UpdateTableQrCodeRequest;
 import pos.pos.tables.dto.UpdateTableStatusRequest;
 import pos.pos.tables.entity.RestaurantTable;
 import pos.pos.tables.enums.TableStatus;
+import pos.pos.tables.event.TableStatusChangedEvent;
 import pos.pos.tables.repository.RestaurantTableRepository;
 
 import java.time.OffsetDateTime;
@@ -45,6 +47,7 @@ import java.util.UUID;
 public class RestaurantTableService {
 
     private final RestaurantScopeService restaurantScopeService;
+    private final ApplicationEventPublisher events;
     private final RestaurantTableRepository restaurantTableRepository;
     private final ReservationTableAssignmentRepository reservationTableAssignmentRepository;
     private final RestaurantTableSupport restaurantTableSupport;
@@ -412,6 +415,7 @@ public class RestaurantTableService {
     ) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         RestaurantTable table = requireTableForUpdate(branchId, tableId);
+        TableStatus previousStatus = table.getStatus();
         if (status == TableStatus.OCCUPIED) {
             if (guestCount == null || guestCount <= 0) {
                 throw new AuthException(
@@ -428,11 +432,13 @@ public class RestaurantTableService {
             table.setSeatedAt(null);
         }
         table.setStatus(status);
-        table.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
-        return restaurantTableSupport.toResponse(
-                restaurantTableSupport.saveTable(table),
-                restaurantTableSupport.loadChildMap(tableId)
-        );
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        table.setUpdatedBy(actorId);
+        RestaurantTable saved = restaurantTableSupport.saveTable(table);
+        if (previousStatus != status) {
+            events.publishEvent(new TableStatusChangedEvent(restaurantId, branchId, tableId, previousStatus, status, actorId));
+        }
+        return restaurantTableSupport.toResponse(saved, restaurantTableSupport.loadChildMap(tableId));
     }
 
     private RestaurantTable requireTableForUpdate(UUID branchId, UUID tableId) {

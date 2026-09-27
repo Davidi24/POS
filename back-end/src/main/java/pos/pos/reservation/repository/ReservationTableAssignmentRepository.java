@@ -39,5 +39,19 @@ public interface ReservationTableAssignmentRepository extends JpaRepository<Rese
             @Param("from") OffsetDateTime from
     );
 
+    // Bookings at a table in these statuses, whatever their time (a seated visit can run past its end).
+    @EntityGraph(attributePaths = {"reservation", "restaurantTable"})
+    @Query("""
+            SELECT assignment
+            FROM ReservationTableAssignment assignment
+            WHERE assignment.restaurantTable.id = :tableId
+              AND assignment.reservation.status IN :statuses
+            ORDER BY assignment.reservation.reservationStart ASC
+            """)
+    List<ReservationTableAssignment> findByTableAndReservationStatus(
+            @Param("tableId") UUID tableId,
+            @Param("statuses") Collection<ReservationStatus> statuses
+    );
+
     boolean existsByRestaurantTable_Id(UUID tableId);
 }

@@ -50,14 +50,36 @@ class ReservationApi(
         restaurantId: String,
         branchId: String,
         from: String? = null,
-        to: String? = null
-    ): List<ReservationResponseDto> = client.get(endpoint("${branchPath(restaurantId, branchId)}/calendar")) {
+        to: String? = null,
+        page: Int = 0,
+        size: Int = 100
+    ): ReservationPageResponseDto = client.get(endpoint("${branchPath(restaurantId, branchId)}/calendar")) {
         from?.let { parameter("from", it) }
         to?.let { parameter("to", it) }
+        parameter("page", page)
+        parameter("size", size)
     }.body()
 
-    suspend fun getTodayReservations(restaurantId: String, branchId: String): List<ReservationResponseDto> =
-        client.get(endpoint("${branchPath(restaurantId, branchId)}/today")).body()
+    suspend fun getTodayReservations(restaurantId: String, branchId: String, page: Int = 0, size: Int = 100): ReservationPageResponseDto =
+        client.get(endpoint("${branchPath(restaurantId, branchId)}/today")) {
+            parameter("page", page)
+            parameter("size", size)
+        }.body()
+
+    // Guests still to arrive (pending or confirmed) from `from` on, soonest first; one floor when given.
+    suspend fun getArrivals(
+        restaurantId: String,
+        branchId: String,
+        from: String? = null,
+        floor: String? = null,
+        page: Int = 0,
+        size: Int = 100
+    ): ReservationPageResponseDto = client.get(endpoint("${branchPath(restaurantId, branchId)}/arrivals")) {
+        from?.let { parameter("from", it) }
+        floor?.let { parameter("floor", it) }
+        parameter("page", page)
+        parameter("size", size)
+    }.body()
 
     suspend fun getUpcomingReservations(
         restaurantId: String,
@@ -78,6 +100,9 @@ class ReservationApi(
 
     suspend fun getReservation(restaurantId: String, reservationId: String): ReservationResponseDto =
         client.get(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}")).body()
+
+    suspend fun getReservationDetails(restaurantId: String, reservationId: String): ReservationDetailsResponseDto =
+        client.get(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/details")).body()
 
     suspend fun updateReservation(
         restaurantId: String,
@@ -125,6 +150,55 @@ class ReservationApi(
 
     suspend fun reopenReservation(restaurantId: String, reservationId: String, request: ReservationActionRequestDto = ReservationActionRequestDto()): ReservationResponseDto =
         reservationAction(restaurantId, reservationId, "reopen", request)
+
+    suspend fun undoSeatReservation(restaurantId: String, reservationId: String, request: ReservationActionRequestDto = ReservationActionRequestDto()): ReservationResponseDto =
+        reservationAction(restaurantId, reservationId, "undo-seat", request)
+
+    suspend fun updateArrivedGuests(restaurantId: String, reservationId: String, request: ReservationActionRequestDto): ReservationResponseDto =
+        reservationAction(restaurantId, reservationId, "arrived-guests", request)
+
+    suspend fun extendHold(restaurantId: String, reservationId: String, request: ExtendReservationHoldRequestDto): ReservationResponseDto =
+        client.post(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/extend-hold")) {
+            headers.append("Idempotency-Key", kotlin.uuid.Uuid.random().toString())
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun confirmAttendance(restaurantId: String, reservationId: String, request: ReservationActionRequestDto = ReservationActionRequestDto()): ReservationResponseDto =
+        reservationAction(restaurantId, reservationId, "confirm-attendance", request)
+
+    suspend fun clearNoShowWarning(restaurantId: String, reservationId: String, request: ReservationActionRequestDto): ReservationResponseDto =
+        reservationAction(restaurantId, reservationId, "clear-no-show-warning", request)
+
+    suspend fun getGuestHistory(restaurantId: String, reservationId: String): GuestHistoryResponseDto =
+        client.get(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/guest-history")).body()
+
+    // Walk-ins waiting at the door for a table.
+    suspend fun getWaitlist(restaurantId: String, branchId: String): List<WaitlistEntryResponseDto> =
+        client.get(endpoint("${waitlistPath(restaurantId, branchId)}")).body()
+
+    suspend fun addToWaitlist(restaurantId: String, branchId: String, request: WaitlistEntryRequestDto): WaitlistEntryResponseDto =
+        client.post(endpoint(waitlistPath(restaurantId, branchId))) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun seatFromWaitlist(restaurantId: String, branchId: String, entryId: String, request: SeatWaitlistEntryRequestDto): WaitlistEntryResponseDto =
+        client.post(endpoint("${waitlistPath(restaurantId, branchId)}/${entryId.encodeURLPathPart()}/seat")) {
+            headers.append("Idempotency-Key", kotlin.uuid.Uuid.random().toString())
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun removeFromWaitlist(restaurantId: String, branchId: String, entryId: String) {
+        client.post(endpoint("${waitlistPath(restaurantId, branchId)}/${entryId.encodeURLPathPart()}/remove"))
+    }
+
+    private fun waitlistPath(restaurantId: String, branchId: String) =
+        "/restaurants/${restaurantId.encodeURLPathPart()}/branches/${branchId.encodeURLPathPart()}/waitlist"
+
+    suspend fun getSeatingCheck(restaurantId: String, reservationId: String): ReservationSeatingCheckResponseDto =
+        client.get(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/seating-check")).body()
 
     private suspend fun reservationAction(
         restaurantId: String,
@@ -254,10 +328,12 @@ class ReservationApi(
         restaurantId: String,
         branchId: String,
         from: String? = null,
-        to: String? = null
+        to: String? = null,
+        floor: String? = null
     ): ReservationSummaryResponseDto = client.get(endpoint("${branchPath(restaurantId, branchId)}/summary")) {
         from?.let { parameter("from", it) }
         to?.let { parameter("to", it) }
+        floor?.let { parameter("floor", it) }
     }.body()
 
     suspend fun getReservationSettings(restaurantId: String, branchId: String): ReservationSettingsResponseDto =

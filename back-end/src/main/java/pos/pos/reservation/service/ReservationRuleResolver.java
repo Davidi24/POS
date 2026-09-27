@@ -36,10 +36,20 @@ public class ReservationRuleResolver {
                         .thenComparingInt(rule -> rule.getBranch() == null ? 1 : 0));
     }
 
-    // Free time kept between two bookings on the same table; none when no rule is set.
+    // Agreed defaults while the restaurant hasn't saved a rule: 2 h bookings, 5 min cleaning.
+    public static final int DEFAULT_DURATION_MINUTES = 120;
+    public static final int DEFAULT_BUFFER_MINUTES = 5;
+
+    // Cleaning time kept between two bookings on the same table.
     public Duration buffer(Branch branch, OffsetDateTime at) {
+        return Duration.ofMinutes(activeRule(branch, at)
+                .map(rule -> Math.max(0, rule.getBufferMinutes()))
+                .orElse(DEFAULT_BUFFER_MINUTES));
+    }
+
+    public int durationMinutes(Branch branch, OffsetDateTime at) {
         return activeRule(branch, at)
-                .map(rule -> Duration.ofMinutes(Math.max(0, rule.getBufferMinutes())))
-                .orElse(Duration.ZERO);
+                .map(SettingsReservationRule::getDefaultDurationMinutes)
+                .orElse(DEFAULT_DURATION_MINUTES);
     }
 }

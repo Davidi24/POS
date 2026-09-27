@@ -63,6 +63,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -120,23 +121,89 @@ internal fun ReservationDetailsPanel(
     var tab by remember(reservation?.id) { mutableStateOf(PanelTab.INFO) }
     var menuOpen by remember { mutableStateOf(false) }
 
-    var pendingConfirm by remember { mutableStateOf<StatusAction?>(null) }
+    var reasonPrompt by remember { mutableStateOf<ReasonPrompt?>(null) }
+    var arrivedPrompt by remember { mutableStateOf<ArrivedPrompt?>(null) }
+    var holdPrompt by remember { mutableStateOf(false) }
     var assigningTable by remember(reservation?.id) { mutableStateOf(false) }
-
-    fun runAction(action: StatusAction, reason: String? = null) {
-        val id = reservation?.id ?: return
-        if (action.danger && reason == null) {
-            pendingConfirm = action
-            return
+    // Seat right after picking a table (checked in without one).
+    var seatAfterPick by remember(reservation?.id) { mutableStateOf(false) }
+    val policy = state.policy
+    // Ticks every 30 s so "late" and "hold ends" labels stay current.
+    val now by produceState(Clock.System.now()) {
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            value = Clock.System.now()
         }
-        val note = reason?.takeIf(String::isNotBlank)
-        when (action) {
-            StatusAction.CONFIRM -> model.confirmReservation(id)
-            StatusAction.CHECK_IN -> model.checkInReservation(id)
-            StatusAction.COMPLETE -> model.completeReservation(id)
-            StatusAction.CANCEL -> model.cancelReservation(id, note)
-            StatusAction.NO_SHOW -> model.markNoShow(id, note)
-            StatusAction.REOPEN -> model.reopenReservation(id)
+    }
+
+    fun ask(prompt: ReasonPrompt) { reasonPrompt = prompt }
+
+    fun start(offer: OfferedAction) {
+        val booking = reservation ?: return
+        if (!offer.enabled || state.isSaving) return
+        val id = booking.id
+        val name = booking.displayGuestName
+        val correction = offer.needsReason
+        fun reasonHint(optional: String = "Reason (optional)") = if (correction) "Reason for the correction" else optional
+        when (offer.action) {
+            BookingAction.ACCEPT -> if (correction) ask(ReasonPrompt(
+                "Accept this request?", offer.note.orEmpty(), "Accept", reasonRequired = true, reasonHint = reasonHint()
+            ) { model.confirmReservation(id, it) }) else model.confirmReservation(id)
+            BookingAction.DECLINE -> ask(ReasonPrompt(
+                "Decline this request?", "The request from $name is declined and its table becomes free.", "Decline request",
+                danger = true, reasonRequired = correction, reasonHint = reasonHint(),
+                suggestions = listOf("Fully booked", "Closed that day", "Group too big")
+            ) { reason -> model.cancelReservation(id, listOfNotNull("Declined", reason).joinToString(": ")) })
+            BookingAction.GUEST_ARRIVED -> if (booking.partySize > 1) {
+                arrivedPrompt = ArrivedPrompt(
+                    "How many have arrived?", booking.partySize, booking.partySize,
+                    confirmLabel = { if (it == booking.partySize) "Everyone's here" else "$it arrived" },
+                    reasonRequired = correction, note = offer.note
+                ) { count, reason -> model.checkInReservation(id, reason, count) }
+            } else if (correction) ask(ReasonPrompt(
+                "Guest arrived?", offer.note.orEmpty(), "Guest arrived", reasonRequired = true, reasonHint = reasonHint()
+            ) { model.checkInReservation(id, it) }) else model.checkInReservation(id)
+            BookingAction.ARRIVED_COUNT -> arrivedPrompt = ArrivedPrompt(
+                "How many have arrived?", booking.partySize, booking.arrivedGuests ?: booking.partySize,
+                confirmLabel = { "Save: $it of ${booking.partySize}" }, reasonRequired = correction, note = offer.note
+            ) { count, reason -> model.updateArrivedGuests(id, count, reason) }
+            BookingAction.SEAT -> if (booking.tableAssignments.isEmpty()) {
+                seatAfterPick = true
+                assigningTable = true
+            } else model.seatReservation(id)
+            BookingAction.UNDO_SEAT -> ask(ReasonPrompt(
+                "Undo seating?", "$name goes back to waiting for a table, and the table becomes free.", "Undo seating",
+                reasonRequired = correction, reasonHint = reasonHint(), suggestions = listOf("Seated the wrong booking")
+            ) { model.undoSeatReservation(id, it) })
+            BookingAction.FINISH -> model.completeReservation(id)
+            BookingAction.LEFT_WITHOUT_ORDERING -> ask(ReasonPrompt(
+                "Left without ordering?", "The visit of $name ends here.", "Finish visit", reasonRequired = correction,
+                reasonHint = reasonHint("Anything to add (optional)")
+            ) { model.completeReservation(id, listOfNotNull("Left without ordering", it).joinToString(": ")) })
+            BookingAction.HOLD_LONGER -> holdPrompt = true
+            BookingAction.CONFIRM_ATTENDANCE -> ask(ReasonPrompt(
+                "Attendance confirmed?", "$name said they're coming. The booking gets \"✓ Attendance confirmed\".", "Attendance confirmed",
+                reasonRequired = correction, reasonHint = reasonHint("Note (optional), e.g. \"Called at 14:10\""),
+                suggestions = listOf("Called the guest", "The guest called")
+            ) { model.confirmAttendance(id, it) })
+            BookingAction.NO_SHOW -> ask(ReasonPrompt(
+                "Mark as no show?", "$name didn't come. The table becomes free, and it counts in the guest's history.", "Mark no show",
+                danger = true, reasonRequired = correction, reasonHint = reasonHint()
+            ) { model.markNoShow(id, it) })
+            BookingAction.CANCEL -> ask(ReasonPrompt(
+                "Cancel this booking?", "The booking for $name is cancelled and its table becomes free. You can reopen it later.", "Cancel booking",
+                danger = true, reasonRequired = correction, reasonHint = reasonHint(),
+                suggestions = listOf("Guest called to cancel", "Booked twice")
+            ) { model.cancelReservation(id, it) })
+            BookingAction.LEFT_BEFORE_SEATING -> ask(ReasonPrompt(
+                "Left before being seated?", "The booking for $name is cancelled. Say what happened.", "Cancel booking",
+                danger = true, reasonRequired = true, reasonHint = "What happened",
+                suggestions = listOf("Left before being seated", "Waited too long")
+            ) { model.cancelReservation(id, it) })
+            BookingAction.REOPEN -> ask(ReasonPrompt(
+                "Reopen this booking?", offer.note ?: "The booking for $name is back on. A table given to someone else meanwhile isn't taken back.",
+                "Reopen", reasonRequired = correction, reasonHint = reasonHint()
+            ) { model.reopenReservation(id, it) })
         }
     }
 
@@ -148,28 +215,36 @@ internal fun ReservationDetailsPanel(
             startIso = reservation.reservationStart,
             endIso = reservation.reservationEnd,
             timeLabel = "${reservation.reservationStart.localTime()} – ${reservation.reservationEnd.localTime()}",
-            onDismiss = { assigningTable = false },
+            onDismiss = { assigningTable = false; seatAfterPick = false },
             onPick = { picked ->
                 assigningTable = false
+                val seat = seatAfterPick
+                seatAfterPick = false
                 val current = reservation.tableAssignments.map { it.tableId }
-                if (picked.map { it.first } != current) {
-                    model.patchReservation(
-                        reservation.id,
-                        UpdateReservationInput(tableIds = picked.map { it.first }, primaryTableId = picked.firstOrNull()?.first)
-                    )
+                scope.launch {
+                    if (picked.map { it.first } != current) {
+                        model.patchReservation(
+                            reservation.id,
+                            UpdateReservationInput(tableIds = picked.map { it.first }, primaryTableId = picked.firstOrNull()?.first)
+                        ).join()
+                    }
+                    if (seat && picked.isNotEmpty() && model.state.value.error == null) model.seatReservation(reservation.id)
                 }
             }
         )
     }
-    pendingConfirm?.let { action ->
-        DangerConfirmDialog(
-            action = action,
-            guestName = reservation?.displayGuestName.orEmpty(),
-            onConfirm = { reason ->
-                pendingConfirm = null
-                runAction(action, reason)
-            },
-            onDismiss = { pendingConfirm = null }
+    reasonPrompt?.let { prompt ->
+        ReasonPromptDialog(prompt.copy(onConfirm = { reason -> reasonPrompt = null; prompt.onConfirm(reason) }), onDismiss = { reasonPrompt = null })
+    }
+    arrivedPrompt?.let { prompt ->
+        ArrivedPromptDialog(prompt.copy(onConfirm = { count, reason -> arrivedPrompt = null; prompt.onConfirm(count, reason) }), onDismiss = { arrivedPrompt = null })
+    }
+    if (holdPrompt && reservation != null) {
+        HoldLongerDialog(
+            guestName = reservation.displayGuestName,
+            endsAt = reservation.reservationEnd.localTime(),
+            onConfirm = { minutes, reason -> holdPrompt = false; model.extendHold(reservation.id, minutes, reason) },
+            onDismiss = { holdPrompt = false }
         )
     }
 
@@ -202,7 +277,8 @@ internal fun ReservationDetailsPanel(
 
         val tables = reservation.tableAssignments.mapNotNull { it.tableNumber }
         val tableLabel = if (tables.isEmpty()) "Unassigned" else tables.joinToString(" + ")
-        val menuActions = reservation.status.menuActions()
+        val actions = bookingActions(reservation, policy, state::can, now)
+        val menuActions = actions.menu
 
         Column(Modifier.padding(start = 20.dp, end = 16.dp, top = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -225,18 +301,24 @@ internal fun ReservationDetailsPanel(
                     Box {
                         SquareIconButton(Icons.Outlined.MoreVert, "More actions") { menuOpen = true }
                         DropdownMenu(menuOpen, { menuOpen = false }, modifier = Modifier.background(Color.White)) {
-                            menuActions.forEach { action ->
+                            menuActions.forEach { offer ->
+                                val tint = when {
+                                    !offer.enabled -> FormMuted
+                                    offer.action.danger -> FormDanger
+                                    else -> FormInk
+                                }
                                 DropdownMenuItem(
                                     text = {
-                                        Text(
-                                            action.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
-                                            color = if (action.danger) FormDanger else FormInk
-                                        )
+                                        Column {
+                                            Text(offer.action.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = tint)
+                                            offer.note?.let { Text(it, fontFamily = Inter(), fontSize = 11.sp, color = FormMuted) }
+                                        }
                                     },
-                                    leadingIcon = { Icon(action.icon, null, Modifier.size(18.dp), tint = if (action.danger) FormDanger else FormInk) },
+                                    leadingIcon = { Icon(offer.action.icon(), null, Modifier.size(18.dp), tint = tint) },
+                                    enabled = offer.enabled,
                                     onClick = {
                                         menuOpen = false
-                                        runAction(action)
+                                        start(offer)
                                     }
                                 )
                             }
@@ -246,6 +328,7 @@ internal fun ReservationDetailsPanel(
                 SquareIconButton(Icons.Outlined.Close, "Close", onClose)
             }
             StatusChip(reservation.status)
+            BookingFlagChips(bookingFlags(reservation, policy, now))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Outlined.PersonOutline, null, Modifier.size(24.dp), tint = FormInk)
                 Column(Modifier.weight(1f)) {
@@ -328,7 +411,21 @@ internal fun ReservationDetailsPanel(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             when (tab) {
-                PanelTab.INFO -> InfoCard {
+                PanelTab.INFO -> {
+                reservation.reviewReason?.takeIf { reservation.needsReview }?.let { reason ->
+                    NoticeCard(
+                        "Needs review", ReviewColor,
+                        "$reason. " + if (reservation.status == ReservationStatus.CHECKED_IN) "Seat them, or cancel with a reason if they left."
+                        else "Finish the visit if they've left."
+                    )
+                }
+                reservation.guestNoShows?.takeIf { it >= policy.noShowWarningFrom }?.let {
+                    GuestNoShowCard(model, reservation, canClear = state.can(ReservationsScreenModel.CORRECT_PERMISSION)) { prompt -> ask(prompt) }
+                }
+                LateSeatingCard(model, reservation, policy, now) { tableIds ->
+                    model.patchReservation(reservation.id, UpdateReservationInput(tableIds = tableIds, primaryTableId = tableIds.firstOrNull()))
+                }
+                InfoCard {
                     InfoLine(Icons.Outlined.Phone, reservation.contactPhone?.takeIf(String::isNotBlank) ?: "No phone")
                     InfoLine(Icons.Outlined.Email, reservation.contactEmail?.takeIf(String::isNotBlank) ?: "No email")
                     InfoLine(Icons.Outlined.PersonOutline, "${reservation.partySize} ${if (reservation.partySize == 1) "guest" else "guests"}")
@@ -339,6 +436,7 @@ internal fun ReservationDetailsPanel(
                     )
                     InfoBlock(Icons.Outlined.Notes, "Special request", reservation.specialRequests?.takeIf(String::isNotBlank) ?: "None")
                     InfoBlock(Icons.Outlined.StickyNote2, "Internal note", reservation.internalNotes?.takeIf(String::isNotBlank) ?: "None")
+                }
                 }
                 PanelTab.TABLES -> {
                     reservation.tableAssignments.forEach { assignment ->
@@ -378,8 +476,22 @@ internal fun ReservationDetailsPanel(
                     }
                 }
                 PanelTab.HISTORY -> {
-                    if (state.statusHistory.isEmpty()) {
+                    // Other changes kept with the status history: table held longer, arrived guests, tables released.
+                    val otherChanges = state.timeline.filter { it.type !in setOf("CREATED", "STATUS_CHANGE", "TABLE_ASSIGNED", "NOTE_ADDED") }
+                    if (state.statusHistory.isEmpty() && otherChanges.isEmpty()) {
                         Text("No status changes yet.", fontFamily = Inter(), fontSize = 12.sp, color = FormMuted)
+                    }
+                    otherChanges.sortedByDescending { it.occurredAt }.forEach { event ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Box(Modifier.padding(top = 5.dp).size(9.dp).background(WaitingColor, CircleShape))
+                            Column {
+                                Text(event.message ?: event.type.orEmpty(), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = FormInk)
+                                Text(
+                                    listOfNotNull(event.occurredAt?.localDateLabel(), event.occurredAt?.localTime()).joinToString(" · "),
+                                    fontFamily = Inter(), fontSize = 12.sp, color = FormMuted
+                                )
+                            }
+                        }
                     }
                     state.statusHistory.sortedByDescending { it.changedAt }.forEach { entry ->
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -416,72 +528,59 @@ internal fun ReservationDetailsPanel(
                 }
                 PanelTab.HISTORY -> Unit
             }
-            val (secondary, primary) = reservation.status.footerActions()
             val primaryTable = reservation.primaryTable?.tableNumber
-            if (reservation.status == ReservationStatus.CHECKED_IN || reservation.status == ReservationStatus.SEATED) {
-                if (primaryTable != null) {
-                    FooterButton("Go to table $primaryTable", Icons.Outlined.TableRestaurant, primary = true, modifier = Modifier.fillMaxWidth()) {
-                        onGoToTable(primaryTable)
-                    }
-                } else {
-                    Text(
-                        "Checked in without a table. Add one in the Tables tab, then seat the guests from Tables.",
-                        fontFamily = Inter(), fontSize = 12.sp, color = FormDanger
-                    )
+            if ((reservation.status == ReservationStatus.CHECKED_IN || reservation.status == ReservationStatus.SEATED) && primaryTable != null) {
+                FooterButton("Go to table $primaryTable", Icons.Outlined.TableRestaurant, primary = false, modifier = Modifier.fillMaxWidth()) {
+                    onGoToTable(primaryTable)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                secondary?.let { action ->
-                    FooterButton(action.label, action.icon, primary = false, modifier = Modifier.weight(1f)) { if (!state.isSaving) runAction(action) }
-                }
-                // Same rule as the server: check-in opens 2 hours before the start.
-                val checkInOpensAt = runCatching { Instant.parse(reservation.reservationStart) - 2.hours }.getOrNull()
-                val tooEarly = primary == StatusAction.CHECK_IN && checkInOpensAt != null && Clock.System.now() < checkInOpensAt
-                if (tooEarly && checkInOpensAt != null) {
-                    val opens = checkInOpensAt.toLocalDateTime(RestaurantTime.zone)
-                    Row(
-                        Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF2F6F2)).padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
-                    ) {
-                        Icon(Icons.Outlined.Schedule, null, Modifier.size(18.dp), tint = FormMuted)
-                        Text(
-                            "Check-in opens ${opens.date.formLabel().substringBeforeLast(",")} at ${opens.hour.toString().padStart(2, '0')}:${opens.minute.toString().padStart(2, '0')}",
-                            fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = FormMuted, maxLines = 1, overflow = TextOverflow.Ellipsis
-                        )
+            val primary = actions.primary
+            val secondary = actions.secondary
+            if (primary != null || secondary != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    secondary?.let { offer ->
+                        FooterButton(offer.action.label, offer.action.icon(), primary = false, modifier = Modifier.weight(1f)) { start(offer) }
                     }
-                } else primary?.let { action ->
-                    FooterButton(action.label, action.icon, primary = true, modifier = Modifier.weight(1f)) { if (!state.isSaving) runAction(action) }
+                    primary?.let { offer ->
+                        if (!offer.enabled) {
+                            // e.g. "Check-in opens at 17:00" or "Only a manager can change this now".
+                            Row(
+                                Modifier.weight(1f).height(46.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF2F6F2)).padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                            ) {
+                                Icon(Icons.Outlined.Schedule, null, Modifier.size(18.dp), tint = FormMuted)
+                                Text(
+                                    offer.note ?: offer.action.label,
+                                    fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = FormMuted,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        } else {
+                            val label = if (offer.action == BookingAction.SEAT && reservation.tableAssignments.isEmpty()) "Choose table and seat" else offer.action.label
+                            FooterButton(label, offer.action.icon(), primary = true, modifier = Modifier.weight(1f)) { start(offer) }
+                        }
+                    }
+                }
+                primary?.takeIf { it.enabled && it.needsReason }?.note?.let {
+                    Text(it, fontFamily = Inter(), fontSize = 12.sp, color = LateColor)
                 }
             }
         }
     }
 }
 
-private enum class StatusAction(val label: String, val icon: ImageVector, val danger: Boolean = false) {
-    CONFIRM("Confirm", Icons.Outlined.CheckCircle),
-    CHECK_IN("Check in", Icons.Outlined.HowToReg),
-    COMPLETE("Complete", Icons.Outlined.TaskAlt),
-    REOPEN("Reopen", Icons.Outlined.Replay),
-    NO_SHOW("Mark as no show", Icons.Outlined.PersonOff, danger = true),
-    CANCEL("Cancel reservation", Icons.Outlined.Cancel, danger = true)
-}
-
-// (secondary, primary) buttons shown at the bottom of the panel.
-private fun ReservationStatus.footerActions(): Pair<StatusAction?, StatusAction?> = when (this) {
-    ReservationStatus.PENDING -> null to StatusAction.CONFIRM
-    // Seating happens from the Tables screen, so there is no seat button here.
-    ReservationStatus.CONFIRMED -> null to StatusAction.CHECK_IN
-    ReservationStatus.CHECKED_IN -> null to null
-    ReservationStatus.SEATED -> null to StatusAction.COMPLETE
-    ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW -> null to StatusAction.REOPEN
-    ReservationStatus.COMPLETED -> null to null
-}
-
-private fun ReservationStatus.menuActions(): List<StatusAction> = when (this) {
-    ReservationStatus.PENDING -> listOf(StatusAction.CANCEL)
-    ReservationStatus.CONFIRMED -> listOf(StatusAction.NO_SHOW, StatusAction.CANCEL)
-    else -> emptyList()
+private fun BookingAction.icon(): ImageVector = when (this) {
+    BookingAction.ACCEPT -> Icons.Outlined.CheckCircle
+    BookingAction.DECLINE, BookingAction.CANCEL, BookingAction.LEFT_BEFORE_SEATING -> Icons.Outlined.Cancel
+    BookingAction.GUEST_ARRIVED -> Icons.Outlined.HowToReg
+    BookingAction.CONFIRM_ATTENDANCE -> Icons.Outlined.CheckCircle
+    BookingAction.ARRIVED_COUNT -> Icons.Outlined.PersonOutline
+    BookingAction.SEAT -> Icons.Outlined.TableRestaurant
+    BookingAction.UNDO_SEAT, BookingAction.REOPEN -> Icons.Outlined.Replay
+    BookingAction.FINISH, BookingAction.LEFT_WITHOUT_ORDERING -> Icons.Outlined.TaskAlt
+    BookingAction.HOLD_LONGER -> Icons.Outlined.Schedule
+    BookingAction.NO_SHOW -> Icons.Outlined.PersonOff
 }
 
 private fun ReservationStatus.panelLabel(): String = when (this) {
@@ -492,6 +591,7 @@ private fun ReservationStatus.panelLabel(): String = when (this) {
     ReservationStatus.COMPLETED -> "Completed"
     ReservationStatus.CANCELLED -> "Cancelled"
     ReservationStatus.NO_SHOW -> "No show"
+    ReservationStatus.EXPIRED -> "Request expired"
 }
 
 private fun durationLabel(start: String, end: String): String? {
@@ -782,6 +882,7 @@ private fun StatusChip(status: ReservationStatus) {
         ReservationStatus.COMPLETED -> "Completed"
         ReservationStatus.CANCELLED -> "Cancelled"
         ReservationStatus.NO_SHOW -> "No show"
+        ReservationStatus.EXPIRED -> "Request expired"
     }
     val color = StatusDotColors[label] ?: FormMuted
     Row(
@@ -834,49 +935,115 @@ private fun String.localTime(): String =
 private fun String.localDateLabel(): String =
     toLocalOrNull(RestaurantTime.zone)?.date?.formLabel() ?: "Unknown date"
 
+private enum class EditSection { INFO, NOTES }
+
+// "⚠ 2 no-shows before": when and which bookings, and (for managers) clearing the warning with a reason.
 @Composable
-private fun DangerConfirmDialog(
-    action: StatusAction,
-    guestName: String,
-    onConfirm: (reason: String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var reason by remember { mutableStateOf("") }
-    val cancelling = action == StatusAction.CANCEL
-    MenuNestedDialog(
-        onDismissRequest = onDismiss,
-        title = {
+private fun GuestNoShowCard(model: ReservationsScreenModel, reservation: Reservation, canClear: Boolean, ask: (ReasonPrompt) -> Unit) {
+    var history by remember(reservation.id, reservation.guestNoShows) { mutableStateOf<com.saporini.mobile_desktop.pos.reservations.domain.model.GuestHistory?>(null) }
+    LaunchedEffect(reservation.id, reservation.guestNoShows) { history = model.guestHistory(reservation.id).getOrNull() }
+    val count = reservation.guestNoShows ?: 0
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(ReviewColor.copy(alpha = 0.08f)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            "⚠ $count ${if (count == 1) "no-show" else "no-shows"} before",
+            fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ReviewColor
+        )
+        history?.noShows?.take(5)?.forEach { noShow ->
             Text(
-                if (cancelling) "Cancel this reservation?" else "Mark as no show?",
-                fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp
+                listOfNotNull(noShow.reservationStart?.localDateLabel(), noShow.reservationStart?.localTime(), noShow.partySize?.let { "$it guests" })
+                    .joinToString(" · "),
+                fontFamily = Inter(), fontSize = 12.sp, color = FormInk
             )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    if (cancelling) "The reservation for $guestName will be cancelled and its table becomes free. You can reopen it later."
-                    else "$guestName will be marked as not showing up and the table becomes free. You can reopen it later.",
-                    fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = FormMuted
-                )
-                InputBox(Icons.Outlined.Notes, reason, "Reason (optional)") { reason = it.take(200) }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(reason.trim()) },
-                shape = RoundedCornerShape(percent = 50),
-                colors = ButtonDefaults.buttonColors(containerColor = FormDanger)
-            ) {
-                Text(if (cancelling) "Cancel reservation" else "Mark no show", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Keep it", color = FormMuted, fontFamily = Inter()) }
         }
-    )
+        if (canClear) {
+            Text(
+                "Clear warning",
+                Modifier.clip(RoundedCornerShape(6.dp)).clickable {
+                    ask(ReasonPrompt(
+                        "Clear the no-show warning?",
+                        "The warning stops showing on this guest's bookings. The no-shows stay in the history.",
+                        "Clear warning", reasonRequired = true, reasonHint = "Why, e.g. \"Explained, family emergency\""
+                    ) { reason -> if (reason != null) model.clearNoShowWarning(reservation.id, reason) })
+                }.padding(vertical = 4.dp),
+                fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = FormGreen
+            )
+        }
+    }
 }
 
-private enum class EditSection { INFO, NOTES }
+@Composable
+private fun NoticeCard(title: String, color: Color, message: String) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.10f)).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = if (color == HoldEndsColor) Color(0xFF8A6A00) else color)
+        Text(message, fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = FormInk)
+    }
+}
+
+// Late guests keep their end time. Once they're late, show whether they still fit at their table until then, or
+// which tables are free for the rest of their visit.
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LateSeatingCard(
+    model: ReservationsScreenModel,
+    reservation: Reservation,
+    policy: com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationPolicy,
+    now: Instant,
+    onMove: (List<String>) -> Unit
+) {
+    val start = runCatching { Instant.parse(reservation.reservationStart) }.getOrNull() ?: return
+    val waiting = reservation.status == ReservationStatus.CONFIRMED || reservation.status == ReservationStatus.CHECKED_IN
+    val late = (now - start).inWholeMinutes >= policy.lateAfterMinutes
+    if (!waiting || !late) return
+    var check by remember(reservation.id, reservation.tableAssignments) { mutableStateOf<com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationSeatingCheck?>(null) }
+    LaunchedEffect(reservation.id, reservation.tableAssignments, reservation.status) {
+        check = model.seatingCheck(reservation.id).getOrNull()
+    }
+    val result = check ?: return
+    val left = "${duration(result.minutesLeft)} left"
+    when {
+        reservation.tableAssignments.isEmpty() && result.alternatives.isEmpty() -> NoticeCard(
+            "No table free for the rest of the visit", ReviewColor, "$left of the booking. Decide with the guests: a shorter stay, or wait."
+        )
+        result.fitsAtTables -> NoticeCard(
+            "Still fits at the table", WaitingColor,
+            listOfNotNull(
+                left,
+                result.nextBookingStart?.let { "next booking at this table at ${it.localTime()}" + (result.nextBookingName?.let { name -> " ($name)" } ?: "") }
+            ).joinToString(" · ").replaceFirstChar { it.uppercase() }
+        )
+        else -> Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(LateColor.copy(alpha = 0.10f)).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                if (reservation.tableAssignments.isEmpty()) "Pick a table for the rest of the visit" else "Doesn't fit at the table until the end",
+                fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = LateColor
+            )
+            Text(
+                listOfNotNull(left, result.nextBookingStart?.let { "next booking there at ${it.localTime()}" }).joinToString(" · ")
+                    .replaceFirstChar { it.uppercase() } + if (result.alternatives.isEmpty()) ". No other table is free: decide with the guests." else ". Free until then:",
+                fontFamily = Inter(), fontSize = 12.sp, color = FormInk
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                result.alternatives.forEach { option ->
+                    Surface(onClick = { onMove(option.tableIds) }, shape = RoundedCornerShape(8.dp), color = Color.White, border = BorderStroke(1.dp, FormBorder)) {
+                        Text(
+                            "Move to ${option.tableNumbers.joinToString(" + ")}" + (option.totalCapacity?.let { " · $it seats" } ?: ""),
+                            Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                            fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = FormInk
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun EmptyWithAction(icon: ImageVector, message: String, action: String, onClick: () -> Unit) {

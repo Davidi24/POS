@@ -78,7 +78,7 @@ class AppScreenshotTest {
                 isActive = true, emailVerified = true, phoneVerified = true, roles = listOf("MANAGER"),
                 permissions = listOf(
                     "MENUS_CREATE", "MENUS_READ", "MENUS_UPDATE", "ORDER_CREATE", "ORDER_READ", "ORDER_UPDATE",
-                    "SETTINGS_READ", "SETTINGS_UPDATE", "ORDER_TRANSFER", "ORDER_CANCEL", "ORDER_CLOSE"
+                    "SETTINGS_READ", "SETTINGS_UPDATE", "RESERVATION_READ", "RESERVATION_MANAGE", "ORDER_TRANSFER", "ORDER_CANCEL", "ORDER_CLOSE"
                 )
             ))
         }
@@ -294,6 +294,16 @@ class AppScreenshotTest {
             "getBranchReservations" -> inRange(args[2], args[3])
             "getTodayReservations" -> reservationList
             "getUpcomingReservations" -> reservationList.filter { Instant.parse(it.reservationStart) > now }
+            // Paged calls: all the sample data fits on the first page.
+            "getTodayReservationsPage" -> samplePage(if (args[2] == 0) reservationList else emptyList(), args[2] as Int)
+            "getBranchReservationCalendarPage" -> samplePage(if (args[4] == 0) inRange(args[2], args[3]) else emptyList(), args[4] as Int)
+            "getArrivalsPage" -> samplePage(
+                if (args[4] != 0) emptyList() else reservationList.filter { r ->
+                    (r.status == ReservationStatus.PENDING || r.status == ReservationStatus.CONFIRMED) &&
+                        (args[2] == null || Instant.parse(r.reservationStart) >= Instant.parse(args[2] as String))
+                },
+                args[4] as Int
+            )
             "getReservation" -> reservationList.first { it.id == args[1] }
             "getAudit" -> ReservationAudit(args[1] as String, notes = listOf(ReservationNote("n1", "Prefers the quiet corner", createdByName = "David Keci", createdAt = at((-2).hours))))
             "getStatusHistory" -> listOf(ReservationStatusHistory("h1", null, ReservationStatus.PENDING, changedAt = at((-30).hours)), ReservationStatusHistory("h2", ReservationStatus.PENDING, ReservationStatus.CONFIRMED, changedAt = at((-20).hours)))
@@ -393,6 +403,9 @@ class AppScreenshotTest {
 
     private object NotHandled
     private val NOT_HANDLED: Any = NotHandled
+
+    private fun samplePage(items: List<Reservation>, page: Int) =
+        ReservationPage(items, page, 100, items.size.toLong(), if (items.isEmpty()) 0 else 1, false, page > 0)
 
     // Answers repository calls from sample data. Suspend functions get the value back directly.
     private inline fun <reified T : Any> proxy(missing: MutableSet<String>, crossinline answer: (String, Array<Any?>) -> Any?): T =

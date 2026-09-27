@@ -55,6 +55,13 @@ data class LayoutTable(
     val nextReservationEnd: String? = null,
     val nextReservationCode: String? = null,
     val nextReservationName: String? = null,
+    // The booking's state for the floor plan: "Hold ends in N min" from nextReservationHoldWarningAt.
+    val nextReservationId: String? = null,
+    val nextReservationStatus: String? = null,
+    val nextReservationHoldUntil: String? = null,
+    val nextReservationHoldWarningAt: String? = null,
+    val nextReservationPartySize: Int? = null,
+    val nextReservationArrivedGuests: Int? = null,
     val currentOrderId: String? = null,
     val currentOrderNumber: String? = null,
     val currentOrderStatus: String? = null,

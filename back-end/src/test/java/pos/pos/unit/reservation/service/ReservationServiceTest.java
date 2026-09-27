@@ -93,6 +93,12 @@ class ReservationServicesTest {
     private TableCategoryRepository tableCategoryRepository;
     @Mock
     private OrderRepository orderRepository;
+    @Mock
+    private pos.pos.settings.repository.SettingsRepository settingsRepository;
+    @Mock
+    private pos.pos.reservation.repository.ReservationEventRepository reservationEventRepository;
+    @Mock
+    private pos.pos.reservation.repository.GuestNoShowClearRepository guestNoShowClearRepository;
     @Spy
     private RestaurantTableMapper restaurantTableMapper;
     @Spy
@@ -112,6 +118,10 @@ class ReservationServicesTest {
                 reservationTableAssignmentRepository,
                 orderRepository
         );
+        pos.pos.reservation.service.ReservationRuleResolver reservationRuleResolver =
+                new pos.pos.reservation.service.ReservationRuleResolver(settingsReservationRuleRepository);
+        pos.pos.reservation.service.ReservationPolicy reservationPolicy =
+                new pos.pos.reservation.service.ReservationPolicy(settingsRepository, reservationRuleResolver);
         ReservationSupport reservationSupport = new ReservationSupport(
                 restaurantScopeService,
                 branchRepository,
@@ -119,10 +129,9 @@ class ReservationServicesTest {
                 reservationRepository,
                 reservationNoteRepository,
                 reservationMapper,
-                userRepository
+                userRepository,
+                reservationPolicy
         );
-        pos.pos.reservation.service.ReservationRuleResolver reservationRuleResolver =
-                new pos.pos.reservation.service.ReservationRuleResolver(settingsReservationRuleRepository);
         ReservationAvailabilitySupport reservationAvailabilitySupport = new ReservationAvailabilitySupport(
                 reservationRepository,
                 restaurantTableSupport,
@@ -143,7 +152,9 @@ class ReservationServicesTest {
                 restaurantTableSupport,
                 reservationAvailabilitySupport,
                 reservationSupport,
-                reservationRuleResolver
+                reservationRuleResolver,
+                reservationPolicy,
+                reservationEventRepository
         );
         reservationCrudService = new ReservationCrudService(
                 restaurantScopeService,
@@ -151,12 +162,20 @@ class ReservationServicesTest {
                 reservationSupport,
                 reservationTableAssignmentService,
                 reservationNotifications,
+                reservationPolicy,
+                reservationAvailabilitySupport,
+                new pos.pos.reservation.service.GuestNoShowCounter(reservationRepository, guestNoShowClearRepository),
                 event -> { }
         );
         reservationLifecycleService = new ReservationLifecycleService(
                 restaurantScopeService,
                 reservationSupport,
                 reservationNotifications,
+                reservationPolicy,
+                reservationAvailabilitySupport,
+                reservationEventRepository,
+                restaurantTableRepository,
+                orderRepository,
                 event -> { }
         );
         reservationDepositService = new ReservationDepositService(
@@ -208,7 +227,9 @@ class ReservationServicesTest {
 
         assertThat(response.getId()).isEqualTo(RESERVATION_ID);
         assertThat(response.getReservationCode()).startsWith("RES_");
-        assertThat(response.getStatus()).isEqualTo(ReservationStatus.PENDING);
+        // Staff booking with a free table: confirmed straight away.
+        assertThat(response.getStatus()).isEqualTo(ReservationStatus.CONFIRMED);
+        assertThat(response.getConfirmedAt()).isNotNull();
         assertThat(response.getDepositStatus()).isEqualTo(ReservationDepositStatus.PENDING);
         assertThat(response.getTableAssignments()).hasSize(1);
         assertThat(response.getTableAssignments().get(0).getTableId()).isEqualTo(TABLE_ID);
@@ -517,8 +538,9 @@ class ReservationServicesTest {
         reservation.setReservationCode("RES_TEST");
         reservation.setStatus(ReservationStatus.PENDING);
         reservation.setPartySize(2);
-        reservation.setReservationStart(OffsetDateTime.parse("2026-05-10T18:00:00Z"));
-        reservation.setReservationEnd(OffsetDateTime.parse("2026-05-10T19:30:00Z"));
+        // Upcoming, so changing it isn't a correction of an earlier day.
+        reservation.setReservationStart(OffsetDateTime.parse("2030-05-10T18:00:00Z"));
+        reservation.setReservationEnd(OffsetDateTime.parse("2030-05-10T19:30:00Z"));
         reservation.setContactName("Alex Stone");
         reservation.setCreatedAt(OffsetDateTime.parse("2026-05-07T11:00:00Z"));
         reservation.setUpdatedAt(OffsetDateTime.parse("2026-05-07T11:00:00Z"));

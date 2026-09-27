@@ -18,7 +18,8 @@ internal fun ReservationInput.toDto(): ReservationRequestDto = ReservationReques
     depositRequired = depositRequired,
     depositAmount = depositAmount,
     initialTableIds = initialTableIds,
-    primaryTableId = primaryTableId
+    primaryTableId = primaryTableId,
+    attendanceConfirmed = attendanceConfirmed
 )
 
 internal fun UpdateReservationInput.toDto(): UpdateReservationRequestDto = UpdateReservationRequestDto(
@@ -41,7 +42,16 @@ internal fun UpdateReservationInput.toDto(): UpdateReservationRequestDto = Updat
 )
 
 internal fun ReservationActionInput.toDto(): ReservationActionRequestDto = ReservationActionRequestDto(
-    reason = reason
+    reason = reason,
+    arrivedGuests = arrivedGuests
+)
+
+internal fun ReservationSeatingCheckResponseDto.toDomain(): ReservationSeatingCheck = ReservationSeatingCheck(
+    minutesLeft = minutesLeft ?: 0,
+    nextBookingStart = nextBookingStart,
+    nextBookingName = nextBookingName,
+    fitsAtTables = fitsAtTables == true,
+    alternatives = alternatives.map { it.toDomain() }
 )
 
 internal fun ReservationTablesInput.toDto(): UpdateReservationTablesRequestDto = UpdateReservationTablesRequestDto(
@@ -98,9 +108,35 @@ internal fun ReservationResponseDto.toDomain(): Reservation = Reservation(
     seatedAt = seatedAt,
     completedAt = completedAt,
     noShowAt = noShowAt,
+    expiredAt = expiredAt,
+    holdUntil = holdUntil,
+    arrivedGuests = arrivedGuests,
+    needsReview = needsReview == true,
+    reviewReason = reviewReason,
+    attendanceConfirmedAt = attendanceConfirmedAt,
+    attendanceConfirmedVia = attendanceConfirmedVia,
+    attendance = attendance,
+    guestNoShows = guestNoShows,
     createdAt = createdAt,
     updatedAt = updatedAt,
     tableAssignments = tableAssignments.orEmpty().map { it.toDomain() }
+)
+
+internal fun ReservationDetailsResponseDto.toDomain(): ReservationDetails = ReservationDetails(
+    reservation = reservation.toDomain(),
+    audit = audit?.toDomain() ?: ReservationAudit(reservationId = reservation.id),
+    timeline = timeline.map { it.toDomain() },
+    deposit = deposit?.toDomain() ?: ReservationDeposit(reservationId = reservation.id)
+)
+
+internal fun ReservationPageResponseDto.toDomain(): ReservationPage = ReservationPage(
+    items = items.map { it.toDomain() },
+    page = page,
+    size = size,
+    totalElements = totalElements,
+    totalPages = totalPages,
+    hasNext = hasNext,
+    hasPrevious = hasPrevious
 )
 
 internal fun ReservationTableAssignmentResponseDto.toDomain(): ReservationTableAssignment = ReservationTableAssignment(
@@ -161,7 +197,36 @@ internal fun ReservationSummaryResponseDto.toDomain(): ReservationSummary = Rese
     completedCount = completedCount ?: 0,
     cancelledCount = cancelledCount ?: 0,
     noShowCount = noShowCount ?: 0,
-    upcomingCount = upcomingCount ?: 0
+    upcomingCount = upcomingCount ?: 0,
+    presentGuests = presentGuests,
+    guestsToArrive = guestsToArrive,
+    unassignedCount = unassignedCount,
+    arrivingSoonCount = arrivingSoonCount,
+    arrivingSoonGuests = arrivingSoonGuests,
+    expiredCount = expiredCount,
+    needsReviewCount = needsReviewCount,
+    attendanceNotConfirmedCount = attendanceNotConfirmedCount,
+    notConfirmedDueCount = notConfirmedDueCount,
+    bigGroupCount = bigGroupCount
+)
+
+internal fun GuestHistoryResponseDto.toDomain(): GuestHistory = GuestHistory(
+    noShowCount = noShowCount ?: 0,
+    warningFrom = warningFrom ?: 1,
+    noShows = noShows.map { GuestNoShow(it.reservationId, it.reservationCode, it.reservationStart, it.partySize) },
+    clears = clears.map { GuestNoShowClear(it.clearedAt, it.reason) }
+)
+
+internal fun WaitlistEntryResponseDto.toDomain(): WaitlistEntry = WaitlistEntry(
+    id = id,
+    guestName = guestName,
+    contactPhone = contactPhone,
+    partySize = partySize,
+    note = note,
+    createdAt = createdAt,
+    waitedMinutes = waitedMinutes ?: 0,
+    tableFreeNow = tableFreeNow == true,
+    tableFreeAround = tableFreeAround
 )
 
 internal fun ReservationCapacityResponseDto.toDomain(): ReservationCapacity = ReservationCapacity(

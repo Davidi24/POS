@@ -1266,7 +1266,7 @@ fun TablesScreen(
                     },
                     text = {
                         Text(
-                            "Both tables have seated guests. Merge them into one party? " +
+                            "Both tables have seated guests. Merge them into one group? " +
                                 "Existing orders and kitchen progress are kept as they are.",
                             fontFamily = Inter()
                         )
@@ -1280,7 +1280,7 @@ fun TablesScreen(
                             shape = RoundedCornerShape(percent = 50),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F7942))
                         ) {
-                            Text("Merge into one party", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                            Text("Merge into one group", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
                         }
                     },
                     dismissButton = {

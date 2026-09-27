@@ -24,6 +24,7 @@ import pos.pos.settings.dto.UpdateSettingsLocalizationRequest;
 import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
 import pos.pos.settings.dto.UpdateSettingsSequencePrefixesRequest;
 import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
+import pos.pos.settings.dto.UpdateSettingsReservationPolicyRequest;
 import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.service.SettingsService;
 
@@ -134,6 +135,17 @@ public class SettingsController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(settingsService.updatePreOrders(authentication, restaurantId, request));
+    }
+
+    @PatchMapping("/reservation-policy")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Set the reservation policy times and limits (holds, reminders, approvals, corrections)")
+    public ResponseEntity<SettingsResponse> updateReservationPolicy(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody UpdateSettingsReservationPolicyRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updateReservationPolicy(authentication, restaurantId, request));
     }
 
     @PostMapping("/reset")

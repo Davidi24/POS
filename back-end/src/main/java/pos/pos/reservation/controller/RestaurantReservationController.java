@@ -18,9 +18,13 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import pos.pos.reservation.dto.ExtendReservationHoldRequest;
+import pos.pos.reservation.dto.GuestHistoryResponse;
 import pos.pos.reservation.dto.ReservationActionRequest;
+import pos.pos.reservation.dto.ReservationSeatingCheckResponse;
 import pos.pos.reservation.dto.ReservationAuditResponse;
 import pos.pos.reservation.dto.ReservationDepositResponse;
+import pos.pos.reservation.dto.ReservationDetailsResponse;
 import pos.pos.reservation.dto.ReservationNoteRequest;
 import pos.pos.reservation.dto.ReservationNoteResponse;
 import pos.pos.reservation.dto.ReservationRequest;
@@ -37,6 +41,7 @@ import pos.pos.reservation.service.ReservationLifecycleService;
 import pos.pos.reservation.service.ReservationNoteService;
 import pos.pos.reservation.service.ReservationQueryService;
 import pos.pos.reservation.service.ReservationTableAssignmentService;
+import pos.pos.tables.realtime.TableLayoutChangeNotifier;
 
 import java.util.List;
 import java.util.UUID;
@@ -54,9 +59,11 @@ public class RestaurantReservationController {
     private final ReservationTableAssignmentService reservationTableAssignmentService;
     private final ReservationNoteService reservationNoteService;
     private final ReservationDepositService reservationDepositService;
+    private final TableLayoutChangeNotifier tableLayoutChangeNotifier;
+    private final pos.pos.reservation.service.GuestHistoryService guestHistoryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "List restaurant reservations")
     public ResponseEntity<List<ReservationResponse>> getReservations(
             @PathVariable UUID restaurantId,
@@ -66,7 +73,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Create a reservation")
     public ResponseEntity<ReservationResponse> createReservation(
             @PathVariable UUID restaurantId,
@@ -78,7 +85,7 @@ public class RestaurantReservationController {
     }
 
     @GetMapping("/{reservationId}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Get one reservation")
     public ResponseEntity<ReservationResponse> getReservation(
             @PathVariable UUID restaurantId,
@@ -88,8 +95,19 @@ public class RestaurantReservationController {
         return ResponseEntity.ok(reservationQueryService.getReservation(authentication, restaurantId, reservationId));
     }
 
+    @GetMapping("/{reservationId}/details")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
+    @Operation(summary = "Get reservation details for the staff panel")
+    public ResponseEntity<ReservationDetailsResponse> getReservationDetails(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(reservationQueryService.getReservationDetails(authentication, restaurantId, reservationId));
+    }
+
     @PutMapping("/{reservationId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Replace a reservation")
     public ResponseEntity<ReservationResponse> updateReservation(
             @PathVariable UUID restaurantId,
@@ -101,7 +119,7 @@ public class RestaurantReservationController {
     }
 
     @PatchMapping("/{reservationId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Patch a reservation")
     public ResponseEntity<ReservationResponse> patchReservation(
             @PathVariable UUID restaurantId,
@@ -113,7 +131,7 @@ public class RestaurantReservationController {
     }
 
     @DeleteMapping("/{reservationId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Delete a reservation")
     public ResponseEntity<Void> deleteReservation(
             @PathVariable UUID restaurantId,
@@ -125,7 +143,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/confirm")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Confirm a reservation")
     public ResponseEntity<ReservationResponse> confirmReservation(
             @PathVariable UUID restaurantId,
@@ -137,7 +155,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/cancel")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Cancel a reservation")
     public ResponseEntity<ReservationResponse> cancelReservation(
             @PathVariable UUID restaurantId,
@@ -149,7 +167,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/check-in")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Check in a reservation")
     public ResponseEntity<ReservationResponse> checkInReservation(
             @PathVariable UUID restaurantId,
@@ -161,19 +179,109 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/seat")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
-    @Operation(summary = "Seat a reservation")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Seat a reservation at its tables")
     public ResponseEntity<ReservationResponse> seatReservation(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
             @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationLifecycleService.seatReservation(authentication, restaurantId, reservationId, request));
+        return withFloorUpdate(restaurantId, reservationLifecycleService.seatReservation(authentication, restaurantId, reservationId, request));
+    }
+
+    @PostMapping("/{reservationId}/undo-seat")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Move seated guests back to checked in (wrong booking seated)")
+    public ResponseEntity<ReservationResponse> undoSeatReservation(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            @RequestBody(required = false) ReservationActionRequest request,
+            Authentication authentication
+    ) {
+        return withFloorUpdate(restaurantId, reservationLifecycleService.undoSeatReservation(authentication, restaurantId, reservationId, request));
+    }
+
+    @PostMapping("/{reservationId}/arrived-guests")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Change how many of the group have arrived")
+    public ResponseEntity<ReservationResponse> updateArrivedGuests(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            @Valid @RequestBody ReservationActionRequest request,
+            Authentication authentication
+    ) {
+        return withFloorUpdate(restaurantId, reservationLifecycleService.updateArrivedGuests(authentication, restaurantId, reservationId, request));
+    }
+
+    @PostMapping("/{reservationId}/extend-hold")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Keep the table longer for late guests (the booking still ends on time)")
+    public ResponseEntity<ReservationResponse> extendHold(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            @Valid @RequestBody ExtendReservationHoldRequest request,
+            Authentication authentication
+    ) {
+        return withFloorUpdate(restaurantId, reservationLifecycleService.extendHold(authentication, restaurantId, reservationId, request));
+    }
+
+    @GetMapping("/{reservationId}/seating-check")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
+    @Operation(summary = "Whether late guests still fit at their tables, and other free tables if not")
+    public ResponseEntity<ReservationSeatingCheckResponse> getSeatingCheck(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(reservationQueryService.getSeatingCheck(authentication, restaurantId, reservationId));
+    }
+
+    @PostMapping("/{reservationId}/confirm-attendance")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Mark that the guest confirmed they're still coming (after a call)")
+    public ResponseEntity<ReservationResponse> confirmAttendance(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            @RequestBody(required = false) ReservationActionRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(reservationLifecycleService.confirmAttendance(authentication, restaurantId, reservationId, request));
+    }
+
+    @GetMapping("/{reservationId}/guest-history")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
+    @Operation(summary = "The guest's no-shows and cleared warnings")
+    public ResponseEntity<GuestHistoryResponse> getGuestHistory(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(guestHistoryService.getGuestHistory(authentication, restaurantId, reservationId));
+    }
+
+    @PostMapping("/{reservationId}/clear-no-show-warning")
+    @PreAuthorize("hasAuthority('RESERVATION_CORRECT')")
+    @Operation(summary = "Clear the guest's no-show warning, with a reason (the history stays)")
+    public ResponseEntity<ReservationResponse> clearNoShowWarning(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            @Valid @RequestBody ReservationActionRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(guestHistoryService.clearNoShowWarning(authentication, restaurantId, reservationId, request.getReason()));
+    }
+
+    // Seating changes the floor plan, so open table screens refresh.
+    private ResponseEntity<ReservationResponse> withFloorUpdate(UUID restaurantId, ReservationResponse response) {
+        if (response.getBranchId() != null) {
+            tableLayoutChangeNotifier.notifyBranchChanged(restaurantId, response.getBranchId());
+        }
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{reservationId}/complete")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Complete a reservation")
     public ResponseEntity<ReservationResponse> completeReservation(
             @PathVariable UUID restaurantId,
@@ -181,11 +289,11 @@ public class RestaurantReservationController {
             @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(reservationLifecycleService.completeReservation(authentication, restaurantId, reservationId, request));
+        return withFloorUpdate(restaurantId, reservationLifecycleService.completeReservation(authentication, restaurantId, reservationId, request));
     }
 
     @PostMapping("/{reservationId}/mark-no-show")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Mark a reservation as no-show")
     public ResponseEntity<ReservationResponse> markNoShow(
             @PathVariable UUID restaurantId,
@@ -197,7 +305,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/reopen")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Reopen a reservation")
     public ResponseEntity<ReservationResponse> reopenReservation(
             @PathVariable UUID restaurantId,
@@ -209,7 +317,7 @@ public class RestaurantReservationController {
     }
 
     @GetMapping("/{reservationId}/tables")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "List reservation table assignments")
     public ResponseEntity<List<ReservationTableAssignmentResponse>> getReservationTables(
             @PathVariable UUID restaurantId,
@@ -220,7 +328,7 @@ public class RestaurantReservationController {
     }
 
     @PutMapping("/{reservationId}/tables")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Replace reservation table assignments")
     public ResponseEntity<List<ReservationTableAssignmentResponse>> updateReservationTables(
             @PathVariable UUID restaurantId,
@@ -232,7 +340,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/tables/{tableId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Assign one table to a reservation")
     public ResponseEntity<ReservationTableAssignmentResponse> addReservationTable(
             @PathVariable UUID restaurantId,
@@ -245,7 +353,7 @@ public class RestaurantReservationController {
     }
 
     @DeleteMapping("/{reservationId}/tables/{tableId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Remove one table assignment from a reservation")
     public ResponseEntity<Void> deleteReservationTable(
             @PathVariable UUID restaurantId,
@@ -258,7 +366,7 @@ public class RestaurantReservationController {
     }
 
     @PatchMapping("/{reservationId}/tables/{tableId}/primary")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Mark one assigned table as primary")
     public ResponseEntity<List<ReservationTableAssignmentResponse>> markPrimaryReservationTable(
             @PathVariable UUID restaurantId,
@@ -270,7 +378,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/auto-assign-table")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Auto-assign the best available table combination")
     public ResponseEntity<List<ReservationTableAssignmentResponse>> autoAssignReservationTable(
             @PathVariable UUID restaurantId,
@@ -281,7 +389,7 @@ public class RestaurantReservationController {
     }
 
     @GetMapping("/{reservationId}/status-history")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "List reservation status history")
     public ResponseEntity<List<ReservationStatusHistoryResponse>> getStatusHistory(
             @PathVariable UUID restaurantId,
@@ -292,7 +400,7 @@ public class RestaurantReservationController {
     }
 
     @GetMapping("/{reservationId}/timeline")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Get reservation timeline")
     public ResponseEntity<List<ReservationTimelineEventResponse>> getTimeline(
             @PathVariable UUID restaurantId,
@@ -314,7 +422,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/notes")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Add a reservation note")
     public ResponseEntity<ReservationNoteResponse> addNote(
             @PathVariable UUID restaurantId,
@@ -327,7 +435,7 @@ public class RestaurantReservationController {
     }
 
     @DeleteMapping("/{reservationId}/notes/{noteId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Delete a reservation note")
     public ResponseEntity<Void> deleteNote(
             @PathVariable UUID restaurantId,
@@ -340,7 +448,7 @@ public class RestaurantReservationController {
     }
 
     @GetMapping("/{reservationId}/deposit")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "Get reservation deposit state")
     public ResponseEntity<ReservationDepositResponse> getDeposit(
             @PathVariable UUID restaurantId,
@@ -351,7 +459,7 @@ public class RestaurantReservationController {
     }
 
     @PutMapping("/{reservationId}/deposit")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Replace reservation deposit settings")
     public ResponseEntity<ReservationDepositResponse> updateDeposit(
             @PathVariable UUID restaurantId,
@@ -363,7 +471,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/deposit/pay")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Mark reservation deposit as paid")
     public ResponseEntity<ReservationDepositResponse> payDeposit(
             @PathVariable UUID restaurantId,
@@ -374,7 +482,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/deposit/refund")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Mark reservation deposit as refunded")
     public ResponseEntity<ReservationDepositResponse> refundDeposit(
             @PathVariable UUID restaurantId,
@@ -385,7 +493,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/deposit/waive")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Waive a reservation deposit")
     public ResponseEntity<ReservationDepositResponse> waiveDeposit(
             @PathVariable UUID restaurantId,
@@ -396,7 +504,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/deposit/forfeit")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
     @Operation(summary = "Forfeit a reservation deposit")
     public ResponseEntity<ReservationDepositResponse> forfeitDeposit(
             @PathVariable UUID restaurantId,

@@ -23,5 +23,5 @@ class OrderCatalogQueries internal constructor(
     suspend fun getTables(): Result<BranchTableLayout> =
         model.query("ORDER_READ") { tables.getTableLayout(it.restaurantId, it.branchId) }
     suspend fun getCustomers() = model.query("SETTINGS_READ") { catalog.getCustomers(it.restaurantId) }
-    suspend fun getReservations() = model.query("SETTINGS_READ") { catalog.getReservations(it.restaurantId, it.branchId) }
+    suspend fun getReservations() = model.query("RESERVATION_READ") { catalog.getReservations(it.restaurantId, it.branchId) }
 }

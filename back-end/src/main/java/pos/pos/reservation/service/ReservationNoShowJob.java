@@ -10,26 +10,28 @@ import pos.pos.reservation.entity.Reservation;
 import pos.pos.reservation.enums.ReservationStatus;
 import pos.pos.reservation.repository.ReservationRepository;
 
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.EnumSet;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
-// Marks bookings as no-show when the guest hasn't checked in within the grace time after the start.
+// Every minute:
+//  - a confirmed booking whose table hold has run out (booking time + the hold setting, or later if staff held it
+//    longer) becomes a no-show;
+//  - a request nobody answered before the booking time expires. That's not the guest's fault, so it's not a no-show.
+// Checked-in and seated guests are never touched: a visit only ends when staff end it.
 @Component
 @RequiredArgsConstructor
 public class ReservationNoShowJob {
 
-    public static final Duration GRACE = Duration.ofMinutes(30);
-    static final String REASON = "Automatically marked no-show: guest did not arrive within 30 minutes";
-    static final String NEVER_SEATED_REASON = "Automatically marked no-show: checked in but never seated before the reservation ended";
-
+    static final String EXPIRED_REASON = "Request expired: nobody answered it before the booking time";
+    private static final DateTimeFormatter CLOCK_TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final Logger logger = LoggerFactory.getLogger(ReservationNoShowJob.class);
-    private static final EnumSet<ReservationStatus> WAITING = EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
 
     private final ReservationRepository reservationRepository;
     private final ReservationLifecycleService reservationLifecycleService;
+    private final ReservationPolicy reservationPolicy;
     private final ReservationSupport reservationSupport;
     private final ReservationNotifications reservationNotifications;
 
@@ -41,27 +43,33 @@ public class ReservationNoShowJob {
 
     @Transactional
     public int markOverdueReservations(OffsetDateTime now) {
-        List<Reservation> overdue = new java.util.ArrayList<>(
-                reservationRepository.findOverdueForNoShow(WAITING, now.minus(GRACE), ReservationStatus.NO_SHOW));
-        for (Reservation reservation : overdue) {
-            reservationLifecycleService.transitionReservation(reservation, ReservationStatus.NO_SHOW, REASON, null);
+        ReservationActor system = ReservationActor.system(null);
+        List<Reservation> noShows = new ArrayList<>();
+        for (Reservation reservation : reservationRepository.findConfirmedPastStart(ReservationStatus.CONFIRMED, now, ReservationStatus.NO_SHOW)) {
+            OffsetDateTime holdUntil = reservationPolicy.holdUntil(reservation);
+            if (holdUntil == null || holdUntil.isAfter(now)) {
+                continue;
+            }
+            String heldUntil = CLOCK_TIME.format(holdUntil.atZoneSameInstant(reservationSupport.restaurantZone(reservation.getRestaurant())));
+            reservationLifecycleService.noShow(reservation, "Automatically marked no-show: the table was held until " + heldUntil, system);
+            noShows.add(reservation);
         }
-        // Checked in but the table never got them before the booking ended: they left, so it doesn't stay open forever.
-        List<Reservation> neverSeated = reservationRepository.findCheckedInPastEnd(ReservationStatus.CHECKED_IN, now, ReservationStatus.NO_SHOW);
-        for (Reservation reservation : neverSeated) {
-            reservation.setStatus(ReservationStatus.NO_SHOW);
-            // A no-show can't carry a check-in time; the check-in stays visible in the status history.
-            reservation.setCheckedInAt(null);
-            reservation.setNoShowAt(now);
-            reservationSupport.addStatusHistory(reservation, ReservationStatus.CHECKED_IN, ReservationStatus.NO_SHOW, NEVER_SEATED_REASON, null);
-            reservationLifecycleService.announceStatusChange(reservation, ReservationStatus.CHECKED_IN, null);
+        List<Reservation> expired = new ArrayList<>(reservationRepository.findUnansweredRequests(ReservationStatus.PENDING, now));
+        for (Reservation reservation : expired) {
+            reservationLifecycleService.expire(reservation, EXPIRED_REASON, system);
         }
-        overdue.addAll(neverSeated);
-        if (!overdue.isEmpty()) {
-            reservationRepository.saveAll(overdue);
-            reservationNotifications.noShows(overdue);
-            logger.info("Marked {} overdue reservation(s) as no-show", overdue.size());
+        List<Reservation> changed = new ArrayList<>(noShows);
+        changed.addAll(expired);
+        if (!changed.isEmpty()) {
+            reservationRepository.saveAll(changed);
+            if (!noShows.isEmpty()) {
+                reservationNotifications.noShows(noShows);
+            }
+            if (!expired.isEmpty()) {
+                reservationNotifications.expired(expired);
+            }
+            logger.info("Marked {} no-show(s) and expired {} request(s)", noShows.size(), expired.size());
         }
-        return overdue.size();
+        return changed.size();
     }
 }

@@ -44,7 +44,7 @@ class ReservationNotificationsTest {
     @Mock private UserRepository userRepository;
 
     private ReservationNotifications notifications() {
-        ReservationSupport support = new ReservationSupport(null, null, null, null, null, null, null);
+        ReservationSupport support = new ReservationSupport(null, null, null, null, null, null, null, null);
         return new ReservationNotifications(publisher, userRepository, support);
     }
 

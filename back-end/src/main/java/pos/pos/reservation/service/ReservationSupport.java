@@ -61,6 +61,14 @@ public class ReservationSupport {
     private final ReservationNoteRepository reservationNoteRepository;
     private final ReservationMapper reservationMapper;
     private final UserRepository userRepository;
+    private final ReservationPolicy reservationPolicy;
+    private GuestNoShowCounter guestNoShowCounter;
+
+    // Optional so the support works without the database-backed counter (e.g. in tests).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setGuestNoShowCounter(GuestNoShowCounter guestNoShowCounter) {
+        this.guestNoShowCounter = guestNoShowCounter;
+    }
 
     public Reservation requireReservation(UUID restaurantId, UUID reservationId) {
         return reservationRepository.findByIdAndRestaurant_Id(reservationId, restaurantId)
@@ -138,13 +146,74 @@ public class ReservationSupport {
     }
 
     public ReservationResponse toResponse(Reservation reservation) {
-        return reservationMapper.toResponse(
+        ReservationResponse response = baseResponse(reservation, OffsetDateTime.now(ZoneOffset.UTC));
+        if (guestNoShowCounter != null && reservation.getId() != null) {
+            response.setGuestNoShows(guestNoShowCounter.counts(List.of(reservation)).get(reservation.getId()));
+        }
+        return response;
+    }
+
+    // Lists: the guests' no-show counts in two queries for the whole page instead of two per booking.
+    public List<ReservationResponse> toResponses(List<Reservation> reservations) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        List<ReservationResponse> responses = reservations.stream().map(reservation -> baseResponse(reservation, now)).toList();
+        if (guestNoShowCounter != null && !reservations.isEmpty()) {
+            java.util.Map<UUID, Integer> counts = guestNoShowCounter.counts(reservations);
+            responses.forEach(response -> response.setGuestNoShows(counts.get(response.getId())));
+        }
+        return responses;
+    }
+
+    private ReservationResponse baseResponse(Reservation reservation, OffsetDateTime now) {
+        ReservationResponse response = reservationMapper.toResponse(
                 reservation,
                 reservation.getTableAssignments().stream()
                         .sorted(Comparator.comparing(ReservationTableAssignment::isPrimaryAssignment).reversed()
                                 .thenComparing(ReservationTableAssignment::getAssignedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                         .toList()
         );
+        if (reservation.getStatus() == ReservationStatus.PENDING || reservation.getStatus() == ReservationStatus.CONFIRMED) {
+            response.setHoldUntil(reservationPolicy.holdUntil(reservation));
+        }
+        String review = reviewReason(reservation, now);
+        response.setNeedsReview(review != null);
+        response.setReviewReason(review);
+        response.setAttendance(attendance(reservation, now));
+        return response;
+    }
+
+    // Has a confirmed booking's guest said they're still coming, and is it due?
+    public String attendance(Reservation reservation, OffsetDateTime now) {
+        if (reservation.getStatus() != ReservationStatus.CONFIRMED || reservation.getReservationStart() == null) {
+            return null;
+        }
+        if (reservation.getAttendanceConfirmedAt() != null) {
+            return "CONFIRMED";
+        }
+        OffsetDateTime start = reservation.getReservationStart();
+        OffsetDateTime deadline = start.minusMinutes(reservationPolicy.values(reservation.getRestaurant()).sameDayConfirmMinutes());
+        boolean bookedLate = reservation.getCreatedAt() != null && !reservation.getCreatedAt().isBefore(deadline);
+        if (bookedLate) {
+            return now.isBefore(start) ? "CONFIRM_NOW" : "NOT_CONFIRMED";
+        }
+        return now.isBefore(deadline) ? "WAITING" : "NOT_CONFIRMED";
+    }
+
+    // Visits are never ended automatically; these ones wait for staff to decide.
+    public String reviewReason(Reservation reservation, OffsetDateTime now) {
+        ReservationStatus status = reservation.getStatus();
+        if (status != ReservationStatus.CHECKED_IN && status != ReservationStatus.SEATED) {
+            return null;
+        }
+        ZoneId zone = restaurantZone(reservation.getRestaurant());
+        if (reservation.getReservationStart() != null
+                && reservationPolicy.serviceDate(reservation.getReservationStart(), zone).isBefore(reservationPolicy.serviceDate(now, zone))) {
+            return "Still open from an earlier day";
+        }
+        if (status == ReservationStatus.CHECKED_IN && reservation.getReservationEnd() != null && reservation.getReservationEnd().isBefore(now)) {
+            return "The booking time is over and the guests were never seated";
+        }
+        return null;
     }
 
     public List<ReservationTableAssignmentResponse> mapAssignments(Reservation reservation) {
@@ -306,13 +375,23 @@ public class ReservationSupport {
     }
 
     public void applyReservationRequest(Reservation reservation, ReservationRequest request, UUID actorId, boolean creating) {
+        applyReservationRequest(reservation, request, actorId, creating, request.getReservationEnd());
+    }
+
+    public void applyReservationRequest(
+            Reservation reservation,
+            ReservationRequest request,
+            UUID actorId,
+            boolean creating,
+            OffsetDateTime reservationEnd
+    ) {
         if (creating) {
             reservation.setReservationCode(generateReservationCode(reservation.getRestaurant().getId()));
         }
         reservation.setSource(request.getSource() == null ? ReservationSource.INTERNAL : request.getSource());
         reservation.setPartySize(request.getPartySize());
         reservation.setReservationStart(request.getReservationStart());
-        reservation.setReservationEnd(request.getReservationEnd());
+        reservation.setReservationEnd(reservationEnd);
         reservation.setContactName(firstNonBlank(
                 request.getContactName(),
                 reservation.getCustomer() == null ? null : reservation.getCustomer().displayName()
@@ -330,7 +409,7 @@ public class ReservationSupport {
         reservation.setInternalNotes(NormalizationUtils.normalize(request.getInternalNotes()));
         reservation.setUpdatedBy(actorId);
         applyDepositFields(reservation, request.getDepositRequired(), request.getDepositAmount(), creating);
-        validateReservationWindow(request.getReservationStart(), request.getReservationEnd());
+        validateReservationWindow(request.getReservationStart(), reservationEnd);
     }
 
     public void applyReservationPatch(Reservation reservation, UpdateReservationRequest request, UUID actorId) {

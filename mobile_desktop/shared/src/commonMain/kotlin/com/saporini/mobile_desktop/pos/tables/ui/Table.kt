@@ -46,6 +46,8 @@ enum class TableVisualState {
     Free,
     Occupied,
     Reserved,
+    // A booking's hold is running out: "Hold ends in N min".
+    HoldEnding,
     BillPending,
     Unavailable
 }
@@ -102,6 +104,7 @@ internal fun tableStatusColor(state: TableVisualState): Color = when (state) {
     // Same burnt orange as the Orders "in preparation" badge.
     TableVisualState.Occupied -> Color(0xFFD15F00)
     TableVisualState.Reserved -> Color(0xFF8B5CF6)
+    TableVisualState.HoldEnding -> Color(0xFFEAB308)
     TableVisualState.BillPending -> Color(0xFF3B82F6)
     TableVisualState.Unavailable -> Color(0xFF6B7280)
 }

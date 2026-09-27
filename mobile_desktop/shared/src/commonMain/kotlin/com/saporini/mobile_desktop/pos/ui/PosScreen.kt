@@ -139,6 +139,7 @@ object PosScreen : Screen {
                         )
                         PosSection.MENU -> MenuScreen(Modifier.weight(1f))
                         PosSection.KITCHEN_STATUS -> KitchenStatusScreen(Modifier.weight(1f))
+                        PosSection.SHIFT -> com.saporini.mobile_desktop.pos.shifts.ShiftScreen(Modifier.weight(1f))
                         PosSection.MY_SALES -> MySalesScreen(Modifier.weight(1f))
                         else -> Box(
                             modifier = Modifier

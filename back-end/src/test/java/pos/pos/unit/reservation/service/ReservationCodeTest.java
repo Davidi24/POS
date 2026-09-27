@@ -28,7 +28,13 @@ class ReservationCodeTest {
     @Test void bookingsMadeBackToBackGetDifferentCodes() {
         Restaurant restaurant = new Restaurant();
         restaurant.setId(UUID.randomUUID());
-        ReservationRequest request = ReservationRequest.builder().partySize(2).build();
+        OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1);
+        ReservationRequest request = ReservationRequest.builder()
+                .partySize(2)
+                .contactName("Maria")
+                .reservationStart(start)
+                .reservationEnd(start.plusHours(2))
+                .build();
 
         Reservation first = booking(restaurant);
         Reservation second = booking(restaurant);
