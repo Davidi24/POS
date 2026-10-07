@@ -34,14 +34,15 @@ public class RoleCatalogService {
     private final RolePermissionRepository rolePermissionRepository;
     private final RoleHierarchyService roleHierarchyService;
 
-    public List<RoleResponse> getRoles() {
+    public List<RoleResponse> getRoles(Authentication authentication) {
         return roleRepository.findByIsActiveTrueOrderByRankDescNameAsc().stream()
+                .filter(role -> roleHierarchyService.visibleTo(authentication, role))
                 .map(RoleMapper::toResponse)
                 .toList();
     }
 
-    public RoleResponse getRole(UUID roleId) {
-        return RoleMapper.toResponse(findExistingRole(roleId));
+    public RoleResponse getRole(Authentication authentication, UUID roleId) {
+        return RoleMapper.toResponse(findVisibleRole(authentication, roleId));
     }
 
     public List<PermissionResponse> getPermissions() {
@@ -50,8 +51,8 @@ public class RoleCatalogService {
                 .toList();
     }
 
-    public List<PermissionResponse> getRolePermissions(UUID roleId) {
-        findExistingRole(roleId);
+    public List<PermissionResponse> getRolePermissions(Authentication authentication, UUID roleId) {
+        findVisibleRole(authentication, roleId);
 
         List<RolePermission> assignments = rolePermissionRepository.findByRoleId(roleId);
         if (assignments.isEmpty()) {
@@ -84,8 +85,10 @@ public class RoleCatalogService {
                 .toList();
     }
 
-    private Role findExistingRole(UUID roleId) {
+    // Another restaurant's custom role is reported as not found, not as forbidden.
+    private Role findVisibleRole(Authentication authentication, UUID roleId) {
         return roleRepository.findByIdAndDeletedAtIsNull(roleId)
+                .filter(role -> roleHierarchyService.visibleTo(authentication, role))
                 .orElseThrow(RoleNotFoundException::new);
     }
 }

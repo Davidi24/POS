@@ -1,5 +1,6 @@
 package pos.pos.menu.dto.request;
 
+import jakarta.validation.constraints.Digits;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -26,6 +27,7 @@ public class CreateMenuVariantRequest {
     @Size(max = 80, message = "SKU must be at most 80 characters")
     private String sku;
 
+    @Digits(integer = 12, fraction = 2, message = "priceDelta must have at most 12 digits and 2 decimals")
     private BigDecimal priceDelta;
 
     @JsonProperty("default")

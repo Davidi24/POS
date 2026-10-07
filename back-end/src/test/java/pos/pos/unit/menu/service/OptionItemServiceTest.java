@@ -23,6 +23,11 @@ import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.restaurant.service.RestaurantValidationService;
+import pos.pos.recipe.repository.RecipeRepository;
+import pos.pos.recipe.entity.Recipe;
+import pos.pos.recipe.enums.RecipeStatus;
+import pos.pos.recipe.enums.RecipeType;
+import pos.pos.exception.auth.AuthException;
 import pos.pos.security.principal.AuthenticatedUser;
 
 import java.math.BigDecimal;
@@ -52,6 +57,9 @@ class OptionItemServiceTest {
     @Mock
     private OptionItemRepository optionItemRepository;
 
+    @Mock
+    private RecipeRepository recipeRepository;
+
     private OptionItemService optionItemService;
     private StubRestaurantScopeService restaurantScopeService;
     private StubRestaurantValidationService restaurantValidationService;
@@ -65,7 +73,8 @@ class OptionItemServiceTest {
                 optionItemRepository,
                 new MenuMapper(),
                 restaurantScopeService,
-                restaurantValidationService
+                restaurantValidationService,
+                recipeRepository
         );
     }
 
@@ -118,6 +127,67 @@ class OptionItemServiceTest {
         assertThat(saved.isAvailable()).isTrue();
         assertThat(saved.getDisplayOrder()).isZero();
         assertThat(response.getId()).isEqualTo(ITEM_ID);
+    }
+
+    @Test
+    @DisplayName("modifier stock mapping defaults to one full recipe yield")
+    void shouldMapModifierToAnActivePrepRecipe() {
+        Restaurant restaurant = restaurant();
+        OptionGroup group = optionGroup(restaurant, GROUP_ID);
+        UUID recipeId = UUID.randomUUID();
+        Recipe recipe = new Recipe();
+        recipe.setId(recipeId);
+        recipe.setRestaurant(restaurant);
+        recipe.setRecipeType(RecipeType.PREP_BATCH);
+        recipe.setStatus(RecipeStatus.ACTIVE);
+        recipe.setYieldQuantity(new BigDecimal("4"));
+        CreateOptionItemRequest request = CreateOptionItemRequest.builder()
+                .name("Extra cheese")
+                .inventoryRecipeId(recipeId)
+                .build();
+
+        restaurantScopeService.manageableRestaurant = restaurant;
+        given(optionGroupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(optionItemRepository.existsByOptionGroupIdAndName(GROUP_ID, "Extra cheese")).willReturn(false);
+        given(recipeRepository.findByIdAndRestaurant_Id(recipeId, RESTAURANT_ID)).willReturn(Optional.of(recipe));
+        given(optionItemRepository.saveAndFlush(any(OptionItem.class))).willAnswer(invocation -> {
+            OptionItem saved = invocation.getArgument(0);
+            saved.setId(ITEM_ID);
+            return saved;
+        });
+
+        OptionItemResponse response = optionItemService.createOptionItem(authentication(), GROUP_ID, request);
+
+        ArgumentCaptor<OptionItem> captor = ArgumentCaptor.forClass(OptionItem.class);
+        verify(optionItemRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getInventoryRecipe()).isSameAs(recipe);
+        assertThat(captor.getValue().getInventoryRecipeQuantity()).isEqualByComparingTo("4");
+        assertThat(response.getInventoryRecipeId()).isEqualTo(recipeId);
+        assertThat(response.getInventoryRecipeQuantity()).isEqualByComparingTo("4");
+    }
+
+    @Test
+    @DisplayName("modifier mappings reject finished dish recipes")
+    void shouldRejectFinishedDishRecipeForModifier() {
+        Restaurant restaurant = restaurant();
+        OptionGroup group = optionGroup(restaurant, GROUP_ID);
+        UUID recipeId = UUID.randomUUID();
+        Recipe recipe = new Recipe();
+        recipe.setId(recipeId);
+        recipe.setRestaurant(restaurant);
+        recipe.setRecipeType(RecipeType.FINISHED_DISH);
+        recipe.setStatus(RecipeStatus.ACTIVE);
+        recipe.setYieldQuantity(BigDecimal.ONE);
+
+        restaurantScopeService.manageableRestaurant = restaurant;
+        given(optionGroupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(optionGroupRepository.findById(GROUP_ID)).willReturn(Optional.of(group));
+        given(optionItemRepository.existsByOptionGroupIdAndName(GROUP_ID, "Extra cheese")).willReturn(false);
+        given(recipeRepository.findByIdAndRestaurant_Id(recipeId, RESTAURANT_ID)).willReturn(Optional.of(recipe));
+
+        assertThatThrownBy(() -> optionItemService.createOptionItem(authentication(), GROUP_ID,
+                CreateOptionItemRequest.builder().name("Extra cheese").inventoryRecipeId(recipeId).build()))
+                .isInstanceOf(AuthException.class).hasMessageContaining("prep-batch or sub-recipe");
     }
 
     @Test

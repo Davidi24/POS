@@ -198,7 +198,7 @@ internal fun HoldLongerDialog(guestName: String, endsAt: String, onConfirm: (min
 }
 
 @Composable
-private fun CountButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+internal fun CountButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.size(38.dp).clip(RoundedCornerShape(10.dp))
             .background(if (enabled) Color.White else Color(0xFFF3F4F2))

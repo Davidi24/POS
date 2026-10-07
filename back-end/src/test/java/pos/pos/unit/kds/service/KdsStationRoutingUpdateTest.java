@@ -89,6 +89,7 @@ class KdsStationRoutingUpdateTest {
 
     private static KdsStationRouting routing(MenuItem item) {
         KdsStationRouting routing = new KdsStationRouting();
+        routing.setId(UUID.randomUUID());
         routing.setMenuItem(item);
         routing.setActive(true);
         return routing;

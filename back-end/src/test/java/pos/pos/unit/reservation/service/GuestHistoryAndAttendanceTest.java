@@ -153,6 +153,20 @@ class GuestHistoryAndAttendanceTest {
         assertThat(counter.noShowsOf(anonymous)).isEmpty();
     }
 
+    @Test
+    @DisplayName("a guest without an email or customer still queries with values Postgres accepts")
+    @SuppressWarnings("unchecked")
+    void emptyKeysAreSafeForPostgres() {
+        Reservation phoneOnly = booking(ReservationStatus.CONFIRMED, NOW.plusHours(1), "+39111");
+        org.mockito.ArgumentCaptor<java.util.Collection<String>> emails = org.mockito.ArgumentCaptor.forClass(java.util.Collection.class);
+
+        new GuestNoShowCounter(reservationRepository, clearRepository).counts(List.of(phoneOnly));
+
+        verify(reservationRepository).findGuestNoShows(any(), any(), any(), any(), emails.capture());
+        // Regression: a NUL placeholder made Postgres reject the query, so creating any booking failed.
+        assertThat(emails.getValue()).noneMatch(value -> value.contains("\u0000"));
+    }
+
     // ---- Attendance ----
 
     @Test

@@ -11,6 +11,7 @@ import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.notification.dto.CreateNotificationBroadcastRequest;
 import pos.pos.notification.dto.NotificationResponse;
+import pos.pos.notification.enums.NotificationChannel;
 import pos.pos.notification.entity.Notification;
 import pos.pos.notification.enums.NotificationMutationType;
 import pos.pos.notification.enums.NotificationTopic;
@@ -104,6 +105,9 @@ public class NotificationService {
         if (notification.getRecipientUser() == null || !currentUserId.equals(notification.getRecipientUser().getId())) {
             throw new AuthException("Only personal notifications can be marked as read", HttpStatus.FORBIDDEN);
         }
+        if (notification.getDeliveredAt() == null) {
+            throw new AuthException("Notification cannot be marked as read before it is delivered", HttpStatus.CONFLICT);
+        }
 
         if (notification.getReadAt() == null) {
             notification.setReadAt(OffsetDateTime.now(ZoneOffset.UTC));
@@ -122,6 +126,10 @@ public class NotificationService {
             CreateNotificationBroadcastRequest request
     ) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        NotificationChannel channel = request.getChannel() == null ? NotificationChannel.IN_APP : request.getChannel();
+        if (channel != NotificationChannel.IN_APP) {
+            throw new AuthException("Delivery for " + channel + " is not configured; choose IN_APP", HttpStatus.CONFLICT);
+        }
         UUID actorId = actorScopeService.currentUserId(authentication);
 
         UUID branchId = request.getBranchId();
@@ -146,7 +154,7 @@ public class NotificationService {
         NotificationOperationalEvent event = new NotificationOperationalEvent(
                 request.getTopic(),
                 NotificationMutationType.BROADCAST,
-                request.getChannel() == null ? pos.pos.notification.enums.NotificationChannel.IN_APP : request.getChannel(),
+                channel,
                 request.getPriority() == null ? pos.pos.notification.enums.NotificationPriority.NORMAL : request.getPriority(),
                 NotificationEventCodeSupport.normalizeEventCode(
                         request.getEventCode(),

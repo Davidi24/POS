@@ -1,11 +1,14 @@
 package pos.pos.inventory.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.inventory.InventoryCountNotFoundException;
 import pos.pos.exception.inventory.InventoryCountStateException;
@@ -32,8 +35,12 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 // A physical inventory count follows these steps:
 // DRAFT -> IN_PROGRESS -> COMPLETED -> APPROVED
@@ -48,6 +55,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class InventoryCountService {
+
+    private static final int DEFAULT_COUNT_PAGE_SIZE = 50;
 
     private final RestaurantScopeService restaurantScopeService;
     private final InventoryCountRepository inventoryCountRepository;
@@ -69,6 +78,7 @@ public class InventoryCountService {
         UUID actorId = restaurantScopeService.currentUserId(authentication);
 
         InventoryLocation location = requireLocation(restaurantId, request.getLocationId());
+        assertLocationActive(location);
         Branch branch = resolveBranch(restaurantId, request.getBranchId());
 
         //Creates a new Inventory Count and sets the given Information for the given count
@@ -97,16 +107,22 @@ public class InventoryCountService {
 
     //Gets a given optional Status and returns all counts on that status, if status not given returns all counts
     @Transactional(readOnly = true)
-    public List<InventoryCountResponse> listCounts(Authentication authentication, UUID restaurantId, InventoryCountStatus status) {
+    public PageResponse<InventoryCountResponse> listCounts(
+            Authentication authentication,
+            UUID restaurantId,
+            InventoryCountStatus status,
+            Integer page,
+            Integer size
+    ) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        PageRequest pageable = pos.pos.utils.PageableUtils.of(page, size, DEFAULT_COUNT_PAGE_SIZE,
+                org.springframework.data.domain.Sort.unsorted());
+        Page<UUID> ids = inventoryCountRepository.findCountIds(restaurantId, status != null, status, pageable);
+        if (ids.isEmpty()) return PageResponse.from(ids.map(id -> (InventoryCountResponse) null));
 
-        List<InventoryCount> counts = status != null
-                ? inventoryCountRepository.findAllByRestaurant_IdAndStatusOrderByCreatedAtDesc(restaurantId, status)
-                : inventoryCountRepository.findAllByRestaurant_IdOrderByCreatedAtDesc(restaurantId);
-
-        return counts.stream()
-                .map(inventoryCountMapper::toResponse)
-                .toList();
+        Map<UUID, InventoryCount> countsById = inventoryCountRepository.findAllByIdIn(ids.getContent()).stream()
+                .collect(Collectors.toMap(InventoryCount::getId, Function.identity()));
+        return PageResponse.from(ids.map(id -> inventoryCountMapper.toResponse(countsById.get(id))));
     }
 
 
@@ -114,11 +130,12 @@ public class InventoryCountService {
     @Transactional
     public InventoryCountResponse startCount(Authentication authentication, UUID restaurantId, UUID countId) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
-        InventoryCount count = requireCount(restaurantId, countId);
+        InventoryCount count = requireCountForUpdate(restaurantId, countId);
 
         if (count.getStatus() != InventoryCountStatus.DRAFT) {
             throw new InventoryCountStateException("Count must be DRAFT to start (currently " + count.getStatus() + ")");
         }
+        assertLocationActive(count.getLocation());
 
         count.setStatus(InventoryCountStatus.IN_PROGRESS);
         count.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
@@ -140,7 +157,7 @@ public class InventoryCountService {
     ) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         //Find the count and check if it is allowed to edit or no(DRAFT, IN_PROGRESS)
-        InventoryCount count = requireCount(restaurantId, countId);
+        InventoryCount count = requireCountForUpdate(restaurantId, countId);
         assertLinesEditable(count);
 
         //Checks the id in the body and the URL for alidation
@@ -188,7 +205,7 @@ public class InventoryCountService {
     @Transactional
     public InventoryCountResponse removeLine(Authentication authentication, UUID restaurantId, UUID countId, UUID lineId) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
-        InventoryCount count = requireCount(restaurantId, countId);
+        InventoryCount count = requireCountForUpdate(restaurantId, countId);
         assertLinesEditable(count);
 
         InventoryCountLine line = count.getLines().stream()
@@ -207,7 +224,7 @@ public class InventoryCountService {
     @Transactional
     public InventoryCountResponse completeCount(Authentication authentication, UUID restaurantId, UUID countId) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
-        InventoryCount count = requireCount(restaurantId, countId);
+        InventoryCount count = requireCountForUpdate(restaurantId, countId);
 
         if (count.getStatus() != InventoryCountStatus.IN_PROGRESS) {
             throw new InventoryCountStateException("Count must be IN_PROGRESS to complete (currently " + count.getStatus() + ")");
@@ -235,11 +252,12 @@ public class InventoryCountService {
     @Transactional
     public InventoryCountResponse approveCount(Authentication authentication, UUID restaurantId, UUID countId) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
-        InventoryCount count = requireCount(restaurantId, countId);
+        InventoryCount count = requireCountForUpdate(restaurantId, countId);
 
         if (count.getStatus() != InventoryCountStatus.COMPLETED) {
             throw new InventoryCountStateException("Count must be COMPLETED to approve (currently " + count.getStatus() + ")");
         }
+        assertLocationActive(count.getLocation());
 
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
@@ -286,7 +304,7 @@ public class InventoryCountService {
     @Transactional
     public InventoryCountResponse cancelCount(Authentication authentication, UUID restaurantId, UUID countId) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
-        InventoryCount count = requireCount(restaurantId, countId);
+        InventoryCount count = requireCountForUpdate(restaurantId, countId);
 
         if (count.getStatus() == InventoryCountStatus.APPROVED) {
             throw new InventoryCountStateException("An approved count cannot be cancelled");
@@ -307,14 +325,14 @@ public class InventoryCountService {
         }
     }
 
-    //Is a number that is used for the inventory which is not the ID but for the communication between workers
-    //It is usually created based on time but if it is givve blank it will be created automatically
+    //A generated count number is a short human-facing reference with random bits. A timestamp-only
+    //suffix can collide when multiple staff members create counts in the same millisecond.
     private String resolveCountNumber(String rawCountNumber) {
         if (rawCountNumber != null && !rawCountNumber.isBlank()) {
             return rawCountNumber;
         }
 
-        return "IC-" + System.currentTimeMillis();
+        return "IC-" + UUID.randomUUID().toString().toUpperCase(Locale.ROOT);
     }
 
     //Returns count from DB
@@ -323,10 +341,21 @@ public class InventoryCountService {
                 .orElseThrow(InventoryCountNotFoundException::new);
     }
 
+    private InventoryCount requireCountForUpdate(UUID restaurantId, UUID countId) {
+        return inventoryCountRepository.findByIdAndRestaurantIdForUpdate(countId, restaurantId)
+                .orElseThrow(InventoryCountNotFoundException::new);
+    }
+
     //Returns Location from DB
     private InventoryLocation requireLocation(UUID restaurantId, UUID locationId) {
         return inventoryLocationRepository.findByIdAndRestaurant_Id(locationId, restaurantId)
                 .orElseThrow(InventoryLocationNotFoundException::new);
+    }
+
+    private void assertLocationActive(InventoryLocation location) {
+        if (!location.isActive()) {
+            throw new AuthException("Inventory counts cannot be performed at an inactive location", HttpStatus.CONFLICT);
+        }
     }
 
     //Returns Item from DB
@@ -349,9 +378,24 @@ public class InventoryCountService {
         try {
             return inventoryCountRepository.saveAndFlush(count);
         } catch (DataIntegrityViolationException ex) {
+            if (isCountNumberConstraintViolation(ex)) {
+                throw new AuthException("This count number is already used in this restaurant", HttpStatus.CONFLICT);
+            }
             throw new AuthException("Inventory count update violates a data constraint", HttpStatus.BAD_REQUEST);
         } catch (IllegalStateException ex) {
             throw new AuthException(ex.getMessage(), HttpStatus.BAD_REQUEST);
         }
+    }
+
+    private boolean isCountNumberConstraintViolation(DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation
+                    && "uk_inventory_counts_restaurant_count_number".equals(violation.getConstraintName())) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 }

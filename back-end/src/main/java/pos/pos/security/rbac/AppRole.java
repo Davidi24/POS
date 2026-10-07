@@ -47,7 +47,9 @@ public enum AppRole {
                     ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
                     KDS_READ, KDS_UPDATE,
                     SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
-                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS
+                    PAYMENT_REFUND,
+                    REPORTS_READ, FRAUD_READ, FRAUD_REVIEW,
+                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS, STATISTICS_ACCESS, FRAUD_ACCESS
             )
     ),
 
@@ -70,7 +72,9 @@ public enum AppRole {
                     ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
                     KDS_READ, KDS_UPDATE,
                     SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
-                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS
+                    PAYMENT_REFUND,
+                    REPORTS_READ,
+                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS, STATISTICS_ACCESS
             )
     ),
 
@@ -92,6 +96,7 @@ public enum AppRole {
                     ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
                     KDS_READ, KDS_UPDATE,
                     SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
+                    PAYMENT_REFUND,
                     POS_ACCESS, ADMIN_ACCESS
             ),
             CO_OWNER
@@ -114,6 +119,8 @@ public enum AppRole {
                     ORDER_DISCOUNT_APPLY,
                     ORDER_TRANSFER,
                     SHIFT_SELF,
+                    // POS → Kitchen Status: what the kitchen is making for their tables.
+                    KDS_READ,
                     POS_ACCESS
             )
     ),

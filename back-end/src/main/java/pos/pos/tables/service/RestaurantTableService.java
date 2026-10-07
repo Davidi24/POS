@@ -340,15 +340,6 @@ public class RestaurantTableService {
             TableMergeRequest request
     ) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
-        RestaurantTable primaryTable = requireTableForUpdate(branchId, tableId);
-        if (primaryTable.getMergedInto() != null) {
-            throw new AuthException(
-                    primaryTable.getTableNumber() + " is already merged with "
-                            + primaryTable.getMergedInto().getTableNumber() + ". Edit the existing table group instead.",
-                    HttpStatus.CONFLICT
-            );
-        }
-
         Set<UUID> uniqueIds = new LinkedHashSet<>(request.getTableIds());
         if (uniqueIds.contains(tableId)) {
             throw new AuthException("tableIds must not include the primary table id", HttpStatus.BAD_REQUEST);
@@ -356,6 +347,21 @@ public class RestaurantTableService {
 
         if (uniqueIds.size() != request.getTableIds().size()) {
             throw new AuthException("tableIds must not contain duplicates", HttpStatus.BAD_REQUEST);
+        }
+
+        // Every merge locks all participants in the same database order. Locking
+        // the primary first and targets second can deadlock overlapping A→B/B→A requests.
+        List<UUID> participantIds = new java.util.ArrayList<>(uniqueIds);
+        participantIds.add(tableId);
+        restaurantTableRepository.lockTablesForUpdateInStableOrder(branchId, participantIds);
+
+        RestaurantTable primaryTable = requireTableForUpdate(branchId, tableId);
+        if (primaryTable.getMergedInto() != null) {
+            throw new AuthException(
+                    primaryTable.getTableNumber() + " is already merged with "
+                            + primaryTable.getMergedInto().getTableNumber() + ". Edit the existing table group instead.",
+                    HttpStatus.CONFLICT
+            );
         }
 
         List<RestaurantTable> mergeTargets = restaurantTableRepository.findAllByBranchIdAndIdsForUpdate(branchId, uniqueIds);

@@ -11,7 +11,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface OrderRepository extends JpaRepository<Order, UUID> {
+public interface OrderRepository extends JpaRepository<Order, UUID>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Order> {
+    @EntityGraph(attributePaths = {"restaurant", "branch", "restaurantTable", "reservation", "customer"})
+    @org.springframework.data.jpa.repository.Query("select o from Order o where o.id in :ids")
+    List<Order> findSummaryGraphByIds(@org.springframework.data.repository.query.Param("ids") Collection<UUID> ids);
+
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select o from Order o where o.id = :id and o.restaurant.id = :restaurantId")
     Optional<Order> findForUpdate(@org.springframework.data.repository.query.Param("id") UUID id,
@@ -87,15 +91,9 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @EntityGraph(attributePaths = {"customer", "restaurantTable"})
     Optional<Order> findTopByRestaurantTable_IdAndStatusInOrderByOpenedAtDesc(UUID tableId, Collection<OrderStatus> statuses);
 
-    // Fetch one collection only; other collections load inside the service transaction.
-    @EntityGraph(attributePaths = {
-            "branch",
-            "customer",
-            "restaurantTable",
-            "lineItems",
-            "lineItems.menuItem",
-            "lineItems.variant"
-    })
+    // This top-row lookup is used by the public checkout flow. Avoid fetching lineItems here: Hibernate would
+    // apply the max-results limit in memory. The caller loads the collection within its transaction when needed.
+    @EntityGraph(attributePaths = {"branch", "customer", "restaurantTable"})
     Optional<Order> findTopByOrderNumberOrderByCreatedAtDesc(String orderNumber);
 
     // Whether a booking already has orders (or payments on them) at its table.

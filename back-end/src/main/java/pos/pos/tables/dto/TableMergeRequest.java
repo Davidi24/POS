@@ -1,5 +1,6 @@
 package pos.pos.tables.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -19,5 +20,6 @@ import java.util.UUID;
 public class TableMergeRequest {
 
     @NotEmpty(message = "tableIds is required")
+    @Size(max = 100, message = "tableIds can have at most 100 values")
     private List<@NotNull(message = "tableIds must not contain null values") UUID> tableIds;
 }

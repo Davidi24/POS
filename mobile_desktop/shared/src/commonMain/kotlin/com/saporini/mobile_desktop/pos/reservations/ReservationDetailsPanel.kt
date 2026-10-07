@@ -150,10 +150,12 @@ internal fun ReservationDetailsPanel(
                 "Accept this request?", offer.note.orEmpty(), "Accept", reasonRequired = true, reasonHint = reasonHint()
             ) { model.confirmReservation(id, it) }) else model.confirmReservation(id)
             BookingAction.DECLINE -> ask(ReasonPrompt(
-                "Decline this request?", "The request from $name is declined and its table becomes free.", "Decline request",
+                "Decline this request?",
+                "The request from $name is declined and its table becomes free. The guest is told by email, and anything they paid goes back in full.",
+                "Decline request",
                 danger = true, reasonRequired = correction, reasonHint = reasonHint(),
                 suggestions = listOf("Fully booked", "Closed that day", "Group too big")
-            ) { reason -> model.cancelReservation(id, listOfNotNull("Declined", reason).joinToString(": ")) })
+            ) { reason -> model.declineReservation(id, reason) })
             BookingAction.GUEST_ARRIVED -> if (booking.partySize > 1) {
                 arrivedPrompt = ArrivedPrompt(
                     "How many have arrived?", booking.partySize, booking.partySize,
@@ -380,6 +382,7 @@ internal fun ReservationDetailsPanel(
                     notes = state.notes,
                     currentUserId = state.scope?.userId,
                     rules = state.rules,
+                    occasions = state.occasions,
                     saving = state.isSaving,
                     onCancel = { editSection = null },
                     onSave = { input, notesToAdd, noteIdsToDelete ->
@@ -419,6 +422,7 @@ internal fun ReservationDetailsPanel(
                         else "Finish the visit if they've left."
                     )
                 }
+                OccasionCard(reservation)
                 reservation.guestNoShows?.takeIf { it >= policy.noShowWarningFrom }?.let {
                     GuestNoShowCard(model, reservation, canClear = state.can(ReservationsScreenModel.CORRECT_PERMISSION)) { prompt -> ask(prompt) }
                 }
@@ -437,6 +441,12 @@ internal fun ReservationDetailsPanel(
                     InfoBlock(Icons.Outlined.Notes, "Special request", reservation.specialRequests?.takeIf(String::isNotBlank) ?: "None")
                     InfoBlock(Icons.Outlined.StickyNote2, "Internal note", reservation.internalNotes?.takeIf(String::isNotBlank) ?: "None")
                 }
+                BookingMoneyCard(
+                    model, reservation,
+                    canManage = state.can(ReservationsScreenModel.WRITE_PERMISSION),
+                    canGoodwill = state.can(ReservationsScreenModel.GOODWILL_PERMISSION),
+                    now = now
+                )
                 }
                 PanelTab.TABLES -> {
                     reservation.tableAssignments.forEach { assignment ->
@@ -691,8 +701,12 @@ private fun EditReservationForm(
     rules: ReservationRules,
     saving: Boolean,
     onCancel: () -> Unit,
-    onSave: (UpdateReservationInput?, notesToAdd: List<String>, noteIdsToDelete: Set<String>) -> Unit
+    onSave: (UpdateReservationInput?, notesToAdd: List<String>, noteIdsToDelete: Set<String>) -> Unit,
+    occasions: List<com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationOccasion> = emptyList()
 ) {
+    var occasionCode by remember(reservation.id) { mutableStateOf(reservation.occasionCode) }
+    var occasionOptions by remember(reservation.id) { mutableStateOf(reservation.occasionOptions) }
+    var occasionNote by remember(reservation.id) { mutableStateOf(reservation.occasionNote.orEmpty()) }
     // Note changes wait for "Save changes", like the rest of the form.
     var notesToAdd by remember(reservation.id) { mutableStateOf<List<String>>(emptyList()) }
     var noteIdsToDelete by remember(reservation.id) { mutableStateOf<Set<String>>(emptySet()) }
@@ -758,6 +772,16 @@ private fun EditReservationForm(
         FormField("Email") {
             InputBox(Icons.Outlined.Email, email, "email@example.com", keyboardType = KeyboardType.Email, isError = attempted && emailError != null) { email = it.trim().take(EMAIL_LIMIT) }
             if (attempted && emailError != null) ErrorText(emailError)
+        }
+        // Occasions no longer offered stay listed on the booking, so show the picker only with the current list.
+        if (occasions.isNotEmpty()) {
+            FormField("Occasion", optional = true) {
+                OccasionPicker(occasions, occasionCode, occasionOptions, occasionNote) { code, options, text ->
+                    occasionCode = code
+                    occasionOptions = options
+                    occasionNote = text
+                }
+            }
         }
         }
         if (section == EditSection.NOTES) {
@@ -826,7 +850,14 @@ private fun EditReservationForm(
                                     reservationEnd = end.at(date).toInstant(zone).toString(),
                                     contactName = name.trim(),
                                     contactPhone = phone.trim(),
-                                    contactEmail = email.trim()
+                                    contactEmail = email.trim(),
+                                    // Only when it changed; an empty code removes it.
+                                    occasionCode = (occasionCode ?: "").takeIf {
+                                        occasionCode != reservation.occasionCode || occasionOptions != reservation.occasionOptions ||
+                                            occasionNote.trim() != reservation.occasionNote.orEmpty()
+                                    },
+                                    occasionOptions = occasionOptions,
+                                    occasionNote = occasionNote.trim()
                                 )
                             } else {
                                 null

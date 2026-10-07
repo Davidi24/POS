@@ -24,8 +24,11 @@ data class StaffNotification(
     val referenceType: String?,
     val referenceId: String?,
     val createdAt: String?,
-    val read: Boolean
-)
+    val read: Boolean,
+    val markReadAllowed: Boolean = true
+) {
+    val canMarkRead: Boolean get() = !read && markReadAllowed
+}
 
 data class NotificationsState(
     val items: List<StaffNotification> = emptyList(),
@@ -94,23 +97,32 @@ class NotificationCenter(
     }
 
     fun markRead(notification: StaffNotification) {
-        if (notification.read) return
-        val restaurantId = sessionManager.currentUser.value?.restaurantId ?: return
-        _state.update { current ->
-            current.copy(
-                items = current.items.map { if (it.id == notification.id) it.copy(read = true) else it },
-                unreadCount = (current.unreadCount - 1).coerceAtLeast(0)
-            )
+        if (!notification.canMarkRead) return
+        val user = sessionManager.currentUser.value ?: return
+        val restaurantId = user.restaurantId ?: return
+        val branchId = user.defaultBranchId ?: return
+        scope.launch {
+            runCatching { api.markRead(restaurantId, notification.id) }
+                .onSuccess {
+                    if (sessionManager.currentUser.value?.restaurantId == restaurantId &&
+                        sessionManager.currentUser.value?.defaultBranchId == branchId
+                    ) refresh(restaurantId, branchId)
+                }
         }
-        scope.launch { runCatching { api.markRead(restaurantId, notification.id) } }
     }
 
     fun markAllRead() {
         val user = sessionManager.currentUser.value ?: return
         val restaurantId = user.restaurantId ?: return
         val branchId = user.defaultBranchId ?: return
-        _state.update { current -> current.copy(items = current.items.map { it.copy(read = true) }, unreadCount = 0) }
-        scope.launch { runCatching { api.markAllRead(restaurantId, branchId) } }
+        scope.launch {
+            runCatching { api.markAllRead(restaurantId, branchId) }
+                .onSuccess {
+                    if (sessionManager.currentUser.value?.restaurantId == restaurantId &&
+                        sessionManager.currentUser.value?.defaultBranchId == branchId
+                    ) refresh(restaurantId, branchId)
+                }
+        }
     }
 }
 
@@ -122,5 +134,6 @@ private fun NotificationDto.toModel() = StaffNotification(
     referenceType = referenceType,
     referenceId = referenceId,
     createdAt = createdAt,
-    read = readAt != null
+    read = readAt != null,
+    markReadAllowed = markReadAllowed
 )

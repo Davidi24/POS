@@ -33,6 +33,8 @@ public class UserMapper {
                 .emailVerified(user.isEmailVerified())
                 .phoneVerified(user.isPhoneVerified())
                 .roles(roles == null ? List.of() : List.copyOf(roles))
+                .restaurantId(user.getRestaurantId())
+                .defaultBranchId(user.getDefaultBranchId())
                 .build();
     }
 

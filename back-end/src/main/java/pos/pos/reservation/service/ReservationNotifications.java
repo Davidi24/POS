@@ -35,6 +35,7 @@ public class ReservationNotifications {
     public static final String CALL_GUEST = "RESERVATION_CALL_GUEST";
     public static final String DAY_BEFORE = "RESERVATION_DAY_BEFORE";
     public static final String TABLE_FREED = "RESERVATION_TABLE_FREED";
+    public static final String RUNNING_LATE = "RESERVATION_RUNNING_LATE";
 
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.ENGLISH);
 
@@ -48,6 +49,12 @@ public class ReservationNotifications {
 
     public void cancelled(Reservation reservation, UUID actorId) {
         send(reservation, CANCELLED, "Reservation cancelled", summary(reservation), reservation.getId(), actorId);
+    }
+
+    // The guest said from their email link that they're running late.
+    public void runningLate(Reservation reservation, int minutes, String heldUntil) {
+        send(reservation, RUNNING_LATE, "Running " + minutes + " min late", summary(reservation) + " · table held until " + heldUntil,
+                reservation.getId(), null);
     }
 
     // A guest who didn't come before has booked again. Staff decide; nothing is restricted automatically.

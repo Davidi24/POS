@@ -19,6 +19,8 @@ import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
 import pos.pos.settings.dto.UpdateSettingsSequencePrefixesRequest;
 import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
 import pos.pos.settings.dto.UpdateSettingsReservationPolicyRequest;
+import pos.pos.settings.dto.UpdateSettingsKitchenStatusRequest;
+import pos.pos.settings.dto.UpdateSettingsShiftsRequest;
 import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.entity.Settings;
 import pos.pos.settings.enums.ServiceChargeType;
@@ -268,6 +270,12 @@ public class SettingsService {
         settings.setGuestReminderHours(request.getGuestReminderHours());
         settings.setNoShowWarningFrom(request.getNoShowWarningFrom());
         settings.setDepositFromGuests(request.getDepositFromGuests());
+        if (request.getCardFeePercent() != null) {
+            settings.setCardFeePercent(request.getCardFeePercent());
+        }
+        if (request.getCardFeeFixed() != null) {
+            settings.setCardFeeFixed(request.getCardFeeFixed());
+        }
 
         return saveSettingsAndAudit(
                 context,
@@ -276,6 +284,67 @@ public class SettingsService {
                 "UPDATE_RESERVATION_POLICY",
                 "Updated reservation policy settings"
         );
+    }
+
+    @Transactional
+    public SettingsResponse updateKitchenStatus(Authentication authentication, UUID restaurantId, UpdateSettingsKitchenStatusRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setKitchenSlowAfterMinutes(request.getKitchenSlowAfterMinutes());
+        settings.setKitchenReadyWaitingMinutes(request.getKitchenReadyWaitingMinutes());
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_KITCHEN_STATUS", "Updated kitchen status settings");
+    }
+
+    @Transactional
+    public SettingsResponse updateShifts(Authentication authentication, UUID restaurantId, UpdateSettingsShiftsRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setClockInEarlyMinutes(request.getClockInEarlyMinutes());
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_SHIFTS", "Updated shift settings");
+    }
+
+    @Transactional
+    public SettingsResponse updatePayments(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsPaymentsRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        java.util.List<Integer> suggestions = request.getTipSuggestions() != null
+                ? request.getTipSuggestions()
+                : request.getTipSuggestionsText() != null
+                ? pos.pos.settings.mapper.SettingsCodes.parsePercents(request.getTipSuggestionsText())
+                : null;
+        if (suggestions == null) {
+            throw new AuthException("tipSuggestions is required", HttpStatus.BAD_REQUEST);
+        }
+        if (suggestions.stream().anyMatch(percent -> percent < 1 || percent > 100)) {
+            throw new AuthException("Suggested tips must be between 1 and 100%", HttpStatus.BAD_REQUEST);
+        }
+        if (suggestions.stream().anyMatch(percent -> percent > request.getMaxTipPercent())) {
+            throw new AuthException("A suggested tip can't be above the biggest tip allowed", HttpStatus.BAD_REQUEST);
+        }
+        settings.setTipsEnabled(request.getTipsEnabled());
+        settings.setTipSuggestions(pos.pos.settings.mapper.SettingsCodes.joinPercents(suggestions.stream().sorted().toList()));
+        settings.setMaxTipPercent(request.getMaxTipPercent());
+        settings.setAutoClosePaidOrders(request.getAutoClosePaidOrders());
+        settings.setRefundWindowDays(request.getRefundWindowDays());
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_PAYMENTS", "Updated payment settings");
+    }
+
+    @Transactional
+    public SettingsResponse updateFraudChecks(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsFraudRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        for (String code : request.getFraudDisabledRules()) {
+            if (pos.pos.fraud.FraudRule.fromCode(code).isEmpty()) {
+                throw new AuthException("Unknown fraud rule: " + code, HttpStatus.BAD_REQUEST);
+            }
+        }
+        settings.setFraudDiscountPercent(request.getFraudDiscountPercent());
+        settings.setFraudRefundAmount(request.getFraudRefundAmount());
+        settings.setFraudVoidsPerDay(request.getFraudVoidsPerDay());
+        settings.setFraudTipPercent(request.getFraudTipPercent());
+        settings.setFraudCashRefundsPerDay(request.getFraudCashRefundsPerDay());
+        settings.setFraudDisabledRules(pos.pos.settings.mapper.SettingsCodes.joinCodes(request.getFraudDisabledRules()));
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_FRAUD_CHECKS", "Updated fraud check settings");
     }
 
     @Transactional
@@ -441,6 +510,22 @@ public class SettingsService {
         settings.setGuestReminderHours(defaults.getGuestReminderHours());
         settings.setNoShowWarningFrom(defaults.getNoShowWarningFrom());
         settings.setDepositFromGuests(defaults.getDepositFromGuests());
+        settings.setCardFeePercent(defaults.getCardFeePercent());
+        settings.setCardFeeFixed(defaults.getCardFeeFixed());
+        settings.setKitchenSlowAfterMinutes(defaults.getKitchenSlowAfterMinutes());
+        settings.setKitchenReadyWaitingMinutes(defaults.getKitchenReadyWaitingMinutes());
+        settings.setClockInEarlyMinutes(defaults.getClockInEarlyMinutes());
+        settings.setTipsEnabled(defaults.isTipsEnabled());
+        settings.setTipSuggestions(defaults.getTipSuggestions());
+        settings.setMaxTipPercent(defaults.getMaxTipPercent());
+        settings.setAutoClosePaidOrders(defaults.isAutoClosePaidOrders());
+        settings.setRefundWindowDays(defaults.getRefundWindowDays());
+        settings.setFraudDiscountPercent(defaults.getFraudDiscountPercent());
+        settings.setFraudRefundAmount(defaults.getFraudRefundAmount());
+        settings.setFraudVoidsPerDay(defaults.getFraudVoidsPerDay());
+        settings.setFraudTipPercent(defaults.getFraudTipPercent());
+        settings.setFraudCashRefundsPerDay(defaults.getFraudCashRefundsPerDay());
+        settings.setFraudDisabledRules(defaults.getFraudDisabledRules());
     }
 
     private void validateLocalization(String defaultLanguage, String dateFormat, String timeFormat) {

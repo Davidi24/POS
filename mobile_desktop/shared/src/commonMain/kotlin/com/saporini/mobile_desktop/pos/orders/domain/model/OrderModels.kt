@@ -1,5 +1,13 @@
 package com.saporini.mobile_desktop.pos.orders.domain.model
 
+data class OrderPage(
+    val items: List<OrderSummary>,
+    val page: Int,
+    val size: Int,
+    val totalElements: Long,
+    val hasNext: Boolean
+)
+
 data class OrderSummary(
     val id: String,
     val restaurantId: String,

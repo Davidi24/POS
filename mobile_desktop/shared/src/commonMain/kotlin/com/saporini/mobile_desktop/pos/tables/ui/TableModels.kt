@@ -21,6 +21,9 @@ data class FloorPlanTable(
     val nextReservationEnd: String? = null,
     val nextReservationCode: String? = null,
     val nextReservationName: String? = null,
+    // The next booking's occasion, e.g. 🎂 Birthday.
+    val occasionIcon: String? = null,
+    val occasionName: String? = null,
     val scale: Float = 0.55f,
     val rotationDegrees: Float = 0f,
     val id: String? = null,

@@ -31,6 +31,8 @@ public class ShiftService {
     private final RestaurantScopeService scope;
     private final EntityManager em;
     private final AuditLogRepository audits;
+    private final pos.pos.settings.repository.SettingsRepository settings;
+    private final pos.pos.shift.repository.StaffPayRateRepository payRates;
     private static final UUID NONE = new UUID(0, 0);
 
     @Transactional(readOnly=true)
@@ -53,8 +55,8 @@ public class ShiftService {
                     roleNames.computeIfAbsent((UUID) row[0], ignored -> new ArrayList<>()).add((String) row[1]));
             staff = roster.stream().map(u -> new Staff(u.getId(), name(u), roleNames.getOrDefault(u.getId(), List.of()))).toList();
         }
-        Shift eligible = has(auth, "SHIFT_SELF") ? shifts.eligible(actor, branchId, now, now.plusHours(2)).stream().findFirst().orElse(null) : null;
-        return new Board(zone.getId(), now, items.stream().map(s -> item(s, now)).toList(), current == null ? null : item(current, now), staff, eligible == null ? null : item(eligible, now));
+        Shift eligible = has(auth, "SHIFT_SELF") ? shifts.eligible(actor, branchId, now, now.plusMinutes(clockInEarlyMinutes(restaurantId))).stream().findFirst().orElse(null) : null;
+        return new Board(zone.getId(), now, items.stream().map(s -> item(s, now)).toList(), current == null ? null : item(current, now), staff, eligible == null ? null : item(eligible, now), clockInEarlyMinutes(restaurantId));
     }
 
     public Item schedule(Authentication auth, UUID restaurantId, UUID branchId, UUID id, Schedule request) {
@@ -91,17 +93,20 @@ public class ShiftService {
         String before = null;
         OffsetDateTime now = now();
         UUID scheduledId = request.shiftId();
-        if (scheduledId == null) scheduledId = shifts.eligible(user.getId(), branchId, now, now.plusHours(2)).stream().findFirst().map(Shift::getId).orElse(null);
+        int early = clockInEarlyMinutes(restaurantId);
+        if (scheduledId == null) scheduledId = shifts.eligible(user.getId(), branchId, now, now.plusMinutes(early)).stream().findFirst().map(Shift::getId).orElse(null);
         if (scheduledId == null) {
             shift = new Shift(); shift.setId(UUID.randomUUID()); shift.setRestaurant(branch.getRestaurant()); shift.setBranch(branch); shift.setUser(user); shift.setCreatedBy(user.getId());
         } else {
             shift = requireShift(restaurantId, branchId, scheduledId);
             if (!shift.getUser().getId().equals(user.getId())) forbidden();
             if (shift.getStatus() != ShiftStatus.SCHEDULED) conflict("This shift is no longer scheduled. Refresh and try again.");
-            if (now.isBefore(shift.getScheduledStart().minusHours(2)) || now.isAfter(shift.getScheduledEnd())) bad("Clock in from two hours before your scheduled start until the scheduled end.");
+            if (now.isBefore(shift.getScheduledStart().minusMinutes(early)) || now.isAfter(shift.getScheduledEnd())) bad(early == 0 ? "Clock in from your scheduled start until the scheduled end." : "Clock in from " + minutesText(early) + " before your scheduled start until the scheduled end.");
             before = snapshot(shift);
         }
         shift.setStatus(ShiftStatus.OPEN); shift.setStartedAt(now);
+        // The shift keeps the wage it is worked at: a later raise doesn't change it.
+        shift.setHourlyRate(payRates.rate(user.getId()).orElse(null));
         return save(auth, shift, "SHIFT_CLOCKED_IN", before, null);
     }
 
@@ -159,7 +164,15 @@ public class ShiftService {
         return save(auth, shift, "SHIFT_ATTENDANCE_CORRECTED", before, request.reason());
     }
 
-    private Shift ownedLocked(Authentication auth, UUID restaurantId, UUID branchId, UUID id, boolean allowManager) {
+    // Admin Hub → Settings → Shifts; 2 hours when the restaurant has no settings yet.
+    private int clockInEarlyMinutes(UUID restaurantId) {
+        return settings.findByRestaurant_Id(restaurantId).map(pos.pos.settings.entity.Settings::getClockInEarlyMinutes).orElse(120);
+    }
+    static String minutesText(int minutes) {
+        if (minutes % 60 == 0) return minutes == 60 ? "1 hour" : (minutes / 60) + " hours";
+        return minutes + " minutes";
+    }
+        private Shift ownedLocked(Authentication auth, UUID restaurantId, UUID branchId, UUID id, boolean allowManager) {
         scope.requireAccessibleBranch(auth, restaurantId, branchId);
         Shift shift = requireShift(restaurantId, branchId, id);
         boolean owner = shift.getUser().getId().equals(scope.currentUserId(auth));

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import pos.pos.common.dto.PageResponse;
 import pos.pos.reservation.dto.ReservationAvailabilityOptionResponse;
 import pos.pos.reservation.dto.ReservationAvailabilitySearchRequest;
 import pos.pos.reservation.dto.ReservationCapacityResponse;
@@ -43,13 +44,15 @@ public class BranchReservationController {
     @GetMapping
     @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "List branch reservations")
-    public ResponseEntity<List<ReservationResponse>> getBranchReservations(
+    public ResponseEntity<PageResponse<ReservationResponse>> getBranchReservations(
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
             @RequestParam(required = false) OffsetDateTime from,
             @RequestParam(required = false) OffsetDateTime to,
             @RequestParam(required = false) ReservationStatus status,
             @RequestParam(required = false) UUID customerId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
             Authentication authentication
     ) {
         return ResponseEntity.ok(reservationQueryService.getBranchReservations(
@@ -59,7 +62,9 @@ public class BranchReservationController {
                 from,
                 to,
                 status,
-                customerId
+                customerId,
+                page,
+                size
         ));
     }
 

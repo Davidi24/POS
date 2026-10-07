@@ -3,6 +3,7 @@ package com.saporini.mobile_desktop.admin
 import com.saporini.mobile_desktop.admin.settings.SaveGroups
 import com.saporini.mobile_desktop.admin.settings.SettingsApi
 import com.saporini.mobile_desktop.admin.settings.SettingsCategory
+import com.saporini.mobile_desktop.admin.settings.sections
 import com.saporini.mobile_desktop.admin.settings.SettingsScope
 import com.saporini.mobile_desktop.admin.settings.SettingsSource
 import com.saporini.mobile_desktop.admin.settings.SettingsValues
@@ -45,6 +46,7 @@ class SettingsSpecTest {
         put("checkInOpensMinutes", 120); put("confirmReminderTime", "15:00:00"); put("sameDayConfirmMinutes", 120)
         put("attendanceCallMinutes", 120); put("reopenWindowMinutes", 60); put("undoSeatMinutes", 15)
         put("runningLateMaxMinutes", 30); put("guestReminderHours", 24); put("noShowWarningFrom", 1); put("depositFromGuests", 7)
+        put("cardFeePercent", 1.5); put("cardFeeFixed", 0.25)
         put("serviceChargeEnabled", false)
     }
     private val rule = buildJsonObject {
@@ -86,17 +88,37 @@ class SettingsSpecTest {
     }
 
     @Test
-    fun aDepositNeedsItsKindAndAmount() {
+    fun aDepositIsAFixedAmountPerBooking() {
         val page = SettingsCategory.RESERVATIONS
         val on = values().set(R, "requireDeposit", JsonPrimitive(true))
-        assertEquals("Choose the kind of deposit.", page.problem(on))
+        assertEquals("Enter the deposit amount.", page.problem(on))
+        assertNull(page.problem(on.set(R, "depositValue", JsonPrimitive(20.0))))
+        // No "percentage" choice: a booking has no bill yet to take a percentage of.
+        val fields = page.sections().flatMap { it.fields }
+        assertFalse(fields.any { it.key == "depositType" })
+    }
 
-        val fixed = on.set(R, "depositType", JsonPrimitive("FIXED_AMOUNT"))
-        assertEquals("Enter the deposit amount.", page.problem(fixed))
-        assertNull(page.problem(fixed.set(R, "depositValue", JsonPrimitive(20.0))))
+    @Test
+    fun theDepositRuleIsSavedAsAFixedAmount() = runTest {
+        val sent = mutableListOf<JsonObject>()
+        val api = api { _, _, body -> sent += body; body }
+        val group = SaveGroups.single { it.source == R }
+        val on = values().set(R, "requireDeposit", JsonPrimitive(true)).set(R, "depositValue", JsonPrimitive(20.0))
 
-        val percentage = on.set(R, "depositType", JsonPrimitive("PERCENTAGE")).set(R, "depositValue", JsonPrimitive(120.0))
-        assertEquals("A percentage deposit can't be more than 100%.", page.problem(percentage))
+        group.save(api, scope, on.current(R)!!)
+
+        assertEquals("FIXED_AMOUNT", sent.single()["depositType"]?.let { (it as JsonPrimitive).content })
+    }
+
+    @Test
+    fun cardFeesAreSavedWithTheReservationTimesAndChecked() {
+        val page = SettingsCategory.RESERVATIONS
+        val policy = SaveGroups.single { it.source == G && "holdMinutes" in it.keys }
+        assertTrue("cardFeePercent" in policy.keys && "cardFeeFixed" in policy.keys)
+        val withFees = values().set(G, "cardFeePercent", JsonPrimitive(1.5)).set(G, "cardFeeFixed", JsonPrimitive(0.25))
+        assertNull(page.problem(withFees))
+        assertEquals("The card fee must be between 0 and 20%.", page.problem(withFees.set(G, "cardFeePercent", JsonPrimitive(25))))
+        assertEquals("The fixed card fee must be between 0 and 10.", page.problem(withFees.set(G, "cardFeeFixed", JsonPrimitive(-1))))
     }
 
     @Test

@@ -77,6 +77,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.admin.inventory.RecipeDto
 import com.saporini.mobile_desktop.pos.menu.ui.MenuCategory
 import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
 import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogActionStatus
@@ -101,6 +102,12 @@ private val ItemEditorBorder = Color(0xFFE2E3DE)
 private val ItemEditorSurface = Color(0xFFF7F7F5)
 private val ItemEditorPlaceholder = Color(0xFFC7C8C2)
 
+private fun isValidInventoryRecipeQuantity(text: String): Boolean {
+    val normalized = text.trim()
+    if (!Regex("^[0-9]{1,9}(\\.[0-9]{1,3})?$").matches(normalized)) return false
+    return normalized.toDoubleOrNull()?.let { it > 0.0 } == true
+}
+
 data class DraftIngredient(
     val name: String,
     val quantity: String,
@@ -116,7 +123,9 @@ data class DraftVariant(
 data class DraftOptionChoice(
     val name: String,
     val priceDeltaLabel: String,
-    val id: String? = null
+    val id: String? = null,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: Double? = null
 )
 
 data class DraftOptionGroup(
@@ -164,7 +173,9 @@ private data class SelectedIngredientRow(
 
 private data class OptionChoiceInput(
     val name: String,
-    val priceDelta: String
+    val priceDelta: String,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: String = ""
 )
 
 private val MockIngredients = listOf(
@@ -450,9 +461,15 @@ internal fun ItemEditorDialog(
         online: OnlinePlacement,
         ingredients: List<DraftIngredient>,
         sectionId: String?
-    ) -> Unit
+    ) -> Unit,
+    // Items in a special menu (occasion extras): shown only when not null, reported just before onSave.
+    extras: ItemExtras? = null,
+    occasions: List<Pair<String, String>> = emptyList(),
+    onExtrasChange: (ItemExtras) -> Unit = {}
 ) {
     val isEditing = existingItem != null
+    var extraHours by remember { mutableStateOf(extras?.orderBeforeHours?.toString().orEmpty()) }
+    var extraOccasions by remember { mutableStateOf(extras?.occasionCodes.orEmpty()) }
     val movableSections = remember(sections) { sections.filter { it.name != "All" && it.id != null } }
     var selectedSectionId by remember(currentSectionId) { mutableStateOf(currentSectionId) }
 
@@ -505,6 +522,9 @@ internal fun ItemEditorDialog(
         subtitle = if (!isEditing) sectionName?.let { "Adding to $it" } else null,
         onDismiss = onDismiss,
         onSave = {
+            if (extras != null) {
+                onExtrasChange(ItemExtras(extraHours.toIntOrNull()?.coerceIn(0, 720), extraOccasions))
+            }
             onSave(
                 name.trim(),
                 formatItemPrice(basePrice),
@@ -685,6 +705,15 @@ internal fun ItemEditorDialog(
             checked = sendToKitchen,
             onCheckedChange = { sendToKitchen = it }
         )
+        if (extras != null) {
+            ItemExtrasFields(
+                hours = extraHours,
+                onHoursChange = { extraHours = it.filter(Char::isDigit).take(3) },
+                occasions = occasions,
+                picked = extraOccasions,
+                onToggle = { code -> extraOccasions = if (code in extraOccasions) extraOccasions - code else extraOccasions + code }
+            )
+        }
         ItemEditorSwitchRow(
             title = "Show in online menu",
             description = if (showOnline) {
@@ -1676,6 +1705,7 @@ private fun DeleteOptionGroupDialog(
 internal fun OptionsEditorDialog(
     itemName: String,
     optionGroups: List<DraftOptionGroup>,
+    inventoryRecipes: List<RecipeDto>,
     onDismiss: () -> Unit,
     onDoneEditing: (List<DraftOptionGroup>) -> Unit,
     onCreateGroup: suspend (group: DraftOptionGroup, displayOrder: Int) -> Result<DraftOptionGroup>,
@@ -1820,6 +1850,7 @@ internal fun OptionsEditorDialog(
             title = "Add option group",
             existingGroups = currentOptionGroups,
             displayOrder = currentOptionGroups.size,
+            inventoryRecipes = inventoryRecipes,
             onDismiss = { addOptionGroupOpen = false },
             onSubmit = { draft, displayOrder -> onCreateGroup(draft, displayOrder) },
             onSaved = { newGroup ->
@@ -1835,6 +1866,7 @@ internal fun OptionsEditorDialog(
             group = editingGroup,
             existingGroups = currentOptionGroups,
             displayOrder = currentOptionGroups.indexOfFirst { it === editingGroup }.coerceAtLeast(0),
+            inventoryRecipes = inventoryRecipes,
             onDismiss = { optionGroupBeingEdited = null },
             onSubmit = { draft, displayOrder -> onUpdateGroup(editingGroup, draft, displayOrder) },
             onSaved = { updatedGroup ->
@@ -1864,6 +1896,7 @@ private fun OptionGroupEditorDialog(
     title: String,
     existingGroups: List<DraftOptionGroup>,
     displayOrder: Int,
+    inventoryRecipes: List<RecipeDto>,
     onDismiss: () -> Unit,
     onSubmit: suspend (draft: DraftOptionGroup, displayOrder: Int) -> Result<DraftOptionGroup>,
     onSaved: (DraftOptionGroup) -> Unit,
@@ -1876,7 +1909,12 @@ private fun OptionGroupEditorDialog(
     var choiceDrafts by remember(group) {
         mutableStateOf(
             group?.choices?.map { choice ->
-                OptionChoiceInput(choice.name, priceDeltaInputValue(choice.priceDeltaLabel))
+                OptionChoiceInput(
+                    name = choice.name,
+                    priceDelta = priceDeltaInputValue(choice.priceDeltaLabel),
+                    inventoryRecipeId = choice.inventoryRecipeId,
+                    inventoryRecipeQuantity = choice.inventoryRecipeQuantity?.toString().orEmpty()
+                )
             }?.takeIf { it.isNotEmpty() } ?: listOf(OptionChoiceInput("", ""))
         )
     }
@@ -1888,12 +1926,15 @@ private fun OptionGroupEditorDialog(
     val trimmedName = groupName.trim()
     val validChoices = choiceDrafts.filter { it.name.isNotBlank() }
     val choicesValid = choiceDrafts.all { isValidPriceDelta(it.priceDelta) }
+    val recipeQuantitiesValid = choiceDrafts.all { choice ->
+        choice.inventoryRecipeId == null || isValidInventoryRecipeQuantity(choice.inventoryRecipeQuantity)
+    }
     val duplicateGroup = trimmedName.isNotBlank() &&
         existingGroups.any { it !== group && it.name.equals(trimmedName, ignoreCase = true) }
     val choiceNames = validChoices.map { it.name.trim().lowercase() }
     val duplicateChoice = choiceNames.size != choiceNames.distinct().size
     val canSave = trimmedName.length in 2..60 && validChoices.isNotEmpty() &&
-        choicesValid && !duplicateGroup && !duplicateChoice
+        choicesValid && recipeQuantitiesValid && !duplicateGroup && !duplicateChoice
     val validationMessage = when {
         trimmedName.isEmpty() -> "Option group name is required."
         trimmedName.length < 2 -> "Use at least 2 characters for the group name."
@@ -1901,6 +1942,7 @@ private fun OptionGroupEditorDialog(
         validChoices.isEmpty() -> "Add at least one choice."
         duplicateChoice -> "Choice names in the same group must be unique."
         !choicesValid -> "Use valid price adjustments, for example +2.00 or -1.50."
+        !recipeQuantitiesValid -> "Enter a positive recipe quantity for every linked modifier."
         else -> null
     }
 
@@ -1916,7 +1958,9 @@ private fun OptionGroupEditorDialog(
             choices = validChoices.map { choice ->
                 DraftOptionChoice(
                     name = choice.name.trim(),
-                    priceDeltaLabel = formatPriceDelta(choice.priceDelta)
+                    priceDeltaLabel = formatPriceDelta(choice.priceDelta),
+                    inventoryRecipeId = choice.inventoryRecipeId,
+                    inventoryRecipeQuantity = choice.inventoryRecipeQuantity.trim().toDoubleOrNull()
                 )
             }
         )
@@ -2043,6 +2087,23 @@ private fun OptionGroupEditorDialog(
                                 it[index] = it[index].copy(priceDelta = newValue)
                             }
                         },
+                        inventoryRecipes = inventoryRecipes,
+                        onInventoryRecipeChange = { recipe ->
+                            choiceDrafts = choiceDrafts.toMutableList().also {
+                                val current = it[index]
+                                it[index] = current.copy(
+                                    inventoryRecipeId = recipe?.id,
+                                    inventoryRecipeQuantity = if (recipe == null) "" else {
+                                        current.inventoryRecipeQuantity.ifBlank { recipe.yieldQuantity?.value.orEmpty() }
+                                    }
+                                )
+                            }
+                        },
+                        onInventoryRecipeQuantityChange = { newValue ->
+                            choiceDrafts = choiceDrafts.toMutableList().also {
+                                it[index] = it[index].copy(inventoryRecipeQuantity = newValue)
+                            }
+                        },
                         onRemove = {
                             if (choiceDrafts.size > 1) {
                                 choiceDrafts = choiceDrafts.filterIndexed { i, _ -> i != index }
@@ -2125,13 +2186,18 @@ private fun OptionChoiceEditorRow(
     canRemove: Boolean,
     onNameChange: (String) -> Unit,
     onPriceChange: (String) -> Unit,
+    inventoryRecipes: List<RecipeDto>,
+    onInventoryRecipeChange: (RecipeDto?) -> Unit,
+    onInventoryRecipeQuantityChange: (String) -> Unit,
     onRemove: () -> Unit
 ) {
-    if (isPhone) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+    var recipeMenuOpen by remember(choice.inventoryRecipeId) { mutableStateOf(false) }
+    val selectedRecipe = inventoryRecipes.firstOrNull { it.id == choice.inventoryRecipeId }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (isPhone) {
             OutlinedTextField(
                 value = choice.name,
                 onValueChange = onNameChange,
@@ -2165,41 +2231,85 @@ private fun OptionChoiceEditorRow(
                 }
             }
         }
-    } else {
+        if (!isPhone) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = choice.name,
+                    onValueChange = onNameChange,
+                    modifier = Modifier.weight(1.4f),
+                    placeholder = { Text("Choice name") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = itemEditorOutlinedTextFieldColors()
+                )
+                OutlinedTextField(
+                    value = choice.priceDelta,
+                    onValueChange = onPriceChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("+0.00") },
+                    singleLine = true,
+                    isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = itemEditorOutlinedTextFieldColors()
+                )
+                IconButton(onClick = onRemove, enabled = canRemove, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Outlined.Close, "Remove choice", modifier = Modifier.size(15.dp), tint = ItemEditorMuted)
+                }
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
-                value = choice.name,
-                onValueChange = onNameChange,
-                modifier = Modifier.weight(1.4f),
-                placeholder = { Text("Choice name") },
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp),
-                colors = itemEditorOutlinedTextFieldColors()
-            )
-            OutlinedTextField(
-                value = choice.priceDelta,
-                onValueChange = onPriceChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("+0.00") },
-                singleLine = true,
-                isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
-                shape = RoundedCornerShape(8.dp),
-                colors = itemEditorOutlinedTextFieldColors()
-            )
-            IconButton(
-                onClick = onRemove,
-                enabled = canRemove,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Close,
-                    contentDescription = "Remove choice",
-                    modifier = Modifier.size(15.dp),
-                    tint = ItemEditorMuted
+            Box {
+                TextButton(onClick = { recipeMenuOpen = true }) {
+                    Text(
+                        text = when {
+                            selectedRecipe != null -> "Uses ${selectedRecipe.name}"
+                            choice.inventoryRecipeId != null -> "Linked recipe unavailable · select or clear"
+                            else -> "No inventory recipe"
+                        },
+                        fontFamily = Inter(),
+                        color = ItemEditorOlive
+                    )
+                }
+                DropdownMenu(expanded = recipeMenuOpen, onDismissRequest = { recipeMenuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("No inventory recipe") },
+                        onClick = { recipeMenuOpen = false; onInventoryRecipeChange(null) }
+                    )
+                    inventoryRecipes.forEach { recipe ->
+                        DropdownMenuItem(
+                            text = { Text("${recipe.name} · ${recipe.yieldUnit.orEmpty()}") },
+                            onClick = { recipeMenuOpen = false; onInventoryRecipeChange(recipe) }
+                        )
+                    }
+                    if (inventoryRecipes.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("No active prep recipes available") },
+                            enabled = false,
+                            onClick = { recipeMenuOpen = false }
+                        )
+                    }
+                }
+            }
+            if (selectedRecipe != null) {
+                OutlinedTextField(
+                    value = choice.inventoryRecipeQuantity,
+                    onValueChange = onInventoryRecipeQuantityChange,
+                    modifier = Modifier.weight(1f),
+                    label = { Text("Usage (${selectedRecipe.yieldUnit.orEmpty()})") },
+                    singleLine = true,
+                    isError = choice.inventoryRecipeQuantity.isNotBlank()
+                            && !isValidInventoryRecipeQuantity(choice.inventoryRecipeQuantity),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = itemEditorOutlinedTextFieldColors()
                 )
             }
         }
@@ -2499,4 +2609,52 @@ private fun priceDeltaInputValue(label: String): String {
     }
     val number = trimmed.filter { it.isDigit() || it == '.' }
     return if (number.isBlank()) "" else sign + number
+}
+
+// Occasion extras (a cake, decoration…): how early they must be ordered, and which occasions offer them.
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ItemExtrasFields(
+    hours: String,
+    onHoursChange: (String) -> Unit,
+    occasions: List<Pair<String, String>>,
+    picked: List<String>,
+    onToggle: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Occasion extra", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color(0xFF222426))
+        OutlinedTextField(
+            value = hours,
+            onValueChange = onHoursChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Order at least … hours ahead (empty: any time)") },
+            placeholder = { Text("e.g. 48 for a cake") },
+            singleLine = true,
+            shape = RoundedCornerShape(9.dp),
+            colors = itemEditorOutlinedTextFieldColors()
+        )
+        if (occasions.isNotEmpty()) {
+            Text("Offered for (none picked: every occasion)", fontFamily = Inter(), fontSize = 12.sp, color = Color(0xFF747572))
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                occasions.forEach { (code, label) ->
+                    val selected = code in picked
+                    androidx.compose.material3.Surface(
+                        onClick = { onToggle(code) },
+                        shape = RoundedCornerShape(50),
+                        color = if (selected) Color(0xFF4F7942) else Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Color(0xFF4F7942) else Color(0xFFE3E6E1))
+                    ) {
+                        Text(
+                            label, Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                            color = if (selected) Color.White else Color(0xFF222426)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

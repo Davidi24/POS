@@ -132,7 +132,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> updateOrderCustomer(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody OrderCustomerRequest request,
+            @Valid @RequestBody OrderCustomerRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderCommandService.updateOrderCustomer(authentication, restaurantId, orderId, request));
@@ -144,7 +144,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> updateOrderTable(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody OrderTableRequest request,
+            @Valid @RequestBody OrderTableRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderCommandService.updateOrderTable(authentication, restaurantId, orderId, request));
@@ -156,7 +156,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> updateOrderReservation(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody OrderReservationRequest request,
+            @Valid @RequestBody OrderReservationRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderCommandService.updateOrderReservation(authentication, restaurantId, orderId, request));
@@ -189,7 +189,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> openOrder(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.openOrder(authentication, restaurantId, orderId, request));
@@ -201,7 +201,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> sendToKitchen(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.sendToKitchen(authentication, restaurantId, orderId, request));
@@ -213,7 +213,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> markOrderReady(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.markOrderReady(authentication, restaurantId, orderId, request));
@@ -225,7 +225,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> fulfillOrder(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.fulfillOrder(authentication, restaurantId, orderId, request));
@@ -237,7 +237,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> closeOrder(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.closeOrder(authentication, restaurantId, orderId, request));
@@ -249,7 +249,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> reopenOrder(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.reopenOrder(authentication, restaurantId, orderId, request));
@@ -261,7 +261,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> cancelOrder(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.cancelOrder(authentication, restaurantId, orderId, request));
@@ -273,7 +273,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> voidOrder(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.voidOrder(authentication, restaurantId, orderId, request));
@@ -384,7 +384,7 @@ public class RestaurantOrderController {
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
             @PathVariable UUID lineItemId,
-            @RequestBody OrderLineItemNotesRequest request,
+            @Valid @RequestBody OrderLineItemNotesRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderItemService.updateItemNotes(authentication, restaurantId, orderId, lineItemId, request));
@@ -410,7 +410,7 @@ public class RestaurantOrderController {
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
             @PathVariable UUID lineItemId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderItemService.fireItem(authentication, restaurantId, orderId, lineItemId, request));
@@ -423,7 +423,7 @@ public class RestaurantOrderController {
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
             @PathVariable UUID lineItemId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderItemService.readyItem(authentication, restaurantId, orderId, lineItemId, request));
@@ -436,7 +436,7 @@ public class RestaurantOrderController {
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
             @PathVariable UUID lineItemId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderItemService.fulfillItem(authentication, restaurantId, orderId, lineItemId, request));
@@ -449,7 +449,7 @@ public class RestaurantOrderController {
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
             @PathVariable UUID lineItemId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderItemService.voidItem(authentication, restaurantId, orderId, lineItemId, request));
@@ -576,7 +576,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderEventResponse> addNoteEvent(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -634,7 +634,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> markPaid(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.markPaid(authentication, restaurantId, orderId, request));
@@ -646,7 +646,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> markPartiallyPaid(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.markPartiallyPaid(authentication, restaurantId, orderId, request));
@@ -658,7 +658,7 @@ public class RestaurantOrderController {
     public ResponseEntity<OrderResponse> markRefunded(
             @PathVariable UUID restaurantId,
             @PathVariable UUID orderId,
-            @RequestBody(required = false) OrderActionRequest request,
+            @Valid @RequestBody(required = false) OrderActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.markRefunded(authentication, restaurantId, orderId, request));

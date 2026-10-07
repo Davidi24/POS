@@ -1,5 +1,6 @@
 package pos.pos.tables.dto;
 
+import jakarta.validation.constraints.Max;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -32,6 +33,7 @@ public class TableCategoryRequest {
     @JsonAlias("default_capacity")
     @NotNull(message = "defaultCapacity is required")
     @Min(value = 1, message = "defaultCapacity must be greater than 0")
+    @Max(value = 1000, message = "defaultCapacity must be at most 1000")
     private Integer defaultCapacity;
 
     @JsonAlias("location_type")

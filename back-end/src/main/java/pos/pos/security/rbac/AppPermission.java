@@ -44,6 +44,13 @@ public enum AppPermission {
     RESERVATION_APPROVE("Approve Bookings", "Accept or decline booking requests, including big groups"),
     RESERVATION_CORRECT("Correct Reservations", "Fix bookings after the staff time limits or from an earlier day, with a reason"),
 
+    PAYMENT_GOODWILL_REFUND("Goodwill Refunds", "Give back part of money the restaurant kept (e.g. a late cancel), with a reason"),
+    PAYMENT_REFUND("Refund Payments", "Give money back on a paid order, with a reason"),
+
+    REPORTS_READ("View Statistics", "See sales, staff, payment and menu statistics and download reports"),
+    FRAUD_READ("View Fraud Alerts", "See flagged discounts, refunds, removals and other risky actions"),
+    FRAUD_REVIEW("Review Fraud Alerts", "Mark flagged actions as checked, dismissed or confirmed"),
+
     ORDER_READ("View Orders", "View restaurant orders and order activity"),
     ORDER_CREATE("Create Orders", "Create new restaurant orders"),
     ORDER_UPDATE("Update Orders", "Update order headers, items, and notes"),
@@ -61,7 +68,9 @@ public enum AppPermission {
     // Which app workspaces a user can open. These only gate entry; what they can do inside comes from the permissions above.
     POS_ACCESS("Open POS", "Open the POS workspace"),
     KDS_ACCESS("Open Kitchen Display", "Open the kitchen display workspace"),
-    ADMIN_ACCESS("Open Admin Hub", "Open the admin hub workspace");
+    ADMIN_ACCESS("Open Admin Hub", "Open the admin hub workspace"),
+    STATISTICS_ACCESS("Open Statistics", "Open the statistics workspace"),
+    FRAUD_ACCESS("Open Fraud Detection", "Open the fraud detection workspace");
 
 
     private final String displayName;

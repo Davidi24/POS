@@ -49,6 +49,7 @@ public class RestaurantTableAvailabilityService {
             OffsetDateTime to,
             Integer partySize
     ) {
+        validatePartySize(partySize);
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         BranchTableSnapshot snapshot = restaurantTableSupport.loadBranchTables(restaurantId, branchId);
         AvailabilityWindow window = resolveAvailabilityWindow(from, to);
@@ -68,6 +69,7 @@ public class RestaurantTableAvailabilityService {
             OffsetDateTime to,
             Integer partySize
     ) {
+        validatePartySize(partySize);
         return getTableAvailability(authentication, restaurantId, branchId, from, to, partySize).stream()
                 .filter(TableAvailabilityResponse::getAvailableForRequestedWindow)
                 .toList();
@@ -83,6 +85,7 @@ public class RestaurantTableAvailabilityService {
             OffsetDateTime to,
             Integer partySize
     ) {
+        validatePartySize(partySize);
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         BranchTableSnapshot snapshot = restaurantTableSupport.loadBranchTables(restaurantId, branchId);
         RestaurantTable table = snapshot.tablesById().get(tableId);
@@ -93,6 +96,12 @@ public class RestaurantTableAvailabilityService {
         AvailabilityWindow window = resolveAvailabilityWindow(from, to);
         Map<UUID, List<UUID>> overlappingReservationIdsByTableId = loadOverlappingReservationIds(branchId, window);
         return toAvailabilityResponse(table, snapshot.childrenByParentId(), overlappingReservationIdsByTableId, partySize, window.from());
+    }
+
+    private void validatePartySize(Integer partySize) {
+        if (partySize != null && partySize < 1) {
+            throw new AuthException("partySize must be greater than 0", HttpStatus.BAD_REQUEST);
+        }
     }
 
     private AvailabilityWindow resolveAvailabilityWindow(OffsetDateTime from, OffsetDateTime to) {

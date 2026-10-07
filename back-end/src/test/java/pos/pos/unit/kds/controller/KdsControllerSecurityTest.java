@@ -25,6 +25,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pos.pos.kds.controller.KdsBoardController;
+import pos.pos.kds.controller.KdsHistoryController;
+import pos.pos.kds.controller.KdsRealtimeController;
+import pos.pos.kds.dto.KdsHistoryResponse;
+import pos.pos.kds.service.KdsHistoryService;
+import pos.pos.order.realtime.OrderChangeNotifier;
 import pos.pos.kds.controller.KdsStationController;
 import pos.pos.kds.controller.OrderKdsController;
 import pos.pos.kds.dto.KdsStationResponse;
@@ -57,7 +62,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = {
                 KdsStationController.class,
                 KdsBoardController.class,
-                OrderKdsController.class
+                OrderKdsController.class, KdsHistoryController.class, KdsRealtimeController.class
         },
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = JwtAuthenticationFilter.class)
 )
@@ -75,6 +80,9 @@ class KdsControllerSecurityTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockBean private KdsHistoryService historyService;
+    @MockBean private OrderChangeNotifier changes;
 
     @MockBean
     private KdsStationQueryService kdsStationQueryService;
@@ -128,6 +136,32 @@ class KdsControllerSecurityTest {
                 .andExpect(jsonPath("$.message").value("Access denied"));
 
         verifyNoInteractions(kdsStationQueryService, kdsStationCommandService, kdsTicketQueryService, kdsTicketWorkflowService);
+    }
+
+    @Test void historyAllowsKitchenReadWithoutOrderOrSettingsPermissions() throws Exception {
+        given(historyService.history(any(), any(), any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
+                .willReturn(new KdsHistoryResponse(List.of(), 0, 30, 0, 0, false));
+        mockMvc.perform(get("/restaurants/{r}/branches/{b}/kds/history", RESTAURANT_ID, BRANCH_ID)
+                .header("X-Test-User", "kitchen@pos.local").header("X-Test-Authorities", "KDS_READ"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isArray()).andExpect(jsonPath("$.size").value(30));
+    }
+
+    @Test void historyAndStreamRejectAccountsWithoutKitchenRead() throws Exception {
+        for (String endpoint : List.of("history", "events")) {
+            mockMvc.perform(get("/restaurants/{r}/branches/{b}/kds/" + endpoint, RESTAURANT_ID, BRANCH_ID)
+                    .header("X-Test-User", "other@pos.local").header("X-Test-Authorities", "ORDER_READ"))
+                    .andExpect(status().isForbidden());
+        }
+        verifyNoInteractions(historyService, changes);
+    }
+
+    @Test void streamAllowsKitchenReadWithoutOrderRead() throws Exception {
+        var emitter = new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(1000L);
+        given(changes.subscribe(any(), any(), any())).willReturn(emitter);
+        mockMvc.perform(get("/restaurants/{r}/branches/{b}/kds/events", RESTAURANT_ID, BRANCH_ID)
+                .header("X-Test-User", "kitchen@pos.local").header("X-Test-Authorities", "KDS_READ"))
+                .andExpect(status().isOk()).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.request().asyncStarted());
+        emitter.complete();
     }
 
     @TestConfiguration

@@ -118,6 +118,7 @@ class UserAdminServiceTest {
                     eq(null),
                     eq(false),
                     eq(20_000L),
+                    any(),
                     any(Pageable.class)
             )).willReturn(new PageImpl<>(List.of(user)));
             given(userRoleRepository.findByUserIdIn(List.of(TARGET_USER_ID)))
@@ -143,6 +144,7 @@ class UserAdminServiceTest {
                     eq(null),
                     eq(false),
                     eq(20_000L),
+                    any(),
                     pageableCaptor.capture()
             );
 
@@ -209,6 +211,7 @@ class UserAdminServiceTest {
                     eq("WAITER"),
                     eq(false),
                     eq(20_000L),
+                    any(),
                     any(Pageable.class)
             )).willReturn(Page.empty());
 
@@ -231,6 +234,7 @@ class UserAdminServiceTest {
                     eq("WAITER"),
                     eq(false),
                     eq(20_000L),
+                    any(),
                     pageableCaptor.capture()
             );
 

@@ -1,5 +1,7 @@
 package pos.pos.menu.dto.request;
 
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -33,8 +35,10 @@ public class CreateMenuItemRequest {
 
     @NotNull(message = "basePrice is required")
     @DecimalMin(value = "0.00", message = "basePrice must be greater than or equal to 0")
+    @Digits(integer = 12, fraction = 2, message = "basePrice must have at most 12 digits and 2 decimals")
     private BigDecimal basePrice;
 
+    @Size(max = 2048, message = "imageUrl must be at most 2048 characters")
     private String imageUrl;
 
     private Boolean available;
@@ -55,5 +59,15 @@ public class CreateMenuItemRequest {
     @Min(value = 0, message = "displayOrder must be greater than or equal to 0")
     private Integer displayOrder;
 
-    private List<String> ingredients;
+    @Size(max = 100, message = "ingredients can have at most 100 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") String> ingredients;
+
+    // Special-menu extras: order at least this many hours ahead, and the occasions they're offered for.
+    @jakarta.validation.constraints.Min(value = 0, message = "orderBeforeHours must not be negative")
+    @jakarta.validation.constraints.Max(value = 720, message = "orderBeforeHours must be at most 720")
+    @Max(value = 720, message = "orderBeforeHours must be at most 720")
+    private Integer orderBeforeHours;
+
+    @Size(max = 50, message = "occasionCodes must be at most 50 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") String> occasionCodes;
 }

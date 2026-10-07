@@ -65,6 +65,10 @@ class AppRoleTest {
         );
         assertThat(AppRole.WAITER.permissions()).containsExactlyInAnyOrder(
                 AppPermission.MENUS_READ,
+                AppPermission.RESERVATION_READ,
+                AppPermission.RESERVATION_MANAGE,
+                AppPermission.SHIFT_SELF,
+                AppPermission.KDS_READ,
                 AppPermission.ORDER_READ,
                 AppPermission.ORDER_CREATE,
                 AppPermission.ORDER_UPDATE,
@@ -73,6 +77,13 @@ class AppRoleTest {
                 AppPermission.ORDER_TRANSFER,
                 AppPermission.POS_ACCESS
         );
+        assertThat(AppRole.MANAGER.permissions()).contains(AppPermission.PAYMENT_REFUND)
+                .doesNotContain(AppPermission.REPORTS_READ, AppPermission.FRAUD_READ, AppPermission.FRAUD_REVIEW);
+        assertThat(AppRole.ADMIN.permissions()).contains(AppPermission.PAYMENT_REFUND, AppPermission.REPORTS_READ)
+                .doesNotContain(AppPermission.FRAUD_READ, AppPermission.FRAUD_REVIEW);
+        assertThat(AppRole.CO_OWNER.permissions()).contains(AppPermission.PAYMENT_REFUND, AppPermission.REPORTS_READ,
+                AppPermission.FRAUD_READ, AppPermission.FRAUD_REVIEW);
+        assertThat(AppRole.WAITER.permissions()).doesNotContain(AppPermission.PAYMENT_REFUND, AppPermission.ORDER_VOID);
         assertThat(AppRole.KITCHEN.permissions()).containsExactlyInAnyOrder(
                 AppPermission.MENUS_READ,
                 AppPermission.ORDER_READ,
@@ -85,14 +96,17 @@ class AppRoleTest {
     @Test
     @DisplayName("Should open only the workspaces each role is meant to use")
     void shouldGrantWorkspaceAccessPerRole() {
-        Set<AppPermission> allWorkspaces = EnumSet.of(AppPermission.POS_ACCESS, AppPermission.KDS_ACCESS, AppPermission.ADMIN_ACCESS);
+        Set<AppPermission> staffWorkspaces = EnumSet.of(AppPermission.POS_ACCESS, AppPermission.KDS_ACCESS, AppPermission.ADMIN_ACCESS);
+        Set<AppPermission> allWorkspaces = EnumSet.of(AppPermission.POS_ACCESS, AppPermission.KDS_ACCESS, AppPermission.ADMIN_ACCESS,
+                AppPermission.STATISTICS_ACCESS, AppPermission.FRAUD_ACCESS);
 
         assertThat(workspaces(AppRole.OWNER)).isEqualTo(allWorkspaces);
         assertThat(workspaces(AppRole.CO_OWNER)).isEqualTo(allWorkspaces);
-        assertThat(workspaces(AppRole.ADMIN)).isEqualTo(allWorkspaces);
+        assertThat(workspaces(AppRole.ADMIN)).containsExactlyInAnyOrder(AppPermission.POS_ACCESS, AppPermission.KDS_ACCESS,
+                AppPermission.ADMIN_ACCESS, AppPermission.STATISTICS_ACCESS);
         assertThat(workspaces(AppRole.MANAGER)).containsExactlyInAnyOrder(AppPermission.POS_ACCESS, AppPermission.ADMIN_ACCESS);
         assertThat(workspaces(AppRole.WAITER)).containsExactly(AppPermission.POS_ACCESS);
-        assertThat(workspaces(AppRole.VIEWER)).isEqualTo(allWorkspaces);
+        assertThat(workspaces(AppRole.VIEWER)).isEqualTo(staffWorkspaces);
         assertThat(workspaces(AppRole.KITCHEN)).containsExactly(AppPermission.KDS_ACCESS);
     }
 

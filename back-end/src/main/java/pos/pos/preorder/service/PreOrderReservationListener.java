@@ -32,6 +32,13 @@ public class PreOrderReservationListener {
     private final PreOrderRepository preOrderRepository;
     private final PreOrderLifecycleService preOrderLifecycleService;
     private final EntityManager entityManager;
+    private pos.pos.reservation.service.BookingMoneyService bookingMoneyService;
+
+    // Optional so the pre-order module works on its own (and in tests); works out the card fee on refunds.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setBookingMoneyService(pos.pos.reservation.service.BookingMoneyService bookingMoneyService) {
+        this.bookingMoneyService = bookingMoneyService;
+    }
 
     // Booking cancelled or guests never came: refund if the kitchen hadn't started, otherwise keep the payment.
     // Same transaction as the status change, so both commit or neither does.
@@ -53,6 +60,16 @@ public class PreOrderReservationListener {
                 preOrderLifecycleService.refund(preOrder,
                         cancelled ? "Reservation cancelled before the kitchen started" : "Marked no-show before the kitchen started",
                         event.actorId(), now);
+                // The money back: all of it when the restaurant declined (or never answered); otherwise the paid
+                // amount minus the card fee, since the guest cancelled before the kitchen started.
+                if (bookingMoneyService != null && preOrder.getPaidAmount() != null) {
+                    var outcome = reservation.getStatus() == ReservationStatus.EXPIRED
+                            || pos.pos.reservation.service.ReservationLifecycleService.isDeclined(reservation)
+                            ? pos.pos.reservation.service.BookingMoneyService.Outcome.RESTAURANT_DECLINED
+                            : pos.pos.reservation.service.BookingMoneyService.Outcome.GUEST_CANCELLED;
+                    preOrder.setRefundedAmount(bookingMoneyService.refundFor(reservation, preOrder.getPaidAmount(), null, outcome, now));
+                    preOrderRepository.save(preOrder);
+                }
             } else {
                 preOrderLifecycleService.forfeit(preOrder,
                         cancelled ? "Reservation cancelled after the kitchen started; payment kept" : "Guests did not arrive; payment kept",

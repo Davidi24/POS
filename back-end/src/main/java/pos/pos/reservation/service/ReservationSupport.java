@@ -63,6 +63,12 @@ public class ReservationSupport {
     private final UserRepository userRepository;
     private final ReservationPolicy reservationPolicy;
     private GuestNoShowCounter guestNoShowCounter;
+    private pos.pos.reservation.repository.RestaurantEventRepository restaurantEventRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRestaurantEventRepository(pos.pos.reservation.repository.RestaurantEventRepository restaurantEventRepository) {
+        this.restaurantEventRepository = restaurantEventRepository;
+    }
 
     // Optional so the support works without the database-backed counter (e.g. in tests).
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -150,7 +156,38 @@ public class ReservationSupport {
         if (guestNoShowCounter != null && reservation.getId() != null) {
             response.setGuestNoShows(guestNoShowCounter.counts(List.of(reservation)).get(reservation.getId()));
         }
+        addEvents(List.of(reservation), List.of(response));
         return response;
+    }
+
+    // The restaurant's event on each booking's day (one query for the whole list).
+    private void addEvents(List<Reservation> reservations, List<ReservationResponse> responses) {
+        if (restaurantEventRepository == null || reservations.isEmpty()) {
+            return;
+        }
+        java.util.Map<UUID, List<Reservation>> byRestaurant = new java.util.HashMap<>();
+        reservations.stream().filter(r -> r.getRestaurant() != null && r.getReservationStart() != null)
+                .forEach(r -> byRestaurant.computeIfAbsent(r.getRestaurant().getId(), id -> new java.util.ArrayList<>()).add(r));
+        java.util.Map<UUID, ReservationResponse> responseById = new java.util.HashMap<>();
+        responses.forEach(response -> responseById.put(response.getId(), response));
+        byRestaurant.forEach((restaurantId, bookings) -> {
+            ZoneId zone = restaurantZone(bookings.getFirst().getRestaurant());
+            java.util.Map<Reservation, LocalDate> dates = new java.util.HashMap<>();
+            bookings.forEach(booking -> dates.put(booking, reservationPolicy.serviceDate(booking.getReservationStart(), zone)));
+            LocalDate from = dates.values().stream().min(LocalDate::compareTo).orElseThrow();
+            LocalDate to = dates.values().stream().max(LocalDate::compareTo).orElseThrow();
+            var events = restaurantEventRepository.findActiveBetween(restaurantId, from, to);
+            if (events.isEmpty()) {
+                return;
+            }
+            dates.forEach((booking, date) -> events.stream().filter(event -> event.covers(date)).findFirst().ifPresent(event -> {
+                ReservationResponse response = responseById.get(booking.getId());
+                if (response != null) {
+                    response.setEventName(event.getName());
+                    response.setEventIcon(event.getIcon());
+                }
+            }));
+        });
     }
 
     // Lists: the guests' no-show counts in two queries for the whole page instead of two per booking.
@@ -161,6 +198,7 @@ public class ReservationSupport {
             java.util.Map<UUID, Integer> counts = guestNoShowCounter.counts(reservations);
             responses.forEach(response -> response.setGuestNoShows(counts.get(response.getId())));
         }
+        addEvents(reservations, responses);
         return responses;
     }
 
@@ -470,7 +508,8 @@ public class ReservationSupport {
         reservation.setContactEmail(request.getContactEmail());
         reservation.setSeatingPreference(request.getSeatingPreference());
         reservation.setSpecialRequests(request.getSpecialRequests());
-        applyDepositFields(reservation, request.getDepositRequired(), request.getDepositAmount(), true);
+        // A guest never decides their own deposit: the restaurant's booking rule does (see BookingMoneyService).
+        applyDepositFields(reservation, false, null, true);
         validateReservationWindow(request.getReservationStart(), request.getReservationEnd());
     }
 
@@ -509,6 +548,10 @@ public class ReservationSupport {
     }
 
     public record TimeWindow(OffsetDateTime from, OffsetDateTime to) {
+    }
+
+    public String newReservationCode(UUID restaurantId) {
+        return generateReservationCode(restaurantId);
     }
 
     private String generateReservationCode(UUID restaurantId) {

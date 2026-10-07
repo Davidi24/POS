@@ -39,6 +39,8 @@ public class KdsTicketResponse {
     private KdsPriority priority;
     private String courseName;
     private String notes;
+    // The booking's occasion for the kitchen, e.g. "🎂 Birthday · Cake from us, Candles · 30 candles at dessert".
+    private String occasion;
     private String voidReason;
     private OffsetDateTime firedAt;
     private OffsetDateTime startedAt;

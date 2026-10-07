@@ -230,7 +230,9 @@ public class InventoryMovementService {
             UUID restaurantId,
             UUID orderLineItemId,
             InventoryMovementType movementType,
-            UUID itemId
+            UUID itemId,
+            int page,
+            int size
     ) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
 
@@ -238,7 +240,9 @@ public class InventoryMovementService {
             requireItem(restaurantId, itemId);
         }
 
-        return inventoryMovementRepository.search(restaurantId, orderLineItemId, movementType, itemId).stream()
+        // Newest first, one page at a time: the history only grows.
+        return inventoryMovementRepository.search(restaurantId, orderLineItemId, movementType, itemId,
+                        org.springframework.data.domain.PageRequest.of(page, size)).stream()
                 .map(inventoryMovementMapper::toResponse)
                 .toList();
     }
@@ -262,6 +266,9 @@ public class InventoryMovementService {
             OrderLineItem orderLineItem,
             UUID actorId
     ) {
+        if (!location.isActive()) {
+            throw new AuthException("Inventory movements cannot be recorded at an inactive location", HttpStatus.CONFLICT);
+        }
         assertItemTrackable(item);
         assertItemActive(item);
 
@@ -291,6 +298,30 @@ public class InventoryMovementService {
         inventoryLevelService.upsertLevel(location, item, quantityDelta);
 
         return inventoryMovementMapper.toResponse(saved);
+    }
+
+    @Transactional
+    public InventoryMovementResponse consumeForSale(
+            OrderLineItem lineItem,
+            InventoryLocation location,
+            InventoryItem item,
+            BigDecimal quantity,
+            UUID actorId
+    ) {
+        return applyMovement(
+                lineItem.getOrder().getRestaurant().getId(),
+                location,
+                item,
+                quantity.negate(),
+                InventoryMovementType.SALE_CONSUMPTION,
+                null,
+                "Order item fulfilled",
+                "ORDER_LINE_ITEM",
+                lineItem.getId(),
+                OffsetDateTime.now(ZoneOffset.UTC),
+                lineItem,
+                actorId
+        );
     }
 
     // Both checks live here, not in requireItem(), on purpose: requireItem() is also used just to

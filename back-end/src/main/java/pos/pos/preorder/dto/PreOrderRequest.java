@@ -22,7 +22,7 @@ public class PreOrderRequest {
     @NotEmpty(message = "items must contain at least one dish")
     @Size(max = 50, message = "items must contain at most 50 dishes")
     @Valid
-    private List<PreOrderItemRequest> items;
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") PreOrderItemRequest> items;
 
     @Size(max = 500, message = "notes must be at most 500 characters")
     private String notes;

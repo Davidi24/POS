@@ -12,6 +12,22 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class OrderCatalogTest {
+    @Test fun customerCatalogLoadsBoundedPagesAndFiltersInactiveCustomers() = runTest {
+        val requestedPages = mutableListOf<String?>()
+        val client = HttpClient(MockEngine { request ->
+            requestedPages += request.url.parameters["page"]
+            assertEquals("100", request.url.parameters["size"])
+            val response = if (requestedPages.last() == "0") customerPageOne else customerPageTwo
+            respond(response, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }) { install(ContentNegotiation) { json(orderJson) } }
+        try {
+            val customers = DefaultOrderCatalogRepository(OrderCatalogApi(client) { "http://localhost" })
+                .getCustomers("restaurant-1")
+            assertEquals(listOf<String?>("0", "1"), requestedPages)
+            assertEquals(listOf("customer-1", "customer-3"), customers.map { it.id })
+        } finally { client.close() }
+    }
+
     @Test fun fetchesRealOptionChoicesAndPreservesUnboundedLimits() = runTest {
         val paths = mutableListOf<String>()
         val client = HttpClient(MockEngine { request ->
@@ -56,5 +72,15 @@ class OrderCatalogTest {
       "id":"group-1","restaurantId":"restaurant-1","name":"Sauce","active":true,
       "minSelect":null,"maxSelect":null,"required":true,
       "items":[{"id":"option-1","optionGroupId":"group-1","name":"Mayo","available":true,"priceDelta":0.10}]
+    }"""
+    private val customerPageOne = """{
+      "items":[
+        {"id":"customer-1","fullName":"Anna Guest","active":true},
+        {"id":"customer-2","fullName":"Inactive Guest","active":false}
+      ],"page":0,"size":100,"totalElements":3,"totalPages":2,"hasNext":true,"hasPrevious":false
+    }"""
+    private val customerPageTwo = """{
+      "items":[{"id":"customer-3","fullName":"Zoe Guest","active":true}],
+      "page":1,"size":100,"totalElements":3,"totalPages":2,"hasNext":false,"hasPrevious":true
     }"""
 }

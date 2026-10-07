@@ -34,6 +34,7 @@ import java.util.UUID;
 public class MenuItemController {
 
     private final MenuItemService menuItemService;
+    private final pos.pos.menu.service.MenuItemImportService menuItemImportService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('MENUS_READ')")
@@ -88,6 +89,19 @@ public class MenuItemController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(menuItemService.createItem(authentication, menuId, sectionId, request));
+    }
+
+    @PostMapping("/import")
+    @PreAuthorize("hasAuthority('MENUS_CREATE')")
+    @Operation(summary = "Copy items from other menus into this section (each copy has its own price)")
+    public ResponseEntity<java.util.List<MenuItemSummaryResponse>> importItems(
+            Authentication authentication,
+            @PathVariable UUID menuId,
+            @PathVariable UUID sectionId,
+            @Valid @RequestBody pos.pos.menu.dto.request.ImportMenuItemsRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(menuItemImportService.importItems(authentication, menuId, sectionId, request.getItemIds()));
     }
 
     @PutMapping("/{itemId}")

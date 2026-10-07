@@ -85,7 +85,9 @@ public class ReservationPolicy {
             int undoSeatMinutes,
             int runningLateMaxMinutes,
             int noShowWarningFrom,
-            int depositFromGuests
+            int depositFromGuests,
+            java.math.BigDecimal cardFeePercent,
+            java.math.BigDecimal cardFeeFixed
     ) {
         static Values from(Settings settings) {
             return new Values(
@@ -104,7 +106,9 @@ public class ReservationPolicy {
                     settings.getUndoSeatMinutes(),
                     settings.getRunningLateMaxMinutes(),
                     settings.getNoShowWarningFrom(),
-                    settings.getDepositFromGuests()
+                    settings.getDepositFromGuests(),
+                    settings.getCardFeePercent(),
+                    settings.getCardFeeFixed()
             );
         }
     }

@@ -134,7 +134,7 @@ class MenuVariantServiceTest {
         actorScopeService.scope = scope;
         given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(Optional.of(menu));
         given(menuSectionRepository.findById(SECTION_ID)).willReturn(Optional.of(section));
-        given(menuItemRepository.findById(ITEM_ID)).willReturn(Optional.of(item));
+        given(menuItemRepository.findByIdForUpdate(ITEM_ID)).willReturn(Optional.of(item));
         given(menuVariantRepository.existsByMenuItemIdAndName(ITEM_ID, "Large")).willReturn(false);
         given(menuVariantRepository.findByMenuItemIdOrderByDisplayOrderAscNameAsc(ITEM_ID)).willReturn(List.of(existingDefault));
         given(menuVariantRepository.saveAndFlush(any(MenuVariant.class))).willAnswer(invocation -> {
@@ -157,6 +157,7 @@ class MenuVariantServiceTest {
         assertThat(saved.getDisplayOrder()).isZero();
         assertThat(existingDefault.isDefault()).isFalse();
         assertThat(response.getId()).isEqualTo(VARIANT_ID);
+        verify(menuItemRepository).findByIdForUpdate(ITEM_ID);
     }
 
     @Test
@@ -174,7 +175,7 @@ class MenuVariantServiceTest {
         actorScopeService.scope = scope;
         given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(Optional.of(menu));
         given(menuSectionRepository.findById(SECTION_ID)).willReturn(Optional.of(section));
-        given(menuItemRepository.findById(ITEM_ID)).willReturn(Optional.of(item));
+        given(menuItemRepository.findByIdForUpdate(ITEM_ID)).willReturn(Optional.of(item));
         given(menuVariantRepository.findById(VARIANT_ID)).willReturn(Optional.of(foreignVariant));
 
         assertThatThrownBy(() -> menuVariantService.updateVariant(authentication, MENU_ID, SECTION_ID, ITEM_ID, VARIANT_ID,

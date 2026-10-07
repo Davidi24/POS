@@ -128,7 +128,20 @@ class NotificationEntityResolver {
             return new ResolvedContext(restaurantId, branchId, actorId);
         }
 
-        for (String nestedGetter : new String[]{"getOrder", "getDevice", "getMenu", "getStation", "getReservation", "getUser"}) {
+        for (String nestedGetter : new String[]{
+                "getOrder",
+                "getDevice",
+                "getMenu",
+                "getStation",
+                "getReservation",
+                "getUser",
+                "getPayment",
+                "getShift",
+                "getInventoryCount",
+                "getInventoryItem",
+                "getLocation",
+                "getRecipe"
+        }) {
             Object nested = readProperty(entity, nestedGetter);
             if (nested == null) {
                 continue;

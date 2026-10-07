@@ -70,6 +70,8 @@ security:
       -----END PUBLIC KEY-----
 
 app:
+  payments:
+    provider: ${APP_PAYMENTS_PROVIDER:test}
   storage:
     floor-plans:
       provider: local
@@ -104,6 +106,7 @@ app:
       token-pepper: change-this-local-dev-email-verification-pepper
 
     sms:
+      delivery-mode: ${SMS_DELIVERY_MODE:LOG_ONLY}
       code-pepper: change-this-local-dev-sms-code-pepper
 
   device:

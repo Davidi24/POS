@@ -78,7 +78,8 @@ import mobile_desktop.shared.generated.resources.pos_simple_logo
 import mobile_desktop.shared.generated.resources.workspace_admin
 import mobile_desktop.shared.generated.resources.workspace_kds
 import mobile_desktop.shared.generated.resources.workspace_pos
-import mobile_desktop.shared.generated.resources.workspace_restaurants
+import mobile_desktop.shared.generated.resources.workspace_statistics
+import mobile_desktop.shared.generated.resources.workspace_fraud
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 
@@ -116,13 +117,21 @@ object WorkspacePickerScreen : Screen {
         BoxWithConstraints(Modifier.fillMaxSize().background(PageBackground)) {
             val narrow = maxWidth < 760.dp
             val fitsFourInRow = maxWidth >= 1240.dp
+            val twoRows = workspaces.size > 3 && Workspace.FRAUD_DETECTION in workspaces
+            val five = workspaces.size == 5
+            // Five choices get smaller cards so the two rows sit comfortably on one screen.
+            val threeColumnCardWidth = ((maxWidth - 104.dp) / 3).coerceAtMost(if (five) 236.dp else 300.dp)
             PageDecorations(Modifier.fillMaxSize(), narrow)
+            val windowHeight = maxHeight
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    // Two rows of cards sit in the middle of the window (lower than the top), still scrolling on short windows.
+                    .then(if (twoRows && !narrow) Modifier.heightIn(min = windowHeight) else Modifier)
                     .padding(horizontal = if (narrow) 16.dp else 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = if (twoRows && !narrow) Arrangement.Center else Arrangement.Top
             ) {
-                Spacer(Modifier.height(if (narrow) 84.dp else 150.dp))
+                Spacer(Modifier.height(if (narrow) 84.dp else if (twoRows) 90.dp else 150.dp))
                 // "Welcome, David" in black, then "Choose your workspace" smaller and grey.
                 val firstName = user?.firstName?.trim().orEmpty().ifBlank { user?.username.orEmpty() }
                 Text(
@@ -138,11 +147,27 @@ object WorkspacePickerScreen : Screen {
                     fontSize = if (narrow) 16.sp else 20.sp, color = Muted,
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.height(if (narrow) 24.dp else 44.dp))
+                Spacer(Modifier.height(if (narrow || twoRows) 24.dp else 44.dp))
                 if (narrow) {
                     Column(Modifier.widthIn(max = 440.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         workspaces.forEach { workspace ->
                             WorkspaceCard(workspace, Modifier.fillMaxWidth(), compact = true) { navigator.push(screenFor(workspace)) }
+                        }
+                    }
+                } else if (twoRows) {
+                    val cardWidth = threeColumnCardWidth
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(if (five) 16.dp else 20.dp)
+                    ) {
+                        workspaces.chunked(3).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(if (five) 16.dp else 20.dp)) {
+                                row.forEach { workspace ->
+                                    WorkspaceCard(workspace, Modifier.width(cardWidth).height(if (five) 212.dp else 272.dp), compact = true, dense = true, smallFive = five) {
+                                        navigator.push(screenFor(workspace))
+                                    }
+                                }
+                            }
                         }
                     }
                 } else if (workspaces.size <= 3 || fitsFourInRow) {
@@ -171,7 +196,7 @@ object WorkspacePickerScreen : Screen {
                         }
                     }
                 }
-                Spacer(Modifier.height(if (narrow) 24.dp else 72.dp))
+                Spacer(Modifier.height(if (narrow || twoRows) 24.dp else 72.dp))
             }
             // Logo on the left; notifications and the profile menu (with log out) on the right.
             WorkspaceTopBar(
@@ -317,18 +342,20 @@ private fun ProfileMenu(user: CurrentUserResponse?, loggingOut: Boolean, onLogou
 }
 
 @Composable
-private fun WorkspaceCard(workspace: Workspace, modifier: Modifier, compact: Boolean, dense: Boolean = false, onOpen: () -> Unit) {
+private fun WorkspaceCard(workspace: Workspace, modifier: Modifier, compact: Boolean, dense: Boolean = false, smallFive: Boolean = false, onOpen: () -> Unit) {
     val (title, subtitle) = when (workspace) {
         Workspace.POS -> "POS" to "Point of Sale \u2014 orders, tables and payments"
         Workspace.KDS -> "KDS" to "Kitchen Display System"
         Workspace.ADMIN -> "Admin Hub" to "Inventory, suppliers, devices and settings"
-        Workspace.RESTAURANTS -> "Restaurants" to "All restaurants, branches and their owners"
+        Workspace.STATISTICS -> "Statistics" to "Sales, performance and reports"
+        Workspace.FRAUD_DETECTION -> "Fraud Detection" to "Suspicious activity and alerts"
     }
     val illustration = when (workspace) {
         Workspace.POS -> Res.drawable.workspace_pos
         Workspace.KDS -> Res.drawable.workspace_kds
         Workspace.ADMIN -> Res.drawable.workspace_admin
-        Workspace.RESTAURANTS -> Res.drawable.workspace_restaurants
+        Workspace.STATISTICS -> Res.drawable.workspace_statistics
+        Workspace.FRAUD_DETECTION -> Res.drawable.workspace_fraud
     }
     val shape = RoundedCornerShape(if (compact) 14.dp else 16.dp)
     Surface(
@@ -340,7 +367,7 @@ private fun WorkspaceCard(workspace: Workspace, modifier: Modifier, compact: Boo
     ) {
         Box(Modifier.fillMaxWidth()) {
             // Soft leaf-shaped green in the top-right corner.
-            Canvas(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(width = 94.dp, height = if (compact) 76.dp else 100.dp)) {
+            Canvas(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(width = if (smallFive) 78.dp else 94.dp, height = if (smallFive) 62.dp else if (compact) 76.dp else 100.dp)) {
                 val w = size.width
                 val h = size.height
                 val leaf = Path().apply {
@@ -356,25 +383,29 @@ private fun WorkspaceCard(workspace: Workspace, modifier: Modifier, compact: Boo
                 drawPath(leaf, CardLeaf)
             }
             Column(
-                Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = if (compact) 18.dp else 26.dp, bottom = if (compact) 16.dp else 22.dp),
+                Modifier.fillMaxWidth().padding(
+                    start = if (smallFive) 18.dp else 24.dp, end = if (smallFive) 18.dp else 24.dp,
+                    top = if (smallFive) 14.dp else if (compact) 18.dp else 26.dp, bottom = if (smallFive) 12.dp else if (compact) 16.dp else 22.dp
+                ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Image(
                     painter = painterResource(illustration),
                     contentDescription = null,
-                    modifier = Modifier.height(if (compact) 100.dp else if (dense) 116.dp else 132.dp).fillMaxWidth(0.82f),
+                    modifier = Modifier.height(if (smallFive) 72.dp else if (compact) 100.dp else if (dense) 116.dp else 132.dp).fillMaxWidth(0.82f),
                     contentScale = ContentScale.Fit
                 )
-                Spacer(Modifier.height(if (compact) 12.dp else 18.dp))
-                Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (compact) 19.sp else if (dense) 19.sp else 21.sp, color = TitleInk)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(if (smallFive) 10.dp else if (compact) 12.dp else 18.dp))
+                Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (smallFive) 17.sp else if (compact) 19.sp else if (dense) 19.sp else 21.sp, color = TitleInk)
+                Spacer(Modifier.height(if (smallFive) 4.dp else 6.dp))
                 Text(
-                    subtitle, Modifier.fillMaxWidth().padding(horizontal = if (compact) 8.dp else 20.dp).heightIn(min = if (compact) 0.dp else 46.dp),
-                    fontFamily = Inter(), fontSize = if (compact) 14.sp else if (dense) 14.sp else 16.sp, lineHeight = if (compact || dense) 20.sp else 22.sp,
+                    subtitle, Modifier.fillMaxWidth().padding(horizontal = if (compact) 8.dp else 20.dp).heightIn(min = if (smallFive) 36.dp else if (compact && dense) 60.dp else if (compact) 0.dp else 46.dp),
+                    fontFamily = Inter(), fontSize = if (smallFive) 12.sp else if (compact) 14.sp else if (dense) 14.sp else 16.sp,
+                    lineHeight = if (smallFive) 17.sp else if (compact || dense) 20.sp else 22.sp,
                     color = Muted, textAlign = TextAlign.Center
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Open $title", Modifier.size(if (compact) 26.dp else 31.dp), tint = IconGreen)
+                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, "Open $title", Modifier.size(if (smallFive) 22.dp else if (compact) 26.dp else 31.dp), tint = IconGreen)
                 }
             }
         }

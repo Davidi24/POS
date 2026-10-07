@@ -140,6 +140,12 @@ class MenuApi(
 
     // Menu items
 
+    suspend fun importItems(menuId: String, sectionId: String, request: ImportMenuItemsRequestDto): List<MenuItemDto> =
+        client.post(endpoint("/menus/$menuId/sections/$sectionId/items/import")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
     suspend fun createItem(
         menuId: String,
         sectionId: String,
@@ -314,6 +320,11 @@ class MenuApi(
         }.body()
     }
 
+    suspend fun getOptionGroup(groupId: String, includeItems: Boolean = false): OptionGroupDto =
+        client.get(endpoint("/option-groups/$groupId")) {
+            parameter("includeItems", includeItems)
+        }.body()
+
     suspend fun deleteOptionGroup(groupId: String) {
         client.delete(endpoint("/option-groups/$groupId"))
     }
@@ -327,6 +338,17 @@ class MenuApi(
         return client.post(
             endpoint("/option-groups/$groupId/items")
         ) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun updateOptionItem(
+        groupId: String,
+        itemId: String,
+        request: UpdateOptionItemRequestDto
+    ): OptionItemDto {
+        return client.put(endpoint("/option-groups/$groupId/items/$itemId")) {
             contentType(ContentType.Application.Json)
             setBody(request)
         }.body()

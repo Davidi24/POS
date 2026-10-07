@@ -24,7 +24,10 @@ data class ReservationRequestDto(
     val depositAmount: OrderDecimal? = null,
     val initialTableIds: List<String>? = null,
     val primaryTableId: String? = null,
-    val attendanceConfirmed: Boolean? = null
+    val attendanceConfirmed: Boolean? = null,
+    val occasionCode: String? = null,
+    val occasionOptions: List<String>? = null,
+    val occasionNote: String? = null
 )
 
 @Serializable
@@ -44,7 +47,10 @@ data class UpdateReservationRequestDto(
     val depositRequired: Boolean? = null,
     val depositAmount: OrderDecimal? = null,
     val tableIds: List<String>? = null,
-    val primaryTableId: String? = null
+    val primaryTableId: String? = null,
+    val occasionCode: String? = null,
+    val occasionOptions: List<String>? = null,
+    val occasionNote: String? = null
 )
 
 @Serializable
@@ -86,6 +92,13 @@ data class ReservationResponseDto(
     val attendanceConfirmedVia: String? = null,
     val attendance: String? = null,
     val guestNoShows: Int? = null,
+    val occasionCode: String? = null,
+    val occasionName: String? = null,
+    val occasionIcon: String? = null,
+    val occasionOptions: List<String>? = null,
+    val occasionNote: String? = null,
+    val eventName: String? = null,
+    val eventIcon: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val tableAssignments: List<ReservationTableAssignmentResponseDto>? = null
@@ -350,3 +363,61 @@ data class ReservationAuditResponseDto(
     val notes: List<ReservationNoteResponseDto>? = null,
     val tableAssignments: List<ReservationTableAssignmentResponseDto>? = null
 )
+
+@Serializable
+data class ReservationOccasionDto(
+    val code: String? = null,
+    val name: String,
+    val icon: String,
+    val options: List<String> = emptyList(),
+    val active: Boolean? = null
+)
+
+@Serializable
+data class SaveReservationOccasionsRequestDto(val occasions: List<ReservationOccasionDto>)
+
+@Serializable
+data class RestaurantEventDto(
+    val id: String? = null,
+    val name: String,
+    val icon: String,
+    val startDate: String,
+    val endDate: String,
+    val menuId: String? = null,
+    val menuName: String? = null,
+    val specialMenuOnly: Boolean? = null,
+    val active: Boolean? = null
+)
+
+// One paid (or to-pay) part of a booking: a deposit, a paid extra or the food pre-order.
+@Serializable
+data class MoneyLineDto(
+    val id: String,
+    val kind: String,
+    val description: String? = null,
+    val amount: OrderDecimal? = null,
+    val currency: String? = null,
+    val status: String,
+    val refundDeadline: String? = null,
+    val refundedAmount: OrderDecimal? = null,
+    val refundIfCancelledNow: OrderDecimal? = null,
+    val explanation: String? = null
+)
+
+// A paid extra from a special menu that fits the booking's occasion, e.g. "Birthday cake · €25".
+@Serializable
+data class BookingExtraChoiceDto(
+    val menuItemId: String,
+    val name: String,
+    val description: String? = null,
+    val price: OrderDecimal? = null,
+    val currency: String? = null,
+    val orderBeforeHours: Int? = null,
+    val occasionCodes: List<String> = emptyList()
+)
+
+@Serializable
+data class AddBookingExtraRequestDto(val menuItemId: String, val quantity: Int)
+
+@Serializable
+data class GoodwillRefundRequestDto(val amount: OrderDecimal, val reason: String)

@@ -184,6 +184,18 @@ class PreOrderServiceTest {
         assertThat(sent.getValue()).isSameAs(scheduled);
     }
 
+    @Test void theKitchenListCoversAtMostSixtyTwoDays() {
+        UUID branchId = UUID.randomUUID();
+        java.time.OffsetDateTime from = inHours(0);
+        when(preOrderRepository.findForBranch(RESTAURANT_ID, branchId, from, from.plusDays(62), null)).thenReturn(List.of());
+
+        assertThat(preOrderService.getForBranch(authentication, RESTAURANT_ID, branchId, from, from.plusDays(62), null)).isEmpty();
+        assertThatThrownBy(() -> preOrderService.getForBranch(authentication, RESTAURANT_ID, branchId, from, from.plusDays(62).plusSeconds(1), null))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Choose at most 62 days");
+        verify(preOrderRepository, never()).findForBranch(RESTAURANT_ID, branchId, from, from.plusDays(62).plusSeconds(1), null);
+    }
+
     private Reservation staffReservation(ReservationStatus status, java.time.OffsetDateTime start) {
         Reservation reservation = reservation(status, start);
         when(reservationSupport.requireReservation(RESTAURANT_ID, RESERVATION_ID)).thenReturn(reservation);

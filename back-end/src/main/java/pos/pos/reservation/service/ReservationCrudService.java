@@ -35,6 +35,20 @@ public class ReservationCrudService {
     private final ReservationPolicy reservationPolicy;
     private final ReservationAvailabilitySupport reservationAvailabilitySupport;
     private final GuestNoShowCounter guestNoShowCounter;
+    private final ReservationOccasionService reservationOccasionService;
+    private BookingMoneyService bookingMoneyService;
+    private ReservationMailService reservationMailService;
+
+    // Optional so the CRUD works without money and email (e.g. in tests).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setBookingMoneyService(BookingMoneyService bookingMoneyService) {
+        this.bookingMoneyService = bookingMoneyService;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setReservationMailService(ReservationMailService reservationMailService) {
+        this.reservationMailService = reservationMailService;
+    }
     private final ApplicationEventPublisher events;
 
     @Transactional
@@ -53,6 +67,7 @@ public class ReservationCrudService {
         reservation.setUpdatedBy(actorId);
 
         reservationSupport.applyReservationRequest(reservation, request, actorId, true, endOf(branch, request));
+        reservationOccasionService.apply(reservation, request.getOccasionCode(), request.getOccasionOptions(), request.getOccasionNote());
 
         // this check if the tables that will be assigned to this reservation can be like maybe there is
         // another reservation there ... after that it clears the previous connection like the previous reservation
@@ -80,6 +95,18 @@ public class ReservationCrudService {
         int noShows = guestNoShowCounter.noShowsOf(saved).size();
         if (noShows > 0 && noShows >= reservationPolicy.values(restaurant).noShowWarningFrom()) {
             reservationNotifications.noShowWarning(saved, noShows, actorId);
+        }
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (bookingMoneyService != null) {
+            bookingMoneyService.createDepositIfRequired(saved);
+        }
+        // A booking taken on the phone: the guest gets the confirmation (with their booking page) by email.
+        if (reservationMailService != null && saved.getStatus() == ReservationStatus.CONFIRMED && saved.getContactEmail() != null) {
+            var due = bookingMoneyService == null ? java.util.List.<pos.pos.reservation.dto.MoneyLineResponse>of()
+                    : bookingMoneyService.lines(saved, now).stream().filter(line -> "PENDING".equals(line.getStatus())).toList();
+            boolean askNow = saved.getAttendanceConfirmedAt() == null
+                    && !now.isBefore(saved.getReservationStart().minusHours(reservationPolicy.values(restaurant).guestReminderHours()));
+            reservationMailService.confirmed(saved, false, askNow, due);
         }
         return reservationSupport.toResponse(saved);
     }
@@ -149,6 +176,7 @@ public class ReservationCrudService {
         reservation.setUpdatedBy(actorId);
 
         reservationSupport.applyReservationRequest(reservation, request, actorId, false, endOf(branch, request));
+        reservationOccasionService.apply(reservation, request.getOccasionCode(), request.getOccasionOptions(), request.getOccasionNote());
         if (request.getInitialTableIds() != null) {
             reservationTableAssignmentService.replaceReservationTables(
                     reservation,
@@ -181,6 +209,12 @@ public class ReservationCrudService {
         }
 
         reservationSupport.applyReservationPatch(reservation, request, actorId);
+        // An occasion change comes with its code; an empty code removes it.
+        if (request.getOccasionCode() != null) {
+            reservationOccasionService.apply(reservation, request.getOccasionCode(), request.getOccasionOptions(), request.getOccasionNote());
+        } else if (request.getOccasionNote() != null) {
+            reservation.setOccasionNote(request.getOccasionNote().isBlank() ? null : request.getOccasionNote().trim());
+        }
         if (request.getTableIds() != null) {
             reservationTableAssignmentService.replaceReservationTables(
                     reservation,

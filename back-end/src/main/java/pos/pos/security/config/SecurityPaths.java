@@ -22,6 +22,8 @@ public class SecurityPaths {
             "/restaurants/registrations",
             "/restaurants/registrations/*",
             "/public/**",
+            "/health/live",
+            "/health/ready",
 
             "/v3/api-docs/**",
             "/swagger-ui/**",

@@ -20,6 +20,7 @@ public class CreateRestaurantOwnerRequest {
 
     @Email(message = "email must be a valid email")
     @NotBlank(message = "email is required")
+    @Size(max = 150, message = "email must be at most 150 characters")
     private String email;
 
     @NotBlank(message = "username is required")

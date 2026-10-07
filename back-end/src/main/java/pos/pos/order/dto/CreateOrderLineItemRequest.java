@@ -1,5 +1,7 @@
 package pos.pos.order.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -26,10 +28,12 @@ public class CreateOrderLineItemRequest {
 
     @NotNull(message = "quantity is required")
     @Min(value = 1, message = "quantity must be greater than 0")
+    @Max(value = 999, message = "quantity must be at most 999")
     private Integer quantity;
 
+    @Size(max = 1000, message = "notes must be at most 1000 characters")
     private String notes;
 
     @Valid
-    private List<CreateOrderItemOptionRequest> options;
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") CreateOrderItemOptionRequest> options;
 }

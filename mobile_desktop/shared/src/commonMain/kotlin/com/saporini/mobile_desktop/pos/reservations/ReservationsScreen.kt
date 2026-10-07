@@ -261,6 +261,9 @@ private fun ReservationsCalendarContent(
     // Re-picks today once the restaurant's zone arrives from the server.
     val restaurantZone = RestaurantTime.zone
     var selectedDate by remember(restaurantZone) { mutableStateOf(serviceDateOf(Clock.System.now(), restaurantZone)) }
+    // The restaurant's event night on the chosen day (e.g. ❤️ Valentine's), shown above the overview.
+    var dayEvent by remember { mutableStateOf<com.saporini.mobile_desktop.pos.reservations.domain.model.RestaurantEvent?>(null) }
+    LaunchedEffect(model, selectedDate) { dayEvent = model.eventOn(selectedDate).getOrNull() }
     LaunchedEffect(model, selectedDate, restaurantZone) {
         val zone = RestaurantTime.zone
         model.setFilter(
@@ -416,6 +419,7 @@ private fun ReservationsCalendarContent(
                         ready = state.arrivalsLoaded
                     ),
                     date = selectedDate,
+                    event = dayEvent,
                     onDateChange = { selectedDate = it },
                     floors = state.floors,
                     floor = selectedFloor,

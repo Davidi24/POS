@@ -12,7 +12,8 @@ fun screenFor(workspace: Workspace): Screen = when (workspace) {
     Workspace.POS -> PosScreen
     Workspace.KDS -> KdsScreen
     Workspace.ADMIN -> AdminScreen
-    Workspace.RESTAURANTS -> RestaurantsWorkspaceScreen
+    Workspace.STATISTICS -> StatisticsWorkspaceScreen
+    Workspace.FRAUD_DETECTION -> FraudDetectionWorkspaceScreen
 }
 
 fun resolveStartScreen(user: CurrentUserResponse): Screen {

@@ -1158,6 +1158,40 @@ fun TablesScreen(
                 )
             }
 
+            // Walk-ins waiting at the door: open the waitlist and seat them at a free table.
+            if (!planOnlyMode && !mergeMode && selectedTables.isEmpty()) {
+                var waitlistOpen by remember { mutableStateOf(false) }
+                Surface(
+                    onClick = { waitlistOpen = true },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(28.dp),
+                    shape = RoundedCornerShape(50),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, Color(0xFFE3E6E1)),
+                    shadowElevation = 4.dp
+                ) {
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Groups, null, Modifier.size(18.dp), tint = Color(0xFF4F7942))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Waitlist", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF222426))
+                    }
+                }
+                if (waitlistOpen) {
+                    MenuNestedDialog(
+                        onDismissRequest = { waitlistOpen = false },
+                        title = { Text("Walk-ins waiting", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp) },
+                        text = {
+                            Box(Modifier.width(380.dp).height(520.dp).verticalScroll(rememberScrollState())) {
+                                com.saporini.mobile_desktop.pos.reservations.WaitlistSection(Modifier.fillMaxWidth())
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { waitlistOpen = false }) { Text("Close", fontFamily = Inter(), color = Color(0xFF4F7942)) }
+                        },
+                        dismissButton = {}
+                    )
+                }
+            }
+
             if (tableNotifications.isNotEmpty()) {
                 TableNotificationQueue(
                     notifications = tableNotifications,
@@ -1642,6 +1676,24 @@ private fun FloorPlanTables(
                         if (editMode) onEditTableSelected(table) else onTableClick(table)
                     }
             )
+            // The booking's occasion at this table, e.g. 🎂 for a birthday.
+            val occasionIcon = table.occasionIcon
+            if (occasionIcon != null && !editMode) {
+                Text(
+                    occasionIcon,
+                    fontSize = 16.sp,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .offset(
+                            x = maxWidth * scaledX + displayedTable.visualWidth() * 0.5f - 12.dp,
+                            y = planHeight * scaledY - displayedTable.visualHeight() * 0.5f - 8.dp
+                        )
+                        .graphicsLayer {
+                            translationX = planOffset.x
+                            translationY = planOffset.y
+                        }
+                )
+            }
         }
     }
 }

@@ -15,7 +15,8 @@ data class CreateMenuRequestDto(
     val availableUntil: String? = null,
     val availableFromDate: String? = null,
     val availableUntilDate: String? = null,
-    val color: String? = null
+    val color: String? = null,
+    val special: Boolean? = null
 )
 
 @Serializable
@@ -30,7 +31,8 @@ data class UpdateMenuRequestDto(
     val availableUntil: String? = null,
     val availableFromDate: String? = null,
     val availableUntilDate: String? = null,
-    val color: String? = null
+    val color: String? = null,
+    val special: Boolean? = null
 )
 
 @Serializable
@@ -72,7 +74,9 @@ data class CreateMenuItemRequestDto(
     val onlineSectionId: String? = null,
     val onlineSectionName: String? = null,
     val displayOrder: Int? = null,
-    val ingredients: List<String> = emptyList()
+    val ingredients: List<String> = emptyList(),
+    val orderBeforeHours: Int? = null,
+    val occasionCodes: List<String>? = null
 )
 
 @Serializable
@@ -89,7 +93,9 @@ data class UpdateMenuItemRequestDto(
     val onlineSectionName: String? = null,
     val displayOrder: Int,
     val ingredients: List<String> = emptyList(),
-    val sectionId: String? = null
+    val sectionId: String? = null,
+    val orderBeforeHours: Int? = null,
+    val occasionCodes: List<String>? = null
 )
 
 @Serializable
@@ -186,7 +192,9 @@ data class CreateOptionItemRequestDto(
     val name: String,
     val priceDelta: Double? = null,
     val available: Boolean? = null,
-    val displayOrder: Int? = null
+    val displayOrder: Int? = null,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: Double? = null
 )
 
 @Serializable
@@ -195,7 +203,9 @@ data class UpdateOptionItemRequestDto(
     val name: String,
     val priceDelta: Double? = null,
     val available: Boolean,
-    val displayOrder: Int
+    val displayOrder: Int,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: Double? = null
 )
 
 @Serializable
@@ -212,3 +222,6 @@ data class RenameOnlineMenuSectionRequestDto(
 data class ReorderOnlineMenuSectionsRequestDto(
     val sectionIds: List<String>
 )
+
+@Serializable
+data class ImportMenuItemsRequestDto(val itemIds: List<String>)

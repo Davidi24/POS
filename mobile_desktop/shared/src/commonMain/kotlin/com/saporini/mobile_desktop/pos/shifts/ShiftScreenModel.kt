@@ -12,6 +12,8 @@ internal data class ShiftState(
     val date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
     val monthView: Boolean = false, val boardFrom: LocalDate? = null, val boardTo: LocalDate? = null,
     val board: ShiftBoard? = null, val loading: Boolean = true, val busy: Boolean = false,
+    // My shift (POS): my pay for the week shown; null until loaded or when it couldn't be read.
+    val pay: PayReport? = null,
     val error: String? = null, val notice: String? = null, val userId: String? = null,
     val permissions: Set<String> = emptySet(), val ready: Boolean = false
 ) {
@@ -47,15 +49,19 @@ internal class ShiftScreenModel(private val repository: ShiftRepository, private
         if (mutable.value.busy) return
         val old = mutable.value
         val nextFrom = if (monthView) LocalDate(date.year, date.month, 1) else date.minus(DatePeriod(days = date.dayOfWeek.ordinal))
-        val nextTo = if (monthView) nextFrom.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1)) else nextFrom.plus(DatePeriod(days = 6))
+        val nextTo = if (monthView) nextFrom.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1)) else nextFrom.plus(DatePeriod(days = weekSpan()))
         mutable.update { it.copy(date = date, monthView = monthView) }
         if (old.boardFrom != nextFrom || old.boardTo != nextTo || old.board == null) {
             generation++
-            mutable.update { it.copy(board = null, boardFrom = null, boardTo = null) }
+            // Pay belongs to the selected date range too. Clear it before loading a new range so an API failure
+            // cannot leave the previous week's wages and tips visible under the newly selected dates.
+            mutable.update { it.copy(board = null, boardFrom = null, boardTo = null, pay = null) }
             refresh()
         }
     }
-    fun clearError() { mutable.update { it.copy(error = null, notice = null) } }
+    // My shift also loads the following week, so the next shift shows even when it isn't this week.
+    private fun weekSpan() = if (admin) 6 else 13
+        fun clearError() { mutable.update { it.copy(error = null, notice = null) } }
     fun refresh() {
         if (mutable.value.busy) return
         refreshJob?.cancel()
@@ -69,9 +75,12 @@ internal class ShiftScreenModel(private val repository: ShiftRepository, private
         mutable.update { it.copy(loading = true) }
         try {
             val from = if (s.monthView) LocalDate(s.date.year, s.date.month, 1) else s.weekStart
-            val to = if (s.monthView) from.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1)) else from.plus(DatePeriod(days = 6))
+            val to = if (s.monthView) from.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1)) else from.plus(DatePeriod(days = weekSpan()))
             val board = repository.board(r, b, from.toString(), to.toString(), !admin)
-            if (token == generation) mutable.update { it.copy(board = board, boardFrom = from, boardTo = to, loading = false, error = null) }
+            // My pay for the week on screen. Pay is extra: the shifts still show when it can't be read.
+            val pay = if (admin) null else runCatching { repository.pay(r, b, from.toString(), from.plus(DatePeriod(days = 6)).toString(), mine = true) }
+                .onFailure { if (it is CancellationException) throw it }.getOrNull()
+            if (token == generation) mutable.update { it.copy(board = board, boardFrom = from, boardTo = to, loading = false, error = null, pay = pay) }
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { if (token == generation) mutable.update { it.copy(loading = false, error = friendly(e)) } }
     }

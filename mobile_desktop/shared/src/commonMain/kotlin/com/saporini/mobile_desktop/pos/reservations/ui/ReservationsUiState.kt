@@ -86,6 +86,8 @@ data class ReservationsUiState(
     val rules: ReservationRules = ReservationRules.NONE,
     // Admin Hub reservation timers (hold, late, check-in, correction windows).
     val policy: ReservationPolicy = ReservationPolicy(),
+    // Occasions a booking can have (🎂 Birthday…), for the booking forms.
+    val occasions: List<ReservationOccasion> = emptyList(),
     // The last "load more" failed: lists stop loading on scroll and offer "Try again" instead.
     val loadMoreReservationsFailed: Boolean = false,
     // Overview "Arriving" feed: guests still to come from 15 minutes ago on, soonest first, loaded page by page.

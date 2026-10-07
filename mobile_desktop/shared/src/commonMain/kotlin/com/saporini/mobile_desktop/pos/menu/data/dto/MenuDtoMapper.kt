@@ -47,7 +47,8 @@ fun MenuResponseDto.toDomain(): Menu {
         createdAt = createdAt,
         updatedAt = updatedAt,
         allFilterPosition = allFilterPosition,
-        sections = sections.map { it.toDomain() }
+        sections = sections.map { it.toDomain() },
+        special = special
     )
 }
 
@@ -86,7 +87,9 @@ fun MenuItemDto.toDomain(): MenuItem {
         displayOrder = displayOrder,
         ingredients = ingredients,
         variants = variants.map { it.toDomain() },
-        optionGroups = optionGroups.map { it.toDomain() }
+        optionGroups = optionGroups.map { it.toDomain() },
+        orderBeforeHours = orderBeforeHours,
+        occasionCodes = occasionCodes
     )
 }
 
@@ -152,7 +155,9 @@ fun OptionItemDto.toDomain(): OptionItem {
         name = name,
         priceDelta = priceDelta,
         available = available,
-        displayOrder = displayOrder
+        displayOrder = displayOrder,
+        inventoryRecipeId = inventoryRecipeId,
+        inventoryRecipeQuantity = inventoryRecipeQuantity
     )
 }
 

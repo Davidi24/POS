@@ -66,6 +66,15 @@ public class ReservationResponse {
     private String attendance;
     // The guest's no-shows counted for the warning (after the last time a manager cleared it).
     private Integer guestNoShows;
+    // 🎂 Birthday · Cake from us, Candles · "30 candles at dessert"
+    private String occasionCode;
+    private String occasionName;
+    private String occasionIcon;
+    private List<String> occasionOptions;
+    private String occasionNote;
+    // The restaurant's event that day, e.g. ❤️ Valentine's.
+    private String eventName;
+    private String eventIcon;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private List<ReservationTableAssignmentResponse> tableAssignments;

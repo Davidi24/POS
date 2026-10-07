@@ -39,6 +39,22 @@ class ShiftScreenModelTest {
         assertFalse(dismissed); assertFalse(model.state.value.busy); assertEquals("Already clocked in",model.state.value.error)
         assertEquals(2,repo.reads); model.onDispose()
     }
+    @Test fun changingWeekClearsOldPayWhenTheNewBoardFails() = runTest(dispatcher) {
+        val repo = FakeShifts().apply {
+            payReport = PayReport("Europe/Berlin", "EUR", "2026-09-21", "2026-09-27", "2026-09-27T10:00:00Z",
+                listOf(StaffPay("u", "Test Staff", tips = com.saporini.mobile_desktop.pos.orders.domain.model.OrderDecimal("5.00"))))
+        }
+        val model = ShiftScreenModel(repo, session()); model.start(false); advanceUntilIdle()
+        assertEquals("5.00", model.state.value.pay?.staff?.single()?.tips?.value)
+
+        repo.boardFailure = ApiException(503, "Shift board unavailable")
+        model.date(model.state.value.weekStart.plus(DatePeriod(days = 7))); advanceUntilIdle()
+
+        assertNull(model.state.value.board)
+        assertNull(model.state.value.pay)
+        assertEquals("Shift board unavailable", model.state.value.error)
+        model.onDispose()
+    }
     @Test fun signOutRemovesShiftData() = runTest(dispatcher) {
         val repo=FakeShifts(); val session=session(); val model=ShiftScreenModel(repo,session); model.start(false); advanceUntilIdle()
         session.signOut(); advanceUntilIdle(); assertNull(model.state.value.board); assertNull(model.state.value.userId); assertFalse(model.state.value.ready); model.onDispose()
@@ -58,11 +74,14 @@ class ShiftScreenModelTest {
 }
 internal fun sample()=ShiftItem("s",0,"u","Test Staff","OPEN",startedAt="2026-09-27T08:00:00Z")
 internal class FakeShifts : ShiftRepository {
-    var reads=0; var clocks=0; var failure: Exception?=null; var current: ShiftItem?=null
-    override suspend fun board(restaurant:String,branch:String,from:String,to:String,mine:Boolean): ShiftBoard { reads++; return ShiftBoard("Europe/Berlin","2026-09-27T10:00:00Z",listOfNotNull(current),current) }
+    var reads=0; var clocks=0; var failure: Exception?=null; var boardFailure: Exception?=null; var current: ShiftItem?=null
+    override suspend fun board(restaurant:String,branch:String,from:String,to:String,mine:Boolean): ShiftBoard { reads++; boardFailure?.let { throw it }; return ShiftBoard("Europe/Berlin","2026-09-27T10:00:00Z",listOfNotNull(current),current) }
     override suspend fun clockIn(restaurant:String,branch:String,id:String?):ShiftItem { clocks++; delay(100); failure?.let { throw it }; return sample().also { current=it } }
     override suspend fun schedule(restaurant:String,branch:String,id:String?,request:ShiftSchedule)=sample()
     override suspend fun action(restaurant:String,branch:String,id:String,action:String,request:ShiftAction)=sample()
     override suspend fun startBreak(restaurant:String,branch:String,id:String,request:ShiftBreakRequest)=sample()
     override suspend fun correct(restaurant:String,branch:String,id:String,request:ShiftCorrection)=sample()
+    var payReads=0; var payReport: PayReport?=null; var rates=mutableMapOf<String,String>()
+    override suspend fun pay(restaurant:String,branch:String,from:String,to:String,mine:Boolean):PayReport { payReads++; return payReport ?: PayReport("Europe/Berlin","EUR",from,to,"2026-09-27T10:00:00Z") }
+    override suspend fun setPayRate(restaurant:String,branch:String,userId:String,rate:com.saporini.mobile_desktop.pos.orders.domain.model.OrderDecimal):PayRate { rates[userId]=rate.value; return PayRate(rate) }
 }

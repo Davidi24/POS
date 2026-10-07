@@ -11,8 +11,10 @@ interface ReservationRepository {
         from: String? = null,
         to: String? = null,
         status: ReservationStatus? = null,
-        customerId: String? = null
-    ): List<Reservation>
+        customerId: String? = null,
+        page: Int = 0,
+        size: Int = 100
+    ): ReservationPage
 
     suspend fun getBranchReservationCalendar(
         restaurantId: String,
@@ -80,11 +82,27 @@ interface ReservationRepository {
     // Keep the table longer for late guests; the booking still ends on time.
     suspend fun extendHold(restaurantId: String, reservationId: String, minutes: Int, reason: String? = null): Reservation
     suspend fun getSeatingCheck(restaurantId: String, reservationId: String): ReservationSeatingCheck
+    suspend fun getOccasions(restaurantId: String): List<ReservationOccasion>
+    // The restaurant's event on a day ("yyyy-MM-dd"), if any.
+    suspend fun getEventOn(restaurantId: String, date: String): RestaurantEvent?
     // "✓ Attendance confirmed" after a call.
     suspend fun confirmAttendance(restaurantId: String, reservationId: String, reason: String? = null): Reservation
     suspend fun getGuestHistory(restaurantId: String, reservationId: String): GuestHistory
     // Managers clear a guest's no-show warning with a reason; the history stays.
     suspend fun clearNoShowWarning(restaurantId: String, reservationId: String, reason: String): Reservation
+
+    // Say no to a request: the guest is told and gets all their money back.
+    suspend fun declineReservation(restaurantId: String, reservationId: String, reason: String? = null): Reservation
+    // The booking's money: deposit, paid extras, food pre-order, and what a cancel would do.
+    suspend fun getMoney(restaurantId: String, reservationId: String): List<MoneyLine>
+    suspend fun getExtraChoices(restaurantId: String, reservationId: String): List<BookingExtraChoice>
+    suspend fun addExtra(restaurantId: String, reservationId: String, menuItemId: String, quantity: Int): List<MoneyLine>
+    suspend fun sendPaymentLink(restaurantId: String, reservationId: String)
+    // Paid at the desk.
+    suspend fun markPaid(restaurantId: String, reservationId: String, paymentId: String): List<MoneyLine>
+    suspend fun removeUnpaid(restaurantId: String, reservationId: String, paymentId: String): List<MoneyLine>
+    // Part of kept money back, with a reason (never all of it).
+    suspend fun goodwillRefund(restaurantId: String, reservationId: String, lineId: String, amountCents: Long, reason: String): List<MoneyLine>
 
     suspend fun getReservationTables(restaurantId: String, reservationId: String): List<ReservationTableAssignment>
     suspend fun updateReservationTables(restaurantId: String, reservationId: String, request: ReservationTablesInput): List<ReservationTableAssignment>

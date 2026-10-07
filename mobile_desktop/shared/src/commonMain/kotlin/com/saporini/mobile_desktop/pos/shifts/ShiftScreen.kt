@@ -34,6 +34,8 @@ private val ShiftBorder = Color(0xFFE3E8E1)
 internal val ShiftBlue = Color(0xFF24748A)
 internal val ShiftAmber = Color(0xFFC8790B)
 
+internal enum class ShiftAdminView(val label: String) { SCHEDULE("Schedule"), PAY("Hours & pay") }
+
 @Composable
 fun ShiftScreen(modifier: Modifier = Modifier, management: Boolean = false) {
     val model = koinInject<ShiftScreenModel>()
@@ -48,187 +50,21 @@ fun ShiftScreen(modifier: Modifier = Modifier, management: Boolean = false) {
 
 @Composable
 internal fun ShiftContent(state: ShiftState, management: Boolean, model: ShiftScreenModel, modifier: Modifier = Modifier) {
-    if (management) { ShiftAdminCalendar(state, model, modifier); return }
-    var details by remember { mutableStateOf<ShiftItem?>(null) }
-    var editor by remember { mutableStateOf<ShiftItem?>(null) }
-    var editing by remember { mutableStateOf(false) }
-    var correction by remember { mutableStateOf(false) }
-    var editorDate by remember { mutableStateOf(state.date) }
-    var editorStaff by remember { mutableStateOf<String?>(null) }
-    var editorStartTime by remember { mutableStateOf("09:00") }
-    var pending by remember { mutableStateOf<Pair<String, ShiftItem?>?>(null) }
-    var staffId by remember { mutableStateOf<String?>(null) }
-    var status by remember { mutableStateOf("All statuses") }
-    val board = state.board
-    val zone = state.zone
-    val now = board?.serverNow?.let { Instant.parse(it) } ?: Clock.System.now()
-    val today = now.toLocalDateTime(zone).date
-    val all = board?.items.orEmpty()
-    val visible = all.filter { (staffId == null || it.userId == staffId) && (status == "All statuses" || shiftStatus(it.status) == status) }
-    val current = board?.current
-    val days = (0..6).map { state.weekStart.plus(DatePeriod(days = it)) }
-    val weekItems = all.filter { it.start?.shiftLocal(zone)?.date in days }
-    val dayItems = visible.filter { it.start?.shiftLocal(zone)?.date == state.date }.sortedBy { it.start }
-    fun openEditor(item: ShiftItem? = null, correct: Boolean = false) { model.clearError(); editor = item; correction = correct; editorDate = item?.start?.shiftLocal(zone)?.date ?: state.date; editorStaff = item?.userId; editorStartTime = "09:00"; editing = true; details = null }
-    fun ask(action: String, item: ShiftItem? = null) { model.clearError(); pending = action to item; details = null }
-    val next = all.filter { it.status == "SCHEDULED" && it.scheduledEnd?.let { end -> Instant.parse(end) >= now } == true }.minByOrNull { it.scheduledStart.orEmpty() }
-    val eligible = board?.clockInShift ?: next?.takeIf { canClockIn(it, now) }
-
-    BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
-        val compact = maxWidth < 900.dp
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(if (compact) 16.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Column(Modifier.weight(1f).widthIn(min = 190.dp)) {
-                    Text(if (management) "Shifts" else "My shift", fontFamily = Inter(), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = FormInk)
-                    Text(if (management) "Plan your team’s week and review attendance." else "Your time, breaks, and upcoming schedule.", fontFamily = Inter(), fontSize = 13.sp, color = FormMuted)
-                }
-                ShiftButton("Refresh", Icons.Outlined.Refresh, primary = false, enabled = !state.loading && !state.busy) { model.clearError(); model.refresh() }
-                if (management && state.canManage) ShiftButton("Schedule shift", Icons.Outlined.Add, enabled = !state.busy && board != null) { openEditor() }
-            }
-            if (state.error != null && !editing && pending == null) ShiftMessage(state.error, error = true, onDismiss = model::clearError)
-            if (state.notice != null) ShiftMessage(state.notice, error = false, onDismiss = model::clearError)
-            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp), color = FormGreen, trackColor = FormGreenSoft)
-            val permitted = if (management) state.canRead else state.canSelf
-            if (!state.ready || !permitted) {
-                ShiftPanel("Shift access", Icons.Outlined.Lock) { Muted("Your account needs a restaurant, branch, and shift permission. Sign in again after permissions are updated.") }
-            } else if (board == null && !state.loading) {
-                ShiftPanel("Couldn't load shifts", Icons.Outlined.CloudOff) { Muted("Your shifts could not be loaded. Check your connection and retry."); ShiftButton("Try again", Icons.Outlined.Refresh) { model.clearError(); model.refresh() } }
-            } else {
-                if (management) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        ShiftMetric("Scheduled", "${all.count { it.status == "SCHEDULED" }}", "This week", Icons.Outlined.CalendarToday, FormGreen, Modifier.weight(1f).widthIn(min = 155.dp))
-                        ShiftMetric("On duty", "${all.count { it.status == "OPEN" }}", "Clocked in", Icons.Outlined.Badge, ShiftBlue, Modifier.weight(1f).widthIn(min = 155.dp))
-                        ShiftMetric("On break", "${all.count { it.status == "ON_BREAK" }}", "Currently away", Icons.Outlined.Coffee, ShiftAmber, Modifier.weight(1f).widthIn(min = 155.dp))
-                        ShiftMetric("Worked time", shiftDuration(weekItems.sumOf { it.workedMinutes }), "Shifts in this week", Icons.Outlined.Schedule, FormGreen, Modifier.weight(1f).widthIn(min = 155.dp))
-                    }
-                } else {
-                    ShiftPanel(if (current == null) "Ready for your next shift" else "Current shift", Icons.Outlined.Schedule) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Column(Modifier.weight(1f).widthIn(min = 200.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                ShiftBadge(current?.status ?: "OFF_DUTY")
-                                Text(if (current == null) "You're off duty" else shiftDuration(current.workedMinutes), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 34.sp, color = FormInk)
-                                Muted(if (current == null) next?.let { "Next: ${it.scheduledStart.shiftLabel(zone)} – ${it.scheduledEnd.shiftTime(zone)}" } ?: "No upcoming shift in the selected week." else "Worked time · started ${current.startedAt.shiftLabel(zone)}")
-                                if (current != null) Muted("Breaks: ${shiftDuration(current.breakMinutes)} · ${current.breaks.size} recorded")
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                if (current == null) {
-                                    ShiftButton("Clock in", Icons.Outlined.PlayArrow, enabled = !state.busy && board != null) { ask("clock-in", eligible) }
-                                    Muted(if (eligible == null) "Start an unscheduled shift now." else "For your ${eligible.scheduledStart.shiftTime(zone)} shift.")
-                                } else {
-                                    if (current.status == "OPEN") ShiftButton("Start break", Icons.Outlined.Coffee, enabled = !state.busy) { ask("break", current) }
-                                    else ShiftButton("End break", Icons.Outlined.PlayArrow, enabled = !state.busy) { model.action(current, "resume", null) {} }
-                                    ShiftButton("Clock out", Icons.Outlined.StopCircle, primary = false, enabled = !state.busy) { ask("close", current) }
-                                    ShiftButton("Shift details", Icons.Outlined.Info, primary = false) { details = current }
-                                }
-                            }
-                        }
-                    }
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ShiftButton("Previous", Icons.AutoMirrored.Outlined.ArrowBack, primary = false, enabled = !state.busy) { model.date(state.date.minus(DatePeriod(days = 7))) }
-                    Box(Modifier.width(210.dp)) { DateBox(state.date) { if (!state.busy) model.date(it) } }
-                    ShiftButton("Next", Icons.AutoMirrored.Outlined.ArrowForward, primary = false, enabled = !state.busy) { model.date(state.date.plus(DatePeriod(days = 7))) }
-                    ShiftButton("Today", Icons.Outlined.Today, primary = false, enabled = !state.busy) { model.date(today) }
-                    if (management) {
-                        Box(Modifier.width(200.dp)) {
-                            StaffPicker(board?.staff.orEmpty(), staffId, "All staff", allowAll = true) { staffId = it }
-                        }
-                        Box(Modifier.width(170.dp)) { DropdownBox(Icons.Outlined.FilterList, status, listOf("All statuses", "Scheduled", "On duty", "On break", "Completed", "Missed", "Cancelled")) { status = it } }
-                    }
-                }
-                Text("${state.weekStart.shiftDateLabel()} – ${days.last().shiftDateLabel()} · ${zone.id}", fontFamily = Inter(), fontSize = 12.sp, color = FormMuted)
-                if (management && !compact) {
-                    ShiftPanel("Weekly schedule", Icons.Outlined.CalendarMonth) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            days.forEach { date ->
-                                val shifts = visible.filter { it.start?.shiftLocal(zone)?.date == date }.sortedBy { it.start }
-                                Column(Modifier.weight(1f).heightIn(min = 265.dp).clip(RoundedCornerShape(8.dp)).background(if (date == state.date) FormGreenSoft else Color(0xFFF8F9F7)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Column(Modifier.fillMaxWidth().clickable(enabled = !state.busy) { model.date(date) }.padding(vertical = 4.dp)) {
-                                        Text(date.dayOfWeek.name.take(3), fontFamily = Inter(), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = FormMuted)
-                                        Text("${date.day}", fontFamily = Inter(), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = if (date == today) FormGreen else FormInk)
-                                    }
-                                    shifts.take(4).forEach { item ->
-                                        Surface(onClick = { details = item }, shape = RoundedCornerShape(8.dp), color = Color.White, border = BorderStroke(1.dp, ShiftBorder), modifier = Modifier.fillMaxWidth()) {
-                                            Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                                Text(item.userName, fontFamily = Inter(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                                Text("${item.start.shiftTime(zone)}–${(item.scheduledEnd ?: item.endedAt).shiftTime(zone)}", fontFamily = Inter(), fontSize = 11.sp, color = FormMuted)
-                                                Text(shiftStatus(item.status), fontFamily = Inter(), fontSize = 10.sp, color = shiftColor(item.status))
-                                            }
-                                        }
-                                    }
-                                    if (shifts.isEmpty()) Text("No shifts", fontFamily = Inter(), fontSize = 11.sp, color = FormMuted)
-                                    if (shifts.size > 4) TextButton(onClick = { model.date(date) }) { Text("+${shifts.size - 4} more", color = FormGreen, fontSize = 11.sp) }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        days.forEach { date ->
-                            Surface(onClick = { if (!state.busy) model.date(date) }, shape = RoundedCornerShape(8.dp), color = if (date == state.date) FormGreen else Color.White, border = BorderStroke(1.dp, ShiftBorder)) {
-                                Column(Modifier.width(72.dp).padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(date.dayOfWeek.name.take(3), fontFamily = Inter(), fontSize = 11.sp, color = if (date == state.date) Color.White else FormMuted)
-                                    Text("${date.day}", fontFamily = Inter(), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (date == state.date) Color.White else FormInk)
-                                    Text("${visible.count { it.start?.shiftLocal(zone)?.date == date }} shifts", fontFamily = Inter(), fontSize = 10.sp, color = if (date == state.date) Color.White else FormMuted)
-                                }
-                            }
-                        }
-                    }
-                }
-                ShiftPanel("${if (management) "Team schedule" else "My schedule"} · ${state.date.shiftDateLabel()}", Icons.Outlined.EventAvailable) {
-                    if (dayItems.isEmpty()) {
-                        Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(Icons.Outlined.EventAvailable, null, Modifier.size(36.dp), tint = FormGreen)
-                            Text(if (state.loading) "Loading shifts…" else "No shifts on this day", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = FormInk)
-                            Muted(if (management) "Choose another day or schedule a shift for your team." else "Use the calendar to view your upcoming shifts and history.")
-                        }
-                    } else dayItems.forEach { item -> ShiftRow(item, zone, compact) { details = item } }
-                }
-                if (management) {
-                    val earlierActive = visible.filter { it.active && it.start?.shiftLocal(zone)?.date !in days }
-                    if (earlierActive.isNotEmpty()) ShiftPanel("Active shifts outside this week", Icons.Outlined.Schedule) {
-                        Muted("These shifts are still clocked in. Open one to review its times or end it with a reason.")
-                        earlierActive.forEach { item -> ShiftRow(item, zone, compact) { details = item } }
-                    }
-                    val unresolved = all.filter { it.status == "SCHEDULED" && it.scheduledEnd?.let { end -> Instant.parse(end) < now } == true }
-                    if (unresolved.isNotEmpty()) ShiftPanel("Needs review · ${unresolved.size}", Icons.Outlined.Info) {
-                        Muted("These scheduled shifts ended without a clock-in. Review them before marking them missed.")
-                        unresolved.forEach { item -> ShiftRow(item, zone, compact) { details = item } }
-                    }
-                }
-            }
-        }
-    }
-    details?.let { original ->
-        val item = board?.items?.find { it.id == original.id } ?: board?.current?.takeIf { it.id == original.id } ?: original
-        ShiftDetails(item, zone, state, now, onDismiss = { details = null }, onEdit = { openEditor(item) }, onCorrect = { openEditor(item, true) }, onAction = { ask(it, item) })
-    }
-    if (editing) ShiftEditor(state, editor, correction, editorDate, editorStaff, editorStartTime, onDismiss = { if (!state.busy) editing = false }, onSave = { request ->
-        model.schedule(editor?.id, request) { editing = false }
-    }, onCorrect = { item, request -> model.correct(item, request) { editing = false } })
-    pending?.let { (action, original) ->
-        val item = original?.let { board?.items?.find { s -> s.id == it.id } ?: board?.current?.takeIf { s -> s.id == it.id } ?: it }
-        ShiftActionDialog(action, item, state, onDismiss = { if (!state.busy) pending = null }) { notes, breakType ->
-            when (action) {
-                "clock-in" -> model.clockIn(item?.id) { pending = null }
-                "break" -> item?.let { model.startBreak(it, breakType) { pending = null } }
-                else -> item?.let { model.action(it, action, notes) { pending = null } }
-            }
-        }
+    if (!management) { MyShiftContent(state, model, modifier); return }
+    // Admin Hub → Shifts: the schedule, and hours & pay for managers who can see wages.
+    var view by remember { mutableStateOf(ShiftAdminView.SCHEDULE) }
+    val tabs: (@Composable () -> Unit)? = if (!state.canManage) null else ({
+        com.saporini.mobile_desktop.core.components.OverviewTabs(
+            ShiftAdminView.entries.map { it.label }, view.label, { label -> view = ShiftAdminView.entries.first { it.label == label } },
+            Modifier.width(196.dp), height = ToolbarHeight
+        )
+    })
+    when (view) {
+        ShiftAdminView.SCHEDULE -> ShiftAdminCalendar(state, model, modifier, tabs)
+        ShiftAdminView.PAY -> HoursAndPay(state, modifier, tabs)
     }
 }
 
-@Composable private fun ShiftMetric(label: String, value: String, detail: String, icon: ImageVector, color: Color, modifier: Modifier) {
-    Surface(modifier, shape = RoundedCornerShape(12.dp), color = Color.White, border = BorderStroke(1.dp, ShiftBorder)) {
-        Row(Modifier.heightIn(min = 90.dp)) {
-            Box(Modifier.width(4.dp).height(96.dp).background(color))
-            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(icon, null, Modifier.size(30.dp), tint = color)
-                Column { Muted(label); Text(value, fontFamily = Inter(), fontSize = 23.sp, fontWeight = FontWeight.Bold, color = FormInk); Text(detail, fontFamily = Inter(), fontSize = 11.sp, color = FormMuted) }
-            }
-        }
-    }
-}
 @Composable internal fun ShiftPanel(title: String, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Color.White, border = BorderStroke(1.dp, ShiftBorder)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -245,22 +81,6 @@ internal fun ShiftContent(state: ShiftState, management: Boolean, model: ShiftSc
         colors = ButtonDefaults.buttonColors(containerColor = if (primary) FormGreen else Color.White, contentColor = if (primary) Color.White else FormInk),
         border = if (primary) null else BorderStroke(1.dp, FormBorder), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
         Icon(icon, null, Modifier.size(18.dp)); Spacer(Modifier.width(7.dp)); Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp)
-    }
-}
-@Composable private fun ShiftRow(item: ShiftItem, zone: TimeZone, compact: Boolean, onClick: () -> Unit) {
-    Surface(onClick, shape = RoundedCornerShape(10.dp), color = Color.White, border = BorderStroke(1.dp, ShiftBorder), modifier = Modifier.fillMaxWidth()) {
-        FlowRow(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.width(if (compact) 110.dp else 130.dp)) {
-                Text(item.start.shiftTime(zone), fontFamily = Inter(), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = FormInk)
-                Text("until ${(item.scheduledEnd ?: item.endedAt).shiftTime(zone)}", fontFamily = Inter(), fontSize = 12.sp, color = FormMuted)
-            }
-            Column(Modifier.weight(1f).widthIn(min = 120.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(item.userName, fontFamily = Inter(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = FormInk)
-                Muted(if (item.startedAt != null) "${shiftDuration(item.workedMinutes)} worked · ${shiftDuration(item.breakMinutes)} breaks" else item.notes?.takeIf { it.isNotBlank() } ?: "Scheduled shift")
-            }
-            ShiftBadge(item.status)
-            Icon(Icons.Outlined.ChevronRight, "View shift", Modifier.size(20.dp), tint = FormMuted)
-        }
     }
 }
 @Composable private fun ShiftBadge(status: String) {
@@ -316,7 +136,7 @@ internal fun ShiftContent(state: ShiftState, management: Boolean, model: ShiftSc
             item.breaks.forEach { br -> DetailLine(if (br.paid) "Paid break" else "${br.type.lowercase().replace('_', ' ')} (unpaid)", "${br.startedAt.shiftTime(zone)} – ${br.endedAt?.shiftTime(zone) ?: "Now"}") }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (item.userId == state.userId && state.canSelf && item.status == "SCHEDULED" && state.board?.current == null && canClockIn(item, now)) ShiftButton("Clock in", Icons.Outlined.PlayArrow, enabled = !state.busy) { onAction("clock-in") }
+            if (item.userId == state.userId && state.canSelf && item.status == "SCHEDULED" && state.board?.current == null && canClockIn(item, now, state.board?.clockInEarlyMinutes ?: 120)) ShiftButton("Clock in", Icons.Outlined.PlayArrow, enabled = !state.busy) { onAction("clock-in") }
             if (state.canManage && item.status == "SCHEDULED") {
                 ShiftButton("Edit shift", Icons.Outlined.Edit, enabled = !state.busy, onClick = onEdit)
                 ShiftButton("Cancel shift", Icons.Outlined.Cancel, primary = false, enabled = !state.busy) { onAction("cancel") }
@@ -414,7 +234,8 @@ internal fun parseShiftTime(date: LocalDate, value: String, zone: TimeZone): Ins
     local.toInstant(zone).also { require(it.toLocalDateTime(zone) == local) }
 }.getOrNull()
 internal fun shiftDuration(minutes: Long): String = "${minutes / 60}h ${minutes % 60}m"
-internal fun canClockIn(item: ShiftItem, now: Instant): Boolean = item.status == "SCHEDULED" && item.scheduledStart != null && item.scheduledEnd != null && (Instant.parse(item.scheduledStart) - now).inWholeSeconds <= 7200 && now <= Instant.parse(item.scheduledEnd)
+// Clocking in opens this long before a scheduled shift (Admin Hub → Settings → Shifts, 2 hours by default).
+internal fun canClockIn(item: ShiftItem, now: Instant, earlyMinutes: Int = 120): Boolean = item.status == "SCHEDULED" && item.scheduledStart != null && item.scheduledEnd != null && (Instant.parse(item.scheduledStart) - now).inWholeSeconds <= earlyMinutes * 60L && now <= Instant.parse(item.scheduledEnd)
 private fun String?.shiftLocal(zone: TimeZone): LocalDateTime? = this?.let { runCatching { Instant.parse(it).toLocalDateTime(zone) }.getOrNull() }
 private fun String?.shiftTime(zone: TimeZone): String = shiftLocal(zone)?.time?.toString()?.take(5) ?: "—"
 private fun String?.shiftLabel(zone: TimeZone): String = shiftLocal(zone)?.let { "${it.date.shiftDateLabel()} · ${it.time.toString().take(5)}" } ?: "—"

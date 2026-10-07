@@ -62,6 +62,8 @@ data class LayoutTable(
     val nextReservationHoldWarningAt: String? = null,
     val nextReservationPartySize: Int? = null,
     val nextReservationArrivedGuests: Int? = null,
+    val nextReservationOccasionIcon: String? = null,
+    val nextReservationOccasionName: String? = null,
     val currentOrderId: String? = null,
     val currentOrderNumber: String? = null,
     val currentOrderStatus: String? = null,

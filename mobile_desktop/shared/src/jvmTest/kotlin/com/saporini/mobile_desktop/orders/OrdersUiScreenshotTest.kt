@@ -27,6 +27,13 @@ class OrdersUiScreenshotTest {
             events = listOf(OrderEvent("event-1",OrderEventType.CREATED,"Order created",createdAt = "2026-09-22T12:00:00Z")))
         val repository = object: OrderRepository by unsupportedRepository() {
             override suspend fun getOpenOrders(restaurantId: String, branchId: String) = (0..5).map { i -> summary("order-$i").copy(orderNumber = "#${1042-i}",tableNumber = "${7-i}",guestCount = 3,customerName = listOf("Emma Wilson","James Carter","Sophie Miller")[i%3],total = OrderDecimal("42.50"),fulfillmentStatus = if(i%2==0) OrderFulfillmentStatus.IN_PREPARATION else OrderFulfillmentStatus.READY) }
+            override suspend fun getOrdersPage(restaurantId: String, branchId: String, from: String?, to: String?, status: OrderStatus?,
+                customerId: String?, search: String?, historyOnly: Boolean, openOnly: Boolean, page: Int, size: Int): OrderPage {
+                val items = (0..5).map { i -> summary("order-$i").copy(orderNumber = "#${1042-i}", tableNumber = "${7-i}", guestCount = 3,
+                    customerName = listOf("Emma Wilson", "James Carter", "Sophie Miller")[i%3], total = OrderDecimal("42.50"),
+                    fulfillmentStatus = if (i%2==0) OrderFulfillmentStatus.IN_PREPARATION else OrderFulfillmentStatus.READY) }
+                return OrderPage(items, page, size, items.size.toLong(), false)
+            }
             override suspend fun getOrder(restaurantId: String, orderId: String) = base.copy(id = orderId)
         }
         val session = SessionManager(); session.signIn(user(permissions = listOf("ORDER_READ","ORDER_CREATE","ORDER_UPDATE","ORDER_TRANSFER","ORDER_CANCEL","ORDER_CLOSE","ORDER_REOPEN","ORDER_VOID","ORDER_DISCOUNT_APPLY","MENUS_READ")))
@@ -60,10 +67,21 @@ class OrdersUiScreenshotTest {
         try {
             scheduler.runCurrent(); model.refresh(); snap("01-list"); assertTrue(all().any { label(it).contains("#1042") })
             model.selectOrder("order-0"); snap("02-details"); assertTrue(all().any { label(it).contains("Margherita pizza") })
-            click("Activity"); snap("03-activity"); assertTrue(all().any { label(it).contains("Order created") })
-            click("Items"); click("•••"); snap("04-actions"); click("Apply discount"); snap("05-discount"); click("Close")
-            click("Add or edit items"); snap("07-composer"); click("+ Add item"); snap("08-item-options"); click("Close"); click("Orders");
-            model.closeOrderDetails(); snap("scratch"); click("New order"); snap("06-new-order"); assertTrue(all().none { it.config.getOrNull(SemanticsProperties.EditableText)?.text?.contains("orderNumber") == true })
+            if (width >= 1000) {
+                // Desktop: the order sits beside the list with Items / Order info / Notes / History tabs.
+                click("History"); snap("03-activity"); assertTrue(all().any { label(it).contains("Order created") })
+                click("Items"); click("Add item"); snap("07-composer")
+                // "New order" is the draggable edge button here; the list is what matters after closing.
+                model.closeOrderDetails(); snap("scratch"); assertTrue(all().any { label(it).contains("#1041") })
+            } else {
+                click("Activity"); snap("03-activity"); assertTrue(all().any { label(it).contains("Order created") })
+                click("Items"); click("•••"); snap("04-actions"); click("Apply discount"); snap("05-discount"); click("Close")
+                // "Add or edit items" first asks what to change.
+                click("Add or edit items"); snap("07-edit-choice"); click("Order items"); snap("07-composer"); click("+ Add item"); snap("08-item-options"); click("Close"); click("Orders")
+                // "New order" is the draggable edge button, which has no click action to press here.
+                model.closeOrderDetails(); snap("scratch"); assertTrue(all().any { label(it).contains("#1041") })
+            }
+            assertTrue(all().none { it.config.getOrNull(SemanticsProperties.EditableText)?.text?.contains("orderNumber") == true })
         } finally { scene.close(); model.onDispose(); Dispatchers.resetMain() }
     }
 }

@@ -1,5 +1,6 @@
 package pos.pos.tables.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,5 +19,6 @@ import java.util.UUID;
 public class UpdateTableCategoryTablesRequest {
 
     @NotNull(message = "tableIds is required")
+    @Size(max = 2000, message = "tableIds can have at most 2000 values")
     private List<@NotNull(message = "tableIds must not contain null values") UUID> tableIds;
 }

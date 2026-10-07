@@ -34,6 +34,8 @@ public class ReservationPublicService {
     private final ReservationLifecycleService reservationLifecycleService;
     private final ReservationSupport reservationSupport;
     private final ReservationNotifications reservationNotifications;
+    private final GuestBookingService guestBookingService;
+    private final pos.pos.reservation.repository.ReservationRepository reservationRepository;
 
     @Transactional(readOnly = true)
     public List<ReservationAvailabilityOptionResponse> getPublicAvailability(
@@ -57,24 +59,24 @@ public class ReservationPublicService {
         );
     }
 
+    // Same rules as the guest booking pages: confirmed when a table is free, otherwise a request.
     @Transactional
     public PublicReservationResponse createPublicReservation(
             String restaurantSlug,
             String branchCode,
             PublicReservationRequest request
     ) {
-        Branch branch = reservationSupport.requirePublicBranch(restaurantSlug, branchCode);
-        Reservation reservation = new Reservation();
-        reservation.setRestaurant(branch.getRestaurant());
-        reservation.setBranch(branch);
-        reservation.setStatus(ReservationStatus.PENDING);
-        reservation.setSource(ReservationSource.WEB);
-
-        reservationSupport.applyPublicReservationRequest(reservation, request);
-        reservationSupport.addStatusHistory(reservation, null, ReservationStatus.PENDING, "Reservation created", null);
-        Reservation saved = reservationSupport.saveReservation(reservation);
-        reservationNotifications.created(saved, null, true);
-        return reservationSupport.toPublicResponse(saved, reservation.getTableAssignments());
+        var booked = guestBookingService.book(restaurantSlug, branchCode, pos.pos.reservation.dto.OnlineBookingRequest.builder()
+                .partySize(request.getPartySize())
+                .reservationStart(request.getReservationStart())
+                .contactName(request.getContactName())
+                .contactPhone(request.getContactPhone())
+                .contactEmail(request.getContactEmail())
+                .specialRequests(request.getSpecialRequests())
+                .build());
+        Reservation reservation = reservationRepository.findByGuestToken(booked.getToken())
+                .orElseThrow(() -> new AuthException("Reservation not found", HttpStatus.NOT_FOUND));
+        return reservationSupport.toPublicResponse(reservation, reservation.getTableAssignments());
     }
 
     @Transactional(readOnly = true)

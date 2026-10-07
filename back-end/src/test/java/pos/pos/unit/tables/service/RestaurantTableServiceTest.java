@@ -203,7 +203,7 @@ class RestaurantTableServiceTest {
         when(restaurantScopeService.requireManageableBranch(authentication, RESTAURANT_ID, BRANCH_ID)).thenReturn(branch);
         when(restaurantScopeService.currentUserId(authentication)).thenReturn(ACTOR_ID);
         when(restaurantTableRepository.findByIdAndBranchIdForUpdate(PRIMARY_TABLE_ID, BRANCH_ID)).thenReturn(Optional.of(primaryTable));
-        when(restaurantTableRepository.findAllByBranch_IdAndIdIn(eq(BRANCH_ID), anyCollection()))
+        when(restaurantTableRepository.findAllByBranchIdAndIdsForUpdate(eq(BRANCH_ID), anyCollection()))
                 .thenReturn(List.of(firstChild, secondChild));
         when(restaurantTableRepository.existsByMergedInto_Id(CHILD_TABLE_ID)).thenReturn(false);
         when(restaurantTableRepository.existsByMergedInto_Id(SECOND_CHILD_TABLE_ID)).thenReturn(false);
@@ -224,6 +224,8 @@ class RestaurantTableServiceTest {
         assertThat(secondChild.getMergedInto()).isEqualTo(primaryTable);
         assertThat(response.getMergedTableIds()).containsExactly(CHILD_TABLE_ID, SECOND_CHILD_TABLE_ID);
         assertThat(response.getEffectiveCapacity()).isEqualTo(8);
+        verify(restaurantTableRepository).lockTablesForUpdateInStableOrder(BRANCH_ID,
+                List.of(CHILD_TABLE_ID, SECOND_CHILD_TABLE_ID, PRIMARY_TABLE_ID));
         verify(restaurantScopeService, never()).requireAccessibleBranch(authentication, RESTAURANT_ID, BRANCH_ID);
     }
 

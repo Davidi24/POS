@@ -51,6 +51,11 @@ class RoleCatalogServiceTest {
     @Mock
     private RoleHierarchyService roleHierarchyService;
 
+    @org.junit.jupiter.api.BeforeEach
+    void everyRoleVisible() {
+        org.mockito.Mockito.lenient().when(roleHierarchyService.visibleTo(any(), any())).thenReturn(true);
+    }
+
     @InjectMocks
     private RoleCatalogService roleCatalogService;
 
@@ -62,7 +67,7 @@ class RoleCatalogServiceTest {
 
         when(roleRepository.findByIsActiveTrueOrderByRankDescNameAsc()).thenReturn(List.of(manager, waiter));
 
-        List<RoleResponse> responses = roleCatalogService.getRoles();
+        List<RoleResponse> responses = roleCatalogService.getRoles(null);
 
         assertThat(responses).hasSize(2);
         assertThat(responses.get(0).getCode()).isEqualTo("MANAGER");
@@ -77,7 +82,7 @@ class RoleCatalogServiceTest {
 
         when(roleRepository.findByIdAndDeletedAtIsNull(ROLE_ID)).thenReturn(Optional.of(role));
 
-        RoleResponse response = roleCatalogService.getRole(ROLE_ID);
+        RoleResponse response = roleCatalogService.getRole(null, ROLE_ID);
 
         assertThat(response.getId()).isEqualTo(ROLE_ID);
         assertThat(response.getCode()).isEqualTo("ADMIN");
@@ -88,7 +93,7 @@ class RoleCatalogServiceTest {
     void shouldRejectMissingRoles() {
         when(roleRepository.findByIdAndDeletedAtIsNull(ROLE_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> roleCatalogService.getRole(ROLE_ID))
+        assertThatThrownBy(() -> roleCatalogService.getRole(null, ROLE_ID))
                 .isInstanceOf(RoleNotFoundException.class);
     }
 
@@ -122,7 +127,7 @@ class RoleCatalogServiceTest {
         when(permissionRepository.findAllById(List.of(deleteUsers.getId(), createUsers.getId())))
                 .thenReturn(List.of(deleteUsers, createUsers));
 
-        List<PermissionResponse> responses = roleCatalogService.getRolePermissions(ROLE_ID);
+        List<PermissionResponse> responses = roleCatalogService.getRolePermissions(null, ROLE_ID);
 
         assertThat(responses).extracting(PermissionResponse::getCode)
                 .containsExactly("USERS_CREATE", "USERS_DELETE");
@@ -168,6 +173,21 @@ class RoleCatalogServiceTest {
             assertThat(response.getCode()).isEqualTo("OWNER");
             assertThat(response.getIsSystem()).isTrue();
         });
+    }
+
+    @Test
+    @DisplayName("Should hide another restaurant's custom roles from lists and lookups")
+    void shouldHideOtherRestaurantsRoles() {
+        Role own = role("WAITER", "Waiter", 10_000L);
+        Role foreign = role("SHIFT_LEAD", "Shift Lead", 15_000L);
+        foreign.setId(UUID.randomUUID());
+        when(roleHierarchyService.visibleTo(any(), org.mockito.ArgumentMatchers.eq(foreign))).thenReturn(false);
+        when(roleRepository.findByIsActiveTrueOrderByRankDescNameAsc()).thenReturn(List.of(foreign, own));
+        when(roleRepository.findByIdAndDeletedAtIsNull(foreign.getId())).thenReturn(Optional.of(foreign));
+
+        assertThat(roleCatalogService.getRoles(null)).extracting(RoleResponse::getCode).containsExactly("WAITER");
+        assertThatThrownBy(() -> roleCatalogService.getRole(null, foreign.getId())).isInstanceOf(RoleNotFoundException.class);
+        assertThatThrownBy(() -> roleCatalogService.getRolePermissions(null, foreign.getId())).isInstanceOf(RoleNotFoundException.class);
     }
 
     private Role role(String code, String name, long rank) {

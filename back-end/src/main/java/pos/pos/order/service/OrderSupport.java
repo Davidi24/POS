@@ -13,6 +13,8 @@ import pos.pos.exception.order.OrderItemOptionNotFoundException;
 import pos.pos.exception.order.OrderLineItemNotFoundException;
 import pos.pos.exception.order.OrderNotFoundException;
 import pos.pos.exception.reservation.ReservationNotFoundException;
+import pos.pos.inventory.enums.InventoryMovementType;
+import pos.pos.inventory.repository.InventoryMovementRepository;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuVariant;
 import pos.pos.menu.entity.OptionItem;
@@ -53,6 +55,7 @@ import pos.pos.settings.entity.SettingsOrderRule;
 import pos.pos.settings.enums.ServiceChargeType;
 import pos.pos.settings.repository.SettingsRepository;
 import pos.pos.tables.entity.RestaurantTable;
+import pos.pos.tables.enums.TableStatus;
 import pos.pos.tables.repository.RestaurantTableRepository;
 import pos.pos.utils.NormalizationUtils;
 
@@ -96,12 +99,32 @@ public class OrderSupport {
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
     private final pos.pos.order.realtime.OrderChangeNotifier orderChangeNotifier;
+    private final pos.pos.payment.service.PaymentCalculator paymentCalculator;
+    private final InventoryMovementRepository inventoryMovementRepository;
 
     public Order requireOrder(UUID restaurantId, UUID orderId) {
         boolean writing = org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
                 && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly();
         return (writing ? orderRepository.findForUpdate(orderId, restaurantId) : orderRepository.findByIdAndRestaurant_Id(orderId, restaurantId))
                 .orElseThrow(OrderNotFoundException::new);
+    }
+
+    public void assertLineItemNotSaleConsumed(OrderLineItem lineItem) {
+        if (inventoryMovementRepository.existsByOrderLineItem_IdAndMovementType(
+                lineItem.getId(), InventoryMovementType.SALE_CONSUMPTION
+        )) {
+            throw new AuthException("This item's ingredients were already consumed and it can no longer be changed", HttpStatus.CONFLICT);
+        }
+    }
+
+    public void assertNoSaleConsumedItems(Order order, String operation) {
+        boolean hasConsumedItems = order.getLineItems().stream()
+                .anyMatch(lineItem -> inventoryMovementRepository.existsByOrderLineItem_IdAndMovementType(
+                        lineItem.getId(), InventoryMovementType.SALE_CONSUMPTION
+                ));
+        if (hasConsumedItems) {
+            throw new AuthException("Orders with consumed inventory cannot be " + operation, HttpStatus.CONFLICT);
+        }
     }
 
     public Order requirePublicOrder(String orderNumber) {
@@ -189,6 +212,14 @@ public class OrderSupport {
             return null;
         }
         return restaurantTableRepository.findByIdAndBranch_Id(tableId, branchId)
+                .orElseThrow(() -> new AuthException("Table not found", HttpStatus.NOT_FOUND));
+    }
+
+    public RestaurantTable resolveTableForUpdate(UUID branchId, UUID tableId) {
+        if (tableId == null) {
+            return null;
+        }
+        return restaurantTableRepository.findByIdAndBranchIdForUpdate(tableId, branchId)
                 .orElseThrow(() -> new AuthException("Table not found", HttpStatus.NOT_FOUND));
     }
 
@@ -329,6 +360,8 @@ public class OrderSupport {
             return;
         }
 
+        assertTableCanReceiveOrder(table);
+
         Settings settings = loadSettings(table.getRestaurant());
         if (!settings.isAllowOpenTickets()
                 && orderRepository.findTopByRestaurantTable_IdAndStatusInOrderByOpenedAtDesc(
@@ -336,6 +369,21 @@ public class OrderSupport {
                         OPEN_ORDER_STATUSES
                 ).isPresent()) {
             throw new AuthException("This table already has an open order", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    public void assertTableCanReceiveOrder(RestaurantTable table) {
+        if (table == null) {
+            return;
+        }
+        if (!table.isActive()) {
+            throw new AuthException("An inactive table cannot receive an order", HttpStatus.CONFLICT);
+        }
+        if (table.getMergedInto() != null) {
+            throw new AuthException("A merged table cannot receive a new order", HttpStatus.CONFLICT);
+        }
+        if (table.getStatus() != TableStatus.AVAILABLE && table.getStatus() != TableStatus.OCCUPIED) {
+            throw new AuthException("This table is not available for a new order", HttpStatus.CONFLICT);
         }
     }
 
@@ -374,6 +422,51 @@ public class OrderSupport {
         } catch (IllegalStateException ex) {
             throw new AuthException(ex.getMessage(), HttpStatus.BAD_REQUEST);
         }
+    }
+
+    /**
+     * With "Send items to the kitchen automatically" on, the new items of an open order go to the kitchen at once.
+     * Returns true when something was sent, so the caller syncs the kitchen display after saving.
+     */
+    public boolean autoFireIfEnabled(Order order, UUID actorId) {
+        if (order.getStatus() != OrderStatus.OPEN || !loadOrderRules(order.getRestaurant()).isAutoFireToKitchen()) {
+            return false;
+        }
+        List<OrderLineItem> pending = order.getLineItems().stream()
+                .filter(this::isFinanciallyActive)
+                .filter(lineItem -> lineItem.getStatus() == OrderLineItemStatus.PENDING)
+                .filter(OrderLineItem::goesToKitchen)
+                .toList();
+        if (pending.isEmpty()) {
+            return false;
+        }
+        pending.forEach(lineItem -> lineItem.setStatus(OrderLineItemStatus.FIRED));
+        order.setFulfillmentStatus(OrderFulfillmentStatus.IN_PREPARATION);
+        recalculateTotals(order);
+        addEvent(order, OrderEventType.SENT_TO_KITCHEN, "Sent to the kitchen automatically", actorId);
+        return true;
+    }
+
+    // Permission check on the signed-in user of this request; work without a user (jobs, guests) is not limited.
+    private static boolean currentUserHas(String authority) {
+        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return true;
+        }
+        return authentication.getAuthorities().stream().anyMatch(granted -> authority.equals(granted.getAuthority()));
+    }
+
+    // True while the order still holds money from a payment (captured and not fully refunded or voided).
+    public boolean hasMoneyTaken(Order order) {
+        if (order.getPayments() == null) {
+            return false;
+        }
+        return order.getPayments().stream()
+                .filter(payment -> payment.getStatus() == pos.pos.payment.enums.PaymentStatus.CAPTURED
+                        || payment.getStatus() == pos.pos.payment.enums.PaymentStatus.PARTIALLY_REFUNDED
+                        || payment.getStatus() == pos.pos.payment.enums.PaymentStatus.AUTHORIZED)
+                .anyMatch(payment -> payment.getAmount().add(payment.getTipAmount()).add(payment.getSurchargeAmount())
+                        .subtract(payment.getRefundedAmount()).signum() > 0);
     }
 
     public void notifyOrderBranchChanged(Order order) {
@@ -479,6 +572,8 @@ public class OrderSupport {
         option.setOptionItem(optionItem);
         option.setOptionNameSnapshot(optionItem.getName());
         option.setPriceDeltaSnapshot(defaultSignedMoney(optionItem.getPriceDelta()));
+        option.setInventoryRecipeSnapshot(optionItem.getInventoryRecipe());
+        option.setInventoryRecipeQuantitySnapshot(optionItem.getInventoryRecipeQuantity());
         option.setQuantity(request.getQuantity() == null ? 1 : request.getQuantity());
         option.setNotes(request.getNotes());
         return option;
@@ -506,6 +601,11 @@ public class OrderSupport {
 
     public void replaceDiscounts(Order order, List<CreateOrderDiscountRequest> requests, UUID actorId) {
         List<OrderDiscount> existing = new ArrayList<>(order.getDiscounts());
+        // Clearing discounts through the order PATCH path must have the same manager-only guard as
+        // adding, editing, or deleting them through the dedicated discount endpoints.
+        if (!existing.isEmpty() || (requests != null && !requests.isEmpty())) {
+            assertCanManageDiscounts(order.getRestaurant());
+        }
         existing.forEach(order::removeDiscount);
 
         if (requests == null) {
@@ -524,10 +624,16 @@ public class OrderSupport {
     }
 
     public void applyDiscountRequest(Order order, OrderDiscount discount, CreateOrderDiscountRequest request, UUID actorId) {
-        if (loadOrderRules(order.getRestaurant()).isRequireReasonForDiscount()
+        SettingsOrderRule rules = loadOrderRules(order.getRestaurant());
+        if (rules.isRequireReasonForDiscount()
                 && NormalizationUtils.normalize(request.getReason()) == null) {
             throw new AuthException("A reason is required for order discounts", HttpStatus.BAD_REQUEST);
         }
+        if (request.getDiscountType() == pos.pos.order.enums.OrderDiscountType.PERCENTAGE
+                && request.getDiscountValue() != null && request.getDiscountValue().compareTo(ONE_HUNDRED) > 0) {
+            throw new AuthException("A percentage discount can be at most 100%", HttpStatus.BAD_REQUEST);
+        }
+        assertCanManageDiscounts(rules);
 
         discount.setName(request.getName());
         discount.setDiscountType(request.getDiscountType());
@@ -535,6 +641,17 @@ public class OrderSupport {
         discount.setReason(request.getReason());
         discount.setAppliedBy(actorId);
         discount.setAmountApplied(ZERO);
+    }
+
+    public void assertCanManageDiscounts(Restaurant restaurant) {
+        assertCanManageDiscounts(loadOrderRules(restaurant));
+    }
+
+    private void assertCanManageDiscounts(SettingsOrderRule rules) {
+        // "Allow discounts without a manager" off: only someone trusted to void (a manager) may manage them.
+        if (!rules.isAllowDiscountWithoutManager() && !currentUserHas("ORDER_VOID")) {
+            throw new AuthException("A manager has to give discounts at this restaurant", HttpStatus.FORBIDDEN);
+        }
     }
 
     public void refreshLineItemPricing(OrderLineItem lineItem) {
@@ -571,7 +688,7 @@ public class OrderSupport {
         BigDecimal remainingDiscountableBase = money(subtotal);
         BigDecimal discountTotal = ZERO;
         for (OrderDiscount discount : order.getDiscounts().stream()
-                .sorted(Comparator.comparing(OrderDiscount::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .sorted(Comparator.comparingInt(OrderDiscount::getDiscountSequence))
                 .toList()) {
             BigDecimal applied = calculateDiscountAmount(discount, remainingDiscountableBase);
             discount.setAmountApplied(applied);
@@ -615,6 +732,13 @@ public class OrderSupport {
     // Orders with money paid in advance are PAID while it covers the total and PARTIALLY_PAID once more is ordered.
     // Refunded/voided states and orders without a prepayment are left alone.
     public void refreshPrepaidPaymentStatus(Order order) {
+        // With payments taken at the till, the payment status follows what they cover of the new total.
+        if (paymentCalculator != null && order.getPayments() != null && !order.getPayments().isEmpty()
+                && order.getStatus() != OrderStatus.VOIDED
+                && !paymentCalculator.moneyPayments(order).isEmpty()) {
+            order.setPaymentStatus(paymentCalculator.paymentStatus(order, loadSettings(order.getRestaurant())));
+            return;
+        }
         BigDecimal prepaid = defaultMoney(order.getPrepaidTotal());
         if (prepaid.signum() <= 0) {
             return;
@@ -717,6 +841,8 @@ public class OrderSupport {
             optionClone.setOptionItem(option.getOptionItem());
             optionClone.setOptionNameSnapshot(option.getOptionNameSnapshot());
             optionClone.setPriceDeltaSnapshot(defaultSignedMoney(option.getPriceDeltaSnapshot()));
+            optionClone.setInventoryRecipeSnapshot(option.getInventoryRecipeSnapshot());
+            optionClone.setInventoryRecipeQuantitySnapshot(option.getInventoryRecipeQuantitySnapshot());
             optionClone.setQuantity(option.getQuantity());
             optionClone.setNotes(option.getNotes());
             clone.addOption(optionClone);
@@ -748,6 +874,10 @@ public class OrderSupport {
 
     public OrderResponse toResponse(Order order, boolean includeChildren, boolean includeEvents) {
         return orderMapper.toResponse(order, includeChildren, includeEvents);
+    }
+
+    public OrderResponse toSummaryResponse(Order order, int itemCount) {
+        return orderMapper.toResponse(order, false, false, itemCount);
     }
 
     public OrderAuditResponse toAuditResponse(Order order) {

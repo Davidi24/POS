@@ -26,6 +26,30 @@ class DefaultOrderRepository(private val api: OrderApi) : OrderRepository {
         return api.getOrders(restaurantId = restaurantId, branchId = branchId, from = from, to = to, status = status, customerId = customerId).map { it.toDomain() }
     }
 
+    override suspend fun getOrdersPage(
+        restaurantId: String,
+        branchId: String,
+        from: String?,
+        to: String?,
+        status: OrderStatus?,
+        customerId: String?,
+        search: String?,
+        historyOnly: Boolean,
+        openOnly: Boolean,
+        page: Int,
+        size: Int
+    ): OrderPage {
+        require(restaurantId.isNotBlank()) { "restaurantId is required" }
+        require(branchId.isNotBlank()) { "branchId is required" }
+        require((from == null) == (to == null)) { "Provide both from and to, or neither" }
+        require(page >= 0 && size in 1..100) { "Page must be non-negative and size between 1 and 100" }
+        require(!(historyOnly && openOnly)) { "historyOnly and openOnly cannot both be true" }
+        val result = api.getOrdersPage(restaurantId, branchId, from, to, status, customerId, search, historyOnly, openOnly, page, size)
+        require(result.page == page && result.size == size && result.items.size <= size && result.totalElements >= 0)
+        require(!result.hasNext || result.items.isNotEmpty())
+        return OrderPage(result.items.map { it.toDomain() }, result.page, result.size, result.totalElements, result.hasNext)
+    }
+
     override suspend fun getOpenOrders(
         restaurantId: String,
         branchId: String

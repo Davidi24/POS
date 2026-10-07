@@ -29,13 +29,28 @@ Fill in and expand this section as you discover build/test/lint commands, code s
 - Build the runnable jar with `./mvnw -o package -Dmaven.test.skip=true`. `-DskipTests` does NOT skip tests here (the pom wires surefire's `skipTests` to `${skip.unit.tests}`).
 - Local backend runs as `java -jar target/pos-0.0.1-SNAPSHOT.jar` from `back-end/` against the podman `pos-db` container (db `pos_local`, user `pos_user`). The local schema is `foundation_local`, and Flyway history is `foundation_local.flyway_schema_history`.
 - Stop the running backend before (or right after) rebuilding the jar. A running process whose jar was replaced starts answering 500s.
-- Repository/persistence tests use Testcontainers, which can't find a Docker environment on this podman host, so they error locally. Unit tests with mocks run fine.
+- Integration tests (`*IntegrationTest`, `*IT`, failsafe) use Testcontainers on podman. Start the socket with `systemctl --user start podman.socket`, then run with `DOCKER_HOST=unix:///run/user/1000/podman/podman.sock TESTCONTAINERS_RYUK_DISABLED=true`.
+  - Everything: `./mvnw -o verify` (1,264 unit tests and 331 ITs as of 2026-10-07).
+  - Unit tests only: `./mvnw -o test -Dtest=Name`.
+  - One IT: `./mvnw -o verify -Dskip.unit.tests=true -Dit.test=Name -Dfailsafe.failIfNoSpecifiedTests=false`.
+- API-level ITs extend `integration/support/AbstractPosApiIntegrationTest` (schema `pos_api_it`, `newWorld()`, `staff()`, `token()`, `menu()/item()/order()`, `setting()`). It fails any test that produced a 500, so every bad input must come back as a 4xx.
+- Input rules: every `@RequestBody` is `@Valid`, and every free-text field has a `@Size` (2000 for notes/descriptions unless the column says otherwise). Bodies over 1 MB get a 413, and list page sizes are capped (`PageableUtils`). `GlobalExceptionHandler` turns database errors and entity rule failures into 400/409.
+- The latest migration is V65 (order replay table rename); the next free migration is V66.
+- Money endpoints:
+  - Payments: `/restaurants/{r}/orders/{o}/payments` (take: ORDER_CLOSE, refund: PAYMENT_REFUND, cancel: ORDER_VOID), plus the receipt and branch payment list. Totals go through `PaymentCalculator`.
+  - Statistics: `/statistics/*`, needs REPORTS_READ.
+  - Fraud: `/fraud/*`, needs FRAUD_READ; reviewing needs FRAUD_REVIEW. Its thresholds are settings (`PATCH /settings/fraud-checks`).
+- Staff and custom roles belong to a restaurant (`users.restaurant_id`, `roles.restaurant_id`; a super admin's roles are shared by all). `RoleHierarchyService` keeps people from seeing or managing other restaurants' staff and roles.
+- Inventory low stock uses the level's own reorder quantity, otherwise the item's reorder point. Movement history is paged (`page`, `size` ≤ 500). Recipes refuse sub-recipe cycles and 100% waste.
 - Roles and permissions are seeded from `AppRole`/`AppPermission` on every startup (`SuperAdminBootstrapRunner`). It updates role flags and ADDS missing permissions, but never removes a permission from a role.
 - App workspaces (POS/KDS/Admin) are gated only by the `POS_ACCESS`/`KDS_ACCESS`/`ADMIN_ACCESS` permissions. Restaurants is Super Admin only.
 - Other modules follow reservations through events in `pos.pos.reservation.event` (`ReservationStatusChangedEvent`, `ReservationDeletingEvent`) rather than being called from reservation services. Publish via `ReservationLifecycleService.announceStatusChange` for any status change made outside `transitionReservation`.
 - Short codes and numbers shown to people (reservation codes, order numbers, KDS ticket numbers) must use random bits (`UUID.randomUUID()`). Truncated time-ordered UUIDs repeat for ~27 s and collide.
 - For JPA child collections with a unique key (e.g. KDS routings), update matching rows in place. Removing and re-adding the same key makes Hibernate insert before it deletes, which violates the constraint.
 - Local super admin for API checks: see `bootstrap.super-admin` in `application-local.yml`; log in with `POST /auth/device/login` `{identifier, password}`. After a reboot, run `podman start pos-db pos-mailhog` before starting the backend.
+- Guest emails (booking confirmed, reminders, payment links) only reach MailHog if the backend starts with `MAIL_HOST=localhost MAIL_PORT=1025 MAIL_SMTP_AUTH=false MAIL_SMTP_STARTTLS_ENABLE=false`. View them at http://localhost:8025. Guest pages are served by the backend at `/public/book/{slug}/{code}` and `/public/bookings/{token}`.
+- Staff pay = worked minutes × the shift's `hourly_rate` (copied from `staff_pay_rates` at clock-in) + tips on orders the person created. Read it through `ShiftPayService` (`/shifts/pay`); wages are set in Admin Hub → Shifts → Hours & pay.
+- Booking money (deposit, paid extras, pre-order refunds) goes through `BookingMoneyService`. The deposit is a fixed amount per booking. Refunds keep the card fee from settings, except when the restaurant declines or a request expires (full refund). Payments run in test mode (`app.payments.provider=test`) until a real provider is connected.
 
 ### App (mobile_desktop)
 - Settings: every value a restaurant might change (durations, buffers, reminder times, hold/grace minutes, thresholds, deadlines) must be editable in the **Admin Hub settings**, with the agreed value as the default. Never hard-code these (user rule).
@@ -43,3 +58,15 @@ Fill in and expand this section as you discover build/test/lint commands, code s
 - Build/check without tests: `./gradlew :desktopApp:compileKotlin`; test sources: `./gradlew :shared:compileTestKotlinJvm`. Launch: `./gradlew :desktopApp:run` (main class `com.saporini.mobile_desktop.MainKt`). When restarting, find PIDs and kill them in a separate command from the one that relaunches Gradle; a `grep`/`pkill` pattern like `desktopApp:run` also matches your own shell.
 - Paged reservation lists: a refresh must reload every page already loaded (never drop back to page 0), so screens keep their scroll position. Long lists use `LazyColumn` keyed by id and load the next page near the end, with a manual "Try again" after a failure.
 - Overview numbers come from the server summary (`/summary`, optionally per `floor`), never from a partially loaded list.
+- New overview-style screens reuse `core/components/OverviewKit.kt` (stat card, panel, tabs, chips, empty states) plus the Reservations header controls (`HeaderButton`, `HeaderDropdown`, `CompactDatePicker`, `ToolbarHeight`), so they match the Reservations overview.
+- Inside a `Row(Modifier.height(IntrinsicSize.Min/Max))`, don't use `BoxWithConstraints` or lazy lists: they can't report intrinsic sizes and crash at runtime. Draw with `drawBehind` instead.
+- App tests: `./gradlew :shared:jvmTest` (all of them) or `--tests 'com.saporini.mobile_desktop.admin.*'`. Screen models are tested with `StandardTestDispatcher` + `Dispatchers.setMain`, fake repositories, and `MockEngine` for the `*Api` classes.
+- State-only modules (ScreenModel + repository, registered in `core/di/appModule.kt`) intentionally have no screens in the current scope:
+  - Payments: `pos/payment`.
+  - Statistics and fraud: `statistics`, `fraud`.
+  - Admin Hub: `admin/people` (Staff, Roles), `admin/inventory` (Inventory, Recipes), `admin/devices`, `admin/audit`.
+  - Food pre-orders: `pos/reservations/preorder`.
+  - Each model has `setActive(true/false)` for when its screen shows. Admin models gate actions on the signed-in person's permissions.
+- The app's JSON leaves out default values (`encodeDefaults = false`). A request DTO field that must always be sent (e.g. `active`, `trackInventory`) must have no default.
+- Parallel loads inside a screen model must wrap their `async` calls in `coroutineScope { }`. A bare `async` inside `launch` escapes the `try/catch` and crashes the app when a call fails.
+- Writes check a sign-in token, not the list's load revision. Otherwise a refresh during a save drops the answer and leaves `saving` stuck.

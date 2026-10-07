@@ -93,6 +93,11 @@ public class PreOrder extends AbstractAuditedEntity {
     @Column(name = "paid_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
+    // Money given back: the paid amount minus the card fee on a timely cancel, all of it when the restaurant declined,
+    // or a goodwill part of a kept payment.
+    @Column(name = "refunded_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal refundedAmount = BigDecimal.ZERO;
+
     // Taken from the restaurant setting when the pre-order is first placed, so later setting changes don't move its cutoff.
     @Column(name = "lead_minutes", nullable = false)
     private int leadMinutes;

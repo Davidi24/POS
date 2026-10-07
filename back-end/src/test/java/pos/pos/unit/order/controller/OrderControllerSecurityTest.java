@@ -30,6 +30,7 @@ import pos.pos.order.controller.RestaurantOrderController;
 import pos.pos.order.dto.OrderResponse;
 import pos.pos.order.enums.OrderStatus;
 import pos.pos.order.service.OrderCommandService;
+import pos.pos.order.service.OrderHistoryService;
 import pos.pos.order.service.OrderItemService;
 import pos.pos.order.service.OrderPublicService;
 import pos.pos.order.service.OrderQueryService;
@@ -77,6 +78,10 @@ class OrderControllerSecurityTest {
 
     @MockBean
     private OrderQueryService orderQueryService;
+    @MockBean
+    private OrderHistoryService orderHistoryService;
+    @MockBean
+    private pos.pos.order.realtime.OrderChangeNotifier orderChangeNotifier;
     @MockBean
     private OrderCommandService orderCommandService;
     @MockBean

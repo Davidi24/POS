@@ -15,6 +15,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ShiftController {
     private final ShiftService service;
+    private final pos.pos.shift.service.ShiftPayService pay;
     @GetMapping
     @PreAuthorize("hasAnyAuthority('SHIFT_SELF','SHIFT_READ','SHIFT_MANAGE')")
     public Board board(Authentication a, @PathVariable UUID restaurantId, @PathVariable UUID branchId, @RequestParam LocalDate from, @RequestParam LocalDate to, @RequestParam(defaultValue="true") boolean mine) {
@@ -47,4 +48,14 @@ public class ShiftController {
     @PutMapping("/{id}/attendance")
     @PreAuthorize("hasAuthority('SHIFT_MANAGE')")
     public Item correct(Authentication a, @PathVariable UUID restaurantId, @PathVariable UUID branchId, @PathVariable UUID id, @Valid @RequestBody Correction r) { return service.correct(a, restaurantId, branchId, id, r); }
+    @GetMapping("/pay")
+    @PreAuthorize("hasAnyAuthority('SHIFT_SELF','SHIFT_MANAGE')")
+    public PayReport pay(Authentication a, @PathVariable UUID restaurantId, @PathVariable UUID branchId, @RequestParam LocalDate from, @RequestParam LocalDate to, @RequestParam(defaultValue="true") boolean mine) {
+        return pay.pay(a, restaurantId, branchId, from, to, mine);
+    }
+    @PutMapping("/pay-rates/{userId}")
+    @PreAuthorize("hasAuthority('SHIFT_MANAGE')")
+    public PayRate setPayRate(Authentication a, @PathVariable UUID restaurantId, @PathVariable UUID branchId, @PathVariable UUID userId, @Valid @RequestBody PayRate r) {
+        return new PayRate(pay.setRate(a, restaurantId, branchId, userId, r));
+    }
 }

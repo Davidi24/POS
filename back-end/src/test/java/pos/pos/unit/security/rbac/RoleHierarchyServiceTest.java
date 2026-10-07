@@ -43,8 +43,24 @@ class RoleHierarchyServiceTest {
     @Mock
     private SettingsRepository settingsRepository;
 
+    @Mock
+    private pos.pos.user.repository.UserRepository userRepository;
+
     @InjectMocks
     private RoleHierarchyService roleHierarchyService;
+
+    // Every actor and target in these tests work at this restaurant unless a test says otherwise.
+    private static final UUID SHARED_RESTAURANT_ID = UUID.fromString("00000000-0000-0000-0000-00000000aaaa");
+
+    @org.junit.jupiter.api.BeforeEach
+    void everyoneWorksAtTheSameRestaurant() {
+        org.mockito.Mockito.lenient().when(userRepository.findById(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            pos.pos.user.entity.User target = new pos.pos.user.entity.User();
+            target.setId(invocation.getArgument(0));
+            target.setRestaurantId(SHARED_RESTAURANT_ID);
+            return Optional.of(target);
+        });
+    }
 
     @Nested
     @DisplayName("highestActiveRank")
@@ -192,6 +208,21 @@ class RoleHierarchyServiceTest {
     class AssertCanManageUserTests {
 
         @Test
+        @DisplayName("Should deny managing someone from another restaurant, whatever the ranks")
+        void shouldDenyManagingAnotherRestaurantsUser() {
+            UUID targetUserId = UUID.randomUUID();
+            pos.pos.user.entity.User target = new pos.pos.user.entity.User();
+            target.setId(targetUserId);
+            target.setRestaurantId(UUID.randomUUID());
+            when(userRepository.findById(targetUserId)).thenReturn(Optional.of(target));
+
+            assertThatThrownBy(() -> roleHierarchyService.assertCanManageUser(authentication(false), targetUserId))
+                    .isInstanceOf(pos.pos.exception.user.UserManagementNotAllowedException.class);
+            verify(roleRepository, never()).findHighestActiveRankByUserId(targetUserId);
+        }
+
+
+        @Test
         @DisplayName("Should allow super admin without querying actor role code")
         void shouldAllowSuperAdmin() {
             UUID targetUserId = UUID.randomUUID();
@@ -288,7 +319,7 @@ class RoleHierarchyServiceTest {
     class RoleFloorTests {
 
         private final UUID actorUserId = UUID.randomUUID();
-        private final UUID restaurantId = UUID.randomUUID();
+        private final UUID restaurantId = SHARED_RESTAURANT_ID;
 
         @Test
         @DisplayName("Should stop an Admin from creating a Manager while the restaurant switch is off")
@@ -429,6 +460,7 @@ class RoleHierarchyServiceTest {
     private Authentication authentication(UUID userId, boolean superAdmin) {
         AuthenticatedUser user = AuthenticatedUser.builder()
                 .id(userId)
+                .restaurantId(SHARED_RESTAURANT_ID)
                 .email("user@pos.local")
                 .active(true)
                 .build();

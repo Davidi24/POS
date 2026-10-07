@@ -63,6 +63,7 @@ public class UserAdminService {
     private final RoleHierarchyService roleHierarchyService;
     private final UserSessionRepository userSessionRepository;
     private final NotificationService notificationService;
+    private final pos.pos.restaurant.repository.BranchRepository branchRepository;
 
     public PageResponse<UserResponse> getUsers(
             Authentication authentication,
@@ -86,6 +87,7 @@ public class UserAdminService {
                 normalizedRoleCode,
                 roleHierarchyService.isSuperAdmin(authentication),
                 roleHierarchyService.actorRank(authentication),
+                roleHierarchyService.actorRestaurantId(authentication),
                 pageable
         );
 
@@ -127,6 +129,14 @@ public class UserAdminService {
         boolean phoneChanged = !java.util.Objects.equals(currentNormalizedPhone, newNormalizedPhone);
         boolean wasActive = user.isActive();
 
+        if (request.getDefaultBranchId() != null) {
+            if (user.getRestaurantId() == null || branchRepository
+                    .findByIdAndRestaurantIdAndDeletedAtIsNull(request.getDefaultBranchId(), user.getRestaurantId()).isEmpty()) {
+                throw new pos.pos.exception.auth.AuthException("defaultBranchId must be a branch of the person's restaurant",
+                        org.springframework.http.HttpStatus.BAD_REQUEST);
+            }
+            user.setDefaultBranchId(request.getDefaultBranchId());
+        }
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhone(request.getPhone());

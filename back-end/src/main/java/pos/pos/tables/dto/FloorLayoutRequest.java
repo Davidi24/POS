@@ -26,8 +26,11 @@ public class FloorLayoutRequest {
     )
     private String floorName;
 
+    @DecimalMin(value = "-99999999.99", message = "planOffsetX is out of range")
+    @DecimalMax(value = "99999999.99", message = "planOffsetX is out of range")
     private BigDecimal planOffsetX;
 
+    @DecimalMax(value = "99999999.99", message = "planOffsetY is out of range")
     private BigDecimal planOffsetY;
 
     @DecimalMin(

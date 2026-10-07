@@ -1,5 +1,7 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
@@ -22,30 +24,38 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class SettingsTransferCoreRequest {
 
+    @Size(max = 100, message = "defaultBranchCode must be at most 100 characters")
     private String defaultBranchCode;
 
     @NotBlank(message = "defaultLanguage is required")
+    @Size(max = 35, message = "defaultLanguage must be at most 35 characters")
     private String defaultLanguage;
 
     @NotBlank(message = "dateFormat is required")
+    @Size(max = 50, message = "dateFormat must be at most 50 characters")
     private String dateFormat;
 
     @NotBlank(message = "timeFormat is required")
+    @Size(max = 50, message = "timeFormat must be at most 50 characters")
     private String timeFormat;
 
     @NotNull(message = "weekStartDay is required")
     private WeekStartDay weekStartDay;
 
+    @Size(max = 20, message = "orderSequencePrefix must be at most 20 characters")
     private String orderSequencePrefix;
 
+    @Size(max = 20, message = "invoiceSequencePrefix must be at most 20 characters")
     private String invoiceSequencePrefix;
 
     @NotNull(message = "reservationSlotMinutes is required")
     @Min(value = 1, message = "reservationSlotMinutes must be greater than 0")
+    @Max(value = 1440, message = "reservationSlotMinutes must be at most 1440")
     private Integer reservationSlotMinutes;
 
     @NotNull(message = "defaultTableTurnTimeMinutes is required")
     @Min(value = 1, message = "defaultTableTurnTimeMinutes must be greater than 0")
+    @Max(value = 1440, message = "defaultTableTurnTimeMinutes must be at most 1440")
     private Integer defaultTableTurnTimeMinutes;
 
     @NotNull(message = "serviceChargeEnabled is required")

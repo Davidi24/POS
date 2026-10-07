@@ -13,6 +13,7 @@ import pos.pos.exception.recipe.RecipeComponentValidationException;
 import pos.pos.exception.recipe.RecipeNotFoundException;
 import pos.pos.inventory.entity.InventoryItem;
 import pos.pos.inventory.repository.InventoryItemRepository;
+import pos.pos.inventory.service.InventoryUnitConversion;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.recipe.dto.RecipeComponentUpsertRequest;
@@ -173,11 +174,22 @@ public class RecipeService {
 
         if (hasItem) {
             inventoryItem = requireItem(restaurantId, request.getInventoryItemId());
+            if (!InventoryUnitConversion.canConvert(request.getUnit(), inventoryItem.getBaseUnit())) {
+                throw new RecipeComponentValidationException(
+                        "Recipe unit " + request.getUnit() + " cannot be converted to inventory base unit " + inventoryItem.getBaseUnit()
+                );
+            }
         } else {
             if (Objects.equals(request.getChildRecipeId(), recipeId)) {
                 throw new RecipeComponentValidationException("A recipe cannot reference itself as a sub-recipe component");
             }
             childRecipe = requireChildRecipe(restaurantId, request.getChildRecipeId());
+            if (!InventoryUnitConversion.canConvert(request.getUnit(), childRecipe.getYieldUnit())) {
+                throw new RecipeComponentValidationException(
+                        "Recipe component unit " + request.getUnit() + " cannot be converted to sub-recipe yield unit " + childRecipe.getYieldUnit()
+                );
+            }
+            assertNotInside(recipe, childRecipe);
         }
 
         //After making the needed checks it sets the needed Information to the component and saves the recipe
@@ -272,14 +284,43 @@ public class RecipeService {
             if (component.getComponentType() == RecipeComponentType.INVENTORY_ITEM) {
                 InventoryItem item = component.getInventoryItem();
                 BigDecimal unitCost = item.getCostPerUnit() == null ? BigDecimal.ZERO : item.getCostPerUnit();
-                total = total.add(effectiveQuantity.multiply(unitCost));
+                BigDecimal baseQuantity = InventoryUnitConversion.convert(effectiveQuantity, component.getUnit(), item.getBaseUnit());
+                total = total.add(baseQuantity.multiply(unitCost));
             } else {
-                total = total.add(accumulateCost(component.getChildRecipe(), effectiveQuantity, visitedRecipeIds));
+                Recipe child = component.getChildRecipe();
+                BigDecimal childYieldQuantity = InventoryUnitConversion.convert(effectiveQuantity, component.getUnit(), child.getYieldUnit());
+                BigDecimal childBatchMultiplier = childYieldQuantity.divide(child.getYieldQuantity(), 9, RoundingMode.HALF_UP);
+                total = total.add(accumulateCost(child, childBatchMultiplier, visitedRecipeIds));
             }
         }
 
         visitedRecipeIds.remove(recipe.getId());
         return total;
+    }
+
+    // Refuses to put [child] inside [parent] when [parent] is already somewhere inside [child]: the recipe would contain itself.
+    private void assertNotInside(Recipe parent, Recipe child) {
+        java.util.Deque<Recipe> pending = new java.util.ArrayDeque<>();
+        Set<UUID> seen = new HashSet<>();
+        pending.push(child);
+        while (!pending.isEmpty()) {
+            Recipe current = pending.pop();
+            if (!seen.add(current.getId())) {
+                continue;
+            }
+            for (RecipeComponent component : current.getComponents()) {
+                Recipe nested = component.getChildRecipe();
+                if (nested == null) {
+                    continue;
+                }
+                if (Objects.equals(nested.getId(), parent.getId())) {
+                    throw new RecipeComponentValidationException(
+                            "\"" + child.getName() + "\" already contains \"" + parent.getName() + "\", so it can't go inside it"
+                    );
+                }
+                pending.push(nested);
+            }
+        }
     }
 
     // The use of this method is:

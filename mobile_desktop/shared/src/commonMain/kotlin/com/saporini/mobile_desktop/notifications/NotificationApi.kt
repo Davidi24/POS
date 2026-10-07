@@ -30,7 +30,8 @@ data class NotificationDto(
     val referenceType: String? = null,
     val referenceId: String? = null,
     val readAt: String? = null,
-    val createdAt: String? = null
+    val createdAt: String? = null,
+    val markReadAllowed: Boolean = false
 )
 
 @Serializable

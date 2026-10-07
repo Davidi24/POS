@@ -110,6 +110,18 @@ class ReservationControllerSecurityTest {
     @MockBean
     private pos.pos.reservation.service.WaitlistService waitlistService;
 
+    @MockBean
+    private pos.pos.reservation.service.ReservationOccasionService reservationOccasionService;
+
+    @MockBean
+    private pos.pos.reservation.service.RestaurantEventService restaurantEventService;
+
+    @MockBean
+    private pos.pos.reservation.service.BookingMoneyStaffService bookingMoneyStaffService;
+
+    @MockBean
+    private pos.pos.reservation.service.GuestBookingService guestBookingService;
+
     @Test
     @DisplayName("GET reservations should allow RESERVATION_READ")
     void shouldAllowReservationReadWithReservationReadPermission() throws Exception {

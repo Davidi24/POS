@@ -28,7 +28,8 @@ public class GuestNoShowCounter {
 
     // Stands in for an empty list in "in (...)" so the query stays valid and matches nothing.
     private static final UUID NO_ID = new UUID(0, 0);
-    private static final String NO_TEXT = "\u0000";
+    // Can't be a phone or an email (Postgres text can't hold a NUL character, so no "\u0000").
+    private static final String NO_TEXT = "#no-guest-details#";
 
     private final ReservationRepository reservationRepository;
     private final GuestNoShowClearRepository guestNoShowClearRepository;

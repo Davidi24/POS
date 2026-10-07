@@ -1,5 +1,7 @@
 package pos.pos.inventory.dto;
 
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -28,9 +30,11 @@ public class InventoryWasteRequest {
 
     @NotNull(message = "quantity is required")
     @Positive(message = "quantity must be greater than zero")
+    @Digits(integer = 9, fraction = 3, message = "quantity must have at most 9 digits and 3 decimals")
     private BigDecimal quantity;
 
     @NotBlank(message = "reason is required")
+    @Size(max = 2000, message = "reason must be at most 2000 characters")
     private String reason;
 
     private OffsetDateTime occurredAt;

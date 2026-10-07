@@ -1,5 +1,7 @@
 package pos.pos.inventory.dto;
 
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -26,9 +28,11 @@ public class InventoryAdjustmentRequest {
     private UUID inventoryItemId;
 
     @NotNull(message = "quantityDelta is required")
+    @Digits(integer = 9, fraction = 3, message = "quantityDelta must have at most 9 digits and 3 decimals")
     private BigDecimal quantityDelta;
 
     @NotBlank(message = "reason is required")
+    @Size(max = 2000, message = "reason must be at most 2000 characters")
     private String reason;
 
     private OffsetDateTime occurredAt;

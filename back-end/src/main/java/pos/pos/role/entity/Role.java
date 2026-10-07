@@ -65,6 +65,10 @@ public class Role implements AuditedEntityLifecycle {
     @Column(name = "deleted_at", columnDefinition = "timestamptz")
     private OffsetDateTime deletedAt;
 
+    // The restaurant a custom role belongs to; null for system roles shared by every restaurant.
+    @Column(name = "restaurant_id", columnDefinition = "uuid")
+    private UUID restaurantId;
+
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamptz")
     private OffsetDateTime createdAt;
 
