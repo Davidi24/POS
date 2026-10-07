@@ -1,3 +1,11 @@
+## 2026-10-07 (Claude, feature/orders) — Backend and desktop app started for the user (~17:45)
+- `podman start pos-db pos-mailhog`. Then the backend: `SPRING_PROFILES_ACTIVE=local SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS='*:missing' MAIL_HOST=localhost MAIL_PORT=1025 MAIL_SMTP_AUTH=false MAIL_SMTP_STARTTLS_ENABLE=false java -jar target/pos-0.0.1-SNAPSHOT.jar` (pid 53842, log `back-end/app.out.log`).
+- **Why the extra Flyway flag:** the local DB has V39 "notifications" applied, but that file was never in `src/`; it only lived in an old `target/classes`, now gone. Without the flag Flyway validation fails at startup.
+  - The flag changes nothing in the DB; it only skips that check for this run.
+  - The cleaner local fix is `flyway repair` (or restore the file), which is the user's call.
+- With the flag, V55–V65 applied to `foundation_local` (now at v65). `/health/ready` answers 200.
+- Desktop app: `./gradlew :desktopApp:run` (MainKt pid 55111). No code changes.
+
 # 2026-10-07 continuation: final state compile and verification handoff
 - After correcting the mobile inventory 409 rejection behavior, `InventoryScreenModelTest` passed 21/21 and `:desktopApp:compileKotlin :shared:compileAndroidMain` passed against the final sources. The forced full mobile JVM run earlier in this continuation passed 338/338; only the focused 21-test suite was rerun after the final state-model change.
 - Full backend `./mvnw -o verify` is green at 1,264 unit + 331 PostgreSQL integration tests. `AGENTS.md` now records these counts, V65 as the latest migration (next V66), and the intentional absence of screens for the requested state-only modules. Root images 5.png, 7.png, 8.png, and 9.png are deleted. `git diff --check` passed.
