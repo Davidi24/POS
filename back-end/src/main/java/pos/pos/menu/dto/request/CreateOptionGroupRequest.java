@@ -1,5 +1,6 @@
 package pos.pos.menu.dto.request;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -32,9 +33,11 @@ public class CreateOptionGroupRequest {
     private String description;
 
     @Min(value = 0, message = "minSelect must be greater than or equal to 0")
+    @Max(value = 100, message = "minSelect must be at most 100")
     private Integer minSelect;
 
     @Min(value = 0, message = "maxSelect must be greater than or equal to 0")
+    @Max(value = 100, message = "maxSelect must be at most 100")
     private Integer maxSelect;
 
     private Boolean required;

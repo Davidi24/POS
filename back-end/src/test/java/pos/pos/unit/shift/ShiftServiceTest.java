@@ -31,13 +31,15 @@ class ShiftServiceTest {
     @Mock RestaurantScopeService scope;
     @Mock EntityManager em;
     @Mock AuditLogRepository audits;
+    @Mock pos.pos.settings.repository.SettingsRepository settings;
+    @Mock pos.pos.shift.repository.StaffPayRateRepository payRates;
     ShiftService service;
     UUID r = UUID.randomUUID(), b = UUID.randomUUID(), actor = UUID.randomUUID(), other = UUID.randomUUID();
     Restaurant restaurant; Branch branch; User user; Shift shift;
     Authentication self, manager;
 
     @BeforeEach void setup() {
-        service = new ShiftService(repository, scope, em, audits);
+        service = new ShiftService(repository, scope, em, audits, settings, payRates);
         restaurant = new Restaurant(); restaurant.setId(r); restaurant.setTimezone("Europe/Berlin");
         branch = new Branch(); branch.setId(b); branch.setRestaurant(restaurant);
         user = user(actor); shift = new Shift(); shift.setId(UUID.randomUUID()); shift.setRestaurant(restaurant); shift.setBranch(branch); shift.setUser(user); shift.setStatus(ShiftStatus.OPEN); shift.setVersion(3); shift.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC).minusHours(2));

@@ -17,8 +17,9 @@ import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.repository.RestaurantRepository;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,12 +36,13 @@ public class PublicMenuService {
     private final MenuItemRepository menuItemRepository;
     private final PublicMenuMapper publicMenuMapper;
 
+    // Public menus follow the restaurant-local date and daily hours, not the server clock.
     @Transactional(readOnly = true)
     public List<PublicMenuResponse> getMenus(UUID restaurantId) {
         Restaurant restaurant = findPublicRestaurant(restaurantId);
-        LocalDate today = LocalDate.now(ZoneId.of(restaurant.getTimezone()));
+        LocalDateTime now = restaurantNow(restaurant);
         return menuRepository.findPublicMenusByRestaurantId(restaurant.getId()).stream()
-                .filter(menu -> menu.isAvailableOn(today))
+                .filter(menu -> menu.isAvailableAt(now))
                 .map(publicMenuMapper::toMenuResponse)
                 .toList();
     }
@@ -51,8 +53,8 @@ public class PublicMenuService {
         Restaurant restaurant = findPublicRestaurant(restaurantId);
         Menu menu = menuRepository.findPublicMenuByRestaurantIdAndId(restaurantId, menuId)
                 .orElseThrow(MenuNotFoundException::new);
-        LocalDate today = LocalDate.now(ZoneId.of(restaurant.getTimezone()));
-        if (!menu.isAvailableOn(today)) {
+        LocalDateTime now = restaurantNow(restaurant);
+        if (!menu.isAvailableAt(now)) {
             throw new MenuNotFoundException();
         }
         if (!includeSections && !includeItems) {
@@ -74,6 +76,14 @@ public class PublicMenuService {
             sections = sections.stream().filter(section -> itemsBySectionId.containsKey(section.getId())).toList();
         }
         return publicMenuMapper.toMenuResponse(menu, sections, itemsBySectionId);
+    }
+
+    private LocalDateTime restaurantNow(Restaurant restaurant) {
+        try {
+            return LocalDateTime.now(ZoneId.of(restaurant.getTimezone() == null ? "UTC" : restaurant.getTimezone()));
+        } catch (RuntimeException invalidTimezone) {
+            return LocalDateTime.now(ZoneOffset.UTC);
+        }
     }
 
     private Restaurant findPublicRestaurant(UUID restaurantId) {

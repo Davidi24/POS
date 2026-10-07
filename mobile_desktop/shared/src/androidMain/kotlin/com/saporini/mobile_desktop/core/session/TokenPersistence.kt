@@ -23,9 +23,16 @@ actual class TokenPersistence {
     actual suspend fun saveRefreshToken(token: String?) = save(KEY_REFRESH, token)
     actual suspend fun loadAccessToken(): String? = load(KEY_ACCESS)
     actual suspend fun loadRefreshToken(): String? = load(KEY_REFRESH)
+    actual suspend fun savePendingInventoryMoves(payload: String?) = save(KEY_PENDING_INVENTORY_MOVES, payload)
+    actual suspend fun loadPendingInventoryMoves(): String? = load(KEY_PENDING_INVENTORY_MOVES)
 
     actual suspend fun clear() {
-        store.edit { it.clear() }
+        // Pending writes belong to the signed-in user and must survive logout so an uncertain
+        // movement can be replayed if that same user signs back in.
+        store.edit { prefs ->
+            prefs.remove(KEY_ACCESS)
+            prefs.remove(KEY_REFRESH)
+        }
     }
 
     private suspend fun save(key: Preferences.Key<String>, token: String?) {
@@ -64,6 +71,7 @@ actual class TokenPersistence {
     companion object {
         private val KEY_ACCESS = stringPreferencesKey("access_token")
         private val KEY_REFRESH = stringPreferencesKey("refresh_token")
+        private val KEY_PENDING_INVENTORY_MOVES = stringPreferencesKey("pending_inventory_moves")
 
         lateinit var appContext: Context
             private set

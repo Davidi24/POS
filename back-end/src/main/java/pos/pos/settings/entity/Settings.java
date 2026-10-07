@@ -227,6 +227,61 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "deposit_from_guests", nullable = false)
     private int depositFromGuests = 7;
 
+    // The payment provider's fee, kept back on refunds: percent of the amount plus a fixed part.
+    @Column(name = "card_fee_percent", nullable = false, precision = 5, scale = 2)
+    private java.math.BigDecimal cardFeePercent = new java.math.BigDecimal("1.50");
+
+    @Column(name = "card_fee_fixed", nullable = false, precision = 10, scale = 2)
+    private java.math.BigDecimal cardFeeFixed = new java.math.BigDecimal("0.25");
+
+    // The waiters' Kitchen Status: an order counts as taking long after this, and ready food as waiting too long.
+    @Column(name = "kitchen_slow_after_minutes", nullable = false)
+    private int kitchenSlowAfterMinutes = 20;
+
+    @Column(name = "kitchen_ready_waiting_minutes", nullable = false)
+    private int kitchenReadyWaitingMinutes = 5;
+
+    // Staff can clock in for a scheduled shift from this long before it starts.
+    @Column(name = "clock_in_early_minutes", nullable = false)
+    private int clockInEarlyMinutes = 120;
+
+    // Payments: tips offered at the till, the biggest tip accepted (as a share of the bill), closing paid orders,
+    // and how many days after payment a refund can still be given.
+    @Column(name = "tips_enabled", nullable = false)
+    private boolean tipsEnabled = true;
+
+    @Column(name = "tip_suggestions", nullable = false, length = 50)
+    private String tipSuggestions = "5,10,15";
+
+    @Column(name = "max_tip_percent", nullable = false)
+    private int maxTipPercent = 50;
+
+    @Column(name = "auto_close_paid_orders", nullable = false)
+    private boolean autoClosePaidOrders = true;
+
+    @Column(name = "refund_window_days", nullable = false)
+    private int refundWindowDays = 30;
+
+    // Fraud checks: when a discount, refund, void or tip is flagged for an owner to look at.
+    @Column(name = "fraud_discount_percent", nullable = false)
+    private int fraudDiscountPercent = 30;
+
+    @Column(name = "fraud_refund_amount", nullable = false, precision = 12, scale = 2)
+    private java.math.BigDecimal fraudRefundAmount = new java.math.BigDecimal("50.00");
+
+    @Column(name = "fraud_voids_per_day", nullable = false)
+    private int fraudVoidsPerDay = 5;
+
+    @Column(name = "fraud_tip_percent", nullable = false)
+    private int fraudTipPercent = 30;
+
+    @Column(name = "fraud_cash_refunds_per_day", nullable = false)
+    private int fraudCashRefundsPerDay = 2;
+
+    // Rule codes the owner switched off, comma separated.
+    @Column(name = "fraud_disabled_rules", nullable = false, length = 500)
+    private String fraudDisabledRules = "";
+
     @OneToOne(mappedBy = "settings", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private SettingsReceipt receiptSettings;
 

@@ -24,7 +24,6 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
     Optional<RestaurantTable> findByIdAndBranch_Id(UUID tableId, UUID branchId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = {"restaurant", "branch", "category", "mergedInto"})
     @Query("""
             SELECT t
             FROM RestaurantTable t
@@ -61,7 +60,7 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
             @Param("tableIds") Collection<UUID> tableIds
     );
 
-    // Row locks in id order, so two bookings locking overlapping tables can't deadlock each other.
+    // Acquire overlapping table locks in one database order for every workflow that touches multiple tables.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT t.id
@@ -70,7 +69,7 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
               AND t.id IN :tableIds
             ORDER BY t.id
             """)
-    List<UUID> lockTablesForBooking(
+    List<UUID> lockTablesForUpdateInStableOrder(
             @Param("branchId") UUID branchId,
             @Param("tableIds") Collection<UUID> tableIds
     );

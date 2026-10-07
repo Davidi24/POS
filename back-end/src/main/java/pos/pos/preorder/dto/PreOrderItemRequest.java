@@ -36,5 +36,5 @@ public class PreOrderItemRequest {
 
     @Size(max = 30, message = "options must contain at most 30 choices")
     @Valid
-    private List<PreOrderItemOptionRequest> options;
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") PreOrderItemOptionRequest> options;
 }

@@ -1,5 +1,6 @@
 package pos.pos.menu.dto.update;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,5 +20,6 @@ import java.util.UUID;
 public class ReorderOnlineMenuSectionsRequest {
 
     @NotEmpty(message = "sectionIds must not be empty")
-    private List<UUID> sectionIds;
+    @Size(max = 500, message = "sectionIds can have at most 500 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UUID> sectionIds;
 }

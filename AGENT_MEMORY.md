@@ -1,4 +1,707 @@
+# 2026-10-07 continuation: final state compile and verification handoff
+- After correcting the mobile inventory 409 rejection behavior, `InventoryScreenModelTest` passed 21/21 and `:desktopApp:compileKotlin :shared:compileAndroidMain` passed against the final sources. The forced full mobile JVM run earlier in this continuation passed 338/338; only the focused 21-test suite was rerun after the final state-model change.
+- Full backend `./mvnw -o verify` is green at 1,264 unit + 331 PostgreSQL integration tests. `AGENTS.md` now records these counts, V65 as the latest migration (next V66), and the intentional absence of screens for the requested state-only modules. Root images 5.png, 7.png, 8.png, and 9.png are deleted. `git diff --check` passed.
+- Current operator review items are listed in the preceding entries and final task response; do not describe external payment, notifications, storage, inventory operations, or deployment setup as production-provisioned.
+
+# 2026-10-07 continuation: fix inventory movement rejection handling
+- Independent review found that `InventoryScreenModel.saveMove` treated every HTTP 409 as an uncertain write, even though stock conflicts (such as insufficient source quantity) are transactional rejections. The pending draft then became frozen and persisted indefinitely. Known 4xx responses now clear the idempotency record and leave the draft editable; changed the regression to exercise the real 409 status. Fresh focused `InventoryScreenModelTest` passed 21/21. The earlier fresh full mobile run passed 338/338 before this small follow-up; desktop and Android compilation passed in that run.
+- Full backend rerun remains green at 1,264 unit + 331 PostgreSQL integration tests; focused notification integration passed 4/4. The main prior verification entry records the detailed notification assertion correction. `git diff --check` passes.
+- Confirmed policy still needing operator review: recipe stock is consumed at fulfillment, so a missing branch source or insufficient stock rejects fulfillment; orders only consume tracked stock when fulfilled. Choosing negative stock, backorders, or non-blocking consumption changes inventory accounting and is not silently changed here. Other deployment gaps remain live payment settlement, durable notification delivery, production file storage, cleanup for the idempotency replay table, and rollout/observability review.
+
+## 2026-10-07 (Claude, feature/orders) — Review of the overnight changes (no code changed)
+**The user asked whether the overnight changes (V56–V65, about 200 files) are better.** Review snapshot ~13:50. Another agent was still editing (a test at 14:06, AGENTS.md at 14:08).
+- **Ran in an isolated copy (scratchpad):**
+  - Backend: 1,264 unit tests pass. 331 ITs ran with 2 failing:
+    - `NotificationPreferenceConcurrencyIntegrationTest.manualInAppBroadcastIsPersistedAsDelivered` (count 0, expected 1). It also fails alone, and was being edited at 14:06.
+    - `TenantIsolationIntegrationTest`: NPE in its `addParams`, because `MethodParameter.getParameterName()` is null for unnamed `@RequestParam`s. That's a weakness in the test helper, exposed by the new paged endpoints. Fix: call `initParameterNameDiscovery`.
+  - App: 338 jvm tests pass; desktop and Android compile.
+  - The in-place `./mvnw verify` broke halfway (NoClassDefFoundError) because something else rewrote `back-end/target` during the run. Test in a copy while another agent or the IDE is active.
+- **Bug, proven with a probe test in the copy:**
+  - In the app, a stock change refused with a 409 (e.g. "Stock balance cannot go below zero", inactive location or item) is treated as "may have saved". It is frozen for good: it can't be edited, cancelled or replaced, and it is kept across restarts and logout.
+  - `InventoryScreenModel.saveMove` should treat 409s with a known reason as rejections.
+  - The existing test `aRefusedStockChangeKeepsTheDraft` uses a 400, which the server doesn't send.
+- **Design concerns raised with the user:**
+  - Selling now blocks service. Marking food served (POS fulfil, KDS complete, pick-up) fails with 409 when recorded stock is short, or when a branch has no sale source location for an ingredient.
+  - Orders closed or paid without being fulfilled never take stock off.
+  - In production, every non-cash payment is refused (`ConfiguredPaymentCapturePolicy`), including cards on an external terminal, gift cards, house accounts and bank transfers.
+  - The POS customer list still downloads every page.
+  - The write-replay table has no cleanup.
+  - Device heartbeat takes a row lock before checking the secret.
+  - Device endpoints record `getRemoteAddr()` instead of `ClientInfoExtractor`.
+- **Good fixes confirmed:**
+  - The discount bypass through order PATCH.
+  - Atomic stock balances.
+  - Recipe unit conversion and sub-recipe yield costing (my earlier costing ignored units).
+  - The table merge deadlock and race, and the OTP attempt race.
+  - OTPs removed from SMS logs.
+  - Refunded tips in pay and statistics.
+  - Discount order kept stable.
+  - Unique barcodes and count numbers.
+  - Health probes.
+  - Fixed notification pool starvation.
+  - Required idempotency keys for payments and stock.
+
+# 2026-10-07 continuation: rerun complete backend and mobile verification
+- Resumed the paused POS completion task, restored rootless Podman test access, and ran a clean backend `./mvnw -o verify`. The first run passed all 1,264 unit tests but exposed a stale expectation in `NotificationPreferenceConcurrencyIntegrationTest.manualInAppBroadcastIsPersistedAsDelivered`: the derived event code includes the reference token (`ORDER_ORDER_BROADCAST`). Updated the assertion to check the response event code and exact persisted notification ID. The focused notification integration class then passed 4/4.
+- Re-ran the full backend suite after the correction: 1,264 unit + 331 PostgreSQL integration tests passed, 0 failures/errors/skips. Mobile desktop compilation, Android shared compilation, and a forced full JVM test run passed: 338 tests, 0 failures/errors/skips. `git diff --check` passed. Root-level image files requested for removal remain deleted.
+- Updated `AGENTS.md` verification count and migration guidance (latest V65; next V66). Mobile state modules remain screenless as requested. This is not production sign-off: live non-cash payment capture/settlement, durable email/SMS delivery, durable production file storage, inventory-on-sale/refund policy and legacy stock reconciliation, and deployment/observability review remain open.
+
+# 2026-10-07 continuation: reject notification channels with no delivery worker
+- The manual notification broadcast API accepted EMAIL, SMS, PUSH, and WEBHOOK while the dispatcher only persisted them as QUEUED and no delivery worker existed. `NotificationService.broadcast` now fails closed with HTTP 409 for every non-IN_APP channel, before creating a notification row.
+- Added PostgreSQL integration coverage that exercises all four unsupported channels and asserts the restaurant notification row count is unchanged. `./mvnw -o -Dskip.unit.tests=true -Dit.test=NotificationPreferenceConcurrencyIntegrationTest verify` passed all 3 integration tests; touched-file `git diff --check` passed. The mobile notification center does not call the broadcast endpoint, so no mobile state or screen changed.
+- This prevents silent queued-message loss; it does not implement email/SMS/PUSH/WEBHOOK delivery. Durable reservation guest-email retries and provider integrations remain open.
+
+# 2026-10-07 continuation: persist uncertain mobile inventory writes across restart
+- Added account-scoped pending inventory movement persistence to the existing mobile Inventory state model. Android stores it through the existing encrypted Preferences DataStore; JVM/desktop stores it alongside auth data using the existing DPAPI/owner-only persistence path. Logout clears credentials but preserves uncertain movement records.
+- Stock movement request data and its idempotency key are persisted before sending. Ambiguous failures freeze the exact draft against edits/cancellation, same-user/same-restaurant sign-in restores it, and successful replay removes it. Known non-409 4xx responses clear the pending record and allow correction; corrupt storage fails closed and is not overwritten. Wired the existing model through TokenStore; no screen added.
+- Added restart/replay-once, locked-draft, known-rejection, corrupt-storage, and persistence-clear tests. Updated an Orders screenshot fake to implement the current paged repository contract after its four screenshot variants failed with the stale unpaged fake. Fresh full mobile JVM run passed 338 tests, 0 failures/errors/skips; Android `:shared:compileAndroidMain` passed. Full backend `./mvnw -o verify` reports 1,285 unit + 329 PostgreSQL integration tests, 0 failures/errors/skips. Touched-file `git diff --check` passed.
+- Production remains blocked on external delivery/storage/payment integrations and explicit inventory refund/void and legacy reconciliation policies; do not call the entire backend production-ready.
+
+# 2026-10-07 continuation: make inventory movements safe to retry
+- Extended the authenticated write-replay filter to the five stock-changing inventory endpoints (`receive`, `waste`, `transfer`, `returns`, `adjustments`) and require a 16–100 character `Idempotency-Key`. Inventory operations serialize only identical owner/key pairs; the atomic SQL quantity delta still handles concurrent distinct stock movements. Renamed the replay table to `write_request_replays` through V65 while retaining its contents.
+- Updated the existing mobile Inventory API/state flow to send a UUID key and retain it with an unchanged movement draft after an uncertain response; changing/cancelling the draft clears the key, and confirmed success clears both. No screen added.
+- PostgreSQL integration verified same-key replay, changed-body 409, missing-key 400, one movement/one stock delta, and simultaneous same-key requests returning one original plus one replay. Full `InventoryFlowIntegrationTest` + `RecipeFlowIntegrationTest` passed 28/28 (14 + 14); mobile `InventoryScreenModelTest` + `InventoryApiTest` passed 19/19; `git diff --check` passed.
+- Reconciliation: the earlier note saying device pairing redemption is absent is stale for the backend. Current source includes hashed one-time token redemption, parent-device locking, single-use device-secret issuance, and heartbeat authentication. `DeviceManagementConcurrencyIntegrationTest` passed 6/6 on PostgreSQL in this turn. No mobile pairing-redemption client was found; the existing admin device flow issues/revokes codes, so a physical-device bootstrap client remains an integration question rather than a missing backend redemption endpoint.
+- Inventory idempotency remains in-memory on the mobile draft; a process restart after a lost response can lose its key. Keep this as a residual risk unless pending write keys are durably stored. Broader backend readiness is still open.
+
+# 2026-10-07 continuation: clear mobile statistics on revoked access
+- Hardened the existing `StatisticsScreenModel` so a 401/403 clears all cached overview, sales, staff, report-catalog, and downloaded CSV data while disabling further reads. Other transient failures still preserve the prior figures as stale data.
+- Extended the existing mobile regression to load every protected result and a CSV, simulate 403, assert all protected data is removed, and confirm refresh makes no further API request. All mobile statistics tests passed: 10 tests (8 screen-model, 2 period/API rules), 0 failures/errors/skips. No UI was added; `StatisticsWorkspaceScreen` remains a navigation shell without a built statistics interface.
+- This closes a mobile in-memory data exposure on permission revocation, not the broader Statistics domain audit or production sign-off.
+
+# 2026-10-07 continuation: fail closed on unverified production payments
+- Added `PaymentCapturePolicy` and a configured policy that always permits cash, permits non-cash simulator captures only for non-prod `app.payments.provider=test`, and otherwise rejects non-cash capture with HTTP 409 until a trusted live provider is configured. Added the simulator as test-source-only integration configuration; the focused production-profile test and test provider policy cases passed.
+- Updated the existing mobile payment screen model so an explicit 409 refusal is treated as a known rejection (no ambiguous retry key) and its message survives the order refresh. Added a state regression covering the unavailable-provider message and preserved amount; `./gradlew :shared:jvmTest --tests com.saporini.mobile_desktop.payment.PaymentScreenModelTest` passed.
+- Verification: focused payment/order PostgreSQL integration run passed 26/26; full backend `./mvnw -o verify` passed 1,259 unit + 326 integration tests (1,585 total), 0 failures/errors/skips; `git diff --check` passed.
+- Production payments remain unavailable for non-cash until a trusted gateway capture/refund/void adapter and settlement/reconciliation are connected. No mobile screen was added. Broader release blockers remain in prior entries (durable SMS/email delivery, durable production image storage, refund/void stock policy/reconciliation, device pairing redemption, inventory-barcode deployment preflight, and deployment configuration/observability review).
+
+# 2026-10-07 continuation: enforce Menu daily availability hours
+- Added `Menu.isAvailableAt(LocalDateTime)` with inclusive date/time boundaries, optional one-sided hour limits, overnight windows, and null-time rejection. Public menu list/detail now evaluate hours using restaurant-local time; today's public online menu and staff preview apply the same rule, while explicit future-date online menu requests remain date-based because they do not include an order time. Staff preview distinguishes date and time hidden reasons.
+- Added 5 entity unit tests for all-day/date bounds, ordinary hours, one-sided hours, overnight hours, and overnight windows at the final date boundary, plus a PostgreSQL/API case covering public list/detail, public online menu, and staff preview.
+- Verification: `MenuAvailabilityTest` + `PublicMenuServiceTest` passed 10/10; full `MenuApiIntegrationTest` passed 31/31; after final hidden-reason wording adjustment, the focused PostgreSQL/API regression passed 1/1; `git diff --check` passed. No response shape or existing mobile state changed; no screen was added.
+- Remaining Menu readiness includes deeper import/export and image storage review, and defining time-of-day behavior for explicit future-date online menu requests. This is not a whole-backend production sign-off.
+
+# 2026-10-07 continuation: enforce Menu daily availability hours
+- Added `Menu.isAvailableAt(LocalDateTime)` with inclusive date/time boundaries, optional one-sided hour limits, overnight windows, and null-time rejection. Public menu list/detail now evaluate hours using restaurant-local time; today's public online menu and staff preview apply the same rule, while explicit future-date online menu requests remain date-based because they do not include an order time. Staff preview reports whether a dish is hidden by date or time.
+- Added 4 entity unit tests for all-day/date bounds, ordinary hours, one-sided hours, and overnight hours, plus a PostgreSQL/API case for public list/detail, public online menu, and staff preview behavior.
+- Verification: `MenuAvailabilityTest` + `PublicMenuServiceTest` passed 9/9; full `MenuApiIntegrationTest` passed 31/31; after a final hidden-reason wording adjustment, the focused PostgreSQL/API regression passed 1/1; `git diff --check` passed. No response shape or existing mobile state changed; no screen was added.
+- Remaining Menu readiness still includes broader import/export/storage review and end-to-end consumer behavior for explicit future-date online menus (no time-of-day is part of that API). This is not a whole-backend production sign-off.
+
+# 2026-10-07 continuation: cover payment void idempotency
+- Added an end-to-end PostgreSQL regression for void retries: the same key/body replays the original response, a changed reason with that key conflicts, the order stays reopened, and only one VOID transaction is recorded. No implementation or API behavior changed.
+- Verification: `./mvnw -o -Dskip.unit.tests=true -Dit.test=PaymentFlowIntegrationTest#idempotentVoidRetry verify` passed 1/1 integration test; `git diff --check` passed. No mobile contract/state changed and no screen was added.
+- Payment remains blocked from production sign-off until a trusted live card provider captures/refunds/voids transactions and settlement/reconciliation behavior is implemented. The current order-payment service records caller-supplied card metadata as CAPTURED; do not represent it as live provider settlement.
+
+# 2026-10-07 continuation: lock order-to-table writes against table merges
+- A PostgreSQL race test showed that simultaneous table merge and table-order creation could leave an open order attached to a merged child. Order creation and order/table reassignment now load table rows with a write lock and reject inactive, merged, RESERVED, DIRTY, MAINTENANCE, or OUT_OF_SERVICE tables (AVAILABLE and OCCUPIED remain valid). Same-table updates remain allowed, so a table becoming unavailable does not block edits to its existing order.
+- Removed the eager association graph from the pessimistic table lookup. Hibernate had used follow-on locking and could return a stale pre-lock table state after waiting for a merge; lazy associations now load after the row lock. Table merges and order writes share the same table row locks. No response fields changed; no mobile state or screens changed.
+- Added PostgreSQL/API coverage for unavailable/merged-table order rejection and the concurrent merge-versus-order race, asserting no open order remains attached to the merged child. The opposite-direction merge race remains covered.
+- Verification: `OrderLifecycleIntegrationTest` passed 12/12 against PostgreSQL; `TableAvailabilityApiIntegrationTest` 2/2; `ReservationFlowIntegrationTest#concurrentReservationsCannotDoubleBookTable` 1/1; `RestaurantTableServiceTest` + `ReservationServicesTest` 12/12; `git diff --check` passed.
+- Remaining: full Tables/Orders audit, broader order update/payment concurrency checks, and the wider backend service readiness review are still open; this is not a production sign-off.
+
+# 2026-10-07 continuation: serialize overlapping table merges
+- `RestaurantTableService.mergeTable` previously locked its primary table before locking targets, so opposite-direction merges could acquire the same two row locks in opposite orders and deadlock. It now acquires all primary/target locks through one stable-ID-order repository query before reading merge state. Generalized the shared table lock method name and kept reservation booking on the same implementation.
+- Added a unit assertion for locking all merge participants and a PostgreSQL API race that starts A→B and B→A together, requires one 200 and one 409, and checks the final merge relationship. No response/mobile contract changed; no screen or mobile state was added.
+- Verification: `TableAvailabilityApiIntegrationTest` passed 2/2 against PostgreSQL; `RestaurantTableServiceTest` passed 4/4; `ReservationServicesTest` passed 8/8 after the shared lock method rename; `git diff --check` passed.
+- The broader Tables domain still needs review of table/order association invariants and other concurrent workflows; this is not a Tables or backend production sign-off.
+
+# 2026-10-07 continuation: page open orders in the existing mobile list
+- The active Orders screen used the unbounded `/orders/open` endpoint, so large branches loaded every open order at once. Added an `openOnly` filter to the existing bounded branch order page endpoint, rejecting contradictory `historyOnly` + `openOnly` filters and statuses outside DRAFT/OPEN.
+- Updated the existing mobile order repository/API and OrdersScreenModel to page open orders, retain loaded pages on refresh, support server-side search, validate returned statuses, and load more through the existing list state. No screens were added.
+- Added PostgreSQL/API assertions for open-only filtering, pagination, contradictory filters, and invalid statuses. Updated mobile API-contract and state-model tests for open paging, append, refresh, and search.
+- Verification: `OrderLifecycleIntegrationTest` passed 10/10 against PostgreSQL; focused mobile `OrdersScreenModelTest` and `OrderDataContractTest` passed; `git diff --check` passed. The first mobile test attempt exposed a test-only active polling loop that did not deactivate; the fixture now deactivates and the focused rerun completed.
+- Remaining order production checks include the legacy unpaged endpoints still used by non-list operations and a broader order-flow concurrency/idempotency/failure review. This is one slice of the ongoing POS production-readiness work, not a whole-backend sign-off.
+
+# 2026-10-07 continuation: batch menu import lookups
+- The menu import endpoint accepts up to 100 item IDs but was loading variants, option-group links, and KDS routings once per source item, with additional lazy loads for source menu scope and ingredients. Added a source-item query that fetches its section/menu/restaurant and ingredients, then batch-loaded and grouped variants, option groups, and routings before copying.
+- Kept import ordering, duplicate-ID de-duplication, separate-copy behavior, and foreign-restaurant rejection unchanged. Added unit assertions that two-item imports issue one batch lookup per related domain and do not use the per-item repository methods.
+- Verification: `MenuItemImportServiceTest` passed 3/3; PostgreSQL-backed `MenuApiIntegrationTest` passed 30/30 through V64; `git diff --check` passed. No response contract or mobile state changed; no screen was added.
+
+# 2026-10-07 continuation: authenticate paired-device heartbeats
+- Added `POST /public/devices/{deviceId}/heartbeat`, which checks the one-time-issued device secret against its stored peppered hash with constant-time comparison, requires an active ACTIVE device, and updates online/last-seen/IP fields under a device-row lock.
+- Deactivation, retirement, blocked, or maintenance status now clears the stored device secret and rotation timestamp as well as revoking open pairing tokens. Reactivation therefore requires pairing again; integration coverage proves the prior secret stays invalid and a newly paired secret works.
+- Verification: `DeviceManagementConcurrencyIntegrationTest` passed 6/6 against PostgreSQL; `DeviceManagementServiceTest` passed 2/2; `git diff --check` passed. No existing mobile screen uses the heartbeat or redemption APIs, so mobile state and screens were unchanged. Device secrets do not yet authorize POS/KDS operations, and no hardware client is wired to send heartbeats.
+
+# 2026-10-07 continuation: redeem device pairing tokens once
+- Added public `POST /public/devices/pairing/redeem`: hashes the supplied pairing token, locks the parent device consistently with issuance/revocation, rejects used/expired/revoked or inactive-device tokens with one generic 401, stores only the new device-secret hash, and returns the raw device secret once.
+- Added PostgreSQL concurrency/API coverage proving simultaneous redemptions yield exactly one success and one rejection, token history hides the raw token, and the database stores a hash rather than the returned secret. No existing mobile screen calls this API; the admin device UI contract/state did not change, and no screen was added.
+- Added invalid-token coverage showing unknown, revoked, and expired tokens all return the same generic 401 response. Verification: `DeviceManagementConcurrencyIntegrationTest` passed 5/5 on PostgreSQL; `git diff --check` passed. The actual device-secret authentication path is still absent, so this completes enrollment redemption only, not full device authentication.
+
+# 2026-10-07 continuation: bound tip-suggestions request text
+- A controller/request DTO audit found `tipSuggestionsText` used a regex that allowed arbitrarily long whitespace even though its semantic content is at most six percentages. Added `@Size(max = 64)` while preserving the existing pattern and valid inputs.
+- Added PostgreSQL/API coverage proving ordinary whitespace formatting succeeds and a 65-character whitespace-only value returns 400. The existing mobile settings editor already limits this field to 23 characters, so no mobile state or screen change was needed.
+- Verification: `SettingsExtendedIntegrationTest` passed 8/8; compilation completed; `git diff --check` passed. A source scan found every controller `@RequestBody` covered by `@Valid`; this field was the unbounded request string identified in the scanned request DTOs.
+- Remaining production blockers remain: live payment processing/settlement, durable SMS/email delivery/retries, durable image/floor-plan storage, inventory refund/void policy and legacy reconciliation, device pairing redemption/authentication, full supplier management, deployment configuration/observability, and legacy unpaged-order compatibility.
+
+# 2026-10-07 continuation: add safe production liveness and readiness probes
+- Added unauthenticated `GET /health/live` and `GET /health/ready` endpoints and allowed only those exact paths through `SecurityPaths`. Liveness does not depend on the database; readiness runs `SELECT 1`, returns 503 on data-access failure, and exposes only UP/DOWN status.
+- Added unit coverage for database-independent liveness and readiness failure without leaking connection details. Extended the production-profile PostgreSQL smoke test to verify both probes are publicly reachable and healthy while the database is available. No mobile contract/state changed; no screen added.
+- Verification: `OperationalHealthControllerTest` passed 2/2; `ProdProfileSmokeTest` passed 1/1 on PostgreSQL; `git diff --check` passed.
+- Other production blockers remain: live payment processing/settlement, durable SMS/email delivery/retries, durable image/floor-plan storage, inventory refund/void policy and legacy reconciliation, device pairing redemption/authentication, full supplier management, deployment configuration/observability beyond basic probes, and legacy unpaged-order compatibility.
+
+# 2026-10-07 continuation: generate collision-resistant stock count numbers
+- Replaced timestamp-derived inventory count numbers (`IC-<millisecond>`) with random UUID references so simultaneous count creation does not collide on `uk_inventory_counts_restaurant_count_number`. Duplicate caller-provided count numbers now map that named unique constraint to HTTP 409.
+- Added an API/PostgreSQL test creating six counts concurrently and asserting all generated references are unique, plus a duplicate custom-number conflict assertion. The existing mobile inventory model treats `countNumber` as a `String`; the contract type did not change, so no mobile state or screen change was needed.
+- Verification: `InventoryFlowIntegrationTest` passed 12/12 against PostgreSQL through migrations V1–V64; compilation completed; `git diff --check` passed. The most recent full backend `./mvnw -o verify` before this change passed 1,249 unit and 316 integration tests.
+- Remaining production blockers are unchanged: live payment provider/settlement, durable notifications, durable image/floor-plan storage, refund/void inventory policy and legacy reconciliation, device pairing redemption/authentication, full supplier management, production configuration/observability review, and legacy unpaged-order compatibility.
+
+# 2026-10-07 continuation: preserve stacked discount application order
+- Found that order discounts were recalculated and returned by `created_at` only; equal persisted timestamps could reorder a percentage and fixed discount and change the charged total. Added `discount_sequence` with a V64 backfill ordered by prior timestamp and ID, assign sequence when discounts are added, and use it for ORM ordering and total recalculation.
+- Added an API/PostgreSQL regression that forces two stacked discounts to the same stored timestamp, reloads them, and checks application order and exact amounts. Fixed `OrderControllerSecurityTest` setup with the missing `OrderHistoryService` mock, which had caused three full-suite context errors.
+- Verification: `OrderLifecycleIntegrationTest` passed 10/10; `OrderMoneyGuardsTest` passed 6/6; `OrderControllerSecurityTest` passed 3/3; full backend `./mvnw -o verify` passed 1,249 unit tests and 316 PostgreSQL integration tests (1,565 total, 0 failures/errors/skips); `git diff --check` passed. No mobile contract or state changed, and no screen was added.
+- Broader production blockers remain: live payment settlement/reconciliation, durable SMS/email delivery and retry, durable image/floor-plan storage, explicit inventory refund/void and legacy reconciliation policy, device pairing redemption/authentication, supplier-management completeness, deployment configuration/observability review, and legacy unpaged-order compatibility. This is an ongoing POS readiness effort; do not treat it as a whole-repository sign-off.
+
+# 2026-10-07 continuation: keep undelivered notifications unread
+- `markAllRead` now updates only delivered personal notifications visible to the user, including restaurant-wide notifications in a branch feed, and updates their audit timestamp/actor. Marking one queued/undelivered personal notification returns HTTP 409. Notification responses expose `markReadAllowed` only when the notification is personal and delivered.
+- Updated the existing mobile notification model/state: queued notifications cannot be marked read, and read actions refresh from the server only after success instead of optimistically clearing unread state. No screen was added.
+- Added API/PostgreSQL coverage for mixed queued email, branch in-app, and restaurant-wide in-app notifications, read-all behavior, audit timestamps, API eligibility metadata, and rejection of a single undelivered read attempt. The full `NotificationPreferenceConcurrencyIntegrationTest` passed 2/2; a final focused lifecycle rerun passed 1/1; mobile `NotificationKindTest` passed 3/3. `git diff --check` passed.
+- Durable external notification delivery/retry and provider wiring remain separate production blockers.
+
+# 2026-10-07 continuation: serialize menu variant default changes
+- Added a pessimistic write lock for the parent menu item and use it on variant create/update/delete. This serializes each dish's default-variant check and clearing logic while leaving variant reads unlocked.
+- Added a concurrent API/PostgreSQL regression that marks two variants as default at the same time and verifies both requests complete with exactly one default remaining.
+- Verification: `MenuVariantServiceTest` + `MenuItemServiceTest` passed 11/11; the complete PostgreSQL-backed `MenuApiIntegrationTest` passed 30/30 through migrations V1–V63; `git diff --check` passed. No API contract or mobile state changed.
+- Previously recorded production blockers remain: live payment settlement/reconciliation, durable SMS/email delivery, durable image storage, refund/void inventory policy and legacy reconciliation, device pairing redemption, duplicate active inventory barcode preflight before V63, production configuration/observability review, and compatibility migration for legacy unpaged order lists.
+
+# 2026-10-07 continuation: batch menu item list expansions
+- Found that `GET /menus/{menuId}/sections/{sectionId}/items?includeVariants=true&includeOptionGroups=true` loaded variants and option-group links separately for every menu item. Reused existing ordered bulk repository queries so the list path now loads each requested expansion in one batch and maps them back by item ID; single-item lookup behavior and response shape are unchanged.
+- Added assertions in `MenuItemServiceTest` that expanded lists use the batch queries and do not issue per-item relationship lookups. No mobile API or screen-state change was needed.
+- Verification: focused `MenuItemServiceTest` passed 8/8; PostgreSQL-backed `MenuApiIntegrationTest` passed 29/29 through migrations V1–V63; `git diff --check` passed.
+- Broader production work remains open: the live payment provider and settlement/reconciliation, durable SMS/email delivery and retries, durable image storage, explicit refund/void inventory-restock and legacy reconciliation policy, device pairing redemption, duplicate active inventory-barcode preflight before V63, production configuration/observability review, and compatibility migration for legacy unpaged order-list APIs.
+
+# 2026-10-07 — Enforce inventory item-code and barcode uniqueness under races
+- Added V63 partial unique index on `(restaurant_id, upper(barcode))` for non-deleted items, with a preflight exception if existing data contains duplicates. This makes barcode scans unambiguous at the database boundary.
+- Inventory code availability now includes soft-deleted rows to match its existing unique constraint. Named item-code and barcode unique violations return HTTP 409, including concurrent requests that both pass the initial check.
+- Added six-way API/PostgreSQL races for duplicate item codes and duplicate barcodes; each race stores exactly one item and returns one 201 plus 409 conflicts. Verification: focused race test 1/1; full `InventoryFlowIntegrationTest` 11/11; `git diff --check` passed. No API/mobile state change.
+- Deployment note: V63 intentionally stops if existing non-deleted inventory items have duplicate barcodes within a restaurant; inspect and resolve those rows before rollout rather than silently changing stock identifiers.
+
+# 2026-10-07 — Defuse whitespace-prefixed spreadsheet formulas in CSV exports
+- CSV cell escaping now looks past leading whitespace, Unicode space separators, control characters, and a BOM before checking formula prefixes. Negative decimal currency remains unescaped.
+- Added unit cases for space/tab, nonbreaking-space, and newline-prefixed formulas. Existing API integration coverage still downloads the CSV and verifies formula-like menu text is emitted as inert text.
+- Verification: `StatisticsServiceTest` 10/10; `StatisticsAndFraudIntegrationTest` 4/4; `git diff --check` passed. No API or mobile state changed.
+
+# 2026-10-07 — Align customer-code conflicts with the database constraint
+- Customer code availability now includes soft-deleted rows, matching `uk_customers_restaurant_code`. Duplicate-key races on that named constraint are translated to HTTP 409 instead of a generic 400.
+- `CustomerFlowIntegrationTest` now checks active duplicates, soft-deleted code reuse, and six concurrent create requests for one code; exactly one record remains and every loser receives 409.
+- Verification: focused PostgreSQL/API `CustomerFlowIntegrationTest` passed 6/6 (0 failures/errors/skips); `git diff --check` passed. Existing mobile POS only reads the paged customer list and has no customer create/update state, so no mobile change or screen was needed.
+
+# 2026-10-07 — Prevent schedules overlapping actual late clock-outs
+- `ShiftRepository.overlaps` now checks both the scheduled interval and the actual attendance interval. A shift that ran later than scheduled therefore blocks a new overlapping staff shift.
+- Added `scheduleCannotOverlapLateAttendance` in `KitchenAndShiftsIntegrationTest`, seeding a completed shift whose actual end is later than its schedule and verifying an overlapping schedule gets HTTP 409 without adding a shift.
+- Verification: focused late-attendance PostgreSQL/API test 1/1; full `KitchenAndShiftsIntegrationTest` 5/5; `ShiftServiceTest` + `ShiftPayServiceTest` 28/28; `git diff --check` passed. No API/mobile state changed, so no mobile screens or state changed.
+
+# 2026-10-07 — Stress same-table reservation booking under concurrency
+- Added an API-level PostgreSQL race to `ReservationFlowIntegrationTest`: six simultaneous reservation creates request the same table and time window. Exactly one must return 201; every other request must conflict (409); the database must contain exactly one assignment for that table.
+- The code path locks the selected table rows in stable ID order, then checks for overlapping assignments before saving. Verification: focused `concurrentReservationsCannotDoubleBookTable` integration test passed 1/1 with six competing requests; `git diff --check` passed. No API/mobile state or screens changed.
+
+# 2026-10-07 — Verify discounts stay immutable after payment closes an order
+- Extended `OrderLifecycleIntegrationTest` with an end-to-end case that fully pays an order with a percentage discount, then attempts to add, update, and delete discounts. All three mutations must fail with HTTP 400, and a follow-up read must preserve CLOSED status, the original discount row, discount total, and order total.
+- Verification: focused PostgreSQL/API `OrderLifecycleIntegrationTest` passed 9/9 (0 failures/errors/skips); `git diff --check` passed. This is test-only; no API/mobile state or screens changed.
+- Existing `OrderItemService` applies the shared editable-order guard to add/update/delete discount paths; this integration test now guards that behavior across the real paid/closed lifecycle.
+
+# 2026-10-07 — Serialize notification preference first writes
+- `NotificationPreferenceService` now locks the active user row before upserting notification preferences. This serializes the first-write check for the same user/channel/event and prevents concurrent requests from colliding on the unique preference key.
+- Added `NotificationPreferenceConcurrencyIntegrationTest`: concurrent enabled/disabled writes both return success and leave exactly one preference row.
+- Verification: targeted notification concurrency integration test passed 1/1; full backend `./mvnw -o verify -Dskip.unit.tests=true` passed 1,270 unit + 307 PostgreSQL integration tests (1,577 total, 0 failures/errors/skips); `git diff --check` passed. No mobile API/state changed, so no mobile screens or state were changed.
+- Notification delivery is still LOG_ONLY for SMS and lacks a durable outbox/retry path; this change only fixes concurrent preference storage.
+
+# 2026-10-07 — Complete recipe-linked modifier editing in the existing menu flow
+- The existing POS Menu → Options editor now loads linked option-group choices with `GET /option-groups/{id}?includeItems=true`, exposes active PREP_BATCH/SUB_RECIPE choices and usage quantity, and sends/retains `inventoryRecipeId` plus `inventoryRecipeQuantity` when creating or editing choices. Existing recipe links remain visible as unavailable if the linked recipe is no longer active, with an option to clear them. No screen was added.
+- Added mobile API/state coverage for option-group detail loading, recipe mapping round-trip, and retaining recipe IDs/quantities in the editor draft. Added a backend PostgreSQL/API assertion that option-group detail returns the linked recipe ID and usage quantity.
+- Verification: full mobile `:shared:jvmTest` passed 327/327 (0 failures/errors/skips); `MenuOptionInventoryRecipeApiTest` passed 3/3; backend `RecipeFlowIntegrationTest` passed 14/14; `git diff --check` passed.
+- The modifier-to-recipe assignment workflow is now present in the existing menu editor. Remaining larger production gaps include live payment/settlement, real SMS and durable notification retries, durable floor-plan storage, supplier management, device pairing redemption/authentication, and refund/void plus legacy stock policy.
+
+# 2026-10-07 — Revoke device pairing tokens on deactivation
+- Device status changes now lock the same device row used by pairing issuance and revoke all open pairing tokens whenever the device becomes inactive, retired, blocked, or enters maintenance. Pair-token issuance refreshes the locked entity after waiting, preventing a stale pre-lock status from allowing a token after deactivation commits.
+- Added a PostgreSQL/API race covering pre-existing and concurrently issued pairing tokens during retirement. It verifies no active token remains after both requests finish.
+- Verification: `DeviceManagementConcurrencyIntegrationTest` 3/3; `DeviceManagementServiceTest` 2/2; full `./mvnw -o verify` passed 1,270 unit + 306 PostgreSQL integration tests (1,576 total, 0 failures/errors/skips); `git diff --check` passed. API contracts did not change, so no mobile state or screens changed.
+- Device pairing still lacks token redemption/device-secret exchange and a device-authentication path. Remaining broader production blockers are real payment/settlement, real SMS and durable notification retries, durable floor-plan storage, supplier management, refund/void and legacy stock policy, and completion of the modifier-recipe operator workflow.
+
+# 2026-10-07 — Serialize device assignment and pairing-token rotation
+- Device management writes now acquire a pessimistic lock on the device row before replacing active assignments, issuing a pairing token, or revoking one. Pairing tokens are refused for inactive, retired, blocked, or maintenance devices.
+- Added `DeviceManagementConcurrencyIntegrationTest`: competing assignment writes leave one active assignment; competing token issues leave one active and one revoked token; a retired device cannot receive a token. Updated the device service unit fixture for the lock repository call.
+- Verification: focused Device PostgreSQL tests 2/2; `DeviceManagementServiceTest` 2/2; full `./mvnw -o verify` passed 1,270 unit + 305 PostgreSQL integration tests (1,575 total, 0 failures/errors/skips); `git diff --check` passed.
+- No mobile API contract or state changed, so no mobile screens/state were changed. Device pairing remains incomplete: the backend issues and revokes pairing tokens but has no token-redemption endpoint/device-secret exchange or device-authentication path. That needs implementation and API/device-client coverage before device onboarding is production complete.
+
+# 2026-10-07 — Redact OTP data from SMS logs; confirm Supplier module gap
+- `SmsMessageService` no longer logs destination phone numbers or SMS bodies (including password-reset and phone-verification OTPs). It logs only delivery mode and that sensitive fields were omitted. Updated log-capture assertions in `back-end/src/test/java/pos/pos/unit/auth/service/SmsMessageServiceTest.java`.
+- Confirmed there is no standalone Supplier package/controller/entity/repository or supplier-management test suite. Inventory items only carry free-text `supplierName` and `supplierSku`; supplier records, purchase orders, and receiving against supplier documents do not exist.
+- Verification: `SmsMessageServiceTest` passed 6/6; full `./mvnw -o verify` passed 1,270 unit + 303 PostgreSQL integration tests (1,573 total, 0 failures/errors/skips); `git diff --check` passed. Payment key contract and mobile state/API tests remain green from this turn. No mobile screens or state were changed.
+- Messaging remains not production ready: SMS is still LOG_ONLY and email errors are only logged without durable outbox/retry. Supplier management remains a product/module gap rather than an existing service to rate.
+
+# 2026-10-07 — Require idempotency keys for payment mutations
+- `OrderWriteFilter` now rejects payment take, refund, and void POSTs without an `Idempotency-Key`, while its existing transactional replay and restaurant serialization still return the original response for retries. Updated the refund/void API descriptions. Existing mobile `PaymentApi` already sends a key and `PaymentScreenModel` keeps the same key for uncertain retries, so no mobile code change was necessary.
+- Added API checks that missing keys produce no payment/refund/void ledger changes and a six-way same-key payment retry creates one payment and replays the same response. Updated the integration request helper to generate keys for legacy payment test calls while retaining an explicit no-key helper.
+- Verification: `PaymentFlowIntegrationTest` passed 12/12; mobile `PaymentApiTest`/`PaymentStateTest` passed (3 tests); full backend `./mvnw -o verify` passed 1,270 unit + 303 PostgreSQL integration tests (1,573 total, 0 failures/errors/skips); `git diff --check` passed.
+- Payment production blockers remain a real gateway authorization/capture/refund/void integration plus settlement/reconciliation, and an operational archive/retention plan for the idempotency replay table that preserves retry safety.
+
+# 2026-10-07 — Block inventory movements and counts at inactive locations
+- `InventoryMovementService.applyMovement` now refuses movements at inactive locations; inventory count creation, start, and approval also require an active location. This prevents receipts, waste, transfers, and zero-variance approvals from changing/auditing stock in deactivated storage.
+- Added a PostgreSQL/API regression covering deactivated-location receipt, waste, transfer, count approval, unchanged stock/history, and preserved COMPLETED status in `back-end/src/test/java/pos/pos/integration/inventory/InventoryFlowIntegrationTest.java`. Expanded existing `InventoryUnitConversionTest` to round-trip every supported mass pair and check all same-unit pairs.
+- Verification: `InventoryUnitConversionTest` 6/6; `InventoryFlowIntegrationTest` 10/10; `RecipeFlowIntegrationTest` 14/14; full `./mvnw -o verify` passed 1,270 unit + 301 PostgreSQL integration tests (1,571 total, 0 failures/errors/skips); `git diff --check` passed. No mobile contract changed, so no mobile state/screens changed.
+- Inventory still needs an explicit business policy for returns/refunds and a reconciliation plan for legacy stock data; no automatic stock return was introduced because that would assert an unapproved food-waste/reuse policy.
+
+# 2026-10-07 — Validate table availability party size and cover menu section concurrency
+- Added positive `partySize` validation to the three table availability routes and service methods. Added unit regression coverage and PostgreSQL/API coverage for valid capacity filtering and 400 responses for zero/negative values: `back-end/src/main/java/pos/pos/tables/controller/RestaurantTableController.java`, `back-end/src/main/java/pos/pos/tables/service/RestaurantTableAvailabilityService.java`, `back-end/src/test/java/pos/pos/unit/tables/service/RestaurantTableAvailabilityServiceTest.java`, and `back-end/src/test/java/pos/pos/integration/tables/TableAvailabilityApiIntegrationTest.java`.
+- Added a four-thread PostgreSQL/API concurrency test proving simultaneous creation of menu items with the same online section name creates one section; removed a duplicate repository import: `back-end/src/test/java/pos/pos/integration/menu/MenuApiIntegrationTest.java`, `back-end/src/main/java/pos/pos/menu/repository/OnlineMenuSectionRepository.java`.
+- Full `./mvnw -o verify` passed: 1,268 unit tests and 300 PostgreSQL integration tests, no failures/errors/skips. `git diff --check` passed. No mobile API contract changed, so mobile state and screens were not modified.
+
+# 2026-10-07 — Serialize online-menu section creation
+- Follow-up to the grouped section-count query: `OnlineMenuService.resolveSection` now requires the caller's transaction, locks the restaurant before creating a missing section, and rechecks by normalized name after locking. This coordinates concurrent menu-item writes across sections and avoids a unique-index conflict when both callers initially see no section.
+- Added a unit regression for the concurrent-winner recheck. Verification: `OnlineMenuServiceTest` passed 11/11; PostgreSQL `MenuApiIntegrationTest` passed 28/28; `git diff --check` passed. No mobile state or screens changed.
+- Remaining production blockers are real payment/settlement, durable email retry/outbox and real SMS, durable floor-plan storage, refund/void and legacy stock reconciliation policy, and completing the existing modifier-recipe operator workflow.
+
+- Current known production blockers remain live payment/settlement, durable email retry/outbox and real SMS, durable floor-plan storage, refund/void and legacy stock reconciliation policy, and completing existing modifier-recipe operator workflow.
+
+# 2026-10-07 — Page customer reservation history
+- Replaced the unbounded customer reservation-history response with `PageResponse`, defaulting to 50 and capped at 200. The service pages reservation IDs first, then loads the bounded page with its table assignments and restores deterministic `reservationStart DESC, id DESC` ordering. Added V59 partial index `(restaurant_id, customer_id, reservation_start DESC, id DESC)` for rows with a customer.
+- Added PostgreSQL/API checks for newest-first pages, next-page contents, invalid page/size, and cross-restaurant access; updated the customer lifecycle test for the paged `items` response. No mobile code calls this endpoint, so mobile state/screens did not need changes.
+- Verification: focused `CustomerFlowIntegrationTest` passed 5/5; full backend `./mvnw -o verify` passed 1,251 unit + 293 PostgreSQL integration tests (1,544 total, 0 failures/errors/skips); `git diff --check` passed.
+- Remaining production blockers remain: real payment gateway/settlement and reconciliation, SMS/email delivery with durable queue/retries and real routing, production object storage for floor plans, sales-driven inventory policy/source location/refund handling, and report execution/scheduling/delivery.
+
+# 2026-10-07 — Customer list paging and mobile order-catalog synchronization
+- Replaced the unbounded customer list query with a `PageResponse` contract on `GET /restaurants/{restaurantId}/customers`, defaulting to 50 records and capping requests at 200 with stable first-name/last-name/id ordering. Added a partial composite index for active customer pages (`V58`) and pagination metadata, sorting, size-cap, invalid-input, and tenant authorization tests.
+- Updated the existing mobile order-catalog API/repository to load bounded customer pages, keep only active customer choices, and reject malformed pagination metadata. No screen was added.
+- Verification: full backend `./mvnw -o verify` passed 1,251 unit + 292 PostgreSQL integration tests (1,543 total, 0 failures/errors/skips); full shared `:shared:jvmTest --rerun-tasks` passed 323 tests (0 failures/errors/skips); focused customer integration passed 4/4 after V58 was added; focused `OrderCatalogTest` passed; `git diff --check` passed.
+- Production blockers remain: real payment processing, durable SMS/email delivery, production object storage, sales-driven inventory consumption and refund policy, and report execution/scheduling.
+
+# 2026-10-07 — Sales report date/shift validation and full-suite verification
+- `MySalesService` now rejects a requested shift that does not overlap the selected local calendar date; this prevents an unrelated shift from silently changing the report range while leaving the selected date in the response. Added a unit regression and PostgreSQL/API assertions for payment totals, tips, top items, selected-shift filtering, cross-date rejection, manager viewing an employee, and waiter denial for another employee.
+- Verification: `./mvnw -o verify` passed 1,251 unit tests and 291 PostgreSQL integration tests (1,542 total, 0 failures/errors/skips); `:shared:jvmTest --rerun-tasks` passed 322 tests (0 failures/errors/skips); focused `KitchenAndShiftsIntegrationTest` passed 4/4; focused `MySalesServiceTest` passed 6/6; `git diff --check` passed.
+- No mobile API contract changed and no screens were added. Existing mobile shift state fix (clear stale weekly pay on week change) was verified earlier in this goal. Production still depends on real payment processing, durable SMS/email delivery, durable floor-plan storage, report scheduling/execution, and an inventory refund policy.
+
+# 2026-10-07 — Full-suite verification after OTP locking
+- Re-ran the full backend `./mvnw -o verify` after the OTP row-lock change and report-refund correction: 1,250 unit tests plus 291 PostgreSQL integration tests passed (1,541 total; 0 failures/errors/skips). This includes both concurrent OTP tests and the extended reporting/fraud test.
+- `git diff --check` passed. Production still cannot be signed off until the real payment provider, durable SMS/email delivery, durable floor-plan storage, report execution/scheduling, and inventory refund policy are resolved.
+
+# 2026-10-07 — Serialize SMS one-time-code attempts
+- Added a pessimistic write lock to the shared active OTP lookup, so concurrent bad password-reset or phone-verification codes cannot lose failed-attempt increments or bypass the five-attempt limit.
+- Added PostgreSQL/API races with eight simultaneous wrong codes for password reset and phone verification; both verify exactly five failures, an invalidated code, and rejection of the original correct code. Focused integration verify passed 15/15 tests across `PasswordIntegrationTest` and `PhoneVerificationIntegrationTest`; `git diff --check` passed.
+- No request/response contract changed, so mobile state and screens were unchanged. The complete backend suite has not been rerun after this lock change.
+
+# 2026-10-07 — Statistics respect refunded tips
+- Updated report totals, payment-method summaries, and per-staff tips to apply the same refund allocation as payroll: refunds reduce the bill first, then reduce tips, never below zero.
+- Extended `StatisticsAndFraudIntegrationTest` with a fully refunded bill-plus-tip payment and assertions for retained tips, net collections, staff totals, and the additional large-refund alert. `StatisticsServiceTest` passed 10/10 and PostgreSQL `StatisticsAndFraudIntegrationTest` passed 4/4.
+- The focused Maven verify completed successfully. No API field changed, so mobile state stayed unchanged and no screen was added.
+
+# 2026-10-07 — Protect manager-only discounts through order PATCH
+- Fixed `OrderSupport.replaceDiscounts`: replacing or clearing existing discounts now requires the same manager/restaurant-rule permission as the dedicated discount endpoints. This closed a bypass where a waiter with `ORDER_UPDATE` could PATCH `discounts: []` and remove manager-only discounts.
+- Added a PostgreSQL/API assertion in `OrderLifecycleIntegrationTest` that the waiter gets 403 and the two stored discounts plus $16.60 order total remain unchanged. Focused discount/pricing units passed 17/17; order lifecycle API tests passed 8/8.
+- Full backend `./mvnw -o verify` passed 1,250 unit + 289 PostgreSQL integration tests (0 failures/errors/skips); `git diff --check` clean. Mobile API/state contract did not change.
+
+# 2026-10-07 — Clear stale weekly pay in My Shift state
+- Fixed `ShiftScreenModel.date`: changing the selected week now clears the previous pay report with the board. Previously, a failed board reload could leave last week's wages/tips visible under the new dates on the existing My Shift screen.
+- Added `ShiftScreenModelTest.changingWeekClearsOldPayWhenTheNewBoardFails`; focused screen-model tests passed 8/8 and full shared `:shared:jvmTest` passed 322/322 (0 failures/errors/skips). No screen was added.
+- Backend contract unchanged. Backend payroll refund regression remains 4/4; the most recent complete backend run passed 1,250 unit + 289 PostgreSQL integration tests.
+
+# 2026-10-07 — Payroll refund allocation tested across cases
+- Expanded `KitchenAndShiftsIntegrationTest.refundedTipsAreRemovedFromStaffPay` to verify bill-only refunds retain all tips, partial refunds beyond the bill reduce tips proportionally, and full refunds remove all tips; the combined report totals the retained $1.50. Focused PostgreSQL/API shift suite passed 4/4.
+- Recompiled and reran the current shared Kotlin JVM suite with `:shared:jvmTest --rerun-tasks`: 321 tests, 0 failures/errors/skips. Existing shift API/state models already consume the same decimal `tips` field; no mobile state or screen change was needed.
+- Reconfirmed operational notification delivery is incomplete: email/SMS operational notifications persist as QUEUED with no worker; `SmsMessageService` is LOG_ONLY, and queued events do not establish provider recipient routing. Keep this as a production blocker until provider and routing contracts exist.
+
+# 2026-10-07 — Payroll excludes refunded tips
+- Updated `StaffPayRateRepository.tips` to subtract the refunded portion allocated to tips after the bill amount is fully refunded; added a PostgreSQL/API regression that pays $6 + $1 tip, refunds $6.50, and confirms staff pay shows $0.50 in tips.
+- Verification: focused `KitchenAndShiftsIntegrationTest` passed 4/4; full backend `./mvnw -o verify` passed 1,250 unit tests + 289 PostgreSQL integration tests (0 failures/errors/skips); `git diff --check` clean.
+- No API contract or mobile state changed; no screens added. Production still needs real payment-provider, SMS/email delivery, and floor-plan storage configuration before those integrations can be treated as live-ready.
+
+# 2026-10-07 — Booking goodwill refunds are serialized
+- Added pessimistic write locks to kept booking-payment lookup and a locked payment-list query used during cancellation/decline/no-show settlement. Goodwill refunds now lock reservation-payment rows and pre-order refunds use the existing pre-order row lock before checking the remaining amount.
+- Added a six-request PostgreSQL/API race against a $50 kept deposit, with each caller requesting $30. Exactly one succeeds, and the persisted refund remains $30. Added a unit case for the retained pre-order goodwill path.
+- Verification: full backend `./mvnw -o verify` passed 1,250 unit tests + 288 PostgreSQL integration tests (0 failures/errors/skips); focused reservation flow passed 7/7 and booking-money unit tests 8/8; `git diff --check` clean. Shutdown logged test-container/schema cleanup connection warnings, but the build completed successfully.
+- No mobile contract or state change was needed. No screens were added. External production payment, notification-delivery, and floor-plan storage integrations remain open.
+
+# 2026-10-07 — Invalid goodwill refund line IDs now return 400
+- Hardened `BookingMoneyService.goodwill`: null/blank line IDs and malformed UUIDs now map to the normal “payment is not on the booking” client error instead of escaping as an unexpected exception.
+- Added unit edge cases and a PostgreSQL/API regression for malformed regular-payment and pre-order line IDs. Verification: `BookingMoneyServiceTest` 7/7 and `ReservationFlowIntegrationTest` 6/6 passed; `git diff --check` clean. The integration run logged expected SMTP connection-refused messages because no local SMTP server was running; the test cases passed.
+- No API contract or mobile state changed. Production external delivery/storage/payment integrations remain outstanding.
+
+# 2026-10-07 — Concurrent payment refunds stay within captured balance
+- Added a six-way PostgreSQL/API refund race in `PaymentFlowIntegrationTest`: six tills request $10 refunds against a $25 captured payment. Exactly two succeed; the persisted summary retains $5 refundable, with paid/refunded totals consistent.
+- Verification: focused `PaymentFlowIntegrationTest` passed 10/10, including charge/refund concurrency and idempotent retries; `git diff --check` clean. The complete backend run immediately before this test addition passed 1,249 unit + 285 integration tests; the newly added race case was separately executed against PostgreSQL.
+- No API contract or mobile behavior changed. Production-provider setup remains required before card processing can receive production sign-off, along with external notification delivery/retries and durable floor-plan storage.
+
+# 2026-10-07 — Menu item import has PostgreSQL/API coverage
+- Added two end-to-end cases to `MenuApiIntegrationTest`: duplicate source IDs import exactly one independent dish copy with ingredients, variant, and option-group link preserved; foreign-restaurant and missing source items return 4xx without a partial target copy.
+- Verification: `MenuApiIntegrationTest` passed 27/27; `MenuItemImportServiceTest` passed 2/2; complete backend `./mvnw -o verify` passed 1,249 unit + 285 PostgreSQL integration tests (0 failures/errors/skips); `git diff --check` clean.
+- No production implementation or API contract changed, so no mobile state update or screen work was needed. The broader goal remains active: production payment-provider setup, SMS/email delivery and durable retries, durable floor-plan storage, and remaining Reports/Auth notification hooks are still release blockers.
+
+# 2026-10-07 — KDS inventory/refund rule verified end to end
+- KDS ticket completion, item completion, and waiter pickup consume recipe stock through the same order-locking workflow as POS fulfillment. A duplicate completion is idempotent; insufficient stock rolls back fulfillment and stock together; simultaneous POS/KDS completion creates one movement.
+- Codified and tested the accounting rule for post-fulfillment refunds: refunding/voiding payment does not automatically restock already-prepared ingredients. A served line cannot be individually voided; whole-order void retains the SALE_CONSUMPTION movement. A real physical correction remains an explicit inventory movement.
+- Verification: complete backend `./mvnw -o verify` passed 1,249 unit tests + 283 PostgreSQL integration tests (0 failures/errors); focused `RecipeFlowIntegrationTest` passed 14/14; mobile `:shared:jvmTest` has 321 passing tests from the current shared-state verification and required no source change for this backend-only behavior; `git diff --check` clean.
+- No mobile screens or state changes were needed because the API contract did not change. Production blockers remain: real payment-provider integration/configuration, production SMS/email providers and durable notification retries, durable production floor-plan storage, and missing Reports/Auth notification hooks. Keep overall production readiness below 100% until the external integrations and remaining TODOs are completed.
+
+# 2026-10-07 — KDS fulfillment now consumes recipe inventory
+- Fixed KDS whole-ticket completion, item completion, and waiter pickup so every newly fulfilled order line goes through `InventorySaleConsumptionService`; KDS writes now load the order through its transactional pessimistic-lock path, matching POS fulfillment serialization.
+- Added PostgreSQL API integration coverage in `RecipeFlowIntegrationTest`: all three KDS completion actions consume stock once, repeating an item completion does not duplicate movement, insufficient stock rolls order and inventory back, and simultaneous POS/KDS completion of the same line produces only one consumption movement.
+- Verified focused RecipeFlow integration suite after the concurrency addition: 13 tests passed. Full backend `./mvnw -o verify` passed 1,249 unit +281 PostgreSQL integration tests; the updated focused suite passed 13/13, covering all 282 current integration cases across the full and focused runs. Mobile `:shared:jvmTest` remains 321/321 passing and Gradle marked it up to date because no mobile contract changed. `git diff --check` passed.
+- No mobile state change was needed for this backend internal wiring, and no screens were added.
+- Still open for production sign-off: real payment provider, production SMS/email delivery and durable notification retry/outbox, durable production floor-plan storage, and the business rule for inventory reconciliation after post-fulfillment refund/void. Reports and auth notification capabilities also remain TODO. Keep overall production status below 100% until these are addressed.
+
+## 2026-10-07 — Notification reliability and catalog accuracy
+- Corrected the notification capability catalog: Inventory, Payment, Shift, and Recipe now report live repository-change events; Reports remains TODO because report execution/scheduling/delivery hooks are missing. Added regression coverage for the advertised event codes.
+- Extended `NotificationEntityResolver` to traverse scoped parent relationships for PaymentTransaction→Payment, ShiftBreak→Shift, InventoryCountLine→InventoryCount, InventoryLevel→location/item, and RecipeComponent→Recipe. Added direct tests that verify topic, generated event code, and restaurant scope.
+- A full backend run exposed JDBC pool starvation: the notification publisher called a `REQUIRES_NEW` dispatch from `afterCommit`, while the originating request still held its connection. Notification rows are now persisted in the originating transaction's `beforeCommit`; SSE broadcasts remain after commit. Extended the stock-concurrency integration test to assert all 20 movement notifications persist.
+- Verified: complete backend `./mvnw -o verify` passed 1,249 unit + 279 PostgreSQL integration tests (0 failures/errors); standalone concurrent inventory test passed with feed assertions; notification catalog/resolver tests passed 3/3; mobile `:shared:jvmTest` passed 321 tests; `git diff --check` clean.
+- Mobile contract shape did not change, so no mobile source/state changes or new screens were needed this turn.
+- Still open: real payment provider, production SMS/email delivery and durable notification retry/outbox, durable production floor-plan storage, and explicit post-fulfillment refund/void inventory reconciliation. Reports and auth notification capabilities remain TODO. Do not call the whole backend production-ready yet.
 # Agent Memory — POS
+
+## 2026-10-06 (Codex) — Inventory oversell race coverage
+- Expanded the PostgreSQL concurrency integration test: after 20 concurrent receipts establish 5 kg, two simultaneous 3 kg deductions must yield exactly one 201 and one 409, leaving 2 kg.
+- Verified the expanded scenario on current source with `InventoryFlowIntegrationTest#concurrentMovementsAreAtomicAndCannotOversell` (1/1 passed). The full suite had passed immediately before this test-only expansion: 1,244 unit + 273 PostgreSQL integration tests, no failures. Production code is unchanged since that full run.
+- `git diff --check` passed. Still no inventory sale-consumption flow; location selection and order edit/reopen/refund reconciliation rules remain required.
+
+## 2026-10-06 (Codex) — Atomic inventory balances
+- Replaced `InventoryLevelService.upsertLevel` read/modify/save with a PostgreSQL `INSERT ... ON CONFLICT` delta update in `InventoryLevelRepository.applyMovementDelta`. Concurrent receipts and transfers now update one balance atomically, including when the first movements race to create the row.
+- The atomic statement prevents negative balances and returns 409 for an insufficient movement; transaction rollback removes its movement record too.
+- Added API/PostgreSQL coverage for 20 concurrent first receipts totaling 5 kg and rejection of negative movements with no stock or insufficient stock. `InventoryFlowIntegrationTest` passed 6/6.
+- Full `./mvnw -o verify` passed 1,244 unit tests plus 273 PostgreSQL integration tests (0 failures/errors/skips). `git diff --check` passed. The mobile contract did not change.
+- Recipe-to-sale stock consumption remains absent. `SALE_CONSUMPTION` has no configured item/branch source-location policy; implementing a full sale flow still needs that policy and reconciliation rules for reopen, line edits, and refunds. Real payment and production storage/notification integrations also remain open.
+
+## 2026-10-06 (Codex) — Recipe unit costing hardening
+- Fixed recipe inventory costing so ingredient quantities convert into the stock item's base unit before applying `costPerUnit`; mass (g/kg/oz/lb) and metric volume (ml/l) are supported, identical units pass through, and unsupported/ambiguous conversions are rejected.
+- Corrected nested recipe costing to prorate a child recipe's batch cost by its yield quantity and unit. Recipe save validation now rejects incompatible ingredient/stock and sub-recipe/yield units.
+- Added conversion unit tests and recipe API/database integration cases for 250 g at cost/kg, incompatible units, and a four-portion nested recipe yield. A final focused conversion rerun passed 4/4 after adding null-unit rejection.
+- Verification: full backend `./mvnw -o verify` passed 1,244 unit tests and 271 PostgreSQL-backed integration tests (0 failures/errors/skips); subsequent focused unit rerun also passed 4/4. `git diff --check` passed.
+- No mobile API fields/screens changed; existing recipe state already uses the same contract. Broader production blockers remain: real payment-provider setup, durable production floor-plan storage, automatic inventory deduction when orders sell, and live email/SMS provider configuration. These changes do not constitute whole-backend production sign-off.
+- Traced order fulfillment and close paths for the next inventory blocker: `SALE_CONSUMPTION` and order-line movement linkage exist, but no recipe-to-sale deduction is wired. A branch can have multiple inventory locations, with no configured default source location, so safely completing this requires a location policy plus idempotent handling for line edits/reopen/refunds; did not guess a stock source or apply a partial deduction.
+
+## 2026-10-06 (Codex) — Backend production-readiness audit
+- Performed a source-level audit of backend domain modules, controllers, security, configuration, migrations, and test inventory on the feature/orders working tree. No code or tests were changed or run.
+- Audit result: backend estimated 47% production ready overall; payment-provider integration, booking test payments, POS inventory depletion, queued external notifications, production-profile activation, file storage, and thin domain integration coverage remain material release blockers.
+- Detailed ranked ratings and file evidence are in the Codex task “Rate POS Services” (referenced conversation audit). Re-audit after uncommitted changes are finalized and real integrations/deployment config are in place.
+
+## 2026-10-06 (Claude, feature/orders) — Backend finished and hard-tested; app state for every remaining feature (no screens)
+**The user asked for this without questions:** finish the backend and test everything hard (unit + integration, edge cases like very long names), finish the mobile state management (no screens), and delete the root images (5/7/8/9.png, now gone). A recheck table of decisions went to the user in chat.
+
+**Backend (V55 used; next free migration V56):**
+- **Payments** (`payment/`):
+  - `PaymentService` (take, refund, cancel) and `PaymentCalculator` (paid, tips, refunded, balance due with cash rounding).
+  - Receipt and payment codes are random (`PaymentCodes`).
+  - `OrderPaymentController` and `BranchPaymentController`. Staff without ORDER_AUDIT only see their own payments.
+- **Statistics** (`report/`): `/statistics/overview|sales|staff|reports`, needs REPORTS_READ.
+- **Fraud** (`fraud/`): rules run as JDBC queries; alert reviews go in `fraud_alert_reviews`; FRAUD_READ / FRAUD_REVIEW. The thresholds are settings (`PATCH /settings/fraud-checks`); payment settings are at `PATCH /settings/payments`.
+- **Order guards** (`OrderSupport`):
+  - No void or cancel once money was taken.
+  - Discount rules apply.
+  - Auto-fire to the kitchen when the setting is on.
+- **Hardening:**
+  - `GlobalExceptionHandler` rewritten: SQL states and entity rules become 400/409, plus 413/415/405.
+  - A 1 MB body cap (`config/web`).
+  - `@Valid` on every body, and `@Size` on all free text.
+  - Page caps.
+  - Mail failures are logged instead of failing a staff registration.
+  - The refresh token limit is 4096.
+- **Tenant isolation:** users and custom roles are scoped to a restaurant (`roles.restaurant_id`, `RoleHierarchyService`). Staff registration takes a restaurant and default branch.
+- **This part of the session:**
+  - Inventory movements are paged (`page`, `size` ≤ 500).
+  - **Low stock never worked** (levels never got a reorder quantity). It now falls back to the item's reorder point and par level, and skips inactive items and places.
+  - Audit log entries carry `actorName`.
+  - Device notes are limited to 2000 characters.
+  - Recipes: description ≤ 2000, waste < 100%, and sub-recipe cycles are refused at save (`RecipeService.assertNotInside`).
+  - The branch pre-order list covers at most 62 days.
+  - Customer email must be valid, and notes ≤ 2000.
+- **Tests:** the final full `./mvnw -o verify` passed: 1226 unit tests + 268 ITs, 0 failures. New ITs: payment flow, robustness fuzz, tenant isolation, staff/roles isolation, statistics/fraud, order lifecycle, inventory (incl. low stock/barcode/paging), kitchen & shifts, bookings, customers, recipes, pre-orders. ITs run on podman (see AGENTS.md).
+
+**App (state only, all registered in `appModule.kt`; screens still to build):**
+- `pos/payment`: take payments with request keys so a retry doesn't charge twice; refunds, cancels and receipts.
+- `statistics` and `fraud`.
+- Admin Hub:
+  - `admin/people`: `StaffScreenModel` (search with a 300 ms debounce, paging that keeps pages, add/edit/roles/on-off/reset/remove, never yourself) and `RolesScreenModel` (built-in roles read-only; you can only grant permissions you hold).
+  - `admin/inventory`: `InventoryScreenModel` (stock, items, suppliers derived from supplier names, places, history, moves, counts) and `RecipesScreenModel`.
+  - `admin/devices`: devices, printers, pairing codes shown once, assignments.
+  - `admin/audit`.
+- `pos/reservations/preorder`: `PreOrderScreenModel` (take/change/cancel/send a booking's pre-order, and the kitchen list).
+- Fixes found by tests:
+  - A bare `async` inside `launch` escaped the catch, so it is now wrapped in `coroutineScope`.
+  - A refresh during a save dropped the answer, so writes now use a sign-in token.
+- 318 jvm tests pass; `:desktopApp:compileKotlin` and `:shared:compileAndroidMain` both OK.
+
+**Open:**
+- Screens for all the state modules above.
+- Payments are still in test mode.
+- Inventory isn't taken off stock when items sell.
+- The customer list isn't paged.
+- `RestaurantsWorkspaceScreen.kt` shows as deleted in git; it was already like that, not this session.
+- Nothing committed.
+
+## 2026-09-28 (Claude, feature/orders) — Backend and app relaunched and checked (~22:50)
+- I stopped the backend (pid 11864) and rebuilt the jar; no backend source was newer than it. It started again as pid 69382 with the MailHog env vars. Flyway was up to date (V54) and the log had no errors.
+- Authenticated checks all returned 200: auth/me, orders, reservations summary, table-layout, floor-layouts, tables, `/menus`, KDS board and pos-timing, shifts (team and mine), shift pay, my sales, order history, and settings. Note: the menu API is `/menus` (no restaurant prefix). `branches/{b}/tables/layout` isn't a route; it's read as a table id and gives a 500.
+- The desktop app was relaunched (MainKt pid 70446) with no errors in its log. No code changes.
+
+## 2026-09-28 (Claude, feature/orders) — App relaunched
+- At ~21:02 I started the desktop app (`:desktopApp:run`, MainKt pid 56185; no rebuild needed). The backend (`back-end/target` jar, pid 11864, started 18:00) and `pos-db`/`pos-mailhog` were already running. No code changes.
+
+## 2026-09-28 (Claude, feature/orders) — Kitchen Status slim tiles; My shift narrower right column
+- **Kitchen Status:** the 4 big stat cards are now `CompactStat` tiles (50 dp: Ready to serve, Cooking, Waiting, Taking long, with little text). The user wants the lanes to get the space.
+- **My shift (desktop):** the left/right weights went from 0.6/0.4 to 0.7/0.3. The Coming up / Worked and paid rows are compact (36 dp date block, 12/10 sp). Week-tile times no longer get cut off.
+- Compiles; the app was relaunched. No tests run.
+
+## 2026-09-28 (Claude, feature/orders) — Workspace picker: smaller five cards, centred
+- **Five choices** (super admin): the cards are 236×212 (were 280×252) with a 16 dp gap. The picture is 72 dp, the title 17 sp, the subtitle 12 sp, and the arrow 22 dp.
+- **Two-row layouts** (four with Fraud, or five) now sit vertically centred in the window (Column min height = window height, `Arrangement.Center`, still scrollable). The user asked for them lower on the screen.
+- `workspace/ui/WorkspacePickerScreen.kt` only; the three- and four-card layouts are unchanged. Compiles; the app was relaunched.
+
+## 2026-09-28 (Claude, feature/orders) — Admin shifts: edge "Add shift", smaller, one toolbar
+- **The user asked for three changes:**
+  - The Add shift button should be the same one Tables uses.
+  - Everything was too big.
+  - There should be only one navbar row, not two.
+- **Add shift is now `RightEdgeActionButton`.** It's draggable on the right edge, like "Add table" and "Reservation", and only shows for SHIFT_MANAGE.
+- **One toolbar row** in `ShiftAdminCalendar.kt`:
+  - Left to right: title, Schedule/Hours & pay tabs (196 dp), a view dropdown (Team/Timeline/Month), ‹ period ›, a Today icon, then search, role and status.
+  - It scrolls sideways below 1200 dp.
+  - The colour key was removed.
+  - `HoursAndPay.kt` got the same single row, with Week/Month as a dropdown.
+- **Smaller:**
+  - A new `CompactStat` in OverviewKit (50 dp tiles) replaces the big stat cards on both Admin shift pages.
+  - Team view: name column 190, row minimum 54, day header 50, avatar 28, blocks 11/9 sp.
+  - Timeline: 42 dp per hour.
+  - Month: row minimum 92.
+- Compiles; the app was relaunched. No tests run.
+
+## 2026-09-28 (Claude, feature/orders) — Admin shift calendar redesigned; demo data for the new screens
+**The user liked the new screens but called the Admin Hub shift calendar (Codex's) "terrible".** They asked for a modern one: people on the left with the weekdays across, or hours on the left with the weekdays across; adding people with a + inside the calendar; scrolling when needed.
+- **`pos/shifts/ShiftAdminCalendar.kt` was rewritten.** Same entry point and the same dialogs (ShiftDetails / ShiftEditor / ShiftActionDialog). Row 1: title with the Schedule / Hours & pay switch, then search, role, status and Add shift. Row 2: Team / Timeline / Month tabs, ‹ period ›, This week, and a colour key. Below that, 4 stat cards (On duty now, Planned, Worked, Needs review; the last one filters when clicked).
+  - **Team:** people rows × 7 day columns. Day headers show a count of people and hours, with today in a green circle. Shift blocks are coloured by state (Planned blue, On duty solid green with a pulsing dot, On break amber, Worked grey, No clock-in amber outline, Missed red). Every cell has a dashed "+" (faint, clear on hover) that opens the editor for that person and day. A "Put someone on a shift" row sits at the end. The grid scrolls both ways (min 132 dp per day).
+  - **Timeline:** hours × weekdays, blocks at their real times; overlapping shifts sit side by side. It has a red now line, and a hover "+ HH:00" on each hour adds a shift at that time. It opens near the first shift, runs 06–24 by default, and stretches past midnight when needed.
+  - **Month:** weeks × weekdays with up to 3 shifts per day and "+N more" (opens that week in Team). A "+" appears on hover.
+  - The right-hand "selected day" panel is gone (the details dialog replaces it).
+- **Demo data (local DB only):** made by the scratchpad script `seed_demo.py`, which records every id in `seed_manifest.json` in the same folder, so it can be undone.
+  - KDS stations Grill / Cold & lunch / Bar / Desserts, with routings for restaurant 1's menu.
+  - 7 open table orders (T02–T08) sent to the kitchen, in every state: ready (one waiting 7 min), partly ready, cooking (a T06 rush at 26 min), waiting. They're split between Super Admin and Demo Waiter.
+  - 49 closed orders with payments and tips ("Demo data 2026-09-28" in the notes, reference DEMO-…): Super Admin today (10, linked to today's shift) and last week, Demo Waiter today and the past 6 days.
+  - Shifts: Super Admin's shift left open since 27 Sep was closed at +5h35. Super Admin got last week's shifts, today's open shift (09:58, meal 13:30–14:00) and 6 planned ones, with a wage of 14.00. Today's team: Kitchen, Admin and Owner finished; Co-Owner and Manager on duty; Waiter on a break.
+  - Restaurant 1's menu has no pizzas or coffee (those belong to restaurants 2 and 3). The burger needs a bun and the ribeye a temperature.
+- Compiles; the app was relaunched. No tests run (user rule).
+
+## 2026-09-28 (Claude, feature/orders) — Kitchen Status, My shift, My Sales and Admin Hours & pay built (UI first, tests not run)
+**User asked Claude (not Codex) to fully build these three POS screens,** focusing on the look ("same as we have done till now"), with testing after they review it. Decisions (asked via question):
+- **Pay = worked hours × hourly wage + tips.** Managers set each person's wage in Admin Hub.
+- **Shift: POS = my own shift. Admin Hub = everyone.** Both use the same data.
+- **Kitchen Status is the waiters' view in POS,** not a copy of KDS.
+
+**DB V54 (applied locally):**
+- New table `staff_pay_rates` (user_id PK, restaurant_id, hourly_rate, updated_at/by).
+- `settings.kitchen_slow_after_minutes` (default 20), `kitchen_ready_waiting_minutes` (5) and `clock_in_early_minutes` (120, replacing the hard-coded 2 h in `ShiftService`).
+- **Next free migration: V55.**
+
+**Backend:**
+- `ShiftPayService` and `StaffPayRateRepository` (JDBC).
+  - `GET /shifts/pay?from&to&mine` (max 62 days; mine = SHIFT_SELF, team = SHIFT_MANAGE).
+  - `PUT /shifts/pay-rates/{userId}` (SHIFT_MANAGE, audited as STAFF_PAY_RATE_SET).
+  - Clock-in copies the current wage into `shifts.hourly_rate`. Setting a first wage fills earlier worked shifts that had none. Tips come from payments on orders the person created, in the restaurant currency.
+- `ShiftDtos.Board` has `clockInEarlyMinutes`.
+- KDS additions:
+  - `POST /kds/tickets/{id}/picked-up` (KDS_UPDATE or ORDER_UPDATE; only READY items become FULFILLED).
+  - `GET /kds/pos-timing` (KDS_READ).
+- Settings: `PATCH /settings/kitchen-status` and `/settings/shifts` (both are also restored by reset).
+- **The WAITER role now has KDS_READ.**
+
+**App:**
+- `core/components/OverviewKit.kt` holds the shared look (stat card, panel, tabs, chips, empty states), copied from the Reservations overview.
+- `pos/kitchen/`:
+  - Orders are grouped per order across stations, in lanes Ready to serve / Cooking / Waiting. Held orders are marked.
+  - "Picked up" button, All orders / My orders filter, station and search filters, 4 stat cards.
+  - Timings come from settings. On a phone the lanes become tabs.
+- `pos/shifts/`:
+  - `MyShiftScreen.kt` (POS): live clock, clock in/out and break buttons, shift bar, week tiles, Coming up list, and a "Worked and paid" panel. It loads the shown week plus the next week, and the week's pay.
+  - `HoursAndPay.kt` (Admin Hub → Shifts, new "Schedule / Hours & pay" switch, SHIFT_MANAGE only): week or month view, team table, person panel with an hours chart, wage dialog.
+  - The old My shift body in `ShiftScreen.kt` was removed.
+- `pos/sales/MySalesScreen.kt` was rewritten in the overview style:
+  - Stat cards: Sales, Tips, Earned today, Tables served.
+  - Panels: Sales by hour (bars), My pay (day / week / month so far), Payments, Top dishes, Where you served, Latest payments.
+  - Pay comes from the shift pay endpoint (needs SHIFT_SELF).
+- Admin Hub Settings:
+  - Orders & kitchen → "Kitchen Status for waiters" (2 values).
+  - Shifts → "Clocking in" (it was empty before).
+
+**Local data:** set demo wages through the API: Demo Waiter 12.50, Demo Kitchen 13.00, Demo Manager 16.00, Demo Admin 15.00. Owners, Co-Owner and Super Admin have no wage on purpose, so the "no wage" state shows.
+
+**Tests: written or updated and compiled, NOT run (user rule).**
+- Backend: new `ShiftPayServiceTest` (3); `ShiftServiceTest` constructor updated.
+- App: `PosKitchenDataTest` rewritten for the new grouping, new `PayTest` (3), `FakeShifts` given pay methods.
+- `PosReadScreensScreenshotTest` still calls `KitchenStatusContent(state, {}, {})`. It compiles, but its render expectations predate the redesign.
+
+**Runtime:**
+- The machine had rebooted, so I ran `podman start pos-db pos-mailhog`.
+- The backend runs from `back-end/target` (with the MailHog env vars) and the desktop app was relaunched. Logs are `backend.log` / `desktop.log` in this session's scratchpad.
+- I couldn't take screenshots (the Wayland display blocks capture), so the user is the first to see the screens.
+
+**Open:** design changes after the user's review; then run the tests. Overtime rules aren't modelled (there's no policy yet).
+
+## 2026-09-28 (Claude, feature/orders) — Backend and desktop app relaunched
+- At ~17:07 I rebuilt `back-end/target/pos-0.0.1-SNAPSHOT.jar` from the current working tree, which includes Codex's MySales fix. That means Codex's `/tmp/pos-todo-runtime-20260928.jar` is no longer needed.
+- The backend runs from that jar (pid 682352, with the MailHog env vars) and started cleanly on 8080. Its log is `backend.log` in this session's scratchpad (`/tmp/claude-1000/.../03aa0c35-.../scratchpad/`).
+- `./gradlew :desktopApp:run` relaunched the desktop app (MainKt pid 683033; everything was up to date, no recompile). Its log is `desktop.log` in the same folder.
+- `pos-db` and `pos-mailhog` were already up. No code changes.
+
+## 2026-09-28 (Claude, feature/orders) — Backend confirmed stopped; VS Code closed at the user's request
+- Confirmed at ~14:02: nothing listens on 8080 and no Java runs. Codex's `/tmp/pos-todo-runtime-20260928.jar` backend is stopped. Restart it before using the app.
+- The user asked to close VS Code and the backend, keeping only Firefox and their files open. VS Code (with this Claude session) was closed right after this entry.
+- The ChatGPT/Codex app was not touched. `pos-db` and `pos-mailhog` are still running.
+- Work is uncommitted on `feature/orders`, as before; nothing was lost or reverted.
+
+## 2026-09-28 (Claude, feature/orders) — Stopped Codex's backend to free RAM
+- The user asked to free memory. At 13:59 I sent a stop signal to Codex's backend `java -Xmx512m -jar /tmp/pos-todo-runtime-20260928.jar` (pid 411805, port 8080, log `/tmp/pos-todo-backend-runtime.log`). Its log only showed the scheduled jobs, and the desktop app wasn't running.
+- I couldn't confirm afterwards that it exited.
+- **Codex:** if you need the backend, check port 8080 and restart it. The `pos-db` and `pos-mailhog` containers were left running.
+- Nothing else was stopped; no Gradle or Kotlin daemons were running. Most of the machine's memory is Firefox (~5.5 GB) and VS Code (~2.1 GB).
+
+## 2026-09-28 (Codex, feature/orders) — POS History, Kitchen Status and My Sales completed
+**Scope:** Resumed the interrupted Codex-only TODO. Implemented all three assigned state/backend connections using existing screens; no reservation/settings/pre-order edits, no payment processing, no commits/pushes. Five-choice workspace cards are smaller (280×252 max versus 300×272), still centered 3+2; other choice counts and phone layout retain their sizing.
+**History:** Added bounded `/orders/history/page` (ORDER_READ + branch scope; max100, app40; terminal statuses; openedAt range, staff/customer/search filters; stable openedAt/id order). Independent `OrderHistoryScreenModel` owns paging/details/session/reset/retry/live refresh, preserving all loaded pages on refresh and retaining them on transient failure. Late responses are discarded. POS History reuses Orders layout through named DI, is read-only, and exposes past-order status/search/All/Mine filters. Normal Orders controls retain their behavior. Fixed Ktor SSE flow to use channelFlow/send rather than cross-context emit.
+**Kitchen Status:** Existing POS lanes now use KdsScreenModel and real station tickets, quantities, variants/modifiers/notes/occasion, elapsed times, permissions, loading/empty/stale/error states and live updates. KDS_READ is sufficient; KDS_ACCESS is not needed for the waiter view. Removed sample rows and the extra hard-coded `1 x` prefix; real item text wraps.
+**My Sales:** Added controller/service/JDBC aggregation with ORDER_READ + branch scope; other staff additionally require ORDER_AUDIT and SHIFT_READ. Date uses restaurant-local calendar day (DST aware); shift uses actual attendance, with explicit payment.shift_id for shift collections. Staff attribution uses order.createdBy. Closed order sales and captured/refunded payment totals are aggregated separately so split payments don't multiply sales. Currencies stay separate, including currencies with only open orders. Tips are recorded gross before refunds; refunds are attributed to original payment date, with no invented tip-refund allocation. Closed orders without payment records are flagged. Existing UI uses real report data, date/shift/currency controls, live refresh, top5 items/floors and latest5 payments; total-collected clipping fixed. No estimates/sample totals or payment processing added.
+**Verification:** Final desktop compile and 30 POS completion tests passed (11 History state/bridge, 8 MySales state, 3 read API/SSE contracts, 4 kitchen mappings, 4 screen renders). Earlier 29 KDS and 14 workspace tests passed; 28 backend unit tests passed. Isolated live SQL/HTTP verifier passed36 assertions including splits/refunds/unsettled payments, multiple currencies, shift/date boundaries, scope and stable paginated history. Inspected five-card workspace and History/MySales/Kitchen renders. `git diff --check` passed. Logs: `/tmp/pos-todo-final-mobile.log`, `/tmp/pos-todo-mobile-resumed.log`, `/tmp/pos-todo-backend-tests-resumed.log`, `/tmp/pos-todo-live-results.log`; renders: `mobile_desktop/shared/build/reports/pos-completion/`.
+**Runtime:** Main backend now runs `/tmp/pos-todo-runtime-20260928.jar` (log `/tmp/pos-todo-backend-runtime.log`), copied from Claude's latest V53-capable target jar with only MySalesRepository.class replaced. All other zip entries verified byte-identical. Latest fix covers PostgreSQL `hour_label` alias and currencies containing only open orders. Original target jar remains intact; future normal builds include the fixed source. Disposable database `pos_codex_todo_verify_20260928` dropped after 36 live assertions; working restaurant data was not seeded. Runtime authenticated History/MySales/KDS reads all returned200. Desktop relaunched successfully (PID 421234), log `/tmp/pos-todo-desktop-runtime.log`; final run reuses up-to-date classes. Tests/builds were serialized after detecting another agent build to avoid memory exhaustion.
+**Handoff:** `CODEX_TODO.md` completed. Module READMEs describe contracts/attribution. Printing/payment placeholders in the reused Orders layout remain outside this TODO; write permissions are denied in History. Shared mobile behavior tested on JVM; no physical Android/iOS validation. Known pre-existing broader failures (stale Orders UI/polling expectations and MenuServiceTest missing OnlineMenuService fixture) were not used as release checks or changed to hide failures. Claude's reservation/settings/Phase4 changes remain separate and preserved.
+
+## 2026-09-28 (Claude, feature/orders) — Reservation rules PHASE 4 done; phases 1–4 COMPLETE
+**The "IN PROGRESS: reservation rules phases 1–4" claim (2026-09-27) is closed.** Used V49–V53; **V54–V56 are released**, so the next free migration is V54. The reservation/pre-order/app `pos/reservations/**` areas are no longer locked.
+- **DB V53:**
+  - `reservations.guest_token` (unique; the guest's private booking link).
+  - `settings.card_fee_percent` 1.50 / `card_fee_fixed` 0.25.
+  - `reservation_payments` (DEPOSIT/EXTRA; PENDING/PAID/REFUNDED/KEPT/CANCELLED; refund_deadline, refunded_amount, card_fee, provider).
+  - `pre_orders.refunded_amount`.
+- **Backend:**
+  - `BookingMoneyService`: deposit for groups ≥ `depositFromGuests` when the rule requires one (**fixed amount per booking**; `depositType` is ignored), paid extras from special menus (occasion + order-before deadline), settle on cancel/expire/no-show/decline, card fee, goodwill (part of KEPT money only, reason required).
+  - `GuestBookingService` + `GuestBookingController` (`/public/guest-bookings/...` JSON).
+  - `GuestBookingPageController` (server HTML: `/public/book/{slug}/{code}`, `/public/bookings/{token}` with confirm / running late / pay / cancel).
+  - `ReservationMailService` + `ReservationGuestMailListener` (confirmed, request received, declined, expired, cancelled, reminder, payment link; sent after commit).
+  - Staff endpoints: `POST /{id}/decline`, `GET /{id}/money`, `GET/POST /{id}/extras`, `POST /{id}/payment-link`, `/payments/{pid}/mark-paid|remove`, `/money/{lineId}/goodwill` (needs `PAYMENT_GOODWILL_REFUND`).
+  - `GuestExtraChoice` now carries `currency`.
+  - **Payments run in test mode** (`app.payments.provider=test`): no real card provider is connected yet.
+  - Guest links use `app.reservations.guest-base-url` (default `http://localhost:8080`).
+- **App:**
+  - `BookingMoney.kt` holds the pure rules: which actions each line offers, the goodwill limit, payment-link / add-extra offers, extras that are too late.
+  - `BookingMoneyCard.kt` is the "Money" card on the booking panel's Info tab: each line with the server's explanation; Mark paid / Remove unpaid extra / Goodwill refund (permission-gated); Send payment link; Add extra.
+  - "Decline request" now calls `/decline` (the guest is emailed and refunded in full).
+  - Model: `MoneyLine` / `BookingExtraChoice` in cents; `moneyCents` / `moneyText`.
+  - Admin Hub → Settings → Reservations:
+    - The deposit is a single "Deposit per booking" amount (the Percentage choice is removed; the rule is saved with `FIXED_AMOUNT`).
+    - A new "Refunds" section has `cardFeePercent` / `cardFeeFixed` (saved with `/reservation-policy`).
+- **Tests (run, passing):**
+  - Backend: `BookingMoneyServiceTest` (7) plus all reservation/settings unit tests (87/88). The 1 error is `ReservationEntityPersistenceTest`: Testcontainers, no Docker on this host.
+  - App: `BookingMoneyTest` (7), `SettingsSpecTest` (9, updated for the fixed deposit and card fees), `BookingRulesTest`, `OccasionsAndEventNightsTest`, `ReservationsPagingTest`.
+  - **Final live journey on one build: 101/101.** Phase 1 28, Phase 2 19, Phase 3 12, Phase 4 guest 26, Phase 4 staff 15, plus the 24 h reminder email. Scripts are in the session scratchpad. Test data cleaned (bookings, payments, menus; the temporary booking rule was deleted again).
+- **Local run:** start the backend with `MAIL_HOST=localhost MAIL_PORT=1025 MAIL_SMTP_AUTH=false MAIL_SMTP_STARTTLS_ENABLE=false` to see guest emails in MailHog (http://localhost:8025).
+- **Open / for later:**
+  - A real card provider (Stripe or similar) behind `app.payments.provider`.
+  - The website (`web/apps/storefront`) is still a skeleton: guests use the server pages for now.
+  - The old `/deposit` endpoints (`ReservationDeposit`) still exist but the app no longer uses them.
+- **Not mine, still failing:**
+  - `OrderControllerSecurityTest` (missing OrderChangeNotifier bean) and 3 `OrderPricingSafetyTest`.
+  - The `RestaurantTableServiceTest` merge test.
+  - `MenuServiceTest.shouldDeleteSectionsWithMenuWhenRequested`.
+  - `OrdersScreenModelTest.activationPollsOnlyWhileVisible` and 4 `OrdersUiScreenshotTest`.
+
+## 2026-09-28 (Claude, feature/orders) — Reservation rules PHASE 3 done (built + tested)
+- **DB V52:**
+  - `reservation_occasions` (per restaurant, code/name/icon/options one per line; the 7 agreed defaults are created on first read).
+  - `reservations.occasion_code/name/icon/options/note` (a copy, kept if the occasion changes).
+  - `restaurant_events` (name, icon, start/end date, menu_id, special_menu_only, active).
+  - `menus.is_special`, `menu-items.order_before_hours` + `occasion_codes`.
+- **Backend:**
+  - `ReservationOccasionService` + `ReservationOccasionController`: GET/PUT `/restaurants/{r}/reservation-occasions` (PUT = whole list; code from the name). Plus `/events`, `/events/on?date=`, POST/PUT/DELETE events (SETTINGS_UPDATE).
+  - Choosing an event's menu makes it special and available only on the event dates. Overlapping active events → 409.
+  - Booking create/update/patch take `occasionCode/Options/Note` (options must be offered for the occasion; an empty code clears it).
+  - Responses carry `occasion*` and the day's `eventName/eventIcon` (batched via `ReservationSupport.addEvents`).
+  - The floor plan carries `nextReservationOccasionIcon/Name`; KDS ticket responses carry `occasion` ("🎂 Birthday · Cake from us, Candles · note").
+  - Menu: `special` on menu create/update; items `orderBeforeHours` + `occasionCodes`. Update only changes those when `occasionCodes` is sent, so older callers don't wipe them.
+  - `MenuItemImportService`: POST `/menus/{m}/sections/{s}/items/import {itemIds}` copies dishes (own price, no SKU, variants, option groups, KDS routing; not online).
+  - **Bug fixed:** deleting a dish or a menu with items failed (500) when dishes had KDS routing (FK). Routings are now deleted with the dish (`MenuItemRepository.deleteKdsRoutingsOf`).
+- **App:**
+  - `OccasionUi.kt`: picker in the create dialog and the edit form; card in the panel; icon on overview cards and floor-plan tables. Check-in toast includes the occasion.
+  - Overview: event banner. Occasions count in "Special requests".
+  - Admin Hub → Settings → Reservations: `OccasionsAndEventsSettings.kt` (occasion list editor, event-night editor with menu + "only the special menu").
+  - Menu: "Special menu" checkbox in the menu editor; "Occasion extra" fields (order ≥ N h ahead, offered-for occasions) in the item editor for special menus; "+ Import existing dishes" → `ImportItemsDialog`.
+  - Orders: `DefaultOrderCatalogRepository` takes `onlyMenuToday`; on an event night with special-menu-only, order-taking offers only that menu. KDS app model has `occasion`.
+- **Regression fixed:** MenuScreen asked Koin for ReservationApi eagerly (broke `MenuUiScreenshotTest`); now looked up lazily, only for special menus.
+- **Tests (run, passing):**
+  - Backend: `OccasionsAndEventsTest` (5), `MenuItemImportServiceTest` (2), `KdsTicketOccasionTest` (2), `MenuItemServiceTest`, all reservation tests.
+  - App: `OccasionsAndEventNightsTest` (3), reservations/admin/menu tests.
+  - Live `phase3_check.py` 12/12; Phase 1 28/28 and Phase 2 19/19 rerun on the same build. Test data cleaned.
+- **Not mine, still failing:**
+  - `MenuServiceTest.shouldDeleteSectionsWithMenuWhenRequested` (test lacks OnlineMenuService).
+  - Orders app tests `OrdersScreenModelTest.activationPollsOnlyWhileVisible` and 4 `OrdersUiScreenshotTest` (Codex's in-progress order screens).
+
+## 2026-09-28 (Codex, feature/orders) — POS TODO implementation in progress
+**Ownership:** User explicitly resumed all three `CODEX_TODO.md` items: POS History (bounded backend paging + separate mobile state), POS Kitchen Status (existing UI connected to KDS), My Sales (authoritative scoped backend aggregation + state/UI data wiring). Codex owns these modules and shared DI/PosScreen integration during this work. No reservation/settings/pre-order changes; Claude phases/migrations remain protected. Also shrinking picker cards only for five choices. No new screens or redesign; no payment processing implementation. Final verification/results will be recorded separately.
+
+## 2026-09-28 (Codex, feature/orders) — Fraud Detection choice and Statistics/Fraud navbars
+**Request:** Add Fraud Detection using `fraud.png`, visible to SUPER_ADMIN, OWNER and CO_OWNER; arrange five choices three above/two below and reload. Follow-up requested matching navbars with sensible initial sections.
+**Changed:** Added `Workspace.FRAUD_DETECTION`, role-gated picker entry and route, and `workspace_fraud.png` copied byte-identically from the supplied image. Desktop choices with Fraud use centered rows of at most three; all five fit the 1280×800 preview, with shared card styling and aligned arrows. Phone keeps the existing scrollable column. Other entry permissions remain unchanged, including Statistics' existing super-admin gate; users with fewer accessible choices see only those choices.
+**Navigation:** Added `WorkspaceSections.kt` and `FraudDetectionWorkspaceScreen`; Statistics now uses the same shell. Statistics tabs: Overview, Sales, Staff, Reports. Fraud tabs: Overview, Alerts, Activity, Rules. Reuses the actual POS WorkspaceTopBar/TopBarNavItem and WorkspaceBottomBar/PhoneNavItem, including profile, logout, back, selected underline and phone More controls. Selection is saveable; direct entry rechecks workspace access. Content remains a simple section label; no reporting/fraud engine, fake data or business-state implementation added.
+**Verified:** Desktop Kotlin compile and 14 workspace tests passed (13 existing cases plus a focused Fraud role-access test including denied Admin/Manager/Waiter/Kitchen). Inspected five-card desktop renders at 1280×800 and 1024×900; all cards fit and second row is centered. Original artwork preserved, `git diff --check` passed, existing POS/Admin navbar files untouched. Checks log `/tmp/pos-fraud-navigation-final.log`; desktop relaunch log `/tmp/pos-fraud-navigation-runtime.log`.
+**Scope:** No backend/reservation/settings changes and no deferred Codex TODO implementation. Other agents' existing changes preserved. No commits/pushes.
+
+## 2026-09-28 (Codex, feature/orders) — Statistics replaces Restaurants in workspace choices
+**Request:** Use the user's newly added `statistics.png` to replace the Restaurants choice with Statistics.
+**Changed:** Renamed `Workspace.RESTAURANTS` to `STATISTICS`, updated the picker title/subtitle to Statistics / Sales, performance and reports, and routed it to `StatisticsWorkspaceScreen` (the existing coming-soon destination renamed, not a reporting implementation). Copied the supplied PNG byte-for-byte to `composeResources/drawable/workspace_statistics.png`; root original preserved. Retained the old Restaurants illustration because the protected Settings page still references it. Existing picker card styling, sizing, ordering and access scope remain unchanged; Statistics currently inherits super-admin-only access.
+**Verified:** Desktop Kotlin build and all 13 existing `WorkspacePickerScreenshotTest` cases passed, including access checks and desktop/phone renders. Inspected desktop and phone output; Statistics appears in the fourth desktop card. Original illustration copy verified identical; `git diff --check` passed. Runtime relaunch log `/tmp/pos-statistics-choice-runtime.log`.
+**Scope:** No backend, reservation/settings, or deferred Codex TODO implementation. Other agents' existing dirty files preserved. No commits/pushes.
+
+## 2026-09-28 (Claude, feature/orders) — Reservation rules PHASE 2 done (built + tested)
+- **DB V51:**
+  - `reservations.attendance_confirmed_at/by/via` (STAFF|GUEST).
+  - `guest_no_show_clears` (manager clears a guest's no-show warning, with a reason).
+  - `waitlist_entries` (walk-ins: WAITING/SEATED/LEFT).
+  - `reservation_reminders` (once-a-day reminders sent).
+- **Attendance ("✓ Attendance confirmed", a mark, not a status):**
+  - `POST /reservations/{id}/confirm-attendance`. Staff create can pass `attendanceConfirmed`; the app shows "The guest confirmed they're coming" for bookings within 24 h.
+  - Response `attendance`: CONFIRMED / WAITING / CONFIRM_NOW (booked < sameDayConfirm ahead) / NOT_CONFIRMED (deadline passed).
+- **No-show warning:** `GuestNoShowCounter` derives each guest's no-shows (same customer/phone/email, not the booking itself, only after the latest clear).
+  - Lists batch it via `ReservationSupport.toResponses` (2 queries per page). Response `guestNoShows`.
+  - `GET /{id}/guest-history`; `POST /{id}/clear-no-show-warning` (RESERVATION_CORRECT, reason required, event NO_SHOW_WARNING_CLEARED).
+  - Staff are notified when such a guest books (from `noShowWarningFrom`).
+  - **Bug fixed during the live test:** an empty-key placeholder "\u0000" made Postgres reject the query (500 on create/lists). It's now "#no-guest-details#", with a regression test.
+- **Reminders (`ReservationReminderJob`, every minute):**
+  - Day before at `confirmReminderTime`: managers (RESERVATION_APPROVE, via new `UserRepository.findActiveStaffIdsWithPermission`) get "Tomorrow: N not confirmed · M requests · K big groups to call", once per restaurant per day.
+  - `attendanceCallMinutes` before a confirmed booking without attendance: staff get "Call to confirm attendance", once (CALL_REMINDED event). Never cancels anything.
+- **Requests:** `ReservationRequestWatcher` (AFTER_COMMIT) tells staff "A table is free … N requests waiting" when a booking holding a table is cancelled or no-shows. Requests are never auto-confirmed.
+- **Waitlist:** `/restaurants/{r}/branches/{b}/waitlist` (GET, POST, `/{id}/seat {tableId}` → table OCCUPIED, `/{id}/remove`). Responses carry waited minutes and a table-free-now / free-around estimate.
+- **Summary:** `attendanceNotConfirmedCount`, `notConfirmedDueCount`, `bigGroupCount`.
+- **App:**
+  - Labels: "✓ Attendance confirmed", "Not confirmed", "Confirm now", "⚠ N no-shows before".
+  - Panel: "Attendance confirmed" action, plus a no-show card listing the dates, with "Clear warning" for managers.
+  - Overview To do: "Requests to answer", "Not confirmed yet" (red after the day-before reminder time), "Big groups (7+) to call" (from the approval setting; replaced the old hard-coded 6+), "No table", "Special requests".
+  - Today's By status gets "Not confirmed" and "Needs review" filters.
+  - `WaitlistBox.kt` sits in today's "Free for walk-ins" box and behind a "Waitlist" button on the Tables screen.
+- **Tests (run, passing):**
+  - `GuestHistoryAndAttendanceTest` (9), all reservation/settings/pre-order unit tests, and the app's `BookingRulesTest` (+2).
+  - Live `phase2_check.py` 19/19, plus Phase 1 rerun 28/28. Test data cleaned (bookings deleted; clears/waitlist rows removed via SQL).
+- **Note:** I stopped Codex's backend (`/tmp/pos-kds-runtime-20260927.jar`, started 23:50) to apply V51. The running backend is now `back-end/target` from the same working tree (includes Codex's KDS code), log in my scratchpad.
+
+## 2026-09-28 (Codex, feature/orders) — Deferred Codex-only POS TODO
+**User instruction:** Queue only POS History, Kitchen Status in POS, and My Sales from the supplied screenshot. State management/business logic/backend only; no screen creation or redesign. These tasks belong to Codex, not Claude. Handle the user's smaller tasks first and wait for the user's explicit instruction to resume this list.
+**Saved:** `CODEX_TODO.md` contains the three unchecked items, ownership, boundaries and deferred status. No automation, implementation, app restart, commits or pushes. Other gaps from the audit are not included. Claude's reservation/settings work remains untouched.
+
+## 2026-09-28 (Codex, feature/orders) — Read-only POS completion audit
+**Request:** Identify unfinished POS logic/state/backend work, excluding screen design. Inspected existing source; no app/backend edits, tests, restarts, commits or pushes in this turn.
+**Confirmed gaps:** POS KitchenStatus still uses the hard-coded `kitchenOrders` list, independent of the newly implemented KDS state. MySales numbers/charts/payments are hard-coded with no sales state/API layer. PaymentScreen accepts no order ID and uses sample payment items; payment module has entities/repository but no transaction processing controller/service; existing order mark-paid/refunded endpoints are status operations. Orders Print/Payment integration is documented as disconnected. POS History falls through the generic label branch, while real order-history querying/state already exists in Orders; order-history API is an unpaged list. Tables' Add items opens the sample `AddItemModal`, and PosScreen's onAddToOrder only closes it; selected table/order identity is not passed through this callback.
+**Existing foundation/limits:** Orders has real state/API, server drafts, item/option edits, lifecycle, kitchen actions, discounts, split/merge/transfer, audit/events/history and idempotent writes. Tables, Menu, Reservations and Shifts already have their own state/API layers. Orders README explicitly excludes offline write queuing and inventory consumption. Its test-history section notes tests predating SSE need updating; no claim of a new runtime failure was made. Reservation phases/settings remain another agent's protected in-progress work. A new dirty ReservationOverviewScreen diff was already present at audit start and was not touched.
+
+## 2026-09-27 (Codex, feature/orders) — KDS shared mobile state and backend connection
+**Request/scope:** Finish KDS state/API behavior without building screens. Added only KDS data/model/state code and tests, DI registration, and lifecycle/tab wiring in the existing placeholder `KdsScreen`. Its layout/navbar/content remain unchanged. No reservation/pre-order/settings code or settings data changed; the earlier Shifts UI diff remains from the preceding task.
+**Mobile:** `kds/KdsScreenModel.kt`, `kds/model/`, `kds/data/` provide active boards, held/upcoming tickets, station/device selection, ticket search/priority/status/course, all-day quantities preserving variants/modifiers/instructions, detail plus related station tickets, ticket/item fire/start/ready/complete, explicit order sync, paginated history, kitchen menu availability, station/routing/device configuration. Authenticated Ktor client and existing MenuRepository reused. State resets on user/branch/permissions; generation guards discard late reads/writes. Lifecycle-controlled SSE plus periodic transport reconciliation, serialized requests, duplicate action suppression, stale/error/loading states, and uncertain-write review without automatic retries. See `kds/README.md` for methods, permissions, and integration boundaries.
+**Backend:** Added `KdsHistoryController`/`KdsHistoryService` (bounded terminal-ticket pagination, completion date range, inactive-station history) and `KdsRealtimeController` (existing committed order invalidations under KDS_READ). Item response/mapper include variant snapshot, optionsPerUnit, modifier names/quantities/notes. No migrations. Corrected an existing station-routing test fixture to give existing entities distinct IDs.
+**Verified:** 29 mobile KDS tests passed (`:shared:jvmTest --tests '*kds.*'`); desktop Kotlin compilation passed. Streaming contract test uses a real local HTTP server/OkHttp because MockEngine does not support SSECapability. 18 backend KDS tests passed (`./mvnw -o test -Dtest='Kds*Test' -DfailIfNoTests=false`). Isolated live flow passed 37 requests/assertions: menu/variant/station/order creation, routing, item start, ticket ready/completion, active-board removal, history/date bounds, availability, inactive-station history, SSE connect/change. Disposable DB `pos_kds_verify_20260927_2339` was dropped; test token removed. Logs `/tmp/pos-kds-final-mobile.log`, `/tmp/pos-kds-backend-final-tests.log`, `/tmp/pos-kds-live-check.log`.
+**Runtime — important:** Source contains unfinished reservation V51, so did NOT rebuild/replace the original runnable jar or apply that migration. Built `/tmp/pos-kds-runtime-20260927.jar` by replacing/adding only 9 compiled KDS class entries in the original `back-end/target/pos-0.0.1-SNAPSHOT.jar`; every other entry was verified byte-identical. Local backend now runs this KDS-only artifact (PID in `/tmp/pos-kds-backend-runtime.pid`, log `/tmp/pos-kds-backend-runtime.log`). Original jar remains intact. Authenticated local board/history/stations/devices and SSE all verified after restart; settings fingerprint unchanged and schema still V50. When rebuilding the full backend later, coordinate unfinished reservation work first. Desktop relaunched with `:desktopApp:run`, log `/tmp/pos-kds-desktop-runtime.log`.
+**Boundaries:** Screens intentionally remain placeholders. Upcoming includes actual KDS tickets; undispatched reservation pre-orders stay with the protected pre-order module. No recall/undo endpoint exists, so no invented client action. Existing in-process notifier retained. Existing role permissions respected (Kitchen needs MENUS_UPDATE granted separately to change availability). Shared Kotlin behavior tested on JVM; no physical Android/iOS device test. No commits/pushes performed for this task.
+
+## 2026-09-27 (Codex, feature/orders) — Admin Shifts layout matches POS controls
+**Did:** Refined only `pos/shifts/ShiftAdminCalendar.kt`. Replaced Today/month navigation and side-panel date arrows with the full selected date and existing Reservations date picker. Week/Month/Time/List now use the existing `HeaderDropdown`; role/status filters and staff search reuse the existing POS components. Desktop controls fit one toolbar at full width and wrap on smaller windows.
+**Layout:** Removed the subtitle, extra timezone/range row, duplicate scheduling buttons, outlined empty cells, and the detail-only overflow menus. Weekly rows have a wider staff column, quiet empty cells, clearer status-tinted shift chips, and horizontal scrolling when space is tight. Selected-day cards show name, role, time, and status; notes remain in shift details. Phone date strip is compact and scrolls the selected day into view. Multiple shifts per staff/day retain room for a selectable more count.
+**Scope:** Admin management view only; POS waiter screen, navbar, reservations/settings, backend, and demo records were not changed. No new tests added and no commits/pushes performed for this UI request.
+**Verified:** `:desktopApp:compileKotlin` and four existing `ShiftScreenshotTest` renders passed (desktop/phone calendar and Add shift dialog); inspected all four output images in `mobile_desktop/shared/build/reports/shifts`. `git diff --check` passed. Desktop relaunched with `:desktopApp:run`; app log `/tmp/pos-shifts-ui-app.log`.
+
+## 2026-09-27 (Codex, feature/orders) — Shift calendar demo data
+**Did:** Populated only the local `Local Demo Bistro` / `Main Branch` shift data for visual review: 60 labeled demo shifts for six existing Demo staff accounts, 21 September–4 October 2026. Includes 28 completed shifts with 30-minute meal breaks and 32 scheduled shifts, varied start times and days off. Existing Super Admin open shift was preserved unchanged.
+**Data scope:** Inserts into `foundation_local.shifts` and `shift_breaks` only. No reservation/settings data or application source changed. Idempotent IDs and the notes prefix `Demo shift preview 2026-09-21` identify this sample set. Insertion skipped overlapping shifts and verified existing rows unchanged inside the transaction. Seed/manifest files are in `/tmp/seed-pos-shift-preview.py`, `/tmp/pos-shift-preview-manifest.json`, and `/tmp/pos-shift-preview-seed.sql`.
+**Verified/runtime:** Authenticated shift board API returned all 60 samples, six staff, and 28 breaks. Reopened the existing compiled desktop app without rebuilding, so the interrupted reservation implementation was not touched. App log: `/tmp/pos-shift-preview-app.log`.
 
 ## 2026-09-27 (Codex, feature/orders) — Admin navigation matches POS
 **Did:** Updated only `admin/ui/AdminNavBar.kt` to match the existing POS desktop More control: trailing chevron, identical font/spacing, white 10dp popup with text-only entries, matching compact/medium/full sizing, and the selected overflow section promoted into the fourth tab (Devices moves into More). All Admin Hub pages use this bar. Kitchen and phone navigation already reuse the POS frame/item components and matching menu styling.
@@ -2093,3 +2796,103 @@ Running handoff log for AI agents (Claude, Codex, or others) working on this rep
 **Backend:** Shift board staff now include their existing role names so role filtering uses real roster data.
 **Verified/runtime:** Desktop Kotlin compile passed (existing warnings only); backend packaged and started; local board roster smoke check returned 8 staff records with roles; `git diff --check` passed. Relaunched desktop app with the rebuilt UI; visual screenshot inspection remains pending user review.
 **Files/modules touched:** `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/admin/ui/AdminScreen.kt`, `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/pos/shifts/`, `back-end/src/main/java/pos/pos/shift/`, related shift API/model and screenshot fixture files.
+
+## 2026-10-06 — POS readiness hardening continuation
+**Did:** Set simulated guest booking payments to disabled by default and explicitly enabled only in the local profile. Added a production-profile guard so setting `APP_PAYMENTS_PROVIDER=test` cannot make production bookings appear paid. Updated the reservation integration test to exercise that guard. Hardened the existing statistics screen model's state lifecycle: cancel in-flight downloads when changing user/deactivating/loading a new report, prevent stale download completion from clearing a newer download's state, and reject future custom date ranges / shifts. Added regression coverage.
+**Verified:** Backend full suite passed earlier in this audit (1,226 unit + 268 integration tests). Latest focused `ReservationFlowIntegrationTest`: 5 passed. Forced full mobile shared JVM suite: 319 passed, 0 failures/errors/skips. The mobile build emitted pre-existing Kotlin deprecation/redundant-nullability warnings. The integration test logs expected connection-refused warnings for the unconfigured test SMTP endpoint; mail delivery needs a configured provider outside tests.
+**Files:** `back-end/src/main/java/pos/pos/reservation/service/GuestBookingService.java`, `back-end/src/main/resources/application.yml`, `back-end/src/main/resources/application-local.yml`, `back-end/src/main/resources/application-prod.yml`, `back-end/src/test/java/pos/pos/integration/reservation/ReservationFlowIntegrationTest.java`, `mobile_desktop/shared/src/commonMain/kotlin/com/saporini/mobile_desktop/statistics/StatisticsScreenModel.kt`, `mobile_desktop/shared/src/jvmTest/kotlin/com/saporini/mobile_desktop/statistics/StatisticsStateTest.kt`.
+**Still open:** No real online payment provider is configured; inventory sale depletion still needs an explicit source-location policy before it can safely be automated. Continue the service-by-service hardening from the already modified worktree; do not treat test success alone as proof of production readiness.
+
+## 2026-10-06 — Fail-closed SMS authentication configuration
+**Did:** Changed `SmsAuthProperties` and shared configuration to default SMS delivery to `DISABLED`. Added local-only `LOG_ONLY` default, and an explicit disabled default in production with a note that no SMS gateway is connected. This prevents production from claiming OTP delivery and writing phone numbers/codes into server logs by default. Added configuration tests for base, local, and production profiles.
+**Verified:** `./mvnw -o test -Dtest=SmsAuthPropertiesTest,SmsMessageServiceTest` passed: 12 tests, 0 failures/errors. It verifies a disabled delivery request fails and the local/prod profile settings bind as intended.
+**Files:** `back-end/src/main/java/pos/pos/config/properties/SmsAuthProperties.java`, `back-end/src/main/resources/application.yml`, `back-end/src/main/resources/application-local.yml`, `back-end/src/main/resources/application-prod.yml`, `back-end/src/test/java/pos/pos/unit/config/SmsAuthPropertiesTest.java`.
+**Still open:** Connect a real SMS gateway; local `LOG_ONLY` deliberately prints one-time codes for development. Re-run the whole backend suite after the accumulated backend configuration changes.
+
+## 2026-10-06 — SMS integration verification
+**Verified:** `PhoneVerificationIntegrationTest` passed all 4 API-level tests under the production profile with explicit test-only `SMS_DELIVERY_MODE=LOG_ONLY`, confirming existing test-auth flows still work. The output also confirms why production defaults must stay disabled: LOG_ONLY deliberately prints the OTP.
+
+## 2026-10-06 — Production defaults and floor-plan storage hardening
+**Did:** Removed `spring.profiles.default: local`; deployments with no explicit profile now use Spring's safe `default` profile, and local startup must opt into `local`. The shared/prod SMS default is disabled, with local `LOG_ONLY` explicitly configured. Floor-plan storage is now disabled by default in shared/prod configuration; production no longer silently writes floor plans to a process-local directory. The existing local provider is selected only by the local profile. Local uploads now compare file signatures against declared PNG/JPEG/WebP types and enforce the 10 MB limit against the bytes actually read. Added direct tests for supported signatures, mismatches, unsupported/empty/oversized uploads, path traversal, scoped persistence, load/delete, and disabled storage.
+**Verified:** A clean backend `./mvnw -o verify` run passed **1,236 unit + 269 integration tests**, 0 failures/errors (this preceded the final production storage-provider gating edit). After that edit: 23 focused SMS/storage unit tests passed; `ProdProfileSmokeTest` passed with assertions that the production context selects `DisabledFloorPlanImageStorage` and binds the provider as `disabled`; SMS/profile/storage configuration tests passed (6). The targeted phone-verification integration test passed 4 earlier. The mobile shared JVM suite passed 319 tests in the previous pass; no mobile source changed here. `git diff --check` still pending for handoff.
+**Files:** `back-end/src/main/resources/application.yml`, `application-local.yml`, `application-prod.yml`, `back-end/src/main/java/pos/pos/config/properties/SmsAuthProperties.java`, `back-end/src/main/java/pos/pos/storage/LocalFloorPlanImageStorage.java`, new `DisabledFloorPlanImageStorage.java`, storage tests, `SmsAuthPropertiesTest.java`, `ProdProfileSmokeTest.java`.
+**Still open:** A durable floor-plan storage provider is not connected, so floor-plan image upload/read returns 503 outside local mode. No live payment or SMS provider is connected; no sale stock-depletion policy exists; production email retry/outbox remains unresolved. Run the full suite again after the last storage-provider edit before treating this checkout as fully verified.
+
+**Verification follow-up (2026-10-06):** `git diff --check` passed after the above handoff entry was recorded.
+
+## 2026-10-06 (Codex) — Production-mode storage/SMS guards and full verification
+- Hardened provider defaults so base and production profiles do not silently enable test payments, log-only SMS, or local floor-plan file storage. Local development opts into local storage and LOG_ONLY SMS explicitly; production keeps these integrations disabled unless configured.
+- Added a disabled floor-plan storage provider that returns a clear 503 for image reads/writes. Hardened local image writes with MIME/signature checks and a read-size cap. Added focused provider/configuration tests and extended the production smoke test.
+- Adjusted the API robustness integration test to allow only the expected production 503 for the disabled floor-plan storage endpoint. The shared API test hook still rejects other 5xx responses; the robustness sweep checks 4,079 requests.
+- Full backend `./mvnw -o verify` passed: 1,240 unit tests and 269 integration tests, zero failures/errors/skips. Menu API integration passed 25 cases. `git diff --check` passed.
+- The mobile statistics state fixes described in the previous entry remain in place; previous verification covered 319 shared JVM tests and compilation of the existing Android/desktop source sets. No mobile screens were added.
+- Production release remains blocked by missing real payment-provider setup, durable production floor-plan storage, and automatic inventory depletion from sales. Storage and payment behavior intentionally fail closed until configured. The repository has extensive pre-existing/uncommitted changes; nothing was committed.
+
+## 2026-10-06 (Codex) — Sale stock linking and end-to-end fulfillment
+- Added branch/item inventory sale-source mappings with a V56 migration, scoped API, validation, and protection against deactivating/untracking referenced items or locations. Updated the existing mobile inventory data/state/repository layer to load, set, and remove sources; no new screens were added.
+- Order fulfillment now consumes tracked ingredients from the active finished-dish recipe, including nested prep batches, yield loss, and batch-yield proration. It is idempotent per order line and transactional; structural line edits and voiding are blocked after stock has been consumed.
+- Added PostgreSQL integration coverage for exact consumption, retry idempotency, missing source mapping with no partial deduction, and insufficient stock with rollback. All 9 `RecipeFlowIntegrationTest` tests passed.
+- Full backend `./mvnw -o verify` passed: 1,244 unit tests + 277 PostgreSQL integration tests, 0 failures/errors/skips. Focused mobile inventory state/API/rules tests passed: 15 + 1 + 6 = 22, 0 failures/errors. `git diff --check` passed.
+- Still open: modifier/variant-specific stock recipes; refund/void after fulfillment needs explicit waste/restock policy (currently protected from accidental edit); legacy fulfilled orders are not reconciled; real payment provider, durable production image storage, and real SMS/email/outbox delivery remain external integration blockers. A whole-backend production sign-off is not warranted yet.
+
+## 2026-10-07 (Codex) — Protect consumed sale lines from order relocation
+- Closed a stock-ledger integrity gap: order merge, split, and branch transfer now refuse orders containing lines with `SALE_CONSUMPTION` movements, so consumed line IDs cannot be detached from their sale history. Added API assertions to recipe fulfillment integration coverage for split/merge rejection.
+- Fixed `OrderPricingSafetyTest` setup to mock the newly required `InventoryMovementRepository`. Made fraud overview test findings and date window share a fixed reference timestamp; the previous test failed after the system date advanced because its stubbed findings fell outside the requested day.
+- Verification: focused recipe integration suite passed 9/9; corrected order/fraud unit classes passed 17/17; final full backend `./mvnw -o verify` passed 1,244 unit + 277 PostgreSQL integration tests, 0 failures/errors/skips. `git diff --check` passed.
+- Mobile state and screens were not changed in this follow-up.
+
+## 2026-10-07 (Codex) — Discount management permission and totals coverage
+- A new stacked-discount lifecycle test exposed that waiter roles could delete an applied discount even though apply/update enforced the manager rule. Added the same restaurant-specific `allow_discount_without_manager` policy to discount removal.
+- Added PostgreSQL API coverage for 10% + fixed discounts, manager-only update/delete, recomputed totals after changing/removing a discount, and staff removal when the restaurant setting permits it. The focused scenario passed.
+- Final current-source backend `./mvnw -o verify`: 1,244 unit + 278 PostgreSQL integration tests, 0 failures/errors/skips. `git diff --check` passed.
+- Remaining production blockers are still provider/environment decisions: live payment, SMS/email delivery and outbox/retries, durable production image storage, plus recipe stock rules for modifiers/variants and refunds.
+
+## 2026-10-07 (Codex) — Modifier inventory recipes and final backend verification
+- Added optional recipe and quantity mappings to menu option items. Orders snapshot the selected modifier recipe/quantity, and fulfillment consumes that snapshot using option quantity and per-unit rules; later menu edits do not rewrite existing orders' stock requirements. Added schema migration V57 and kept mobile changes in existing models, API/repository, and screen-model state; no screen was added.
+- Added service validation/tests for recipe scope/type and default full-yield quantities, a PostgreSQL fulfillment test for scaled modifier consumption and order-time snapshots, and a mobile HTTP DTO/API test for updating a mapped option item.
+- Verification: full backend `./mvnw -o verify` passed 1,246 unit + 279 PostgreSQL integration tests (1,525 total), 0 failures/errors/skips; migration V57 applied in test schemas. Mobile `MenuOptionInventoryRecipeApiTest` passed in the prior focused run. `git diff --check` passed.
+- Production remains blocked on deployment-specific integrations and policy decisions: real payment provider and settlement/reconciliation, live SMS/email delivery with retry/outbox behavior, durable production image storage, refund/void stock restock policy, and operator UI for selecting modifier recipes. No new mobile screens were added.
+
+## 2026-10-07 continuation: fail-fast pagination guard
+- Enabled `spring.jpa.properties.hibernate.query.fail_on_pagination_over_collection_fetch=true` in `back-end/src/main/resources/application.yml` so collection-fetch pagination regressions fail immediately. `open-in-view: false` remains enabled.
+- Removed collection fetch graphs from the limited latest-row lookups in `ReservationRepository.findTopByReservationCodeOrderByCreatedAtDesc`, `OrderRepository.findTopByOrderNumberOrderByCreatedAtDesc`, and `KdsTicketRepository.findTopByOrder_IdAndStation_IdAndStatusInOrderByCreatedAtDesc`; callers access these collections inside transactions when needed.
+- The filtered strict run passed 9/9 integration tests including the 4,098-request robustness sweep. A subsequent complete `./mvnw -o verify` with the guard passed 1,246 unit tests and 279 PostgreSQL integration tests, 0 failures/errors/skips; `git diff --check` was clean.
+- Full-suite shutdown logged Hikari connection-validation warnings after Testcontainers closed PostgreSQL, plus Hibernate immutable restaurant-property and follow-on-lock warnings. Treat as teardown/noise to investigate separately; tests completed successfully. This turn did not make mobile code changes.
+
+## 2026-10-07 continuation: page branch-wide reservation lists
+- Changed the existing branch reservation endpoint to filter and page at the database, with stable reservation-start/id ordering, a bounded page size, and optional date/status/customer filters. Added V60 index on `(branch_id, reservation_start, id)`.
+- Updated the existing mobile reservation API/repository/state flow so All and Range modes fetch more pages and refresh every previously visible page while preserving their filters. No screen was added.
+- Added PostgreSQL integration coverage for page order/metadata, filter combinations, page-size cap, invalid pagination/date inputs, and tenant scope; added mobile state coverage for All/Range continuation and refresh.
+- Focused backend reservation integration passed 8/8. Full backend `./mvnw -o verify` passed 1,261 unit + 294 PostgreSQL integration tests (1,555 total), 0 failures/errors/skips. Full mobile shared JVM suite passed 324 tests, 0 failures/errors. `git diff --check` passed.
+- Previously recorded production blockers remain: live payment and settlement/reconciliation, production SMS/email delivery with durable retry/outbox, durable production image storage, explicit refund/void stock policy, legacy fulfilled-order reconciliation, and operator workflow for modifier recipes.
+
+## 2026-10-07 continuation: serialize physical count state changes
+- Found that two concurrent inventory-count approvals could both observe `COMPLETED` and apply the same variance twice. Added a tenant-scoped `PESSIMISTIC_WRITE` lookup and used it for all count mutations (start, line upsert/removal, complete, approve, cancel) so status validation and movement creation are serialized.
+- Added a PostgreSQL concurrent-approval test that starts two approval requests together, verifies one succeeds and one gets a conflict, and checks both the final stock level and movement ledger contain only one adjustment.
+- Verification: focused `InventoryFlowIntegrationTest` passed 8/8. Full backend `./mvnw -o verify` passed 1,261 unit + 295 PostgreSQL integration tests (1,556 total), 0 failures/errors/skips. `git diff --check` passed.
+
+## 2026-10-07 continuation: page physical inventory count history
+- Replaced the unbounded `/inventory/counts` response with a tenant-scoped, status-filterable `PageResponse`, stable `createdAt DESC, id DESC` ordering, bounded 50-item default pages, and V61 indexes for filtered/unfiltered page scans. Pages IDs first, then loads the selected counts and lines in one entity-graph query.
+- Updated the existing mobile inventory repository/API DTO and state model: count history can load another page, refresh reloads all pages already displayed, filters reset paging, and in-progress state prevents duplicate page fetches. No screen was added.
+- Added PostgreSQL API tests for order/metadata, status filter, size cap, invalid page/size, and restaurant scope; added mobile MockEngine contract and state tests for paging, refresh, and filter reset.
+- Verification: focused `InventoryFlowIntegrationTest` passed 9/9. Full backend `./mvnw -o verify` passed 1,261 unit + 296 PostgreSQL integration tests (1,557 total), 0 failures/errors/skips. Full mobile shared JVM suite passed 325 tests, 0 failures/errors. `git diff --check` passed.
+
+## 2026-10-07 continuation: share refresh rate limits across app instances
+- Replaced process-local refresh IP/token buckets with PostgreSQL atomic fixed-window counters. Store only peppered SHA-256 hashes of IPs/token IDs; use database time and independent transactions so rejected/invalid refresh requests still count. Added V62 table and expiry index.
+- Added unit checks for null inputs, both dimensions, rejection, and invalid configuration; added a PostgreSQL concurrency test issuing 28 concurrent requests through two separate limiter instances and asserting exactly 20 pass.
+- Verification: `./mvnw -o verify` passed 1,244 unit + 297 PostgreSQL integration tests (1,541 total), 0 failures/errors/skips. The auth integration also applied V62 and passed all 6 tests. No mobile state/API contract changed. `git diff --check` passed.
+- Refreshed the old in-memory/single-node throttling notes in `back-end/src/main/resources/info/info.txt`. Previously identified live payment, SMS/email delivery, durable image storage, refund/void restock policy, legacy order reconciliation, and modifier-recipe operator workflow blockers remain.
+# 2026-10-07 continuation: preserve inventory duplicate conflicts in mobile state
+- Inventory now checks item-code uniqueness across soft-deleted rows to match the database constraint, maps concurrent duplicate code/barcode constraint violations to HTTP 409, and uses V63 for case-insensitive active-barcode uniqueness per restaurant. V63 deliberately fails with a clear message when duplicate active barcodes already exist, so operators must resolve those rows before deployment.
+- Updated the existing mobile inventory screen model so a successful refresh after a 409 does not clear the conflict message. Added a state regression test proving the unsaved draft remains available, the duplicate explanation stays visible, and the inventory refresh still occurs. No screen was added.
+- Verification: `InventoryFlowIntegrationTest` passed 11/11 (including six-way duplicate-code and duplicate-barcode races); full mobile `:shared:jvmTest` passed 328 tests, 0 failures/errors/skips; `git diff --check` passed.
+- Readiness remains in progress. Before deploying V63, check for active duplicate barcodes. Broader unresolved production work includes live payment/settlement and refund behavior, durable SMS/email delivery and retries, durable image storage, refund/void stock policy and legacy reconciliation, device activation redemption, and final deployment configuration/observability review.
+# 2026-10-07 continuation: prove payment refund idempotency
+- Added a PostgreSQL integration regression for same-key refund retries. It verifies that the server replays the first successful refund, rejects reuse of that key with a changed amount/body (409), and persists only one refund transaction.
+- Verification: focused `PaymentFlowIntegrationTest#idempotentRefundRetry` passed 1/1 on PostgreSQL with all migrations through V63 applied; `git diff --check` passed.
+- Existing production blockers remain: configured live payment processing and reconciliation, durable SMS/email delivery and retries, durable production image storage, explicit refund/void inventory-restock and legacy reconciliation policy, device pairing redemption/authentication flow, and deployment configuration/observability review.
+# 2026-10-07 continuation: page the built Orders ALL and HISTORY lists
+- Added `GET /restaurants/{restaurantId}/branches/{branchId}/orders/page`, with a 100-row maximum, stable openedAt/id ordering, branch/restaurant scoping, server-side date/status/customer/search filters, and optional terminal-history-only behavior. It pages in SQL and batches page relationship hydration plus active-line item counts instead of loading every order and issuing summary queries per row.
+- Updated the existing mobile Orders API and screen-model state so ALL/HISTORY modes load the first page, append later pages, refresh all pages already shown after invalidations, reset pages on filter changes, and debounce search. The existing screen's load-more control is reused; no screen was added.
+- Verification: PostgreSQL `OrderLifecycleIntegrationTest#branchOrdersArePagedAndFiltered` passed 1/1 through schema V63, including page boundaries, deterministic order, status/history/search filters, item counts, and invalid page/size; `OrderControllerTest` and `OrderHistoryServiceTest` passed 4/4; focused mobile `OrdersScreenModelTest` + `OrderDataContractTest` passed 21/21. `git diff --check` passed.
+- Legacy non-paginated restaurant/customer/branch order-list endpoints remain exposed for compatibility and need a deliberate migration/deprecation plan. Other outstanding production blockers remain live payment/settlement, durable SMS/email delivery/retries, durable production image storage, explicit refund/void stock-restock and legacy reconciliation policy, device pairing redemption, preflight for duplicate active inventory barcodes before V63, and deployment configuration/observability review.

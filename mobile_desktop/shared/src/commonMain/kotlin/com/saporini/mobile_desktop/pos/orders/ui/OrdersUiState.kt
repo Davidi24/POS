@@ -41,6 +41,10 @@ data class OrdersUiState(
     val refreshWarning: String? = null,
     val needsReconciliation: Boolean = false,
     val lastRefreshedAt: String? = null,
+    val historyTotal: Long = 0,
+    val historyLoadedPages: Int = 0,
+    val historyHasNext: Boolean = false,
+    val historyLoadingMore: Boolean = false,
     val lastSuccessfulOperation: String? = null
 ) {
     val visibleOrders: List<OrderSummary>
@@ -50,7 +54,7 @@ data class OrdersUiState(
                 (filter.status == null || order.status == filter.status) &&
                     (filter.customerId == null || order.customerId == filter.customerId) &&
                     (query.isEmpty() || listOfNotNull(order.orderNumber, order.tableNumber,
-                        order.tableName, order.customerName).any { it.contains(query, ignoreCase = true) })
+                        order.tableName, order.customerName, order.notes).any { it.contains(query, ignoreCase = true) })
             }
         }
 

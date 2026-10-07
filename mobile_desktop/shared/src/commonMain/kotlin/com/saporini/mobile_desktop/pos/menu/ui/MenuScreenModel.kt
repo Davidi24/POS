@@ -2,12 +2,16 @@ package com.saporini.mobile_desktop.pos.menu.ui
 
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
+import com.saporini.mobile_desktop.admin.inventory.RecipeDto
+import com.saporini.mobile_desktop.admin.inventory.RecipesRepository
 import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItem
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuVariant
 import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenu
 import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
+import com.saporini.mobile_desktop.pos.menu.domain.model.OptionItem
+import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroup
 import com.saporini.mobile_desktop.pos.menu.domain.repository.CreateMenuInput
 import com.saporini.mobile_desktop.pos.menu.domain.repository.CreateMenuItemOptionGroupInput
 import com.saporini.mobile_desktop.pos.menu.domain.repository.CreateOptionGroupInput
@@ -18,6 +22,7 @@ import com.saporini.mobile_desktop.pos.menu.domain.repository.MenuVariantInput
 import com.saporini.mobile_desktop.pos.menu.domain.repository.OptionGroupTypeInput
 import com.saporini.mobile_desktop.pos.menu.domain.repository.OptionItemInput
 import com.saporini.mobile_desktop.pos.menu.domain.repository.UpdateMenuInput
+import com.saporini.mobile_desktop.pos.menu.ui.item.DraftOptionChoice
 import com.saporini.mobile_desktop.pos.menu.ui.item.DraftOptionGroup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -28,7 +33,8 @@ import kotlinx.coroutines.launch
 
 class MenuScreenModel(
     private val repository: MenuRepository,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val recipesRepository: RecipesRepository? = null
 ) : ScreenModel {
 
     private val _state = MutableStateFlow(MenuUiState())
@@ -153,6 +159,7 @@ class MenuScreenModel(
         availableFromDate: String?,
         availableUntilDate: String?,
         color: String,
+        special: Boolean = false,
         onSuccess: () -> Unit = {}
     ) {
         val restaurantId = currentRestaurantId() ?: return
@@ -180,7 +187,8 @@ class MenuScreenModel(
                         availableUntil = availableUntil,
                         availableFromDate = availableFromDate,
                         availableUntilDate = availableUntilDate,
-                        color = color
+                        color = color,
+                        special = special
                     )
                 )
 
@@ -213,6 +221,7 @@ class MenuScreenModel(
         availableFromDate: String?,
         availableUntilDate: String?,
         color: String,
+        special: Boolean? = null,
         onSuccess: () -> Unit = {}
     ) {
         val currentMenu = _state.value.menus.firstOrNull { it.id == menuId }
@@ -243,7 +252,8 @@ class MenuScreenModel(
                         availableUntil = availableUntil,
                         availableFromDate = availableFromDate,
                         availableUntilDate = availableUntilDate,
-                        color = color
+                        color = color,
+                        special = special
                     )
                 )
 
@@ -303,6 +313,10 @@ class MenuScreenModel(
             Result.failure(error)
         }
     }
+
+    // Copies of dishes from other menus into a section of this (special) menu.
+    suspend fun importItems(menuId: String, sectionId: String, itemIds: List<String>): Result<List<com.saporini.mobile_desktop.pos.menu.domain.model.MenuItem>> =
+        runSuspendCatching { repository.importItems(menuId, sectionId, itemIds) }
 
     suspend fun saveAllFilterPosition(menuId: String, position: Int): Result<Unit> = runSuspendCatching {
         val current = repository.getMenu(menuId, true, true, true, true)
@@ -417,6 +431,22 @@ class MenuScreenModel(
         variantId: String
     ): Result<Unit> = runSuspendCatching { repository.deleteVariant(menuId, sectionId, itemId, variantId) }
 
+    suspend fun loadOptionGroupChoices(groups: List<DraftOptionGroup>): Result<List<DraftOptionGroup>> = runSuspendCatching {
+        groups.map { group ->
+            val groupId = group.optionGroupId ?: return@map group
+            val loaded = repository.getOptionGroup(groupId, includeItems = true)
+            loaded.toDraftOptionGroup(group)
+        }
+    }
+
+    suspend fun loadModifierRecipes(): Result<List<RecipeDto>> = runSuspendCatching {
+        val restaurantId = sessionManager.currentUser.value?.restaurantId
+            ?: throw IllegalStateException("No restaurant is assigned to this user")
+        val recipes = recipesRepository?.recipes(restaurantId, type = null, status = "ACTIVE").orEmpty()
+        recipes.filter { it.recipeType == "PREP_BATCH" || it.recipeType == "SUB_RECIPE" }
+            .sortedBy { it.name.lowercase() }
+    }
+
     // Option groups are restaurant-level reusable entities server-side.
     // There's no picker UI yet to reuse an existing one, so every save
     // replaces an item's linked groups with fresh ones scoped to just
@@ -452,9 +482,19 @@ class MenuScreenModel(
                 .toDoubleOrNull() ?: 0.0
             val createdItem = repository.createOptionItem(
                 createdGroup.id,
-                OptionItemInput(name = choice.name, priceDelta = priceDelta, displayOrder = choiceIndex)
+                OptionItemInput(
+                    name = choice.name,
+                    priceDelta = priceDelta,
+                    displayOrder = choiceIndex,
+                    inventoryRecipeId = choice.inventoryRecipeId,
+                    inventoryRecipeQuantity = choice.inventoryRecipeQuantity
+                )
             )
-            choice.copy(id = createdItem.id)
+            choice.copy(
+                id = createdItem.id,
+                inventoryRecipeId = createdItem.inventoryRecipeId,
+                inventoryRecipeQuantity = createdItem.inventoryRecipeQuantity
+            )
         }
         val link = repository.createItemOptionGroup(
             menuId,
@@ -488,6 +528,17 @@ class MenuScreenModel(
         deleteItemOptionGroupInternal(menuId, sectionId, itemId, group)
     }
 
+    suspend fun updateOptionItem(
+        groupId: String,
+        itemId: String,
+        input: OptionItemInput
+    ): Result<OptionItem> = runSuspendCatching {
+        if (currentRestaurantId() == null) {
+            throw IllegalStateException("No restaurant is assigned to this user")
+        }
+        repository.updateOptionItem(groupId, itemId, input)
+    }
+
     private suspend fun deleteItemOptionGroupInternal(
         menuId: String,
         sectionId: String,
@@ -510,3 +561,24 @@ class MenuScreenModel(
         }
     }
 }
+
+private fun formatOptionPriceDelta(value: Double): String {
+    val cents = kotlin.math.round(value * 100).toLong()
+    val absolute = kotlin.math.abs(cents)
+    val sign = if (cents < 0) "-" else "+"
+    return sign + "$" + (absolute / 100) + "." + (absolute % 100).toString().padStart(2, '0')
+}
+
+internal fun OptionGroup.toDraftOptionGroup(previous: DraftOptionGroup): DraftOptionGroup = previous.copy(
+    name = name,
+    required = required,
+    choices = items.sortedBy { it.displayOrder }.map { item ->
+        DraftOptionChoice(
+            name = item.name,
+            priceDeltaLabel = formatOptionPriceDelta(item.priceDelta),
+            id = item.id,
+            inventoryRecipeId = item.inventoryRecipeId,
+            inventoryRecipeQuantity = item.inventoryRecipeQuantity
+        )
+    }
+)

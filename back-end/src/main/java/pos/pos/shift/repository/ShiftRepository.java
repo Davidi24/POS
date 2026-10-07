@@ -25,8 +25,12 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     @Query("""
         select count(s) from Shift s where s.user.id = :userId and s.id <> :exclude
         and s.status not in (pos.pos.shift.enums.ShiftStatus.CANCELLED, pos.pos.shift.enums.ShiftStatus.MISSED)
-        and coalesce(s.scheduledStart, s.startedAt) < :end
-        and coalesce(s.scheduledEnd, s.endedAt, :end) > :start
+        and (
+            (coalesce(s.scheduledStart, s.startedAt) < :end
+            and coalesce(s.scheduledEnd, s.endedAt, :end) > :start)
+            or (s.startedAt is not null and s.startedAt < :end
+            and coalesce(s.endedAt, :end) > :start)
+        )
         """)
     long overlaps(UUID userId, UUID exclude, OffsetDateTime start, OffsetDateTime end);
 

@@ -1,5 +1,6 @@
 package pos.pos.order.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,5 +19,6 @@ public class OrderPaymentStatusRequest {
     @NotNull(message = "paymentStatus is required")
     private OrderPaymentStatus paymentStatus;
 
+    @Size(max = 1000, message = "note must be at most 1000 characters")
     private String note;
 }

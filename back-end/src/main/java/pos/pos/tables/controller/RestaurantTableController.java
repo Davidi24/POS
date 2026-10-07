@@ -3,6 +3,7 @@ package pos.pos.tables.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -183,7 +184,7 @@ public class RestaurantTableController {
             @PathVariable UUID branchId,
             @RequestParam(required = false) OffsetDateTime from,
             @RequestParam(required = false) OffsetDateTime to,
-            @RequestParam(required = false) Integer partySize,
+            @RequestParam(required = false) @Min(value = 1, message = "partySize must be greater than 0") Integer partySize,
             Authentication authentication
     ) {
         return ResponseEntity.ok(restaurantTableService.getTableAvailability(authentication, restaurantId, branchId, from, to, partySize));
@@ -197,7 +198,7 @@ public class RestaurantTableController {
             @PathVariable UUID branchId,
             @RequestParam(required = false) OffsetDateTime from,
             @RequestParam(required = false) OffsetDateTime to,
-            @RequestParam(required = false) Integer partySize,
+            @RequestParam(required = false) @Min(value = 1, message = "partySize must be greater than 0") Integer partySize,
             Authentication authentication
     ) {
         return ResponseEntity.ok(restaurantTableService.getAvailableTables(authentication, restaurantId, branchId, from, to, partySize));
@@ -212,7 +213,7 @@ public class RestaurantTableController {
             @PathVariable UUID tableId,
             @RequestParam(required = false) OffsetDateTime from,
             @RequestParam(required = false) OffsetDateTime to,
-            @RequestParam(required = false) Integer partySize,
+            @RequestParam(required = false) @Min(value = 1, message = "partySize must be greater than 0") Integer partySize,
             Authentication authentication
     ) {
         return ResponseEntity.ok(restaurantTableService.getTableAvailability(authentication, restaurantId, branchId, tableId, from, to, partySize));

@@ -96,4 +96,13 @@ public class UpdateSettingsReservationPolicyRequest {
     @Min(value = 1, message = "depositFromGuests must be at least 1")
     @Max(value = 200, message = "depositFromGuests must be at most 200")
     private Integer depositFromGuests;
+
+    // Optional so older clients keep working; empty keeps the saved fee.
+    @jakarta.validation.constraints.DecimalMin(value = "0.0", message = "cardFeePercent must not be negative")
+    @jakarta.validation.constraints.DecimalMax(value = "20.0", message = "cardFeePercent must be at most 20")
+    private java.math.BigDecimal cardFeePercent;
+
+    @jakarta.validation.constraints.DecimalMin(value = "0.0", message = "cardFeeFixed must not be negative")
+    @jakarta.validation.constraints.DecimalMax(value = "10.0", message = "cardFeeFixed must be at most 10")
+    private java.math.BigDecimal cardFeeFixed;
 }

@@ -29,6 +29,10 @@ public class OrderMapper {
     }
 
     public OrderResponse toResponse(Order order, boolean includeChildren, boolean includeEvents) {
+        return toResponse(order, includeChildren, includeEvents, null);
+    }
+
+    public OrderResponse toResponse(Order order, boolean includeChildren, boolean includeEvents, Integer resolvedItemCount) {
         if (order == null) {
             return null;
         }
@@ -61,7 +65,7 @@ public class OrderMapper {
                 .serviceChargeTotal(order.getServiceChargeTotal())
                 .total(order.getTotal())
                 .prepaidTotal(order.getPrepaidTotal())
-                .itemCount(quantityTotal(order))
+                .itemCount(resolvedItemCount == null ? quantityTotal(order) : resolvedItemCount)
                 .openedAt(order.getOpenedAt())
                 .closedAt(order.getClosedAt())
                 .createdAt(order.getCreatedAt())

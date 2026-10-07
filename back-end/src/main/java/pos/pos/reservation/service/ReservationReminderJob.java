@@ -45,6 +45,13 @@ public class ReservationReminderJob {
     private final ReservationPolicy reservationPolicy;
     private final ReservationSupport reservationSupport;
     private final ReservationNotifications reservationNotifications;
+    private ReservationMailService reservationMailService;
+
+    // Optional so the job runs without email (and in tests).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setReservationMailService(ReservationMailService reservationMailService) {
+        this.reservationMailService = reservationMailService;
+    }
 
     @Scheduled(fixedDelay = 60_000, initialDelay = 40_000)
     @Transactional
@@ -54,8 +61,27 @@ public class ReservationReminderJob {
 
     @Transactional
     public void sendReminders(OffsetDateTime now) {
+        guestReminders(now);
         callReminders(now);
         dayBeforeReminders(now);
+    }
+
+    // The guest's "See you soon? [Confirm] [Cancel]" email, the reminder time (24 h) before, once.
+    private void guestReminders(OffsetDateTime now) {
+        if (reservationMailService == null) {
+            return;
+        }
+        for (Reservation booking : reservationRepository.findAwaitingAttendance(ReservationStatus.CONFIRMED, now, now.plusDays(8))) {
+            if (booking.getContactEmail() == null || booking.getContactEmail().isBlank()) {
+                continue;
+            }
+            int hours = reservationPolicy.values(booking.getRestaurant()).guestReminderHours();
+            if (now.isBefore(booking.getReservationStart().minusHours(hours))
+                    || reservationEventRepository.existsByReservation_IdAndType(booking.getId(), ReservationEventType.GUEST_REMINDED)) {
+                continue;
+            }
+            reservationMailService.reminder(booking);
+        }
     }
 
     private void callReminders(OffsetDateTime now) {

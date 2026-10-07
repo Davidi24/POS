@@ -15,6 +15,7 @@ import mobile_desktop.shared.generated.resources.settings_notifications
 import mobile_desktop.shared.generated.resources.settings_orders_kitchen
 import mobile_desktop.shared.generated.resources.settings_payments
 import mobile_desktop.shared.generated.resources.settings_tables
+import mobile_desktop.shared.generated.resources.workspace_fraud
 import mobile_desktop.shared.generated.resources.workspace_pos
 import mobile_desktop.shared.generated.resources.workspace_restaurants
 import org.jetbrains.compose.resources.DrawableResource
@@ -79,11 +80,18 @@ internal val SaveGroups: List<SaveGroup> = listOf(
     patchGroup("/order-channels", "allowOpenTickets", "enableQrOrdering", "enableTakeaway", "enableDelivery"),
     patchGroup("/pre-orders", "preOrdersEnabled", "preOrderLeadMinutes"),
     patchGroup("/sequence-prefixes", "orderSequencePrefix", "invoiceSequencePrefix"),
+    patchGroup("/kitchen-status", "kitchenSlowAfterMinutes", "kitchenReadyWaitingMinutes"),
+    patchGroup("/shifts", "clockInEarlyMinutes"),
+    patchGroup("/payments", "tipsEnabled", "tipSuggestionsText", "maxTipPercent", "autoClosePaidOrders", "refundWindowDays"),
+    patchGroup(
+        "/fraud-checks", "fraudDiscountPercent", "fraudRefundAmount", "fraudVoidsPerDay", "fraudTipPercent",
+        "fraudCashRefundsPerDay", "fraudDisabledRules"
+    ),
     patchGroup(
         "/reservation-policy", "largeGroupFrom", "largeGroupExtraMinutes", "approvalGroupSize", "holdMinutes",
         "holdWarningMinutes", "checkInOpensMinutes", "confirmReminderTime", "sameDayConfirmMinutes",
         "attendanceCallMinutes", "reopenWindowMinutes", "undoSeatMinutes", "runningLateMaxMinutes", "lateAfterMinutes",
-        "guestReminderHours", "noShowWarningFrom", "depositFromGuests"
+        "guestReminderHours", "noShowWarningFrom", "depositFromGuests", "cardFeePercent", "cardFeeFixed"
     ),
     SaveGroup(
         SettingsSource.ORDER_RULES,
@@ -101,7 +109,9 @@ internal val SaveGroups: List<SaveGroup> = listOf(
     ) { scope, body -> put(scope.restaurantId, "/receipt", body) },
     SaveGroup(SettingsSource.RESERVATION_RULE, ReservationRuleKeys) { scope, body ->
         val id = body.text("id")
-        val request = JsonObject(body.filterKeys { it in ReservationRuleKeys })
+        // The deposit is a fixed amount per booking (the server still wants its kind).
+        val fixed = if (body.bool("requireDeposit") == true) mapOf("depositType" to JsonPrimitive("FIXED_AMOUNT")) else emptyMap()
+        val request = JsonObject(body.filterKeys { it in ReservationRuleKeys } + fixed)
         if (id == null) post(scope.restaurantId, "/reservation-rules", request)
         else put(scope.restaurantId, "/reservation-rules/$id", request)
     }
@@ -163,6 +173,7 @@ internal enum class SettingsCategory(val title: String, val description: String,
     ORDERS("Orders & kitchen", "Kitchen, order changes, order types and pre-orders", Res.drawable.settings_orders_kitchen),
     PAYMENTS("Payments & receipts", "Tax, service charge, paying and what receipts show", Res.drawable.settings_payments),
     SHIFTS("Shifts", "Clock-in, breaks and schedules", Res.drawable.overview_next_hours),
+    FRAUD("Fraud checks", "When discounts, refunds and removals are flagged for review", Res.drawable.workspace_fraud),
     NOTIFICATIONS("Notifications", "Who is told about what, and when", Res.drawable.settings_notifications),
     ONLINE_BOOKING("Online booking", "Your website booking page. Coming later", Res.drawable.workspace_restaurants, available = false)
 }
@@ -230,10 +241,15 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
             "Deposit for big groups", listOf(
                 ToggleField(RR, "requireDeposit", "Ask big groups for a deposit", "Off for most restaurants"),
                 NumberField(G, "depositFromGuests", "Deposit from", "guests", 1, 200, 1, shownWhen = { it.bool(RR, "requireDeposit") }),
-                ChoiceField(RR, "depositType", "Deposit", AmountTypes, shownWhen = { it.bool(RR, "requireDeposit") }),
-                DecimalField(RR, "depositValue", "Amount", "%", shownWhen = { it.bool(RR, "requireDeposit") && it.text(RR, "depositType") == "PERCENTAGE" }),
-                DecimalField(RR, "depositValue", "Amount per booking", "", shownWhen = { it.bool(RR, "requireDeposit") && it.text(RR, "depositType") != "PERCENTAGE" }),
+                // A fixed amount per booking: when a table is booked there's no bill yet to take a percentage of.
+                DecimalField(RR, "depositValue", "Deposit per booking", "", "Paid when booking", shownWhen = { it.bool(RR, "requireDeposit") }),
                 NumberField(RR, "cancellationWindowHours", "Refund the deposit if cancelled at least", "h before", 0, 720, 1, "Minus the card fee. Kept on a no-show", shownWhen = { it.bool(RR, "requireDeposit") })
+            )
+        ),
+        SettingsSection(
+            "Refunds", listOf(
+                DecimalField(G, "cardFeePercent", "Card fee kept on a refund", "%", "What the card company charges; taken off refunds of deposits, extras and pre-orders"),
+                DecimalField(G, "cardFeeFixed", "Plus per payment", "", "A fixed part of the card fee, e.g. 0.25")
             )
         )
     )
@@ -241,6 +257,12 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
         SettingsSection(
             "Kitchen", listOf(
                 ToggleField(OR, "autoFireToKitchen", "Send items to the kitchen automatically", "Otherwise staff send them")
+            )
+        ),
+        SettingsSection(
+            "Kitchen Status for waiters", listOf(
+                NumberField(G, "kitchenSlowAfterMinutes", "An order is taking long after", "min", 1, 240, 1, "It turns red on the waiters' Kitchen Status"),
+                NumberField(G, "kitchenReadyWaitingMinutes", "Ready food is waiting too long after", "min", 1, 120, 1, "Waiters see it in red until they pick it up")
             )
         ),
         SettingsSection(
@@ -305,6 +327,21 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
             )
         ),
         SettingsSection(
+            "Tips", listOf(
+                ToggleField(G, "tipsEnabled", "Guests can leave a tip"),
+                TextSettingField(G, "tipSuggestionsText", "Tip buttons", 23, "5,10,15",
+                    hint = "Percents of the bill, separated by commas (up to 6)", shownWhen = { it.bool(G, "tipsEnabled") }),
+                NumberField(G, "maxTipPercent", "Biggest tip allowed", "% of the payment", 1, 200, 5,
+                    "A bigger tip is refused, so a typo can't charge a guest too much", shownWhen = { it.bool(G, "tipsEnabled") })
+            )
+        ),
+        SettingsSection(
+            "After paying", listOf(
+                ToggleField(G, "autoClosePaidOrders", "Close the order once it's paid", "Otherwise staff close it themselves"),
+                NumberField(G, "refundWindowDays", "Refunds possible for", "days", 0, 365, 1, "After the payment. 0 means no limit")
+            )
+        ),
+        SettingsSection(
             "Receipts", listOf(
                 ToggleField(RC, "autoPrintCustomerReceipt", "Print the receipt automatically"),
                 ToggleField(RC, "autoPrintKitchenTicket", "Print kitchen tickets automatically"),
@@ -320,7 +357,27 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
             )
         )
     )
-    SettingsCategory.DEVICES, SettingsCategory.SHIFTS, SettingsCategory.NOTIFICATIONS, SettingsCategory.ONLINE_BOOKING -> emptyList()
+    SettingsCategory.SHIFTS -> listOf(
+        SettingsSection(
+            "Clocking in", listOf(
+                NumberField(G, "clockInEarlyMinutes", "Staff can clock in for a shift from", "min before", 0, 720, 15, "Before that, clocking in starts a shift that isn't planned")
+            ),
+            note = "Hourly wages are set per person in Shifts → Hours & pay."
+        )
+    )
+    SettingsCategory.FRAUD -> listOf(
+        SettingsSection(
+            "Flag for review", listOf(
+                NumberField(G, "fraudDiscountPercent", "Discounts from", "% of the bill", 1, 100, 5),
+                DecimalField(G, "fraudRefundAmount", "Refunds from", "", "Any single refund this big or bigger"),
+                NumberField(G, "fraudVoidsPerDay", "Removals by one person from", "a day", 1, 1000, 1, "Items or whole orders removed"),
+                NumberField(G, "fraudCashRefundsPerDay", "Cash refunds by one person from", "a day", 1, 1000, 1),
+                NumberField(G, "fraudTipPercent", "Tips from", "% of the payment", 1, 500, 5)
+            ),
+            note = "Each check can be switched off in Fraud Detection → Rules."
+        )
+    )
+    SettingsCategory.DEVICES, SettingsCategory.NOTIFICATIONS, SettingsCategory.ONLINE_BOOKING -> emptyList()
 }
 
 // What must be fixed before a page can be saved, or null when it's fine.
@@ -334,16 +391,34 @@ internal fun SettingsCategory.problem(values: SettingsValues): String? {
             val warning = number(G, "holdWarningMinutes")
             val late = number(G, "lateAfterMinutes")
             val deposit = number(RR, "depositValue")
+            val feePercent = number(G, "cardFeePercent")
+            val feeFixed = number(G, "cardFeeFixed")
             when {
                 smallest != null && largest != null && smallest > largest -> "The smallest booking can't be bigger than the largest."
                 hold != null && warning != null && warning >= hold -> "\"Hold ends soon\" must show before the hold ends."
                 hold != null && late != null && late >= hold -> "A guest must show as late before the hold ends."
-                values.bool(RR, "requireDeposit") && values.text(RR, "depositType") == null -> "Choose the kind of deposit."
                 values.bool(RR, "requireDeposit") && (deposit == null || deposit <= 0.0) -> "Enter the deposit amount."
-                values.bool(RR, "requireDeposit") && values.text(RR, "depositType") == "PERCENTAGE" && deposit != null && deposit > 100.0 ->
-                    "A percentage deposit can't be more than 100%."
+                feePercent != null && (feePercent < 0.0 || feePercent > 20.0) -> "The card fee must be between 0 and 20%."
+                feeFixed != null && (feeFixed < 0.0 || feeFixed > 10.0) -> "The fixed card fee must be between 0 and 10."
                 else -> null
             }
+        }
+        SettingsCategory.PAYMENTS -> {
+            val maxTip = number(G, "maxTipPercent")
+            val text = values.text(G, "tipSuggestionsText").orEmpty().trim()
+            val tips = if (text.isEmpty()) emptyList() else text.split(',').map { it.trim().toIntOrNull() }
+            when {
+                values.bool(G, "tipsEnabled") && (tips.any { it == null } || tips.size > 6) ->
+                    "Tip buttons are up to 6 whole percents, like 5,10,15."
+                values.bool(G, "tipsEnabled") && tips.any { it != null && (it < 1 || it > 100) } -> "A tip button must be between 1 and 100%."
+                values.bool(G, "tipsEnabled") && maxTip != null && tips.any { it != null && it > maxTip } ->
+                    "A tip button can't be above the biggest tip allowed."
+                else -> null
+            }
+        }
+        SettingsCategory.FRAUD -> {
+            val refund = number(G, "fraudRefundAmount")
+            if (refund != null && (refund < 0.0 || refund > 1_000_000.0)) "The refund amount must be between 0 and 1,000,000." else null
         }
         else -> null
     }

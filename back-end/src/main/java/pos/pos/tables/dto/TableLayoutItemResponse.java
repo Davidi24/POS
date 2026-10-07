@@ -52,6 +52,9 @@ public class TableLayoutItemResponse {
     private OffsetDateTime nextReservationHoldWarningAt;
     private Integer nextReservationPartySize;
     private Integer nextReservationArrivedGuests;
+    // e.g. 🎂 for a birthday booking at this table.
+    private String nextReservationOccasionIcon;
+    private String nextReservationOccasionName;
     private UUID currentOrderId;
     private String currentOrderNumber;
     private OrderStatus currentOrderStatus;

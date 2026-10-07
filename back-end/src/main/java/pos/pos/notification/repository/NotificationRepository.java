@@ -36,15 +36,19 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     java.util.Optional<Notification> findByIdAndRestaurant_Id(UUID id, UUID restaurantId);
 
-    // Marks every unread personal notification of a user as read (optionally only for one branch).
+    // Marks delivered unread personal notifications visible to the user (optionally one branch plus restaurant-wide).
     @org.springframework.data.jpa.repository.Modifying
     @Query("""
             update Notification n
-               set n.readAt = :readAt, n.status = :readStatus
+               set n.readAt = :readAt,
+                   n.status = :readStatus,
+                   n.updatedAt = :readAt,
+                   n.updatedBy = :userId
              where n.restaurant.id = :restaurantId
                and n.recipientUser.id = :userId
                and n.readAt is null
-               and (:branchId is null or n.branch.id = :branchId)
+               and n.deliveredAt is not null
+               and (:branchId is null or n.branch is null or n.branch.id = :branchId)
             """)
     int markAllRead(
             UUID restaurantId,

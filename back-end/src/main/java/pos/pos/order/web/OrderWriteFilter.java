@@ -22,7 +22,7 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.regex.Pattern;
 
-/** Atomic request replay and restaurant-scoped serialization of order writes across instances. */
+/** Atomic request replay and serialization of order writes plus stock-movement retries across instances. */
 @RequiredArgsConstructor
 public class OrderWriteFilter extends OncePerRequestFilter {
     private final JdbcTemplate jdbc;
@@ -32,9 +32,9 @@ public class OrderWriteFilter extends OncePerRequestFilter {
     public void setSchema(String schema) { this.schema = schema; }
     private String replayTable() {
         if (!schema.matches("[A-Za-z_][A-Za-z0-9_]*")) throw new IllegalStateException("Invalid database schema");
-        return "\"" + schema + "\".order_write_requests";
+        return "\"" + schema + "\".write_request_replays";
     }
-    private static final Pattern PATH = Pattern.compile(".*/restaurants/([0-9a-fA-F-]{36})/(?:branches/[^/]+/(?:tables/[^/]+/)?orders|orders)(?:/.*)?");
+    private static final Pattern PATH = Pattern.compile(".*/restaurants/([0-9a-fA-F-]{36})/(?:branches/[^/]+/(?:tables/[^/]+/)?orders|orders|inventory/(?:receive|waste|transfer|returns|adjustments))(?:/.*)?");
 
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
         return !java.util.Set.of("POST", "PUT", "PATCH", "DELETE").contains(request.getMethod())
@@ -46,6 +46,9 @@ public class OrderWriteFilter extends OncePerRequestFilter {
         var match = PATH.matcher(request.getRequestURI());
         if (!match.matches()) { chain.doFilter(request, response); return; }
         String key = request.getHeader("Idempotency-Key");
+        if (key == null && requiresIdempotencyKey(request.getMethod(), request.getRequestURI())) {
+            response.sendError(400, "Idempotency-Key is required for this action"); return;
+        }
         if (key != null && !key.matches("[A-Za-z0-9_-]{16,100}")) {
             response.sendError(400, "Invalid Idempotency-Key"); return;
         }
@@ -65,8 +68,12 @@ public class OrderWriteFilter extends OncePerRequestFilter {
         transaction.setTimeout(30);
         try {
             transaction.executeWithoutResult(status -> {
-                // One restaurant lock also gives merge/create-table operations a consistent lock order.
-                jdbc.query("select pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> {}, "orders:" + match.group(1));
+                // Order writes share a restaurant lock for their table/order invariants. Inventory
+                // stock deltas are atomic in SQL, so serialize only identical replay keys there.
+                String lockName = isInventoryMovement(request.getMethod(), request.getRequestURI())
+                        ? "write-replay:" + owner + ":" + key
+                        : "orders:" + match.group(1);
+                jdbc.query("select pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> {}, lockName);
                 if (key != null) {
                     var previous = jdbc.queryForList("select fingerprint, status, content_type, body from " + replayTable() + " where owner_id = ? and request_key = ?", owner, key);
                     if (!previous.isEmpty()) {
@@ -106,6 +113,19 @@ public class OrderWriteFilter extends OncePerRequestFilter {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
+
+    private static boolean requiresIdempotencyKey(String method, String requestUri) {
+        return "POST".equals(method) && (
+                requestUri.matches(".*/restaurants/[0-9a-fA-F-]{36}/orders/[^/]+/payments(?:/[^/]+/(?:refund|void))?")
+                        || isInventoryMovement(method, requestUri)
+        );
+    }
+
+    private static boolean isInventoryMovement(String method, String requestUri) {
+        return "POST".equals(method)
+                && requestUri.matches(".*/restaurants/[0-9a-fA-F-]{36}/inventory/(?:receive|waste|transfer|returns|adjustments)");
+    }
+
     private static final class BufferedRequest extends HttpServletRequestWrapper {
         private final byte[] body;
         BufferedRequest(HttpServletRequest request, byte[] body) { super(request); this.body = body; }

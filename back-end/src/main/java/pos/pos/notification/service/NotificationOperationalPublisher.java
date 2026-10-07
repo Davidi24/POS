@@ -10,6 +10,8 @@ import pos.pos.notification.enums.NotificationPriority;
 import pos.pos.notification.enums.NotificationTopic;
 import pos.pos.notification.support.NotificationEventCodeSupport;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,6 +29,8 @@ public class NotificationOperationalPublisher {
             ThreadLocal.withInitial(LinkedHashMap::new);
     private final ThreadLocal<Boolean> synchronizationRegistered =
             ThreadLocal.withInitial(() -> Boolean.FALSE);
+    private final ThreadLocal<List<NotificationDispatchService.DispatchPair>> persistedEvents = new ThreadLocal<>();
+    private final ThreadLocal<OffsetDateTime> happenedAt = new ThreadLocal<>();
 
     public void publishEntityChange(Object entity, NotificationMutationType mutationType) {
         notificationEntityResolver.resolveEntityChange(entity, mutationType).ifPresent(this::queue);
@@ -86,10 +90,20 @@ public class NotificationOperationalPublisher {
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
-            public void afterCommit() {
+            public void beforeCommit(boolean readOnly) {
                 Collection<NotificationOperationalEvent> events = List.copyOf(queuedEvents.get().values());
-                clear();
-                notificationDispatchService.dispatch(events);
+                OffsetDateTime commitTime = OffsetDateTime.now(ZoneOffset.UTC);
+                persistedEvents.set(notificationDispatchService.persistOperationalEvents(events, commitTime));
+                happenedAt.set(commitTime);
+            }
+
+            @Override
+            public void afterCommit() {
+                List<NotificationDispatchService.DispatchPair> saved = persistedEvents.get();
+                OffsetDateTime occurredAt = happenedAt.get();
+                if (saved != null && occurredAt != null) {
+                    notificationDispatchService.broadcast(saved, occurredAt);
+                }
             }
 
             @Override
@@ -100,6 +114,8 @@ public class NotificationOperationalPublisher {
             private void clear() {
                 queuedEvents.remove();
                 synchronizationRegistered.remove();
+                persistedEvents.remove();
+                happenedAt.remove();
             }
         });
 

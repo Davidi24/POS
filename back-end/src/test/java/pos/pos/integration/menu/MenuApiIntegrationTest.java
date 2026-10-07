@@ -13,8 +13,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 import pos.pos.menu.entity.Menu;
@@ -27,6 +29,7 @@ import pos.pos.menu.entity.OptionGroupType;
 import pos.pos.menu.entity.OptionItem;
 import pos.pos.menu.repository.MenuItemOptionGroupRepository;
 import pos.pos.menu.repository.MenuItemRepository;
+import pos.pos.menu.repository.OnlineMenuSectionRepository;
 import pos.pos.menu.repository.MenuRepository;
 import pos.pos.menu.repository.MenuSectionRepository;
 import pos.pos.menu.repository.MenuVariantRepository;
@@ -45,11 +48,19 @@ import pos.pos.user.repository.UserRepository;
 import pos.pos.user.repository.UserRoleRepository;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -127,6 +138,9 @@ class MenuApiIntegrationTest {
 
     @Autowired
     private MenuItemRepository menuItemRepository;
+
+    @Autowired
+    private OnlineMenuSectionRepository onlineMenuSectionRepository;
 
     @Autowired
     private MenuVariantRepository menuVariantRepository;
@@ -237,6 +251,86 @@ class MenuApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("Menu item import copies a dish graph once and leaves its source unchanged")
+    void shouldCopyMenuItemWithVariantsAndOptionGroups() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("import-items", admin.getId());
+        Menu regular = createMenu(restaurant, "regular", "Regular Menu", true, 1, admin.getId());
+        Menu special = createMenu(restaurant, "special", "Special Menu", true, 2, admin.getId());
+        MenuSection regularSection = createSection(regular, "Desserts", "Desserts", true, 1);
+        MenuSection specialSection = createSection(special, "Specials", "Specials", true, 1);
+        MenuItem source = createItem(regularSection, "DES-001", "Chocolate Cake", new BigDecimal("6.50"), true, 1);
+        source.setIngredients(List.of("cocoa", "cream"));
+        menuItemRepository.saveAndFlush(source);
+        createVariant(source, "Large", "DES-001-L", new BigDecimal("2.00"), false, true, 1);
+        OptionGroupType type = createOptionGroupType("dessert_choice", "Dessert Choice");
+        OptionGroup topping = createOptionGroup(restaurant, type, "Toppings", "Choose toppings", 0, 2, false, true, 1);
+        linkOptionGroup(source, topping, 1, 0, 2, false);
+
+        String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "MENU-ITEM-IMPORT");
+        MvcResult result = mockMvc.perform(post("/menus/{menuId}/sections/{sectionId}/items/import",
+                        special.getId(), specialSection.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("itemIds", List.of(source.getId(), source.getId())))))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode copies = bodyOf(result);
+        assertThat(copies).hasSize(1);
+        JsonNode copy = copies.get(0);
+        UUID copiedId = UUID.fromString(copy.get("id").asText());
+        assertThat(copiedId).isNotEqualTo(source.getId());
+        assertThat(copy.has("sku")).isFalse();
+        assertThat(copy.get("basePrice").decimalValue()).isEqualByComparingTo("6.50");
+        assertThat(copy.get("ingredients")).extracting(JsonNode::asText).containsExactly("cocoa", "cream");
+        assertThat(copy.get("variants")).hasSize(1);
+        assertThat(copy.get("variants").get(0).get("name").asText()).isEqualTo("Large");
+        assertThat(copy.get("optionGroups")).hasSize(1);
+        assertThat(copy.get("optionGroups").get(0).get("name").asText()).isEqualTo("Toppings");
+
+        MenuItem persistedCopy = menuItemRepository.findById(copiedId).orElseThrow();
+        assertThat(persistedCopy.getSection().getId()).isEqualTo(specialSection.getId());
+        assertThat(menuItemRepository.findById(source.getId()).orElseThrow().getSection().getId()).isEqualTo(regularSection.getId());
+        assertThat(menuVariantRepository.findByMenuItemIdOrderByDisplayOrderAscNameAsc(copiedId)).hasSize(1);
+        assertThat(menuItemOptionGroupRepository.findByMenuItemIdOrdered(copiedId)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Menu item import rejects foreign and missing source items without partial copies")
+    void shouldRejectInvalidMenuItemImportSourcesAtomically() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("import-items-scope", admin.getId());
+        Restaurant foreignRestaurant = createRestaurant("import-items-foreign", admin.getId());
+        Menu menu = createMenu(restaurant, "target", "Target Menu", true, 1, admin.getId());
+        MenuSection section = createSection(menu, "Target", "Target", true, 1);
+        Menu foreignMenu = createMenu(foreignRestaurant, "foreign", "Foreign Menu", true, 1, admin.getId());
+        MenuSection foreignSection = createSection(foreignMenu, "Foreign", "Foreign", true, 1);
+        MenuItem foreignItem = createItem(foreignSection, "FOR-001", "Foreign Dish", new BigDecimal("4.00"), true, 1);
+        String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "MENU-ITEM-IMPORT-SCOPE");
+        long originalCount = menuItemRepository.countByMenuId(menu.getId());
+
+        MvcResult foreignResult = mockMvc.perform(post("/menus/{menuId}/sections/{sectionId}/items/import",
+                        menu.getId(), section.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("itemIds", List.of(foreignItem.getId())))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+        MvcResult missingResult = mockMvc.perform(post("/menus/{menuId}/sections/{sectionId}/items/import",
+                        menu.getId(), section.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("itemIds", List.of(UUID.randomUUID())))))
+                .andExpect(status().isNotFound())
+                .andReturn();
+
+        assertThat(messageOf(foreignResult)).contains("this restaurant's menus");
+        assertThat(messageOf(missingResult)).contains("no longer exist");
+        assertThat(menuItemRepository.countByMenuId(menu.getId())).isEqualTo(originalCount);
+    }
+
+    @Test
     @DisplayName("Public menu endpoints return active customer-safe data without authentication")
     void shouldExposePublicMenuEndpointsWithoutAuthentication() throws Exception {
         User admin = adminUser();
@@ -246,8 +340,18 @@ class MenuApiIntegrationTest {
 
         MenuSection mains = createSection(breakfast, "Mains", "Main dishes", true, 1);
         createSection(breakfast, "Archived", "Hidden section", false, 2);
-        createItem(mains, "BRG-001", "House Burger", new BigDecimal("12.50"), true, 1);
-        createItem(mains, "BRG-002", "Sold Out Burger", new BigDecimal("13.50"), false, 2);
+        // Guests only see dishes staff switched on for the online menu.
+        pos.pos.menu.entity.OnlineMenuSection online = new pos.pos.menu.entity.OnlineMenuSection();
+        online.setRestaurant(restaurant);
+        online.setName("Burgers");
+        online.setDisplayOrder(0);
+        online = onlineMenuSectionRepository.save(online);
+        MenuItem burger = createItem(mains, "BRG-001", "House Burger", new BigDecimal("12.50"), true, 1);
+        burger.setOnlineSection(online);
+        MenuItem soldOut = createItem(mains, "BRG-002", "Sold Out Burger", new BigDecimal("13.50"), false, 2);
+        soldOut.setOnlineSection(online);
+        createItem(mains, "BRG-003", "Staff Only Burger", new BigDecimal("9.00"), true, 3);
+        menuItemRepository.flush();
 
         MvcResult listResult = mockMvc.perform(get("/public/restaurants/{restaurantId}/menus", restaurant.getId()))
                 .andExpect(status().isOk())
@@ -270,6 +374,136 @@ class MenuApiIntegrationTest {
         assertThat(detailBody.get("sections").get(0).get("items").get(0).get("name").asText()).isEqualTo("House Burger");
         assertThat(detailBody.has("createdBy")).isFalse();
         assertThat(detailBody.has("updatedAt")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Public menus and today's online menu respect restaurant-local daily availability hours")
+    void publicMenusRespectRestaurantLocalHours() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("public-menu-hours", admin.getId());
+        Menu menu = createMenu(restaurant, "lunch-hours", "Lunch", true, 0, admin.getId());
+        LocalTime now = LocalTime.now(ZoneId.of(restaurant.getTimezone()));
+        menu.setAvailableFrom(now.minusHours(2));
+        menu.setAvailableUntil(now.minusHours(1));
+        menuRepository.saveAndFlush(menu);
+        MenuSection section = createSection(menu, "Mains", null, true, 0);
+        pos.pos.menu.entity.OnlineMenuSection onlineSection = new pos.pos.menu.entity.OnlineMenuSection();
+        onlineSection.setRestaurant(restaurant);
+        onlineSection.setName("Lunch");
+        onlineSection.setDisplayOrder(0);
+        onlineSection = onlineMenuSectionRepository.save(onlineSection);
+        MenuItem item = createItem(section, "LUNCH-01", "Daily special", new BigDecimal("12.00"), true, 0);
+        item.setOnlineSection(onlineSection);
+        menuItemRepository.saveAndFlush(item);
+
+        JsonNode publicMenus = bodyOf(mockMvc.perform(get("/public/restaurants/{restaurantId}/menus", restaurant.getId()))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(publicMenus).isEmpty();
+        mockMvc.perform(get("/public/restaurants/{restaurantId}/menus/{menuId}", restaurant.getId(), menu.getId()))
+                .andExpect(status().isNotFound());
+
+        JsonNode publicOnlineMenu = bodyOf(mockMvc.perform(get("/public/restaurants/{restaurantId}/online-menu", restaurant.getId()))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(publicOnlineMenu.get("sections")).isEmpty();
+
+        String token = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "MENU-HOURS-PREVIEW");
+        JsonNode preview = bodyOf(mockMvc.perform(get("/restaurants/{restaurantId}/online-menu", restaurant.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk()).andReturn());
+        JsonNode previewItem = preview.get("sections").get(0).get("items").get(0);
+        assertThat(previewItem.get("visible").asBoolean()).isFalse();
+        assertThat(previewItem.get("hiddenReason").asText()).contains("at this time");
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("Concurrent menu item writes reuse one newly created online section")
+    void concurrentMenuItemWritesCreateOneOnlineSection() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("online-section-concurrency", admin.getId());
+        Menu menu = createMenu(restaurant, "concurrent", "Concurrent Menu", true, 0, admin.getId());
+        MenuSection section = createSection(menu, "Mains", null, true, 0);
+        String token = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "ONLINE-SECTION-RACE");
+        int writes = 4;
+        CountDownLatch ready = new CountDownLatch(writes);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(writes);
+        try {
+            List<Future<MvcResult>> results = new ArrayList<>();
+            for (int i = 0; i < writes; i++) {
+                int itemNumber = i;
+                results.add(executor.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        throw new AssertionError("Timed out waiting to start online-menu section race");
+                    }
+                    return mockMvc.perform(post("/menus/{menuId}/sections/{sectionId}/items", menu.getId(), section.getId())
+                                    .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(Map.of(
+                                            "sku", "RACE-" + itemNumber,
+                                            "name", "Concurrent Dish " + itemNumber,
+                                            "basePrice", "9.50",
+                                            "available", true,
+                                            "showOnline", true,
+                                            "onlineSectionName", "Shared Mains"
+                                    ))))
+                            .andReturn();
+                }));
+            }
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            for (Future<MvcResult> result : results) {
+                assertThat(result.get(30, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(201);
+            }
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+
+        var sections = onlineMenuSectionRepository.findByRestaurant_IdOrderByDisplayOrderAscNameAsc(restaurant.getId());
+        assertThat(sections).hasSize(1);
+        assertThat(sections.get(0).getName()).isEqualTo("Shared Mains");
+        assertThat(menuItemRepository.findByOnlineSection_Id(sections.get(0).getId())).hasSize(writes);
+    }
+
+    @Test
+    @DisplayName("Online section listing returns accurate item counts and excludes another restaurant")
+    void shouldListOnlineSectionSummariesWithItemCounts() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("online-section-counts", admin.getId());
+        Restaurant otherRestaurant = createRestaurant("online-section-other", admin.getId());
+        Menu menu = createMenu(restaurant, "dinner", "Dinner", true, 0, admin.getId());
+        MenuSection staffSection = createSection(menu, "Mains", null, true, 0);
+
+        pos.pos.menu.entity.OnlineMenuSection burgers = onlineSection(restaurant, "Burgers", 0);
+        onlineSection(restaurant, "Desserts", 1);
+        onlineSection(otherRestaurant, "Other restaurant section", 0);
+        MenuItem burger = createItem(staffSection, "BURGER", "House Burger", new BigDecimal("12.50"), true, 0);
+        burger.setOnlineSection(burgers);
+        menuItemRepository.flush();
+
+        String token = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "ONLINE-SECTION-COUNTS");
+        MvcResult result = mockMvc.perform(get("/restaurants/{restaurantId}/online-menu/sections", restaurant.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode sections = bodyOf(result);
+        assertThat(sections).hasSize(2);
+        assertThat(sections.get(0).get("name").asText()).isEqualTo("Burgers");
+        assertThat(sections.get(0).get("itemCount").asLong()).isEqualTo(1L);
+        assertThat(sections.get(1).get("name").asText()).isEqualTo("Desserts");
+        assertThat(sections.get(1).get("itemCount").asLong()).isZero();
+    }
+
+    private pos.pos.menu.entity.OnlineMenuSection onlineSection(Restaurant restaurant, String name, int displayOrder) {
+        pos.pos.menu.entity.OnlineMenuSection section = new pos.pos.menu.entity.OnlineMenuSection();
+        section.setRestaurant(restaurant);
+        section.setName(name);
+        section.setDisplayOrder(displayOrder);
+        return onlineMenuSectionRepository.save(section);
     }
 
     @Test
@@ -901,6 +1135,71 @@ class MenuApiIntegrationTest {
         assertThat(messageOf(blockedDeleteResult)).isEqualTo("Menu item cannot be deleted while it still has variants or option groups");
         assertThat(menuItemRepository.findById(blocked.getId())).isPresent();
         assertThat(menuItemRepository.findById(clear.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Concurrent default variant changes leave exactly one default per dish")
+    void concurrentVariantDefaultChangesRemainUnique() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("variant-default-race", admin.getId());
+        Menu menu = createMenu(restaurant, "race-menu", "Race Menu", true, 1, admin.getId());
+        MenuSection section = createSection(menu, "Mains", "Main dishes", true, 1);
+        MenuItem item = createItem(section, "RACE-001", "Race Dish", new BigDecimal("10.00"), true, 1);
+        MenuVariant first = createVariant(item, "First", "RACE-001-A", BigDecimal.ZERO, false, true, 1);
+        MenuVariant second = createVariant(item, "Second", "RACE-001-B", BigDecimal.ZERO, false, true, 2);
+        String accessToken = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "VARIANT-DEFAULT-RACE");
+
+        // Worker requests use independent transactions, so commit their fixtures before starting the race.
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Integer> firstUpdate = executor.submit(() -> updateVariantDefault(
+                    menu.getId(), section.getId(), item.getId(), first.getId(), accessToken, ready, start));
+            Future<Integer> secondUpdate = executor.submit(() -> updateVariantDefault(
+                    menu.getId(), section.getId(), item.getId(), second.getId(), accessToken, ready, start));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            assertThat(firstUpdate.get(20, TimeUnit.SECONDS)).isEqualTo(200);
+            assertThat(secondUpdate.get(20, TimeUnit.SECONDS)).isEqualTo(200);
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(menuVariantRepository.findByMenuItemIdOrderByDisplayOrderAscNameAsc(item.getId()).stream()
+                .filter(MenuVariant::isDefault)
+                .count()).isEqualTo(1);
+    }
+
+    private int updateVariantDefault(
+            UUID menuId,
+            UUID sectionId,
+            UUID itemId,
+            UUID variantId,
+            String accessToken,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("Timed out waiting to start concurrent variant update");
+        }
+        return mockMvc.perform(put("/menus/{menuId}/sections/{sectionId}/items/{itemId}/variants/{variantId}",
+                        menuId, sectionId, itemId, variantId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Updated " + variantId,
+                                "priceDelta", "0.00",
+                                "default", true,
+                                "active", true,
+                                "displayOrder", 1
+                        ))))
+                .andReturn().getResponse().getStatus();
     }
 
     @Test

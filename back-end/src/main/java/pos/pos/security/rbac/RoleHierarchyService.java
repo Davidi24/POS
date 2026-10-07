@@ -25,6 +25,7 @@ public class RoleHierarchyService {
 
     private final RoleRepository roleRepository;
     private final SettingsRepository settingsRepository;
+    private final pos.pos.user.repository.UserRepository userRepository;
 
 
     // takes the highest rank of all roles that a user has
@@ -48,6 +49,7 @@ public class RoleHierarchyService {
 
         long actorRank = highestActiveRank(currentUserId(authentication));
         return roleRepository.findAssignableRolesForActorRank(actorRank).stream()
+                .filter(role -> visibleTo(authentication, role))
                 .filter(role -> meetsRoleFloor(authentication, actorRank, role))
                 .toList();
     }
@@ -60,7 +62,8 @@ public class RoleHierarchyService {
         }
 
         long actorRank = highestActiveRank(currentUserId(authentication));
-        if (actorRank <= targetRole.getRank()
+        if (!visibleTo(authentication, targetRole)
+                || actorRank <= targetRole.getRank()
                 || !targetRole.isAssignable()
                 || targetRole.isProtectedRole()
                 || !meetsRoleFloor(authentication, actorRank, targetRole)) {
@@ -74,7 +77,10 @@ public class RoleHierarchyService {
         }
 
         long actorRank = highestActiveRank(currentUserId(authentication));
-        if (actorRank <= targetRole.getRank() || targetRole.isProtectedRole() || targetRole.isSystem()) {
+        UUID actorRestaurantId = actorRestaurantId(authentication);
+        // Only the restaurant that made a custom role changes it.
+        if (actorRestaurantId == null || !actorRestaurantId.equals(targetRole.getRestaurantId())
+                || actorRank <= targetRole.getRank() || targetRole.isProtectedRole() || targetRole.isSystem()) {
             throw new RoleManagementNotAllowedException();
         }
     }
@@ -86,6 +92,11 @@ public class RoleHierarchyService {
             return;
         }
 
+        // Staff of one restaurant never reach the people of another, whatever their rank.
+        if (!sameRestaurant(authentication, targetUserId)) {
+            throw new UserManagementNotAllowedException();
+        }
+
         long actorRank = highestActiveRank(currentUserId(authentication));
         long targetRank = highestActiveRank(targetUserId);
 
@@ -95,6 +106,32 @@ public class RoleHierarchyService {
                         .anyMatch(role -> !meetsRoleFloor(authentication, actorRank, role))) {
             throw new UserManagementNotAllowedException();
         }
+    }
+
+    // A role is visible to everyone when it's shared (system roles), otherwise only to its own restaurant.
+    public boolean visibleTo(Authentication authentication, Role role) {
+        if (role.getRestaurantId() == null || isSuperAdmin(authentication)) {
+            return true;
+        }
+        return role.getRestaurantId().equals(actorRestaurantId(authentication));
+    }
+
+    // True when the target person works at the actor's restaurant (an actor without a restaurant reaches nobody).
+    public boolean sameRestaurant(Authentication authentication, UUID targetUserId) {
+        UUID actorRestaurantId = actorRestaurantId(authentication);
+        if (actorRestaurantId == null || targetUserId == null) {
+            return false;
+        }
+        return userRepository.findById(targetUserId)
+                .map(target -> actorRestaurantId.equals(target.getRestaurantId()))
+                .orElse(false);
+    }
+
+    public UUID actorRestaurantId(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
+            return null;
+        }
+        return user.getRestaurantId();
     }
 
     // Some system roles can only be handed out or managed from a set level up (Managers from Co-Owner, Viewers from Admin),

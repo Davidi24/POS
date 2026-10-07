@@ -45,6 +45,20 @@ class NotificationDispatchService {
 
         OffsetDateTime happenedAt = OffsetDateTime.now(ZoneOffset.UTC);
         List<DispatchPair> persisted = persist(events, happenedAt);
+        broadcast(persisted, happenedAt);
+    }
+
+    /**
+     * Persist events inside the originating business transaction. Calling REQUIRES_NEW from an after-commit
+     * callback can deadlock a busy connection pool: each completed request still holds its connection while
+     * waiting for a second connection for notification persistence.
+     */
+    @Transactional
+    List<DispatchPair> persistOperationalEvents(Collection<NotificationOperationalEvent> events, OffsetDateTime happenedAt) {
+        return persist(events, happenedAt);
+    }
+
+    void broadcast(List<DispatchPair> persisted, OffsetDateTime happenedAt) {
         for (DispatchPair pair : persisted) {
             if (pair.notification().getChannel() == NotificationChannel.IN_APP) {
                 notificationStreamService.broadcast(pair.event(), pair.notification(), happenedAt);
@@ -116,6 +130,6 @@ class NotificationDispatchService {
         return savedPairs;
     }
 
-    private record DispatchPair(NotificationOperationalEvent event, Notification notification) {
+    record DispatchPair(NotificationOperationalEvent event, Notification notification) {
     }
 }

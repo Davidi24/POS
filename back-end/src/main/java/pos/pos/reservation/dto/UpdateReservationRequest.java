@@ -1,5 +1,6 @@
 package pos.pos.reservation.dto;
 
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
@@ -60,8 +61,22 @@ public class UpdateReservationRequest {
     private Boolean depositRequired;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "depositAmount must not be negative")
+    @Digits(integer = 12, fraction = 2, message = "depositAmount must have at most 12 digits and 2 decimals")
     private BigDecimal depositAmount;
 
-    private List<UUID> tableIds;
+    @Size(max = 50, message = "tableIds can have at most 50 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UUID> tableIds;
     private UUID primaryTableId;
+
+    // An occasion (code from /reservation-occasions; empty clears it), its picked options and a note.
+    @jakarta.validation.constraints.Size(max = 40, message = "occasionCode must be at most 40 characters")
+    @Size(max = 40, message = "occasionCode must be at most 40 characters")
+    private String occasionCode;
+
+    @jakarta.validation.constraints.Size(max = 20, message = "at most 20 occasion options")
+    private java.util.List<@Size(max = 100, message = "an occasion option must be at most 100 characters") String> occasionOptions;
+
+    @jakarta.validation.constraints.Size(max = 1000, message = "occasionNote must be at most 1000 characters")
+    @Size(max = 500, message = "occasionNote must be at most 500 characters")
+    private String occasionNote;
 }

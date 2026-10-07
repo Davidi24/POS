@@ -64,8 +64,13 @@ public class OrderCommandService {
         applyCreateRequest(order, request);
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, pos.pos.order.enums.OrderEventType.CREATED, "Order created", actorId);
+        boolean fired = orderSupport.autoFireIfEnabled(order, actorId);
 
-        return orderSupport.toResponse(orderSupport.saveOrder(order));
+        Order saved = orderSupport.saveOrder(order);
+        if (fired) {
+            kdsOrderSyncService.syncFromCurrentOrderState(saved, actorId);
+        }
+        return orderSupport.toResponse(saved);
     }
 
     @Transactional
@@ -94,8 +99,13 @@ public class OrderCommandService {
         applyCreateRequest(order, request);
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, pos.pos.order.enums.OrderEventType.CREATED, "Order created", actorId);
+        boolean fired = orderSupport.autoFireIfEnabled(order, actorId);
 
-        return orderSupport.toResponse(orderSupport.saveOrder(order));
+        Order saved = orderSupport.saveOrder(order);
+        if (fired) {
+            kdsOrderSyncService.syncFromCurrentOrderState(saved, actorId);
+        }
+        return orderSupport.toResponse(saved);
     }
 
     @Transactional
@@ -146,7 +156,11 @@ public class OrderCommandService {
         }
 
         if (request.getTableId() != null) {
-            order.setRestaurantTable(orderSupport.resolveTable(branch.getId(), request.getTableId()));
+            RestaurantTable table = orderSupport.resolveTableForUpdate(branch.getId(), request.getTableId());
+            if (order.getRestaurantTable() == null || !Objects.equals(order.getRestaurantTable().getId(), table.getId())) {
+                orderSupport.assertTableCanReceiveOrder(table);
+            }
+            order.setRestaurantTable(table);
         } else if (!Objects.equals(originalBranchId, branch.getId())
                 && order.getRestaurantTable() != null
                 && !Objects.equals(order.getRestaurantTable().getBranch().getId(), branch.getId())) {
@@ -191,7 +205,12 @@ public class OrderCommandService {
         Order order = orderSupport.requireOrder(restaurantId, orderId);
         orderDomainSupport.assertOrderEditable(order);
 
-        order.setRestaurantTable(request.getTableId() == null ? null : orderSupport.resolveTable(order.getBranch().getId(), request.getTableId()));
+        RestaurantTable table = orderSupport.resolveTableForUpdate(order.getBranch().getId(), request.getTableId());
+        if (!Objects.equals(order.getRestaurantTable() == null ? null : order.getRestaurantTable().getId(),
+                table == null ? null : table.getId())) {
+            orderSupport.assertTableCanReceiveOrder(table);
+        }
+        order.setRestaurantTable(table);
         if (order.getRestaurantTable() != null) {
             order.setOrderType(OrderType.DINE_IN);
         }
@@ -282,8 +301,8 @@ public class OrderCommandService {
         Reservation reservation = orderSupport.resolveReservation(restaurantId, request.getReservationId());
         orderDomainSupport.requireReservationBranch(reservation, branch);
         RestaurantTable table = tableIdOverride == null
-                ? orderSupport.resolveTable(branch.getId(), request.getTableId())
-                : orderSupport.resolveTable(branch.getId(), tableIdOverride);
+                ? orderSupport.resolveTableForUpdate(branch.getId(), request.getTableId())
+                : orderSupport.resolveTableForUpdate(branch.getId(), tableIdOverride);
         Customer customer = request.getCustomerId() == null
                 ? reservation == null ? null : reservation.getCustomer()
                 : orderSupport.resolveCustomer(restaurantId, request.getCustomerId());

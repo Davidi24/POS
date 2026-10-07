@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -17,5 +18,6 @@ public class UpdateReservationRulePriorityRequest {
 
     @NotNull(message = "priority is required")
     @Min(value = 0, message = "priority must not be negative")
+    @Max(value = 100000, message = "priority must be at most 100000")
     private Integer priority;
 }

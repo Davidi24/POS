@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.inventory.service.InventorySaleConsumptionService;
 import pos.pos.kds.service.KdsOrderSyncService;
 import pos.pos.order.dto.CreateOrderDiscountRequest;
 import pos.pos.order.dto.CreateOrderItemOptionRequest;
@@ -37,6 +38,7 @@ public class OrderItemService {
     private final OrderSupport orderSupport;
     private final OrderDomainSupport orderDomainSupport;
     private final KdsOrderSyncService kdsOrderSyncService;
+    private final InventorySaleConsumptionService inventorySaleConsumptionService;
 
     @Transactional
     public OrderLineItemResponse addItem(
@@ -54,7 +56,11 @@ public class OrderItemService {
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_ADDED, "Order item added", order.getUpdatedBy());
+        boolean fired = orderSupport.autoFireIfEnabled(order, order.getUpdatedBy());
         orderSupport.saveOrder(order);
+        if (fired) {
+            kdsOrderSyncService.syncFromCurrentOrderState(order, order.getUpdatedBy());
+        }
 
         return orderSupport.toLineItemResponse(lineItem);
     }
@@ -72,6 +78,7 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        orderSupport.assertLineItemNotSaleConsumed(lineItem);
         kdsOrderSyncService.assertLineItemMutable(
                 lineItem,
                 "Order items with KDS ticket history cannot be structurally replaced"
@@ -98,6 +105,7 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        orderSupport.assertLineItemNotSaleConsumed(lineItem);
         kdsOrderSyncService.assertLineItemMutable(
                 lineItem,
                 "Order items with KDS ticket history cannot change quantity"
@@ -149,6 +157,11 @@ public class OrderItemService {
         }
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        if (request.getStatus() == OrderLineItemStatus.FULFILLED && lineItem.getStatus() != OrderLineItemStatus.FULFILLED) {
+            inventorySaleConsumptionService.consumeFulfilledLine(order, lineItem, restaurantScopeService.currentUserId(authentication));
+        } else if (request.getStatus() != OrderLineItemStatus.FULFILLED) {
+            orderSupport.assertLineItemNotSaleConsumed(lineItem);
+        }
         assertKitchenStatusAllowed(lineItem, request.getStatus());
         lineItem.setStatus(request.getStatus());
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
@@ -213,9 +226,15 @@ public class OrderItemService {
         orderSupport.requireVoidReasonIfNeeded(order, request == null ? null : request.getReason());
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        orderSupport.assertLineItemNotSaleConsumed(lineItem);
+        if (lineItem.getStatus() == OrderLineItemStatus.VOIDED || lineItem.getStatus() == OrderLineItemStatus.CANCELLED) {
+            throw new AuthException("This item was already removed", HttpStatus.BAD_REQUEST);
+        }
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
         lineItem.setStatus(OrderLineItemStatus.VOIDED);
+        lineItem.setVoidedBy(actorId);
         orderSupport.appendReasonToLineItem(lineItem, request == null ? null : request.getReason());
-        order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        order.setUpdatedBy(actorId);
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_VOIDED, orderDomainSupport.firstNote(request, "Order item voided"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
@@ -237,6 +256,7 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        orderSupport.assertLineItemNotSaleConsumed(lineItem);
         kdsOrderSyncService.assertLineItemMutable(lineItem, "Sent items cannot change options");
         OrderItemOption option = orderSupport.buildOption(order, lineItem, request);
         lineItem.addOption(option);
@@ -266,12 +286,15 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        orderSupport.assertLineItemNotSaleConsumed(lineItem);
         kdsOrderSyncService.assertLineItemMutable(lineItem, "Sent items cannot change options");
         OrderItemOption option = orderSupport.requireOption(lineItem, optionId);
         OrderItemOption replacement = orderSupport.buildOption(order, lineItem, request);
         option.setOptionItem(replacement.getOptionItem());
         option.setOptionNameSnapshot(replacement.getOptionNameSnapshot());
         option.setPriceDeltaSnapshot(replacement.getPriceDeltaSnapshot());
+        option.setInventoryRecipeSnapshot(replacement.getInventoryRecipeSnapshot());
+        option.setInventoryRecipeQuantitySnapshot(replacement.getInventoryRecipeQuantitySnapshot());
         option.setQuantity(replacement.getQuantity());
         option.setNotes(replacement.getNotes());
 
@@ -300,6 +323,7 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        orderSupport.assertLineItemNotSaleConsumed(lineItem);
         kdsOrderSyncService.assertLineItemMutable(lineItem, "Sent items cannot change options");
         lineItem.removeOption(orderSupport.requireOption(lineItem, optionId));
         orderSupport.validateOptionSelection(lineItem);
@@ -369,6 +393,7 @@ public class OrderItemService {
         Order order = orderSupport.requireOrder(restaurantId, orderId);
         orderDomainSupport.assertOrderEditable(order);
 
+        orderSupport.assertCanManageDiscounts(order.getRestaurant());
         order.removeDiscount(orderSupport.requireDiscount(order, discountId));
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
@@ -404,6 +429,11 @@ public class OrderItemService {
         orderDomainSupport.assertOrderEditable(order);
 
         OrderLineItem lineItem = orderSupport.requireLineItem(order, lineItemId);
+        if (status == OrderLineItemStatus.FULFILLED && lineItem.getStatus() != OrderLineItemStatus.FULFILLED) {
+            inventorySaleConsumptionService.consumeFulfilledLine(order, lineItem, restaurantScopeService.currentUserId(authentication));
+        } else if (status != OrderLineItemStatus.FULFILLED) {
+            orderSupport.assertLineItemNotSaleConsumed(lineItem);
+        }
         assertKitchenStatusAllowed(lineItem, status);
         lineItem.setStatus(status);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));

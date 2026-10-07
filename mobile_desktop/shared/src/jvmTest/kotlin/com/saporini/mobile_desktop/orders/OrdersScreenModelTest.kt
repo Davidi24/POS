@@ -23,7 +23,12 @@ class OrdersScreenModelTest {
     @Test fun activationPollsOnlyWhileVisible() = runTest(dispatcher) {
         var reads = 0
         val repo = object : OrderRepository by unsupportedRepository() {
-            override suspend fun getOpenOrders(restaurantId: String, branchId: String): List<OrderSummary> { reads++; return listOf(summary()) }
+            override suspend fun getOrdersPage(restaurantId: String, branchId: String, from: String?, to: String?, status: OrderStatus?,
+                customerId: String?, search: String?, historyOnly: Boolean, openOnly: Boolean, page: Int, size: Int): OrderPage {
+                reads++
+                assertTrue(openOnly)
+                return OrderPage(listOf(summary()), page, size, 1, false)
+            }
         }
         val model = model(repo)
         assertEquals(0, reads)
@@ -35,6 +40,69 @@ class OrdersScreenModelTest {
         model.setActive(false)
         advanceTimeBy(30_000); runCurrent()
         assertEquals(2, reads)
+    }
+
+    @Test fun allOrderPagesLoadAppendRefreshAndSearchWithoutLosingLoadedPages() = runTest(dispatcher) {
+        val all = (1..55).map { summary("order-$it") }
+        val requests = mutableListOf<Triple<Int, Int, String?>>()
+        val repo = object : OrderRepository by unsupportedRepository() {
+            override suspend fun getOpenOrders(restaurantId: String, branchId: String) = emptyList<OrderSummary>()
+            override suspend fun getOrdersPage(
+                restaurantId: String, branchId: String, from: String?, to: String?, status: OrderStatus?,
+                customerId: String?, search: String?, historyOnly: Boolean, openOnly: Boolean, page: Int, size: Int
+            ): OrderPage {
+                requests += Triple(page, size, search)
+                val items = all.drop(page * size).take(size)
+                return OrderPage(items, page, size, all.size.toLong(), (page + 1) * size < all.size)
+            }
+        }
+        val model = model(repo)
+        model.setFilter(OrderListFilter(mode = OrderListMode.ALL)); runCurrent()
+        assertEquals(50, model.state.value.orders.size)
+        assertEquals(1, model.state.value.historyLoadedPages)
+        assertTrue(model.state.value.historyHasNext)
+
+        model.loadMoreHistory(); runCurrent()
+        assertEquals(55, model.state.value.orders.size)
+        assertEquals(2, model.state.value.historyLoadedPages)
+        assertFalse(model.state.value.historyHasNext)
+
+        model.refreshNow()
+        assertEquals(55, model.state.value.orders.size)
+        assertEquals(listOf(0, 1), requests.takeLast(2).map { it.first })
+
+        model.setSearchQuery("pasta")
+        advanceTimeBy(250); runCurrent()
+        assertEquals("pasta", requests.last().third)
+        assertEquals(1, model.state.value.historyLoadedPages)
+    }
+
+    @Test fun openOrdersArePagedSearchedAndRefreshEveryLoadedPage() = runTest(dispatcher) {
+        val all = (1..55).map { summary("open-$it") }
+        val requests = mutableListOf<Triple<Int, Boolean, String?>>()
+        val repo = object : OrderRepository by unsupportedRepository() {
+            override suspend fun getOrdersPage(restaurantId: String, branchId: String, from: String?, to: String?, status: OrderStatus?,
+                customerId: String?, search: String?, historyOnly: Boolean, openOnly: Boolean, page: Int, size: Int): OrderPage {
+                requests += Triple(page, openOnly, search)
+                val items = all.drop(page * size).take(size)
+                return OrderPage(items, page, size, all.size.toLong(), (page + 1) * size < all.size)
+            }
+        }
+        val model = model(repo)
+        model.setActive(true)
+        runCurrent()
+        assertEquals(50, model.state.value.orders.size)
+        assertTrue(requests.last().second)
+        assertTrue(model.state.value.historyHasNext)
+        model.loadMoreHistory(); runCurrent()
+        assertEquals(55, model.state.value.orders.size)
+        model.refreshNow()
+        assertEquals(listOf(0, 1), requests.takeLast(2).map { it.first })
+        model.setSearchQuery("open-4"); advanceTimeBy(250); runCurrent()
+        assertEquals("open-4", requests.last().third)
+        assertTrue(requests.last().second)
+        assertEquals(1, model.state.value.historyLoadedPages)
+        model.setActive(false)
     }
 
     @Test fun confirmedWriteRemainsSuccessfulIfRefreshFails() = runTest(dispatcher) {
@@ -57,7 +125,9 @@ class OrdersScreenModelTest {
         var writes = 0
         val repo = object : OrderRepository by unsupportedRepository() {
             override suspend fun createOrder(restaurantId: String, branchId: String, request: CreateOrderInput): Order { writes++; throw IOException("lost response") }
-            override suspend fun getOpenOrders(restaurantId: String, branchId: String) = listOf(summary())
+            override suspend fun getOrdersPage(restaurantId: String, branchId: String, from: String?, to: String?, status: OrderStatus?,
+                customerId: String?, search: String?, historyOnly: Boolean, openOnly: Boolean, page: Int, size: Int) =
+                OrderPage(listOf(summary()), page, size, 1, false)
         }
         val model = model(repo)
         assertTrue(model.operations.createOrder(CreateOrderInput()).isFailure)
@@ -75,7 +145,9 @@ class OrdersScreenModelTest {
         var writes = 0
         val repo = object : OrderRepository by unsupportedRepository() {
             override suspend fun createOrder(restaurantId: String, branchId: String, request: CreateOrderInput): Order { writes++; gate.await(); return order() }
-            override suspend fun getOpenOrders(restaurantId: String, branchId: String) = listOf(summary())
+            override suspend fun getOrdersPage(restaurantId: String, branchId: String, from: String?, to: String?, status: OrderStatus?,
+                customerId: String?, search: String?, historyOnly: Boolean, openOnly: Boolean, page: Int, size: Int) =
+                OrderPage(listOf(summary()), page, size, 1, false)
             override suspend fun getOrder(restaurantId: String, orderId: String) = order()
         }
         val model = model(repo)
@@ -103,7 +175,11 @@ class OrdersScreenModelTest {
         val gate = CompletableDeferred<Unit>()
         val session = SessionManager().also { it.signIn(user()) }
         val repo = object : OrderRepository by unsupportedRepository() {
-            override suspend fun getOpenOrders(restaurantId: String, branchId: String): List<OrderSummary> { gate.await(); return listOf(summary()) }
+            override suspend fun getOrdersPage(restaurantId: String, branchId: String, from: String?, to: String?, status: OrderStatus?,
+                customerId: String?, search: String?, historyOnly: Boolean, openOnly: Boolean, page: Int, size: Int): OrderPage {
+                gate.await()
+                return OrderPage(listOf(summary()), page, size, 1, false)
+            }
         }
         val model = model(repo, session)
         val loading = async { model.refreshNow() }

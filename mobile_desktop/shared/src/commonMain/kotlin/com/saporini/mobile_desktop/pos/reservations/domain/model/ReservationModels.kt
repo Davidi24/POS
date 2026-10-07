@@ -81,6 +81,15 @@ data class Reservation(
     val attendance: String? = null,
     // The guest's no-shows since a manager last cleared the warning.
     val guestNoShows: Int? = null,
+    // 🎂 Birthday · Cake from us, Candles · "30 candles at dessert"
+    val occasionCode: String? = null,
+    val occasionName: String? = null,
+    val occasionIcon: String? = null,
+    val occasionOptions: List<String> = emptyList(),
+    val occasionNote: String? = null,
+    // The restaurant's event that day, e.g. ❤️ Valentine's.
+    val eventName: String? = null,
+    val eventIcon: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val tableAssignments: List<ReservationTableAssignment> = emptyList()
@@ -277,7 +286,10 @@ data class ReservationInput(
     val initialTableIds: List<String>? = null,
     val primaryTableId: String? = null,
     // Same-day phone bookings: the guest already said they're coming ("✓ Attendance confirmed").
-    val attendanceConfirmed: Boolean? = null
+    val attendanceConfirmed: Boolean? = null,
+    val occasionCode: String? = null,
+    val occasionOptions: List<String>? = null,
+    val occasionNote: String? = null
 )
 
 data class UpdateReservationInput(
@@ -296,7 +308,11 @@ data class UpdateReservationInput(
     val depositRequired: Boolean? = null,
     val depositAmount: OrderDecimal? = null,
     val tableIds: List<String>? = null,
-    val primaryTableId: String? = null
+    val primaryTableId: String? = null,
+    // An empty code removes the occasion.
+    val occasionCode: String? = null,
+    val occasionOptions: List<String>? = null,
+    val occasionNote: String? = null
 )
 
 data class ReservationActionInput(
@@ -380,4 +396,84 @@ data class ReservationRules(
         // Used while no rule is set: two-hour bookings with 5 minutes' cleaning, 1–20 guests, no booking window.
         val NONE = ReservationRules(null, 120, 5, 1, 20, null)
     }
+}
+
+// An occasion a booking can have (Admin Hub → Settings → Reservations).
+data class ReservationOccasion(
+    val code: String,
+    val name: String,
+    val icon: String,
+    val options: List<String> = emptyList(),
+    val active: Boolean = true
+) {
+    val label: String get() = "$icon $name"
+}
+
+// One of the restaurant's own nights, e.g. ❤️ Valentine's on 14 Feb with its special menu.
+data class RestaurantEvent(
+    val id: String? = null,
+    val name: String,
+    val icon: String,
+    val startDate: String,
+    val endDate: String,
+    val menuId: String? = null,
+    val menuName: String? = null,
+    val specialMenuOnly: Boolean = false,
+    val active: Boolean = true
+)
+
+// One paid (or to-pay) part of a booking, in cents. What a cancel would do comes from the server's rules.
+data class MoneyLine(
+    val id: String,
+    // DEPOSIT, EXTRA or PRE_ORDER.
+    val kind: String,
+    val description: String,
+    val amountCents: Long,
+    val currency: String,
+    // PENDING, PAID, REFUNDED, KEPT or CANCELLED.
+    val status: String,
+    val refundDeadline: String? = null,
+    val refundedCents: Long = 0,
+    val refundIfCancelledNowCents: Long = 0,
+    // e.g. "€49.10 back if cancelled now: food pre-order €50.00 minus the card fee (€0.90)".
+    val explanation: String? = null
+) {
+    val isPreOrder: Boolean get() = kind == "PRE_ORDER"
+}
+
+// A paid extra from a special menu that can be added for the booking's occasion.
+data class BookingExtraChoice(
+    val menuItemId: String,
+    val name: String,
+    val description: String? = null,
+    val priceCents: Long,
+    val currency: String = "EUR",
+    val orderBeforeHours: Int? = null
+)
+
+// "12", "12.5", "12,50" or "1.2E+1" → cents; null when it isn't an amount.
+fun moneyCents(text: String?): Long? {
+    val clean = text?.trim()?.replace(',', '.')?.takeIf { it.isNotEmpty() } ?: return null
+    if (Regex("-?\\d+(\\.\\d{0,2})?").matches(clean)) {
+        val negative = clean.startsWith("-")
+        val digits = clean.removePrefix("-")
+        val whole = digits.substringBefore('.').toLongOrNull() ?: return null
+        val fraction = digits.substringAfter('.', "").padEnd(2, '0').toLong()
+        return (whole * 100 + fraction).let { if (negative) -it else it }
+    }
+    val number = clean.toDoubleOrNull() ?: return null
+    return kotlin.math.round(number * 100).toLong()
+}
+
+// 2510, "EUR" → "€25.10".
+fun moneyText(cents: Long, currency: String): String {
+    val symbol = when (currency) {
+        "EUR" -> "€"
+        "USD" -> "$"
+        "GBP" -> "£"
+        else -> "$currency "
+    }
+    val sign = if (cents < 0) "-" else ""
+    val abs = kotlin.math.abs(cents)
+    return "$sign$symbol${abs / 100}.${(abs % 100).toString().padStart(2, '0')}"
 }

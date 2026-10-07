@@ -84,7 +84,7 @@ public class KdsBoardController {
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
             @PathVariable UUID ticketId,
-            @RequestBody(required = false) KdsActionRequest request,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(
@@ -99,7 +99,7 @@ public class KdsBoardController {
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
             @PathVariable UUID ticketId,
-            @RequestBody(required = false) KdsActionRequest request,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(
@@ -114,7 +114,7 @@ public class KdsBoardController {
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
             @PathVariable UUID ticketId,
-            @RequestBody(required = false) KdsActionRequest request,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(
@@ -129,12 +129,40 @@ public class KdsBoardController {
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
             @PathVariable UUID ticketId,
-            @RequestBody(required = false) KdsActionRequest request,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(
                 kdsTicketWorkflowService.completeTicket(authentication, restaurantId, branchId, ticketId, request)
         );
+    }
+
+    // Waiters taking ready food out from the POS Kitchen Status (order staff, not only kitchen staff).
+    @PostMapping("/tickets/{ticketId}/picked-up")
+    @PreAuthorize("hasAnyAuthority('KDS_UPDATE','ORDER_UPDATE')")
+    @Operation(summary = "Mark a ticket's ready food as picked up by the waiter")
+    public ResponseEntity<KdsTicketResponse> pickUpTicket(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            @PathVariable UUID ticketId,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                kdsTicketWorkflowService.pickUpTicket(authentication, restaurantId, branchId, ticketId, request)
+        );
+    }
+
+    // The POS Kitchen Status timings from Admin Hub → Settings → Orders & kitchen (defaults when not set yet).
+    @GetMapping("/pos-timing")
+    @PreAuthorize("hasAuthority('KDS_READ')")
+    @Operation(summary = "When the POS Kitchen Status marks orders slow and ready food as waiting")
+    public ResponseEntity<java.util.Map<String, Integer>> posTiming(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(kdsTicketQueryService.posTiming(authentication, restaurantId, branchId));
     }
 
     @PostMapping("/tickets/{ticketId}/items/{ticketItemId}/fire")
@@ -145,7 +173,7 @@ public class KdsBoardController {
             @PathVariable UUID branchId,
             @PathVariable UUID ticketId,
             @PathVariable UUID ticketItemId,
-            @RequestBody(required = false) KdsActionRequest request,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(
@@ -161,7 +189,7 @@ public class KdsBoardController {
             @PathVariable UUID branchId,
             @PathVariable UUID ticketId,
             @PathVariable UUID ticketItemId,
-            @RequestBody(required = false) KdsActionRequest request,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(
@@ -177,7 +205,7 @@ public class KdsBoardController {
             @PathVariable UUID branchId,
             @PathVariable UUID ticketId,
             @PathVariable UUID ticketItemId,
-            @RequestBody(required = false) KdsActionRequest request,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(
@@ -193,7 +221,7 @@ public class KdsBoardController {
             @PathVariable UUID branchId,
             @PathVariable UUID ticketId,
             @PathVariable UUID ticketItemId,
-            @RequestBody(required = false) KdsActionRequest request,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(

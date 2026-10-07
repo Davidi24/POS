@@ -6,8 +6,9 @@ enum class Workspace {
     POS,
     KDS,
     ADMIN,
-    // Managing all restaurants on the platform: super admins only.
-    RESTAURANTS
+    // Opened with STATISTICS_ACCESS (Owner, Co-Owner, Admin).
+    STATISTICS,
+    FRAUD_DETECTION
 }
 
 fun accessibleWorkspaces(user: CurrentUserResponse): Set<Workspace> {
@@ -27,6 +28,15 @@ fun accessibleWorkspaces(user: CurrentUserResponse): Set<Workspace> {
     }
     if ("ADMIN_ACCESS" in user.permissions) {
         workspaces.add(Workspace.ADMIN)
+    }
+
+    if ("STATISTICS_ACCESS" in user.permissions) {
+        workspaces.add(Workspace.STATISTICS)
+    }
+    // Older servers don't send FRAUD_ACCESS yet; owners and co-owners always had Fraud Detection.
+    if ("FRAUD_ACCESS" in user.permissions ||
+        user.roles.any { it.equals("OWNER", ignoreCase = true) || it.equals("CO_OWNER", ignoreCase = true) }) {
+        workspaces.add(Workspace.FRAUD_DETECTION)
     }
 
     return workspaces

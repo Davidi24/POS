@@ -30,6 +30,21 @@ springdoc:
     enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
 
 app:
+  # Test payments are never enabled in the production profile. Set a real provider
+  # only when its verified integration is installed and configured.
+  payments:
+    provider: ${APP_PAYMENTS_PROVIDER:disabled}
+
+  auth:
+    sms:
+      # No SMS gateway is connected; never log OTPs or report SMS delivery as available.
+      delivery-mode: ${SMS_DELIVERY_MODE:DISABLED}
+
+  storage:
+    floor-plans:
+      # Require an explicit durable storage choice; local disk is not a safe production fallback.
+      provider: ${FLOOR_PLAN_STORAGE_PROVIDER:disabled}
+
   security:
     trusted-proxies: ${TRUSTED_PROXIES}
     cookie:

@@ -37,8 +37,11 @@ class OrderCatalogApi(
         client.get(endpoint("/option-groups/${groupId.encodeURLPathPart()}")) {
             parameter("includeItems", true)
         }.body()
-    suspend fun getCustomers(restaurantId: String): List<OrderCustomerChoice> =
-        client.get(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/customers")).body()
+    suspend fun getCustomers(restaurantId: String, page: Int, size: Int): OrderCustomerPageDto =
+        client.get(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/customers")) {
+            parameter("page", page)
+            parameter("size", size)
+        }.body()
     suspend fun getReservations(restaurantId: String, branchId: String): List<OrderReservationChoice> =
         client.get(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/branches/${branchId.encodeURLPathPart()}/reservations/today")).body()
 }

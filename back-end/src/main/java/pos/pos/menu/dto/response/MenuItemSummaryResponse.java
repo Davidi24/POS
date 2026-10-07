@@ -32,6 +32,8 @@ public class MenuItemSummaryResponse {
     private String onlineSectionName;
     private Integer displayOrder;
     private List<String> ingredients;
+    private Integer orderBeforeHours;
+    private List<String> occasionCodes;
     private List<MenuVariantSummaryResponse> variants;
     private List<MenuItemOptionGroupSummaryResponse> optionGroups;
 }

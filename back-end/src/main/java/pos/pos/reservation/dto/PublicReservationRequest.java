@@ -1,5 +1,6 @@
 package pos.pos.reservation.dto;
 
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
@@ -54,5 +55,6 @@ public class PublicReservationRequest {
     private Boolean depositRequired;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "depositAmount must not be negative")
+    @Digits(integer = 12, fraction = 2, message = "depositAmount must have at most 12 digits and 2 decimals")
     private BigDecimal depositAmount;
 }

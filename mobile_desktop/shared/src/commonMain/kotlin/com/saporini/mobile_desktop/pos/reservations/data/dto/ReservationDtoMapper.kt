@@ -19,7 +19,10 @@ internal fun ReservationInput.toDto(): ReservationRequestDto = ReservationReques
     depositAmount = depositAmount,
     initialTableIds = initialTableIds,
     primaryTableId = primaryTableId,
-    attendanceConfirmed = attendanceConfirmed
+    attendanceConfirmed = attendanceConfirmed,
+    occasionCode = occasionCode,
+    occasionOptions = occasionOptions,
+    occasionNote = occasionNote
 )
 
 internal fun UpdateReservationInput.toDto(): UpdateReservationRequestDto = UpdateReservationRequestDto(
@@ -38,7 +41,10 @@ internal fun UpdateReservationInput.toDto(): UpdateReservationRequestDto = Updat
     depositRequired = depositRequired,
     depositAmount = depositAmount,
     tableIds = tableIds,
-    primaryTableId = primaryTableId
+    primaryTableId = primaryTableId,
+    occasionCode = occasionCode,
+    occasionOptions = occasionOptions,
+    occasionNote = occasionNote
 )
 
 internal fun ReservationActionInput.toDto(): ReservationActionRequestDto = ReservationActionRequestDto(
@@ -117,6 +123,13 @@ internal fun ReservationResponseDto.toDomain(): Reservation = Reservation(
     attendanceConfirmedVia = attendanceConfirmedVia,
     attendance = attendance,
     guestNoShows = guestNoShows,
+    occasionCode = occasionCode,
+    occasionName = occasionName,
+    occasionIcon = occasionIcon,
+    occasionOptions = occasionOptions.orEmpty(),
+    occasionNote = occasionNote,
+    eventName = eventName,
+    eventIcon = eventIcon,
     createdAt = createdAt,
     updatedAt = updatedAt,
     tableAssignments = tableAssignments.orEmpty().map { it.toDomain() }
@@ -273,4 +286,46 @@ internal fun ReservationAuditResponseDto.toDomain(): ReservationAudit = Reservat
     statusHistory = statusHistory.orEmpty().map { it.toDomain() },
     notes = notes.orEmpty().map { it.toDomain() },
     tableAssignments = tableAssignments.orEmpty().map { it.toDomain() }
+)
+
+internal fun ReservationOccasionDto.toDomain(): ReservationOccasion =
+    ReservationOccasion(code = code.orEmpty(), name = name, icon = icon, options = options, active = active != false)
+
+internal fun ReservationOccasion.toDto(): ReservationOccasionDto =
+    ReservationOccasionDto(code = code.ifBlank { null }, name = name, icon = icon, options = options, active = active)
+
+internal fun RestaurantEventDto.toDomain(): RestaurantEvent = RestaurantEvent(
+    id = id, name = name, icon = icon, startDate = startDate, endDate = endDate, menuId = menuId, menuName = menuName,
+    specialMenuOnly = specialMenuOnly == true, active = active != false
+)
+
+internal fun RestaurantEvent.toDto(): RestaurantEventDto = RestaurantEventDto(
+    id = id, name = name, icon = icon, startDate = startDate, endDate = endDate, menuId = menuId,
+    specialMenuOnly = specialMenuOnly, active = active
+)
+
+internal fun MoneyLineDto.toDomain(): MoneyLine = MoneyLine(
+    id = id,
+    kind = kind,
+    description = description?.takeIf(String::isNotBlank) ?: when (kind) {
+        "DEPOSIT" -> "Deposit"
+        "PRE_ORDER" -> "Food pre-order"
+        else -> "Extra"
+    },
+    amountCents = moneyCents(amount?.value) ?: 0,
+    currency = currency ?: "EUR",
+    status = status,
+    refundDeadline = refundDeadline,
+    refundedCents = moneyCents(refundedAmount?.value) ?: 0,
+    refundIfCancelledNowCents = moneyCents(refundIfCancelledNow?.value) ?: 0,
+    explanation = explanation
+)
+
+internal fun BookingExtraChoiceDto.toDomain(): BookingExtraChoice = BookingExtraChoice(
+    menuItemId = menuItemId,
+    name = name,
+    description = description,
+    priceCents = moneyCents(price?.value) ?: 0,
+    currency = currency ?: "EUR",
+    orderBeforeHours = orderBeforeHours
 )

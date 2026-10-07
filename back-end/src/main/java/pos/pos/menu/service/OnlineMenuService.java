@@ -1,10 +1,13 @@
 package pos.pos.menu.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.restaurant.RestaurantNotFoundException;
 import pos.pos.menu.dto.response.OnlineMenuResponse;
@@ -21,6 +24,8 @@ import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -32,7 +37,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 // The restaurant's online menu: its own sections, filled with dishes that point at them (dishes are never copied).
-// A dish is visible online on a date when it's available and its staff menu and section are active on that date.
+// A dish is visible online when it is available and its staff menu and section are active for the requested date and, for today, the restaurant-local menu hours.
 @Service
 @RequiredArgsConstructor
 public class OnlineMenuService {
@@ -41,8 +46,10 @@ public class OnlineMenuService {
     private final MenuItemRepository menuItemRepository;
     private final RestaurantRepository restaurantRepository;
     private final RestaurantScopeService restaurantScopeService;
+    private final EntityManager entityManager;
 
     // Where "Show in online menu" puts a dish: the given section, or the one with this name (any case), created if missing.
+    @Transactional(propagation = Propagation.MANDATORY)
     public OnlineMenuSection resolveSection(Restaurant restaurant, UUID sectionId, String sectionName) {
         if (sectionId != null) {
             return onlineMenuSectionRepository.findByIdAndRestaurant_Id(sectionId, restaurant.getId())
@@ -52,6 +59,13 @@ public class OnlineMenuService {
         if (name == null) {
             throw new AuthException("Choose an online section for this dish", HttpStatus.BAD_REQUEST);
         }
+        var existing = onlineMenuSectionRepository.findFirstByRestaurant_IdAndNameIgnoreCase(restaurant.getId(), name);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        // A restaurant-scoped lock prevents concurrent menu writes from both creating the same section name.
+        entityManager.lock(restaurant, LockModeType.PESSIMISTIC_WRITE);
         return onlineMenuSectionRepository.findFirstByRestaurant_IdAndNameIgnoreCase(restaurant.getId(), name)
                 .orElseGet(() -> {
                     OnlineMenuSection section = new OnlineMenuSection();
@@ -112,12 +126,12 @@ public class OnlineMenuService {
     @Transactional(readOnly = true)
     public List<OnlineMenuSectionResponse> getSections(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
-        return onlineMenuSectionRepository.findByRestaurant_IdOrderByDisplayOrderAscNameAsc(restaurantId).stream()
+        return onlineMenuSectionRepository.findSummariesByRestaurantId(restaurantId).stream()
                 .map(section -> OnlineMenuSectionResponse.builder()
                         .id(section.getId())
                         .name(section.getName())
                         .displayOrder(section.getDisplayOrder())
-                        .itemCount(menuItemRepository.countByOnlineSection_Id(section.getId()))
+                        .itemCount(section.getItemCount())
                         .build())
                 .toList();
     }
@@ -126,7 +140,8 @@ public class OnlineMenuService {
     @Transactional(readOnly = true)
     public OnlineMenuResponse getPreview(Authentication authentication, UUID restaurantId) {
         Restaurant restaurant = restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
-        return build(restaurant, today(restaurant), true);
+        LocalDateTime now = restaurantNow(restaurant);
+        return build(restaurant, now.toLocalDate(), now.toLocalTime(), true);
     }
 
     // What the website shows: only visible dishes, and only sections that have some.
@@ -135,7 +150,10 @@ public class OnlineMenuService {
         Restaurant restaurant = restaurantRepository.findByIdAndDeletedAtIsNull(restaurantId)
                 .filter(found -> found.isActive() && found.getStatus() == RestaurantStatus.ACTIVE)
                 .orElseThrow(RestaurantNotFoundException::new);
-        return build(restaurant, date == null ? today(restaurant) : date, false);
+        LocalDateTime now = restaurantNow(restaurant);
+        LocalDate requestedDate = date == null ? now.toLocalDate() : date;
+        LocalTime requestedTime = requestedDate.equals(now.toLocalDate()) ? now.toLocalTime() : null;
+        return build(restaurant, requestedDate, requestedTime, false);
     }
 
     @Transactional
@@ -189,10 +207,10 @@ public class OnlineMenuService {
         onlineMenuSectionRepository.delete(section);
     }
 
-    private OnlineMenuResponse build(Restaurant restaurant, LocalDate date, boolean staffPreview) {
+    private OnlineMenuResponse build(Restaurant restaurant, LocalDate date, LocalTime time, boolean staffPreview) {
         Map<UUID, List<OnlineMenuResponse.Item>> itemsBySection = new LinkedHashMap<>();
         for (MenuItem item : menuItemRepository.findOnlineByRestaurantId(restaurant.getId())) {
-            String hiddenReason = hiddenReason(item, date);
+            String hiddenReason = hiddenReason(item, date, time);
             if (hiddenReason != null && !staffPreview) {
                 continue;
             }
@@ -215,7 +233,7 @@ public class OnlineMenuService {
         return OnlineMenuResponse.builder().restaurantId(restaurant.getId()).date(date).sections(sections).build();
     }
 
-    private String hiddenReason(MenuItem item, LocalDate date) {
+    private String hiddenReason(MenuItem item, LocalDate date, LocalTime time) {
         Menu menu = item.getSection().getMenu();
         if (!item.isAvailable()) {
             return "Sold out";
@@ -225,6 +243,9 @@ public class OnlineMenuService {
         }
         if (!menu.isAvailableOn(date)) {
             return "Its menu isn't offered on this date";
+        }
+        if (time != null && !menu.isAvailableAt(date.atTime(time))) {
+            return "Its menu isn't offered at this time";
         }
         return null;
     }
@@ -255,11 +276,11 @@ public class OnlineMenuService {
                 .orElseThrow(() -> new AuthException("Online section not found", HttpStatus.NOT_FOUND));
     }
 
-    private static LocalDate today(Restaurant restaurant) {
+    private static LocalDateTime restaurantNow(Restaurant restaurant) {
         try {
-            return LocalDate.now(restaurant.getTimezone() == null ? ZoneOffset.UTC : ZoneId.of(restaurant.getTimezone()));
+            return LocalDateTime.now(restaurant.getTimezone() == null ? ZoneOffset.UTC : ZoneId.of(restaurant.getTimezone()));
         } catch (RuntimeException invalidZone) {
-            return LocalDate.now(ZoneOffset.UTC);
+            return LocalDateTime.now(ZoneOffset.UTC);
         }
     }
 }

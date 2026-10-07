@@ -128,4 +128,26 @@ class BookingRulesTest {
         assertEquals(120, policy.bookingMinutes(rules, 4))
         assertEquals(135, policy.bookingMinutes(rules, 5))
     }
+
+    @Test
+    fun attendanceLabelsAndAction() {
+        val waiting = booking(ReservationStatus.CONFIRMED, 5.hours) { copy(attendance = "WAITING") }
+        assertTrue(bookingActions(waiting, policy, staff, now).secondary?.action == BookingAction.CONFIRM_ATTENDANCE)
+        assertTrue(bookingFlags(waiting, policy, now).isEmpty())
+
+        val confirmed = booking(ReservationStatus.CONFIRMED, 5.hours) { copy(attendance = "CONFIRMED") }
+        assertNull(bookingActions(confirmed, policy, staff, now).secondary)
+        assertEquals("✓ Attendance confirmed", bookingFlags(confirmed, policy, now).single().text)
+
+        assertEquals("Not confirmed", bookingFlags(booking(ReservationStatus.CONFIRMED, 1.hours) { copy(attendance = "NOT_CONFIRMED") }, policy, now).single().text)
+        assertEquals("Confirm now", bookingFlags(booking(ReservationStatus.CONFIRMED, 1.hours) { copy(attendance = "CONFIRM_NOW") }, policy, now).single().text)
+    }
+
+    @Test
+    fun noShowWarningFromTheSetting() {
+        val once = booking(ReservationStatus.CONFIRMED, 5.hours) { copy(guestNoShows = 1) }
+        assertEquals("⚠ 1 no-show before", bookingFlags(once, policy, now).single().text)
+        assertTrue(bookingFlags(once, policy.copy(noShowWarningFrom = 2), now).isEmpty())
+        assertEquals("⚠ 3 no-shows before", bookingFlags(booking(ReservationStatus.CONFIRMED, 5.hours) { copy(guestNoShows = 3) }, policy, now).single().text)
+    }
 }

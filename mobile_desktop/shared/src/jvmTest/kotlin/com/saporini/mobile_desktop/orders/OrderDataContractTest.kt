@@ -107,6 +107,32 @@ class OrderDataContractTest {
         } finally { client.close() }
     }
 
+    @Test fun pagedOrdersSendFiltersAndDecodeBoundedPageMetadata() = runTest {
+        val requests = mutableListOf<HttpRequestData>()
+        val page = """{"items":[${orderFixture()}],"page":1,"size":50,"totalElements":51,"totalPages":2,"hasNext":true,"hasPrevious":true}"""
+        val client = client { request -> requests += request; page }
+        try {
+            val api = OrderApi(client) { "http://localhost" }
+            val result = api.getOrdersPage("restaurant-1", "branch-1", from = "2026-01-01T00:00:00Z",
+                to = "2026-02-01T00:00:00Z", status = OrderStatus.OPEN, customerId = "customer-1",
+                search = "  pasta  ", openOnly = true, page = 1, size = 50)
+            assertEquals("/restaurants/restaurant-1/branches/branch-1/orders/page", requests.single().url.encodedPath)
+            assertEquals("2026-01-01T00:00:00Z", requests.single().url.parameters["from"])
+            assertEquals("2026-02-01T00:00:00Z", requests.single().url.parameters["to"])
+            assertEquals("OPEN", requests.single().url.parameters["status"])
+            assertEquals("customer-1", requests.single().url.parameters["customerId"])
+            assertEquals("pasta", requests.single().url.parameters["search"])
+            assertEquals("true", requests.single().url.parameters["openOnly"])
+            assertEquals("1", requests.single().url.parameters["page"])
+            assertEquals("50", requests.single().url.parameters["size"])
+            assertEquals(1, result.page)
+            assertEquals(51, result.totalElements)
+            assertTrue(result.hasNext)
+            assertTrue(result.hasPrevious)
+            assertEquals(1, result.items.size)
+        } finally { client.close() }
+    }
+
     @Test fun createIncludesPosSourceAndRejectsMismatchedTableBeforeSending() = runTest {
         var calls = 0
         var body = ""

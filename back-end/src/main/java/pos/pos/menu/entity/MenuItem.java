@@ -92,6 +92,14 @@ public class MenuItem extends AbstractTimestampedEntity {
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
 
+    // Extras that need preparing: how many hours before the booking they must be ordered (e.g. a cake 48 h).
+    @Column(name = "order_before_hours")
+    private Integer orderBeforeHours;
+
+    // Occasion codes this extra is offered for, comma separated (e.g. "BIRTHDAY,GRADUATION"); empty means all.
+    @Column(name = "occasion_codes", length = 500)
+    private String occasionCodes;
+
     @ElementCollection
     @CollectionTable(
             name = "`menu-item-ingredients`",

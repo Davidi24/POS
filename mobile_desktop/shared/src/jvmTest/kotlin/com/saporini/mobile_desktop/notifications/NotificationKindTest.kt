@@ -21,4 +21,14 @@ class NotificationKindTest {
         assertEquals(NotificationKind.OTHER, notification(null).kind)
         assertEquals(NotificationKind.OTHER, notification("INVENTORY").kind)
     }
+
+    @Test fun queuedNotificationsCannotBeMarkedReadUntilDelivery() {
+        val queued = notification("ORDER").copy(markReadAllowed = false)
+        val delivered = notification("ORDER").copy(markReadAllowed = true)
+        val alreadyRead = delivered.copy(read = true)
+
+        assertEquals(false, queued.canMarkRead)
+        assertEquals(true, delivered.canMarkRead)
+        assertEquals(false, alreadyRead.canMarkRead)
+    }
 }

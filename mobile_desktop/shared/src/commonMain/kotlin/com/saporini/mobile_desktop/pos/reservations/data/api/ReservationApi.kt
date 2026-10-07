@@ -38,12 +38,16 @@ class ReservationApi(
         from: String? = null,
         to: String? = null,
         status: ReservationStatus? = null,
-        customerId: String? = null
-    ): List<ReservationResponseDto> = client.get(endpoint(branchPath(restaurantId, branchId))) {
+        customerId: String? = null,
+        page: Int = 0,
+        size: Int = 100
+    ): ReservationPageResponseDto = client.get(endpoint(branchPath(restaurantId, branchId))) {
         from?.let { parameter("from", it) }
         to?.let { parameter("to", it) }
         status?.let { parameter("status", it.name) }
         customerId?.let { parameter("customerId", it) }
+        parameter("page", page)
+        parameter("size", size)
     }.body()
 
     suspend fun getBranchReservationCalendar(
@@ -173,6 +177,38 @@ class ReservationApi(
     suspend fun getGuestHistory(restaurantId: String, reservationId: String): GuestHistoryResponseDto =
         client.get(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/guest-history")).body()
 
+    // Occasions and event nights (read by staff; changed in the Admin Hub settings).
+    suspend fun getOccasions(restaurantId: String): List<ReservationOccasionDto> =
+        client.get(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/reservation-occasions")).body()
+
+    suspend fun saveOccasions(restaurantId: String, occasions: List<ReservationOccasionDto>): List<ReservationOccasionDto> =
+        client.put(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/reservation-occasions")) {
+            contentType(ContentType.Application.Json)
+            setBody(SaveReservationOccasionsRequestDto(occasions))
+        }.body()
+
+    suspend fun getEvents(restaurantId: String): List<RestaurantEventDto> =
+        client.get(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/events")).body()
+
+    // The event on a day ("yyyy-MM-dd"), or null.
+    suspend fun getEventOn(restaurantId: String, date: String): RestaurantEventDto? {
+        val response = client.get(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/events/on")) { parameter("date", date) }
+        return if (response.status.value == 204) null else response.body()
+    }
+
+    suspend fun saveEvent(restaurantId: String, event: RestaurantEventDto): RestaurantEventDto {
+        val base = "/restaurants/${restaurantId.encodeURLPathPart()}/events"
+        return if (event.id == null) {
+            client.post(endpoint(base)) { contentType(ContentType.Application.Json); setBody(event) }.body()
+        } else {
+            client.put(endpoint("$base/${event.id.encodeURLPathPart()}")) { contentType(ContentType.Application.Json); setBody(event) }.body()
+        }
+    }
+
+    suspend fun deleteEvent(restaurantId: String, eventId: String) {
+        client.delete(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/events/${eventId.encodeURLPathPart()}"))
+    }
+
     // Walk-ins waiting at the door for a table.
     suspend fun getWaitlist(restaurantId: String, branchId: String): List<WaitlistEntryResponseDto> =
         client.get(endpoint("${waitlistPath(restaurantId, branchId)}")).body()
@@ -196,6 +232,49 @@ class ReservationApi(
 
     private fun waitlistPath(restaurantId: String, branchId: String) =
         "/restaurants/${restaurantId.encodeURLPathPart()}/branches/${branchId.encodeURLPathPart()}/waitlist"
+
+    // Say no to a request: the guest is told and gets all their money back.
+    suspend fun declineReservation(restaurantId: String, reservationId: String, request: ReservationActionRequestDto = ReservationActionRequestDto()): ReservationResponseDto =
+        reservationAction(restaurantId, reservationId, "decline", request)
+
+    // Each paid part of the booking (deposit, extras, pre-order) and what a cancel would do.
+    suspend fun getMoney(restaurantId: String, reservationId: String): List<MoneyLineDto> =
+        client.get(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/money")).body()
+
+    suspend fun getExtraChoices(restaurantId: String, reservationId: String): List<BookingExtraChoiceDto> =
+        client.get(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/extras")).body()
+
+    suspend fun addExtra(restaurantId: String, reservationId: String, request: AddBookingExtraRequestDto): List<MoneyLineDto> =
+        client.post(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/extras")) {
+            headers.append("Idempotency-Key", kotlin.uuid.Uuid.random().toString())
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    // Emails the guest a link to pay what's due.
+    suspend fun sendPaymentLink(restaurantId: String, reservationId: String) {
+        client.post(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/payment-link")) {
+            headers.append("Idempotency-Key", kotlin.uuid.Uuid.random().toString())
+        }
+    }
+
+    suspend fun markPaid(restaurantId: String, reservationId: String, paymentId: String): List<MoneyLineDto> =
+        paymentAction(restaurantId, reservationId, paymentId, "mark-paid")
+
+    suspend fun removeUnpaid(restaurantId: String, reservationId: String, paymentId: String): List<MoneyLineDto> =
+        paymentAction(restaurantId, reservationId, paymentId, "remove")
+
+    suspend fun goodwillRefund(restaurantId: String, reservationId: String, lineId: String, request: GoodwillRefundRequestDto): List<MoneyLineDto> =
+        client.post(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/money/${lineId.encodeURLPathPart()}/goodwill")) {
+            headers.append("Idempotency-Key", kotlin.uuid.Uuid.random().toString())
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    private suspend fun paymentAction(restaurantId: String, reservationId: String, paymentId: String, action: String): List<MoneyLineDto> =
+        client.post(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/payments/${paymentId.encodeURLPathPart()}/$action")) {
+            headers.append("Idempotency-Key", kotlin.uuid.Uuid.random().toString())
+        }.body()
 
     suspend fun getSeatingCheck(restaurantId: String, reservationId: String): ReservationSeatingCheckResponseDto =
         client.get(endpoint("${restaurantPath(restaurantId)}/${reservationId.encodeURLPathPart()}/seating-check")).body()

@@ -16,6 +16,31 @@ interface OrderRepository {
         customerId: String? = null
     ): List<OrderSummary>
 
+    suspend fun getOrdersPage(
+        restaurantId: String,
+        branchId: String,
+        from: String? = null,
+        to: String? = null,
+        status: OrderStatus? = null,
+        customerId: String? = null,
+        search: String? = null,
+        historyOnly: Boolean = false,
+        openOnly: Boolean = false,
+        page: Int = 0,
+        size: Int = 50
+    ): OrderPage {
+        require(page >= 0 && size in 1..100)
+        val all = if (historyOnly) getOrderHistory(restaurantId, branchId, from, to)
+        else getOrders(restaurantId, branchId, from, to, status, customerId)
+        val statusFiltered = if (openOnly) all.filter { it.status == OrderStatus.DRAFT || it.status == OrderStatus.OPEN } else all
+        val filtered = if (search.isNullOrBlank()) statusFiltered else statusFiltered.filter { order ->
+            listOfNotNull(order.orderNumber, order.tableNumber, order.tableName, order.customerName, order.notes)
+                .any { it.contains(search.trim(), ignoreCase = true) }
+        }
+        val items = filtered.drop(page * size).take(size)
+        return OrderPage(items, page, size, filtered.size.toLong(), (page + 1) * size < filtered.size)
+    }
+
     suspend fun getOpenOrders(
         restaurantId: String,
         branchId: String

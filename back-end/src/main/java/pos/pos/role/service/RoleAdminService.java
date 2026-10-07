@@ -12,6 +12,7 @@ import pos.pos.exception.role.PermissionNotFoundException;
 import pos.pos.exception.role.RoleCodeAlreadyExistsException;
 import pos.pos.exception.role.RoleNameAlreadyExistsException;
 import pos.pos.exception.role.RoleNotFoundException;
+import pos.pos.exception.role.RoleManagementNotAllowedException;
 import pos.pos.role.dto.CloneRoleRequest;
 import pos.pos.role.dto.CreateRoleRequest;
 import pos.pos.role.dto.PermissionResponse;
@@ -66,9 +67,11 @@ public class RoleAdminService {
         assertUniqueRoleName(normalizedName, null);
         assertUniqueRoleCode(generatedCode, null);
 
+        UUID restaurantId = ownerRestaurant(authentication);
         Role role = roleRepository.save(Role.builder()
                 .name(normalizedName)
                 .code(generatedCode)
+                .restaurantId(restaurantId)
                 .description(request.getDescription())
                 .rank(defaultCustomRank(authentication))
                 .isSystem(false)
@@ -180,9 +183,13 @@ public class RoleAdminService {
     @Transactional
     public RoleResponse cloneRole(Authentication authentication, UUID roleId, CloneRoleRequest request) {
         Role sourceRole = findExistingRole(roleId);
+        if (!roleHierarchyService.visibleTo(authentication, sourceRole)) {
+            throw new RoleNotFoundException();
+        }
         if (!roleHierarchyService.isSuperAdmin(authentication)) {
             roleHierarchyService.assertCanAssignRole(authentication, sourceRole);
         }
+        UUID restaurantId = ownerRestaurant(authentication);
 
         List<Permission> sourcePermissions = loadPermissionsForRole(sourceRole.getId());
         assertActorCanGrantPermissions(authentication, sourcePermissions);
@@ -196,6 +203,7 @@ public class RoleAdminService {
         Role clonedRole = roleRepository.save(Role.builder()
                 .name(normalizedName)
                 .code(generatedCode)
+                .restaurantId(restaurantId)
                 .description(requestedDescription != null ? request.getDescription() : sourceRole.getDescription())
                 .rank(sourceRole.getRank())
                 .isSystem(false)
@@ -216,6 +224,18 @@ public class RoleAdminService {
         publishRoleChange(authentication, clonedRole.getId(), "Role cloned");
 
         return RoleMapper.toResponse(clonedRole);
+    }
+
+    // A custom role belongs to its maker's restaurant; a super admin's roles are shared by every restaurant.
+    private UUID ownerRestaurant(Authentication authentication) {
+        if (roleHierarchyService.isSuperAdmin(authentication)) {
+            return null;
+        }
+        UUID restaurantId = roleHierarchyService.actorRestaurantId(authentication);
+        if (restaurantId == null) {
+            throw new RoleManagementNotAllowedException();
+        }
+        return restaurantId;
     }
 
     private void publishRoleChange(Authentication authentication, UUID roleId, String message) {

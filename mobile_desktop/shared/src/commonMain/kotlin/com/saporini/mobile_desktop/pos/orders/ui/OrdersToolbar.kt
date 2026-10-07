@@ -18,25 +18,39 @@ import com.saporini.mobile_desktop.core.components.SearchField
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.core.ui.isPhoneWindow
 import com.saporini.mobile_desktop.pos.orders.domain.model.OrderFulfillmentStatus
+import com.saporini.mobile_desktop.pos.orders.domain.model.OrderStatus
 
 @Composable
 internal fun OrdersToolbar(
     query: String, onQueryChange: (String) -> Unit,
     progress: OrderFulfillmentStatus?, onProgressChange: (OrderFulfillmentStatus?) -> Unit,
     mineOnly: Boolean, onMineChange: (Boolean) -> Unit,
-    history: Boolean, onHistoryChange: (Boolean) -> Unit
+    history: Boolean, onHistoryChange: (Boolean) -> Unit,
+    historyOnly: Boolean = false, historyStatus: OrderStatus? = null,
+    onHistoryStatusChange: (OrderStatus?) -> Unit = {}
 ) {
     val phone = isPhoneWindow()
     val title: @Composable () -> Unit = {
-        Text("Orders", fontFamily = Inter(), fontWeight = FontWeight.Bold,
+        Text(if (historyOnly) "History" else "Orders", fontFamily = Inter(), fontWeight = FontWeight.Bold,
             fontSize = if (phone) 18.sp else 20.sp, color = Color(0xFF232422))
     }
     val controls: @Composable () -> Unit = {
+        if (historyOnly) {
+            HeaderDropdown(historyStatus?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "All statuses",
+                Icons.Outlined.ReceiptLong, Modifier.width(146.dp)) { close ->
+                DropdownMenuItem(text = { HeaderText("All statuses") }, onClick = { onHistoryStatusChange(null); close() })
+                listOf(OrderStatus.CLOSED, OrderStatus.CANCELLED, OrderStatus.VOIDED).forEach { status ->
+                    DropdownMenuItem(text = { HeaderText(status.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                        onClick = { onHistoryStatusChange(status); close() })
+                }
+            }
+        } else {
         HeaderDropdown(if (history) "History" else "Open orders", Icons.Outlined.ReceiptLong, Modifier.width(146.dp)) { close ->
             DropdownMenuItem(
                 text = { HeaderText(if (history) "Open orders" else "History") },
                 onClick = { onHistoryChange(!history); close() }
             )
+        }
         }
         Surface(
             modifier = Modifier.width(132.dp).height(44.dp),
@@ -60,7 +74,7 @@ internal fun OrdersToolbar(
                 }
             }
         }
-        HeaderDropdown(progress?.label() ?: "Order progress", Icons.Outlined.Restaurant, Modifier.width(170.dp), progress?.let(::progressColor)) { close ->
+        if (!historyOnly) HeaderDropdown(progress?.label() ?: "Order progress", Icons.Outlined.Restaurant, Modifier.width(170.dp), progress?.let(::progressColor)) { close ->
             DropdownMenuItem(text = { HeaderText("All progress") }, onClick = { onProgressChange(null); close() })
             OrderFulfillmentStatus.entries.forEach { status ->
                 DropdownMenuItem(text = { HeaderText(status.label()) }, leadingIcon = { ProgressDot(progressColor(status)) }, onClick = { onProgressChange(status); close() })

@@ -29,6 +29,7 @@ data class MenuResponseDto(
     val availableFromDate: String? = null,
     val availableUntilDate: String? = null,
     val color: String? = null,
+    val special: Boolean = false,
     val itemCount: Int? = null,
     val createdBy: String? = null,
     val updatedBy: String? = null,
@@ -69,6 +70,8 @@ data class MenuItemDto(
     val onlineSectionName: String? = null,
     val displayOrder: Int = 0,
     val ingredients: List<String> = emptyList(),
+    val orderBeforeHours: Int? = null,
+    val occasionCodes: List<String> = emptyList(),
     val variants: List<MenuVariantDto> = emptyList(),
     val optionGroups: List<MenuItemOptionGroupDto> = emptyList()
 )
@@ -132,7 +135,9 @@ data class OptionItemDto(
     val name: String,
     val priceDelta: Double,
     val available: Boolean,
-    val displayOrder: Int = 0
+    val displayOrder: Int = 0,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: Double? = null
 )
 
 // Online menu: its own sections, filled with dishes that point at them.

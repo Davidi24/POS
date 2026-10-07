@@ -1,5 +1,7 @@
 package pos.pos.unit.menu.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,6 +46,7 @@ class OnlineMenuServiceTest {
     @Mock MenuItemRepository menuItemRepository;
     @Mock RestaurantRepository restaurantRepository;
     @Mock RestaurantScopeService restaurantScopeService;
+    @Mock EntityManager entityManager;
     @Mock Authentication authentication;
     @InjectMocks OnlineMenuService onlineMenuService;
 
@@ -66,6 +70,19 @@ class OnlineMenuServiceTest {
         assertThat(created.getName()).isEqualTo("Pasta");
         assertThat(created.getDisplayOrder()).isEqualTo(3);
         assertThat(created.getRestaurant()).isSameAs(restaurant);
+        verify(entityManager).lock(restaurant, LockModeType.PESSIMISTIC_WRITE);
+    }
+
+    @Test void sectionCreationRechecksForAConcurrentWinnerAfterLockingTheRestaurant() {
+        OnlineMenuSection concurrentSection = section("Pasta", 2);
+        when(onlineMenuSectionRepository.findFirstByRestaurant_IdAndNameIgnoreCase(RESTAURANT_ID, "Pasta"))
+                .thenReturn(Optional.empty(), Optional.of(concurrentSection));
+
+        OnlineMenuSection resolved = onlineMenuService.resolveSection(restaurant, null, "Pasta");
+
+        assertThat(resolved).isSameAs(concurrentSection);
+        verify(entityManager).lock(restaurant, LockModeType.PESSIMISTIC_WRITE);
+        verify(onlineMenuSectionRepository, never()).save(any());
     }
 
     @Test void theWebsiteSeesOnlyVisibleDishesAndNoEmptySections() {
@@ -106,6 +123,29 @@ class OnlineMenuServiceTest {
                 .isInstanceOf(AuthException.class)
                 .hasMessageContaining("Move its dishes");
         verify(onlineMenuSectionRepository, never()).delete(any());
+    }
+
+    @Test void sectionSummariesLoadCountsInOneGroupedRepositoryCall() {
+        OnlineMenuSectionRepository.SectionSummaryRow pasta = mock(OnlineMenuSectionRepository.SectionSummaryRow.class);
+        OnlineMenuSectionRepository.SectionSummaryRow empty = mock(OnlineMenuSectionRepository.SectionSummaryRow.class);
+        when(pasta.getId()).thenReturn(UUID.randomUUID());
+        when(pasta.getName()).thenReturn("Pasta");
+        when(pasta.getDisplayOrder()).thenReturn(0);
+        when(pasta.getItemCount()).thenReturn(3L);
+        when(empty.getId()).thenReturn(UUID.randomUUID());
+        when(empty.getName()).thenReturn("Desserts");
+        when(empty.getDisplayOrder()).thenReturn(1);
+        when(empty.getItemCount()).thenReturn(0L);
+        when(restaurantScopeService.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(onlineMenuSectionRepository.findSummariesByRestaurantId(RESTAURANT_ID)).thenReturn(List.of(pasta, empty));
+
+        var summaries = onlineMenuService.getSections(authentication, RESTAURANT_ID);
+
+        assertThat(summaries).extracting("name").containsExactly("Pasta", "Desserts");
+        assertThat(summaries).extracting("itemCount").containsExactly(3L, 0L);
+        verify(onlineMenuSectionRepository).findSummariesByRestaurantId(RESTAURANT_ID);
+        verify(onlineMenuSectionRepository, never()).findByRestaurant_IdOrderByDisplayOrderAscNameAsc(RESTAURANT_ID);
+        verify(menuItemRepository, never()).countByOnlineSection_Id(any());
     }
 
     @Test void reorderingMustListEverySectionOnce() {

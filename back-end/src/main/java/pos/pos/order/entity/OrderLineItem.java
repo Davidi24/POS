@@ -123,6 +123,16 @@ public class OrderLineItem extends AbstractTimestampedEntity {
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
 
+    // When the item first went to the kitchen, and who removed it when (fraud checks use these).
+    @Column(name = "fired_at", columnDefinition = "timestamptz")
+    private java.time.OffsetDateTime firedAt;
+
+    @Column(name = "voided_at", columnDefinition = "timestamptz")
+    private java.time.OffsetDateTime voidedAt;
+
+    @Column(name = "voided_by", columnDefinition = "uuid")
+    private java.util.UUID voidedBy;
+
     @OneToMany(mappedBy = "orderLineItem", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
     @org.hibernate.annotations.BatchSize(size = 50)
@@ -161,6 +171,16 @@ public class OrderLineItem extends AbstractTimestampedEntity {
 
     @Override
     protected void normalizeFields() {
+        if (firedAt == null && (status == OrderLineItemStatus.FIRED
+                || status == OrderLineItemStatus.PREPARING
+                || status == OrderLineItemStatus.READY
+                || status == OrderLineItemStatus.FULFILLED)) {
+            firedAt = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);
+        }
+        if (status == OrderLineItemStatus.VOIDED && voidedAt == null) {
+            voidedAt = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);
+        }
+
         if (itemNameSnapshot == null && menuItem != null) {
             itemNameSnapshot = menuItem.getName();
         }

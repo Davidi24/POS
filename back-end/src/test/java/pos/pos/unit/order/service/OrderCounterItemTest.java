@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.inventory.service.InventorySaleConsumptionService;
 import pos.pos.kds.service.KdsOrderSyncService;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.order.dto.UpdateOrderLineItemStatusRequest;
@@ -36,6 +37,7 @@ class OrderCounterItemTest {
     @Mock OrderSupport support;
     @Mock OrderDomainSupport domain;
     @Mock KdsOrderSyncService kds;
+    @Mock InventorySaleConsumptionService inventorySaleConsumptionService;
     @Mock Authentication authentication;
     @InjectMocks OrderWorkflowService workflow;
     @InjectMocks OrderItemService items;

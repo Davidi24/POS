@@ -39,14 +39,31 @@ class WorkspacePickerScreenshotTest {
     @Test fun phoneThree() = capture(390, 844, everything, "phone-3")
     @Test fun phoneTwo() = capture(390, 844, listOf("POS_ACCESS", "KDS_ACCESS"), "phone-2")
 
-    @Test fun superAdminDesktop() = capture(1280, 800, emptyList(), "desktop-4-super-admin", roles = listOf("SUPER_ADMIN"))
-    @Test fun superAdminNarrowDesktop() = capture(1024, 900, emptyList(), "desktop-1024-4-super-admin", roles = listOf("SUPER_ADMIN"))
-    @Test fun superAdminPhone() = capture(390, 844, emptyList(), "phone-4-super-admin", roles = listOf("SUPER_ADMIN"))
+    @Test fun superAdminDesktop() = capture(1280, 800, emptyList(), "desktop-5-super-admin", roles = listOf("SUPER_ADMIN"))
+    @Test fun superAdminNarrowDesktop() = capture(1024, 900, emptyList(), "desktop-1024-5-super-admin", roles = listOf("SUPER_ADMIN"))
+    @Test fun superAdminPhone() = capture(390, 844, emptyList(), "phone-5-super-admin", roles = listOf("SUPER_ADMIN"))
 
-    @Test fun onlySuperAdminSeesRestaurants() {
-        val manager = user(listOf("POS_ACCESS", "KDS_ACCESS", "ADMIN_ACCESS", "USERS_READ"))
-        kotlin.test.assertFalse(com.saporini.mobile_desktop.core.session.Workspace.RESTAURANTS in
+    @Test fun statisticsNeedsItsOwnPermission() {
+        val manager = user(listOf("POS_ACCESS", "KDS_ACCESS", "ADMIN_ACCESS", "USERS_READ", "REPORTS_READ"))
+        kotlin.test.assertFalse(com.saporini.mobile_desktop.core.session.Workspace.STATISTICS in
             com.saporini.mobile_desktop.core.session.accessibleWorkspaces(manager))
+        val admin = user(listOf("POS_ACCESS", "ADMIN_ACCESS", "STATISTICS_ACCESS", "REPORTS_READ"))
+        kotlin.test.assertTrue(com.saporini.mobile_desktop.core.session.Workspace.STATISTICS in
+            com.saporini.mobile_desktop.core.session.accessibleWorkspaces(admin))
+    }
+
+    @Test fun fraudAccessPermissionOpensFraudDetection() {
+        val custom = user(listOf("POS_ACCESS", "FRAUD_ACCESS", "FRAUD_READ")).copy(roles = listOf("AUDITOR"))
+        kotlin.test.assertTrue(com.saporini.mobile_desktop.core.session.Workspace.FRAUD_DETECTION in
+            com.saporini.mobile_desktop.core.session.accessibleWorkspaces(custom))
+    }
+
+    @Test fun fraudDetectionIsLimitedToOwnersCoOwnersAndSuperAdmins() {
+        for (role in listOf("SUPER_ADMIN", "OWNER", "CO_OWNER", "ADMIN", "MANAGER", "WAITER", "KITCHEN")) {
+            val actual = com.saporini.mobile_desktop.core.session.Workspace.FRAUD_DETECTION in
+                com.saporini.mobile_desktop.core.session.accessibleWorkspaces(user(everything).copy(roles = listOf(role)))
+            kotlin.test.assertEquals(role in listOf("SUPER_ADMIN", "OWNER", "CO_OWNER"), actual, role)
+        }
     }
 
     @Test fun waiterWithOnlyPosSkipsThePicker() {

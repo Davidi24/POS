@@ -115,9 +115,14 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
                     TokenStore.save(refreshResponse.accessToken, refreshResponse.refreshToken)
 
                     BearerTokens(refreshResponse.accessToken, refreshResponse.refreshToken)
+                } catch (e: ApiException) {
+                    // The server refused the refresh token (expired, revoked or reused): log in again.
+                    if (e.status in 400..499) sessionManager.signOut()
+                    null
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    // Refresh failed — refresh token is invalid/expired. User must log in again.
-                    sessionManager.signOut()
+                    // No connection: keep the session; the next request tries to refresh again.
                     null
                 }
             }

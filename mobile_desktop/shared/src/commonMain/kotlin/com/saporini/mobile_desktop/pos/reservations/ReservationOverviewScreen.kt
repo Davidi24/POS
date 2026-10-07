@@ -7,6 +7,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import com.saporini.mobile_desktop.core.components.SearchField
 import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.PhoneInTalk
+import androidx.compose.material.icons.outlined.ReportProblem
 import com.saporini.mobile_desktop.core.ui.PlatformVerticalScrollbar
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.foundation.layout.widthIn
@@ -158,9 +160,6 @@ import kotlin.time.Instant
 private val OrderLikeBorder = Color(0xFFE3E8E1)
 private val ActiveStatuses = setOf(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN, ReservationStatus.SEATED)
 private val PresentStatuses = ActiveStatuses + ReservationStatus.COMPLETED
-// A party this size or bigger counts as a big party in a future day's "To do" box.
-private const val BIG_PARTY_SIZE = 6
-
 // Bookings made online (website, app or a partner service): the "Ordered online" row and the past-day card.
 private val OnlineSources = setOf(ReservationSource.WEB, ReservationSource.MOBILE, ReservationSource.THIRD_PARTY)
 // The online colour (same purple family as the Online menu cover).
@@ -205,6 +204,7 @@ internal fun ReservationOverviewScreen(
     arrivals: List<Reservation>,
     arrivalsPaging: ListPaging,
     date: LocalDate,
+    event: com.saporini.mobile_desktop.pos.reservations.domain.model.RestaurantEvent? = null,
     onDateChange: (LocalDate) -> Unit,
     floors: List<String>,
     floor: String?,
@@ -310,7 +310,7 @@ internal fun ReservationOverviewScreen(
                     calendarButton()
                 }
                 if (firstLoad) OverviewSkeleton(size, Modifier.weight(1f))
-                else OverviewContent(date, now, isToday, reservations, listed, listFilter, onStatusChange, onAreaChange, arrivals, arrivalsPaging, dayPaging, summary, capacity, onOpenReservation, size, isPast && floor == null, Modifier.weight(1f))
+                else OverviewContent(date, now, isToday, reservations, listed, listFilter, onStatusChange, onAreaChange, arrivals, arrivalsPaging, dayPaging, summary, capacity, onOpenReservation, size, isPast && floor == null, Modifier.weight(1f), event)
             }
         } else {
             // Tablet and phone: one scrolling page; the filters scroll sideways under the title.
@@ -329,7 +329,7 @@ internal fun ReservationOverviewScreen(
                     filters()
                 }
                 if (firstLoad) OverviewSkeleton(size, Modifier.fillMaxWidth())
-                else OverviewContent(date, now, isToday, reservations, listed, listFilter, onStatusChange, onAreaChange, arrivals, arrivalsPaging, dayPaging, summary, capacity, onOpenReservation, size, isPast && floor == null, Modifier.fillMaxWidth())
+                else OverviewContent(date, now, isToday, reservations, listed, listFilter, onStatusChange, onAreaChange, arrivals, arrivalsPaging, dayPaging, summary, capacity, onOpenReservation, size, isPast && floor == null, Modifier.fillMaxWidth(), event)
             }
         }
     }
@@ -353,7 +353,8 @@ private fun OverviewContent(
     onOpenReservation: (String) -> Unit,
     size: ScreenSize,
     showFloorOnPastRows: Boolean,
-    modifier: Modifier
+    modifier: Modifier,
+    event: com.saporini.mobile_desktop.pos.reservations.domain.model.RestaurantEvent? = null
 ) {
     val active = reservations.filter { it.status in PresentStatuses }
     val isPast = date < serviceDateOf(now, RestaurantTime.zone)
@@ -394,6 +395,12 @@ private fun OverviewContent(
     // Future day's "To do" box: big parties and bookings with special requests or notes.
     var bigOnly by remember(date) { mutableStateOf(false) }
     var requestsOnly by remember(date) { mutableStateOf(false) }
+    // Confirmed bookings whose guests haven't confirmed attendance yet, and visits staff must look at.
+    var notConfirmedOnly by remember(date) { mutableStateOf(false) }
+    var reviewOnly by remember(date) { mutableStateOf(false) }
+    val policy = LocalReservationPolicy.current
+    val bigFrom = policy.approvalGroupSize
+    val isNotConfirmed = { reservation: Reservation -> reservation.status == ReservationStatus.CONFIRMED && reservation.attendance != "CONFIRMED" }
     val reservationsByHour = reservations.mapNotNull { reservation ->
         val hour = runCatching { Instant.parse(reservation.reservationStart).toLocalDateTime(RestaurantTime.zone).hour }.getOrNull()
             ?: return@mapNotNull null
@@ -416,9 +423,10 @@ private fun OverviewContent(
     }
         .filterKeys { it != null }
         .maxByOrNull { (_, bookings) -> bookings.size }
-    val isBigParty = { reservation: Reservation -> reservation.partySize >= BIG_PARTY_SIZE }
+    // Big groups need approval and a call the day before (from the Admin Hub approval size, 7 by default).
+    val isBigParty = { reservation: Reservation -> reservation.partySize >= bigFrom }
     val hasRequests = { reservation: Reservation ->
-        !reservation.specialRequests.isNullOrBlank() || !reservation.internalNotes.isNullOrBlank()
+        !reservation.specialRequests.isNullOrBlank() || !reservation.internalNotes.isNullOrBlank() || reservation.occasionName != null
     }
     val futureCard0: @Composable (Modifier) -> Unit = { cardModifier ->
         SummaryCard(
@@ -506,7 +514,7 @@ private fun OverviewContent(
     // Today without filters the list is the Arriving feed (the next 2 hours, then the rest of today), loaded from the
     // server a page at a time as you scroll. A status, area or search filter lists every match of the day instead;
     // another day lists its bookings.
-    val filtering = listFilter.active || selectedHour != null || onlineOnly || bigOnly || requestsOnly
+    val filtering = listFilter.active || selectedHour != null || onlineOnly || bigOnly || requestsOnly || notConfirmedOnly || reviewOnly
     val feedView = isToday && !filtering
     val soonFrom = now - 0.25.hours
     val soonUntil = now + 2.hours
@@ -521,7 +529,7 @@ private fun OverviewContent(
     // listed twice while the lists refresh one after the other (e.g. right after one is added).
     val dayRows = (when {
         listFilter.active -> listed
-        selectedHour != null || onlineOnly -> reservations
+        selectedHour != null || onlineOnly || notConfirmedOnly || reviewOnly -> reservations
         // A day ahead lists what's still expected: pending and confirmed.
         isFuture -> reservations.filter { it.status == ReservationStatus.PENDING || it.status == ReservationStatus.CONFIRMED }
         else -> reservations.filter { it.status != ReservationStatus.CANCELLED }
@@ -532,6 +540,8 @@ private fun OverviewContent(
         .filter { reservation -> !onlineOnly || reservation.source in OnlineSources }
         .filter { reservation -> !bigOnly || isBigParty(reservation) }
         .filter { reservation -> !requestsOnly || hasRequests(reservation) }
+        .filter { reservation -> !notConfirmedOnly || isNotConfirmed(reservation) }
+        .filter { reservation -> !reviewOnly || reservation.needsReview }
         .distinctBy { it.id }
         .sortedBy { it.reservationStart }
         .toList()
@@ -580,7 +590,9 @@ private fun OverviewContent(
             "Nothing found",
             if (selectedHour != null) "No reservations at ${selectedHour.toString().padStart(2, '0')}:00."
             else if (onlineOnly && !listFilter.active) "No reservations ordered online on ${date.fullDay()}."
-            else if (bigOnly && !listFilter.active) "No groups of $BIG_PARTY_SIZE or more on ${date.fullDay()}."
+            else if (bigOnly && !listFilter.active) "No groups of $bigFrom or more on ${date.fullDay()}."
+            else if (notConfirmedOnly && !listFilter.active) "Every guest has confirmed attendance."
+            else if (reviewOnly && !listFilter.active) "No visits need a review."
             else if (requestsOnly && !listFilter.active) "No special requests or notes on ${date.fullDay()}."
             else listFilter.emptyMessage(date)
         )
@@ -613,7 +625,7 @@ private fun OverviewContent(
         if (dayPaging.hasMore && !dayPaging.loading && !dayPaging.failed) dayPaging.onLoadMore()
     }
     // Each view keeps its own scroll position; a refresh swaps rows in place, so the position stays.
-    val listState = remember(feedView, listFilter, selectedHour, onlineOnly, bigOnly, requestsOnly, date) { LazyListState() }
+    val listState = remember(feedView, listFilter, selectedHour, onlineOnly, bigOnly, requestsOnly, notConfirmedOnly, reviewOnly, date) { LazyListState() }
     val listScope = rememberCoroutineScope()
     // Set once the user scrolls or clicks a section; until then the list keeps Arriving in view as data loads.
     val userMoved = remember(listState) { mutableStateOf(false) }
@@ -847,7 +859,9 @@ private fun OverviewContent(
                     selectedHour?.let { "${it.toString().padStart(2, '0')}:00" },
                     "Ordered online".takeIf { onlineOnly },
                     "Big groups".takeIf { bigOnly },
-                    "Special requests".takeIf { requestsOnly }
+                    "Special requests".takeIf { requestsOnly },
+                    "Not confirmed".takeIf { notConfirmedOnly },
+                    "Needs review".takeIf { reviewOnly }
                 ).joinToString(" · ").ifEmpty { "Results" }
                 feedView -> "Today"
                 else -> "Reservations"
@@ -1027,12 +1041,29 @@ private fun OverviewContent(
             StatusCountRow(Icons.Outlined.Public, "Ordered online", reservations.count { it.source in OnlineSources }, OnlineColor, onlineOnly) {
                 onlineOnly = !onlineOnly
             }
+            // Today: guests who haven't confirmed yet, and visits staff must decide on (never seated, or left open).
+            if (isToday) {
+                val notConfirmed = summary?.attendanceNotConfirmedCount ?: reservations.count(isNotConfirmed)
+                val due = (summary?.notConfirmedDueCount ?: 0) > 0
+                StatusCountRow(Icons.Outlined.PhoneInTalk, "Not confirmed", notConfirmed, if (due) ReviewColor else LateColor, notConfirmedOnly) {
+                    notConfirmedOnly = !notConfirmedOnly
+                }
+                StatusCountRow(Icons.Outlined.ReportProblem, "Needs review", summary?.needsReviewCount ?: reservations.count { it.needsReview }, ReviewColor, reviewOnly) {
+                    reviewOnly = !reviewOnly
+                }
+            }
         }
     }
     // A day ahead: what to sort out before it. Each row filters the list (tap again to clear) and combines with
     // the others, like By status.
     val pendingPicked = listFilter.status == "Pending"
-    val todoActive = pendingPicked || noTableOnly || bigOnly || requestsOnly
+    val todoActive = pendingPicked || noTableOnly || bigOnly || requestsOnly || notConfirmedOnly
+    // The day before, from the reminder time (15:00), bookings not confirmed yet turn red.
+    val reminderPassed = run {
+        val local = now.toLocalDateTime(RestaurantTime.zone)
+        val (hour, minute) = policy.confirmReminderTime.split(":").let { (it.getOrNull(0)?.toIntOrNull() ?: 15) to (it.getOrNull(1)?.toIntOrNull() ?: 0) }
+        date == serviceDateOf(now, RestaurantTime.zone).plus(kotlinx.datetime.DatePeriod(days = 1)) && local.hour * 60 + local.minute >= hour * 60 + minute
+    }
     val todoList: @Composable (Modifier) -> Unit = { boxModifier ->
         ListContainer(
             Icons.Outlined.TaskAlt, "To do before the day", count = null, modifier = boxModifier, scrollable = false,
@@ -1044,18 +1075,25 @@ private fun OverviewContent(
                         if (noTableOnly) onAreaChange("All areas")
                         bigOnly = false
                         requestsOnly = false
+                        notConfirmedOnly = false
                     }.padding(horizontal = 8.dp, vertical = 3.dp),
                     fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = FormGreen
                 )
             })
         ) {
-            StatusCountRow(Icons.Outlined.HourglassEmpty, "Pending to confirm", pendingAhead, StatusDotColors["Pending"] ?: FormMuted, pendingPicked) {
+            StatusCountRow(Icons.Outlined.HourglassEmpty, "Requests to answer", pendingAhead, StatusDotColors["Pending"] ?: FormMuted, pendingPicked) {
                 onStatusChange(if (pendingPicked) "All statuses" else "Pending")
+            }
+            StatusCountRow(
+                Icons.Outlined.PhoneInTalk, "Not confirmed yet", bookedAhead.count(isNotConfirmed),
+                if (reminderPassed) ReviewColor else LateColor, notConfirmedOnly
+            ) {
+                notConfirmedOnly = !notConfirmedOnly
             }
             StatusCountRow(Icons.Outlined.TableRestaurant, "No table", bookedAhead.count { it.tableAssignments.isEmpty() }, FormDanger, noTableOnly) {
                 onAreaChange(if (noTableOnly) "All areas" else "Unassigned")
             }
-            StatusCountRow(Icons.Outlined.Groups, "Big groups ($BIG_PARTY_SIZE+)", bookedAhead.count(isBigParty), Color(0xFF24748A), bigOnly) {
+            StatusCountRow(Icons.Outlined.Groups, "Big groups ($bigFrom+) to call", bookedAhead.count(isBigParty), Color(0xFF24748A), bigOnly) {
                 bigOnly = !bigOnly
             }
             StatusCountRow(Icons.Outlined.EventNote, "Special requests", bookedAhead.count(hasRequests), Color(0xFFC8790B), requestsOnly) {
@@ -1074,6 +1112,10 @@ private fun OverviewContent(
                     InfoPill(Icons.Outlined.Groups, "${capacity.availableSeats} of ${capacity.totalSeats} seats free")
                     capacity.maxAvailableTableCapacity?.let { InfoPill(Icons.Outlined.EventSeat, "Largest free table: $it seats") }
                 }
+            }
+            if (isToday) {
+                HorizontalDivider(Modifier.padding(vertical = 4.dp), color = OrderLikeBorder)
+                WaitlistSection(Modifier.fillMaxWidth())
             }
         }
     }
@@ -1108,8 +1150,28 @@ private fun OverviewContent(
         }
     }
 
+    // The restaurant's own night that day: bookings stay normal; the special menu is on.
+    val eventBanner: @Composable () -> Unit = {
+        event?.let { night ->
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFFF7EEF3)).padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(night.icon, fontSize = 18.sp)
+                Text(
+                    listOfNotNull(
+                        night.name,
+                        night.menuName?.let { if (night.specialMenuOnly) "only the $it" else "$it and the usual menus" }
+                    ).joinToString(" · "),
+                    fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = FormInk
+                )
+            }
+        }
+    }
     if (size.isDesktop) {
         Column(modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            eventBanner()
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (isFuture) {
                     futureCard0(Modifier.weight(1f)); futureCard1(Modifier.weight(1f)); futureCard2(Modifier.weight(1f)); card3(Modifier.weight(1f))
@@ -1137,6 +1199,7 @@ private fun OverviewContent(
     // Tablet and phone: cards two by two, then the lists one under the other (the page scrolls).
     val gap = if (size.isPhone) 10.dp else 12.dp
     Column(modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
+        eventBanner()
         if (isFuture) {
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) { futureCard0(Modifier.weight(1f)); futureCard1(Modifier.weight(1f)) }
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) { futureCard2(Modifier.weight(1f)); card3(Modifier.weight(1f)) }
@@ -1952,7 +2015,10 @@ private fun ReservationCard(
                 }
                 Box(Modifier.width(1.dp).height(40.dp).background(OrderLikeBorder))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(reservation.displayGuestName, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FormInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        listOfNotNull(reservation.occasionIcon, reservation.displayGuestName).joinToString(" "),
+                        fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FormInk, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Groups, null, Modifier.size(15.dp), tint = FormMuted)
                         Spacer(Modifier.width(5.dp))

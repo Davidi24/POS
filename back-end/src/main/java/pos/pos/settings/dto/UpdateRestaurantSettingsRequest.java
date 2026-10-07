@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
@@ -49,10 +50,12 @@ public class UpdateRestaurantSettingsRequest {
 
     @NotNull(message = "reservationSlotMinutes is required")
     @Min(value = 1, message = "reservationSlotMinutes must be greater than 0")
+    @Max(value = 1440, message = "reservationSlotMinutes must be at most 1440")
     private Integer reservationSlotMinutes;
 
     @NotNull(message = "defaultTableTurnTimeMinutes is required")
     @Min(value = 1, message = "defaultTableTurnTimeMinutes must be greater than 0")
+    @Max(value = 1440, message = "defaultTableTurnTimeMinutes must be at most 1440")
     private Integer defaultTableTurnTimeMinutes;
 
     @NotNull(message = "serviceChargeEnabled is required")

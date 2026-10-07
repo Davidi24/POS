@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -127,8 +129,10 @@ public class InventoryMovementController {
             @RequestParam(required = false) UUID orderLineItemId,
             @RequestParam(required = false) InventoryMovementType type,
             @RequestParam(required = false) UUID itemId,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page must be at least 0") @Max(value = 100000, message = "page is too large") int page,
+            @RequestParam(defaultValue = "200") @Min(value = 1, message = "size must be at least 1") @Max(value = 500, message = "size must be at most 500") int size,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(inventoryMovementService.listMovements(authentication, restaurantId, orderLineItemId, type, itemId));
+        return ResponseEntity.ok(inventoryMovementService.listMovements(authentication, restaurantId, orderLineItemId, type, itemId, page, size));
     }
 }

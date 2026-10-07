@@ -245,6 +245,10 @@ internal fun CreateReservationDialog(
     var noteTags by remember { mutableStateOf<List<String>>(emptyList()) }
     // Booked by phone for the next 24 hours: the guest just said they're coming (✓ Attendance confirmed).
     var confirmedOnPhone by remember { mutableStateOf(true) }
+    // An occasion (🎂 Birthday…), its options and a note.
+    var occasionCode by remember { mutableStateOf<String?>(null) }
+    var occasionOptions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var occasionNote by remember { mutableStateOf("") }
     var tableMode by remember { mutableStateOf(TableMode.SUGGEST) }
     var options by remember { mutableStateOf<List<ReservationAvailabilityOption>>(emptyList()) }
     var optionsLoading by remember { mutableStateOf(false) }
@@ -375,7 +379,10 @@ internal fun CreateReservationDialog(
                     specialRequests = combinedNote(noteTags, note),
                     initialTableIds = chosenTableIds.ifEmpty { null },
                     primaryTableId = chosenPrimary,
-                    attendanceConfirmed = confirmedOnPhone.takeIf { soonBooking }
+                    attendanceConfirmed = confirmedOnPhone.takeIf { soonBooking },
+                    occasionCode = occasionCode,
+                    occasionOptions = occasionOptions.takeIf { occasionCode != null },
+                    occasionNote = occasionNote.trim().ifBlank { null }.takeIf { occasionCode != null }
                 )
             ).onSuccess { onCreated(date) }
                 .onFailure { saveError = it.message ?: "Could not create the reservation." }
@@ -568,6 +575,15 @@ internal fun CreateReservationDialog(
                                             noteTags = if (tag in noteTags) noteTags - tag else noteTags + tag
                                         })
                                         NoteBox(note, "Anything else? Write your own note…") { note = it.take(NOTE_LIMIT) }
+                                    }
+                                    if (modelState.occasions.isNotEmpty()) {
+                                        FormField("Occasion", optional = true) {
+                                            OccasionPicker(modelState.occasions, occasionCode, occasionOptions, occasionNote) { code, options, text ->
+                                                occasionCode = code
+                                                occasionOptions = options
+                                                occasionNote = text
+                                            }
+                                        }
                                     }
                                     if (soonBooking) {
                                         Row(

@@ -66,6 +66,9 @@ public class OrderDiscount extends AbstractTimestampedEntity {
     @Column(name = "amount_applied", nullable = false, precision = 19, scale = 2)
     private BigDecimal amountApplied = BigDecimal.ZERO;
 
+    @Column(name = "discount_sequence", nullable = false)
+    private int discountSequence;
+
     @Column(name = "reason", columnDefinition = "text")
     private String reason;
 

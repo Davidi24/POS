@@ -97,7 +97,7 @@ public class ReservationAvailabilitySupport {
         for (UUID tableId : selectedTables.keySet()) {
             snapshot.childrenByParentId().getOrDefault(tableId, List.of()).forEach(child -> tablesToLock.add(child.getId()));
         }
-        restaurantTableSupport.lockTablesForBooking(branch.getId(), tablesToLock);
+        restaurantTableSupport.lockTablesForUpdateInStableOrder(branch.getId(), tablesToLock);
 
         Set<UUID> unavailableTableIds = overlappingAssignedTableIds(
                 branch,
@@ -251,6 +251,8 @@ public class ReservationAvailabilitySupport {
         //Table 2 + Table 3 = 6  ✅ good: 2 tables, exact fit
         //Table 5 capacity 8     ✅ okay: 1 table, 2 extra seats
         return combinations.stream()
+                // A booking always needs at least one table.
+                .filter(combination -> !combination.tableIds().isEmpty())
                 .sorted(Comparator //Java Comparator sorts ascending by default.
                         // Groups ordered first in "Group tables" are preferred; ungrouped tables come last.
                         .comparingInt(TableCombination::groupPriority)

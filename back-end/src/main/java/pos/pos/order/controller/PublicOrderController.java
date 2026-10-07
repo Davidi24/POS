@@ -59,7 +59,7 @@ public class PublicOrderController {
     @Operation(summary = "Request checkout for a public order")
     public ResponseEntity<OrderResponse> checkoutPublicOrder(
             @PathVariable String orderNumber,
-            @RequestBody(required = false) PublicOrderCheckoutRequest request
+            @Valid @RequestBody(required = false) PublicOrderCheckoutRequest request
     ) {
         return ResponseEntity.ok(orderPublicService.checkoutPublicOrder(orderNumber, request));
     }
@@ -68,7 +68,7 @@ public class PublicOrderController {
     @Operation(summary = "Request cancellation for a public order")
     public ResponseEntity<OrderResponse> cancelPublicOrder(
             @PathVariable String orderNumber,
-            @RequestBody(required = false) OrderActionRequest request
+            @Valid @RequestBody(required = false) OrderActionRequest request
     ) {
         return ResponseEntity.ok(orderPublicService.cancelPublicOrder(orderNumber, request));
     }

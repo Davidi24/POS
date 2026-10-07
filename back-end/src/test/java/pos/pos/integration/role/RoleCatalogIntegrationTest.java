@@ -178,8 +178,10 @@ class RoleCatalogIntegrationTest extends AbstractRoleIntegrationTest {
                 .andReturn();
 
         List<String> codes = codesOf(bodyOf(result));
-        assertThat(codes).containsExactly("ROLE007_SHIFT_LEAD", "MANAGER", "ROLE007_CASHIER", "WAITER");
+        // Admins hand out Viewer; Managers are left to Owner and Co-Owner unless the restaurant allows Admins too.
+        assertThat(codes).containsExactly("ROLE007_SHIFT_LEAD", "ROLE007_CASHIER", "WAITER", "VIEWER");
         assertThat(codes).doesNotContain(
+                "MANAGER",
                 aboveActor.getCode(),
                 inactiveAssignable.getCode(),
                 unassignable.getCode(),

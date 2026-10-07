@@ -1,6 +1,8 @@
 package pos.pos.auth.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import pos.pos.auth.entity.AuthSmsOtpCode;
@@ -13,6 +15,7 @@ import java.util.UUID;
 public interface AuthSmsOtpCodeRepository extends JpaRepository<AuthSmsOtpCode, UUID> {
 
     // "Give me the most recent SMS code sent to user 123 for password reset, as long as it hasn't been used yet and hasn't expired."
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AuthSmsOtpCode> findTopByUserIdAndPurposeAndUsedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(
             UUID userId,
             SmsOtpPurpose purpose,

@@ -1,9 +1,12 @@
 package pos.pos.user.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import pos.pos.user.entity.User;
 
@@ -37,6 +40,16 @@ public interface UserRepository extends JpaRepository<User, UUID> {
           AND u.isActive = true
     """)
     Optional<User> findActiveById(UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT u
+        FROM User u
+        WHERE u.id = :userId
+          AND u.deletedAt IS NULL
+          AND u.isActive = true
+    """)
+    Optional<User> findActiveByIdForUpdate(@Param("userId") UUID userId);
 
     // Active staff of a restaurant who work in this branch (or aren't tied to one branch).
     @Query("""
@@ -86,6 +99,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                           AND r.code = :roleCode
                     )
               )
+              AND (:superAdmin = true OR u.restaurantId = :actorRestaurantId)
               AND (
                     :superAdmin = true
                     OR (
@@ -131,6 +145,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                           AND r.code = :roleCode
                     )
               )
+              AND (:superAdmin = true OR u.restaurantId = :actorRestaurantId)
               AND (
                     :superAdmin = true
                     OR (
@@ -160,6 +175,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             String roleCode,
             boolean superAdmin,
             long actorRank,
+            UUID actorRestaurantId,
             Pageable pageable
     );
 }

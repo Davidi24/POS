@@ -125,6 +125,7 @@ import com.saporini.mobile_desktop.pos.menu.ui.item.OptionsEditorDialog
 import com.saporini.mobile_desktop.pos.menu.ui.item.VariantEditorDialog
 import com.saporini.mobile_desktop.pos.menu.ui.item.phoneMenuItemHeight
 import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogActionStatus
+import com.saporini.mobile_desktop.admin.inventory.RecipeDto
 import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogStatusBody
 import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuCoverUi
 import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuEditorDialog
@@ -246,7 +247,9 @@ private fun DomainMenuItem.toUiMenuItem(sectionId: String, category: String): Me
         id = id,
         sectionId = sectionId,
         basePrice = basePrice,
-        displayOrder = displayOrder
+        displayOrder = displayOrder,
+        orderBeforeHours = orderBeforeHours,
+        occasionCodes = occasionCodes
     )
 
 /** Transient success/error feedback shown after an action completes. */
@@ -260,6 +263,8 @@ fun MenuScreen(
     val menuState by screenModel.state.collectAsState()
     var showMenuEditor by remember { mutableStateOf(false) }
     var menuBeingEdited by remember { mutableStateOf<DomainMenu?>(null) }
+    // The editor's "Special menu" choice, reported just before it saves.
+    var pendingSpecial by remember { mutableStateOf(false) }
     var menuStatus by remember { mutableStateOf<DialogActionStatus>(DialogActionStatus.Idle) }
     var showOnlineMenu by remember { mutableStateOf(false) }
     var onlineItemCount by remember { mutableStateOf(0) }
@@ -377,6 +382,7 @@ fun MenuScreen(
                         }
                     }
                 },
+                onSpecialChange = { pendingSpecial = it },
                 onSave = {
                     name,
                     description,
@@ -397,7 +403,8 @@ fun MenuScreen(
                             availableUntil = availableUntil,
                             availableFromDate = availableFromDate,
                             availableUntilDate = availableUntilDate,
-                            color = color
+                            color = color,
+                            special = pendingSpecial
                         ) {
                             menuStatus = DialogActionStatus.Success("$name created")
                         }
@@ -411,7 +418,8 @@ fun MenuScreen(
                             availableUntil = availableUntil,
                             availableFromDate = availableFromDate,
                             availableUntilDate = availableUntilDate,
-                            color = color
+                            color = color,
+                            special = pendingSpecial
                         ) {
                             menuStatus = DialogActionStatus.Success("$name updated")
                         }
@@ -555,6 +563,24 @@ private fun MenuDetailsContent(
     val screenModel = koinInject<MenuScreenModel>()
     val scope = rememberCoroutineScope()
     var selectedCategory by remember(menu.id) { mutableStateOf("All") }
+    // "Import existing" dishes into a special menu's section (as copies).
+    var importingItems by remember(menu.id) { mutableStateOf(false) }
+    var importBusy by remember(menu.id) { mutableStateOf(false) }
+    // The item editor's occasion-extras fields (special menus only), reported just before it saves.
+    var pendingExtras by remember { mutableStateOf(com.saporini.mobile_desktop.pos.menu.ui.item.ItemExtras()) }
+    // Occasions for the extras chips (🎂 Birthday…), only for special menus. Looked up lazily so the menu screen
+    // works where reservations aren't set up.
+    val koin = org.koin.compose.getKoin()
+    var occasionChoices by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    LaunchedEffect(menu.special) {
+        if (!menu.special) return@LaunchedEffect
+        val reservationApi = koin.getOrNull<com.saporini.mobile_desktop.pos.reservations.data.api.ReservationApi>() ?: return@LaunchedEffect
+        val restaurantId = koin.getOrNull<com.saporini.mobile_desktop.core.session.SessionManager>()
+            ?.currentUser?.value?.restaurantId ?: return@LaunchedEffect
+        occasionChoices = runCatching { reservationApi.getOccasions(restaurantId).map { it.code.orEmpty() to "${it.icon} ${it.name}" } }
+            .getOrDefault(emptyList())
+    }
+
     fun categoriesFor(value: DomainMenu) = value.sections.filter { it.active }
         .sortedBy { it.displayOrder }.map { it.toMenuCategory() }.withAllFilterAt(value.allFilterPosition)
     var sections by remember(menu.id) { mutableStateOf(categoriesFor(menu)) }
@@ -589,6 +615,8 @@ private fun MenuDetailsContent(
     var showItemEditor by remember(menu.id) { mutableStateOf(false) }
     var showVariantEditor by remember(menu.id) { mutableStateOf(false) }
     var showOptionsEditor by remember(menu.id) { mutableStateOf(false) }
+    var optionInventoryRecipes by remember(menu.id) { mutableStateOf<List<RecipeDto>>(emptyList()) }
+    var optionEditorLoading by remember(menu.id) { mutableStateOf(false) }
     var isReorderingItems by remember(menu.id) { mutableStateOf(false) }
 
     // Shared by the add/edit item dialogs (only one is ever open at a time)
@@ -843,6 +871,13 @@ private fun MenuDetailsContent(
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    if (menu.special && canAddToSection) {
+                        Text(
+                            "+ Import existing dishes",
+                            Modifier.clip(RoundedCornerShape(8.dp)).clickable { importingItems = true }.padding(horizontal = 4.dp, vertical = 4.dp),
+                            fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color(0xFF4F7942)
+                        )
+                    }
                     rowSlots.chunked(columns).forEach { rowChunk ->
                         // The row with the Add card doesn't force its item cards to
                         // match its height (no IntrinsicSize.Max / fillMaxHeight there)
@@ -891,7 +926,27 @@ private fun MenuDetailsContent(
                                         },
                                         onEditOptions = {
                                             itemBeingEdited = item
-                                            showOptionsEditor = true
+                                            if (!optionEditorLoading) {
+                                                optionEditorLoading = true
+                                                scope.launch {
+                                                    val groups = screenModel.loadOptionGroupChoices(item.optionGroups)
+                                                    val recipes = screenModel.loadModifierRecipes()
+                                                    groups.fold(
+                                                        onSuccess = { loadedGroups ->
+                                                            itemBeingEdited = item.copy(optionGroups = loadedGroups)
+                                                            optionInventoryRecipes = recipes.getOrDefault(emptyList())
+                                                            showOptionsEditor = true
+                                                        },
+                                                        onFailure = { error ->
+                                                            detailToast = ActionToast(
+                                                                error.message ?: "Couldn't load modifier choices",
+                                                                isError = true
+                                                            )
+                                                        }
+                                                    )
+                                                    optionEditorLoading = false
+                                                }
+                                            }
                                         },
                                         onToggleAvailability = {
                                             val sectionId = item.sectionId
@@ -932,6 +987,36 @@ private fun MenuDetailsContent(
             }
         }
 
+        if (importingItems) {
+            val targetSection = sections.firstOrNull { it.name == selectedCategory && it.id != null }
+            if (targetSection?.id == null) {
+                importingItems = false
+            } else {
+                com.saporini.mobile_desktop.pos.menu.ui.item.ImportItemsDialog(
+                    currentMenuId = menu.id,
+                    sectionName = targetSection.name,
+                    importing = importBusy,
+                    onDismiss = { importingItems = false },
+                    onImport = { ids ->
+                        importBusy = true
+                        scope.launch {
+                            screenModel.importItems(menu.id, targetSection.id, ids).fold(
+                                onSuccess = { copies ->
+                                    localItems = localItems + copies.map { it.toUiMenuItem(targetSection.id, targetSection.name) }
+                                    detailToast = ActionToast("${copies.size} ${if (copies.size == 1) "dish" else "dishes"} imported", isError = false)
+                                    importingItems = false
+                                },
+                                onFailure = { error ->
+                                    detailToast = ActionToast(error.message ?: "Could not import the dishes", isError = true)
+                                }
+                            )
+                            importBusy = false
+                        }
+                    }
+                )
+            }
+        }
+
         if (showAddItemDialog) {
             ItemEditorDialog(
                 sectionName = sections.firstOrNull { it.name == selectedCategory && it.id != null }?.name,
@@ -946,6 +1031,9 @@ private fun MenuDetailsContent(
                     itemDialogStatus = DialogActionStatus.Idle
                 },
                 loadOnlineSections = screenModel::loadOnlineMenuSections,
+                extras = com.saporini.mobile_desktop.pos.menu.ui.item.ItemExtras().takeIf { menu.special },
+                occasions = occasionChoices,
+                onExtrasChange = { pendingExtras = it },
                 onSave = { name, priceLabel, sku, description, imageFileName, available, sendToKitchen, online, ingredients, _ ->
                     val targetSection = sections.firstOrNull { it.name == selectedCategory && it.id != null }
                     if (targetSection?.id == null) {
@@ -972,7 +1060,9 @@ private fun MenuDetailsContent(
                                     onlineSectionId = online.sectionId,
                                     onlineSectionName = online.sectionName,
                                     displayOrder = localItems.count { it.category == category },
-                                    ingredients = ingredients.toBackendIngredients()
+                                    ingredients = ingredients.toBackendIngredients(),
+                                    orderBeforeHours = pendingExtras.orderBeforeHours.takeIf { menu.special },
+                                    occasionCodes = pendingExtras.occasionCodes.takeIf { menu.special }
                                 )
                             ).fold(
                                 onSuccess = { created ->
@@ -1011,6 +1101,10 @@ private fun MenuDetailsContent(
                     loadOnlineSections = screenModel::loadOnlineMenuSections,
                     sections = sections,
                     currentSectionId = editingItem.sectionId,
+                    extras = com.saporini.mobile_desktop.pos.menu.ui.item.ItemExtras(editingItem.orderBeforeHours, editingItem.occasionCodes)
+                        .takeIf { menu.special },
+                    occasions = occasionChoices,
+                    onExtrasChange = { pendingExtras = it },
                     status = itemDialogStatus,
                     onRetry = { itemDialogStatus = DialogActionStatus.Idle },
                     onSuccessSettled = {
@@ -1053,7 +1147,9 @@ private fun MenuDetailsContent(
                                         onlineSectionName = online.sectionName,
                                         displayOrder = editingItem.displayOrder,
                                         ingredients = ingredients.toBackendIngredients(),
-                                        sectionId = newSectionId
+                                        sectionId = newSectionId,
+                                        orderBeforeHours = pendingExtras.orderBeforeHours.takeIf { menu.special },
+                                        occasionCodes = pendingExtras.occasionCodes.takeIf { menu.special }
                                     )
                                 ).fold(
                                     onSuccess = { updated ->
@@ -1250,6 +1346,7 @@ private fun MenuDetailsContent(
                 OptionsEditorDialog(
                     itemName = editingItem.name,
                     optionGroups = editingItem.optionGroups,
+                    inventoryRecipes = optionInventoryRecipes,
                     onDismiss = {
                         showOptionsEditor = false
                         itemBeingEdited = null

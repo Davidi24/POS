@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.saporini.mobile_desktop.kds.KdsScreenModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,7 +32,19 @@ object KdsScreen : Screen {
 
     @Composable
     override fun Content() {
-        var selected by remember { mutableStateOf(KdsSection.TICKETS) }
+        val model = koinInject<KdsScreenModel>()
+        val state by model.state.collectAsState()
+        val selected = state.section
+        val owner = LocalLifecycleOwner.current
+        DisposableEffect(model, owner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_START) model.setActive(true)
+                if (event == Lifecycle.Event.ON_STOP) model.setActive(false)
+            }
+            owner.lifecycle.addObserver(observer)
+            model.setActive(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+            onDispose { owner.lifecycle.removeObserver(observer); model.setActive(false); model.onDispose() }
+        }
         val sessionManager = koinInject<SessionManager>()
         val currentUser by sessionManager.currentUser.collectAsState()
         val navigator = LocalNavigator.current
@@ -50,7 +64,7 @@ object KdsScreen : Screen {
             if (!isPhoneLayout) {
                 KdsTopBar(
                     selected = selected,
-                    onSelect = { selected = it },
+                    onSelect = model::selectSection,
                     onLogout = { sessionManager.signOut() },
                     onBackToWorkspaces = backToWorkspaces
                 )
@@ -69,7 +83,7 @@ object KdsScreen : Screen {
             if (isPhoneLayout) {
                 KdsBottomBar(
                     selected = selected,
-                    onSelect = { selected = it },
+                    onSelect = model::selectSection,
                     onLogout = { sessionManager.signOut() },
                     onBackToWorkspaces = backToWorkspaces
                 )

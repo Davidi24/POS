@@ -39,6 +39,8 @@ import static pos.pos.preorder.service.PreOrderLifecycleService.SENDABLE;
 @RequiredArgsConstructor
 public class PreOrderService {
 
+    static final int MAX_LIST_DAYS = 62;
+
     private static final Set<ReservationStatus> OPEN_FOR_PRE_ORDERS = EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
 
     private final RestaurantScopeService restaurantScopeService;
@@ -97,6 +99,10 @@ public class PreOrderService {
     ) {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         orderSupport.requireCompleteWindow(from, to);
+        // A kitchen plans days ahead, not years: a bounded window keeps the answer small.
+        if (java.time.Duration.between(from, to).compareTo(java.time.Duration.ofDays(MAX_LIST_DAYS)) > 0) {
+            throw new AuthException("Choose at most " + MAX_LIST_DAYS + " days", HttpStatus.BAD_REQUEST);
+        }
         return preOrderRepository.findForBranch(restaurantId, branchId, from, to, status).stream()
                 .map(preOrderMapper::toResponse)
                 .toList();

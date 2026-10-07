@@ -12,6 +12,7 @@ import com.saporini.mobile_desktop.pos.tables.domain.model.TableSection
 import com.saporini.mobile_desktop.pos.tables.domain.repository.TableLayoutRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -81,6 +82,8 @@ class ReservationsScreenModel(
                     val settings = runCatching { repository.getReservationSettings(scope.restaurantId, scope.branchId) }.getOrNull()
                     RestaurantTime.use(settings?.timezone)
                     _state.update { it.copy(rules = settings?.rules ?: ReservationRules.NONE, policy = settings?.policy ?: ReservationPolicy()) }
+                    val occasions = runCatching { repository.getOccasions(scope.restaurantId) }.getOrDefault(emptyList())
+                    _state.update { it.copy(occasions = occasions.filter { occasion -> occasion.active }) }
                     refresh()
                 }
             }
@@ -98,7 +101,7 @@ class ReservationsScreenModel(
         val state = _state.value
         if (!state.hasMoreReservations || state.isLoadingMoreReservations) return@launch
         val filter = state.filter
-        if (filter.mode != ReservationListMode.TODAY && filter.mode != ReservationListMode.CALENDAR) return@launch
+        if (filter.mode !in setOf(ReservationListMode.TODAY, ReservationListMode.RANGE, ReservationListMode.CALENDAR, ReservationListMode.ALL)) return@launch
         val scope = try { requireScope(READ_PERMISSION) } catch (error: Exception) {
             _state.update { it.copy(error = failure(error, false)) }
             return@launch
@@ -113,8 +116,18 @@ class ReservationsScreenModel(
             val requestedPage = loadedReservationsPage + 1
             val result = when (filter.mode) {
                 ReservationListMode.TODAY -> repository.getTodayReservationsPage(scope.restaurantId, scope.branchId, requestedPage, RESERVATION_PAGE_SIZE)
+                ReservationListMode.RANGE, ReservationListMode.ALL -> repository.getBranchReservations(
+                    restaurantId = scope.restaurantId,
+                    branchId = scope.branchId,
+                    from = filter.from,
+                    to = filter.to,
+                    status = filter.status,
+                    customerId = filter.customerId,
+                    page = requestedPage,
+                    size = RESERVATION_PAGE_SIZE
+                )
                 ReservationListMode.CALENDAR -> repository.getBranchReservationCalendarPage(scope.restaurantId, scope.branchId, filter.from, filter.to, requestedPage, RESERVATION_PAGE_SIZE)
-                else -> return@launch
+                ReservationListMode.UPCOMING -> return@launch
             }
             if (!isCurrent(token, scope) || requestRevision != listRevision || _state.value.filter != filter) return@launch
             loadedReservationsPage = result.page
@@ -230,28 +243,42 @@ class ReservationsScreenModel(
                         lastPageLoaded = it.lastPage
                     }.items
                     ReservationListMode.UPCOMING -> repository.getUpcomingReservations(scope.restaurantId, scope.branchId, filter.upcomingLimit)
-                    ReservationListMode.RANGE -> repository.getBranchReservations(
-                        restaurantId = scope.restaurantId,
-                        branchId = scope.branchId,
-                        from = filter.from,
-                        to = filter.to,
-                        status = filter.status,
-                        customerId = filter.customerId
-                    )
+                    ReservationListMode.RANGE -> loadPages(lastPageShown) { page ->
+                        repository.getBranchReservations(
+                            restaurantId = scope.restaurantId,
+                            branchId = scope.branchId,
+                            from = filter.from,
+                            to = filter.to,
+                            status = filter.status,
+                            customerId = filter.customerId,
+                            page = page,
+                            size = RESERVATION_PAGE_SIZE
+                        )
+                    }.also {
+                        hasMoreReservations = it.hasNext
+                        lastPageLoaded = it.lastPage
+                    }.items
                     ReservationListMode.CALENDAR -> loadPages(lastPageShown) { page ->
                         repository.getBranchReservationCalendarPage(scope.restaurantId, scope.branchId, filter.from, filter.to, page, RESERVATION_PAGE_SIZE)
                     }.also {
                         hasMoreReservations = it.hasNext
                         lastPageLoaded = it.lastPage
                     }.items
-                    ReservationListMode.ALL -> repository.getBranchReservations(
-                        restaurantId = scope.restaurantId,
-                        branchId = scope.branchId,
-                        from = filter.from,
-                        to = filter.to,
-                        status = filter.status,
-                        customerId = filter.customerId
-                    )
+                    ReservationListMode.ALL -> loadPages(lastPageShown) { page ->
+                        repository.getBranchReservations(
+                            restaurantId = scope.restaurantId,
+                            branchId = scope.branchId,
+                            from = filter.from,
+                            to = filter.to,
+                            status = filter.status,
+                            customerId = filter.customerId,
+                            page = page,
+                            size = RESERVATION_PAGE_SIZE
+                        )
+                    }.also {
+                        hasMoreReservations = it.hasNext
+                        lastPageLoaded = it.lastPage
+                    }.items
                 }
                 if (!isCurrent(token, scope) || requestRevision != listRevision) return false
                 loadedReservationsPage = lastPageLoaded
@@ -536,7 +563,16 @@ class ReservationsScreenModel(
 
     // "Guest arrived": everyone, or how many of the group are here so far.
     fun checkInReservation(reservationId: String, reason: String? = null, arrivedGuests: Int? = null): Job =
-        mutateReservation(withGuest("Guest arrived", reservationId)) { scope ->
+        mutateReservation(
+            withGuest("Guest arrived", reservationId),
+            // A reminder for the host: "Guest arrived · Maria · 🎂 Birthday: Cake from us".
+            describe = { saved ->
+                listOfNotNull(withGuest("Guest arrived", reservationId), saved.occasionName?.let { name ->
+                    listOfNotNull(saved.occasionIcon, name).joinToString(" ") +
+                        (saved.occasionOptions.takeIf { it.isNotEmpty() }?.joinToString(", ", prefix = ": ") ?: "")
+                }).joinToString(" · ")
+            }
+        ) { scope ->
             repository.checkInReservation(scope.restaurantId, reservationId, ReservationActionInput(reason = reason, arrivedGuests = arrivedGuests))
         }
 
@@ -563,6 +599,55 @@ class ReservationsScreenModel(
         mutateReservation(withGuest("No-show warning cleared", reservationId)) { scope ->
             repository.clearNoShowWarning(scope.restaurantId, reservationId, reason)
         }
+
+    // Say no to a request: the guest is told and gets all their money back.
+    fun declineReservation(reservationId: String, reason: String? = null): Job =
+        mutateReservation(withGuest("Request declined", reservationId)) { scope ->
+            repository.declineReservation(scope.restaurantId, reservationId, reason)
+        }
+
+    // The booking's money (deposit, paid extras, food pre-order) and what a cancel would do right now.
+    suspend fun money(reservationId: String): Result<List<MoneyLine>> =
+        query(READ_PERMISSION) { scope -> repository.getMoney(scope.restaurantId, reservationId) }
+
+    // Paid extras from the special menu that fit the booking's occasion.
+    suspend fun extraChoices(reservationId: String): Result<List<BookingExtraChoice>> =
+        query(READ_PERMISSION) { scope -> repository.getExtraChoices(scope.restaurantId, reservationId) }
+
+    // Money changes run in the model's scope, so closing the panel doesn't cut a save short.
+    fun addExtra(reservationId: String, choice: BookingExtraChoice, quantity: Int): Deferred<Result<List<MoneyLine>>> = work.async {
+        mutate(WRITE_PERMISSION, withGuest("${if (quantity > 1) "$quantity × " else ""}${choice.name} added", reservationId)) { scope ->
+            repository.addExtra(scope.restaurantId, reservationId, choice.menuItemId, quantity)
+        }
+    }
+
+    fun sendPaymentLink(reservationId: String): Deferred<Result<Unit>> = work.async {
+        mutate(WRITE_PERMISSION, withGuest("Payment link emailed", reservationId)) { scope ->
+            repository.sendPaymentLink(scope.restaurantId, reservationId)
+        }
+    }
+
+    fun markPaid(reservationId: String, line: MoneyLine): Deferred<Result<List<MoneyLine>>> = work.async {
+        mutate(WRITE_PERMISSION, "${line.description} marked paid") { scope ->
+            repository.markPaid(scope.restaurantId, reservationId, line.id)
+        }
+    }
+
+    fun removeUnpaid(reservationId: String, line: MoneyLine): Deferred<Result<List<MoneyLine>>> = work.async {
+        mutate(WRITE_PERMISSION, "${line.description} removed") { scope ->
+            repository.removeUnpaid(scope.restaurantId, reservationId, line.id)
+        }
+    }
+
+    fun goodwillRefund(reservationId: String, line: MoneyLine, amountCents: Long, reason: String): Deferred<Result<List<MoneyLine>>> = work.async {
+        mutate(GOODWILL_PERMISSION, "Goodwill refund: ${moneyText(amountCents, line.currency)} back") { scope ->
+            repository.goodwillRefund(scope.restaurantId, reservationId, line.id, amountCents, reason)
+        }
+    }
+
+    // The restaurant's event on a day, for the overview's header.
+    suspend fun eventOn(date: kotlinx.datetime.LocalDate): Result<RestaurantEvent?> =
+        query(READ_PERMISSION) { scope -> repository.getEventOn(scope.restaurantId, date.toString()) }
 
     suspend fun guestHistory(reservationId: String): Result<GuestHistory> =
         query(READ_PERMISSION) { scope -> repository.getGuestHistory(scope.restaurantId, reservationId) }
@@ -876,6 +961,8 @@ class ReservationsScreenModel(
         const val CORRECT_PERMISSION = "RESERVATION_CORRECT"
         // Accept requests from big groups.
         const val APPROVE_PERMISSION = "RESERVATION_APPROVE"
+        // Give part of kept money back as goodwill (Owner, or whoever the Owner allows).
+        const val GOODWILL_PERMISSION = "PAYMENT_GOODWILL_REFUND"
         const val RESERVATION_PAGE_SIZE = 100
         // A guest up to 15 minutes late still shows as arriving.
         private val ARRIVAL_GRACE = 15.minutes

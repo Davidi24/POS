@@ -5,10 +5,17 @@ import com.saporini.mobile_desktop.pos.orders.data.dto.toDomain
 import com.saporini.mobile_desktop.pos.orders.domain.model.*
 import com.saporini.mobile_desktop.pos.orders.domain.repository.OrderCatalogRepository
 
-class DefaultOrderCatalogRepository(private val api: OrderCatalogApi) : OrderCatalogRepository {
+class DefaultOrderCatalogRepository(
+    private val api: OrderCatalogApi,
+    // On an event night set to "only the special menu" (Admin Hub), that menu's id; otherwise null.
+    private val onlyMenuToday: suspend (restaurantId: String) -> String? = { null }
+) : OrderCatalogRepository {
     override suspend fun getMenus(restaurantId: String, page: Int, size: Int): OrderCatalogPage {
         require(restaurantId.isNotBlank() && page >= 0 && size in 1..100)
-        return api.getMenus(restaurantId, page, size).toDomain()
+        val menus = api.getMenus(restaurantId, page, size).toDomain()
+        val only = runCatching { onlyMenuToday(restaurantId) }.getOrNull() ?: return menus
+        val kept = menus.items.filter { it.id == only }
+        return if (kept.isEmpty()) menus else menus.copy(items = kept, totalElements = kept.size.toLong(), totalPages = 1, hasNext = false)
     }
 
     override suspend fun getMenu(restaurantId: String, menuId: String): OrderCatalogMenu {
@@ -32,6 +39,20 @@ class DefaultOrderCatalogRepository(private val api: OrderCatalogApi) : OrderCat
         }
         return OrderItemChoices(item, groups)
     }
-    override suspend fun getCustomers(restaurantId: String) = api.getCustomers(restaurantId).filter { it.active }
+    override suspend fun getCustomers(restaurantId: String): List<OrderCustomerChoice> {
+        require(restaurantId.isNotBlank())
+        val pageSize = 100
+        val customers = linkedMapOf<String, OrderCustomerChoice>()
+        var page = 0
+        while (true) {
+            val result = api.getCustomers(restaurantId, page, pageSize)
+            require(result.page == page) { "Customer page response did not match the requested page" }
+            result.items.filter { it.active }.forEach { customers.putIfAbsent(it.id, it) }
+            if (!result.hasNext) break
+            require(result.items.isNotEmpty() && page + 1 < result.totalPages) { "Customer page response has invalid pagination metadata" }
+            page += 1
+        }
+        return customers.values.toList()
+    }
     override suspend fun getReservations(restaurantId: String, branchId: String) = api.getReservations(restaurantId, branchId).filter { it.status !in setOf("CANCELLED", "NO_SHOW", "COMPLETED", "EXPIRED") }
 }

@@ -84,6 +84,31 @@ abstract class AbstractRoleIntegrationTest {
     private final AtomicInteger userSequence = new AtomicInteger(1);
     private final AtomicInteger ipSequence = new AtomicInteger(200);
 
+    @Autowired
+    private pos.pos.restaurant.repository.RestaurantRepository testRestaurants;
+
+    private UUID testRestaurantId;
+
+    // People and custom roles in these tests work at one restaurant, as staff do in production.
+    protected UUID testRestaurantId() {
+        if (testRestaurantId == null) {
+            UUID adminId = adminUser().getId();
+            String key = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+            pos.pos.restaurant.entity.Restaurant restaurant = new pos.pos.restaurant.entity.Restaurant();
+            restaurant.setName("Test restaurant " + key);
+            restaurant.setLegalName("Test restaurant " + key + " LLC");
+            restaurant.setCode("test_" + key);
+            restaurant.setSlug("test-" + key);
+            restaurant.setCurrency("EUR");
+            restaurant.setTimezone("Europe/Rome");
+            restaurant.setOwnerId(adminId);
+            restaurant.setCreatedBy(adminId);
+            restaurant.setUpdatedBy(adminId);
+            testRestaurantId = testRestaurants.save(restaurant).getId();
+        }
+        return testRestaurantId;
+    }
+
     static void registerProdProperties(DynamicPropertyRegistry registry, String schema) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, schema);
         TestJwtKeySupport.registerJwtProperties(registry);
@@ -138,6 +163,7 @@ abstract class AbstractRoleIntegrationTest {
             boolean protectedRole
     ) {
         return roleRepository.save(Role.builder()
+                .restaurantId(system ? null : testRestaurantId())
                 .code(code)
                 .name(name)
                 .description(description)
@@ -221,6 +247,7 @@ abstract class AbstractRoleIntegrationTest {
         UUID adminId = adminUser().getId();
 
         User user = userRepository.save(User.builder()
+                .restaurantId(testRestaurantId())
                 .email("role." + suffix + "@pos.example")
                 .username("role." + suffix)
                 .passwordHash(passwordService.hash(DEFAULT_PASSWORD))

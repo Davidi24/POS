@@ -25,6 +25,17 @@ public class KdsTicketQueryService {
     private final RestaurantScopeService restaurantScopeService;
     private final OrderSupport orderSupport;
     private final KdsSupport kdsSupport;
+    private final pos.pos.settings.repository.SettingsRepository settingsRepository;
+
+    @Transactional(readOnly = true)
+    public Map<String, Integer> posTiming(Authentication authentication, UUID restaurantId, UUID branchId) {
+        restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
+        var settings = settingsRepository.findByRestaurant_Id(restaurantId);
+        return Map.of(
+                "slowAfterMinutes", settings.map(pos.pos.settings.entity.Settings::getKitchenSlowAfterMinutes).orElse(20),
+                "readyWaitingMinutes", settings.map(pos.pos.settings.entity.Settings::getKitchenReadyWaitingMinutes).orElse(5)
+        );
+    }
 
     @Transactional(readOnly = true)
     public List<KdsStationBoardResponse> getBoard(

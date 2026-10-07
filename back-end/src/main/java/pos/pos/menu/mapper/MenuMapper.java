@@ -68,6 +68,7 @@ public class MenuMapper {
                 .availableFromDate(menu.getAvailableFromDate())
                 .availableUntilDate(menu.getAvailableUntilDate())
                 .color(menu.getColor())
+                .special(menu.isSpecial())
                 .itemCount(itemCount)
                 .createdBy(menu.getCreatedBy())
                 .updatedBy(menu.getUpdatedBy())
@@ -153,6 +154,10 @@ public class MenuMapper {
                 .onlineSectionName(item.getOnlineSection() == null ? null : item.getOnlineSection().getName())
                 .displayOrder(item.getDisplayOrder())
                 .ingredients(List.copyOf(item.getIngredients()))
+                .orderBeforeHours(item.getOrderBeforeHours())
+                .occasionCodes(item.getOccasionCodes() == null || item.getOccasionCodes().isBlank()
+                        ? List.of()
+                        : java.util.Arrays.stream(item.getOccasionCodes().split(",")).map(String::trim).filter(code -> !code.isEmpty()).toList())
                 .variants(variants == null ? null : variants.stream().map(this::toMenuVariantSummaryResponse).toList())
                 .optionGroups(optionGroups == null ? null : optionGroups.stream().map(this::toMenuItemOptionGroupSummaryResponse).toList())
                 .build();
@@ -232,6 +237,8 @@ public class MenuMapper {
                 .priceDelta(item.getPriceDelta())
                 .available(item.isAvailable())
                 .displayOrder(item.getDisplayOrder())
+                .inventoryRecipeId(item.getInventoryRecipe() == null ? null : item.getInventoryRecipe().getId())
+                .inventoryRecipeQuantity(item.getInventoryRecipeQuantity())
                 .build();
     }
 

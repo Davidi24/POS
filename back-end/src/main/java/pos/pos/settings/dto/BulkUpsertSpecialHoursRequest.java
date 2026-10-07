@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
@@ -19,5 +20,6 @@ public class BulkUpsertSpecialHoursRequest {
 
     @Valid
     @NotEmpty(message = "items is required")
-    private List<UpsertSpecialHourRequest> items;
+    @Size(max = 1000, message = "items can have at most 1000 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UpsertSpecialHourRequest> items;
 }

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.kds.service.KdsOrderSyncService;
+import pos.pos.inventory.service.InventorySaleConsumptionService;
 import pos.pos.order.dto.OrderActionRequest;
 import pos.pos.order.dto.OrderMergeRequest;
 import pos.pos.order.dto.OrderPaymentStatusRequest;
@@ -26,6 +27,7 @@ import pos.pos.order.enums.OrderType;
 import pos.pos.reservation.entity.Reservation;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.service.RestaurantScopeService;
+import pos.pos.tables.entity.RestaurantTable;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -49,6 +51,7 @@ public class OrderWorkflowService {
     private final OrderSupport orderSupport;
     private final OrderDomainSupport orderDomainSupport;
     private final KdsOrderSyncService kdsOrderSyncService;
+    private final InventorySaleConsumptionService inventorySaleConsumptionService;
 
     @Transactional
     public OrderResponse openOrder(Authentication authentication, UUID restaurantId, UUID orderId, OrderActionRequest request) {
@@ -112,10 +115,15 @@ public class OrderWorkflowService {
         Order order = orderSupport.requireOrder(restaurantId, orderId);
         orderDomainSupport.assertOrderEditable(order);
 
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
         order.getLineItems().stream()
                 .filter(orderSupport::isFinanciallyActive)
-                .forEach(lineItem -> lineItem.setStatus(OrderLineItemStatus.FULFILLED));
-        order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+                .filter(lineItem -> lineItem.getStatus() != OrderLineItemStatus.FULFILLED)
+                .forEach(lineItem -> {
+                    inventorySaleConsumptionService.consumeFulfilledLine(order, lineItem, actorId);
+                    lineItem.setStatus(OrderLineItemStatus.FULFILLED);
+                });
+        order.setUpdatedBy(actorId);
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.FULFILLED, orderDomainSupport.firstNote(request, "Order fulfilled"), order.getUpdatedBy());
         orderSupport.saveOrder(order);
@@ -167,10 +175,14 @@ public class OrderWorkflowService {
     public OrderResponse cancelOrder(Authentication authentication, UUID restaurantId, UUID orderId, OrderActionRequest request) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         Order order = orderSupport.requireOrder(restaurantId, orderId);
+        if (order.getStatus() == OrderStatus.VOIDED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new AuthException("This order was already " + order.getStatus().name().toLowerCase(), HttpStatus.BAD_REQUEST);
+        }
         if (order.getStatus() == OrderStatus.CLOSED) {
             throw new AuthException("Closed orders must be reopened before they can be cancelled", HttpStatus.BAD_REQUEST);
         }
-        if (EnumSet.of(OrderPaymentStatus.PAID, OrderPaymentStatus.PARTIALLY_PAID).contains(order.getPaymentStatus())) {
+        if (EnumSet.of(OrderPaymentStatus.PAID, OrderPaymentStatus.PARTIALLY_PAID).contains(order.getPaymentStatus())
+                || orderSupport.hasMoneyTaken(order)) {
             throw new AuthException("Paid orders cannot be cancelled", HttpStatus.BAD_REQUEST);
         }
 
@@ -192,6 +204,16 @@ public class OrderWorkflowService {
     public OrderResponse voidOrder(Authentication authentication, UUID restaurantId, UUID orderId, OrderActionRequest request) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         Order order = orderSupport.requireOrder(restaurantId, orderId);
+        if (order.getStatus() == OrderStatus.VOIDED || order.getStatus() == OrderStatus.CANCELLED) {
+            throw new AuthException("This order was already " + order.getStatus().name().toLowerCase(), HttpStatus.BAD_REQUEST);
+        }
+        if (order.getStatus() == OrderStatus.CLOSED) {
+            throw new AuthException("Closed orders must be reopened before they can be voided", HttpStatus.BAD_REQUEST);
+        }
+        // Money taken must be given back (refund) or cancelled (void the payment) first, so it is never lost track of.
+        if (orderSupport.hasMoneyTaken(order)) {
+            throw new AuthException("Refund or void the payments on this order first", HttpStatus.BAD_REQUEST);
+        }
         orderSupport.requireVoidReasonIfNeeded(order, request == null ? null : request.getReason());
 
         order.setStatus(OrderStatus.VOIDED);
@@ -201,7 +223,10 @@ public class OrderWorkflowService {
         order.getLineItems().stream()
                 .filter(orderSupport::isFinanciallyActive)
                 .forEach(lineItem -> {
+                    // Voiding/refunding the bill does not mean prepared ingredients returned to stock. Any genuine
+                    // physical stock correction must be an explicit inventory movement, never an automatic reversal.
                     lineItem.setStatus(OrderLineItemStatus.VOIDED);
+                    lineItem.setVoidedBy(order.getUpdatedBy());
                     orderSupport.appendReasonToLineItem(lineItem, request == null ? null : request.getReason());
                 });
         orderSupport.recalculateTotals(order);
@@ -224,6 +249,8 @@ public class OrderWorkflowService {
         Order sourceOrder = orderSupport.requireOrder(restaurantId, request.getSourceOrderId());
         orderDomainSupport.assertOrderEditable(targetOrder);
         orderDomainSupport.assertOrderEditable(sourceOrder);
+        orderSupport.assertNoSaleConsumedItems(targetOrder, "merged");
+        orderSupport.assertNoSaleConsumedItems(sourceOrder, "merged");
         if (Objects.equals(targetOrder.getId(), sourceOrder.getId())) {
             throw new AuthException("sourceOrderId must be different from the target order", HttpStatus.BAD_REQUEST);
         }
@@ -294,7 +321,12 @@ public class OrderWorkflowService {
             throw new AuthException("Order transfers are disabled for this restaurant", HttpStatus.BAD_REQUEST);
         }
 
-        order.setRestaurantTable(orderSupport.resolveTable(order.getBranch().getId(), request.getTableId()));
+        RestaurantTable table = orderSupport.resolveTableForUpdate(order.getBranch().getId(), request.getTableId());
+        if (!Objects.equals(order.getRestaurantTable() == null ? null : order.getRestaurantTable().getId(),
+                table == null ? null : table.getId())) {
+            orderSupport.assertTableCanReceiveOrder(table);
+        }
+        order.setRestaurantTable(table);
         order.setOrderType(OrderType.DINE_IN);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.addEvent(order, OrderEventType.TABLE_CHANGED,
@@ -314,6 +346,7 @@ public class OrderWorkflowService {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         Order order = orderSupport.requireOrder(restaurantId, orderId);
         orderDomainSupport.assertOrderEditable(order);
+        orderSupport.assertNoSaleConsumedItems(order, "transferred to another branch");
         if (!orderSupport.loadOrderRules(order.getRestaurant()).isTransferOrdersEnabled()) {
             throw new AuthException("Order transfers are disabled for this restaurant", HttpStatus.BAD_REQUEST);
         }
@@ -329,7 +362,12 @@ public class OrderWorkflowService {
         // Refresh the old branch as well once the transfer transaction commits.
         orderSupport.notifyOrderBranchChanged(order);
         order.setBranch(branch);
-        order.setRestaurantTable(request.getTableId() == null ? null : orderSupport.resolveTable(branch.getId(), request.getTableId()));
+        RestaurantTable table = orderSupport.resolveTableForUpdate(branch.getId(), request.getTableId());
+        if (!Objects.equals(order.getRestaurantTable() == null ? null : order.getRestaurantTable().getId(),
+                table == null ? null : table.getId())) {
+            orderSupport.assertTableCanReceiveOrder(table);
+        }
+        order.setRestaurantTable(table);
         order.setReservation(reservation);
         if (reservation != null) {
             order.setOrderType(OrderType.DINE_IN);
@@ -390,6 +428,7 @@ public class OrderWorkflowService {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         Order sourceOrder = orderSupport.requireOrder(restaurantId, orderId);
         orderDomainSupport.assertOrderEditable(sourceOrder);
+        orderSupport.assertNoSaleConsumedItems(sourceOrder, "split");
         if (!orderSupport.loadSettings(sourceOrder.getRestaurant()).isAllowSplitBills()) {
             throw new AuthException("Split bills are disabled for this restaurant", HttpStatus.BAD_REQUEST);
         }
@@ -404,9 +443,12 @@ public class OrderWorkflowService {
         Order newOrder = new Order();
         newOrder.setRestaurant(sourceOrder.getRestaurant());
         newOrder.setBranch(sourceOrder.getBranch());
-        newOrder.setRestaurantTable(request.getTargetTableId() == null
-                ? sourceOrder.getRestaurantTable()
-                : orderSupport.resolveTable(sourceOrder.getBranch().getId(), request.getTargetTableId()));
+        UUID targetTableId = request.getTargetTableId() == null
+                ? sourceOrder.getRestaurantTable() == null ? null : sourceOrder.getRestaurantTable().getId()
+                : request.getTargetTableId();
+        RestaurantTable targetTable = orderSupport.resolveTableForUpdate(sourceOrder.getBranch().getId(), targetTableId);
+        orderSupport.assertTableCanReceiveOrder(targetTable);
+        newOrder.setRestaurantTable(targetTable);
         newOrder.setReservation(sourceOrder.getReservation());
         newOrder.setCustomer(sourceOrder.getCustomer());
         newOrder.setCreatedBy(actorId);

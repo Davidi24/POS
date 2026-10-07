@@ -19,6 +19,7 @@ import pos.pos.settings.repository.SettingsRepository;
 import pos.pos.order.repository.OrderRepository;
 import pos.pos.order.mapper.OrderMapper;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.inventory.repository.InventoryMovementRepository;
 import pos.pos.order.enums.OrderDiscountType;
 import java.math.BigDecimal;
 import java.util.*;
@@ -38,6 +39,8 @@ class OrderPricingSafetyTest {
     @Mock SettingsRepository settings;
     @Mock OrderRepository orders;
     @Mock OrderMapper mapper;
+    @Mock pos.pos.order.realtime.OrderChangeNotifier orderChangeNotifier;
+    @Mock InventoryMovementRepository inventoryMovementRepository;
     @InjectMocks OrderSupport support;
     private OrderLineItem line(String price, int quantity) {
         var line = new OrderLineItem(); line.setUnitPriceSnapshot(new BigDecimal(price)); line.setQuantity(quantity); return line;
@@ -45,6 +48,7 @@ class OrderPricingSafetyTest {
     private Order order(OrderLineItem... lines) {
         var order = new Order(); var restaurant = new Restaurant(); restaurant.setId(UUID.randomUUID());
         order.setRestaurant(restaurant); order.setCurrency("EUR"); order.setTaxRateSnapshot(BigDecimal.ZERO);
+        var branch = new pos.pos.restaurant.entity.Branch(); branch.setId(UUID.randomUUID()); order.setBranch(branch);
         when(settings.findByRestaurant_Id(restaurant.getId())).thenReturn(Optional.empty());
         for(var line:lines) order.addLineItem(line); return order;
     }
@@ -115,7 +119,8 @@ class OrderPricingSafetyTest {
             when(orders.saveAndFlush(current)).thenReturn(current);
         }
         var domain = new pos.pos.order.service.OrderDomainSupport(orders,support);
-        var workflow = new pos.pos.order.service.OrderWorkflowService(restaurantScopeService,support,domain,mock(pos.pos.kds.service.KdsOrderSyncService.class));
+        var workflow = new pos.pos.order.service.OrderWorkflowService(restaurantScopeService,support,domain,
+                mock(pos.pos.kds.service.KdsOrderSyncService.class), mock(pos.pos.inventory.service.InventorySaleConsumptionService.class));
         workflow.mergeOrders(null,target.getRestaurant().getId(),target.getId(),new pos.pos.order.dto.OrderMergeRequest(source.getId(),null));
         assertThat(target.getDiscountTotal()).isEqualByComparingTo("20"); assertThat(target.getTotal()).isEqualByComparingTo("180");
         assertThat(source.getTotal()).isEqualByComparingTo("0");
@@ -128,7 +133,7 @@ class OrderPricingSafetyTest {
         when(orders.saveAndFlush(order)).thenReturn(order);
         var domain = new pos.pos.order.service.OrderDomainSupport(orders, support);
         var workflow = new pos.pos.order.service.OrderWorkflowService(restaurantScopeService, support, domain,
-                mock(pos.pos.kds.service.KdsOrderSyncService.class));
+                mock(pos.pos.kds.service.KdsOrderSyncService.class), mock(pos.pos.inventory.service.InventorySaleConsumptionService.class));
         workflow.markOrderReady(null, order.getRestaurant().getId(), order.getId(), new pos.pos.order.dto.OrderActionRequest());
         assertThat(order.getFulfillmentStatus()).isEqualTo(pos.pos.order.enums.OrderFulfillmentStatus.FULFILLED);
     }
@@ -143,6 +148,7 @@ class OrderPricingSafetyTest {
     }
     @Test void cancellationIsConsistentBeforeSettingsQueryCanFlush() {
         var order = new Order(); var restaurant = new Restaurant(); restaurant.setId(UUID.randomUUID()); order.setRestaurant(restaurant); order.setId(UUID.randomUUID()); order.setStatus(pos.pos.order.enums.OrderStatus.OPEN); order.setTaxRateSnapshot(BigDecimal.ZERO);
+        var branch = new pos.pos.restaurant.entity.Branch(); branch.setId(UUID.randomUUID()); order.setBranch(branch);
         when(orders.findByIdAndRestaurant_Id(order.getId(),restaurant.getId())).thenReturn(Optional.of(order));
         order.setFulfillmentStatus(pos.pos.order.enums.OrderFulfillmentStatus.IN_PREPARATION);
         when(settings.findByRestaurant_Id(restaurant.getId())).thenAnswer(i -> {
@@ -152,7 +158,8 @@ class OrderPricingSafetyTest {
         });
         when(orders.saveAndFlush(order)).thenReturn(order);
         var domain = new pos.pos.order.service.OrderDomainSupport(orders,support);
-        var workflow = new pos.pos.order.service.OrderWorkflowService(restaurantScopeService,support,domain,mock(pos.pos.kds.service.KdsOrderSyncService.class));
+        var workflow = new pos.pos.order.service.OrderWorkflowService(restaurantScopeService, support, domain,
+                mock(pos.pos.kds.service.KdsOrderSyncService.class), mock(pos.pos.inventory.service.InventorySaleConsumptionService.class));
         workflow.cancelOrder(null,restaurant.getId(),order.getId(),new pos.pos.order.dto.OrderActionRequest());
         assertThat(order.getStatus()).isEqualTo(pos.pos.order.enums.OrderStatus.CANCELLED);
     }

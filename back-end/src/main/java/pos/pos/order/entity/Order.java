@@ -210,7 +210,7 @@ public class Order extends AbstractAuditedEntity {
     private List<OrderLineItem> lineItems = new ArrayList<>();
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("createdAt ASC")
+    @OrderBy("discountSequence ASC")
     private List<OrderDiscount> discounts = new ArrayList<>();
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -248,6 +248,11 @@ public class Order extends AbstractAuditedEntity {
             return;
         }
 
+        int nextSequence = discounts.stream()
+                .mapToInt(OrderDiscount::getDiscountSequence)
+                .max()
+                .orElse(-1) + 1;
+        discount.setDiscountSequence(nextSequence);
         discounts.add(discount);
         discount.setOrder(this);
     }

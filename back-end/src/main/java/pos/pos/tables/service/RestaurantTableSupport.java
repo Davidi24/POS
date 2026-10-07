@@ -232,6 +232,8 @@ public class RestaurantTableSupport {
             response.setNextReservationStatus(reservation.getStatus());
             response.setNextReservationPartySize(reservation.getPartySize());
             response.setNextReservationArrivedGuests(reservation.getArrivedGuests());
+            response.setNextReservationOccasionIcon(reservation.getOccasionIcon());
+            response.setNextReservationOccasionName(reservation.getOccasionName());
             response.setNextReservationHoldUntil(reservationPolicy == null
                     ? reservation.getHoldUntil()
                     : reservationPolicy.holdUntil(reservation));
@@ -295,12 +297,12 @@ public class RestaurantTableSupport {
                 ));
     }
 
-    // Holds these tables until the transaction ends, so two bookings can't take the same table at once.
-    public void lockTablesForBooking(UUID branchId, Collection<UUID> tableIds) {
+    // Holds these tables until transaction end and follows one lock order across workflows.
+    public void lockTablesForUpdateInStableOrder(UUID branchId, Collection<UUID> tableIds) {
         if (tableIds.isEmpty()) {
             return;
         }
-        restaurantTableRepository.lockTablesForBooking(branchId, new LinkedHashSet<>(tableIds));
+        restaurantTableRepository.lockTablesForUpdateInStableOrder(branchId, new LinkedHashSet<>(tableIds));
     }
 
     public Map<UUID, RestaurantTable> loadTablesForUpdate(UUID branchId, Collection<UUID> tableIds) {

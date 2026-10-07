@@ -286,6 +286,8 @@ private fun SettingsPage(category: SettingsCategory, onBack: () -> Unit, modifie
                                 }
                             }
                             if (savedNote) InfoBanner("Saved.")
+                            // Occasions and event nights have their own lists and save on their own.
+                            if (category == SettingsCategory.RESERVATIONS) OccasionsAndEventsSettings(scope.restaurantId, canEdit)
                         }
                     }
                 }

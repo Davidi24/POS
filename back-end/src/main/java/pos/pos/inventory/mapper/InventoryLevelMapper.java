@@ -16,7 +16,11 @@ public class InventoryLevelMapper {
 
         BigDecimal onHand = level.getOnHandQuantity() == null ? BigDecimal.ZERO : level.getOnHandQuantity();
         BigDecimal committed = level.getCommittedQuantity() == null ? BigDecimal.ZERO : level.getCommittedQuantity();
-        BigDecimal reorderQuantity = level.getReorderQuantity();
+        // A place's own reorder/full levels win; otherwise the item's apply everywhere it is kept.
+        BigDecimal reorderQuantity = level.getReorderQuantity() != null || level.getInventoryItem() == null
+                ? level.getReorderQuantity() : level.getInventoryItem().getReorderPoint();
+        BigDecimal parQuantity = level.getParQuantity() != null || level.getInventoryItem() == null
+                ? level.getParQuantity() : level.getInventoryItem().getParLevel();
 
         return InventoryLevelResponse.builder()
                 .id(level.getId())
@@ -27,7 +31,7 @@ public class InventoryLevelMapper {
                 .onHandQuantity(onHand)
                 .committedQuantity(committed)
                 .availableQuantity(onHand.subtract(committed))
-                .parQuantity(level.getParQuantity())
+                .parQuantity(parQuantity)
                 .reorderQuantity(reorderQuantity)
                 .lastCountedAt(level.getLastCountedAt())
                 .lastMovementAt(level.getLastMovementAt())

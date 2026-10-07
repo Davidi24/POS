@@ -99,6 +99,8 @@ class ReservationServicesTest {
     private pos.pos.reservation.repository.ReservationEventRepository reservationEventRepository;
     @Mock
     private pos.pos.reservation.repository.GuestNoShowClearRepository guestNoShowClearRepository;
+    @Mock
+    private pos.pos.reservation.repository.ReservationOccasionRepository reservationOccasionRepository;
     @Spy
     private RestaurantTableMapper restaurantTableMapper;
     @Spy
@@ -165,6 +167,7 @@ class ReservationServicesTest {
                 reservationPolicy,
                 reservationAvailabilitySupport,
                 new pos.pos.reservation.service.GuestNoShowCounter(reservationRepository, guestNoShowClearRepository),
+                new pos.pos.reservation.service.ReservationOccasionService(restaurantScopeService, reservationOccasionRepository),
                 event -> { }
         );
         reservationLifecycleService = new ReservationLifecycleService(
@@ -266,7 +269,7 @@ class ReservationServicesTest {
 
         // A second booking for the same table waits on this lock, then its overlap check sees the first booking.
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(restaurantTableRepository, reservationRepository);
-        order.verify(restaurantTableRepository).lockTablesForBooking(BRANCH_ID, java.util.Set.of(TABLE_ID));
+        order.verify(restaurantTableRepository).lockTablesForUpdateInStableOrder(BRANCH_ID, java.util.Set.of(TABLE_ID));
         order.verify(reservationRepository).findAllByBranch_IdAndStatusInAndReservationStartLessThanAndReservationEndGreaterThanOrderByReservationStartAsc(
                 eq(BRANCH_ID), any(), any(), any());
     }

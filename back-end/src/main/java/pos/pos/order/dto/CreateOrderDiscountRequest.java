@@ -1,5 +1,6 @@
 package pos.pos.order.dto;
 
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -29,7 +30,9 @@ public class CreateOrderDiscountRequest {
 
     @NotNull(message = "discountValue is required")
     @DecimalMin(value = "0.0", inclusive = true, message = "discountValue must not be negative")
+    @Digits(integer = 12, fraction = 2, message = "discountValue must have at most 12 digits and 2 decimals")
     private BigDecimal discountValue;
 
+    @Size(max = 1000, message = "reason must be at most 1000 characters")
     private String reason;
 }

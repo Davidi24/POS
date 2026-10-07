@@ -25,6 +25,8 @@ import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
 import pos.pos.settings.dto.UpdateSettingsSequencePrefixesRequest;
 import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
 import pos.pos.settings.dto.UpdateSettingsReservationPolicyRequest;
+import pos.pos.settings.dto.UpdateSettingsKitchenStatusRequest;
+import pos.pos.settings.dto.UpdateSettingsShiftsRequest;
 import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.service.SettingsService;
 
@@ -146,6 +148,50 @@ public class SettingsController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(settingsService.updateReservationPolicy(authentication, restaurantId, request));
+    }
+
+    @PatchMapping("/kitchen-status")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Set when the waiters' Kitchen Status marks orders as slow and ready food as waiting")
+    public ResponseEntity<SettingsResponse> updateKitchenStatus(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody UpdateSettingsKitchenStatusRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updateKitchenStatus(authentication, restaurantId, request));
+    }
+
+    @PatchMapping("/shifts")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Set the shift rules (how early staff can clock in)")
+    public ResponseEntity<SettingsResponse> updateShifts(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody UpdateSettingsShiftsRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updateShifts(authentication, restaurantId, request));
+    }
+
+    @PatchMapping("/payments")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Set tips, closing paid orders and the refund window")
+    public ResponseEntity<SettingsResponse> updatePayments(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody pos.pos.settings.dto.UpdateSettingsPaymentsRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updatePayments(authentication, restaurantId, request));
+    }
+
+    @PatchMapping("/fraud-checks")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Set when discounts, refunds, removals and tips are flagged for review, and which checks run")
+    public ResponseEntity<SettingsResponse> updateFraudChecks(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody pos.pos.settings.dto.UpdateSettingsFraudRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updateFraudChecks(authentication, restaurantId, request));
     }
 
     @PostMapping("/reset")

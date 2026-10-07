@@ -1,7 +1,10 @@
 package pos.pos.device.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import pos.pos.device.entity.Device;
 
 import java.util.List;
@@ -46,6 +49,17 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
     List<Device> findBranchNonPrinterDevices(UUID restaurantId, UUID branchId);
 
     Optional<Device> findByIdAndRestaurant_Id(UUID deviceId, UUID restaurantId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM Device d WHERE d.id = :deviceId AND d.restaurant.id = :restaurantId")
+    Optional<Device> findForUpdateByIdAndRestaurantId(
+            @Param("deviceId") UUID deviceId,
+            @Param("restaurantId") UUID restaurantId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM Device d WHERE d.id = :deviceId")
+    Optional<Device> findForUpdateById(@Param("deviceId") UUID deviceId);
 
     @Query("""
         SELECT d

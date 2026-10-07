@@ -122,8 +122,8 @@ class MenuItemServiceTest {
         given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(Optional.of(menu));
         given(menuSectionRepository.findById(SECTION_ID)).willReturn(Optional.of(section));
         given(menuItemRepository.findBySectionIdAndAvailableOrderByDisplayOrderAscNameAsc(SECTION_ID, true)).willReturn(List.of(item));
-        given(menuVariantRepository.findByMenuItemIdOrderByDisplayOrderAscNameAsc(ITEM_ID)).willReturn(List.of(variant(item)));
-        given(menuItemOptionGroupRepository.findByMenuItemIdOrdered(ITEM_ID)).willReturn(List.of(optionGroupLink(item)));
+        given(menuVariantRepository.findByMenuItemIdInOrdered(List.of(ITEM_ID))).willReturn(List.of(variant(item)));
+        given(menuItemOptionGroupRepository.findByMenuItemIdInOrdered(List.of(ITEM_ID))).willReturn(List.of(optionGroupLink(item)));
 
         List<MenuItemSummaryResponse> response = menuItemService.getItems(authentication, MENU_ID, SECTION_ID, true, true, true);
 
@@ -131,6 +131,10 @@ class MenuItemServiceTest {
         assertThat(response.get(0).getId()).isEqualTo(ITEM_ID);
         assertThat(response.get(0).getVariants()).hasSize(1);
         assertThat(response.get(0).getOptionGroups()).hasSize(1);
+        verify(menuVariantRepository).findByMenuItemIdInOrdered(List.of(ITEM_ID));
+        verify(menuItemOptionGroupRepository).findByMenuItemIdInOrdered(List.of(ITEM_ID));
+        verify(menuVariantRepository, never()).findByMenuItemIdOrderByDisplayOrderAscNameAsc(ITEM_ID);
+        verify(menuItemOptionGroupRepository, never()).findByMenuItemIdOrdered(ITEM_ID);
     }
 
     @Test

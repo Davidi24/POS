@@ -44,6 +44,8 @@ import java.util.function.BiConsumer;
 @lombok.RequiredArgsConstructor
 public class ReservationLifecycleService {
 
+    // A request the restaurant said no to is cancelled with this reason, and the guest gets all money back.
+    public static final String DECLINED = "Declined";
     private static final EnumSet<ReservationStatus> WAITING = EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
     private static final EnumSet<OrderStatus> ORDERS_ON_VISIT = EnumSet.of(OrderStatus.DRAFT, OrderStatus.OPEN, OrderStatus.CLOSED);
     private static final EnumSet<TableStatus> SEATABLE = EnumSet.of(TableStatus.AVAILABLE, TableStatus.RESERVED, TableStatus.OCCUPIED);
@@ -65,6 +67,11 @@ public class ReservationLifecycleService {
     @Transactional
     public ReservationResponse confirmReservation(Authentication authentication, UUID restaurantId, UUID reservationId, ReservationActionRequest request) {
         return act(authentication, restaurantId, reservationId, (reservation, actor) -> confirm(reservation, reason(request), actor));
+    }
+
+    @Transactional
+    public ReservationResponse declineReservation(Authentication authentication, UUID restaurantId, UUID reservationId, ReservationActionRequest request) {
+        return act(authentication, restaurantId, reservationId, (reservation, actor) -> decline(reservation, reason(request), actor));
     }
 
     @Transactional
@@ -135,6 +142,22 @@ public class ReservationLifecycleService {
         }
         reservation.setConfirmedAt(now());
         change(reservation, ReservationStatus.CONFIRMED, reason, actor);
+    }
+
+    // The restaurant says no to a request (e.g. "Fully booked"). The guest is told and gets all money back.
+    public void decline(Reservation reservation, String reason, ReservationActor actor) {
+        if (reservation.getStatus() != ReservationStatus.PENDING) {
+            throw bad("Only a booking request can be declined");
+        }
+        String full = reason == null || reason.isBlank() ? DECLINED : DECLINED + ": " + reason.trim();
+        reservation.setCancelledAt(now());
+        reservation.setCancellationReason(full);
+        change(reservation, ReservationStatus.CANCELLED, full, actor);
+    }
+
+    public static boolean isDeclined(Reservation reservation) {
+        return reservation.getStatus() == ReservationStatus.CANCELLED && reservation.getCancellationReason() != null
+                && reservation.getCancellationReason().startsWith(DECLINED);
     }
 
     public void cancel(Reservation reservation, String reason, ReservationActor actor) {

@@ -36,6 +36,7 @@ import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.tables.entity.RestaurantTable;
 import pos.pos.tables.service.RestaurantTableSupport;
+import pos.pos.utils.PageableUtils;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -179,25 +180,24 @@ public class ReservationQueryService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReservationResponse> getBranchReservations(
+    public PageResponse<ReservationResponse> getBranchReservations(
             Authentication authentication,
             UUID restaurantId,
             UUID branchId,
             OffsetDateTime from,
             OffsetDateTime to,
             ReservationStatus status,
-            UUID customerId
+            UUID customerId,
+            Integer page,
+            Integer size
     ) {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
-        List<Reservation> reservations = loadBranchReservations(branchId, from, to);
-
-        return reservationSupport.toResponses(reservations.stream()
-                .filter(reservation -> status == null || reservation.getStatus() == status)
-                .filter(reservation -> customerId == null || Objects.equals(
-                        reservation.getCustomer() == null ? null : reservation.getCustomer().getId(),
-                        customerId
-                ))
-                .toList());
+        if ((from == null) != (to == null)) reservationSupport.requireCompleteWindow(from, to);
+        PageRequest pageable = PageableUtils.of(page, size, DEFAULT_RESERVATION_PAGE_SIZE, org.springframework.data.domain.Sort.unsorted());
+        Page<UUID> ids = reservationRepository.findReservationIdsForBranch(
+                branchId, from != null, from, to != null, to, status != null, status, customerId != null, customerId, pageable
+        );
+        return toReservationPage(ids);
     }
 
     @Transactional(readOnly = true)
@@ -507,6 +507,9 @@ public class ReservationQueryService {
             String floor
     ) {
         Branch branch = restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
+        if (partySize != null && (partySize < 1 || partySize > 1000)) {
+            throw new AuthException("partySize must be between 1 and 1000", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
         ReservationSupport.TimeWindow window = reservationSupport.resolveCapacityWindow(from, to);
         // Optional: count only one floor, so the numbers match the floor plan on screen.
         String onlyFloor = NormalizationUtils.normalize(floor);

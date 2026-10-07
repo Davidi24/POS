@@ -71,6 +71,8 @@ fun TableLayoutResponseDto.toDomain(): BranchTableLayout {
                 nextReservationHoldWarningAt = table.nextReservationHoldWarningAt,
                 nextReservationPartySize = table.nextReservationPartySize,
                 nextReservationArrivedGuests = table.nextReservationArrivedGuests,
+                nextReservationOccasionIcon = table.nextReservationOccasionIcon,
+                nextReservationOccasionName = table.nextReservationOccasionName,
                 currentOrderId = table.currentOrderId,
                 currentOrderNumber = table.currentOrderNumber,
                 currentOrderStatus = table.currentOrderStatus,

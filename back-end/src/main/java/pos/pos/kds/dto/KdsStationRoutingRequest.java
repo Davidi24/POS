@@ -1,5 +1,6 @@
 package pos.pos.kds.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -26,6 +27,7 @@ public class KdsStationRoutingRequest {
 
     private KdsPriority priority;
 
+    @Size(max = 50, message = "courseLabel must be at most 50 characters")
     private String courseLabel;
 
     private Boolean active;

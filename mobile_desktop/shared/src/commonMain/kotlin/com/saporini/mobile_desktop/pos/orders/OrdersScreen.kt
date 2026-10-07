@@ -110,8 +110,8 @@ import kotlin.time.Instant
 import kotlin.math.roundToInt
 
 @Composable
-fun OrdersScreen(modifier: Modifier = Modifier, onPaymentRequested: () -> Unit = {}) {
-    val model = koinInject<OrdersScreenModel>()
+fun OrdersScreen(modifier: Modifier = Modifier, onPaymentRequested: () -> Unit = {}, historyOnly: Boolean = false) {
+    val model = koinInject<OrdersScreenModel>(qualifier = if(historyOnly) org.koin.core.qualifier.named("pos-history") else null)
     val owner = LocalLifecycleOwner.current
     DisposableEffect(model, owner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -171,9 +171,12 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier) {
                     progress = kitchen,
                     onProgressChange = { kitchen = it },
                     mineOnly = mineOnly,
-                    onMineChange = { mineOnly = it },
+                    onMineChange = { mineOnly = it; model.historyMine(it) },
                     history = state.filter.mode == OrderListMode.HISTORY,
-                    onHistoryChange = { model.setFilter(OrderListFilter(mode = if (it) OrderListMode.HISTORY else OrderListMode.OPEN)) }
+                    onHistoryChange = { model.setFilter(OrderListFilter(mode = if (it) OrderListMode.HISTORY else OrderListMode.OPEN)) },
+                    historyOnly = model.historyOnly,
+                    historyStatus = state.filter.status,
+                    onHistoryStatusChange = { model.setFilter(state.filter.copy(status = it)) }
                 )
                 state.error?.let { OrderError(it.message, model::clearError) }
                 state.refreshWarning?.let { OrderError(it, model::clearError) }
@@ -195,6 +198,10 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier) {
                     } else {
                         OrdersListPanel(
                             orders = visible,
+                            hasNext = state.historyHasNext,
+                            loadingMore = state.historyLoadingMore || state.isLoading,
+                            pageError = state.error != null,
+                            onLoadMore = model::loadMoreHistory,
                             selectedId = state.selectedOrderId,
                             compact = compact,
                             modifier = Modifier.weight(if(compact) 1f else 1.65f).fillMaxHeight(),
@@ -1815,6 +1822,10 @@ private val orderEmptyDiningResource: DrawableResource by lazy {
 @Composable
 private fun OrdersListPanel(
     orders: List<OrderSummary>,
+    hasNext: Boolean = false,
+    loadingMore: Boolean = false,
+    pageError: Boolean = false,
+    onLoadMore: () -> Unit = {},
     selectedId: String?,
     compact: Boolean,
     modifier: Modifier = Modifier,
@@ -1822,6 +1833,10 @@ private fun OrdersListPanel(
 ) {
     Surface(modifier, shape = RoundedCornerShape(12.dp), color = Color.White, border = BorderStroke(1.dp, OrderBorder)) {
         val listState = rememberLazyListState()
+        val nearEnd by remember(listState, orders.size) { derivedStateOf { (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= orders.size - 5 } }
+        LaunchedEffect(nearEnd, hasNext, loadingMore, pageError, orders.size) {
+            if (nearEnd && hasNext && !loadingMore && !pageError) onLoadMore()
+        }
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 Modifier.fillMaxSize().padding(start = 8.dp, top = 8.dp, end = 12.dp, bottom = 4.dp),
@@ -1830,6 +1845,11 @@ private fun OrdersListPanel(
             ) {
                 items(orders, key = { it.id }) { row ->
                     OrderListCard(row, selectedId == row.id, compact) { onSelect(row.id) }
+                }
+                if (hasNext) item(key = "history-load-more") {
+                    TextButton(onClick = onLoadMore, enabled = !loadingMore) {
+                        Text(if (loadingMore) "Loading…" else if (pageError) "Try again" else "Load more")
+                    }
                 }
             }
             PlatformVerticalScrollbar(state = listState,

@@ -84,6 +84,8 @@ import java.util.Objects;
         AND surcharge_amount >= 0
         AND refunded_amount >= 0
         AND refunded_amount <= (amount + tip_amount + surcharge_amount)
+        AND (tendered_amount IS NULL OR tendered_amount >= 0)
+        AND (change_amount IS NULL OR change_amount >= 0)
         """)
 @Getter
 @Setter
@@ -181,6 +183,23 @@ public class Payment extends AbstractAuditedEntity {
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
 
+    // Cash only: what the guest handed over and the change given back.
+    @Column(name = "tendered_amount", precision = 19, scale = 2)
+    private BigDecimal tenderedAmount;
+
+    @Column(name = "change_amount", precision = 19, scale = 2)
+    private BigDecimal changeAmount;
+
+    // A payment taken by mistake is voided rather than refunded; it then counts nowhere.
+    @Column(name = "voided_at", columnDefinition = "timestamptz")
+    private OffsetDateTime voidedAt;
+
+    @Column(name = "voided_by", columnDefinition = "uuid")
+    private java.util.UUID voidedBy;
+
+    @Column(name = "void_reason", columnDefinition = "text")
+    private String voidReason;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "created_by",
@@ -233,6 +252,7 @@ public class Payment extends AbstractAuditedEntity {
         cardLast4 = NormalizationUtils.normalize(cardLast4);
         receiptNumber = NormalizationUtils.normalizeUpper(receiptNumber);
         notes = NormalizationUtils.normalize(notes);
+        voidReason = NormalizationUtils.normalize(voidReason);
         amount = defaultMoney(amount);
         tipAmount = defaultMoney(tipAmount);
         surchargeAmount = defaultMoney(surchargeAmount);
@@ -256,6 +276,18 @@ public class Payment extends AbstractAuditedEntity {
 
         if (currency == null || currency.length() != 3) {
             throw new IllegalStateException("currency must be a 3-letter code");
+        }
+
+        if (tenderedAmount != null && tenderedAmount.signum() < 0) {
+            throw new IllegalStateException("tenderedAmount must not be negative");
+        }
+
+        if (changeAmount != null && changeAmount.signum() < 0) {
+            throw new IllegalStateException("changeAmount must not be negative");
+        }
+
+        if (status == PaymentStatus.VOIDED && voidedAt == null) {
+            throw new IllegalStateException("a voided payment needs the time it was voided");
         }
 
         if (restaurant != null && branch != null && branch.getRestaurant() != null) {

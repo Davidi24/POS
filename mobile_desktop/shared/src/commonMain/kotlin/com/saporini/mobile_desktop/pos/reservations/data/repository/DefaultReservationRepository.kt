@@ -1,6 +1,9 @@
 package com.saporini.mobile_desktop.pos.reservations.data.repository
 
+import com.saporini.mobile_desktop.pos.orders.domain.model.OrderDecimal
 import com.saporini.mobile_desktop.pos.reservations.data.api.ReservationApi
+import com.saporini.mobile_desktop.pos.reservations.data.dto.AddBookingExtraRequestDto
+import com.saporini.mobile_desktop.pos.reservations.data.dto.GoodwillRefundRequestDto
 import com.saporini.mobile_desktop.pos.reservations.data.dto.ExtendReservationHoldRequestDto
 import com.saporini.mobile_desktop.pos.reservations.data.dto.ReservationActionRequestDto
 import com.saporini.mobile_desktop.pos.reservations.data.dto.ReservationNoteRequestDto
@@ -21,8 +24,10 @@ class DefaultReservationRepository(
         from: String?,
         to: String?,
         status: ReservationStatus?,
-        customerId: String?
-    ): List<Reservation> = api.getBranchReservations(restaurantId, branchId, from, to, status, customerId).map { it.toDomain() }
+        customerId: String?,
+        page: Int,
+        size: Int
+    ): ReservationPage = api.getBranchReservations(restaurantId, branchId, from, to, status, customerId, page, size).toDomain()
 
     override suspend fun getBranchReservationCalendar(
         restaurantId: String,
@@ -99,6 +104,12 @@ class DefaultReservationRepository(
     override suspend fun getSeatingCheck(restaurantId: String, reservationId: String): ReservationSeatingCheck =
         api.getSeatingCheck(restaurantId, reservationId).toDomain()
 
+    override suspend fun getOccasions(restaurantId: String): List<ReservationOccasion> =
+        api.getOccasions(restaurantId).map { it.toDomain() }
+
+    override suspend fun getEventOn(restaurantId: String, date: String): RestaurantEvent? =
+        api.getEventOn(restaurantId, date)?.toDomain()
+
     override suspend fun confirmAttendance(restaurantId: String, reservationId: String, reason: String?): Reservation =
         api.confirmAttendance(restaurantId, reservationId, ReservationActionRequestDto(reason = reason)).toDomain()
 
@@ -107,6 +118,32 @@ class DefaultReservationRepository(
 
     override suspend fun clearNoShowWarning(restaurantId: String, reservationId: String, reason: String): Reservation =
         api.clearNoShowWarning(restaurantId, reservationId, ReservationActionRequestDto(reason = reason)).toDomain()
+
+    override suspend fun declineReservation(restaurantId: String, reservationId: String, reason: String?): Reservation =
+        api.declineReservation(restaurantId, reservationId, ReservationActionRequestDto(reason = reason)).toDomain()
+
+    override suspend fun getMoney(restaurantId: String, reservationId: String): List<MoneyLine> =
+        api.getMoney(restaurantId, reservationId).map { it.toDomain() }
+
+    override suspend fun getExtraChoices(restaurantId: String, reservationId: String): List<BookingExtraChoice> =
+        api.getExtraChoices(restaurantId, reservationId).map { it.toDomain() }
+
+    override suspend fun addExtra(restaurantId: String, reservationId: String, menuItemId: String, quantity: Int): List<MoneyLine> =
+        api.addExtra(restaurantId, reservationId, AddBookingExtraRequestDto(menuItemId, quantity)).map { it.toDomain() }
+
+    override suspend fun sendPaymentLink(restaurantId: String, reservationId: String) =
+        api.sendPaymentLink(restaurantId, reservationId)
+
+    override suspend fun markPaid(restaurantId: String, reservationId: String, paymentId: String): List<MoneyLine> =
+        api.markPaid(restaurantId, reservationId, paymentId).map { it.toDomain() }
+
+    override suspend fun removeUnpaid(restaurantId: String, reservationId: String, paymentId: String): List<MoneyLine> =
+        api.removeUnpaid(restaurantId, reservationId, paymentId).map { it.toDomain() }
+
+    override suspend fun goodwillRefund(restaurantId: String, reservationId: String, lineId: String, amountCents: Long, reason: String): List<MoneyLine> =
+        api.goodwillRefund(restaurantId, reservationId, lineId, GoodwillRefundRequestDto(OrderDecimal(centsText(amountCents)), reason)).map { it.toDomain() }
+
+    private fun centsText(cents: Long): String = "${cents / 100}.${(cents % 100).toString().padStart(2, '0')}"
 
     override suspend fun getReservationTables(restaurantId: String, reservationId: String): List<ReservationTableAssignment> =
         api.getReservationTables(restaurantId, reservationId).map { it.toDomain() }

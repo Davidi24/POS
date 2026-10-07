@@ -43,6 +43,35 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
             Pageable pageable
     );
 
+    @Query(value = """
+            select r.id from Reservation r
+            where r.branch.id = :branchId
+              and (:hasFrom = false or r.reservationStart >= :from)
+              and (:hasTo = false or r.reservationStart <= :to)
+              and (:hasStatus = false or r.status = :status)
+              and (:hasCustomer = false or r.customer.id = :customerId)
+            order by r.reservationStart asc, r.id asc
+            """, countQuery = """
+            select count(r.id) from Reservation r
+            where r.branch.id = :branchId
+              and (:hasFrom = false or r.reservationStart >= :from)
+              and (:hasTo = false or r.reservationStart <= :to)
+              and (:hasStatus = false or r.status = :status)
+              and (:hasCustomer = false or r.customer.id = :customerId)
+            """)
+    Page<UUID> findReservationIdsForBranch(
+            @Param("branchId") UUID branchId,
+            @Param("hasFrom") boolean hasFrom,
+            @Param("from") OffsetDateTime from,
+            @Param("hasTo") boolean hasTo,
+            @Param("to") OffsetDateTime to,
+            @Param("hasStatus") boolean hasStatus,
+            @Param("status") ReservationStatus status,
+            @Param("hasCustomer") boolean hasCustomer,
+            @Param("customerId") UUID customerId,
+            Pageable pageable
+    );
+
     @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
     List<Reservation> findAllByBranch_IdOrderByReservationStartAsc(UUID branchId);
 
@@ -57,10 +86,23 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
     @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
     Optional<Reservation> findByIdAndRestaurant_Id(UUID reservationId, UUID restaurantId);
 
-    @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
-    List<Reservation> findAllByCustomer_IdAndRestaurant_IdOrderByReservationStartDesc(UUID customerId, UUID restaurantId);
+    @Query(value = """
+            select r.id from Reservation r
+            where r.customer.id = :customerId and r.restaurant.id = :restaurantId
+            order by r.reservationStart desc, r.id desc
+            """, countQuery = """
+            select count(r.id) from Reservation r
+            where r.customer.id = :customerId and r.restaurant.id = :restaurantId
+            """)
+    Page<UUID> findReservationIdsForCustomer(
+            @Param("customerId") UUID customerId,
+            @Param("restaurantId") UUID restaurantId,
+            Pageable pageable
+    );
 
-    @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
+    // Keep collection loading out of the limited lookup query. Loading tableAssignments here makes Hibernate
+    // apply the first-row limit in memory; callers that need assignments load them lazily inside their transaction.
+    @EntityGraph(attributePaths = {"branch", "customer"})
     Optional<Reservation> findTopByReservationCodeOrderByCreatedAtDesc(String reservationCode);
 
     // Ids first, then the full rows, so the limit runs in the database and not after fetching every table assignment.
@@ -119,6 +161,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
 
     @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
     List<Reservation> findAllByIdInOrderByReservationStartAsc(Collection<UUID> ids);
+
+    @EntityGraph(attributePaths = {"branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
+    List<Reservation> findAllByIdIn(Collection<UUID> ids);
 
     long countByBranch_IdAndStatusInAndReservationStartGreaterThanEqual(
             UUID branchId,
@@ -205,6 +250,10 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
             OffsetDateTime from,
             OffsetDateTime to
     );
+
+    // The guest's links find their booking by its secret token.
+    @EntityGraph(attributePaths = {"restaurant", "branch", "customer", "tableAssignments", "tableAssignments.restaurantTable"})
+    Optional<Reservation> findByGuestToken(String guestToken);
 
     boolean existsByRestaurant_IdAndReservationCode(UUID restaurantId, String reservationCode);
 

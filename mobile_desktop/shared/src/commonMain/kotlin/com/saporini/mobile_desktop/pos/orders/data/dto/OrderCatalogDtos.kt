@@ -10,6 +10,16 @@ data class OrderCatalogPageDto(
     val totalElements: Long, val totalPages: Int, val hasNext: Boolean, val hasPrevious: Boolean
 )
 @Serializable
+data class OrderCustomerPageDto(
+    val items: List<com.saporini.mobile_desktop.pos.orders.domain.model.OrderCustomerChoice>,
+    val page: Int,
+    val size: Int,
+    val totalElements: Long,
+    val totalPages: Int,
+    val hasNext: Boolean,
+    val hasPrevious: Boolean
+)
+@Serializable
 data class OrderCatalogRestaurantDto(val id: String)
 @Serializable
 data class OrderCatalogMenuDto(

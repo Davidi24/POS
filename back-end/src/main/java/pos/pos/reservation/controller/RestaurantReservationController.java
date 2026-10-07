@@ -61,6 +61,7 @@ public class RestaurantReservationController {
     private final ReservationDepositService reservationDepositService;
     private final TableLayoutChangeNotifier tableLayoutChangeNotifier;
     private final pos.pos.reservation.service.GuestHistoryService guestHistoryService;
+    private final pos.pos.reservation.service.BookingMoneyStaffService bookingMoneyStaffService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('RESERVATION_READ')")
@@ -148,7 +149,7 @@ public class RestaurantReservationController {
     public ResponseEntity<ReservationResponse> confirmReservation(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
-            @RequestBody(required = false) ReservationActionRequest request,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(reservationLifecycleService.confirmReservation(authentication, restaurantId, reservationId, request));
@@ -160,7 +161,7 @@ public class RestaurantReservationController {
     public ResponseEntity<ReservationResponse> cancelReservation(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
-            @RequestBody(required = false) ReservationActionRequest request,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(reservationLifecycleService.cancelReservation(authentication, restaurantId, reservationId, request));
@@ -172,7 +173,7 @@ public class RestaurantReservationController {
     public ResponseEntity<ReservationResponse> checkInReservation(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
-            @RequestBody(required = false) ReservationActionRequest request,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(reservationLifecycleService.checkInReservation(authentication, restaurantId, reservationId, request));
@@ -184,7 +185,7 @@ public class RestaurantReservationController {
     public ResponseEntity<ReservationResponse> seatReservation(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
-            @RequestBody(required = false) ReservationActionRequest request,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
         return withFloorUpdate(restaurantId, reservationLifecycleService.seatReservation(authentication, restaurantId, reservationId, request));
@@ -196,7 +197,7 @@ public class RestaurantReservationController {
     public ResponseEntity<ReservationResponse> undoSeatReservation(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
-            @RequestBody(required = false) ReservationActionRequest request,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
         return withFloorUpdate(restaurantId, reservationLifecycleService.undoSeatReservation(authentication, restaurantId, reservationId, request));
@@ -243,7 +244,7 @@ public class RestaurantReservationController {
     public ResponseEntity<ReservationResponse> confirmAttendance(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
-            @RequestBody(required = false) ReservationActionRequest request,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(reservationLifecycleService.confirmAttendance(authentication, restaurantId, reservationId, request));
@@ -272,6 +273,76 @@ public class RestaurantReservationController {
         return ResponseEntity.ok(guestHistoryService.clearNoShowWarning(authentication, restaurantId, reservationId, request.getReason()));
     }
 
+    @PostMapping("/{reservationId}/decline")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Say no to a booking request (the guest is told and gets all money back)")
+    public ResponseEntity<ReservationResponse> declineReservation(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(reservationLifecycleService.declineReservation(authentication, restaurantId, reservationId, request));
+    }
+
+    @GetMapping("/{reservationId}/money")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
+    @Operation(summary = "Each paid part of the booking (deposit, extras, pre-order) and what a cancel would do")
+    public ResponseEntity<java.util.List<pos.pos.reservation.dto.MoneyLineResponse>> getMoney(
+            @PathVariable UUID restaurantId, @PathVariable UUID reservationId, Authentication authentication) {
+        return ResponseEntity.ok(bookingMoneyStaffService.lines(authentication, restaurantId, reservationId));
+    }
+
+    @GetMapping("/{reservationId}/extras")
+    @PreAuthorize("hasAuthority('RESERVATION_READ')")
+    @Operation(summary = "Paid extras that can be added for this booking's occasion")
+    public ResponseEntity<java.util.List<pos.pos.reservation.dto.GuestExtraChoice>> getExtraChoices(
+            @PathVariable UUID restaurantId, @PathVariable UUID reservationId, Authentication authentication) {
+        return ResponseEntity.ok(bookingMoneyStaffService.extraChoices(authentication, restaurantId, reservationId));
+    }
+
+    @PostMapping("/{reservationId}/extras")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Add a paid extra (e.g. a cake), to be paid online or at the desk")
+    public ResponseEntity<java.util.List<pos.pos.reservation.dto.MoneyLineResponse>> addExtra(
+            @PathVariable UUID restaurantId, @PathVariable UUID reservationId,
+            @Valid @RequestBody pos.pos.reservation.dto.AddBookingExtraRequest request, Authentication authentication) {
+        return ResponseEntity.ok(bookingMoneyStaffService.addExtra(authentication, restaurantId, reservationId, request.getMenuItemId(), request.getQuantity()));
+    }
+
+    @PostMapping("/{reservationId}/payment-link")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Email the guest a link to pay what's due")
+    public ResponseEntity<Void> sendPaymentLink(@PathVariable UUID restaurantId, @PathVariable UUID reservationId, Authentication authentication) {
+        bookingMoneyStaffService.sendPaymentLink(authentication, restaurantId, reservationId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{reservationId}/payments/{paymentId}/mark-paid")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "The guest paid at the desk")
+    public ResponseEntity<java.util.List<pos.pos.reservation.dto.MoneyLineResponse>> markPaid(
+            @PathVariable UUID restaurantId, @PathVariable UUID reservationId, @PathVariable UUID paymentId, Authentication authentication) {
+        return ResponseEntity.ok(bookingMoneyStaffService.markPaid(authentication, restaurantId, reservationId, paymentId));
+    }
+
+    @PostMapping("/{reservationId}/payments/{paymentId}/remove")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Remove an unpaid extra")
+    public ResponseEntity<java.util.List<pos.pos.reservation.dto.MoneyLineResponse>> removeUnpaid(
+            @PathVariable UUID restaurantId, @PathVariable UUID reservationId, @PathVariable UUID paymentId, Authentication authentication) {
+        return ResponseEntity.ok(bookingMoneyStaffService.removeUnpaid(authentication, restaurantId, reservationId, paymentId));
+    }
+
+    @PostMapping("/{reservationId}/money/{lineId}/goodwill")
+    @PreAuthorize("hasAuthority('PAYMENT_GOODWILL_REFUND')")
+    @Operation(summary = "Give part of kept money back as goodwill, with a reason (never all of it)")
+    public ResponseEntity<java.util.List<pos.pos.reservation.dto.MoneyLineResponse>> goodwill(
+            @PathVariable UUID restaurantId, @PathVariable UUID reservationId, @PathVariable String lineId,
+            @Valid @RequestBody pos.pos.reservation.dto.GoodwillRefundRequest request, Authentication authentication) {
+        return ResponseEntity.ok(bookingMoneyStaffService.goodwill(authentication, restaurantId, reservationId, lineId, request.getAmount(), request.getReason()));
+    }
+
     // Seating changes the floor plan, so open table screens refresh.
     private ResponseEntity<ReservationResponse> withFloorUpdate(UUID restaurantId, ReservationResponse response) {
         if (response.getBranchId() != null) {
@@ -286,7 +357,7 @@ public class RestaurantReservationController {
     public ResponseEntity<ReservationResponse> completeReservation(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
-            @RequestBody(required = false) ReservationActionRequest request,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
         return withFloorUpdate(restaurantId, reservationLifecycleService.completeReservation(authentication, restaurantId, reservationId, request));
@@ -298,7 +369,7 @@ public class RestaurantReservationController {
     public ResponseEntity<ReservationResponse> markNoShow(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
-            @RequestBody(required = false) ReservationActionRequest request,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(reservationLifecycleService.markNoShow(authentication, restaurantId, reservationId, request));
@@ -310,7 +381,7 @@ public class RestaurantReservationController {
     public ResponseEntity<ReservationResponse> reopenReservation(
             @PathVariable UUID restaurantId,
             @PathVariable UUID reservationId,
-            @RequestBody(required = false) ReservationActionRequest request,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
             Authentication authentication
     ) {
         return ResponseEntity.ok(reservationLifecycleService.reopenReservation(authentication, restaurantId, reservationId, request));

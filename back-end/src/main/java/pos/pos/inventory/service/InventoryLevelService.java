@@ -1,12 +1,14 @@
 package pos.pos.inventory.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.inventory.InventoryItemNotFoundException;
 import pos.pos.exception.inventory.InventoryLevelNotFoundException;
 import pos.pos.exception.inventory.InventoryLocationNotFoundException;
+import pos.pos.exception.auth.AuthException;
 import pos.pos.inventory.dto.InventoryLevelResponse;
 import pos.pos.inventory.dto.InventoryLevelTotalResponse;
 import pos.pos.inventory.entity.InventoryItem;
@@ -126,28 +128,23 @@ public class InventoryLevelService {
     }
 
     // Internal use only. Not exposed through InventoryLevelController.
-    // Meant to be called by the InventoryMovement service once it exists: every delivery,
+    // Called by InventoryMovementService: every delivery,
     // sale, waste log, count correction, etc. calls this to apply its effect on stock,
     // instead of any endpoint being able to set onHandQuantity directly.
     @Transactional
-    InventoryLevel upsertLevel(InventoryLocation location, InventoryItem item, BigDecimal quantityDelta) {
-        //Get the Inventor Level Created, if it does not exist a level create a new one and return it
-        InventoryLevel level = inventoryLevelRepository
-                .findByLocation_IdAndInventoryItem_Id(location.getId(), item.getId())
-                .orElseGet(() -> {
-                    InventoryLevel created = new InventoryLevel();
-                    created.setLocation(location);
-                    created.setInventoryItem(item);
-                    created.setOnHandQuantity(BigDecimal.ZERO);
-                    return created;
-                });
-
-        // updates the onhand quantity and sets the last Movement
-        BigDecimal currentOnHand = level.getOnHandQuantity() == null ? BigDecimal.ZERO : level.getOnHandQuantity();
-        level.setOnHandQuantity(currentOnHand.add(quantityDelta));
-        level.setLastMovementAt(OffsetDateTime.now(ZoneOffset.UTC));
-
-        return inventoryLevelRepository.saveAndFlush(level);
+    void upsertLevel(InventoryLocation location, InventoryItem item, BigDecimal quantityDelta) {
+        // A database-side delta prevents concurrent receipts/transfers/count adjustments from
+        // overwriting each other, and ON CONFLICT makes initial level creation race-safe.
+        int rows = inventoryLevelRepository.applyMovementDelta(
+                UUID.randomUUID(),
+                location.getId(),
+                item.getId(),
+                quantityDelta,
+                OffsetDateTime.now(ZoneOffset.UTC)
+        );
+        if (rows == 0) {
+            throw new AuthException("Stock balance cannot go below zero", HttpStatus.CONFLICT);
+        }
     }
 
     // Internal use only. Meant to be called by InventoryCountService when a count is approved:

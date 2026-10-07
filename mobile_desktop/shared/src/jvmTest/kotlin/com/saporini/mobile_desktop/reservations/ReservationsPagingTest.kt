@@ -7,6 +7,8 @@ import com.saporini.mobile_desktop.pos.reservations.domain.model.Reservation
 import com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationPage
 import com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationStatus
 import com.saporini.mobile_desktop.pos.reservations.domain.repository.ReservationRepository
+import com.saporini.mobile_desktop.pos.reservations.ui.ReservationListFilter
+import com.saporini.mobile_desktop.pos.reservations.ui.ReservationListMode
 import com.saporini.mobile_desktop.pos.reservations.ui.ReservationsScreenModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
@@ -142,6 +144,44 @@ class ReservationsPagingTest {
         assertEquals(listOf("a1"), model.state.value.arrivals.map { it.id })
         assertFalse(model.state.value.loadMoreArrivalsFailed)
         assertFalse(model.state.value.hasMoreArrivals)
+    }
+
+    @Test fun allAndRangeModesPageAndRefreshEveryLoadedPageWithTheirFilters() = runTest(dispatcher) {
+        for (mode in listOf(ReservationListMode.ALL, ReservationListMode.RANGE)) {
+            val requested = mutableListOf<Triple<Int, String?, String?>>()
+            val model = model(repository { name, args ->
+                when (name) {
+                    "getTodayReservationsPage" -> pageOf(emptyList(), 0, hasNext = false)
+                    "getBranchReservations" -> {
+                        val page = args[6] as Int
+                        val from = args[2] as String?
+                        val to = args[3] as String?
+                        requested += Triple(page, from, to)
+                        if (page == 0) pageOf(listOf(booking("all-1"), booking("all-2")), 0, hasNext = true)
+                        else pageOf(listOf(booking("all-3")), page, hasNext = false)
+                    }
+                    else -> null
+                }
+            })
+            val from = if (mode == ReservationListMode.RANGE) "2026-09-27T00:00:00Z" else null
+            val to = if (mode == ReservationListMode.RANGE) "2026-09-28T00:00:00Z" else null
+            model.setFilter(ReservationListFilter(mode = mode, from = from, to = to))
+            runCurrent()
+            assertEquals(listOf("all-1", "all-2"), model.state.value.reservations.map { it.id })
+            assertTrue(model.state.value.hasMoreReservations)
+
+            model.loadMoreReservations(); runCurrent()
+            assertEquals(listOf("all-1", "all-2", "all-3"), model.state.value.reservations.map { it.id })
+            assertFalse(model.state.value.hasMoreReservations)
+            assertEquals(listOf(0, 1), requested.map { it.first })
+            assertEquals(listOf(from, from), requested.map { it.second })
+            assertEquals(listOf(to, to), requested.map { it.third })
+
+            requested.clear()
+            assertTrue(model.refreshNow())
+            assertEquals(listOf(0, 1), requested.map { it.first })
+            assertEquals(listOf("all-1", "all-2", "all-3"), model.state.value.reservations.map { it.id })
+        }
     }
 
     private fun booking(id: String) = Reservation(

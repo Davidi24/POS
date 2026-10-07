@@ -29,7 +29,9 @@ data class Menu(
     val createdAt: String?,
     val updatedAt: String?,
     val sections: List<MenuSection>,
-    val allFilterPosition: Int? = null
+    val allFilterPosition: Int? = null,
+    // A special menu: occasion extras or an event night's menu.
+    val special: Boolean = false
 )
 
 data class MenuRestaurant(
@@ -65,7 +67,10 @@ data class MenuItem(
     val showOnline: Boolean = false,
     // The online menu section it sits in, when it's online.
     val onlineSectionId: String? = null,
-    val onlineSectionName: String? = null
+    val onlineSectionName: String? = null,
+    // Extras in a special menu: order at least this many hours ahead, and the occasions they're offered for.
+    val orderBeforeHours: Int? = null,
+    val occasionCodes: List<String> = emptyList()
 )
 
 data class MenuVariant(
@@ -130,7 +135,9 @@ data class OptionItem(
     val name: String,
     val priceDelta: Double,
     val available: Boolean,
-    val displayOrder: Int
+    val displayOrder: Int,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: Double? = null
 )
 
 // The online menu (website): its own sections, filled with dishes that point at them.

@@ -272,6 +272,77 @@ class SettingsServiceTest {
         verify(settingsAuditService).log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_STAFF_PERMISSIONS"), anyString(), eq(ACTOR_ID));
     }
 
+    private Settings stubSettings(Authentication authentication, Restaurant restaurant, boolean save) {
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        if (save) {
+            when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+            when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+        }
+        return settings;
+    }
+
+    @Test
+    @DisplayName("Should save tips and refund rules, taking tip buttons as a list or as text")
+    void shouldUpdatePaymentSettings() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = stubSettings(authentication, restaurant, true);
+
+        settingsService.updatePayments(authentication, RESTAURANT_ID, pos.pos.settings.dto.UpdateSettingsPaymentsRequest.builder()
+                .tipsEnabled(true).tipSuggestionsText(" 15, 5 ,10 ").maxTipPercent(40).autoClosePaidOrders(false).refundWindowDays(7).build());
+        assertThat(settings.getTipSuggestions()).isEqualTo("5,10,15");
+        assertThat(settings.getMaxTipPercent()).isEqualTo(40);
+        assertThat(settings.isAutoClosePaidOrders()).isFalse();
+        assertThat(settings.getRefundWindowDays()).isEqualTo(7);
+
+        settingsService.updatePayments(authentication, RESTAURANT_ID, pos.pos.settings.dto.UpdateSettingsPaymentsRequest.builder()
+                .tipsEnabled(false).tipSuggestions(java.util.List.of(20, 10)).maxTipPercent(40).autoClosePaidOrders(true).refundWindowDays(0).build());
+        assertThat(settings.getTipSuggestions()).isEqualTo("10,20");
+        assertThat(settings.isTipsEnabled()).isFalse();
+        verify(settingsAuditService, org.mockito.Mockito.times(2))
+                .log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_PAYMENTS"), anyString(), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("Should refuse tip buttons above the biggest tip, out of range, or missing")
+    void shouldRefuseBadTipButtons() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        stubSettings(authentication, restaurant, false);
+        var base = pos.pos.settings.dto.UpdateSettingsPaymentsRequest.builder().tipsEnabled(true).maxTipPercent(20)
+                .autoClosePaidOrders(true).refundWindowDays(30);
+        assertThatThrownBy(() -> settingsService.updatePayments(authentication, RESTAURANT_ID, base.tipSuggestions(java.util.List.of(25)).build()))
+                .isInstanceOf(AuthException.class).hasMessageContaining("above the biggest tip");
+        assertThatThrownBy(() -> settingsService.updatePayments(authentication, RESTAURANT_ID, base.tipSuggestions(null).tipSuggestionsText("0,5").build()))
+                .isInstanceOf(AuthException.class).hasMessageContaining("between 1 and 100");
+        assertThatThrownBy(() -> settingsService.updatePayments(authentication, RESTAURANT_ID, base.tipSuggestions(null).tipSuggestionsText(null).build()))
+                .isInstanceOf(AuthException.class).hasMessageContaining("tipSuggestions is required");
+        verify(settingsDomainSupport, never()).saveSettings(any());
+    }
+
+    @Test
+    @DisplayName("Should save fraud thresholds and switched-off checks, refusing unknown checks")
+    void shouldUpdateFraudChecks() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = stubSettings(authentication, restaurant, true);
+        var request = pos.pos.settings.dto.UpdateSettingsFraudRequest.builder()
+                .fraudDiscountPercent(25).fraudRefundAmount(new java.math.BigDecimal("75.00")).fraudVoidsPerDay(3)
+                .fraudTipPercent(40).fraudCashRefundsPerDay(1).fraudDisabledRules(java.util.Set.of("HIGH_TIP", "large_refund")).build();
+        settingsService.updateFraudChecks(authentication, RESTAURANT_ID, request);
+        assertThat(settings.getFraudDiscountPercent()).isEqualTo(25);
+        assertThat(settings.getFraudRefundAmount()).isEqualByComparingTo("75.00");
+        assertThat(settings.getFraudDisabledRules()).isEqualTo("HIGH_TIP,LARGE_REFUND");
+
+        request.setFraudDisabledRules(java.util.Set.of("STEALING"));
+        assertThatThrownBy(() -> settingsService.updateFraudChecks(authentication, RESTAURANT_ID, request))
+                .isInstanceOf(AuthException.class).hasMessageContaining("Unknown fraud rule");
+    }
+
     @Test
     @DisplayName("Should turn pre-orders on with the chosen kitchen lead time")
     void shouldUpdatePreOrderSettings() {

@@ -48,4 +48,7 @@ public class CreateMenuRequest  {
 
     @Size(max = 20, message = "Color must be at most 20 characters")
     private String color;
+
+    // Occasion extras or an event night's menu.
+    private Boolean special;
 }

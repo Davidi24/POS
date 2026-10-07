@@ -12,7 +12,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
 import kotlin.time.Duration.Companion.seconds
 import io.ktor.client.HttpClient
@@ -30,7 +30,7 @@ class OrderApi(
     private fun endpoint(path: String): String =
         "${baseUrlProvider().trimEnd('/')}$path"
 
-    fun observeOrderChanges(restaurantId: String, branchId: String) = flow {
+    fun observeOrderChanges(restaurantId: String, branchId: String) = channelFlow {
         require(restaurantId.isNotBlank() && branchId.isNotBlank())
         val url = endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/branches/${branchId.encodeURLPathPart()}/orders/events")
         while (currentCoroutineContext().isActive) {
@@ -43,7 +43,7 @@ class OrderApi(
                 }, reconnectionTime = 3.seconds) {
                     incoming.collect { event ->
                         // Always resync on connection, including after missed events/restarts.
-                        if (event.event == "connected" || event.event == "orders-changed") emit(Unit)
+                        if (event.event == "connected" || event.event == "orders-changed") send(Unit)
                     }
                 }
             } catch (error: CancellationException) {
@@ -68,6 +68,32 @@ class OrderApi(
             to?.let { parameter("to", it) }
             status?.let { parameter("status", it.name) }
             customerId?.let { parameter("customerId", it) }
+        }.body()
+    }
+
+    suspend fun getOrdersPage(
+        restaurantId: String,
+        branchId: String,
+        from: String? = null,
+        to: String? = null,
+        status: OrderStatus? = null,
+        customerId: String? = null,
+        search: String? = null,
+        historyOnly: Boolean = false,
+        openOnly: Boolean = false,
+        page: Int = 0,
+        size: Int = 50
+    ): OrderPageResponseDto {
+        return client.get(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/branches/${branchId.encodeURLPathPart()}/orders/page")) {
+            from?.let { parameter("from", it) }
+            to?.let { parameter("to", it) }
+            status?.let { parameter("status", it.name) }
+            customerId?.let { parameter("customerId", it) }
+            search?.trim()?.takeIf { it.isNotEmpty() }?.let { parameter("search", it) }
+            if (historyOnly) parameter("historyOnly", true)
+            if (openOnly) parameter("openOnly", true)
+            parameter("page", page)
+            parameter("size", size)
         }.body()
     }
 

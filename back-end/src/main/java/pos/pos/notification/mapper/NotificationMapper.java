@@ -50,7 +50,7 @@ public class NotificationMapper {
                 .createdBy(notification.getCreatedBy())
                 .updatedBy(notification.getUpdatedBy())
                 .personal(personal)
-                .markReadAllowed(personal)
+                .markReadAllowed(personal && notification.getDeliveredAt() != null)
                 .build();
     }
 

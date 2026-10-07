@@ -16,6 +16,7 @@ import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractTimestampedEntity;
 import pos.pos.menu.entity.OptionItem;
+import pos.pos.recipe.entity.Recipe;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
@@ -72,6 +73,13 @@ public class OrderItemOption extends AbstractTimestampedEntity {
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "inventory_recipe_id_snapshot")
+    private Recipe inventoryRecipeSnapshot;
+
+    @Column(name = "inventory_recipe_quantity_snapshot", precision = 12, scale = 3)
+    private BigDecimal inventoryRecipeQuantitySnapshot;
+
     @Override
     protected void normalizeFields() {
         if (optionNameSnapshot == null && optionItem != null) {
@@ -95,6 +103,11 @@ public class OrderItemOption extends AbstractTimestampedEntity {
 
         if (quantity <= 0) {
             throw new IllegalStateException("quantity must be greater than zero");
+        }
+
+        if ((inventoryRecipeSnapshot == null) != (inventoryRecipeQuantitySnapshot == null)
+                || (inventoryRecipeQuantitySnapshot != null && inventoryRecipeQuantitySnapshot.signum() <= 0)) {
+            throw new IllegalStateException("inventory recipe snapshot and positive usage quantity must be provided together");
         }
 
         if (orderLineItem != null && optionItem != null

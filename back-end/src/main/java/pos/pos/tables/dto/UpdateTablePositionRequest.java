@@ -22,9 +22,11 @@ public class UpdateTablePositionRequest {
     private String floor;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "positionX must not be negative")
+    @DecimalMax(value = "99999999.99", message = "positionX is out of range")
     private BigDecimal positionX;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "positionY must not be negative")
+    @DecimalMax(value = "99999999.99", message = "positionY is out of range")
     private BigDecimal positionY;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "rotationDegrees must not be negative")
