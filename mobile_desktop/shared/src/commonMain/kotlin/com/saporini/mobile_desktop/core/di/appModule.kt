@@ -116,7 +116,12 @@ private val appModule = module {
     single<com.saporini.mobile_desktop.admin.audit.AuditLogRepository> { com.saporini.mobile_desktop.admin.audit.AuditLogApi(client = get()) }
     factory { com.saporini.mobile_desktop.admin.audit.AuditLogScreenModel(repository = get(), session = get()) }
     single<com.saporini.mobile_desktop.admin.inventory.RecipesRepository> { com.saporini.mobile_desktop.admin.inventory.RecipesApi(client = get()) }
-    factory { com.saporini.mobile_desktop.admin.inventory.RecipesScreenModel(repository = get(), session = get()) }
+    factory {
+        val menus = get<MenuRepository>()
+        com.saporini.mobile_desktop.admin.inventory.RecipesScreenModel(repository = get(), session = get()) { restaurantId ->
+            com.saporini.mobile_desktop.admin.inventory.menuChoicesOf(menus, restaurantId)
+        }
+    }
     single<com.saporini.mobile_desktop.pos.reservations.preorder.PreOrderRepository> { com.saporini.mobile_desktop.pos.reservations.preorder.PreOrderApi(client = get()) }
     factory { com.saporini.mobile_desktop.pos.reservations.preorder.PreOrderScreenModel(repository = get(), session = get()) }
 

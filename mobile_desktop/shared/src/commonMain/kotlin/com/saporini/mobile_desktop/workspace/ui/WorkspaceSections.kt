@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -14,13 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.core.session.Workspace
 import com.saporini.mobile_desktop.core.session.accessibleWorkspaces
-import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.core.ui.isPhoneWindow
 import com.saporini.mobile_desktop.pos.ui.shell.PhoneNavItem
 import com.saporini.mobile_desktop.pos.ui.shell.TopBarNavItem
@@ -52,7 +49,7 @@ internal enum class WorkspacePage(val title: String, val workspace: Workspace) {
     }
 }
 
-/** Navigation only; reporting and fraud detection content are separate work. */
+/** The workspace navigation and, under it, the content of the chosen tab. */
 @Composable
 internal fun WorkspaceSections(page: WorkspacePage) {
     val session = koinInject<SessionManager>()
@@ -80,7 +77,12 @@ internal fun WorkspaceSections(page: WorkspacePage) {
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Text("${page.title} · ${tabs[selectedIndex].label}", fontFamily = Inter(), fontWeight = FontWeight.SemiBold)
+            when (page) {
+                WorkspacePage.STATISTICS -> com.saporini.mobile_desktop.statistics.ui.StatisticsWorkspace(
+                    com.saporini.mobile_desktop.statistics.StatsTab.entries[selectedIndex], { selectedIndex = it.ordinal }, Modifier.fillMaxSize())
+                WorkspacePage.FRAUD_DETECTION -> com.saporini.mobile_desktop.fraud.ui.FraudWorkspace(
+                    com.saporini.mobile_desktop.fraud.FraudTab.entries[selectedIndex], { selectedIndex = it.ordinal }, Modifier.fillMaxSize())
+            }
         }
         if (phone) {
             WorkspaceBottomBar(moreSelected = false, onLogout = session::signOut, onBackToWorkspaces = back) {
