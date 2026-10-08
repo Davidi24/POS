@@ -46,11 +46,18 @@ data class StaffState(
     // Ids being changed by a quick action (switch on/off, password reset, remove).
     val busy: Set<String> = emptySet(),
     val confirmRemove: String? = null,
+    // Whole-team numbers from the server (not from the loaded pages), for the summary cards and filters.
+    val counts: StaffCounts? = null,
     val notice: String? = null,
     val error: String? = null
 ) {
     fun canEdit(person: StaffUserDto): Boolean = canUpdate && person.id != myId
     fun canRemove(person: StaffUserDto): Boolean = canDelete && person.id != myId
+}
+
+/** How many people are active, switched off, and in each role (by role code); null when not loaded. */
+data class StaffCounts(val active: Long, val inactive: Long, val byRole: Map<String, Long>) {
+    val everyone: Long get() = active + inactive
 }
 
 /**
@@ -427,6 +434,30 @@ class StaffScreenModel(
     }
 
     fun clearMessages() = mutable.update { it.copy(error = null, notice = null) }
+
+    /**
+     * Reads the team's totals (active, switched off, per role) with one tiny page each, so the cards and filters
+     * show real numbers however much of the list is loaded. Failures leave the previous numbers.
+     */
+    fun loadCounts() {
+        val current = state.value
+        if (!current.canRead || current.restaurantId == null) return
+        val token = signIn
+        work.launch {
+            try {
+                val active = repository.staff(StaffFilter(active = true), 0, 1).totalElements
+                val inactive = repository.staff(StaffFilter(active = false), 0, 1).totalElements
+                val roles = state.value.assignableRoles.associate { role ->
+                    role.code to repository.staff(StaffFilter(active = true, roleCode = role.code), 0, 1).totalElements
+                }
+                if (token == signIn) mutable.update { it.copy(counts = StaffCounts(active, inactive, roles)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // The numbers are a summary; the list itself reports problems.
+            }
+        }
+    }
 
     override fun onDispose() {
         revision++

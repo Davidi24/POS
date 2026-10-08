@@ -1,6 +1,6 @@
 # KDS state and backend integration
 
-The existing KDS screen keeps its placeholder content. This package supplies state and actions for the later screen implementation; no tickets/calendar/menu/history UI is introduced here.
+This package supplies the KDS state and actions. The screens are in `ui/`: `KdsContent.kt` picks the tab (Tickets board, Upcoming with booking pre-orders, Menu availability, History) and `StationsDialog.kt` edits stations. `KdsScreen.kt` only hosts them.
 
 ## Ownership and lifecycle
 

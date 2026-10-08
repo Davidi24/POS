@@ -447,6 +447,9 @@ internal fun ReservationDetailsPanel(
                     canGoodwill = state.can(ReservationsScreenModel.GOODWILL_PERMISSION),
                     now = now
                 )
+                com.saporini.mobile_desktop.pos.reservations.preorder.ui.BookingPreOrderCard(
+                    reservation.id, reservation.partySize, bookingOpen = reservation.status == ReservationStatus.PENDING || reservation.status == ReservationStatus.CONFIRMED
+                )
                 }
                 PanelTab.TABLES -> {
                     reservation.tableAssignments.forEach { assignment ->

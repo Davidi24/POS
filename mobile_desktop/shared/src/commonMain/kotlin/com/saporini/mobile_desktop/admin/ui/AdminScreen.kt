@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,12 +15,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.core.session.accessibleWorkspaces
-import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.core.ui.isPhoneWindow
 import com.saporini.mobile_desktop.workspace.ui.WorkspacePickerScreen
 import org.koin.compose.koinInject
@@ -60,8 +57,13 @@ object AdminScreen : Screen {
             ) {
                 when (selected) {
                     AdminSection.SHIFTS -> com.saporini.mobile_desktop.pos.shifts.ShiftScreen(Modifier.fillMaxSize(), management = true)
+                    AdminSection.INVENTORY -> com.saporini.mobile_desktop.admin.inventory.ui.InventoryScreen(Modifier.fillMaxSize())
+                    AdminSection.SUPPLIERS -> com.saporini.mobile_desktop.admin.inventory.ui.SuppliersScreen(Modifier.fillMaxSize())
+                    AdminSection.DEVICES -> com.saporini.mobile_desktop.admin.devices.ui.DevicesScreen(Modifier.fillMaxSize())
                     AdminSection.SETTINGS -> com.saporini.mobile_desktop.admin.settings.AdminSettings(Modifier.fillMaxSize())
-                    else -> Text(selected.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold)
+                    AdminSection.USERS -> com.saporini.mobile_desktop.admin.people.ui.UsersScreen(Modifier.fillMaxSize())
+                    AdminSection.PERMISSIONS -> com.saporini.mobile_desktop.admin.people.ui.RolesScreen(Modifier.fillMaxSize())
+                    AdminSection.AUDIT_LOGS -> com.saporini.mobile_desktop.admin.audit.ui.AuditLogScreen(Modifier.fillMaxSize())
                 }
             }
 

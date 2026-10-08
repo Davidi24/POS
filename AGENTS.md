@@ -61,12 +61,11 @@ Fill in and expand this section as you discover build/test/lint commands, code s
 - New overview-style screens reuse `core/components/OverviewKit.kt` (stat card, panel, tabs, chips, empty states) plus the Reservations header controls (`HeaderButton`, `HeaderDropdown`, `CompactDatePicker`, `ToolbarHeight`), so they match the Reservations overview.
 - Inside a `Row(Modifier.height(IntrinsicSize.Min/Max))`, don't use `BoxWithConstraints` or lazy lists: they can't report intrinsic sizes and crash at runtime. Draw with `drawBehind` instead.
 - App tests: `./gradlew :shared:jvmTest` (all of them) or `--tests 'com.saporini.mobile_desktop.admin.*'`. Screen models are tested with `StandardTestDispatcher` + `Dispatchers.setMain`, fake repositories, and `MockEngine` for the `*Api` classes.
-- State-only modules (ScreenModel + repository, registered in `core/di/appModule.kt`) intentionally have no screens in the current scope:
-  - Payments: `pos/payment`.
-  - Statistics and fraud: `statistics`, `fraud`.
-  - Admin Hub: `admin/people` (Staff, Roles), `admin/inventory` (Inventory, Recipes), `admin/devices`, `admin/audit`.
-  - Food pre-orders: `pos/reservations/preorder`.
-  - Each model has `setActive(true/false)` for when its screen shows. Admin models gate actions on the signed-in person's permissions.
+- Screens for the state modules live in a `ui/` folder next to their model (`admin/people/ui`, `admin/inventory/ui`, `admin/devices/ui`, `admin/audit/ui`, `statistics/ui`, `fraud/ui`, `kds/ui`, `pos/payment/ui`). Each has a `*Screen`/`*Workspace` entry that gets the model from Koin and a `*Content(state, model, …)` that tests can render. Models have `setActive(true/false)` (bound with `BindToLifecycle`); admin models gate actions on the signed-in person's permissions.
+  - Pre-orders: taken and changed from the booking panel (`pos/reservations/preorder/ui/BookingPreOrderCard`, hooked into `ReservationDetailsPanel`), and listed for the kitchen in KDS → Upcoming.
+  - `pos/payment/PaymentScreen.kt` is the user's original static mock and is no longer shown; `pos/payment/ui/TakePaymentScreen` is the live one.
+- Shared UI kits in `core/components/` (use these before writing new pieces): `PageKit` (page header, toolbar buttons, messages, page states, paged footer), `FormKit` (dialogs, buttons, inputs, selects, switches), `ListKit` (tables, row menus, load-more), `OverviewExtras` (strip cards, filter rows, skeletons), `ChartKit` (bar/trend/share/ring charts), `DashboardKit` (equal-height panel rows, hero figures), `PeriodKit` (date-range picker, KPI card with trend). Formatting helpers are in `core/format/Formatting.kt`; CSV/text export in `core/files` (`saveTextFile`, `csvRow`).
+- Screen look check without running the app: `./gradlew :shared:jvmTest --tests 'com.saporini.mobile_desktop.gallery.*'` renders the new screens with fake data to `shared/build/reports/gallery/*.png` (the tests also assert key texts).
 - The app's JSON leaves out default values (`encodeDefaults = false`). A request DTO field that must always be sent (e.g. `active`, `trackInventory`) must have no default.
 - Parallel loads inside a screen model must wrap their `async` calls in `coroutineScope { }`. A bare `async` inside `launch` escapes the `try/catch` and crashes the app when a call fails.
 - Writes check a sign-in token, not the list's load revision. Otherwise a refresh during a save drops the answer and leaves `saving` stuck.

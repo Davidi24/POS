@@ -110,7 +110,7 @@ import kotlin.time.Instant
 import kotlin.math.roundToInt
 
 @Composable
-fun OrdersScreen(modifier: Modifier = Modifier, onPaymentRequested: () -> Unit = {}, historyOnly: Boolean = false) {
+fun OrdersScreen(modifier: Modifier = Modifier, onPaymentRequested: (orderId: String) -> Unit = {}, historyOnly: Boolean = false) {
     val model = koinInject<OrdersScreenModel>(qualifier = if(historyOnly) org.koin.core.qualifier.named("pos-history") else null)
     val owner = LocalLifecycleOwner.current
     DisposableEffect(model, owner) {
@@ -122,12 +122,12 @@ fun OrdersScreen(modifier: Modifier = Modifier, onPaymentRequested: () -> Unit =
         model.setActive(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
         onDispose { owner.lifecycle.removeObserver(observer); model.setActive(false); model.onDispose() }
     }
-    OrdersContent(model, modifier)
+    OrdersContent(model, modifier, onPaymentRequested)
 }
 
 /** Separate from lifecycle ownership to support deterministic screenshots and previews. */
 @Composable
-fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier) {
+fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier, onPaymentRequested: (orderId: String) -> Unit = {}) {
     val state by model.state.collectAsState()
     val scope = rememberCoroutineScope()
     var creating by remember { mutableStateOf(false) }
@@ -223,6 +223,7 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier) {
                                     onEditInfo = { action = "Edit information" },
                                     onEditProgress = { progressChooser = true },
                                     onAction = { action = it },
+                                    onPayment = { onPaymentRequested(order.id) },
                                     onClose = {
                                     detailsClosedByUser = true
                                     model.closeOrderDetails()
@@ -1982,6 +1983,7 @@ private fun OrdersListPanel(
     onEditInfo: () -> Unit,
     onEditProgress: () -> Unit,
     onAction: (String) -> Unit,
+    onPayment: () -> Unit,
     onClose: () -> Unit
 ) {
     var tab by remember(order.id) { mutableStateOf("Items") }
@@ -2101,7 +2103,7 @@ private fun OrdersListPanel(
                     OrderEditDropdownItem("Order progress", Icons.Outlined.Restaurant) { editMenu = false; onEditProgress() }
                 }
             }
-            DesktopOrderActionButton("Payment", Icons.Outlined.CreditCard, Modifier.weight(1.25f), container = OrderGreen, content = Color.White) { }
+            DesktopOrderActionButton("Payment", Icons.Outlined.CreditCard, Modifier.weight(1.25f), container = OrderGreen, content = Color.White) { onPayment() }
         }
     }
 }

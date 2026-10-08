@@ -32,6 +32,8 @@ data class RecipesState(
     val draft: RecipeDraft? = null,
     val component: ComponentDraft? = null,
     val confirmArchive: String? = null,
+    // Dishes a finished-dish recipe can be linked to; loaded once.
+    val menuChoices: List<MenuChoice> = emptyList(),
     val loading: Boolean = false,
     val saving: Boolean = false,
     val stale: Boolean = true,
@@ -56,7 +58,8 @@ data class RecipesState(
  */
 class RecipesScreenModel(
     private val repository: RecipesRepository,
-    session: SessionManager
+    session: SessionManager,
+    private val menuChoices: (suspend (restaurantId: String) -> List<MenuChoice>)? = null
 ) : ScreenModel {
 
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -118,6 +121,11 @@ class RecipesScreenModel(
                 val recipes = repository.recipes(restaurantId, current.type, current.status)
                 val open = current.open?.let { repository.recipe(restaurantId, it.id) }
                 if (token == revision) mutable.update { it.copy(recipes = recipes, open = open, stale = false, error = null) }
+                // The dish list is only a helper for the editor; a failure there doesn't stop recipes from showing.
+                if (current.menuChoices.isEmpty() && current.canEdit) menuChoices?.let { loader ->
+                    val choices = runCatching { loader(restaurantId) }.getOrNull()
+                    if (choices != null && token == revision) mutable.update { it.copy(menuChoices = choices) }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

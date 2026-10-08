@@ -31,7 +31,7 @@ import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.kitchen.KitchenStatusScreen
 import com.saporini.mobile_desktop.pos.menu.ui.MenuScreen
 import com.saporini.mobile_desktop.pos.orders.OrdersScreen
-import com.saporini.mobile_desktop.pos.payment.PaymentScreen
+import com.saporini.mobile_desktop.pos.payment.ui.TakePaymentScreen
 import com.saporini.mobile_desktop.pos.reservations.ReservationsScreen
 import com.saporini.mobile_desktop.pos.sales.MySalesScreen
 import com.saporini.mobile_desktop.pos.tables.ui.AddItemModal
@@ -50,6 +50,8 @@ object PosScreen : Screen {
         var selected by remember { mutableStateOf(PosSection.TABLES) }
         var showAddItemModal by remember { mutableStateOf(false) }
         var showPaymentScreen by remember { mutableStateOf(false) }
+        // The order being paid for on the payment screen.
+        var paymentOrderId by remember { mutableStateOf<String?>(null) }
         var focusTableNumber by remember { mutableStateOf<String?>(null) }
         var focusReservationId by remember { mutableStateOf<String?>(null) }
         val notificationCenter = org.koin.compose.getKoin().getOrNull<com.saporini.mobile_desktop.notifications.NotificationCenter>()
@@ -106,8 +108,10 @@ object PosScreen : Screen {
                         }
                     )
                 }
-                if (showPaymentScreen) {
-                    PaymentScreen(
+                val payingFor = paymentOrderId
+                if (showPaymentScreen && payingFor != null) {
+                    TakePaymentScreen(
+                        orderId = payingFor,
                         modifier = Modifier.weight(1f),
                         onBack = { showPaymentScreen = false }
                     )
@@ -123,8 +127,9 @@ object PosScreen : Screen {
                         )
                         PosSection.ORDERS -> OrdersScreen(
                             modifier = Modifier.weight(1f),
-                            onPaymentRequested = {
+                            onPaymentRequested = { orderId ->
                                 selected = PosSection.ORDERS
+                                paymentOrderId = orderId
                                 showPaymentScreen = true
                             }
                         )

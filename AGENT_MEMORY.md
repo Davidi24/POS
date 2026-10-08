@@ -1,3 +1,50 @@
+## 2026-10-08 (Claude, feature/orders) — Pre-order editor, KDS dish routing, services restarted (~17:55)
+- **Why:** the user said "start when you left". The previous entry's open items were the booking pre-order hook and per-station dish routing.
+- **Services were down** (likely a restart):
+  - `podman start pos-db pos-mailhog`.
+  - Backend started again with the same command as the 2026-10-07 entry (log `back-end/app.out.log`).
+  - Desktop app relaunched with `:desktopApp:run`.
+- **Pre-orders with a booking** (`pos/reservations/preorder/ui`):
+  - `BookingPreOrderCard`: shows what was ordered and when it goes to the kitchen. Take / Change / Send now / Cancel, depending on permissions.
+  - Taking and changing pre-orders is only offered for PENDING and CONFIRMED bookings (the server's rule).
+  - `PreOrderEditorDialog`: menu browser on the left, the guests' food on the right, with quantity stepper, per-dish note and an estimate. The server prices on save.
+  - A choices dialog for size and required extras.
+  - `PreOrderDishes`: menus come from `MenuRepository` (active menus) and choices from `OrderCatalogRepository.getItemChoices`. It deliberately doesn't use the till's "tonight's event menu only" filter, because the booking may be another day.
+- **Hook in the user's screen:** one call in `ReservationDetailsPanel` (Info tab, under `BookingMoneyCard`).
+- **KDS stations dialog:** "Dishes made here" lets you add a dish, set its priority and course name, switch it on or off, and remove it.
+  - The dishes come from `KdsMenuRepository`.
+  - `StationsDialog` now takes `menuSource` (Koin default) and `openStation` (used by the gallery test).
+- **Fix:** `SelectInput` without a label ignored its modifier and filled the row. It now wraps the field in `Box(modifier)`. This also affected Inventory → History on narrow screens.
+- **Checked:**
+  - `:shared:compileKotlinJvm`, `:shared:compileAndroidMain` and `:desktopApp:compileKotlin` pass.
+  - The new `PreOrderGalleryTest` and the updated `KdsGalleryTest` renders pass.
+  - The live pre-order list and menu list endpoints answer 200.
+  - Full test suites not run.
+- **Still open:** whether pre-orders are switched on is an Admin Hub setting the app can't read without SETTINGS_READ. If they're off, saving shows the server's "Pre-orders are not available" message.
+
+## 2026-10-08 (Claude, feature/orders) — Screens for every empty app section
+**The user asked for production-ready, modern screens (Reservations-overview look) for every empty section, without touching screens they built.** Not committed. Nothing in the backend changed.
+- **New screens** (each has a `*Content(state, model, …)` that the gallery tests render):
+  - Admin Hub: Users and Permissions (`admin/people/ui`), Audit log (`admin/audit/ui`), Devices (`admin/devices/ui`), Inventory with Stock / Items / Places / History / Counts / Recipes tabs and Suppliers (`admin/inventory/ui`).
+  - Statistics workspace: Overview, Sales, Staff, Reports with CSV download (`statistics/ui`).
+  - Fraud Detection workspace: Overview, Alerts with review dialog, Sensitive actions, Checks (`fraud/ui`).
+  - KDS: Tickets board (New / Cooking / Ready lanes, all-day panel, ticket detail), Upcoming (held and timed tickets plus booking pre-orders), Menu availability, History, kitchen stations dialog (`kds/ui`).
+  - POS payment: `pos/payment/ui/TakePaymentScreen` (bill from the receipt API, methods, split, tip, cash change, refunds and cancels, receipt view).
+- **New shared kits** in `core/components`: PageKit, FormKit, ListKit, OverviewExtras, ChartKit, DashboardKit, PeriodKit. Also `core/format/Formatting.kt` and `core/files` (`saveTextFile` with jvm/android actuals, `csvRow` with formula-injection guard).
+  - `SelectInput` now takes a nullable value (shows the placeholder).
+- **Small edits to the user's files, only to connect the new screens:**
+  - `AdminScreen` (sections wired), `WorkspaceSections` (placeholder text → content), `KdsScreen` (placeholder → `KdsSectionContent`).
+  - `OrdersScreen`: the Payment button was a no-op; `onPaymentRequested` now passes the order id.
+  - `PosScreen`: shows `TakePaymentScreen` for that order. The old static mock `pos/payment/PaymentScreen.kt` is untouched and no longer shown.
+  - Earlier in this task: `StaffScreenModel.loadCounts`, `RecipesScreenModel` menu choices, a Koin factory for recipes with a menu loader.
+- **Settings rule kept:** KDS late and ready limits come from `posTiming` (Admin Hub → Orders & kitchen). Fraud limits are only shown, with a pointer to Admin Hub → Settings → Fraud checks.
+- **Checked:**
+  - `:shared:compileKotlinJvm`, `:shared:compileAndroidMain` and `:desktopApp:compileKotlin` pass.
+  - Gallery renders pass (Admin people/system/inventory, Workspace, KDS, Payment): `./gradlew :shared:jvmTest --tests 'com.saporini.mobile_desktop.gallery.*'`, PNGs in `shared/build/reports/gallery/`.
+  - The full test suites were NOT run (the user runs tests at the end).
+  - The live endpoints these screens call answer 200 on the local backend. The local DB has no inventory or recipes, so those tabs show their empty states.
+- **Open / for the user to review one by one:** look and wording of each screen; KDS dish routing per station isn't editable yet (the station dialog keeps existing routings); the Reservations booking panel has no pre-order hook; the desktop app was relaunched (`:desktopApp:run`) against the backend still running on :8080.
+
 ## 2026-10-07 (Claude, feature/orders) — Backend and desktop app started for the user (~17:45)
 - `podman start pos-db pos-mailhog`. Then the backend: `SPRING_PROFILES_ACTIVE=local SPRING_FLYWAY_IGNORE_MIGRATION_PATTERNS='*:missing' MAIL_HOST=localhost MAIL_PORT=1025 MAIL_SMTP_AUTH=false MAIL_SMTP_STARTTLS_ENABLE=false java -jar target/pos-0.0.1-SNAPSHOT.jar` (pid 53842, log `back-end/app.out.log`).
 - **Why the extra Flyway flag:** the local DB has V39 "notifications" applied, but that file was never in `src/`; it only lived in an old `target/classes`, now gone. Without the flag Flyway validation fails at startup.
@@ -2904,3 +2951,9 @@ Running handoff log for AI agents (Claude, Codex, or others) working on this rep
 - Updated the existing mobile Orders API and screen-model state so ALL/HISTORY modes load the first page, append later pages, refresh all pages already shown after invalidations, reset pages on filter changes, and debounce search. The existing screen's load-more control is reused; no screen was added.
 - Verification: PostgreSQL `OrderLifecycleIntegrationTest#branchOrdersArePagedAndFiltered` passed 1/1 through schema V63, including page boundaries, deterministic order, status/history/search filters, item counts, and invalid page/size; `OrderControllerTest` and `OrderHistoryServiceTest` passed 4/4; focused mobile `OrdersScreenModelTest` + `OrderDataContractTest` passed 21/21. `git diff --check` passed.
 - Legacy non-paginated restaurant/customer/branch order-list endpoints remain exposed for compatibility and need a deliberate migration/deprecation plan. Other outstanding production blockers remain live payment/settlement, durable SMS/email delivery/retries, durable production image storage, explicit refund/void stock-restock and legacy reconciliation policy, device pairing redemption, preflight for duplicate active inventory barcodes before V63, and deployment configuration/observability review.
+## 2026-10-08 (Codex) — PR preparation for `feature/orders`
+- User requested a pull request into `develop`, with the user performing the merge. No merge has been performed.
+- Local branch currently has the backend/mobile state-management commit `0df6fda` plus docs commit `4a16460`; there are 42 additional modified/untracked paths for mobile screens, screen wiring, and docs from the Oct 8 UI work. Preserved these changes pending verification and packaging.
+- Backend full verification is recorded green at 1,264 unit + 331 PostgreSQL integration tests. New UI sources have a previous recorded compile/gallery pass; this session's combined Gradle test/compile run has started but is not yet returning an exit status.
+- GitHub account is authenticated through the GitHub connector and has push permission, but local `git push` credentials are unavailable (`/tmp/pos-gh` askpass helper path is missing). Remote `develop` is at `efa00654`; local `develop` remains at `5716c95`. Branch has not been pushed and no PR exists yet.
+- Open: finish mobile verification, commit intended Oct 8 UI changes if verified, push `feature/orders`, create PR to `develop`, check CI, and attach PR. Do not merge; user will merge. Do not claim ready-to-merge until remote checks are green.
