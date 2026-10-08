@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -44,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TenantIsolationIntegrationTest extends AbstractPosApiIntegrationTest {
 
     private static final Pattern VARIABLE = Pattern.compile("\\{([^}/]+)}");
+    private static final DefaultParameterNameDiscoverer PARAMETER_NAME_DISCOVERER = new DefaultParameterNameDiscoverer();
     // Registration status is a capability link for the person who applied (it shows only name and status).
     private static final Set<String> SKIPPED_PATH_PARTS = Set.of(
             "/auth", "/error", "/v3/api-docs", "/swagger", "logout", "password", "/.well-known", "/public",
@@ -192,6 +194,7 @@ class TenantIsolationIntegrationTest extends AbstractPosApiIntegrationTest {
 
     private void addParams(Call call, HandlerMethod handler) {
         for (MethodParameter parameter : handler.getMethodParameters()) {
+            parameter.initParameterNameDiscovery(PARAMETER_NAME_DISCOVERER);
             RequestParam annotation = parameter.getParameterAnnotation(RequestParam.class);
             if (annotation == null) {
                 continue;
@@ -207,7 +210,7 @@ class TenantIsolationIntegrationTest extends AbstractPosApiIntegrationTest {
             } else if (type == UUID.class) {
                 value = ids.getOrDefault(name, null);
             } else if (type == Integer.class || type == int.class) {
-                value = name.equals("size") ? 10 : name.equals("partySize") ? 2 : 0;
+                value = "size".equals(name) ? 10 : "partySize".equals(name) ? 2 : 0;
             } else if (type == String.class && annotation.required()) {
                 value = "a";
             }
