@@ -46,6 +46,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -369,6 +374,63 @@ class PasswordIntegrationTest {
         AuthSmsOtpCode expiredCode = authSmsOtpCodeRepository.findById(resetCode.getId()).orElseThrow();
         assertThat(expiredCode.getFailedAttempts()).isEqualTo(5);
         assertThat(expiredCode.getUsedAt()).isNotNull();
+
+        mockMvc.perform(post("/auth/reset-password/code")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "phone", user.getPhone(),
+                                "code", issuedCode,
+                                "newPassword", NEW_PASSWORD
+                        ))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("AUTH-039A concurrent wrong reset codes cannot bypass the attempt limit")
+    void concurrentWrongResetCodesCannotBypassAttemptLimit() throws Exception {
+        User user = createUser("auth039a", true, "+1555010605", true);
+        requestSmsReset(user.getPhone());
+        String issuedCode = latestPasswordResetCode.get();
+        String wrongCode = differentCodeFrom(issuedCode);
+        AuthSmsOtpCode issued = latestSmsCodeFor(user.getId(), SmsOtpPurpose.PASSWORD_RESET);
+
+        int requests = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(requests);
+        CountDownLatch ready = new CountDownLatch(requests);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Integer>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < requests; i++) {
+                results.add(pool.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Concurrent OTP requests did not start");
+                    }
+                    return mockMvc.perform(post("/auth/reset-password/code")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(Map.of(
+                                            "phone", user.getPhone(),
+                                            "code", wrongCode,
+                                            "newPassword", NEW_PASSWORD
+                                    ))))
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            for (Future<Integer> result : results) {
+                assertThat(result.get(20, TimeUnit.SECONDS)).isEqualTo(401);
+            }
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+
+        AuthSmsOtpCode exhausted = authSmsOtpCodeRepository.findById(issued.getId()).orElseThrow();
+        assertThat(exhausted.getFailedAttempts()).isEqualTo(5);
+        assertThat(exhausted.getUsedAt()).isNotNull();
 
         mockMvc.perform(post("/auth/reset-password/code")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -18,6 +18,8 @@ public interface BranchRepository extends JpaRepository<Branch, UUID> {
 
     Optional<Branch> findByIdAndRestaurantIdAndDeletedAtIsNull(UUID id, UUID restaurantId);
 
+    boolean existsByIdAndRestaurantIdAndDeletedAtIsNull(UUID id, UUID restaurantId);
+
     java.util.List<Branch> findAllByRestaurantIdAndDeletedAtIsNull(UUID restaurantId);
 
     long countByRestaurantIdAndDeletedAtIsNull(UUID restaurantId);

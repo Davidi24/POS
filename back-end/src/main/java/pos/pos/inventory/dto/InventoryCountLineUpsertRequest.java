@@ -1,5 +1,7 @@
 package pos.pos.inventory.dto;
 
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.AllArgsConstructor;
@@ -24,10 +26,13 @@ public class InventoryCountLineUpsertRequest {
 
     @NotNull(message = "countedQuantity is required")
     @PositiveOrZero(message = "countedQuantity must not be negative")
+    @Digits(integer = 9, fraction = 3, message = "countedQuantity must have at most 9 digits and 3 decimals")
     private BigDecimal countedQuantity;
 
     @PositiveOrZero(message = "expectedQuantity must not be negative")
+    @Digits(integer = 9, fraction = 3, message = "expectedQuantity must have at most 9 digits and 3 decimals")
     private BigDecimal expectedQuantity;
 
+    @Size(max = 2000, message = "notes must be at most 2000 characters")
     private String notes;
 }

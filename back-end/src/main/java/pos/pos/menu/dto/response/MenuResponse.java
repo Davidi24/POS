@@ -38,6 +38,7 @@ public class MenuResponse implements MenuViewResponse {
     private LocalDate availableFromDate;
     private LocalDate availableUntilDate;
     private String color;
+    private Boolean special;
     private Integer itemCount;
     private UUID createdBy; //using UUID to store ID of the user who created the menu, not the full User
     private UUID updatedBy;

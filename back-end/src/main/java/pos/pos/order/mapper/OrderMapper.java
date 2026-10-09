@@ -29,6 +29,10 @@ public class OrderMapper {
     }
 
     public OrderResponse toResponse(Order order, boolean includeChildren, boolean includeEvents) {
+        return toResponse(order, includeChildren, includeEvents, null);
+    }
+
+    public OrderResponse toResponse(Order order, boolean includeChildren, boolean includeEvents, Integer resolvedItemCount) {
         if (order == null) {
             return null;
         }
@@ -47,6 +51,7 @@ public class OrderMapper {
                 .customerName(order.getCustomer() == null ? null : order.getCustomer().displayName())
                 .orderNumber(order.getOrderNumber())
                 .currency(order.getCurrency())
+                .taxInclusive(order.isTaxInclusiveSnapshot())
                 .orderType(order.getOrderType())
                 .source(order.getSource())
                 .status(order.getStatus())
@@ -59,6 +64,8 @@ public class OrderMapper {
                 .taxTotal(order.getTaxTotal())
                 .serviceChargeTotal(order.getServiceChargeTotal())
                 .total(order.getTotal())
+                .prepaidTotal(order.getPrepaidTotal())
+                .itemCount(resolvedItemCount == null ? quantityTotal(order) : resolvedItemCount)
                 .openedAt(order.getOpenedAt())
                 .closedAt(order.getClosedAt())
                 .createdAt(order.getCreatedAt())
@@ -157,6 +164,7 @@ public class OrderMapper {
                 .taxTotal(lineItem.getTaxTotal())
                 .lineTotal(lineItem.getLineTotal())
                 .status(lineItem.getStatus())
+                .sendToKitchen(lineItem.goesToKitchen())
                 .notes(lineItem.getNotes())
                 .options(mapOptions(lineItem.getOptions()))
                 .createdAt(lineItem.getCreatedAt())
@@ -218,6 +226,17 @@ public class OrderMapper {
                 .sorted(Comparator.comparing(OrderLineItem::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(this::toLineItemResponse)
                 .toList();
+    }
+
+    private Integer quantityTotal(Order order) {
+        if (order == null || order.getLineItems() == null) {
+            return 0;
+        }
+        return order.getLineItems().stream()
+                .filter(lineItem -> lineItem.getStatus() != OrderLineItemStatus.CANCELLED)
+                .filter(lineItem -> lineItem.getStatus() != OrderLineItemStatus.VOIDED)
+                .mapToInt(OrderLineItem::getQuantity)
+                .sum();
     }
 
     public List<OrderItemOptionResponse> mapOptions(List<OrderItemOption> options) {

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -72,6 +73,7 @@ import org.jetbrains.compose.resources.painterResource
 
 private val PhoneCoverAccent = Color(0xFF4F7942)
 private val PhoneCoverInk = Color(0xFF222426)
+private val PhoneCoverActionSize = 38.dp
 
 internal fun phoneMenuCoverHeight(availableHeight: Dp): Dp =
     (availableHeight - 24.dp).coerceAtLeast(360.dp) * 0.9f
@@ -212,41 +214,45 @@ internal fun PhoneMenuBookCover(
                     )
                 }
             }
+        }
 
-            if (!isReordering) {
-                Column(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (canManageMenus) {
-                        PhoneCoverAction(Icons.Outlined.Edit, "Edit ${menu.name}", theme.ink, onEdit)
-                    }
-                    if (!menu.description.isNullOrBlank()) {
-                        PhoneCoverAction(Icons.Outlined.Info, "About ${menu.name}", theme.ink) {
-                            showDescription = true
-                        }
+        // Outside the clipped face so the edit button can sit on the top-right corner, a little past the top and
+        // right edges (same as the desktop covers); info goes right below it.
+        if (!isReordering) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = CoverActionOverhang, y = -CoverActionOverhang),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (canManageMenus) {
+                    PhoneCoverAction(Icons.Outlined.Edit, "Edit ${menu.name}", theme.ink, onEdit)
+                }
+                if (!menu.description.isNullOrBlank()) {
+                    PhoneCoverAction(Icons.Outlined.Info, "About ${menu.name}", theme.ink) {
+                        showDescription = true
                     }
                 }
-            } else {
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 14.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(Icons.Outlined.DragIndicator, null, Modifier.size(18.dp), tint = PhoneCoverInk)
-                    Text(
-                        text = if (isDragging) "Moving..." else "Hold & drag",
-                        fontFamily = Inter(),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PhoneCoverAccent
-                    )
-                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 14.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Outlined.DragIndicator, null, Modifier.size(18.dp), tint = PhoneCoverInk)
+                Text(
+                    text = if (isDragging) "Moving..." else "Hold & drag",
+                    fontFamily = Inter(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = PhoneCoverAccent
+                )
             }
         }
     }
@@ -259,7 +265,7 @@ internal fun PhoneMenuBookCover(
 private fun PhoneCoverAction(icon: ImageVector, label: String, color: Color, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(38.dp).shadow(4.dp, CircleShape).clip(CircleShape).background(Color.White)
+        modifier = Modifier.size(PhoneCoverActionSize).shadow(4.dp, CircleShape).clip(CircleShape).background(Color.White)
     ) {
         Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp), tint = color)
     }

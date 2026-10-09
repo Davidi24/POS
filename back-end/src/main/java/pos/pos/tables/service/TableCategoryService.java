@@ -14,11 +14,15 @@ import pos.pos.tables.dto.ReorderTableCategoriesRequest;
 import pos.pos.tables.dto.TableCategoryRequest;
 import pos.pos.tables.dto.TableCategoryResponse;
 import pos.pos.tables.dto.UpdateTableCategoryStatusRequest;
+import pos.pos.tables.dto.UpdateTableCategoryTablesRequest;
+import pos.pos.tables.entity.RestaurantTable;
+import pos.pos.exception.tables.RestaurantTableNotFoundException;
 import pos.pos.tables.entity.TableCategory;
 import pos.pos.tables.mapper.TableCategoryMapper;
 import pos.pos.tables.repository.RestaurantTableRepository;
 import pos.pos.tables.repository.TableCategoryRepository;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -121,6 +125,38 @@ public class TableCategoryService {
                         .thenComparing(TableCategory::getName))
                 .map(tableCategoryMapper::toResponse)
                 .toList();
+    }
+
+    // Makes the given tables the exact members of the category; tables in another category move here.
+    @Transactional
+    public TableCategoryResponse replaceTableCategoryTables(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID branchId,
+            UUID categoryId,
+            UpdateTableCategoryTablesRequest request
+    ) {
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
+        TableCategory tableCategory = requireTableCategory(branchId, categoryId);
+        Set<UUID> requestedIds = new LinkedHashSet<>(request.getTableIds());
+        List<RestaurantTable> requestedTables = restaurantTableRepository.findAllByBranch_IdAndIdIn(branchId, requestedIds);
+        if (requestedTables.size() != requestedIds.size()) {
+            throw new RestaurantTableNotFoundException();
+        }
+
+        List<RestaurantTable> changed = new ArrayList<>();
+        for (RestaurantTable table : restaurantTableRepository.findAllByBranch_IdAndCategory_Id(branchId, categoryId)) {
+            if (!requestedIds.contains(table.getId())) {
+                table.setCategory(null);
+                changed.add(table);
+            }
+        }
+        for (RestaurantTable table : requestedTables) {
+            table.setCategory(tableCategory);
+            changed.add(table);
+        }
+        restaurantTableRepository.saveAllAndFlush(changed);
+        return tableCategoryMapper.toResponse(tableCategory);
     }
 
     @Transactional

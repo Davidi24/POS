@@ -64,8 +64,13 @@ public class OrderCommandService {
         applyCreateRequest(order, request);
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, pos.pos.order.enums.OrderEventType.CREATED, "Order created", actorId);
+        boolean fired = orderSupport.autoFireIfEnabled(order, actorId);
 
-        return orderSupport.toResponse(orderSupport.saveOrder(order));
+        Order saved = orderSupport.saveOrder(order);
+        if (fired) {
+            kdsOrderSyncService.syncFromCurrentOrderState(saved, actorId);
+        }
+        return orderSupport.toResponse(saved);
     }
 
     @Transactional
@@ -94,8 +99,13 @@ public class OrderCommandService {
         applyCreateRequest(order, request);
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, pos.pos.order.enums.OrderEventType.CREATED, "Order created", actorId);
+        boolean fired = orderSupport.autoFireIfEnabled(order, actorId);
 
-        return orderSupport.toResponse(orderSupport.saveOrder(order));
+        Order saved = orderSupport.saveOrder(order);
+        if (fired) {
+            kdsOrderSyncService.syncFromCurrentOrderState(saved, actorId);
+        }
+        return orderSupport.toResponse(saved);
     }
 
     @Transactional
@@ -110,6 +120,7 @@ public class OrderCommandService {
         orderDomainSupport.assertOrderEditable(order);
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
+        UUID originalBranchId = order.getBranch().getId();
         Branch branch = order.getBranch();
         if (request.getBranchId() != null && !Objects.equals(request.getBranchId(), order.getBranch().getId())) {
             kdsOrderSyncService.assertNoTicketHistory(
@@ -138,15 +149,19 @@ public class OrderCommandService {
             if (order.getCustomer() == null && reservation.getCustomer() != null) {
                 order.setCustomer(reservation.getCustomer());
             }
-        } else if (!Objects.equals(order.getBranch().getId(), branch.getId())
+        } else if (!Objects.equals(originalBranchId, branch.getId())
                 && order.getReservation() != null
                 && !Objects.equals(order.getReservation().getBranch().getId(), branch.getId())) {
             order.setReservation(null);
         }
 
         if (request.getTableId() != null) {
-            order.setRestaurantTable(orderSupport.resolveTable(branch.getId(), request.getTableId()));
-        } else if (!Objects.equals(order.getBranch().getId(), branch.getId())
+            RestaurantTable table = orderSupport.resolveTableForUpdate(branch.getId(), request.getTableId());
+            if (order.getRestaurantTable() == null || !Objects.equals(order.getRestaurantTable().getId(), table.getId())) {
+                orderSupport.assertTableCanReceiveOrder(table);
+            }
+            order.setRestaurantTable(table);
+        } else if (!Objects.equals(originalBranchId, branch.getId())
                 && order.getRestaurantTable() != null
                 && !Objects.equals(order.getRestaurantTable().getBranch().getId(), branch.getId())) {
             order.setRestaurantTable(null);
@@ -190,7 +205,12 @@ public class OrderCommandService {
         Order order = orderSupport.requireOrder(restaurantId, orderId);
         orderDomainSupport.assertOrderEditable(order);
 
-        order.setRestaurantTable(request.getTableId() == null ? null : orderSupport.resolveTable(order.getBranch().getId(), request.getTableId()));
+        RestaurantTable table = orderSupport.resolveTableForUpdate(order.getBranch().getId(), request.getTableId());
+        if (!Objects.equals(order.getRestaurantTable() == null ? null : order.getRestaurantTable().getId(),
+                table == null ? null : table.getId())) {
+            orderSupport.assertTableCanReceiveOrder(table);
+        }
+        order.setRestaurantTable(table);
         if (order.getRestaurantTable() != null) {
             order.setOrderType(OrderType.DINE_IN);
         }
@@ -281,8 +301,8 @@ public class OrderCommandService {
         Reservation reservation = orderSupport.resolveReservation(restaurantId, request.getReservationId());
         orderDomainSupport.requireReservationBranch(reservation, branch);
         RestaurantTable table = tableIdOverride == null
-                ? orderSupport.resolveTable(branch.getId(), request.getTableId())
-                : orderSupport.resolveTable(branch.getId(), tableIdOverride);
+                ? orderSupport.resolveTableForUpdate(branch.getId(), request.getTableId())
+                : orderSupport.resolveTableForUpdate(branch.getId(), tableIdOverride);
         Customer customer = request.getCustomerId() == null
                 ? reservation == null ? null : reservation.getCustomer()
                 : orderSupport.resolveCustomer(restaurantId, request.getCustomerId());
@@ -299,32 +319,29 @@ public class OrderCommandService {
     private void applyCreateRequest(Order order, CreateOrderRequest request) {
         OrderType orderType = orderDomainSupport.resolveOrderType(order.getRestaurantTable(), order.getReservation(), request.getOrderType());
         orderSupport.validateOrderMode(order.getRestaurant(), orderType);
-        orderSupport.validateOpenedAt(order.getRestaurant(), request.getOpenedAt());
 
-        order.setOrderNumber(request.getOrderNumber() == null
-                ? orderSupport.nextOrderNumber(order.getRestaurant())
-                : request.getOrderNumber());
-        order.setCurrency(request.getCurrency() == null ? order.getRestaurant().getCurrency() : request.getCurrency());
+        order.setOrderNumber(orderSupport.nextOrderNumber(order.getRestaurant()));
+        order.setCurrency(order.getRestaurant().getCurrency());
         order.setOrderType(orderType);
         order.setSource(request.getSource() == null
                 ? OrderSource.POS
                 : request.getSource());
+        if (request.getStatus() != null && request.getStatus() != OrderStatus.DRAFT && request.getStatus() != OrderStatus.OPEN) {
+            throw new AuthException("New orders must be draft or open", HttpStatus.BAD_REQUEST);
+        }
         order.setStatus(request.getStatus() == null ? OrderStatus.OPEN : request.getStatus());
         order.setPaymentStatus(OrderPaymentStatus.UNPAID);
         order.setGuestCount(request.getGuestCount() == null ? 1 : request.getGuestCount());
         order.setNotes(request.getNotes());
-        order.setOpenedAt(request.getOpenedAt() == null ? OffsetDateTime.now(ZoneOffset.UTC) : request.getOpenedAt());
+        order.setOpenedAt(OffsetDateTime.now(ZoneOffset.UTC));
         orderSupport.replaceItems(order, request.getItems());
         orderSupport.replaceDiscounts(order, request.getDiscounts(), order.getUpdatedBy());
         orderDomainSupport.applyStatusSideEffects(order);
     }
 
     private void applyUpdateRequest(Order order, UpdateOrderRequest request) {
-        if (request.getOrderNumber() != null) {
-            order.setOrderNumber(request.getOrderNumber());
-        }
-        if (request.getCurrency() != null) {
-            order.setCurrency(request.getCurrency());
+        if (request.getOrderNumber() != null || request.getCurrency() != null || request.getOpenedAt() != null) {
+            throw new AuthException("Order number, currency and opening time are assigned by the server", HttpStatus.BAD_REQUEST);
         }
         if (request.getOrderType() != null) {
             orderSupport.validateOrderMode(order.getRestaurant(), request.getOrderType());
@@ -333,18 +350,14 @@ public class OrderCommandService {
         if (request.getSource() != null) {
             order.setSource(request.getSource());
         }
-        if (request.getStatus() != null) {
-            order.setStatus(request.getStatus());
+        if (request.getStatus() != null && request.getStatus() != order.getStatus()) {
+            throw new AuthException("Use the dedicated order workflow action to change status", HttpStatus.BAD_REQUEST);
         }
         if (request.getGuestCount() != null) {
             order.setGuestCount(request.getGuestCount());
         }
         if (request.getNotes() != null) {
             order.setNotes(request.getNotes());
-        }
-        if (request.getOpenedAt() != null) {
-            orderSupport.validateOpenedAt(order.getRestaurant(), request.getOpenedAt());
-            order.setOpenedAt(request.getOpenedAt());
         }
         if (request.getItems() != null) {
             orderSupport.replaceItems(order, request.getItems());

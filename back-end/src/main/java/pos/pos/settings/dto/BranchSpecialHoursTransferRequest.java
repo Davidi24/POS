@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -19,9 +20,10 @@ import java.util.List;
 public class BranchSpecialHoursTransferRequest {
 
     @NotBlank(message = "branchCode is required")
+    @Size(max = 100, message = "branchCode must be at most 100 characters")
     private String branchCode;
 
     @Valid
     @NotNull(message = "items is required")
-    private List<UpsertSpecialHourRequest> items;
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UpsertSpecialHourRequest> items;
 }

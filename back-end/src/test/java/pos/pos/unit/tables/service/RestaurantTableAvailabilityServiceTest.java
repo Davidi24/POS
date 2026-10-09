@@ -9,10 +9,13 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import pos.pos.order.repository.OrderRepository;
 import pos.pos.reservation.entity.Reservation;
 import pos.pos.reservation.entity.ReservationTableAssignment;
 import pos.pos.reservation.enums.ReservationStatus;
 import pos.pos.reservation.repository.ReservationRepository;
+import pos.pos.exception.auth.AuthException;
+import pos.pos.reservation.repository.ReservationTableAssignmentRepository;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
@@ -32,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -58,6 +62,12 @@ class RestaurantTableAvailabilityServiceTest {
     @Mock
     private TableCategoryRepository tableCategoryRepository;
 
+    @Mock
+    private ReservationTableAssignmentRepository reservationTableAssignmentRepository;
+
+    @Mock
+    private OrderRepository orderRepository;
+
     @Spy
     private RestaurantTableMapper restaurantTableMapper;
 
@@ -68,7 +78,9 @@ class RestaurantTableAvailabilityServiceTest {
         RestaurantTableSupport restaurantTableSupport = new RestaurantTableSupport(
                 restaurantTableRepository,
                 tableCategoryRepository,
-                restaurantTableMapper
+                restaurantTableMapper,
+                reservationTableAssignmentRepository,
+                orderRepository
         );
         restaurantTableAvailabilityService = new RestaurantTableAvailabilityService(
                 restaurantScopeService,
@@ -113,6 +125,27 @@ class RestaurantTableAvailabilityServiceTest {
         assertThat(response.getFirst().getAvailableForRequestedWindow()).isFalse();
         assertThat(response.getFirst().getBlockingReason()).isEqualTo("RESERVED_FOR_REQUESTED_WINDOW");
         assertThat(response.getFirst().getOverlappingReservationIds()).containsExactly(RESERVATION_ID);
+    }
+
+    @Test
+    @DisplayName("Rejects non-positive party sizes before loading table availability")
+    void rejectsNonPositivePartySize() {
+        Authentication authentication = authentication();
+        OffsetDateTime from = OffsetDateTime.parse("2026-05-07T18:00:00Z");
+        OffsetDateTime to = OffsetDateTime.parse("2026-05-07T19:00:00Z");
+
+        assertThatThrownBy(() -> restaurantTableAvailabilityService.getTableAvailability(
+                authentication, RESTAURANT_ID, BRANCH_ID, from, to, 0))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("partySize must be greater than 0");
+        assertThatThrownBy(() -> restaurantTableAvailabilityService.getAvailableTables(
+                authentication, RESTAURANT_ID, BRANCH_ID, from, to, -1))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("partySize must be greater than 0");
+        assertThatThrownBy(() -> restaurantTableAvailabilityService.getTableAvailability(
+                authentication, RESTAURANT_ID, BRANCH_ID, TABLE_ID, from, to, 0))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("partySize must be greater than 0");
     }
 
     private Authentication authentication() {

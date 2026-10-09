@@ -117,7 +117,8 @@ internal fun SectionManagerDialog(
     onChangeOrder: () -> Unit,
     onCreateSection: suspend (name: String, displayOrder: Int) -> Result<String>,
     onRenameSection: suspend (sectionId: String, name: String, displayOrder: Int) -> Result<Unit>,
-    onDeleteSection: suspend (sectionId: String, deleteItems: Boolean) -> Result<Unit>
+    onDeleteSection: suspend (sectionId: String, deleteItems: Boolean) -> Result<Unit>,
+    allowCreateDelete: Boolean = true
 ) {
     val isPhone = isPhoneMenuWindow()
     val isWidePhone = isWidePhoneWindow()
@@ -174,7 +175,7 @@ internal fun SectionManagerDialog(
                 ) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            if (isReordering) "Change section order" else "Edit menu sections",
+                            if (isReordering) "Change section order" else if (allowCreateDelete) "Edit menu sections" else "Edit online sections",
                             fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = SectionInk
                         )
                         Text(
@@ -182,7 +183,7 @@ internal fun SectionManagerDialog(
                                 if (isPhone) "Press and hold the six-dot handle, then drag and drop to change the order."
                                 else "Drag and drop the six-dot handle to change the order."
                             } else {
-                                "Rename or delete sections, or add a new one."
+                                if (allowCreateDelete) "Rename or delete sections, or add a new one." else "Rename sections or change their order."
                             },
                             fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = SectionMuted
                         )
@@ -214,12 +215,13 @@ internal fun SectionManagerDialog(
                         sections = workingSections,
                         isPhone = isPhone,
                         mode = mode,
+                        allowDelete = allowCreateDelete,
                         itemCountFor = { section -> itemCounts[section.name] ?: 0 },
                         onReorder = { workingSections = it },
                         onEdit = { sectionBeingEdited = it },
                         onDelete = { sectionToDelete = it }
                     )
-                    if (!isReordering) {
+                    if (!isReordering && allowCreateDelete) {
                         Spacer(Modifier.size(4.dp))
                         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             Box(
@@ -343,6 +345,7 @@ private fun SectionReorderList(
     sections: List<MenuCategory>,
     isPhone: Boolean,
     mode: SectionManagerMode,
+    allowDelete: Boolean,
     itemCountFor: (MenuCategory) -> Int,
     onReorder: (List<MenuCategory>) -> Unit,
     onEdit: (MenuCategory) -> Unit,
@@ -430,6 +433,7 @@ private fun SectionReorderList(
                     section = section,
                     itemCount = itemCount,
                     mode = mode,
+                    allowDelete = allowDelete,
                     canMove = canMove,
                     isDragging = isDragging,
                     onEdit = { onEdit(section) },
@@ -455,6 +459,7 @@ private fun SectionRow(
     section: MenuCategory,
     itemCount: Int,
     mode: SectionManagerMode,
+    allowDelete: Boolean,
     canMove: Boolean,
     isDragging: Boolean,
     onEdit: () -> Unit,
@@ -515,18 +520,20 @@ private fun SectionRow(
             ) {
                 Icon(Icons.Outlined.Edit, "Rename ${section.name}", Modifier.size(18.dp), tint = SectionInk)
             }
-            Spacer(Modifier.width(8.dp))
-            Box(
-                modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp))
-                    .background(SectionDanger).clickable(onClick = onDelete),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Outlined.DeleteOutline,
-                    "Delete ${section.name}",
-                    Modifier.size(18.dp),
-                    tint = Color.White
-                )
+            if (allowDelete) {
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier.size(38.dp).clip(RoundedCornerShape(8.dp))
+                        .background(SectionDanger).clickable(onClick = onDelete),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.DeleteOutline,
+                        "Delete ${section.name}",
+                        Modifier.size(18.dp),
+                        tint = Color.White
+                    )
+                }
             }
         }
     }

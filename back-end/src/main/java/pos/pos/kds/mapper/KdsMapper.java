@@ -99,6 +99,7 @@ public class KdsMapper {
                 .ticketNumber(ticket.getTicketNumber())
                 .orderId(ticket.getOrder() == null ? null : ticket.getOrder().getId())
                 .orderNumber(ticket.getOrder() == null ? null : ticket.getOrder().getOrderNumber())
+                .occasion(ticket.getOrder() == null ? null : occasionOf(ticket.getOrder().getReservation()))
                 .tableId(ticket.getOrder() == null || ticket.getOrder().getRestaurantTable() == null
                         ? null
                         : ticket.getOrder().getRestaurantTable().getId())
@@ -150,6 +151,11 @@ public class KdsMapper {
                 .priority(item.getPriority())
                 .seatLabel(item.getSeatLabel())
                 .notes(item.getNotes())
+                .variantNameSnapshot(item.getOrderLineItem() == null ? null : item.getOrderLineItem().getVariantNameSnapshot())
+                .optionsPerUnit(item.getOrderLineItem() == null || item.getOrderLineItem().isOptionsPerUnit())
+                .modifiers(item.getOrderLineItem() == null || item.getOrderLineItem().getOptions() == null ? List.of()
+                        : item.getOrderLineItem().getOptions().stream().map(option -> new pos.pos.kds.dto.KdsModifierResponse(
+                                option.getOptionNameSnapshot(), option.getQuantity(), option.getNotes())).toList())
                 .firedAt(item.getFiredAt())
                 .readyAt(item.getReadyAt())
                 .completedAt(item.getCompletedAt())
@@ -213,5 +219,20 @@ public class KdsMapper {
                 .sorted(Comparator.comparing(KdsTicketItem::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(this::toTicketItemResponse)
                 .toList();
+    }
+
+    private static String occasionOf(pos.pos.reservation.entity.Reservation reservation) {
+        if (reservation == null || reservation.getOccasionName() == null) {
+            return null;
+        }
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        parts.add((reservation.getOccasionIcon() == null ? "" : reservation.getOccasionIcon() + " ") + reservation.getOccasionName());
+        if (reservation.getOccasionOptions() != null && !reservation.getOccasionOptions().isBlank()) {
+            parts.add(String.join(", ", reservation.getOccasionOptions().split("\n")));
+        }
+        if (reservation.getOccasionNote() != null && !reservation.getOccasionNote().isBlank()) {
+            parts.add(reservation.getOccasionNote());
+        }
+        return String.join(" · ", parts);
     }
 }

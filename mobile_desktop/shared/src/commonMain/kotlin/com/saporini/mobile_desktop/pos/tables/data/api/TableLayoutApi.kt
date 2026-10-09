@@ -3,7 +3,12 @@ package com.saporini.mobile_desktop.pos.tables.data.api
 import com.saporini.mobile_desktop.core.network.ApiConfig
 import com.saporini.mobile_desktop.pos.tables.data.dto.FloorLayoutRequestDto
 import com.saporini.mobile_desktop.pos.tables.data.dto.FloorLayoutResponseDto
+import com.saporini.mobile_desktop.pos.tables.data.dto.ReorderTableCategoriesRequestDto
+import com.saporini.mobile_desktop.pos.tables.data.dto.TableAvailabilityDto
+import com.saporini.mobile_desktop.pos.tables.data.dto.TableCategoryRequestDto
+import com.saporini.mobile_desktop.pos.tables.data.dto.TableCategoryResponseDto
 import com.saporini.mobile_desktop.pos.tables.data.dto.TableLayoutResponseDto
+import com.saporini.mobile_desktop.pos.tables.data.dto.UpdateTableCategoryTablesRequestDto
 import com.saporini.mobile_desktop.pos.tables.data.dto.TableMergeRequestDto
 import com.saporini.mobile_desktop.pos.tables.data.dto.TableRequestDto
 import com.saporini.mobile_desktop.pos.tables.data.dto.TableResponseDto
@@ -19,6 +24,7 @@ import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -281,5 +287,109 @@ class TableLayoutApi(
             "${baseUrlProvider()}/restaurants/$restaurantId" +
                     "/branches/$branchId/floor-layouts/$floorLayoutId"
         )
+    }
+
+    suspend fun getTables(
+        restaurantId: String,
+        branchId: String
+    ): List<TableResponseDto> {
+        return client.get(
+            "${baseUrlProvider()}/restaurants/$restaurantId" +
+                "/branches/$branchId/tables"
+        ).body()
+    }
+
+    suspend fun getTableCategories(
+        restaurantId: String,
+        branchId: String
+    ): List<TableCategoryResponseDto> {
+        return client.get(
+            "${baseUrlProvider()}/restaurants/$restaurantId" +
+                "/branches/$branchId/table-categories"
+        ).body()
+    }
+
+    suspend fun createTableCategory(
+        restaurantId: String,
+        branchId: String,
+        request: TableCategoryRequestDto
+    ): TableCategoryResponseDto {
+        return client.post(
+            "${baseUrlProvider()}/restaurants/$restaurantId" +
+                "/branches/$branchId/table-categories"
+        ) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun updateTableCategory(
+        restaurantId: String,
+        branchId: String,
+        categoryId: String,
+        request: TableCategoryRequestDto
+    ): TableCategoryResponseDto {
+        return client.put(
+            "${baseUrlProvider()}/restaurants/$restaurantId" +
+                "/branches/$branchId/table-categories/$categoryId"
+        ) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun replaceTableCategoryTables(
+        restaurantId: String,
+        branchId: String,
+        categoryId: String,
+        tableIds: List<String>
+    ) {
+        client.put(
+            "${baseUrlProvider()}/restaurants/$restaurantId" +
+                "/branches/$branchId/table-categories/$categoryId/tables"
+        ) {
+            contentType(ContentType.Application.Json)
+            setBody(UpdateTableCategoryTablesRequestDto(tableIds))
+        }
+    }
+
+    suspend fun deleteTableCategory(
+        restaurantId: String,
+        branchId: String,
+        categoryId: String
+    ) {
+        client.delete(
+            "${baseUrlProvider()}/restaurants/$restaurantId" +
+                "/branches/$branchId/table-categories/$categoryId"
+        )
+    }
+
+    suspend fun getAvailableTables(
+        restaurantId: String,
+        branchId: String,
+        from: String,
+        to: String
+    ): List<TableAvailabilityDto> {
+        return client.get(
+            "${baseUrlProvider()}/restaurants/$restaurantId" +
+                "/branches/$branchId/tables/available"
+        ) {
+            parameter("from", from)
+            parameter("to", to)
+        }.body()
+    }
+
+    suspend fun reorderTableCategories(
+        restaurantId: String,
+        branchId: String,
+        categoryIds: List<String>
+    ) {
+        client.patch(
+            "${baseUrlProvider()}/restaurants/$restaurantId" +
+                "/branches/$branchId/table-categories/reorder"
+        ) {
+            contentType(ContentType.Application.Json)
+            setBody(ReorderTableCategoriesRequestDto(categoryIds))
+        }
     }
 }

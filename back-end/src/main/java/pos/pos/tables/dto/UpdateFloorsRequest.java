@@ -1,5 +1,6 @@
 package pos.pos.tables.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -18,5 +19,6 @@ import java.util.List;
 public class UpdateFloorsRequest {
 
     @NotNull(message = "renames is required")
+    @Size(max = 200, message = "renames can have at most 200 values")
     private List<@Valid FloorRenameRequest> renames;
 }

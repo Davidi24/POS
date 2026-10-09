@@ -1,5 +1,6 @@
 package pos.pos.inventory.repository;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface InventoryMovementRepository extends JpaRepository<InventoryMovement, UUID> {
+
+    boolean existsByOrderLineItem_IdAndMovementType(UUID orderLineItemId, InventoryMovementType movementType);
 
     Optional<InventoryMovement> findByIdAndInventoryItem_Restaurant_Id(UUID id, UUID restaurantId);
 
@@ -25,12 +28,13 @@ public interface InventoryMovementRepository extends JpaRepository<InventoryMove
               AND (:orderLineItemId IS NULL OR mv.orderLineItem.id = :orderLineItemId)
               AND (:movementType IS NULL OR mv.movementType = :movementType)
               AND (:itemId IS NULL OR mv.inventoryItem.id = :itemId)
-            ORDER BY mv.occurredAt DESC
+            ORDER BY mv.occurredAt DESC, mv.id DESC
             """)
     List<InventoryMovement> search(
             @Param("restaurantId") UUID restaurantId,
             @Param("orderLineItemId") UUID orderLineItemId,
             @Param("movementType") InventoryMovementType movementType,
-            @Param("itemId") UUID itemId
+            @Param("itemId") UUID itemId,
+            Pageable pageable
     );
 }

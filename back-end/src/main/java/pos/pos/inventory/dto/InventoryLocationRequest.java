@@ -31,6 +31,7 @@ public class InventoryLocationRequest {
     @NotNull(message = "locationType is required")
     private InventoryLocationType locationType;
 
+    @Size(max = 2000, message = "notes must be at most 2000 characters")
     private String notes;
 
     private Boolean active;

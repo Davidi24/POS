@@ -19,6 +19,7 @@ import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -99,6 +100,10 @@ public class Menu extends AbstractAuditedEntity {
     @Column(name = "color", length = 20)
     private String color;
 
+    // A special menu: occasion extras or an event night's menu. Its items can be copies imported from other menus.
+    @Column(name = "is_special", nullable = false)
+    private boolean special = false;
+
     @OneToMany(mappedBy = "menu")
     private List<MenuSection> sections = new ArrayList<>();
 
@@ -126,5 +131,34 @@ public class Menu extends AbstractAuditedEntity {
         return date != null
                 && (availableFromDate == null || !date.isBefore(availableFromDate))
                 && (availableUntilDate == null || !date.isAfter(availableUntilDate));
+    }
+
+    /** Whether the menu is available at a local restaurant date and time. The time window may cross midnight. */
+    public boolean isAvailableAt(LocalDateTime dateTime) {
+        if (dateTime == null) {
+            return false;
+        }
+        LocalTime time = dateTime.toLocalTime();
+        boolean afterMidnightInOvernightWindow = availableFrom != null && availableUntil != null
+                && availableFrom.isAfter(availableUntil) && !time.isAfter(availableUntil);
+        LocalDate availabilityDate = afterMidnightInOvernightWindow
+                ? dateTime.toLocalDate().minusDays(1)
+                : dateTime.toLocalDate();
+        if (!isAvailableOn(availabilityDate)) {
+            return false;
+        }
+        if (availableFrom == null && availableUntil == null) {
+            return true;
+        }
+        if (availableFrom == null) {
+            return !time.isAfter(availableUntil);
+        }
+        if (availableUntil == null) {
+            return !time.isBefore(availableFrom);
+        }
+        if (!availableFrom.isAfter(availableUntil)) {
+            return !time.isBefore(availableFrom) && !time.isAfter(availableUntil);
+        }
+        return !time.isBefore(availableFrom) || !time.isAfter(availableUntil);
     }
 }

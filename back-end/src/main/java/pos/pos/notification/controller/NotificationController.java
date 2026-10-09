@@ -113,6 +113,18 @@ public class NotificationController {
         return ResponseEntity.ok(notificationService.markRead(authentication, restaurantId, notificationId));
     }
 
+    @PostMapping("/read-all")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Mark all of the current user's personal notifications as read")
+    public ResponseEntity<Void> markAllRead(
+            @PathVariable UUID restaurantId,
+            @RequestParam(required = false) UUID branchId,
+            Authentication authentication
+    ) {
+        notificationService.markAllRead(authentication, restaurantId, branchId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/broadcast")
     @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
     @Operation(summary = "Create a manual operational notification")

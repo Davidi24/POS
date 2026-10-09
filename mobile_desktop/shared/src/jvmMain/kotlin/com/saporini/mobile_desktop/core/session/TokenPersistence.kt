@@ -9,11 +9,14 @@ actual class TokenPersistence {
     private val storageDir: File = File(System.getProperty("user.home"), ".saporini").apply { mkdirs() }
     private val accessFile = File(storageDir, "access.bin")
     private val refreshFile = File(storageDir, "refresh.bin")
+    private val pendingInventoryMovesFile = File(storageDir, "pending-inventory-moves.bin")
 
     actual suspend fun saveAccessToken(token: String?) = save(accessFile, token)
     actual suspend fun saveRefreshToken(token: String?) = save(refreshFile, token)
     actual suspend fun loadAccessToken(): String? = load(accessFile)
     actual suspend fun loadRefreshToken(): String? = load(refreshFile)
+    actual suspend fun savePendingInventoryMoves(payload: String?) = save(pendingInventoryMovesFile, payload)
+    actual suspend fun loadPendingInventoryMoves(): String? = load(pendingInventoryMovesFile)
 
     actual suspend fun clear() {
         accessFile.delete()

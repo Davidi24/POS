@@ -39,7 +39,8 @@ public class NotificationPreferenceController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Upsert current user notification preferences")
     public ResponseEntity<List<NotificationPreferenceResponse>> upsertPreferences(
-            @Valid @RequestBody List<NotificationPreferenceRequest> requests,
+            @Valid @RequestBody @jakarta.validation.constraints.Size(max = 200, message = "at most 200 preferences at once")
+            List<@jakarta.validation.constraints.NotNull(message = "a preference must not be empty") @Valid NotificationPreferenceRequest> requests,
             Authentication authentication
     ) {
         return ResponseEntity.ok(notificationPreferenceService.upsertCurrentPreferences(authentication, requests));

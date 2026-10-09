@@ -57,6 +57,12 @@ class RestaurantReservationControllerTest {
     private ReservationNoteService reservationNoteService;
     @Mock
     private ReservationDepositService reservationDepositService;
+    @Mock
+    private pos.pos.tables.realtime.TableLayoutChangeNotifier tableLayoutChangeNotifier;
+    @Mock
+    private pos.pos.reservation.service.GuestHistoryService guestHistoryService;
+    @Mock
+    private pos.pos.reservation.service.BookingMoneyStaffService bookingMoneyStaffService;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -75,7 +81,10 @@ class RestaurantReservationControllerTest {
                         reservationLifecycleService,
                         reservationTableAssignmentService,
                         reservationNoteService,
-                        reservationDepositService
+                        reservationDepositService,
+                        tableLayoutChangeNotifier,
+                        guestHistoryService,
+                        bookingMoneyStaffService
                 ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)

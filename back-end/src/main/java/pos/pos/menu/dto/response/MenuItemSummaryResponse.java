@@ -26,8 +26,14 @@ public class MenuItemSummaryResponse {
     private BigDecimal basePrice;
     private String imageUrl;
     private Boolean available;
+    private Boolean sendToKitchen;
+    private Boolean showOnline;
+    private UUID onlineSectionId;
+    private String onlineSectionName;
     private Integer displayOrder;
     private List<String> ingredients;
+    private Integer orderBeforeHours;
+    private List<String> occasionCodes;
     private List<MenuVariantSummaryResponse> variants;
     private List<MenuItemOptionGroupSummaryResponse> optionGroups;
 }

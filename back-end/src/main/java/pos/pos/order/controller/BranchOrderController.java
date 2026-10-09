@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.order.dto.CreateOrderRequest;
 import pos.pos.order.dto.OrderExportResponse;
+import pos.pos.order.dto.OrderHistoryPage;
 import pos.pos.order.dto.OrderResponse;
 import pos.pos.order.enums.OrderStatus;
 import pos.pos.order.service.OrderCommandService;
@@ -35,7 +36,18 @@ import java.util.UUID;
 public class BranchOrderController {
 
     private final OrderQueryService orderQueryService;
+    private final pos.pos.order.service.OrderHistoryService orderHistoryService;
     private final OrderCommandService orderCommandService;
+    private final pos.pos.order.realtime.OrderChangeNotifier orderChangeNotifier;
+
+    @GetMapping(value = "/orders/events", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @Operation(summary = "Subscribe to branch order changes")
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter orderEvents(
+            @PathVariable UUID restaurantId, @PathVariable UUID branchId,
+            Authentication authentication) {
+        return orderChangeNotifier.subscribe(authentication, restaurantId, branchId);
+    }
 
     @GetMapping("/orders")
     @PreAuthorize("hasAuthority('ORDER_READ')")
@@ -50,6 +62,27 @@ public class BranchOrderController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderQueryService.getBranchOrders(authentication, restaurantId, branchId, from, to, status, customerId));
+    }
+
+    @GetMapping("/orders/page")
+    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @Operation(summary = "List branch orders with bounded server pagination")
+    public ResponseEntity<OrderHistoryPage> getBranchOrdersPage(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            @RequestParam(required = false) OffsetDateTime from,
+            @RequestParam(required = false) OffsetDateTime to,
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) UUID customerId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "false") boolean historyOnly,
+            @RequestParam(defaultValue = "false") boolean openOnly,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(orderHistoryService.orders(authentication, restaurantId, branchId,
+                from, to, status, customerId, search, page, size, historyOnly, openOnly));
     }
 
     @GetMapping("/orders/open")

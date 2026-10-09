@@ -101,21 +101,42 @@ class ReservationControllerSecurityTest {
     @MockBean
     private CustomerService customerService;
 
+    @MockBean
+    private pos.pos.tables.realtime.TableLayoutChangeNotifier tableLayoutChangeNotifier;
+
+    @MockBean
+    private pos.pos.reservation.service.GuestHistoryService guestHistoryService;
+
+    @MockBean
+    private pos.pos.reservation.service.WaitlistService waitlistService;
+
+    @MockBean
+    private pos.pos.reservation.service.ReservationOccasionService reservationOccasionService;
+
+    @MockBean
+    private pos.pos.reservation.service.RestaurantEventService restaurantEventService;
+
+    @MockBean
+    private pos.pos.reservation.service.BookingMoneyStaffService bookingMoneyStaffService;
+
+    @MockBean
+    private pos.pos.reservation.service.GuestBookingService guestBookingService;
+
     @Test
-    @DisplayName("GET reservations should allow SETTINGS_READ")
-    void shouldAllowReservationReadWithSettingsReadPermission() throws Exception {
+    @DisplayName("GET reservations should allow RESERVATION_READ")
+    void shouldAllowReservationReadWithReservationReadPermission() throws Exception {
         given(reservationQueryService.getReservations(any(), any()))
                 .willReturn(List.of(ReservationResponse.builder().id(RESERVATION_ID).reservationCode("RES_TEST").build()));
 
         mockMvc.perform(get("/restaurants/{restaurantId}/reservations", RESTAURANT_ID)
                         .header("X-Test-User", "owner@pos.local")
-                        .header("X-Test-Authorities", "SETTINGS_READ"))
+                        .header("X-Test-Authorities", "RESERVATION_READ"))
                 .andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("POST reservation should reject missing SETTINGS_UPDATE")
-    void shouldRejectReservationCreateWithoutSettingsUpdatePermission() throws Exception {
+    @DisplayName("POST reservation should reject missing RESERVATION_MANAGE")
+    void shouldRejectReservationCreateWithoutReservationManagePermission() throws Exception {
         String request = """
                 {
                   "branchId":"%s",
@@ -128,7 +149,7 @@ class ReservationControllerSecurityTest {
 
         mockMvc.perform(post("/restaurants/{restaurantId}/reservations", RESTAURANT_ID)
                         .header("X-Test-User", "owner@pos.local")
-                        .header("X-Test-Authorities", "SETTINGS_READ")
+                        .header("X-Test-Authorities", "RESERVATION_READ,SETTINGS_UPDATE")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isForbidden())

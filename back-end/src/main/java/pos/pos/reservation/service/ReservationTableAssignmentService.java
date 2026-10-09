@@ -197,4 +197,28 @@ public class ReservationTableAssignmentService {
             reservation.addTableAssignment(assignment);
         }
     }
+
+    // Re-checks the reservation's current tables after its time or party size changed.
+    void revalidateCurrentTables(Reservation reservation) {
+        List<UUID> tableIds = reservation.getTableAssignments().stream()
+                .map(assignment -> assignment.getRestaurantTable().getId())
+                .toList();
+        if (tableIds.isEmpty()) {
+            return;
+        }
+        UUID primaryTableId = reservation.getTableAssignments().stream()
+                .filter(ReservationTableAssignment::isPrimaryAssignment)
+                .map(assignment -> assignment.getRestaurantTable().getId())
+                .findFirst()
+                .orElse(tableIds.getFirst());
+        reservationAvailabilitySupport.validateTableSelection(
+                reservation.getBranch(),
+                reservation.getId(),
+                reservation.getReservationStart(),
+                reservation.getReservationEnd(),
+                reservation.getPartySize(),
+                tableIds,
+                primaryTableId
+        );
+    }
 }

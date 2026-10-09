@@ -55,6 +55,10 @@ class OrderControllerTest {
     @Mock
     private OrderCommandService orderCommandService;
     @Mock
+    private pos.pos.order.service.OrderHistoryService orderHistoryService;
+    @Mock
+    private pos.pos.order.realtime.OrderChangeNotifier orderChangeNotifier;
+    @Mock
     private OrderWorkflowService orderWorkflowService;
     @Mock
     private OrderItemService orderItemService;
@@ -73,7 +77,7 @@ class OrderControllerTest {
 
         mockMvc = MockMvcBuilders.standaloneSetup(
                         new RestaurantOrderController(orderQueryService, orderCommandService, orderWorkflowService, orderItemService),
-                        new BranchOrderController(orderQueryService, orderCommandService),
+                        new BranchOrderController(orderQueryService, orderHistoryService, orderCommandService, orderChangeNotifier),
                         new PublicOrderController(orderPublicService)
                 )
                 .setControllerAdvice(new GlobalExceptionHandler())

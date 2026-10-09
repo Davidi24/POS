@@ -8,6 +8,7 @@ import pos.pos.kds.dto.KdsActionRequest;
 import pos.pos.kds.dto.KdsTicketResponse;
 import pos.pos.kds.entity.KdsTicket;
 import pos.pos.kds.entity.KdsTicketItem;
+import pos.pos.inventory.service.InventorySaleConsumptionService;
 import pos.pos.order.entity.Order;
 import pos.pos.order.entity.OrderLineItem;
 import pos.pos.order.enums.OrderEventType;
@@ -28,6 +29,7 @@ public class KdsTicketWorkflowService {
     private final OrderDomainSupport orderDomainSupport;
     private final KdsSupport kdsSupport;
     private final KdsOrderSyncService kdsOrderSyncService;
+    private final InventorySaleConsumptionService inventorySaleConsumptionService;
 
     @Transactional
     public KdsTicketResponse fireTicket(
@@ -71,6 +73,38 @@ public class KdsTicketWorkflowService {
             KdsActionRequest request
     ) {
         return changeTicketStatus(authentication, restaurantId, branchId, ticketId, request, OrderLineItemStatus.FULFILLED, "KDS ticket completed");
+    }
+
+    /**
+     * A waiter took the ready food out: the ticket's ready items are served. Only ready food can be picked up; items
+     * still cooking stay on the ticket for the kitchen.
+     */
+    @Transactional
+    public KdsTicketResponse pickUpTicket(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID branchId,
+            UUID ticketId,
+            KdsActionRequest request
+    ) {
+        restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
+        KdsTicket ticket = kdsSupport.requireTicketInBranch(branchId, ticketId);
+        Order order = lockAndValidateOrder(ticket);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        orderDomainSupport.assertOrderEditable(order);
+
+        boolean changed = false;
+        for (KdsTicketItem ticketItem : ticket.getItems()) {
+            OrderLineItem lineItem = ticketItem.getOrderLineItem();
+            if (lineItem != null && lineItem.getStatus() == OrderLineItemStatus.READY) {
+                changed |= applyLineItemStatus(order, lineItem, OrderLineItemStatus.FULFILLED, actorId);
+            }
+        }
+        if (!changed) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                    "Nothing on this ticket is ready yet. Refresh to see the latest.");
+        }
+        return saveAndSync(order, authentication, branchId, ticketId, request, "Picked up by the waiter", true);
     }
 
     @Transactional
@@ -146,12 +180,13 @@ public class KdsTicketWorkflowService {
     ) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         KdsTicket ticket = kdsSupport.requireTicketInBranch(branchId, ticketId);
-        Order order = ticket.getOrder();
+        Order order = lockAndValidateOrder(ticket);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
         orderDomainSupport.assertOrderEditable(order);
 
         boolean changed = false;
         for (KdsTicketItem ticketItem : ticket.getItems()) {
-            changed |= applyLineItemStatus(ticketItem.getOrderLineItem(), targetStatus);
+            changed |= applyLineItemStatus(order, ticketItem.getOrderLineItem(), targetStatus, actorId);
         }
 
         return saveAndSync(order, authentication, branchId, ticketId, request, fallbackNote, changed);
@@ -169,11 +204,12 @@ public class KdsTicketWorkflowService {
     ) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         KdsTicket ticket = kdsSupport.requireTicketInBranch(branchId, ticketId);
-        Order order = ticket.getOrder();
+        Order order = lockAndValidateOrder(ticket);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
         orderDomainSupport.assertOrderEditable(order);
 
         KdsTicketItem ticketItem = kdsSupport.requireTicketItem(ticket, ticketItemId);
-        boolean changed = applyLineItemStatus(ticketItem.getOrderLineItem(), targetStatus);
+        boolean changed = applyLineItemStatus(order, ticketItem.getOrderLineItem(), targetStatus, actorId);
         return saveAndSync(order, authentication, branchId, ticketId, request, fallbackNote, changed);
     }
 
@@ -198,7 +234,17 @@ public class KdsTicketWorkflowService {
         return kdsSupport.mapper().toTicketResponse(kdsSupport.requireTicketInBranch(branchId, ticketId));
     }
 
-    private boolean applyLineItemStatus(OrderLineItem lineItem, OrderLineItemStatus targetStatus) {
+    private Order lockAndValidateOrder(KdsTicket ticket) {
+        Order ticketOrder = ticket.getOrder();
+        return orderSupport.requireOrder(ticketOrder.getRestaurant().getId(), ticketOrder.getId());
+    }
+
+    private boolean applyLineItemStatus(
+            Order order,
+            OrderLineItem lineItem,
+            OrderLineItemStatus targetStatus,
+            UUID actorId
+    ) {
         if (lineItem == null || lineItem.getStatus() == null) {
             return false;
         }
@@ -232,6 +278,7 @@ public class KdsTicketWorkflowService {
                 if (lineItem.getStatus() == OrderLineItemStatus.FULFILLED) {
                     yield false;
                 }
+                inventorySaleConsumptionService.consumeFulfilledLine(order, lineItem, actorId);
                 lineItem.setStatus(OrderLineItemStatus.FULFILLED);
                 yield true;
             }

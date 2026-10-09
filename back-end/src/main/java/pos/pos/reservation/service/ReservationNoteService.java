@@ -34,7 +34,7 @@ public class ReservationNoteService {
 
         ReservationNote note = new ReservationNote();
         note.setReservation(reservation);
-        note.setNote(request.getNote());
+        note.setNote(request.getNote().trim());
         note.setCreatedBy(actorId);
         note.setUpdatedBy(actorId);
 

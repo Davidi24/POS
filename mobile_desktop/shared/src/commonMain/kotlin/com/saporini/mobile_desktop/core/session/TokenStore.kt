@@ -9,7 +9,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-object TokenStore {
+/** Encrypted/owner-only persistence for stock movements with an uncertain server outcome. */
+interface PendingInventoryMoveStorage {
+    suspend fun loadPendingInventoryMoves(): String?
+    suspend fun savePendingInventoryMoves(payload: String?)
+}
+
+object TokenStore : PendingInventoryMoveStorage {
     private val persistence: TokenPersistence? by lazy {
         try { TokenPersistence() } catch (_: Throwable) { null }
     }
@@ -45,6 +51,12 @@ object TokenStore {
         scope.launch {
             persistence?.clear()
         }
+    }
+
+    override suspend fun loadPendingInventoryMoves(): String? = persistence?.loadPendingInventoryMoves()
+
+    override suspend fun savePendingInventoryMoves(payload: String?) {
+        persistence?.savePendingInventoryMoves(payload)
     }
 
     val isLoggedIn: Boolean

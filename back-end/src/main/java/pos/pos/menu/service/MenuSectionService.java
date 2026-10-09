@@ -54,6 +54,7 @@ public class MenuSectionService {
     private final ActorScopeService actorScopeService;
     private final MenuPolicy menuPolicy;
     private final RestaurantValidationService restaurantValidationService;
+    private final OnlineMenuService onlineMenuService;
 
     @Transactional(readOnly = true)
     public List<MenuSectionSummaryResponse> getSections(
@@ -171,6 +172,7 @@ public class MenuSectionService {
                             menuItemOptionGroupRepository.findByMenuItemIdOrdered(item.getId()));
                 }
                 menuItemRepository.deleteAll(items);
+                onlineMenuService.removeEmptySections(menu.getRestaurant().getId());
             } else {
                 contentTransfer.preserveItems(section, items);
             }

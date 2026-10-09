@@ -1,5 +1,6 @@
 package pos.pos.inventory.dto;
 
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -29,9 +30,11 @@ public class InventoryReceiveRequest {
 
     @NotNull(message = "quantity is required")
     @Positive(message = "quantity must be greater than zero")
+    @Digits(integer = 9, fraction = 3, message = "quantity must have at most 9 digits and 3 decimals")
     private BigDecimal quantity;
 
     @PositiveOrZero(message = "unitCostOverride must not be negative")
+    @Digits(integer = 12, fraction = 4, message = "unitCostOverride must have at most 12 digits and 4 decimals")
     private BigDecimal unitCostOverride;
 
     private OffsetDateTime occurredAt;

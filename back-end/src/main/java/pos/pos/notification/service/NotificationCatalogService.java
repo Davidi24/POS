@@ -41,11 +41,15 @@ public class NotificationCatalogService {
                                 List.of("RESTAURANT_RESTAURANT_UPSERT")),
                         capability(NotificationTopic.BRANCH, "Branch profile and lifecycle changes", NotificationCapabilityStatus.LIVE,
                                 List.of("BRANCH_BRANCH_UPSERT")),
-                        todo(NotificationTopic.INVENTORY, "Inventory schema exists. Service/controller wiring is not in place yet; event pipeline is prepared for later repository usage."),
-                        todo(NotificationTopic.PAYMENT, "Payment entities exist, but operational services are not connected yet."),
-                        todo(NotificationTopic.SHIFT, "Shift entities exist, but shift workflow services are not connected yet."),
-                        todo(NotificationTopic.RECIPE, "Recipe schema exists; notification wiring should start when recipe command services arrive."),
-                        todo(NotificationTopic.REPORT, "Report definitions exist; report execution and delivery hooks are still pending."),
+                        capability(NotificationTopic.INVENTORY, "Inventory items, counts, levels, movements, and sale-source changes", NotificationCapabilityStatus.LIVE,
+                                List.of("INVENTORY_INVENTORY_ITEM_UPSERT", "INVENTORY_INVENTORY_COUNT_UPSERT", "INVENTORY_INVENTORY_COUNT_LINE_UPSERT", "INVENTORY_INVENTORY_LEVEL_UPSERT", "INVENTORY_INVENTORY_MOVEMENT_UPSERT", "INVENTORY_INVENTORY_SALES_SOURCE_UPSERT")),
+                        capability(NotificationTopic.PAYMENT, "Payment records and transaction state", NotificationCapabilityStatus.LIVE,
+                                List.of("PAYMENT_PAYMENT_UPSERT", "PAYMENT_PAYMENT_TRANSACTION_UPSERT")),
+                        capability(NotificationTopic.SHIFT, "Staff shifts and shift workflow state", NotificationCapabilityStatus.LIVE,
+                                List.of("SHIFT_SHIFT_UPSERT", "SHIFT_SHIFT_BREAK_UPSERT")),
+                        capability(NotificationTopic.RECIPE, "Recipes and their ingredient or sub-recipe components", NotificationCapabilityStatus.LIVE,
+                                List.of("RECIPE_RECIPE_UPSERT", "RECIPE_RECIPE_COMPONENT_UPSERT")),
+                        todo(NotificationTopic.REPORT, "Report execution, scheduling, and delivery notifications are not implemented."),
                         todo(NotificationTopic.AUTH, "Account security, session, and verification events can be targeted later when a user-facing inbox is required.")
                 ))
                 .build();

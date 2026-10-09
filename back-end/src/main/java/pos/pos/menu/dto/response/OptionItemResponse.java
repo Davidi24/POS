@@ -23,4 +23,6 @@ public class OptionItemResponse {
     private BigDecimal priceDelta;
     private Boolean available;
     private Integer displayOrder;
+    private UUID inventoryRecipeId;
+    private BigDecimal inventoryRecipeQuantity;
 }

@@ -27,6 +27,10 @@ public class KdsTicketItemResponse {
     private KdsPriority priority;
     private String seatLabel;
     private String notes;
+    private String variantNameSnapshot;
+    @Builder.Default
+    private boolean optionsPerUnit = true;
+    private java.util.List<KdsModifierResponse> modifiers;
     private OffsetDateTime firedAt;
     private OffsetDateTime readyAt;
     private OffsetDateTime completedAt;

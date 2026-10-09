@@ -57,6 +57,8 @@ class RoleAdminServiceTest {
     private static final UUID CLONED_ROLE_ID = UUID.fromString("00000000-0000-0000-0000-000000000223");
     private static final UUID PERMISSION_ID = UUID.fromString("00000000-0000-0000-0000-000000000224");
 
+    private static final UUID ACTOR_RESTAURANT_ID = UUID.fromString("00000000-0000-0000-0000-00000000bbbb");
+
     @Mock
     private RoleRepository roleRepository;
 
@@ -89,6 +91,7 @@ class RoleAdminServiceTest {
 
         when(roleHierarchyService.currentUserId(authentication)).thenReturn(ACTOR_ID);
         when(roleHierarchyService.highestActiveRank(ACTOR_ID)).thenReturn(30_000L);
+        when(roleHierarchyService.actorRestaurantId(authentication)).thenReturn(ACTOR_RESTAURANT_ID);
         when(userRepository.findActiveById(ACTOR_ID)).thenReturn(Optional.of(actorUser()));
         when(roleRepository.save(any(Role.class))).thenAnswer(invocation -> {
             Role savedRole = invocation.getArgument(0);
@@ -106,6 +109,7 @@ class RoleAdminServiceTest {
         assertThat(savedRole.getName()).isEqualTo("Floor Supervisor");
         assertThat(savedRole.getRank()).isEqualTo(29_999L);
         assertThat(savedRole.isSystem()).isFalse();
+        assertThat(savedRole.getRestaurantId()).isEqualTo(ACTOR_RESTAURANT_ID);
         assertThat(savedRole.isAssignable()).isTrue();
         assertThat(response.getId()).isEqualTo(ROLE_ID);
     }
@@ -287,6 +291,8 @@ class RoleAdminServiceTest {
         when(permissionRepository.findAllById(List.of(PERMISSION_ID))).thenReturn(List.of(permission));
         when(roleHierarchyService.isSuperAdmin(authentication)).thenReturn(false);
         when(roleHierarchyService.currentUserId(authentication)).thenReturn(ACTOR_ID);
+        when(roleHierarchyService.visibleTo(org.mockito.ArgumentMatchers.eq(authentication), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        when(roleHierarchyService.actorRestaurantId(authentication)).thenReturn(ACTOR_RESTAURANT_ID);
         when(userRepository.findActiveById(ACTOR_ID)).thenReturn(Optional.of(actorUser()));
         when(roleRepository.save(any(Role.class))).thenAnswer(invocation -> {
             Role savedRole = invocation.getArgument(0);

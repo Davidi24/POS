@@ -29,6 +29,7 @@ data class MenuResponseDto(
     val availableFromDate: String? = null,
     val availableUntilDate: String? = null,
     val color: String? = null,
+    val special: Boolean = false,
     val itemCount: Int? = null,
     val createdBy: String? = null,
     val updatedBy: String? = null,
@@ -63,8 +64,14 @@ data class MenuItemDto(
     val basePrice: Double,
     val imageUrl: String? = null,
     val available: Boolean,
+    val sendToKitchen: Boolean = true,
+    val showOnline: Boolean = false,
+    val onlineSectionId: String? = null,
+    val onlineSectionName: String? = null,
     val displayOrder: Int = 0,
     val ingredients: List<String> = emptyList(),
+    val orderBeforeHours: Int? = null,
+    val occasionCodes: List<String> = emptyList(),
     val variants: List<MenuVariantDto> = emptyList(),
     val optionGroups: List<MenuItemOptionGroupDto> = emptyList()
 )
@@ -128,5 +135,53 @@ data class OptionItemDto(
     val name: String,
     val priceDelta: Double,
     val available: Boolean,
-    val displayOrder: Int = 0
+    val displayOrder: Int = 0,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: Double? = null
+)
+
+// Online menu: its own sections, filled with dishes that point at them.
+@Serializable
+data class OnlineMenuSectionDto(
+    val id: String,
+    val name: String,
+    val displayOrder: Int = 0,
+    val itemCount: Long = 0
+)
+
+@Serializable
+data class OnlineMenuDto(
+    val date: String? = null,
+    val sections: List<OnlineMenuSectionViewDto> = emptyList()
+)
+
+@Serializable
+data class OnlineMenuSectionViewDto(
+    val id: String,
+    val name: String,
+    val displayOrder: Int = 0,
+    val items: List<OnlineMenuItemDto> = emptyList()
+)
+
+@Serializable
+data class OnlineMenuItemDto(
+    val id: String,
+    val sku: String? = null,
+    val name: String,
+    val description: String? = null,
+    val basePrice: Double = 0.0,
+    val imageUrl: String? = null,
+    val ingredients: List<String> = emptyList(),
+    val available: Boolean = true,
+    val sendToKitchen: Boolean = true,
+    val displayOrder: Int = 0,
+    val menuName: String? = null,
+    val menuSectionName: String? = null,
+    val visible: Boolean = true,
+    val hiddenReason: String? = null
+)
+
+@Serializable
+data class ReorderOnlineMenuItemsRequestDto(
+    val itemIds: List<String>
 )

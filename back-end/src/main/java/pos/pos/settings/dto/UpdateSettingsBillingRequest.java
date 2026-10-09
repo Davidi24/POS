@@ -22,6 +22,12 @@ public class UpdateSettingsBillingRequest {
     @NotNull(message = "serviceChargeEnabled is required")
     private Boolean serviceChargeEnabled;
 
+    @jakarta.validation.constraints.DecimalMin("0")
+    @jakarta.validation.constraints.DecimalMax("100")
+    @Digits(integer = 3, fraction = 4)
+    private BigDecimal orderTaxRate;
+    private Boolean orderTaxInclusive;
+
     private ServiceChargeType serviceChargeType;
 
     @Digits(integer = 10, fraction = 2, message = "serviceChargeValue must have at most 10 integer digits and 2 decimal places")

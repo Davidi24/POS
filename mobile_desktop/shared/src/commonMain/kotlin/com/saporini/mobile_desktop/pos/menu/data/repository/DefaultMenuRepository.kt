@@ -46,7 +46,8 @@ class DefaultMenuRepository(
                 availableUntil = input.availableUntil,
                 availableFromDate = input.availableFromDate,
                 availableUntilDate = input.availableUntilDate,
-                color = input.color
+                color = input.color,
+                special = input.special
             )
         ).toDomain()
     }
@@ -84,7 +85,8 @@ class DefaultMenuRepository(
                 availableUntil = input.availableUntil,
                 availableFromDate = input.availableFromDate,
                 availableUntilDate = input.availableUntilDate,
-                color = input.color
+                color = input.color,
+                special = input.special
             )
         ).toDomain()
     }
@@ -152,11 +154,20 @@ class DefaultMenuRepository(
                 basePrice = input.basePrice,
                 imageUrl = input.imageUrl,
                 available = input.available,
+                sendToKitchen = input.sendToKitchen,
+                showOnline = input.showOnline,
+                onlineSectionId = input.onlineSectionId,
+                onlineSectionName = input.onlineSectionName,
                 displayOrder = input.displayOrder,
-                ingredients = input.ingredients
+                ingredients = input.ingredients,
+                orderBeforeHours = input.orderBeforeHours,
+                occasionCodes = input.occasionCodes
             )
         ).toDomain()
     }
+
+    override suspend fun importItems(menuId: String, sectionId: String, itemIds: List<String>): List<MenuItem> =
+        api.importItems(menuId, sectionId, ImportMenuItemsRequestDto(itemIds)).map { it.toDomain() }
 
     override suspend fun updateItem(
         menuId: String,
@@ -175,9 +186,15 @@ class DefaultMenuRepository(
                 basePrice = input.basePrice,
                 imageUrl = input.imageUrl,
                 available = input.available,
+                sendToKitchen = input.sendToKitchen,
+                showOnline = input.showOnline,
+                onlineSectionId = input.onlineSectionId,
+                onlineSectionName = input.onlineSectionName,
                 displayOrder = input.displayOrder,
                 ingredients = input.ingredients,
-                sectionId = input.sectionId
+                sectionId = input.sectionId,
+                orderBeforeHours = input.orderBeforeHours,
+                occasionCodes = input.occasionCodes
             )
         ).toDomain()
     }
@@ -347,6 +364,9 @@ class DefaultMenuRepository(
         ).toDomain()
     }
 
+    override suspend fun getOptionGroup(groupId: String, includeItems: Boolean): OptionGroup =
+        api.getOptionGroup(groupId, includeItems).toDomain()
+
     override suspend fun deleteOptionGroup(groupId: String) {
         api.deleteOptionGroup(groupId)
     }
@@ -364,12 +384,53 @@ class DefaultMenuRepository(
                 name = input.name,
                 priceDelta = input.priceDelta,
                 available = input.available,
-                displayOrder = input.displayOrder
+                displayOrder = input.displayOrder,
+                inventoryRecipeId = input.inventoryRecipeId,
+                inventoryRecipeQuantity = input.inventoryRecipeQuantity
+            )
+        ).toDomain()
+    }
+
+    override suspend fun updateOptionItem(
+        groupId: String,
+        itemId: String,
+        input: OptionItemInput
+    ): OptionItem {
+        return api.updateOptionItem(
+            groupId = groupId,
+            itemId = itemId,
+            request = UpdateOptionItemRequestDto(
+                code = input.code,
+                name = input.name,
+                priceDelta = input.priceDelta,
+                available = input.available,
+                displayOrder = input.displayOrder,
+                inventoryRecipeId = input.inventoryRecipeId,
+                inventoryRecipeQuantity = input.inventoryRecipeQuantity
             )
         ).toDomain()
     }
 
     override suspend fun deleteOptionItem(groupId: String, itemId: String) {
         api.deleteOptionItem(groupId, itemId)
+    }
+
+    override suspend fun getOnlineMenu(restaurantId: String): OnlineMenu =
+        api.getOnlineMenu(restaurantId).toDomain()
+
+    override suspend fun getOnlineMenuSections(restaurantId: String): List<OnlineMenuSection> =
+        api.getOnlineMenuSections(restaurantId).map { it.toDomain() }
+
+    override suspend fun renameOnlineMenuSection(restaurantId: String, sectionId: String, name: String): OnlineMenuSection =
+        api.renameOnlineMenuSection(restaurantId, sectionId, RenameOnlineMenuSectionRequestDto(name)).toDomain()
+
+    override suspend fun reorderOnlineMenuSections(restaurantId: String, sectionIds: List<String>): List<OnlineMenuSection> =
+        api.reorderOnlineMenuSections(restaurantId, ReorderOnlineMenuSectionsRequestDto(sectionIds)).map { it.toDomain() }
+
+    override suspend fun reorderOnlineMenuItems(restaurantId: String, sectionId: String, itemIds: List<String>): OnlineMenu =
+        api.reorderOnlineMenuItems(restaurantId, sectionId, ReorderOnlineMenuItemsRequestDto(itemIds)).toDomain()
+
+    override suspend fun deleteOnlineMenuSection(restaurantId: String, sectionId: String) {
+        api.deleteOnlineMenuSection(restaurantId, sectionId)
     }
 }

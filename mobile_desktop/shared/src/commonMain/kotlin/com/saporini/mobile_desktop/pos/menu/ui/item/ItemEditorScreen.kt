@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -46,6 +47,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -74,7 +77,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.admin.inventory.RecipeDto
 import com.saporini.mobile_desktop.pos.menu.ui.MenuCategory
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
 import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogActionStatus
 import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogStatusBody
 import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuFormDialog
@@ -97,6 +102,12 @@ private val ItemEditorBorder = Color(0xFFE2E3DE)
 private val ItemEditorSurface = Color(0xFFF7F7F5)
 private val ItemEditorPlaceholder = Color(0xFFC7C8C2)
 
+private fun isValidInventoryRecipeQuantity(text: String): Boolean {
+    val normalized = text.trim()
+    if (!Regex("^[0-9]{1,9}(\\.[0-9]{1,3})?$").matches(normalized)) return false
+    return normalized.toDoubleOrNull()?.let { it > 0.0 } == true
+}
+
 data class DraftIngredient(
     val name: String,
     val quantity: String,
@@ -112,7 +123,9 @@ data class DraftVariant(
 data class DraftOptionChoice(
     val name: String,
     val priceDeltaLabel: String,
-    val id: String? = null
+    val id: String? = null,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: Double? = null
 )
 
 data class DraftOptionGroup(
@@ -130,7 +143,18 @@ data class EditableMenuItem(
     val description: String?,
     val imageFileName: String?,
     val available: Boolean,
+    val sendToKitchen: Boolean = true,
+    val showOnline: Boolean = false,
+    val onlineSectionId: String? = null,
+    val onlineSectionName: String? = null,
     val ingredients: List<DraftIngredient> = emptyList()
+)
+
+// Where "Show in online menu" puts the dish: an existing online section (id), or one by name (created if new).
+internal data class OnlinePlacement(
+    val show: Boolean,
+    val sectionId: String? = null,
+    val sectionName: String? = null
 )
 
 private data class MockIngredient(
@@ -149,7 +173,9 @@ private data class SelectedIngredientRow(
 
 private data class OptionChoiceInput(
     val name: String,
-    val priceDelta: String
+    val priceDelta: String,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: String = ""
 )
 
 private val MockIngredients = listOf(
@@ -174,6 +200,240 @@ private val IngredientCategories = listOf(
     "All", "Produce", "Dairy", "Meat", "Pantry", "Spices"
 )
 
+// A setting with a short explanation that follows the switch, e.g. "Send to kitchen".
+@Composable
+private fun ItemEditorSwitchRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    extra: (@Composable () -> Unit)? = null
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(9.dp))
+            .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(text = title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ItemEditorInk)
+                Text(text = description, fontFamily = Inter(), fontSize = 12.sp, color = ItemEditorMuted)
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = ItemEditorOlive
+                )
+            )
+        }
+        if (extra != null) {
+            HorizontalDivider(Modifier.padding(vertical = 6.dp), color = ItemEditorBorder)
+            extra()
+        }
+    }
+}
+
+// Asked when "Show in online menu" is switched on: which online section the dish goes into. Three kinds of choice:
+// the section named like the dish's own section (reused if the online menu has it, created otherwise), any existing
+// online section, or a new name (which still reuses an existing section if the name matches one).
+private sealed interface OnlineSectionPick {
+    data object Same : OnlineSectionPick
+    data class Existing(val section: OnlineMenuSection) : OnlineSectionPick
+    data object New : OnlineSectionPick
+}
+
+@Composable
+private fun OnlineSectionChooserDialog(
+    dishName: String,
+    staffSectionName: String?,
+    currentOnlineSectionId: String?,
+    currentOnlineSectionName: String?,
+    loadSections: suspend () -> Result<List<OnlineMenuSection>>,
+    onDismiss: () -> Unit,
+    onConfirm: (sectionId: String?, sectionName: String) -> Unit
+) {
+    var sections by remember { mutableStateOf<List<OnlineMenuSection>?>(null) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var attempt by remember { mutableStateOf(0) }
+    LaunchedEffect(attempt) {
+        loadError = null
+        loadSections().fold(
+            onSuccess = { sections = it },
+            onFailure = { loadError = it.message ?: "Couldn't load the online menu" }
+        )
+    }
+
+    val sameName = staffSectionName?.trim()?.takeIf { it.isNotEmpty() }
+    val sameExisting = sameName?.let { wanted -> sections?.firstOrNull { it.name.equals(wanted, ignoreCase = true) } }
+    // The same-named section already has its own choice above, so the list shows every other one.
+    val otherSections = sections.orEmpty().filter { it.id != sameExisting?.id }
+    var pick by remember { mutableStateOf<OnlineSectionPick?>(null) }
+    var customName by remember { mutableStateOf("") }
+    // Once the sections are in: start on where the dish is now, else the same-named section, else the first one.
+    LaunchedEffect(sections) {
+        val loaded = sections ?: return@LaunchedEffect
+        if (pick != null) return@LaunchedEffect
+        val current = loaded.firstOrNull { it.id == currentOnlineSectionId }
+            ?: currentOnlineSectionName?.let { name -> loaded.firstOrNull { it.name.equals(name, ignoreCase = true) } }
+        pick = when {
+            current != null && current.id == sameExisting?.id -> OnlineSectionPick.Same
+            current != null -> OnlineSectionPick.Existing(current)
+            sameName != null -> OnlineSectionPick.Same
+            loaded.isNotEmpty() -> OnlineSectionPick.Existing(loaded.first())
+            else -> OnlineSectionPick.New
+        }
+    }
+    val customTrimmed = customName.trim()
+    val customExisting = sections?.firstOrNull { it.name.equals(customTrimmed, ignoreCase = true) }
+    val canConfirm = sections != null && when (val chosen = pick) {
+        OnlineSectionPick.Same -> sameName != null
+        is OnlineSectionPick.Existing -> true
+        OnlineSectionPick.New -> customTrimmed.isNotEmpty()
+        null -> false
+    }
+
+    MenuNestedDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        titleContentColor = ItemEditorInk,
+        textContentColor = ItemEditorMuted,
+        title = {
+            Text(
+                if (currentOnlineSectionName == null) "Add to online menu" else "Online section",
+                fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = ItemEditorInk
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Choose the online section for $dishName.",
+                    fontFamily = Inter(),
+                    fontSize = 13.sp,
+                    color = ItemEditorMuted
+                )
+                val loaded = sections
+                when {
+                    loadError != null -> {
+                        Text(loadError.orEmpty(), fontFamily = Inter(), fontSize = 12.sp, color = Color(0xFFB13A2F))
+                        TextButton(onClick = { attempt++ }) {
+                            Text("Try again", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = ItemEditorOlive)
+                        }
+                    }
+                    loaded == null -> Box(Modifier.fillMaxWidth().padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(Modifier.size(24.dp), color = ItemEditorOlive, strokeWidth = 2.dp)
+                    }
+                    else -> {
+                        if (sameName != null) {
+                            OnlineSectionChoice(
+                                selected = pick == OnlineSectionPick.Same,
+                                title = if (sameExisting != null) "Same section as here: ${sameExisting.name}" else "Create \u201C$sameName\u201D in the online menu",
+                                subtitle = if (sameExisting != null) sectionCountLabel(sameExisting) else "Same name as its section here",
+                                onClick = { pick = OnlineSectionPick.Same }
+                            )
+                        }
+                        if (otherSections.isNotEmpty()) {
+                            ItemEditorFieldLabel(text = "Existing online sections")
+                            Column(
+                                modifier = Modifier.fillMaxWidth().heightIn(max = 230.dp).verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                otherSections.forEach { section ->
+                                    OnlineSectionChoice(
+                                        selected = (pick as? OnlineSectionPick.Existing)?.section?.id == section.id,
+                                        title = section.name,
+                                        subtitle = sectionCountLabel(section),
+                                        onClick = { pick = OnlineSectionPick.Existing(section) }
+                                    )
+                                }
+                            }
+                        }
+                        OnlineSectionChoice(
+                            selected = pick == OnlineSectionPick.New,
+                            title = "New section",
+                            subtitle = "Type a name for a new online section",
+                            onClick = { pick = OnlineSectionPick.New }
+                        )
+                        if (pick == OnlineSectionPick.New) {
+                            OutlinedTextField(
+                                value = customName,
+                                onValueChange = { if (it.length <= 150) customName = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("e.g. Chef's favourites") },
+                                singleLine = true,
+                                shape = RoundedCornerShape(8.dp),
+                                colors = itemEditorOutlinedTextFieldColors()
+                            )
+                            if (customExisting != null) {
+                                Text(
+                                    text = "The online menu already has \u201C${customExisting.name}\u201D, so the dish goes there",
+                                    fontFamily = Inter(),
+                                    fontSize = 12.sp,
+                                    color = ItemEditorMuted
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    when (val chosen = pick) {
+                        OnlineSectionPick.Same -> if (sameName != null) onConfirm(sameExisting?.id, sameExisting?.name ?: sameName)
+                        is OnlineSectionPick.Existing -> onConfirm(chosen.section.id, chosen.section.name)
+                        OnlineSectionPick.New -> onConfirm(customExisting?.id, customExisting?.name ?: customTrimmed)
+                        null -> Unit
+                    }
+                },
+                enabled = canConfirm,
+                shape = RoundedCornerShape(percent = 50),
+                colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
+            ) {
+                Text(
+                    if (currentOnlineSectionName == null) "Add to online menu" else "Save",
+                    fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = ItemEditorMuted)
+            }
+        }
+    )
+}
+
+private fun sectionCountLabel(section: OnlineMenuSection): String = when (section.itemCount) {
+    0L -> "No dishes yet"
+    1L -> "1 dish"
+    else -> "${section.itemCount} dishes"
+}
+
+@Composable
+private fun OnlineSectionChoice(selected: Boolean, title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(9.dp))
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) ItemEditorOlive else ItemEditorBorder, RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick, colors = RadioButtonDefaults.colors(selectedColor = ItemEditorOlive))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ItemEditorInk)
+            Text(subtitle, fontFamily = Inter(), fontSize = 12.sp, color = ItemEditorMuted)
+        }
+    }
+}
+
 @Composable
 internal fun ItemEditorDialog(
     existingItem: EditableMenuItem? = null,
@@ -186,6 +446,8 @@ internal fun ItemEditorDialog(
     status: DialogActionStatus = DialogActionStatus.Idle,
     onRetry: () -> Unit = {},
     onSuccessSettled: () -> Unit = {},
+    // Loads the online menu's sections for the "Show in online menu" chooser.
+    loadOnlineSections: suspend () -> Result<List<OnlineMenuSection>> = { Result.success(emptyList()) },
     onDismiss: () -> Unit,
     onDeleteItem: (() -> Unit)? = null,
     onSave: (
@@ -195,11 +457,19 @@ internal fun ItemEditorDialog(
         description: String?,
         imageFileName: String?,
         available: Boolean,
+        sendToKitchen: Boolean,
+        online: OnlinePlacement,
         ingredients: List<DraftIngredient>,
         sectionId: String?
-    ) -> Unit
+    ) -> Unit,
+    // Items in a special menu (occasion extras): shown only when not null, reported just before onSave.
+    extras: ItemExtras? = null,
+    occasions: List<Pair<String, String>> = emptyList(),
+    onExtrasChange: (ItemExtras) -> Unit = {}
 ) {
     val isEditing = existingItem != null
+    var extraHours by remember { mutableStateOf(extras?.orderBeforeHours?.toString().orEmpty()) }
+    var extraOccasions by remember { mutableStateOf(extras?.occasionCodes.orEmpty()) }
     val movableSections = remember(sections) { sections.filter { it.name != "All" && it.id != null } }
     var selectedSectionId by remember(currentSectionId) { mutableStateOf(currentSectionId) }
 
@@ -208,6 +478,13 @@ internal fun ItemEditorDialog(
     var sku by remember { mutableStateOf(existingItem?.sku.orEmpty()) }
     var description by remember { mutableStateOf(existingItem?.description.orEmpty()) }
     var available by remember { mutableStateOf(existingItem?.available ?: true) }
+    var sendToKitchen by remember { mutableStateOf(existingItem?.sendToKitchen ?: true) }
+    var showOnline by remember { mutableStateOf(existingItem?.showOnline ?: false) }
+    var onlineSectionId by remember { mutableStateOf(existingItem?.onlineSectionId) }
+    var onlineSectionName by remember { mutableStateOf(existingItem?.onlineSectionName) }
+    var onlineChooserOpen by remember { mutableStateOf(false) }
+    // The dish's own section here, which the online chooser offers as the default section name.
+    val staffSectionName = movableSections.firstOrNull { it.id == selectedSectionId }?.name ?: sectionName
     var selectedImageName by remember { mutableStateOf(existingItem?.imageFileName) }
     var ingredientSearchOpen by remember { mutableStateOf(false) }
     var pendingIngredient by remember { mutableStateOf<MockIngredient?>(null) }
@@ -245,6 +522,9 @@ internal fun ItemEditorDialog(
         subtitle = if (!isEditing) sectionName?.let { "Adding to $it" } else null,
         onDismiss = onDismiss,
         onSave = {
+            if (extras != null) {
+                onExtrasChange(ItemExtras(extraHours.toIntOrNull()?.coerceIn(0, 720), extraOccasions))
+            }
             onSave(
                 name.trim(),
                 formatItemPrice(basePrice),
@@ -252,6 +532,12 @@ internal fun ItemEditorDialog(
                 description.trim().takeIf { it.isNotEmpty() },
                 selectedImageName,
                 available,
+                sendToKitchen,
+                OnlinePlacement(
+                    show = showOnline,
+                    sectionId = onlineSectionId.takeIf { showOnline },
+                    sectionName = onlineSectionName.takeIf { showOnline }
+                ),
                 selectedIngredients.map { DraftIngredient(it.name, it.quantity, it.unit) },
                 if (isEditing && selectedSectionId != currentSectionId) selectedSectionId else null
             )
@@ -406,6 +692,89 @@ internal fun ItemEditorDialog(
                 fontFamily = Inter(),
                 fontSize = 12.sp,
                 color = Color(0xFFB13A2F)
+            )
+        }
+
+        ItemEditorSwitchRow(
+            title = "Send to kitchen",
+            description = if (sendToKitchen) {
+                "Shows on the kitchen screen when the order is sent"
+            } else {
+                "Served directly, like a bottled drink. Never goes to the kitchen"
+            },
+            checked = sendToKitchen,
+            onCheckedChange = { sendToKitchen = it }
+        )
+        if (extras != null) {
+            ItemExtrasFields(
+                hours = extraHours,
+                onHoursChange = { extraHours = it.filter(Char::isDigit).take(3) },
+                occasions = occasions,
+                picked = extraOccasions,
+                onToggle = { code -> extraOccasions = if (code in extraOccasions) extraOccasions - code else extraOccasions + code }
+            )
+        }
+        ItemEditorSwitchRow(
+            title = "Show in online menu",
+            description = if (showOnline) {
+                "Customers see it in the online menu and can order it online"
+            } else {
+                "Only staff see it, in the POS menu"
+            },
+            checked = showOnline,
+            onCheckedChange = { on ->
+                if (on) {
+                    // Turning it on first asks which online section it goes into.
+                    onlineChooserOpen = true
+                } else {
+                    showOnline = false
+                    onlineSectionId = null
+                    onlineSectionName = null
+                }
+            },
+            extra = if (showOnline && onlineSectionName != null) {
+                {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Online section: ",
+                            fontFamily = Inter(),
+                            fontSize = 13.sp,
+                            color = ItemEditorMuted
+                        )
+                        Text(
+                            text = onlineSectionName.orEmpty(),
+                            modifier = Modifier.weight(1f, fill = false),
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = ItemEditorInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.weight(1f))
+                        TextButton(onClick = { onlineChooserOpen = true }) {
+                            Text("Change", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = ItemEditorOlive)
+                        }
+                    }
+                }
+            } else {
+                null
+            }
+        )
+        if (onlineChooserOpen) {
+            OnlineSectionChooserDialog(
+                dishName = name.trim().ifEmpty { "this dish" },
+                staffSectionName = staffSectionName,
+                currentOnlineSectionId = onlineSectionId,
+                currentOnlineSectionName = onlineSectionName,
+                loadSections = loadOnlineSections,
+                onDismiss = { onlineChooserOpen = false },
+                onConfirm = { id, chosenName ->
+                    showOnline = true
+                    onlineSectionId = id
+                    onlineSectionName = chosenName
+                    onlineChooserOpen = false
+                }
             )
         }
 
@@ -1336,6 +1705,7 @@ private fun DeleteOptionGroupDialog(
 internal fun OptionsEditorDialog(
     itemName: String,
     optionGroups: List<DraftOptionGroup>,
+    inventoryRecipes: List<RecipeDto>,
     onDismiss: () -> Unit,
     onDoneEditing: (List<DraftOptionGroup>) -> Unit,
     onCreateGroup: suspend (group: DraftOptionGroup, displayOrder: Int) -> Result<DraftOptionGroup>,
@@ -1480,6 +1850,7 @@ internal fun OptionsEditorDialog(
             title = "Add option group",
             existingGroups = currentOptionGroups,
             displayOrder = currentOptionGroups.size,
+            inventoryRecipes = inventoryRecipes,
             onDismiss = { addOptionGroupOpen = false },
             onSubmit = { draft, displayOrder -> onCreateGroup(draft, displayOrder) },
             onSaved = { newGroup ->
@@ -1495,6 +1866,7 @@ internal fun OptionsEditorDialog(
             group = editingGroup,
             existingGroups = currentOptionGroups,
             displayOrder = currentOptionGroups.indexOfFirst { it === editingGroup }.coerceAtLeast(0),
+            inventoryRecipes = inventoryRecipes,
             onDismiss = { optionGroupBeingEdited = null },
             onSubmit = { draft, displayOrder -> onUpdateGroup(editingGroup, draft, displayOrder) },
             onSaved = { updatedGroup ->
@@ -1524,6 +1896,7 @@ private fun OptionGroupEditorDialog(
     title: String,
     existingGroups: List<DraftOptionGroup>,
     displayOrder: Int,
+    inventoryRecipes: List<RecipeDto>,
     onDismiss: () -> Unit,
     onSubmit: suspend (draft: DraftOptionGroup, displayOrder: Int) -> Result<DraftOptionGroup>,
     onSaved: (DraftOptionGroup) -> Unit,
@@ -1536,7 +1909,12 @@ private fun OptionGroupEditorDialog(
     var choiceDrafts by remember(group) {
         mutableStateOf(
             group?.choices?.map { choice ->
-                OptionChoiceInput(choice.name, priceDeltaInputValue(choice.priceDeltaLabel))
+                OptionChoiceInput(
+                    name = choice.name,
+                    priceDelta = priceDeltaInputValue(choice.priceDeltaLabel),
+                    inventoryRecipeId = choice.inventoryRecipeId,
+                    inventoryRecipeQuantity = choice.inventoryRecipeQuantity?.toString().orEmpty()
+                )
             }?.takeIf { it.isNotEmpty() } ?: listOf(OptionChoiceInput("", ""))
         )
     }
@@ -1548,12 +1926,15 @@ private fun OptionGroupEditorDialog(
     val trimmedName = groupName.trim()
     val validChoices = choiceDrafts.filter { it.name.isNotBlank() }
     val choicesValid = choiceDrafts.all { isValidPriceDelta(it.priceDelta) }
+    val recipeQuantitiesValid = choiceDrafts.all { choice ->
+        choice.inventoryRecipeId == null || isValidInventoryRecipeQuantity(choice.inventoryRecipeQuantity)
+    }
     val duplicateGroup = trimmedName.isNotBlank() &&
         existingGroups.any { it !== group && it.name.equals(trimmedName, ignoreCase = true) }
     val choiceNames = validChoices.map { it.name.trim().lowercase() }
     val duplicateChoice = choiceNames.size != choiceNames.distinct().size
     val canSave = trimmedName.length in 2..60 && validChoices.isNotEmpty() &&
-        choicesValid && !duplicateGroup && !duplicateChoice
+        choicesValid && recipeQuantitiesValid && !duplicateGroup && !duplicateChoice
     val validationMessage = when {
         trimmedName.isEmpty() -> "Option group name is required."
         trimmedName.length < 2 -> "Use at least 2 characters for the group name."
@@ -1561,6 +1942,7 @@ private fun OptionGroupEditorDialog(
         validChoices.isEmpty() -> "Add at least one choice."
         duplicateChoice -> "Choice names in the same group must be unique."
         !choicesValid -> "Use valid price adjustments, for example +2.00 or -1.50."
+        !recipeQuantitiesValid -> "Enter a positive recipe quantity for every linked modifier."
         else -> null
     }
 
@@ -1576,7 +1958,9 @@ private fun OptionGroupEditorDialog(
             choices = validChoices.map { choice ->
                 DraftOptionChoice(
                     name = choice.name.trim(),
-                    priceDeltaLabel = formatPriceDelta(choice.priceDelta)
+                    priceDeltaLabel = formatPriceDelta(choice.priceDelta),
+                    inventoryRecipeId = choice.inventoryRecipeId,
+                    inventoryRecipeQuantity = choice.inventoryRecipeQuantity.trim().toDoubleOrNull()
                 )
             }
         )
@@ -1703,6 +2087,23 @@ private fun OptionGroupEditorDialog(
                                 it[index] = it[index].copy(priceDelta = newValue)
                             }
                         },
+                        inventoryRecipes = inventoryRecipes,
+                        onInventoryRecipeChange = { recipe ->
+                            choiceDrafts = choiceDrafts.toMutableList().also {
+                                val current = it[index]
+                                it[index] = current.copy(
+                                    inventoryRecipeId = recipe?.id,
+                                    inventoryRecipeQuantity = if (recipe == null) "" else {
+                                        current.inventoryRecipeQuantity.ifBlank { recipe.yieldQuantity?.value.orEmpty() }
+                                    }
+                                )
+                            }
+                        },
+                        onInventoryRecipeQuantityChange = { newValue ->
+                            choiceDrafts = choiceDrafts.toMutableList().also {
+                                it[index] = it[index].copy(inventoryRecipeQuantity = newValue)
+                            }
+                        },
                         onRemove = {
                             if (choiceDrafts.size > 1) {
                                 choiceDrafts = choiceDrafts.filterIndexed { i, _ -> i != index }
@@ -1785,13 +2186,18 @@ private fun OptionChoiceEditorRow(
     canRemove: Boolean,
     onNameChange: (String) -> Unit,
     onPriceChange: (String) -> Unit,
+    inventoryRecipes: List<RecipeDto>,
+    onInventoryRecipeChange: (RecipeDto?) -> Unit,
+    onInventoryRecipeQuantityChange: (String) -> Unit,
     onRemove: () -> Unit
 ) {
-    if (isPhone) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+    var recipeMenuOpen by remember(choice.inventoryRecipeId) { mutableStateOf(false) }
+    val selectedRecipe = inventoryRecipes.firstOrNull { it.id == choice.inventoryRecipeId }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (isPhone) {
             OutlinedTextField(
                 value = choice.name,
                 onValueChange = onNameChange,
@@ -1825,41 +2231,85 @@ private fun OptionChoiceEditorRow(
                 }
             }
         }
-    } else {
+        if (!isPhone) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = choice.name,
+                    onValueChange = onNameChange,
+                    modifier = Modifier.weight(1.4f),
+                    placeholder = { Text("Choice name") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = itemEditorOutlinedTextFieldColors()
+                )
+                OutlinedTextField(
+                    value = choice.priceDelta,
+                    onValueChange = onPriceChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("+0.00") },
+                    singleLine = true,
+                    isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = itemEditorOutlinedTextFieldColors()
+                )
+                IconButton(onClick = onRemove, enabled = canRemove, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Outlined.Close, "Remove choice", modifier = Modifier.size(15.dp), tint = ItemEditorMuted)
+                }
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OutlinedTextField(
-                value = choice.name,
-                onValueChange = onNameChange,
-                modifier = Modifier.weight(1.4f),
-                placeholder = { Text("Choice name") },
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp),
-                colors = itemEditorOutlinedTextFieldColors()
-            )
-            OutlinedTextField(
-                value = choice.priceDelta,
-                onValueChange = onPriceChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("+0.00") },
-                singleLine = true,
-                isError = choice.priceDelta.isNotBlank() && !isValidPriceDelta(choice.priceDelta),
-                shape = RoundedCornerShape(8.dp),
-                colors = itemEditorOutlinedTextFieldColors()
-            )
-            IconButton(
-                onClick = onRemove,
-                enabled = canRemove,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Close,
-                    contentDescription = "Remove choice",
-                    modifier = Modifier.size(15.dp),
-                    tint = ItemEditorMuted
+            Box {
+                TextButton(onClick = { recipeMenuOpen = true }) {
+                    Text(
+                        text = when {
+                            selectedRecipe != null -> "Uses ${selectedRecipe.name}"
+                            choice.inventoryRecipeId != null -> "Linked recipe unavailable · select or clear"
+                            else -> "No inventory recipe"
+                        },
+                        fontFamily = Inter(),
+                        color = ItemEditorOlive
+                    )
+                }
+                DropdownMenu(expanded = recipeMenuOpen, onDismissRequest = { recipeMenuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text("No inventory recipe") },
+                        onClick = { recipeMenuOpen = false; onInventoryRecipeChange(null) }
+                    )
+                    inventoryRecipes.forEach { recipe ->
+                        DropdownMenuItem(
+                            text = { Text("${recipe.name} · ${recipe.yieldUnit.orEmpty()}") },
+                            onClick = { recipeMenuOpen = false; onInventoryRecipeChange(recipe) }
+                        )
+                    }
+                    if (inventoryRecipes.isEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("No active prep recipes available") },
+                            enabled = false,
+                            onClick = { recipeMenuOpen = false }
+                        )
+                    }
+                }
+            }
+            if (selectedRecipe != null) {
+                OutlinedTextField(
+                    value = choice.inventoryRecipeQuantity,
+                    onValueChange = onInventoryRecipeQuantityChange,
+                    modifier = Modifier.weight(1f),
+                    label = { Text("Usage (${selectedRecipe.yieldUnit.orEmpty()})") },
+                    singleLine = true,
+                    isError = choice.inventoryRecipeQuantity.isNotBlank()
+                            && !isValidInventoryRecipeQuantity(choice.inventoryRecipeQuantity),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = itemEditorOutlinedTextFieldColors()
                 )
             }
         }
@@ -2159,4 +2609,52 @@ private fun priceDeltaInputValue(label: String): String {
     }
     val number = trimmed.filter { it.isDigit() || it == '.' }
     return if (number.isBlank()) "" else sign + number
+}
+
+// Occasion extras (a cake, decoration…): how early they must be ordered, and which occasions offer them.
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ItemExtrasFields(
+    hours: String,
+    onHoursChange: (String) -> Unit,
+    occasions: List<Pair<String, String>>,
+    picked: List<String>,
+    onToggle: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Occasion extra", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color(0xFF222426))
+        OutlinedTextField(
+            value = hours,
+            onValueChange = onHoursChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Order at least … hours ahead (empty: any time)") },
+            placeholder = { Text("e.g. 48 for a cake") },
+            singleLine = true,
+            shape = RoundedCornerShape(9.dp),
+            colors = itemEditorOutlinedTextFieldColors()
+        )
+        if (occasions.isNotEmpty()) {
+            Text("Offered for (none picked: every occasion)", fontFamily = Inter(), fontSize = 12.sp, color = Color(0xFF747572))
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                occasions.forEach { (code, label) ->
+                    val selected = code in picked
+                    androidx.compose.material3.Surface(
+                        onClick = { onToggle(code) },
+                        shape = RoundedCornerShape(50),
+                        color = if (selected) Color(0xFF4F7942) else Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) Color(0xFF4F7942) else Color(0xFFE3E6E1))
+                    ) {
+                        Text(
+                            label, Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                            color = if (selected) Color.White else Color(0xFF222426)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

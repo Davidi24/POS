@@ -98,6 +98,12 @@ public class OrderLineItem extends AbstractTimestampedEntity {
     @Column(name = "unit_price_snapshot", nullable = false, precision = 19, scale = 2)
     private BigDecimal unitPriceSnapshot = BigDecimal.ZERO;
 
+    @Column(name = "variant_price_delta_snapshot", nullable = false, precision = 19, scale = 2)
+    private BigDecimal variantPriceDeltaSnapshot = BigDecimal.ZERO;
+
+    @Column(name = "options_per_unit", nullable = false)
+    private boolean optionsPerUnit = true;
+
     @Column(name = "price_delta_total", nullable = false, precision = 19, scale = 2)
     private BigDecimal priceDeltaTotal = BigDecimal.ZERO;
 
@@ -117,8 +123,19 @@ public class OrderLineItem extends AbstractTimestampedEntity {
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
 
+    // When the item first went to the kitchen, and who removed it when (fraud checks use these).
+    @Column(name = "fired_at", columnDefinition = "timestamptz")
+    private java.time.OffsetDateTime firedAt;
+
+    @Column(name = "voided_at", columnDefinition = "timestamptz")
+    private java.time.OffsetDateTime voidedAt;
+
+    @Column(name = "voided_by", columnDefinition = "uuid")
+    private java.util.UUID voidedBy;
+
     @OneToMany(mappedBy = "orderLineItem", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
+    @org.hibernate.annotations.BatchSize(size = 50)
     private List<OrderItemOption> options = new ArrayList<>();
 
     @OneToMany(mappedBy = "orderLineItem")
@@ -138,6 +155,11 @@ public class OrderLineItem extends AbstractTimestampedEntity {
         option.setOrderLineItem(this);
     }
 
+    // Follows the menu item's current setting; counter items (e.g. a bottled cola) are served directly instead.
+    public boolean goesToKitchen() {
+        return menuItem == null || menuItem.isSendToKitchen();
+    }
+
     public void removeOption(OrderItemOption option) {
         if (option == null) {
             return;
@@ -149,6 +171,16 @@ public class OrderLineItem extends AbstractTimestampedEntity {
 
     @Override
     protected void normalizeFields() {
+        if (firedAt == null && (status == OrderLineItemStatus.FIRED
+                || status == OrderLineItemStatus.PREPARING
+                || status == OrderLineItemStatus.READY
+                || status == OrderLineItemStatus.FULFILLED)) {
+            firedAt = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);
+        }
+        if (status == OrderLineItemStatus.VOIDED && voidedAt == null) {
+            voidedAt = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);
+        }
+
         if (itemNameSnapshot == null && menuItem != null) {
             itemNameSnapshot = menuItem.getName();
         }

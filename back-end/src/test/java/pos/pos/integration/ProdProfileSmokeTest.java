@@ -26,6 +26,8 @@ import pos.pos.auth.service.AuthMailService;
 import pos.pos.auth.service.SmsMessageService;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.storage.DisabledFloorPlanImageStorage;
+import pos.pos.storage.FloorPlanImageStorage;
 import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
@@ -108,6 +110,9 @@ class ProdProfileSmokeTest {
     private UserRepository userRepository;
 
     @Autowired
+    private FloorPlanImageStorage floorPlanImageStorage;
+
+    @Autowired
     private RoleRepository roleRepository;
 
     @MockBean
@@ -153,11 +158,22 @@ class ProdProfileSmokeTest {
     @DisplayName("Should boot with prod profile and exercise core auth flows end to end")
     void shouldVerifyProdProfileAuthFlows() throws Exception {
         assertThat(List.of(environment.getActiveProfiles())).containsExactly("prod");
+        assertThat(floorPlanImageStorage).isInstanceOf(DisabledFloorPlanImageStorage.class);
+        assertThat(environment.getProperty("app.storage.floor-plans.provider")).isEqualTo("disabled");
         assertThat(environment.getProperty("spring.jpa.show-sql", Boolean.class)).isFalse();
         assertThat(environment.getProperty("spring.jpa.open-in-view", Boolean.class)).isFalse();
         assertThat(environment.getProperty("app.security.cookie.domain")).isEqualTo("pos.example");
         assertThat(environment.getProperty("springdoc.api-docs.enabled", Boolean.class)).isFalse();
         assertThat(environment.getProperty("springdoc.swagger-ui.enabled", Boolean.class)).isFalse();
+
+        JsonNode liveHealth = bodyOf(mockMvc.perform(get("/health/live"))
+                .andExpect(status().isOk())
+                .andReturn());
+        assertThat(liveHealth.get("status").asText()).isEqualTo("UP");
+        JsonNode readyHealth = bodyOf(mockMvc.perform(get("/health/ready"))
+                .andExpect(status().isOk())
+                .andReturn());
+        assertThat(readyHealth.get("status").asText()).isEqualTo("UP");
 
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "select count(*) from flyway_schema_history where version = '1'",

@@ -32,6 +32,7 @@ public class OrderLineItemResponse {
     private BigDecimal taxTotal;
     private BigDecimal lineTotal;
     private OrderLineItemStatus status;
+    private Boolean sendToKitchen;
     private String notes;
     private List<OrderItemOptionResponse> options;
     private OffsetDateTime createdAt;

@@ -1,5 +1,6 @@
 package pos.pos.notification.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -14,6 +15,7 @@ public class NotificationPreferenceRequest {
     private NotificationChannel channel;
 
     @NotBlank
+    @Size(max = 80, message = "eventCode must be at most 80 characters")
     private String eventCode;
 
     @NotNull

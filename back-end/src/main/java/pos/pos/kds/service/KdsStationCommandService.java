@@ -17,8 +17,10 @@ import pos.pos.settings.service.SettingsAuditService;
 import pos.pos.settings.service.SettingsDomainSupport;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -130,7 +132,11 @@ public class KdsStationCommandService {
             UUID stationId
     ) {
         Set<UUID> menuItemIds = new LinkedHashSet<>();
-        List<KdsStationRouting> replacements = new ArrayList<>();
+        // Dishes already on the station are updated in place. Removing and re-adding them made Hibernate insert the
+        // new row before deleting the old one, which broke the one-row-per-dish-per-station rule on every save.
+        Map<UUID, KdsStationRouting> existingByMenuItem = new LinkedHashMap<>();
+        station.getRoutings().forEach(routing -> existingByMenuItem.put(routing.getMenuItem().getId(), routing));
+        List<KdsStationRouting> added = new ArrayList<>();
 
         if (requests != null) {
             for (KdsStationRoutingRequest request : requests) {
@@ -147,18 +153,20 @@ public class KdsStationCommandService {
                     );
                 }
 
-                KdsStationRouting routing = new KdsStationRouting();
-                routing.setMenuItem(kdsSupport.requireMenuItemInRestaurant(restaurantId, request.getMenuItemId()));
+                KdsStationRouting routing = existingByMenuItem.remove(request.getMenuItemId());
+                if (routing == null) {
+                    routing = new KdsStationRouting();
+                    routing.setMenuItem(kdsSupport.requireMenuItemInRestaurant(restaurantId, request.getMenuItemId()));
+                    added.add(routing);
+                }
                 routing.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
                 routing.setPriority(request.getPriority() == null ? KdsPriority.NORMAL : request.getPriority());
                 routing.setCourseLabel(request.getCourseLabel());
                 routing.setActive(routingActive);
-                replacements.add(routing);
             }
         }
 
-        List<KdsStationRouting> existing = new ArrayList<>(station.getRoutings());
-        existing.forEach(station::removeRouting);
-        replacements.forEach(station::addRouting);
+        existingByMenuItem.values().forEach(station::removeRouting);
+        added.forEach(station::addRouting);
     }
 }

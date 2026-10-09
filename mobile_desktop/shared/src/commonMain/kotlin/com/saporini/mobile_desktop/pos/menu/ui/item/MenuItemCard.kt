@@ -79,6 +79,7 @@ internal fun MenuItemCard(
     selected: Boolean,
     isPhone: Boolean = false,
     canEdit: Boolean = true,
+    availabilityEditable: Boolean = true,
     modifier: Modifier = Modifier,
     isReordering: Boolean = false,
     isDragging: Boolean = false,
@@ -99,6 +100,7 @@ internal fun MenuItemCard(
             available = available,
             selected = selected,
             canEdit = canEdit,
+            availabilityEditable = availabilityEditable,
             modifier = modifier,
             isReordering = isReordering,
             isDragging = isDragging,
@@ -142,6 +144,7 @@ internal fun MenuItemCard(
 
                 AvailabilityButton(
                     available = available,
+                    enabled = availabilityEditable,
                     onToggle = onToggleAvailability,
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -273,6 +276,7 @@ private fun PhoneMenuItemCard(
     available: Boolean,
     selected: Boolean,
     canEdit: Boolean,
+    availabilityEditable: Boolean,
     modifier: Modifier,
     isReordering: Boolean,
     isDragging: Boolean,
@@ -319,6 +323,7 @@ private fun PhoneMenuItemCard(
                 ItemReorderHint(isDragging, Modifier.align(Alignment.BottomCenter).padding(bottom = 5.dp))
             } else AvailabilityButton(
                 available = available,
+                enabled = availabilityEditable,
                 compact = true,
                 onToggle = onToggleAvailability,
                 modifier = Modifier
@@ -740,6 +745,7 @@ private fun PhoneMenuItemAction(
 internal fun AvailabilityButton(
     available: Boolean,
     compact: Boolean = false,
+    enabled: Boolean = true,
     onToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -748,7 +754,7 @@ internal fun AvailabilityButton(
             .shadow(4.dp, RoundedCornerShape(50))
             .clip(RoundedCornerShape(50))
             .background(if (available) Color.White else Color(0xFF6D6D6D))
-            .clickable(onClick = onToggle)
+            .clickable(enabled = enabled, onClick = onToggle)
             .padding(
                 horizontal = if (compact) 6.dp else 12.dp,
                 vertical = if (compact) 4.dp else 6.dp

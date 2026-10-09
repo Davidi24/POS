@@ -33,6 +33,9 @@ public class ReservationPublicService {
     private final ReservationAvailabilitySupport reservationAvailabilitySupport;
     private final ReservationLifecycleService reservationLifecycleService;
     private final ReservationSupport reservationSupport;
+    private final ReservationNotifications reservationNotifications;
+    private final GuestBookingService guestBookingService;
+    private final pos.pos.reservation.repository.ReservationRepository reservationRepository;
 
     @Transactional(readOnly = true)
     public List<ReservationAvailabilityOptionResponse> getPublicAvailability(
@@ -56,25 +59,24 @@ public class ReservationPublicService {
         );
     }
 
+    // Same rules as the guest booking pages: confirmed when a table is free, otherwise a request.
     @Transactional
     public PublicReservationResponse createPublicReservation(
             String restaurantSlug,
             String branchCode,
             PublicReservationRequest request
     ) {
-        Branch branch = reservationSupport.requirePublicBranch(restaurantSlug, branchCode);
-        Reservation reservation = new Reservation();
-        reservation.setRestaurant(branch.getRestaurant());
-        reservation.setBranch(branch);
-        reservation.setStatus(ReservationStatus.PENDING);
-        reservation.setSource(ReservationSource.WEB);
-
-        reservationSupport.applyPublicReservationRequest(reservation, request);
-        reservationSupport.addStatusHistory(reservation, null, ReservationStatus.PENDING, "Reservation created", null);
-        return reservationSupport.toPublicResponse(
-                reservationSupport.saveReservation(reservation),
-                reservation.getTableAssignments()
-        );
+        var booked = guestBookingService.book(restaurantSlug, branchCode, pos.pos.reservation.dto.OnlineBookingRequest.builder()
+                .partySize(request.getPartySize())
+                .reservationStart(request.getReservationStart())
+                .contactName(request.getContactName())
+                .contactPhone(request.getContactPhone())
+                .contactEmail(request.getContactEmail())
+                .specialRequests(request.getSpecialRequests())
+                .build());
+        Reservation reservation = reservationRepository.findByGuestToken(booked.getToken())
+                .orElseThrow(() -> new AuthException("Reservation not found", HttpStatus.NOT_FOUND));
+        return reservationSupport.toPublicResponse(reservation, reservation.getTableAssignments());
     }
 
     @Transactional(readOnly = true)
@@ -86,13 +88,17 @@ public class ReservationPublicService {
     @Transactional
     public PublicReservationResponse cancelPublicReservation(String reservationCode, ReservationActionRequest request) {
         Reservation reservation = reservationSupport.requirePublicReservation(reservationCode);
-        reservationLifecycleService.transitionReservation(
+        // Guests cancel for free any time before they arrive; after that only staff can.
+        if (reservation.getStatus() != ReservationStatus.PENDING && reservation.getStatus() != ReservationStatus.CONFIRMED) {
+            throw new AuthException("This booking can't be cancelled online anymore", HttpStatus.BAD_REQUEST);
+        }
+        reservationLifecycleService.cancel(
                 reservation,
-                ReservationStatus.CANCELLED,
-                request == null ? null : request.getReason(),
-                null
+                request == null || request.getReason() == null || request.getReason().isBlank() ? "Cancelled by the guest" : request.getReason().trim(),
+                ReservationActor.system(null)
         );
         reservationSupport.saveReservation(reservation);
+        reservationNotifications.cancelled(reservation, null);
         return reservationSupport.toPublicResponse(reservation, reservation.getTableAssignments());
     }
 

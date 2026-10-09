@@ -28,5 +28,6 @@ public class InventoryCountCreateRequest {
 
     private OffsetDateTime scheduledAt;
 
+    @Size(max = 2000, message = "notes must be at most 2000 characters")
     private String notes;
 }

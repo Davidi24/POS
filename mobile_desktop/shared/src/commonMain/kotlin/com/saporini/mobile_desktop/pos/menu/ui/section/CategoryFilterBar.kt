@@ -12,6 +12,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -93,8 +94,9 @@ internal fun CategoryButtons(
     val visibleItems = if (hasOverflow) fixedItems + listOfNotNull(visibleTail) else items
     val overflowItems = items.filterNot { it in visibleItems }
 
+    // The end padding keeps the last button's border clear of the scrolling row's edge.
     Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        modifier = Modifier.horizontalScroll(rememberScrollState()).padding(end = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         visibleItems.forEach { item ->
@@ -111,7 +113,7 @@ internal fun CategoryButtons(
                 TextButton(
                     onClick = { onSelected(item.name) },
                     modifier = Modifier
-                        .height(46.dp)
+                        .height(44.dp)
                         .semantics { this.selected = isSelected }
                         .width(if (item.name == "All") 78.dp else 128.dp)
                         .clip(RoundedCornerShape(8.dp))
@@ -137,7 +139,7 @@ internal fun CategoryButtons(
                             text = item.name,
                             fontFamily = Inter(),
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
+                            fontSize = 12.sp,
                             letterSpacing = 0.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -154,7 +156,7 @@ internal fun CategoryButtons(
                 IconButton(
                     onClick = { overflowExpanded = true },
                     modifier = Modifier
-                        .size(46.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color.White)
                         .border(1.dp, Border, RoundedCornerShape(8.dp))
@@ -162,7 +164,7 @@ internal fun CategoryButtons(
                     Icon(
                         imageVector = Icons.Outlined.Menu,
                         contentDescription = "More categories",
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(20.dp),
                         tint = TextInk
                     )
                 }
@@ -184,7 +186,7 @@ internal fun CategoryButtons(
                                     text = item.name,
                                     fontFamily = Inter(),
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
+                                    fontSize = 12.sp,
                                     color = TextInk
                                 )
                             },
@@ -208,15 +210,18 @@ internal fun CategoryButtons(
         }
 
         if (canManage) {
-            IconButton(
-                onClick = onManageSections,
-                modifier = Modifier.size(46.dp).clip(RoundedCornerShape(8.dp))
+            // A plain 44dp box: an IconButton here insists on a 48dp touch area and spills past its slot, which the
+            // scrolling row then cut off on the right.
+            Box(
+                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))
                     .background(Color.White).border(1.dp, Border, RoundedCornerShape(8.dp))
+                    .clickable(onClick = onManageSections),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Outlined.Edit,
                     contentDescription = "Edit menu sections",
-                    modifier = Modifier.size(19.dp),
+                    modifier = Modifier.size(18.dp),
                     tint = TextInk
                 )
             }
@@ -241,11 +246,15 @@ internal fun PhoneCategoryFilterRow(
 ) {
     Row(
         modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(end = 18.dp),
+            .fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        Row(
+            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         sections.forEach { section ->
             val selected = selectedCategory == section.name
             // Capped width (was unbounded) so one long section name can't stretch the
@@ -303,6 +312,7 @@ internal fun PhoneCategoryFilterRow(
 
                 ChipNameRevealPopup(visible = showFullName, text = section.name)
             }
+        }
         }
         if (canManage) {
             IconButton(

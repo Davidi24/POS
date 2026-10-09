@@ -74,7 +74,7 @@ public class PublicReservationController {
     @Operation(summary = "Cancel a public reservation by code")
     public ResponseEntity<PublicReservationResponse> cancelPublicReservation(
             @PathVariable String reservationCode,
-            @RequestBody(required = false) ReservationActionRequest request
+            @Valid @RequestBody(required = false) ReservationActionRequest request
     ) {
         return ResponseEntity.ok(reservationPublicService.cancelPublicReservation(reservationCode, request));
     }

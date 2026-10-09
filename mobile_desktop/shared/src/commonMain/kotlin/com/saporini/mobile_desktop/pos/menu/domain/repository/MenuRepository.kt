@@ -6,6 +6,8 @@ import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItemOptionGroup
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuPage
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuVariant
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenu
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroup
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroupType
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionItem
@@ -21,7 +23,8 @@ data class CreateMenuInput(
     val availableUntil: String? = null,
     val availableFromDate: String? = null,
     val availableUntilDate: String? = null,
-    val color: String? = null
+    val color: String? = null,
+    val special: Boolean = false
 )
 
 data class UpdateMenuInput(
@@ -35,7 +38,9 @@ data class UpdateMenuInput(
     val availableUntil: String? = null,
     val availableFromDate: String? = null,
     val availableUntilDate: String? = null,
-    val color: String? = null
+    val color: String? = null,
+    // Null keeps it as it is.
+    val special: Boolean? = null
 )
 
 data class MenuSectionInput(
@@ -52,9 +57,19 @@ data class MenuItemInput(
     val basePrice: Double,
     val imageUrl: String? = null,
     val available: Boolean = true,
+    // Off for counter items like a cola. Null leaves an existing item's setting unchanged.
+    val sendToKitchen: Boolean? = null,
+    // On: the dish appears in the customer-facing online menu. Null leaves an existing item's setting unchanged.
+    val showOnline: Boolean? = null,
+    // Which online section: an existing one by id, or by name (reused if it exists, created otherwise).
+    val onlineSectionId: String? = null,
+    val onlineSectionName: String? = null,
     val displayOrder: Int = 0,
     val ingredients: List<String> = emptyList(),
-    val sectionId: String? = null
+    val sectionId: String? = null,
+    // Special-menu extras. Leave occasionCodes null to keep both as they are.
+    val orderBeforeHours: Int? = null,
+    val occasionCodes: List<String>? = null
 )
 
 data class MenuVariantInput(
@@ -97,10 +112,21 @@ data class OptionItemInput(
     val name: String,
     val priceDelta: Double = 0.0,
     val available: Boolean = true,
-    val displayOrder: Int = 0
+    val displayOrder: Int = 0,
+    val inventoryRecipeId: String? = null,
+    val inventoryRecipeQuantity: Double? = null
 )
 
 interface MenuRepository {
+
+    // Online menu
+    suspend fun getOnlineMenu(restaurantId: String): OnlineMenu
+    suspend fun getOnlineMenuSections(restaurantId: String): List<OnlineMenuSection>
+    suspend fun renameOnlineMenuSection(restaurantId: String, sectionId: String, name: String): OnlineMenuSection
+    suspend fun reorderOnlineMenuSections(restaurantId: String, sectionIds: List<String>): List<OnlineMenuSection>
+    suspend fun reorderOnlineMenuItems(restaurantId: String, sectionId: String, itemIds: List<String>): OnlineMenu
+    suspend fun deleteOnlineMenuSection(restaurantId: String, sectionId: String)
+
 
     // Menus
 
@@ -169,6 +195,9 @@ interface MenuRepository {
         itemId: String,
         input: MenuItemInput
     ): MenuItem
+
+    // Copies of dishes from other menus, each with its own price.
+    suspend fun importItems(menuId: String, sectionId: String, itemIds: List<String>): List<MenuItem>
 
     suspend fun updateItemAvailability(
         menuId: String,
@@ -239,6 +268,8 @@ interface MenuRepository {
         input: CreateOptionGroupInput
     ): OptionGroup
 
+    suspend fun getOptionGroup(groupId: String, includeItems: Boolean = false): OptionGroup
+
     suspend fun deleteOptionGroup(
         groupId: String
     )
@@ -247,6 +278,12 @@ interface MenuRepository {
 
     suspend fun createOptionItem(
         groupId: String,
+        input: OptionItemInput
+    ): OptionItem
+
+    suspend fun updateOptionItem(
+        groupId: String,
+        itemId: String,
         input: OptionItemInput
     ): OptionItem
 

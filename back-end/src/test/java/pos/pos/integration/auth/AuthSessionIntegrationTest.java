@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -25,6 +26,7 @@ import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
+import pos.pos.security.service.RefreshRateLimiter;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
 
@@ -33,6 +35,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -99,6 +106,12 @@ class AuthSessionIntegrationTest {
     @Autowired
     private AuthEmailVerificationTokenRepository authEmailVerificationTokenRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RefreshRateLimiter refreshRateLimiter;
+
     @MockBean
     private JavaMailSender javaMailSender;
 
@@ -110,6 +123,60 @@ class AuthSessionIntegrationTest {
         authLoginAttemptRepository.deleteAllInBatch();
         userSessionRepository.deleteAllInBatch();
         authEmailVerificationTokenRepository.deleteAllInBatch();
+        jdbcTemplate.update("DELETE FROM auth_refresh_rate_limit");
+    }
+
+    @Test
+    @DisplayName("Enforces one shared IP limit across independent limiter instances under concurrency")
+    void enforcesSharedIpLimitAcrossInstancesUnderConcurrency() throws Exception {
+        String ip = "198.51.100." + (ipSequence.incrementAndGet() % 200 + 1);
+        RefreshRateLimiter secondInstance = new RefreshRateLimiter(
+                jdbcTemplate,
+                20,
+                5,
+                1,
+                "auth-session-refresh-token-pepper-0123456789"
+        );
+        int requestCount = 28;
+        CountDownLatch ready = new CountDownLatch(requestCount);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(requestCount);
+        try {
+            List<Future<Boolean>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < requestCount; i++) {
+                final RefreshRateLimiter instance = i % 2 == 0 ? refreshRateLimiter : secondInstance;
+                results.add(executor.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        throw new AssertionError("Timed out waiting to start shared limiter test");
+                    }
+                    try {
+                        instance.check(ip);
+                        return true;
+                    } catch (pos.pos.exception.auth.TooManyRequestsException expected) {
+                        return false;
+                    }
+                }));
+            }
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            long allowed = 0;
+            for (Future<Boolean> result : results) {
+                if (result.get(30, TimeUnit.SECONDS)) {
+                    allowed++;
+                }
+            }
+            assertThat(allowed).isEqualTo(20);
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT attempt_count FROM auth_refresh_rate_limit WHERE scope = 'IP' AND key_hash <> '' " +
+                            "AND expires_at > CURRENT_TIMESTAMP ORDER BY window_started_at DESC LIMIT 1",
+                    Integer.class
+            )).isEqualTo(20);
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
     }
 
     @Test
