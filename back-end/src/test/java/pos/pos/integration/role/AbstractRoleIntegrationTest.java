@@ -20,6 +20,7 @@ import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RolePermissionRepository;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.service.PasswordService;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserRole;
@@ -47,6 +48,7 @@ abstract class AbstractRoleIntegrationTest {
     protected static final String ADMIN_USERNAME = "roleadmin";
     protected static final String ADMIN_PASSWORD = "StrongPass123!";
     protected static final String DEFAULT_PASSWORD = "StrongPass123!";
+    private static final String ACCESS_COOKIE_NAME = "access-token";
 
     @Autowired
     protected MockMvc mockMvc;
@@ -82,9 +84,34 @@ abstract class AbstractRoleIntegrationTest {
     private final AtomicInteger userSequence = new AtomicInteger(1);
     private final AtomicInteger ipSequence = new AtomicInteger(200);
 
+    @Autowired
+    private pos.pos.restaurant.repository.RestaurantRepository testRestaurants;
+
+    private UUID testRestaurantId;
+
+    // People and custom roles in these tests work at one restaurant, as staff do in production.
+    protected UUID testRestaurantId() {
+        if (testRestaurantId == null) {
+            UUID adminId = adminUser().getId();
+            String key = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+            pos.pos.restaurant.entity.Restaurant restaurant = new pos.pos.restaurant.entity.Restaurant();
+            restaurant.setName("Test restaurant " + key);
+            restaurant.setLegalName("Test restaurant " + key + " LLC");
+            restaurant.setCode("test_" + key);
+            restaurant.setSlug("test-" + key);
+            restaurant.setCurrency("EUR");
+            restaurant.setTimezone("Europe/Rome");
+            restaurant.setOwnerId(adminId);
+            restaurant.setCreatedBy(adminId);
+            restaurant.setUpdatedBy(adminId);
+            testRestaurantId = testRestaurants.save(restaurant).getId();
+        }
+        return testRestaurantId;
+    }
+
     static void registerProdProperties(DynamicPropertyRegistry registry, String schema) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, schema);
-        registry.add("JWT_SECRET", () -> schema + "-jwt-secret-key-for-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> schema + "-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> schema + "-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> schema + "-email-verification-pepper");
@@ -136,6 +163,7 @@ abstract class AbstractRoleIntegrationTest {
             boolean protectedRole
     ) {
         return roleRepository.save(Role.builder()
+                .restaurantId(system ? null : testRestaurantId())
                 .code(code)
                 .name(name)
                 .description(description)
@@ -219,6 +247,7 @@ abstract class AbstractRoleIntegrationTest {
         UUID adminId = adminUser().getId();
 
         User user = userRepository.save(User.builder()
+                .restaurantId(testRestaurantId())
                 .email("role." + suffix + "@pos.example")
                 .username("role." + suffix)
                 .passwordHash(passwordService.hash(DEFAULT_PASSWORD))
@@ -277,7 +306,7 @@ abstract class AbstractRoleIntegrationTest {
                 .andExpect(expectedStatus)
                 .andReturn();
 
-        return bodyOf(result).get("accessToken").asText();
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
     }
 
     protected JsonNode bodyOf(MvcResult result) throws Exception {
@@ -286,6 +315,19 @@ abstract class AbstractRoleIntegrationTest {
 
     protected String messageOf(MvcResult result) throws Exception {
         return bodyOf(result).get("message").asText();
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     protected List<String> codesOf(JsonNode arrayNode) {

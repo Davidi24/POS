@@ -21,5 +21,5 @@ public class ReplaceBusinessHoursRequest {
     @Valid
     @NotEmpty(message = "items is required")
     @Size(min = 7, max = 7, message = "items must contain exactly 7 day definitions")
-    private List<UpsertBusinessHourRequest> items;
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UpsertBusinessHourRequest> items;
 }

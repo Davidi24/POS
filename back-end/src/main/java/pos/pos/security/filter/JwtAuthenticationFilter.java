@@ -11,9 +11,12 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
+import org.springframework.util.StringUtils;
+import org.springframework.web.util.WebUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.UserSessionRepository;
+import pos.pos.security.config.AuthCookieProperties;
 import pos.pos.security.config.SecurityPaths;
 import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.security.service.JwtService;
@@ -41,6 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final UserSessionRepository userSessionRepository;
+    private final AuthCookieProperties authCookieProperties;
 
     private final AntPathMatcher matcher = new AntPathMatcher();
 
@@ -51,7 +55,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UserRoleRepository userRoleRepository,
             RoleRepository roleRepository,
             PermissionRepository permissionRepository,
-            UserSessionRepository userSessionRepository
+            UserSessionRepository userSessionRepository,
+            AuthCookieProperties authCookieProperties
     ) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
@@ -59,6 +64,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.userSessionRepository = userSessionRepository;
+        this.authCookieProperties = authCookieProperties;
     }
 
     @Override
@@ -77,14 +83,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
 
-        String header = request.getHeader("Authorization");
-
-        if (header == null || !header.startsWith("Bearer ")) {
+        String token = extractAccessToken(request);
+        if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        String token = header.substring(7);
 
         if (!jwtService.isValid(token) || !jwtService.isAccessToken(token)) {
             filterChain.doFilter(request, response);
@@ -160,5 +163,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         filterChain.doFilter(request, response);
+    }
+
+    private String extractAccessToken(HttpServletRequest request) {
+        String authorizationToken = extractBearerToken(request.getHeader("Authorization"));
+        if (authorizationToken != null) {
+            return authorizationToken;
+        }
+
+        var cookie = WebUtils.getCookie(request, authCookieProperties.getAccessTokenName());
+        if (cookie == null || !StringUtils.hasText(cookie.getValue())) {
+            return null;
+        }
+
+        return cookie.getValue().trim();
+    }
+
+    private String extractBearerToken(String header) {
+        if (!StringUtils.hasText(header) || !header.startsWith("Bearer ")) {
+            return null;
+        }
+
+        String token = header.substring(7).trim();
+        return StringUtils.hasText(token) ? token : null;
     }
 }

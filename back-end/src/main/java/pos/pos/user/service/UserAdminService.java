@@ -21,6 +21,7 @@ import pos.pos.role.entity.Role;
 import pos.pos.role.mapper.RoleMapper;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.notification.service.NotificationService;
 import pos.pos.user.dto.ReplaceUserRolesRequest;
 import pos.pos.user.dto.UpdateUserRequest;
 import pos.pos.user.dto.UserResponse;
@@ -61,6 +62,8 @@ public class UserAdminService {
     private final UserMapper userMapper;
     private final RoleHierarchyService roleHierarchyService;
     private final UserSessionRepository userSessionRepository;
+    private final NotificationService notificationService;
+    private final pos.pos.restaurant.repository.BranchRepository branchRepository;
 
     public PageResponse<UserResponse> getUsers(
             Authentication authentication,
@@ -84,6 +87,7 @@ public class UserAdminService {
                 normalizedRoleCode,
                 roleHierarchyService.isSuperAdmin(authentication),
                 roleHierarchyService.actorRank(authentication),
+                roleHierarchyService.actorRestaurantId(authentication),
                 pageable
         );
 
@@ -125,6 +129,14 @@ public class UserAdminService {
         boolean phoneChanged = !java.util.Objects.equals(currentNormalizedPhone, newNormalizedPhone);
         boolean wasActive = user.isActive();
 
+        if (request.getDefaultBranchId() != null) {
+            if (user.getRestaurantId() == null || branchRepository
+                    .findByIdAndRestaurantIdAndDeletedAtIsNull(request.getDefaultBranchId(), user.getRestaurantId()).isEmpty()) {
+                throw new pos.pos.exception.auth.AuthException("defaultBranchId must be a branch of the person's restaurant",
+                        org.springframework.http.HttpStatus.BAD_REQUEST);
+            }
+            user.setDefaultBranchId(request.getDefaultBranchId());
+        }
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhone(request.getPhone());
@@ -199,6 +211,9 @@ public class UserAdminService {
         }
 
         User user = findExistingUser(userId);
+        if (user.getRestaurantId() != null) {
+            notificationService.publishUserRoleChange(user.getRestaurantId(), userId, actorId);
+        }
         return userMapper.toUserResponse(
                 user,
                 requestedRoles.stream().map(Role::getCode).toList()

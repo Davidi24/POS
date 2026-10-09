@@ -33,7 +33,13 @@ import pos.pos.reservation.controller.PublicReservationController;
 import pos.pos.reservation.controller.RestaurantReservationController;
 import pos.pos.reservation.dto.ReservationAvailabilityOptionResponse;
 import pos.pos.reservation.dto.ReservationResponse;
-import pos.pos.reservation.service.ReservationService;
+import pos.pos.reservation.service.ReservationCrudService;
+import pos.pos.reservation.service.ReservationDepositService;
+import pos.pos.reservation.service.ReservationLifecycleService;
+import pos.pos.reservation.service.ReservationNoteService;
+import pos.pos.reservation.service.ReservationPublicService;
+import pos.pos.reservation.service.ReservationQueryService;
+import pos.pos.reservation.service.ReservationTableAssignmentService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;
 import pos.pos.security.principal.AuthenticatedUser;
@@ -78,26 +84,59 @@ class ReservationControllerSecurityTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private ReservationService reservationService;
+    private ReservationQueryService reservationQueryService;
+    @MockBean
+    private ReservationCrudService reservationCrudService;
+    @MockBean
+    private ReservationLifecycleService reservationLifecycleService;
+    @MockBean
+    private ReservationTableAssignmentService reservationTableAssignmentService;
+    @MockBean
+    private ReservationNoteService reservationNoteService;
+    @MockBean
+    private ReservationDepositService reservationDepositService;
+    @MockBean
+    private ReservationPublicService reservationPublicService;
 
     @MockBean
     private CustomerService customerService;
 
+    @MockBean
+    private pos.pos.tables.realtime.TableLayoutChangeNotifier tableLayoutChangeNotifier;
+
+    @MockBean
+    private pos.pos.reservation.service.GuestHistoryService guestHistoryService;
+
+    @MockBean
+    private pos.pos.reservation.service.WaitlistService waitlistService;
+
+    @MockBean
+    private pos.pos.reservation.service.ReservationOccasionService reservationOccasionService;
+
+    @MockBean
+    private pos.pos.reservation.service.RestaurantEventService restaurantEventService;
+
+    @MockBean
+    private pos.pos.reservation.service.BookingMoneyStaffService bookingMoneyStaffService;
+
+    @MockBean
+    private pos.pos.reservation.service.GuestBookingService guestBookingService;
+
     @Test
-    @DisplayName("GET reservations should allow SETTINGS_READ")
-    void shouldAllowReservationReadWithSettingsReadPermission() throws Exception {
-        given(reservationService.getReservations(any(), any()))
+    @DisplayName("GET reservations should allow RESERVATION_READ")
+    void shouldAllowReservationReadWithReservationReadPermission() throws Exception {
+        given(reservationQueryService.getReservations(any(), any()))
                 .willReturn(List.of(ReservationResponse.builder().id(RESERVATION_ID).reservationCode("RES_TEST").build()));
 
         mockMvc.perform(get("/restaurants/{restaurantId}/reservations", RESTAURANT_ID)
                         .header("X-Test-User", "owner@pos.local")
-                        .header("X-Test-Authorities", "SETTINGS_READ"))
+                        .header("X-Test-Authorities", "RESERVATION_READ"))
                 .andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("POST reservation should reject missing SETTINGS_UPDATE")
-    void shouldRejectReservationCreateWithoutSettingsUpdatePermission() throws Exception {
+    @DisplayName("POST reservation should reject missing RESERVATION_MANAGE")
+    void shouldRejectReservationCreateWithoutReservationManagePermission() throws Exception {
         String request = """
                 {
                   "branchId":"%s",
@@ -110,19 +149,27 @@ class ReservationControllerSecurityTest {
 
         mockMvc.perform(post("/restaurants/{restaurantId}/reservations", RESTAURANT_ID)
                         .header("X-Test-User", "owner@pos.local")
-                        .header("X-Test-Authorities", "SETTINGS_READ")
+                        .header("X-Test-Authorities", "RESERVATION_READ,SETTINGS_UPDATE")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("Access denied"));
 
-        verifyNoInteractions(reservationService);
+        verifyNoInteractions(
+                reservationQueryService,
+                reservationCrudService,
+                reservationLifecycleService,
+                reservationTableAssignmentService,
+                reservationNoteService,
+                reservationDepositService,
+                reservationPublicService
+        );
     }
 
     @Test
     @DisplayName("GET public availability should allow anonymous access")
     void shouldAllowAnonymousPublicAvailability() throws Exception {
-        given(reservationService.getPublicAvailability(
+        given(reservationPublicService.getPublicAvailability(
                 any(),
                 any(),
                 any(),

@@ -1,6 +1,10 @@
 package pos.pos.customer.service;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -10,18 +14,22 @@ import pos.pos.customer.dto.CustomerResponse;
 import pos.pos.customer.entity.Customer;
 import pos.pos.customer.mapper.CustomerMapper;
 import pos.pos.customer.repository.CustomerRepository;
+import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.customer.CustomerNotFoundException;
 import pos.pos.reservation.dto.ReservationResponse;
+import pos.pos.reservation.entity.Reservation;
 import pos.pos.reservation.mapper.ReservationMapper;
 import pos.pos.reservation.repository.ReservationRepository;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.utils.NormalizationUtils;
+import pos.pos.utils.PageableUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -35,11 +43,15 @@ public class CustomerService {
     private final ReservationMapper reservationMapper;
 
     @Transactional(readOnly = true)
-    public List<CustomerResponse> getCustomers(Authentication authentication, UUID restaurantId) {
+    public PageResponse<CustomerResponse> getCustomers(Authentication authentication, UUID restaurantId, Integer page, Integer size) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
-        return customerRepository.findAllByRestaurant_IdAndDeletedAtIsNullOrderByFirstNameAscLastNameAsc(restaurantId).stream()
-                .map(customerMapper::toResponse)
-                .toList();
+        PageRequest pageable = PageableUtils.of(page, size, 50, Sort.by(
+                Sort.Order.asc("firstName"),
+                Sort.Order.asc("lastName"),
+                Sort.Order.asc("id")
+        ));
+        return PageResponse.from(customerRepository.findAllByRestaurant_IdAndDeletedAtIsNull(restaurantId, pageable)
+                .map(customerMapper::toResponse));
     }
 
     @Transactional
@@ -83,13 +95,28 @@ public class CustomerService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReservationResponse> getCustomerReservations(Authentication authentication, UUID restaurantId, UUID customerId) {
+    public PageResponse<ReservationResponse> getCustomerReservations(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID customerId,
+            Integer page,
+            Integer size
+    ) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
         requireCustomer(restaurantId, customerId);
 
-        return reservationRepository.findAllByCustomer_IdAndRestaurant_IdOrderByReservationStartDesc(customerId, restaurantId).stream()
+        PageRequest pageable = PageableUtils.of(page, size, 50, Sort.unsorted());
+        Page<UUID> ids = reservationRepository.findReservationIdsForCustomer(customerId, restaurantId, pageable);
+        Map<UUID, Reservation> reservationsById = new HashMap<>();
+        if (!ids.isEmpty()) {
+            reservationRepository.findAllByIdIn(ids.getContent()).forEach(reservation -> reservationsById.put(reservation.getId(), reservation));
+        }
+        var items = ids.getContent().stream()
+                .map(reservationsById::get)
+                .filter(java.util.Objects::nonNull)
                 .map(reservation -> reservationMapper.toResponse(reservation, reservation.getTableAssignments()))
                 .toList();
+        return PageResponse.from(new PageImpl<>(items, ids.getPageable(), ids.getTotalElements()));
     }
 
     @Transactional
@@ -114,15 +141,30 @@ public class CustomerService {
             return;
         }
 
-        if (customerRepository.existsByRestaurant_IdAndCodeAndDeletedAtIsNull(restaurantId, normalizedCode)) {
+        if (customerRepository.existsByRestaurant_IdAndCode(restaurantId, normalizedCode)) {
             throw new AuthException("Customer code already exists in this restaurant", HttpStatus.CONFLICT);
         }
+    }
+
+    private boolean isCustomerCodeConstraintViolation(DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation
+                    && "uk_customers_restaurant_code".equals(violation.getConstraintName())) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private Customer saveCustomer(Customer customer) {
         try {
             return customerRepository.saveAndFlush(customer);
         } catch (DataIntegrityViolationException ex) {
+            if (isCustomerCodeConstraintViolation(ex)) {
+                throw new AuthException("Customer code already exists in this restaurant", HttpStatus.CONFLICT);
+            }
             throw new AuthException("Customer update violates a data constraint", HttpStatus.BAD_REQUEST);
         } catch (IllegalStateException ex) {
             throw new AuthException(ex.getMessage(), HttpStatus.BAD_REQUEST);

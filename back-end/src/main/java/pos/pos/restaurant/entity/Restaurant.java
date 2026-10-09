@@ -19,12 +19,22 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.audit.entity.AuditLog;
 import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
 import pos.pos.device.entity.Device;
+import pos.pos.inventory.entity.InventoryItem;
+import pos.pos.inventory.entity.InventoryLocation;
+import pos.pos.kds.entity.KdsStation;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.OptionGroup;
+import pos.pos.notification.entity.Notification;
+import pos.pos.notification.entity.NotificationTemplate;
 import pos.pos.auth.enums.ClientLinkTarget;
+import pos.pos.payment.entity.Payment;
+import pos.pos.recipe.entity.Recipe;
+import pos.pos.report.entity.ReportDefinition;
 import pos.pos.restaurant.enums.RestaurantStatus;
+import pos.pos.shift.entity.Shift;
 import pos.pos.restaurant.util.RestaurantFieldNormalizer;
 import pos.pos.settings.entity.Settings;
 import pos.pos.user.entity.User;
@@ -181,6 +191,36 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
 
     @OneToMany(mappedBy = "restaurant")
     private List<Device> devices = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<InventoryItem> inventoryItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<InventoryLocation> inventoryLocations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Recipe> recipes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<KdsStation> kdsStations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Payment> payments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Shift> shifts = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<ReportDefinition> reportDefinitions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<NotificationTemplate> notificationTemplates = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Notification> notifications = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<AuditLog> auditLogs = new ArrayList<>();
 
     @Override
     protected void normalizeFields() {

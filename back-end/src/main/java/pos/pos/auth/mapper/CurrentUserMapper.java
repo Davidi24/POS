@@ -19,6 +19,8 @@ public class CurrentUserMapper {
 
         return CurrentUserResponse.builder()
                 .id(user.getId())
+                .restaurantId(user.getRestaurantId())
+                .defaultBranchId(user.getDefaultBranchId())
                 .email(user.getEmail())
                 .username(user.getUsername())
                 .firstName(user.getFirstName())
@@ -43,6 +45,8 @@ public class CurrentUserMapper {
 
         return CurrentUserResponse.builder()
                 .id(user.getId())
+                .restaurantId(user.getRestaurantId())
+                .defaultBranchId(user.getDefaultBranchId())
                 .email(user.getEmail())
                 .username(user.getUsername())
                 .firstName(user.getFirstName())

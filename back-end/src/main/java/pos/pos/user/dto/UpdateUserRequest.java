@@ -25,4 +25,7 @@ public class UpdateUserRequest {
 
     @NotNull(message = "isActive is required")
     private Boolean isActive;
+
+    // Moves the person to another branch of their restaurant; null leaves it as it is.
+    private java.util.UUID defaultBranchId;
 }

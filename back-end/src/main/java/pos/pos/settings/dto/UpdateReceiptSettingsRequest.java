@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -24,6 +25,7 @@ public class UpdateReceiptSettingsRequest {
 
     @NotNull(message = "receiptCopies is required")
     @Min(value = 1, message = "receiptCopies must be greater than 0")
+    @Max(value = 10, message = "receiptCopies must be at most 10")
     private Integer receiptCopies;
 
     @NotNull(message = "showLogo is required")

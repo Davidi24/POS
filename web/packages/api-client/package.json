@@ -1,0 +1,13 @@
+{
+  "name": "@pos/api-client",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@pos/tsconfig": "workspace:*",
+    "typescript": "latest"
+  }
+}

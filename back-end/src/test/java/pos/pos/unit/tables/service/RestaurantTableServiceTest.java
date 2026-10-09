@@ -11,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.order.repository.OrderRepository;
+import pos.pos.order.service.OrderSupport;
 import pos.pos.reservation.repository.ReservationTableAssignmentRepository;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
@@ -19,6 +21,7 @@ import pos.pos.security.principal.AuthenticatedUser;
 import pos.pos.tables.dto.TableMergeRequest;
 import pos.pos.tables.dto.TableRequest;
 import pos.pos.tables.dto.TableResponse;
+import pos.pos.tables.dto.UpdateTableStatusRequest;
 import pos.pos.tables.entity.RestaurantTable;
 import pos.pos.tables.entity.TableCategory;
 import pos.pos.tables.enums.TableLocationType;
@@ -75,6 +78,15 @@ class RestaurantTableServiceTest {
     @Mock
     private RestaurantTableAvailabilityService restaurantTableAvailabilityService;
 
+    @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
+    private OrderSupport orderSupport;
+
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher events;
+
     @Spy
     private RestaurantTableMapper restaurantTableMapper;
 
@@ -85,15 +97,20 @@ class RestaurantTableServiceTest {
         RestaurantTableSupport restaurantTableSupport = new RestaurantTableSupport(
                 restaurantTableRepository,
                 tableCategoryRepository,
-                restaurantTableMapper
+                restaurantTableMapper,
+                reservationTableAssignmentRepository,
+                orderRepository
         );
         restaurantTableService = new RestaurantTableService(
                 restaurantScopeService,
+                events,
                 restaurantTableRepository,
                 reservationTableAssignmentRepository,
                 restaurantTableSupport,
                 restaurantTableLayoutService,
-                restaurantTableAvailabilityService
+                restaurantTableAvailabilityService,
+                orderRepository,
+                orderSupport
         );
     }
 
@@ -133,6 +150,48 @@ class RestaurantTableServiceTest {
     }
 
     @Test
+    @DisplayName("Should seat guests without creating an order")
+    void shouldSeatGuestsWithoutCreatingOrder() {
+        Authentication authentication = authentication();
+        Branch branch = branch();
+        RestaurantTable table = table(branch, PRIMARY_TABLE_ID, "A1", 4);
+        UpdateTableStatusRequest request = UpdateTableStatusRequest.builder()
+                .status(TableStatus.OCCUPIED)
+                .guestCount(3)
+                .build();
+
+        when(restaurantScopeService.requireManageableBranch(
+                authentication,
+                RESTAURANT_ID,
+                BRANCH_ID
+        )).thenReturn(branch);
+        when(restaurantScopeService.currentUserId(authentication))
+                .thenReturn(ACTOR_ID);
+        when(restaurantTableRepository.findByIdAndBranchIdForUpdate(
+                PRIMARY_TABLE_ID,
+                BRANCH_ID
+        )).thenReturn(Optional.of(table));
+        when(restaurantTableRepository.saveAndFlush(any(RestaurantTable.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(restaurantTableRepository
+                .findAllByMergedInto_IdOrderByTableNumberAsc(PRIMARY_TABLE_ID))
+                .thenReturn(List.of());
+
+        TableResponse response = restaurantTableService.updateTableStatus(
+                authentication,
+                RESTAURANT_ID,
+                BRANCH_ID,
+                PRIMARY_TABLE_ID,
+                request
+        );
+
+        assertThat(response.getStatus()).isEqualTo(TableStatus.OCCUPIED);
+        assertThat(response.getGuestCount()).isEqualTo(3);
+        assertThat(response.getSeatedAt()).isNotNull();
+        assertThat(table.getUpdatedBy()).isEqualTo(ACTOR_ID);
+    }
+
+    @Test
     @DisplayName("Should merge child tables into primary table and return effective capacity")
     void shouldMergeChildTablesIntoPrimaryTableAndReturnEffectiveCapacity() {
         Authentication authentication = authentication();
@@ -143,8 +202,8 @@ class RestaurantTableServiceTest {
 
         when(restaurantScopeService.requireManageableBranch(authentication, RESTAURANT_ID, BRANCH_ID)).thenReturn(branch);
         when(restaurantScopeService.currentUserId(authentication)).thenReturn(ACTOR_ID);
-        when(restaurantTableRepository.findByIdAndBranch_Id(PRIMARY_TABLE_ID, BRANCH_ID)).thenReturn(Optional.of(primaryTable));
-        when(restaurantTableRepository.findAllByBranch_IdAndIdIn(eq(BRANCH_ID), anyCollection()))
+        when(restaurantTableRepository.findByIdAndBranchIdForUpdate(PRIMARY_TABLE_ID, BRANCH_ID)).thenReturn(Optional.of(primaryTable));
+        when(restaurantTableRepository.findAllByBranchIdAndIdsForUpdate(eq(BRANCH_ID), anyCollection()))
                 .thenReturn(List.of(firstChild, secondChild));
         when(restaurantTableRepository.existsByMergedInto_Id(CHILD_TABLE_ID)).thenReturn(false);
         when(restaurantTableRepository.existsByMergedInto_Id(SECOND_CHILD_TABLE_ID)).thenReturn(false);
@@ -165,6 +224,8 @@ class RestaurantTableServiceTest {
         assertThat(secondChild.getMergedInto()).isEqualTo(primaryTable);
         assertThat(response.getMergedTableIds()).containsExactly(CHILD_TABLE_ID, SECOND_CHILD_TABLE_ID);
         assertThat(response.getEffectiveCapacity()).isEqualTo(8);
+        verify(restaurantTableRepository).lockTablesForUpdateInStableOrder(BRANCH_ID,
+                List.of(CHILD_TABLE_ID, SECOND_CHILD_TABLE_ID, PRIMARY_TABLE_ID));
         verify(restaurantScopeService, never()).requireAccessibleBranch(authentication, RESTAURANT_ID, BRANCH_ID);
     }
 

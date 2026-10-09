@@ -24,7 +24,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pos.pos.menu.controller.PublicMenuController;
-import pos.pos.menu.dto.PublicMenuResponse;
+import pos.pos.menu.dto.response.PublicMenuResponse;
 import pos.pos.menu.service.PublicMenuService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;

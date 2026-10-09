@@ -1,23 +1,30 @@
 package pos.pos.menu.entity;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractTimestampedEntity;
+import pos.pos.kds.entity.KdsStationRouting;
+import pos.pos.recipe.entity.Recipe;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Represents an orderable item in a menu section.
@@ -69,8 +76,50 @@ public class MenuItem extends AbstractTimestampedEntity {
     @Column(name = "is_available", nullable = false)
     private boolean available = true;
 
+    // Off for items served straight from the counter (e.g. a bottled cola): they never reach the kitchen or KDS.
+    @Column(name = "send_to_kitchen", nullable = false)
+    private boolean sendToKitchen = true;
+
+    // Where the dish sits in the online menu (the website); null means staff menu only.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "online_section_id", columnDefinition = "uuid", foreignKey = @ForeignKey(name = "fk_menu_items_online_section"))
+    private OnlineMenuSection onlineSection;
+
+    // Position inside its online section.
+    @Column(name = "online_display_order", nullable = false)
+    private int onlineDisplayOrder = 0;
+
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
+
+    // Extras that need preparing: how many hours before the booking they must be ordered (e.g. a cake 48 h).
+    @Column(name = "order_before_hours")
+    private Integer orderBeforeHours;
+
+    // Occasion codes this extra is offered for, comma separated (e.g. "BIRTHDAY,GRADUATION"); empty means all.
+    @Column(name = "occasion_codes", length = 500)
+    private String occasionCodes;
+
+    @ElementCollection
+    @CollectionTable(
+            name = "`menu-item-ingredients`",
+            joinColumns = @JoinColumn(name = "menu_item_id")
+    )
+    @OrderColumn(name = "display_order")
+    @Column(name = "ingredient", length = 150)
+    private List<String> ingredients = new ArrayList<>();
+
+    /**
+     * Manual setter (Lombok skips generating one once this exists) -- always
+     * copies into a mutable list. Callers may pass an immutable list (e.g.
+     * {@code List.of(...)} in seed data), and Hibernate's merge-time
+     * {@code CollectionType.replaceElements} needs to mutate this collection
+     * in place, which throws {@code UnsupportedOperationException} on an
+     * immutable one.
+     */
+    public void setIngredients(List<String> ingredients) {
+        this.ingredients = ingredients == null ? new ArrayList<>() : new ArrayList<>(ingredients);
+    }
 
     @OneToMany(mappedBy = "menuItem")
     private List<MenuVariant> variants = new ArrayList<>();
@@ -78,12 +127,35 @@ public class MenuItem extends AbstractTimestampedEntity {
     @OneToMany(mappedBy = "menuItem")
     private List<MenuItemOptionGroup> optionGroups = new ArrayList<>();
 
+    @OneToMany(mappedBy = "menuItem")
+    private List<Recipe> recipes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "menuItem")
+    private List<KdsStationRouting> kdsStationRoutings = new ArrayList<>();
+
     @Override
     protected void normalizeFields() {
         sku = NormalizationUtils.normalizeUpper(sku);
         name = NormalizationUtils.normalize(name);
         description = NormalizationUtils.normalize(description);
         imageUrl = NormalizationUtils.normalize(imageUrl);
+        ingredients = normalizeIngredients(ingredients);
+    }
+
+    // "Show in online menu": customers see the dish once it has an online section.
+    public boolean isShowOnline() {
+        return onlineSection != null;
+    }
+
+    private static List<String> normalizeIngredients(List<String> values) {
+        if (values == null) {
+            return new ArrayList<>();
+        }
+
+        return values.stream()
+                .map(NormalizationUtils::normalize)
+                .filter(value -> value != null)
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     @Override

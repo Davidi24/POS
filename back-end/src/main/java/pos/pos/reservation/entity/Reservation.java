@@ -89,9 +89,15 @@ public class Reservation extends AbstractAuditedEntity {
     )
     private Customer customer;
 
+    // a unique code for each reservation
     @Column(name = "reservation_code", nullable = false, length = 50)
     private String reservationCode;
 
+    // The secret in the guest's email links (confirm, cancel, running late, pay).
+    @Column(name = "guest_token", nullable = false, length = 64, updatable = false)
+    private String guestToken;
+
+    // base in when it came from it can handle it different
     @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false, length = 30)
     private ReservationSource source = ReservationSource.INTERNAL;
@@ -157,6 +163,46 @@ public class Reservation extends AbstractAuditedEntity {
 
     @Column(name = "no_show_at", columnDefinition = "timestamptz")
     private OffsetDateTime noShowAt;
+
+    @Column(name = "expired_at", columnDefinition = "timestamptz")
+    private OffsetDateTime expiredAt;
+
+    // Staff kept the table longer for a late guest; empty means the booking time plus the hold setting.
+    @Column(name = "hold_until", columnDefinition = "timestamptz")
+    private OffsetDateTime holdUntil;
+
+    // "3 of 6 arrived": set on check-in while the rest of the group is still coming.
+    @Column(name = "arrived_guests")
+    private Integer arrivedGuests;
+
+    // "✓ Attendance confirmed": a mark on a confirmed booking, not a status.
+    @Column(name = "attendance_confirmed_at", columnDefinition = "timestamptz")
+    private OffsetDateTime attendanceConfirmedAt;
+
+    @Column(name = "attendance_confirmed_by", columnDefinition = "uuid")
+    private java.util.UUID attendanceConfirmedBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "attendance_confirmed_via", length = 20)
+    private pos.pos.reservation.enums.AttendanceConfirmedVia attendanceConfirmedVia;
+
+    // The occasion as picked (a copy, so renaming the occasion later doesn't change past bookings).
+    @Column(name = "occasion_code", length = 40)
+    private String occasionCode;
+
+    @Column(name = "occasion_name", length = 80)
+    private String occasionName;
+
+    @Column(name = "occasion_icon", length = 16)
+    private String occasionIcon;
+
+    // Picked options, one per line, e.g. "Cake from us\nCandles".
+    @Column(name = "occasion_options", columnDefinition = "text")
+    private String occasionOptions;
+
+    // e.g. "Cake with 30 candles at dessert", "It's a surprise".
+    @Column(name = "occasion_note", columnDefinition = "text")
+    private String occasionNote;
 
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("changedAt DESC")
@@ -226,6 +272,10 @@ public class Reservation extends AbstractAuditedEntity {
 
     @Override
     protected void normalizeFields() {
+        if (guestToken == null) {
+            // Random, not time-ordered: it's the only thing protecting the guest's links.
+            guestToken = java.util.UUID.randomUUID().toString().replace("-", "") + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        }
         reservationCode = NormalizationUtils.normalizeCode(reservationCode);
         contactName = NormalizationUtils.normalize(contactName);
         contactPhone = NormalizationUtils.normalizePhone(contactPhone);
@@ -294,6 +344,18 @@ public class Reservation extends AbstractAuditedEntity {
 
         if (noShowAt != null && status != ReservationStatus.NO_SHOW) {
             throw new IllegalStateException("noShowAt requires NO_SHOW status");
+        }
+
+        if (expiredAt != null && status != ReservationStatus.EXPIRED) {
+            throw new IllegalStateException("expiredAt requires EXPIRED status");
+        }
+
+        if (arrivedGuests != null && arrivedGuests <= 0) {
+            throw new IllegalStateException("arrivedGuests must be greater than zero");
+        }
+
+        if (holdUntil != null && reservationStart != null && !holdUntil.isAfter(reservationStart)) {
+            throw new IllegalStateException("holdUntil must be after reservationStart");
         }
 
         if (completedAt != null && status != ReservationStatus.COMPLETED) {

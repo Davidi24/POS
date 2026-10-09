@@ -1,7 +1,6 @@
 package pos.pos.reservation.mapper;
 
 import org.springframework.stereotype.Component;
-import pos.pos.customer.entity.Customer;
 import pos.pos.reservation.dto.PublicReservationResponse;
 import pos.pos.reservation.dto.PublicTableLookupResponse;
 import pos.pos.reservation.dto.ReservationAuditResponse;
@@ -32,7 +31,7 @@ public class ReservationMapper {
                 .branchId(reservation.getBranch() == null ? null : reservation.getBranch().getId())
                 .customerId(reservation.getCustomer() == null ? null : reservation.getCustomer().getId())
                 .customerCode(reservation.getCustomer() == null ? null : reservation.getCustomer().getCode())
-                .customerName(customerName(reservation.getCustomer()))
+                .customerName(reservation.getCustomer() == null ? null : reservation.getCustomer().displayName())
                 .reservationCode(reservation.getReservationCode())
                 .source(reservation.getSource())
                 .status(reservation.getStatus())
@@ -55,6 +54,16 @@ public class ReservationMapper {
                 .seatedAt(reservation.getSeatedAt())
                 .completedAt(reservation.getCompletedAt())
                 .noShowAt(reservation.getNoShowAt())
+                .expiredAt(reservation.getExpiredAt())
+                .arrivedGuests(reservation.getArrivedGuests())
+                .attendanceConfirmedAt(reservation.getAttendanceConfirmedAt())
+                .attendanceConfirmedVia(reservation.getAttendanceConfirmedVia())
+                .occasionCode(reservation.getOccasionCode())
+                .occasionName(reservation.getOccasionName())
+                .occasionIcon(reservation.getOccasionIcon())
+                .occasionOptions(reservation.getOccasionOptions() == null ? List.of() : java.util.Arrays.stream(reservation.getOccasionOptions().split("\n"))
+                        .map(String::trim).filter(option -> !option.isEmpty()).toList())
+                .occasionNote(reservation.getOccasionNote())
                 .createdAt(reservation.getCreatedAt())
                 .updatedAt(reservation.getUpdatedAt())
                 .tableAssignments(assignments.stream().map(this::toTableAssignmentResponse).toList())
@@ -203,19 +212,4 @@ public class ReservationMapper {
                 .build();
     }
 
-    private String customerName(Customer customer) {
-        if (customer == null) {
-            return null;
-        }
-        if (customer.getFirstName() == null && customer.getLastName() == null) {
-            return null;
-        }
-        if (customer.getFirstName() == null) {
-            return customer.getLastName();
-        }
-        if (customer.getLastName() == null) {
-            return customer.getFirstName();
-        }
-        return customer.getFirstName() + " " + customer.getLastName();
-    }
 }

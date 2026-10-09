@@ -1,0 +1,14 @@
+package pos.pos.report.enums;
+
+public enum ReportType {
+    SALES_SUMMARY,
+    SHIFT_SUMMARY,
+    PAYMENT_SUMMARY,
+    INVENTORY_VALUATION,
+    INVENTORY_VARIANCE,
+    KITCHEN_PERFORMANCE,
+    MENU_PERFORMANCE,
+    LABOR_COST,
+    AUDIT_ACTIVITY,
+    EXCEPTION_REPORT
+}

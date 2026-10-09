@@ -19,6 +19,8 @@ public final class AuthenticatedUser implements AuthenticatedPrincipal, Serializ
     private static final long serialVersionUID = 1L;
 
     private final UUID id;
+    private final UUID restaurantId;
+    private final UUID defaultBranchId;
     private final String email;
     private final String username;
     private final String firstName;
@@ -31,6 +33,8 @@ public final class AuthenticatedUser implements AuthenticatedPrincipal, Serializ
     public static AuthenticatedUser from(User user) {
         return AuthenticatedUser.builder()
                 .id(user.getId())
+                .restaurantId(user.getRestaurantId())
+                .defaultBranchId(user.getDefaultBranchId())
                 .email(user.getEmail())
                 .username(user.getUsername())
                 .firstName(user.getFirstName())

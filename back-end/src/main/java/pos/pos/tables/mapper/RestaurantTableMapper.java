@@ -12,6 +12,8 @@ import pos.pos.tables.enums.TableStatus;
 
 import java.util.List;
 import java.util.UUID;
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
 @Component
 public class RestaurantTableMapper {
@@ -28,8 +30,27 @@ public class RestaurantTableMapper {
         table.setFloor(request.getFloor());
         table.setPositionX(request.getPositionX());
         table.setPositionY(request.getPositionY());
+        table.setRotationDegrees(request.getRotationDegrees() == null
+                ? BigDecimal.ZERO
+                : request.getRotationDegrees());
+        table.setLayoutScale(request.getLayoutScale() == null
+                ? new BigDecimal("0.7400")
+                : request.getLayoutScale());
         table.setShape(request.getShape() == null ? TableShape.RECTANGLE : request.getShape());
-        table.setStatus(request.getStatus() == null ? TableStatus.AVAILABLE : request.getStatus());
+        TableStatus previousStatus = table.getStatus();
+        TableStatus nextStatus = request.getStatus() == null
+                ? TableStatus.AVAILABLE
+                : request.getStatus();
+        table.setStatus(nextStatus);
+        if (nextStatus == TableStatus.OCCUPIED) {
+            if (previousStatus != TableStatus.OCCUPIED || table.getGuestCount() == null) {
+                table.setGuestCount(request.getCapacity());
+                table.setSeatedAt(OffsetDateTime.now());
+            }
+        } else {
+            table.setGuestCount(null);
+            table.setSeatedAt(null);
+        }
         table.setActive(request.getActive() == null || request.getActive());
         table.setQrCodeValue(request.getQrCodeValue());
     }
@@ -55,8 +76,12 @@ public class RestaurantTableMapper {
                 .floor(table.getFloor())
                 .positionX(table.getPositionX())
                 .positionY(table.getPositionY())
+                .rotationDegrees(table.getRotationDegrees())
+                .layoutScale(table.getLayoutScale())
                 .shape(table.getShape())
                 .status(table.getStatus())
+                .guestCount(table.getGuestCount())
+                .seatedAt(table.getSeatedAt())
                 .active(table.isActive())
                 .qrCodeValue(table.getQrCodeValue())
                 .createdAt(table.getCreatedAt())
@@ -80,8 +105,12 @@ public class RestaurantTableMapper {
                 .floor(table.getFloor())
                 .positionX(table.getPositionX())
                 .positionY(table.getPositionY())
+                .rotationDegrees(table.getRotationDegrees())
+                .layoutScale(table.getLayoutScale())
                 .shape(table.getShape())
                 .status(table.getStatus())
+                .guestCount(table.getGuestCount())
+                .seatedAt(table.getSeatedAt())
                 .active(table.isActive())
                 .build();
     }

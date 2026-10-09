@@ -117,7 +117,7 @@ class WebAuthControllerTest {
     class Login {
 
         @Test
-        @DisplayName("Should return 200, set cookie, and exclude refreshToken from body")
+        @DisplayName("Should return 200, set auth cookies, and keep tokens out of the body")
         void shouldReturn200_andSetCookie_onValidCredentials() throws Exception {
             given(authLoginService.login(any(), any())).willReturn(AUTH_TOKENS);
 
@@ -125,7 +125,7 @@ class WebAuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(validLoginRequest())))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessToken").value("access.token.here"))
+                    .andExpect(jsonPath("$.accessToken").doesNotExist())
                     .andExpect(jsonPath("$.tokenType").value("Bearer"))
                     .andExpect(jsonPath("$.expiresIn").value(900))
                     .andExpect(jsonPath("$.user.email").value("cashier@pos.local"))
@@ -135,6 +135,7 @@ class WebAuthControllerTest {
             verify(clientInfoExtractor).extract(any());
             verify(authLoginService).login(any(), any());
             verify(cookieService).addRefreshTokenCookie(any(), eq(REFRESH_TOKEN));
+            verify(cookieService).addAccessTokenCookie(any(), eq("access.token.here"));
         }
 
         @Test
@@ -271,14 +272,14 @@ class WebAuthControllerTest {
     class Refresh {
 
         @Test
-        @DisplayName("Should return 200, new access token, and renew cookie on valid cookie")
+        @DisplayName("Should return 200, renew auth cookies, and keep tokens out of the body")
         void shouldReturn200_andRenewCookie_onValidCookie() throws Exception {
             given(authRefreshService.refresh(any(), any())).willReturn(AUTH_TOKENS);
 
             mockMvc.perform(post("/auth/web/refresh")
                             .cookie(new Cookie(COOKIE_NAME, REFRESH_TOKEN)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.accessToken").value("access.token.here"))
+                    .andExpect(jsonPath("$.accessToken").doesNotExist())
                     .andExpect(jsonPath("$.tokenType").value("Bearer"))
                     .andExpect(jsonPath("$.expiresIn").value(900))
                     .andExpect(jsonPath("$.refreshToken").doesNotExist());
@@ -286,6 +287,7 @@ class WebAuthControllerTest {
             verify(clientInfoExtractor).extract(any());
             verify(authRefreshService).refresh(eq(REFRESH_TOKEN), any());
             verify(cookieService).addRefreshTokenCookie(any(), eq(REFRESH_TOKEN));
+            verify(cookieService).addAccessTokenCookie(any(), eq("access.token.here"));
         }
 
         @Test
@@ -308,6 +310,7 @@ class WebAuthControllerTest {
 
             verifyNoInteractions(authRefreshService);
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
         }
 
         @Test
@@ -319,6 +322,7 @@ class WebAuthControllerTest {
 
             verifyNoInteractions(authRefreshService);
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
         }
 
         @Test
@@ -334,6 +338,7 @@ class WebAuthControllerTest {
                     .andExpect(jsonPath("$.message").value("Token invalid or expired"));
 
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
         }
 
         @Test
@@ -357,6 +362,7 @@ class WebAuthControllerTest {
                     .andExpect(status().isUnauthorized());
 
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
             verifyNoInteractions(authRefreshService);
         }
     }
@@ -380,6 +386,7 @@ class WebAuthControllerTest {
 
             verify(authLogoutService).logout(REFRESH_TOKEN);
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
         }
 
         @Test
@@ -390,6 +397,7 @@ class WebAuthControllerTest {
 
             verifyNoInteractions(authLogoutService);
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
         }
 
         @Test
@@ -404,6 +412,7 @@ class WebAuthControllerTest {
 
             verify(authLogoutService).logout(REFRESH_TOKEN);
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
         }
 
         @Test
@@ -436,6 +445,7 @@ class WebAuthControllerTest {
 
             verify(authLogoutService).logoutAll(REFRESH_TOKEN);
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
         }
 
         @Test
@@ -445,6 +455,7 @@ class WebAuthControllerTest {
                     .andExpect(status().isUnauthorized());
 
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
         }
 
         @Test
@@ -461,6 +472,7 @@ class WebAuthControllerTest {
 
             verify(authLogoutService).logoutAll(REFRESH_TOKEN);
             verify(cookieService).clearRefreshTokenCookie(any());
+            verify(cookieService).clearAccessTokenCookie(any());
         }
 
         @Test

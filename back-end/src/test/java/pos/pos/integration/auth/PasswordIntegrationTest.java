@@ -33,6 +33,7 @@ import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.AuthMailService;
 import pos.pos.auth.service.SmsMessageService;
 import pos.pos.security.service.PasswordService;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -45,6 +46,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -65,6 +71,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PasswordIntegrationTest {
 
     private static final String SCHEMA = "password_auth_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String DEFAULT_PASSWORD = "StrongPass123!";
     private static final String NEW_PASSWORD = "ResetPass123!";
     private static final String INVALID_TOKEN_MESSAGE = "Invalid token";
@@ -72,7 +79,7 @@ class PasswordIntegrationTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "password-auth-test-secret-key-for-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "password-auth-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "password-auth-password-reset-pepper-value");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "password-auth-email-verification-pepper");
@@ -379,6 +386,63 @@ class PasswordIntegrationTest {
     }
 
     @Test
+    @DisplayName("AUTH-039A concurrent wrong reset codes cannot bypass the attempt limit")
+    void concurrentWrongResetCodesCannotBypassAttemptLimit() throws Exception {
+        User user = createUser("auth039a", true, "+1555010605", true);
+        requestSmsReset(user.getPhone());
+        String issuedCode = latestPasswordResetCode.get();
+        String wrongCode = differentCodeFrom(issuedCode);
+        AuthSmsOtpCode issued = latestSmsCodeFor(user.getId(), SmsOtpPurpose.PASSWORD_RESET);
+
+        int requests = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(requests);
+        CountDownLatch ready = new CountDownLatch(requests);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Integer>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < requests; i++) {
+                results.add(pool.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Concurrent OTP requests did not start");
+                    }
+                    return mockMvc.perform(post("/auth/reset-password/code")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(Map.of(
+                                            "phone", user.getPhone(),
+                                            "code", wrongCode,
+                                            "newPassword", NEW_PASSWORD
+                                    ))))
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            for (Future<Integer> result : results) {
+                assertThat(result.get(20, TimeUnit.SECONDS)).isEqualTo(401);
+            }
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+
+        AuthSmsOtpCode exhausted = authSmsOtpCodeRepository.findById(issued.getId()).orElseThrow();
+        assertThat(exhausted.getFailedAttempts()).isEqualTo(5);
+        assertThat(exhausted.getUsedAt()).isNotNull();
+
+        mockMvc.perform(post("/auth/reset-password/code")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "phone", user.getPhone(),
+                                "code", issuedCode,
+                                "newPassword", NEW_PASSWORD
+                        ))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("AUTH-040 PUT /auth/change-password valid current password changes password and revokes other sessions")
     void auth040ChangePasswordRevokesOtherSessions() throws Exception {
         User user = createUser("auth040", true, null, false);
@@ -477,7 +541,7 @@ class PasswordIntegrationTest {
                 ? null
                 : bodyOf(result);
 
-        return new AuthTokens(body == null || body.get("accessToken") == null ? null : body.get("accessToken").asText());
+        return new AuthTokens(extractCookieValue(result, ACCESS_COOKIE_NAME));
     }
 
     private User createUser(String label, boolean emailVerified, String phone, boolean phoneVerified) {
@@ -535,6 +599,19 @@ class PasswordIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElse(null);
     }
 
     private RequestPostProcessor client(String ip, String userAgent) {

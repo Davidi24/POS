@@ -1,133 +1,134 @@
 package pos.pos.security.service;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.TooManyRequestsException;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.ArrayDeque;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * In-memory sliding-window limiter for refresh requests, keyed by client IP and refresh token ID.
- * Expired buckets are periodically pruned so state stays bounded even when a key is never used again.
- * works only for single node
+ * Shared PostgreSQL-backed refresh limiter. Keys are peppered hashes so client IPs and token IDs are not stored.
+ * Each key uses a fixed window anchored at its first request; PostgreSQL atomically serializes competing requests.
  */
-// checked
-// tested
 @Component
 public class RefreshRateLimiter {
 
     private static final String TOO_MANY_REQUESTS_MESSAGE = "Too many refresh attempts. Try again later.";
-    private static final long SECONDS_PER_MINUTE = 60L;
+    private static final String UPSERT_SQL = """
+            INSERT INTO auth_refresh_rate_limit (scope, key_hash, window_started_at, attempt_count, expires_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP + (? * INTERVAL '1 second'))
+            ON CONFLICT (scope, key_hash) DO UPDATE SET
+                window_started_at = CASE
+                    WHEN auth_refresh_rate_limit.window_started_at <= CURRENT_TIMESTAMP - (? * INTERVAL '1 second')
+                        THEN CURRENT_TIMESTAMP
+                    ELSE auth_refresh_rate_limit.window_started_at
+                END,
+                attempt_count = CASE
+                    WHEN auth_refresh_rate_limit.window_started_at <= CURRENT_TIMESTAMP - (? * INTERVAL '1 second')
+                        THEN 1
+                    ELSE auth_refresh_rate_limit.attempt_count + 1
+                END,
+                expires_at = CASE
+                    WHEN auth_refresh_rate_limit.window_started_at <= CURRENT_TIMESTAMP - (? * INTERVAL '1 second')
+                        THEN EXCLUDED.expires_at
+                    ELSE auth_refresh_rate_limit.expires_at
+                END
+            WHERE auth_refresh_rate_limit.window_started_at <= CURRENT_TIMESTAMP - (? * INTERVAL '1 second')
+               OR auth_refresh_rate_limit.attempt_count < ?
+            RETURNING attempt_count
+            """;
 
-    @Value("${app.security.refresh-token.rate-limit.max-attempts-per-ip:20}")
-    private int maxAttemptsPerIp;
+    private final JdbcTemplate jdbcTemplate;
+    private final int maxAttemptsPerIp;
+    private final int maxAttemptsPerToken;
+    private final long windowSeconds;
+    private final String pepper;
+    private final AtomicLong lastCleanupEpochSecond = new AtomicLong();
 
-    @Value("${app.security.refresh-token.rate-limit.max-attempts-per-token:5}")
-    private int maxAttemptsPerToken;
-
-    @Value("${app.security.refresh-token.rate-limit.window-minutes:1}")
-    private long windowMinutes;
-
-    private final ConcurrentHashMap<String, ArrayDeque<Instant>> ipWindow = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, ArrayDeque<Instant>> tokenWindow = new ConcurrentHashMap<>();
-    // AtomicLong is a thread-safe long value that supports atomic operations (no race conditions).
-    // It behaves like a long, but: multiple threads can read/write safely, no need for synchronized
-    // saved in RAM
-    private final AtomicLong lastCleanupEpochSecond = new AtomicLong(0);
-
-    public void check(String ip) {
-        Instant now = Instant.now();
-        cleanupExpiredBucketsIfNeeded(now);
-        if (ip == null) {
-            return;
-        }
-        checkBucket(ip, ipWindow, maxAttemptsPerIp, now);
-    }
-
-    public void checkByTokenId(UUID tokenId) {
-        Instant now = Instant.now();
-        cleanupExpiredBucketsIfNeeded(now);
-        checkBucket(tokenId.toString(), tokenWindow, maxAttemptsPerToken, now);
-    }
-
-    // For a given key (IP or token), this updates its request history (bucket) atomically.
-    // It gets or creates the deque of timestamps, removes expired ones (outside the window),
-    // checks if the remaining requests exceed the limit → throws exception if so,
-    // otherwise adds the current request time and stores the updated bucket back.
-    private void checkBucket(
-            String key,
-            ConcurrentHashMap<String, ArrayDeque<Instant>> window,
-            int maxAttempts,
-            Instant now
+    public RefreshRateLimiter(
+            JdbcTemplate jdbcTemplate,
+            @Value("${app.security.refresh-token.rate-limit.max-attempts-per-ip:20}") int maxAttemptsPerIp,
+            @Value("${app.security.refresh-token.rate-limit.max-attempts-per-token:5}") int maxAttemptsPerToken,
+            @Value("${app.security.refresh-token.rate-limit.window-minutes:1}") long windowMinutes,
+            @Value("${app.security.refresh-token.pepper}") String pepper
     ) {
-        Instant windowStart = now.minusSeconds(windowSizeSeconds());
-
-        window.compute(key, (ignored, timestamps) -> {
-            ArrayDeque<Instant> bucket = timestamps != null ? timestamps : new ArrayDeque<>();
-            pruneExpired(bucket, windowStart);
-            if (bucket.size() >= maxAttempts) {
-                throw new TooManyRequestsException(TOO_MANY_REQUESTS_MESSAGE);
-            }
-            bucket.addLast(now);
-            return bucket;
-        });
+        if (maxAttemptsPerIp < 1 || maxAttemptsPerToken < 1) {
+            throw new IllegalStateException("Refresh rate-limit attempt limits must be positive");
+        }
+        if (windowMinutes < 1 || windowMinutes > Long.MAX_VALUE / 60) {
+            throw new IllegalStateException("Refresh rate-limit window must be positive and representable");
+        }
+        if (pepper == null || pepper.length() < 32) {
+            throw new IllegalStateException("app.security.refresh-token.pepper must be at least 32 characters");
+        }
+        this.jdbcTemplate = jdbcTemplate;
+        this.maxAttemptsPerIp = maxAttemptsPerIp;
+        this.maxAttemptsPerToken = maxAttemptsPerToken;
+        this.windowSeconds = windowMinutes * 60;
+        this.pepper = pepper;
     }
 
-    private void cleanupExpiredBucketsIfNeeded(Instant now) {
-        long cleanupIntervalSeconds = windowSizeSeconds();
-        long nowEpochSecond = now.getEpochSecond();
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void check(String ip) {
+        if (ip != null && !ip.isBlank()) {
+            checkKey("IP", ip, maxAttemptsPerIp);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void checkByTokenId(UUID tokenId) {
+        if (tokenId != null) {
+            checkKey("TOKEN", tokenId.toString(), maxAttemptsPerToken);
+        }
+    }
+
+    private void checkKey(String scope, String rawKey, int limit) {
+        Instant now = Instant.now();
+        cleanupExpiredRowsPeriodically(now);
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                UPSERT_SQL,
+                scope,
+                hashKey(scope, rawKey),
+                windowSeconds,
+                windowSeconds,
+                windowSeconds,
+                windowSeconds,
+                windowSeconds,
+                limit
+        );
+        if (rows.isEmpty()) {
+            throw new TooManyRequestsException(TOO_MANY_REQUESTS_MESSAGE);
+        }
+    }
+
+    private void cleanupExpiredRowsPeriodically(Instant now) {
+        long epochSecond = now.getEpochSecond();
         long lastCleanup = lastCleanupEpochSecond.get();
-        // Has enough time passed since the last cleanup?
-        if (nowEpochSecond - lastCleanup < cleanupIntervalSeconds) {
+        if (epochSecond - lastCleanup < windowSeconds || !lastCleanupEpochSecond.compareAndSet(lastCleanup, epochSecond)) {
             return;
         }
-        // This method is called on every request, so multiple threads can reach this point at the same time.
-        // We use compareAndSet to ensure that only one thread performs the cleanup.
-        // If another thread has already updated the value (meaning it already did the cleanup),
-        // this thread skips and continues without doing it again.
-        if (!lastCleanupEpochSecond.compareAndSet(lastCleanup, nowEpochSecond)) {
-            return;
-        }
-        cleanupWindow(ipWindow, now);
-        cleanupWindow(tokenWindow, now);
+        jdbcTemplate.update("DELETE FROM auth_refresh_rate_limit WHERE expires_at <= CURRENT_TIMESTAMP");
     }
 
-    // Iterates over all keys (e.g., IPs) in the in-memory map.
-    // For each key, it updates its deque of timestamps using computeIfPresent()
-    // (so only existing entries are processed, thread-safe).
-    // It calculates the window start and removes all timestamps older than that window.
-    // If after cleanup the deque is empty, it returns null → which removes the key from the map.
-    // Otherwise, it keeps the cleaned deque.
-    // for all ip or tokens
-    private void cleanupWindow(ConcurrentHashMap<String, ArrayDeque<Instant>> window, Instant now) {
-        Instant windowStart = now.minusSeconds(windowSizeSeconds());
-        for (String key : window.keySet()) {
-            window.computeIfPresent(key, (ignored, timestamps) -> {
-                pruneExpired(timestamps, windowStart);
-                return timestamps.isEmpty() ? null : timestamps;
-            });
+    private String hashKey(String scope, String rawKey) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest((pepper + "\u0000" + scope + "\u0000" + rawKey).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(bytes);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("Failed to hash refresh rate-limit key", ex);
         }
-    }
-
-
-    // Goes through the deque from the oldest elements (front) to the newest.
-    // It checks each timestamp, and if it is before the window start,
-    // it removes it from the deque.
-    // We use pollFirst() instead of removeFirst() to avoid exceptions
-    // in case the deque becomes empty.
-    private void pruneExpired(ArrayDeque<Instant> timestamps, Instant windowStart) {
-        while (!timestamps.isEmpty() && timestamps.peekFirst().isBefore(windowStart)) {
-            timestamps.pollFirst();
-        }
-    }
-
-    // Converts the configured window from minutes to seconds,
-    // ensuring the result is at least 1 second to avoid zero or negative values
-    private long windowSizeSeconds() {
-        return Math.max(1L, windowMinutes * SECONDS_PER_MINUTE);
     }
 }

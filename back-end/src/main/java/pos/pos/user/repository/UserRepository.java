@@ -1,13 +1,18 @@
 package pos.pos.user.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 import pos.pos.user.entity.User;
 
 import java.util.Optional;
 import java.util.UUID;
+
 
 public interface UserRepository extends JpaRepository<User, UUID> {
 
@@ -36,6 +41,39 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     """)
     Optional<User> findActiveById(UUID userId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT u
+        FROM User u
+        WHERE u.id = :userId
+          AND u.deletedAt IS NULL
+          AND u.isActive = true
+    """)
+    Optional<User> findActiveByIdForUpdate(@Param("userId") UUID userId);
+
+    // Active staff of a restaurant who work in this branch (or aren't tied to one branch).
+    @Query("""
+        SELECT u.id
+        FROM User u
+        WHERE u.restaurantId = :restaurantId
+          AND u.deletedAt IS NULL
+          AND u.isActive = true
+          AND (u.defaultBranchId IS NULL OR u.defaultBranchId = :branchId)
+    """)
+    java.util.List<UUID> findActiveStaffIds(UUID restaurantId, UUID branchId);
+
+    // The same staff, only those whose role has this permission (e.g. managers who approve bookings).
+    @Query("""
+        SELECT DISTINCT u.id
+        FROM User u, UserRole ur, RolePermission rp, Permission p
+        WHERE ur.userId = u.id AND rp.roleId = ur.roleId AND p.id = rp.permissionId AND p.code = :permission
+          AND u.restaurantId = :restaurantId
+          AND u.deletedAt IS NULL
+          AND u.isActive = true
+          AND (u.defaultBranchId IS NULL OR u.defaultBranchId = :branchId)
+    """)
+    java.util.List<UUID> findActiveStaffIdsWithPermission(UUID restaurantId, UUID branchId, String permission);
+
     @Query(
             value = """
             SELECT u
@@ -61,6 +99,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                           AND r.code = :roleCode
                     )
               )
+              AND (:superAdmin = true OR u.restaurantId = :actorRestaurantId)
               AND (
                     :superAdmin = true
                     OR (
@@ -106,6 +145,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                           AND r.code = :roleCode
                     )
               )
+              AND (:superAdmin = true OR u.restaurantId = :actorRestaurantId)
               AND (
                     :superAdmin = true
                     OR (
@@ -135,6 +175,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
             String roleCode,
             boolean superAdmin,
             long actorRank,
+            UUID actorRestaurantId,
             Pageable pageable
     );
 }

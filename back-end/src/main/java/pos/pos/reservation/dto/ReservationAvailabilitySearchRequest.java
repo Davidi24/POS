@@ -1,5 +1,6 @@
 package pos.pos.reservation.dto;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -25,8 +26,10 @@ public class ReservationAvailabilitySearchRequest {
 
     @NotNull(message = "partySize is required")
     @Min(value = 1, message = "partySize must be greater than 0")
+    @Max(value = 1000, message = "partySize must be at most 1000")
     private Integer partySize;
 
     @Min(value = 1, message = "maxOptions must be greater than 0")
+    @Max(value = 100, message = "maxOptions must be at most 100")
     private Integer maxOptions;
 }

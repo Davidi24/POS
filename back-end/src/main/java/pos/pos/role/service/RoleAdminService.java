@@ -12,6 +12,7 @@ import pos.pos.exception.role.PermissionNotFoundException;
 import pos.pos.exception.role.RoleCodeAlreadyExistsException;
 import pos.pos.exception.role.RoleNameAlreadyExistsException;
 import pos.pos.exception.role.RoleNotFoundException;
+import pos.pos.exception.role.RoleManagementNotAllowedException;
 import pos.pos.role.dto.CloneRoleRequest;
 import pos.pos.role.dto.CreateRoleRequest;
 import pos.pos.role.dto.PermissionResponse;
@@ -27,7 +28,10 @@ import pos.pos.role.mapper.RoleMapper;
 import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RolePermissionRepository;
 import pos.pos.role.repository.RoleRepository;
+import pos.pos.notification.service.NotificationService;
 import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.user.entity.User;
+import pos.pos.user.repository.UserRepository;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
@@ -52,6 +56,8 @@ public class RoleAdminService {
     private final PermissionRepository permissionRepository;
     private final RolePermissionRepository rolePermissionRepository;
     private final RoleHierarchyService roleHierarchyService;
+    private final NotificationService notificationService;
+    private final UserRepository userRepository;
 
     @Transactional
     public RoleResponse createRole(Authentication authentication, CreateRoleRequest request) {
@@ -61,9 +67,11 @@ public class RoleAdminService {
         assertUniqueRoleName(normalizedName, null);
         assertUniqueRoleCode(generatedCode, null);
 
+        UUID restaurantId = ownerRestaurant(authentication);
         Role role = roleRepository.save(Role.builder()
                 .name(normalizedName)
                 .code(generatedCode)
+                .restaurantId(restaurantId)
                 .description(request.getDescription())
                 .rank(defaultCustomRank(authentication))
                 .isSystem(false)
@@ -71,6 +79,8 @@ public class RoleAdminService {
                 .assignable(true)
                 .protectedRole(false)
                 .build());
+
+        publishRoleChange(authentication, role.getId(), "Role created");
 
         return RoleMapper.toResponse(role);
     }
@@ -88,6 +98,8 @@ public class RoleAdminService {
 
         role.setName(normalizedName);
         role.setDescription(request.getDescription());
+
+        publishRoleChange(authentication, role.getId(), "Role updated");
 
         return RoleMapper.toResponse(roleRepository.save(role));
     }
@@ -137,6 +149,8 @@ public class RoleAdminService {
             rolePermissionRepository.saveAll(assignmentsToAdd);
         }
 
+        publishRoleChange(authentication, roleId, "Role permissions changed");
+
         return requestedPermissions.stream()
                 .map(PermissionMapper::toResponse)
                 .toList();
@@ -149,6 +163,7 @@ public class RoleAdminService {
         roleHierarchyService.assertCanManageRole(authentication, role);
 
         role.setActive(Boolean.TRUE.equals(request.getIsActive()));
+        publishRoleChange(authentication, role.getId(), "Role status changed");
         return RoleMapper.toResponse(roleRepository.save(role));
     }
 
@@ -162,14 +177,19 @@ public class RoleAdminService {
         role.setAssignable(false);
         role.setDeletedAt(OffsetDateTime.now(ZoneOffset.UTC));
         roleRepository.save(role);
+        publishRoleChange(authentication, role.getId(), "Role deleted");
     }
 
     @Transactional
     public RoleResponse cloneRole(Authentication authentication, UUID roleId, CloneRoleRequest request) {
         Role sourceRole = findExistingRole(roleId);
+        if (!roleHierarchyService.visibleTo(authentication, sourceRole)) {
+            throw new RoleNotFoundException();
+        }
         if (!roleHierarchyService.isSuperAdmin(authentication)) {
             roleHierarchyService.assertCanAssignRole(authentication, sourceRole);
         }
+        UUID restaurantId = ownerRestaurant(authentication);
 
         List<Permission> sourcePermissions = loadPermissionsForRole(sourceRole.getId());
         assertActorCanGrantPermissions(authentication, sourcePermissions);
@@ -183,6 +203,7 @@ public class RoleAdminService {
         Role clonedRole = roleRepository.save(Role.builder()
                 .name(normalizedName)
                 .code(generatedCode)
+                .restaurantId(restaurantId)
                 .description(requestedDescription != null ? request.getDescription() : sourceRole.getDescription())
                 .rank(sourceRole.getRank())
                 .isSystem(false)
@@ -200,7 +221,29 @@ public class RoleAdminService {
                     .toList());
         }
 
+        publishRoleChange(authentication, clonedRole.getId(), "Role cloned");
+
         return RoleMapper.toResponse(clonedRole);
+    }
+
+    // A custom role belongs to its maker's restaurant; a super admin's roles are shared by every restaurant.
+    private UUID ownerRestaurant(Authentication authentication) {
+        if (roleHierarchyService.isSuperAdmin(authentication)) {
+            return null;
+        }
+        UUID restaurantId = roleHierarchyService.actorRestaurantId(authentication);
+        if (restaurantId == null) {
+            throw new RoleManagementNotAllowedException();
+        }
+        return restaurantId;
+    }
+
+    private void publishRoleChange(Authentication authentication, UUID roleId, String message) {
+        User actor = userRepository.findActiveById(roleHierarchyService.currentUserId(authentication)).orElse(null);
+        if (actor == null || actor.getRestaurantId() == null) {
+            return;
+        }
+        notificationService.publishRoleChange(actor.getRestaurantId(), roleId, actor.getId(), message);
     }
 
     private Role findExistingRole(UUID roleId) {

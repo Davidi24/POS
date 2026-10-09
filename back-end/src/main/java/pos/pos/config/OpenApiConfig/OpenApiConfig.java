@@ -76,6 +76,14 @@ public class OpenApiConfig {
     }
 
     @Bean
+    public GroupedOpenApi reservationsGroup() {
+        return GroupedOpenApi.builder()
+                .group("Reservations")
+                .packagesToScan("pos.pos.reservation.controller")
+                .build();
+    }
+
+    @Bean
     public GroupedOpenApi deviceGroup() {
         return GroupedOpenApi.builder()
                 .group("Devices")
@@ -98,7 +106,32 @@ public class OpenApiConfig {
     public GroupedOpenApi menuGroup() {
         return GroupedOpenApi.builder()
                 .group("Menus")
-                .pathsToMatch("/menus", "/menus/**", "/public/restaurants/*/menus", "/public/restaurants/*/menus/**")
+                .pathsToMatch(
+                        "/menus",
+                        "/menus/**",
+                        "/option-group-types",
+                        "/option-group-types/**",
+                        "/option-groups",
+                        "/option-groups/**",
+                        "/public/restaurants/*/menus",
+                        "/public/restaurants/*/menus/**"
+                )
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi inventoryGroup() {
+        return GroupedOpenApi.builder()
+                .group("Inventory")
+                .packagesToScan("pos.pos.inventory.controller")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi recipeGroup() {
+        return GroupedOpenApi.builder()
+                .group("Recipes")
+                .packagesToScan("pos.pos.recipe.controller")
                 .build();
     }
 }

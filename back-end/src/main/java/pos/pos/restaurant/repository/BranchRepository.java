@@ -18,6 +18,8 @@ public interface BranchRepository extends JpaRepository<Branch, UUID> {
 
     Optional<Branch> findByIdAndRestaurantIdAndDeletedAtIsNull(UUID id, UUID restaurantId);
 
+    boolean existsByIdAndRestaurantIdAndDeletedAtIsNull(UUID id, UUID restaurantId);
+
     java.util.List<Branch> findAllByRestaurantIdAndDeletedAtIsNull(UUID restaurantId);
 
     long countByRestaurantIdAndDeletedAtIsNull(UUID restaurantId);
@@ -27,7 +29,7 @@ public interface BranchRepository extends JpaRepository<Branch, UUID> {
     // Bulk soft-delete: single native UPDATE instead of loading + looping over each branch.
     @Modifying
     @Query(value = """
-            UPDATE branches
+            UPDATE {h-schema}branches
             SET is_active = false, status = 'ARCHIVED',
                 deleted_at = :deletedAt, updated_by = :actorId
             WHERE restaurant_id = :restaurantId AND deleted_at IS NULL

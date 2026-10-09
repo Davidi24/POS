@@ -1,0 +1,284 @@
+ORDER API DOCUMENTATION
+
+Scope
+- This file documents the implemented API surface for the order domain in this branch.
+- This branch now includes the order entities, enums, repositories, Flyway schema, DTOs, controllers, service workflows, validation, pricing recalculation, reporting endpoints, and public QR ordering endpoints.
+- External payment gateway settlement and external KDS dispatch integrations are still not implemented. Payment-related endpoints currently manage internal order and payment status only.
+- All ids are UUID values unless noted otherwise.
+- Orders should never be hard-deleted in production. Use cancel, void, close, reopen, transfer, and event endpoints instead.
+
+
+Status key
+- [x] implemented in the repo
+- [ ] planned but not implemented yet
+
+
+Current domain model added in this repo
+- [x] orders
+- [x] order_line_items
+- [x] order_item_options
+- [x] order_discounts
+- [x] order_events
+
+
+ORDER CORE APIS
+
+[x] 1. GET /restaurants/{restaurantId}/orders
+[x] 2. GET /restaurants/{restaurantId}/orders/{orderId}
+[x] 3. GET /restaurants/{restaurantId}/orders/number/{orderNumber}
+[x] 4. GET /restaurants/{restaurantId}/customers/{customerId}/orders
+[x] 5. GET /restaurants/{restaurantId}/branches/{branchId}/orders
+[x] 6. GET /restaurants/{restaurantId}/branches/{branchId}/orders/open
+[x] 7. GET /restaurants/{restaurantId}/branches/{branchId}/orders/history
+[x] 8. GET /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/orders/current
+[x] 9. POST /restaurants/{restaurantId}/branches/{branchId}/orders
+[x] 10. POST /restaurants/{restaurantId}/branches/{branchId}/tables/{tableId}/orders
+[x] 11. PATCH /restaurants/{restaurantId}/orders/{orderId}
+[x] 12. PATCH /restaurants/{restaurantId}/orders/{orderId}/customer
+[x] 13. PATCH /restaurants/{restaurantId}/orders/{orderId}/table
+[x] 14. PATCH /restaurants/{restaurantId}/orders/{orderId}/reservation
+[x] 15. POST /restaurants/{restaurantId}/orders/validate
+[x] 16. POST /restaurants/{restaurantId}/orders/next-number
+
+
+ORDER WORKFLOW APIS
+
+[x] 17. POST /restaurants/{restaurantId}/orders/{orderId}/open
+[x] 18. POST /restaurants/{restaurantId}/orders/{orderId}/send-to-kitchen
+[x] 19. POST /restaurants/{restaurantId}/orders/{orderId}/ready
+[x] 20. POST /restaurants/{restaurantId}/orders/{orderId}/fulfill
+[x] 21. POST /restaurants/{restaurantId}/orders/{orderId}/close
+[x] 22. POST /restaurants/{restaurantId}/orders/{orderId}/reopen
+[x] 23. POST /restaurants/{restaurantId}/orders/{orderId}/cancel
+[x] 24. POST /restaurants/{restaurantId}/orders/{orderId}/void
+[x] 25. POST /restaurants/{restaurantId}/orders/{orderId}/merge
+[x] 26. POST /restaurants/{restaurantId}/orders/{orderId}/transfer/table
+[x] 27. POST /restaurants/{restaurantId}/orders/{orderId}/transfer/branch
+
+
+ORDER LINE ITEM APIS
+
+[x] 28. GET /restaurants/{restaurantId}/orders/{orderId}/items
+[x] 29. POST /restaurants/{restaurantId}/orders/{orderId}/items
+[x] 30. GET /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}
+[x] 31. PUT /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}
+[x] 32. PATCH /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/quantity
+[x] 33. PATCH /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/notes
+[x] 34. PATCH /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/status
+[x] 35. POST /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/fire
+[x] 36. POST /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/ready
+[x] 37. POST /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/fulfill
+[x] 38. POST /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/void
+
+
+ORDER MODIFIER APIS
+
+[x] 39. GET /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/options
+[x] 40. POST /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/options
+[x] 41. PUT /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/options/{optionId}
+[x] 42. DELETE /restaurants/{restaurantId}/orders/{orderId}/items/{lineItemId}/options/{optionId}
+
+
+ORDER DISCOUNT APIS
+
+[x] 43. GET /restaurants/{restaurantId}/orders/{orderId}/discounts
+[x] 44. POST /restaurants/{restaurantId}/orders/{orderId}/discounts
+[x] 45. PUT /restaurants/{restaurantId}/orders/{orderId}/discounts/{discountId}
+[x] 46. DELETE /restaurants/{restaurantId}/orders/{orderId}/discounts/{discountId}
+
+
+ORDER TIMELINE AND AUDIT APIS
+
+[x] 47. GET /restaurants/{restaurantId}/orders/{orderId}/events
+[x] 48. POST /restaurants/{restaurantId}/orders/{orderId}/events/notes
+[x] 49. GET /restaurants/{restaurantId}/orders/{orderId}/timeline
+[x] 50. GET /restaurants/{restaurantId}/orders/{orderId}/audit
+
+
+PAYMENT-ADJACENT ORDER APIS
+
+[x] 51. GET /restaurants/{restaurantId}/orders/{orderId}/totals
+[x] 52. POST /restaurants/{restaurantId}/orders/{orderId}/payment-status
+[x] 53. POST /restaurants/{restaurantId}/orders/{orderId}/mark-paid
+[x] 54. POST /restaurants/{restaurantId}/orders/{orderId}/mark-partially-paid
+[x] 55. POST /restaurants/{restaurantId}/orders/{orderId}/mark-refunded
+[x] 56. POST /restaurants/{restaurantId}/orders/{orderId}/split-preview
+[x] 57. POST /restaurants/{restaurantId}/orders/{orderId}/split
+
+
+PUBLIC AND QR ORDERING APIS
+
+[x] 58. POST /public/restaurants/{restaurantSlug}/branches/{branchCode}/tables/{tableCode}/orders
+[x] 59. GET /public/orders/{orderNumber}
+[x] 60. POST /public/orders/{orderNumber}/items
+[x] 61. POST /public/orders/{orderNumber}/checkout
+[x] 62. POST /public/orders/{orderNumber}/cancel-request
+
+
+REPORTING AND OPERATIONS APIS
+
+[x] 63. GET /restaurants/{restaurantId}/orders/summary
+[x] 64. GET /restaurants/{restaurantId}/branches/{branchId}/orders/kitchen-board
+[x] 65. GET /restaurants/{restaurantId}/branches/{branchId}/orders/export
+
+
+Recommended request shapes
+
+Create order
+- tableId: uuid, optional
+- reservationId: uuid, optional
+- customerId: uuid, optional
+- orderNumber: string, optional if generated server-side, max 50
+- currency: string, optional if derived from restaurant, must be ISO 4217 code
+- orderType: OrderType, optional
+- source: OrderSource, optional
+- guestCount: integer, optional, min 1
+- notes: string, optional
+- items: array<CreateOrderLineItem>, optional
+- discounts: array<CreateOrderDiscount>, optional
+
+Create order line item
+- menuItemId: uuid, required
+- variantId: uuid, optional
+- quantity: integer, required, min 1
+- notes: string, optional
+- options: array<CreateOrderItemOption>, optional
+
+Create order item option
+- optionItemId: uuid, required
+- quantity: integer, optional, min 1
+- notes: string, optional
+
+Create order discount
+- name: string, required, max 100
+- discountType: OrderDiscountType, required
+- discountValue: decimal, required, min 0
+- reason: string, optional
+
+Patch order header
+- branchId: uuid, optional
+- tableId: uuid, optional
+- reservationId: uuid, optional
+- customerId: uuid, optional
+- orderNumber: string, optional, max 50
+- currency: string, optional, must be ISO 4217 code
+- orderType: OrderType, optional
+- source: OrderSource, optional
+- status: OrderStatus, optional
+- guestCount: integer, optional, min 1
+- openedAt: datetime, optional
+- items: array<CreateOrderLineItem>, optional
+- discounts: array<CreateOrderDiscount>, optional
+- notes: string, optional
+
+
+Recommended response sections
+- order header: id, orderNumber, branch, table, reservation, customer, source, type
+- operational status: status, fulfillmentStatus, paymentStatus, openedAt, closedAt
+- pricing summary: subtotal, discountTotal, taxTotal, serviceChargeTotal, total, currency
+- line items: item snapshot, variant snapshot, quantity, totals, status, options
+- discounts: name, type, value, amountApplied, appliedBy, createdAt
+- timeline: eventType, note, createdBy, createdAt
+
+
+Recommended enum values
+
+OrderType
+- DINE_IN
+- TAKEAWAY
+- DELIVERY
+
+OrderSource
+- POS
+- WEB
+- MOBILE
+- QR_TABLE
+- KIOSK
+- PHONE
+- THIRD_PARTY
+
+OrderStatus
+- DRAFT
+- OPEN
+- CLOSED
+- CANCELLED
+- VOIDED
+
+OrderFulfillmentStatus
+- PENDING
+- IN_PREPARATION
+- READY
+- PARTIALLY_FULFILLED
+- FULFILLED
+- DELIVERED
+- CANCELLED
+
+OrderPaymentStatus
+- UNPAID
+- PARTIALLY_PAID
+- PAID
+- PARTIALLY_REFUNDED
+- REFUNDED
+- VOIDED
+
+OrderLineItemStatus
+- PENDING
+- FIRED
+- PREPARING
+- READY
+- FULFILLED
+- CANCELLED
+- VOIDED
+
+OrderDiscountType
+- PERCENTAGE
+- FIXED_AMOUNT
+- PROMOTION
+- LOYALTY
+- MANUAL
+- COMP
+
+OrderEventType
+- CREATED
+- UPDATED
+- STATUS_UPDATED
+- FULFILLMENT_UPDATED
+- PAYMENT_UPDATED
+- ITEM_ADDED
+- ITEM_UPDATED
+- ITEM_REMOVED
+- ITEM_VOIDED
+- DISCOUNT_APPLIED
+- DISCOUNT_REMOVED
+- SENT_TO_KITCHEN
+- READY
+- FULFILLED
+- TABLE_CHANGED
+- RESERVATION_LINKED
+- REOPENED
+- CLOSED
+- CANCELLED
+- VOIDED
+- NOTE_ADDED
+
+
+Implemented permission codes
+- ORDER_READ
+- ORDER_CREATE
+- ORDER_UPDATE
+- ORDER_CLOSE
+- ORDER_CANCEL
+- ORDER_VOID
+- ORDER_DISCOUNT_APPLY
+- ORDER_TRANSFER
+- ORDER_REOPEN
+- ORDER_AUDIT
+
+
+Implementation notes
+- The documented endpoints above are implemented in this branch.
+- Payment endpoints manage internal order payment status only. No external PSP or settlement workflow is connected yet.
+- Kitchen workflow endpoints update order and line-item states and write order events. No external KDS dispatch adapter is connected yet.
+- Public checkout currently records a checkout request and only closes the order when `closeOrder=true` and the order is already in a paid state.
+- Public cancel-request cancels the order directly only when it is still unpaid and pending; otherwise it is recorded as a cancellation request note on the order timeline.
+- Branch export currently returns a structured JSON export payload of orders for the requested window.

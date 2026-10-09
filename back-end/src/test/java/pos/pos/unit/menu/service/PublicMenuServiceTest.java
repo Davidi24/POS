@@ -9,7 +9,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import pos.pos.exception.menu.MenuNotFoundException;
 import pos.pos.exception.restaurant.RestaurantNotFoundException;
-import pos.pos.menu.dto.PublicMenuResponse;
+import pos.pos.menu.dto.response.PublicMenuResponse;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
@@ -77,6 +77,25 @@ class PublicMenuServiceTest {
     }
 
     @Test
+    @DisplayName("getMenu should hide staff-only dishes and sections left without online dishes")
+    void shouldHideDishesNotShownOnline() {
+        Restaurant restaurant = restaurant(true, RestaurantStatus.ACTIVE);
+        Menu menu = menu();
+        MenuSection section = section(menu);
+        MenuItem staffOnly = item(section);
+        staffOnly.setOnlineSection(null);
+
+        given(restaurantRepository.findByIdAndDeletedAtIsNull(RESTAURANT_ID)).willReturn(Optional.of(restaurant));
+        given(menuRepository.findPublicMenuByRestaurantIdAndId(RESTAURANT_ID, MENU_ID)).willReturn(Optional.of(menu));
+        given(menuSectionRepository.findByMenuIdAndActiveTrueOrderByDisplayOrderAscNameAsc(MENU_ID)).willReturn(List.of(section));
+        given(menuItemRepository.findByMenuIdAndAvailableTrueOrdered(MENU_ID)).willReturn(List.of(staffOnly));
+
+        PublicMenuResponse response = publicMenuService.getMenu(RESTAURANT_ID, MENU_ID, true, true);
+
+        assertThat(response.getSections()).isEmpty();
+    }
+
+    @Test
     @DisplayName("getMenu should return expanded active sections and items")
     void shouldReturnExpandedPublicMenu() {
         Restaurant restaurant = restaurant(true, RestaurantStatus.ACTIVE);
@@ -126,6 +145,7 @@ class PublicMenuServiceTest {
         restaurant.setName("POS Main");
         restaurant.setActive(active);
         restaurant.setStatus(status);
+        restaurant.setTimezone("UTC");
         return restaurant;
     }
 
@@ -159,6 +179,7 @@ class PublicMenuServiceTest {
         item.setDescription("Signature burger");
         item.setBasePrice(new BigDecimal("12.50"));
         item.setAvailable(true);
+        item.setOnlineSection(new pos.pos.menu.entity.OnlineMenuSection());
         item.setDisplayOrder(1);
         return item;
     }

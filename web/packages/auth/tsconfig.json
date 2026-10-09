@@ -1,0 +1,4 @@
+{
+  "extends": "@pos/tsconfig/next.json",
+  "include": ["src"]
+}
