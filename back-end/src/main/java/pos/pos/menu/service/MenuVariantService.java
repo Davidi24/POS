@@ -76,7 +76,7 @@ public class MenuVariantService {
         Menu menu = requireManageableMenu(authentication, menuId);
         assertMenuWriteAllowed(menu.getRestaurant());
         MenuSection section = requireScopedSection(menu, sectionId);
-        MenuItem item = requireScopedItem(section, itemId);
+        MenuItem item = requireScopedItemForUpdate(section, itemId);
 
         String normalizedName = NormalizationUtils.normalize(request.getName());
         assertUniqueName(itemId, normalizedName, null);
@@ -109,7 +109,7 @@ public class MenuVariantService {
         Menu menu = requireManageableMenu(authentication, menuId);
         assertMenuWriteAllowed(menu.getRestaurant());
         MenuSection section = requireScopedSection(menu, sectionId);
-        MenuItem item = requireScopedItem(section, itemId);
+        MenuItem item = requireScopedItemForUpdate(section, itemId);
         MenuVariant variant = requireScopedVariant(item, variantId);
 
         String normalizedName = NormalizationUtils.normalize(request.getName());
@@ -140,7 +140,7 @@ public class MenuVariantService {
         Menu menu = requireManageableMenu(authentication, menuId);
         assertMenuWriteAllowed(menu.getRestaurant());
         MenuSection section = requireScopedSection(menu, sectionId);
-        MenuItem item = requireScopedItem(section, itemId);
+        MenuItem item = requireScopedItemForUpdate(section, itemId);
         MenuVariant variant = requireScopedVariant(item, variantId);
         menuVariantRepository.delete(variant);
     }
@@ -176,10 +176,23 @@ public class MenuVariantService {
     private MenuItem requireScopedItem(MenuSection section, UUID itemId) {
         MenuItem item = menuItemRepository.findById(itemId)
                 .orElseThrow(MenuItemNotFoundException::new);
+        assertItemInSection(section, item);
+        return item;
+    }
+
+    private MenuItem requireScopedItemForUpdate(MenuSection section, UUID itemId) {
+        // Variant defaults are unique per menu item. Lock the parent row before checking/clearing defaults
+        // so concurrent create/update requests cannot each retain their own default.
+        MenuItem item = menuItemRepository.findByIdForUpdate(itemId)
+                .orElseThrow(MenuItemNotFoundException::new);
+        assertItemInSection(section, item);
+        return item;
+    }
+
+    private static void assertItemInSection(MenuSection section, MenuItem item) {
         if (!item.getSection().getId().equals(section.getId())) {
             throw new MenuItemSectionMismatchException();
         }
-        return item;
     }
 
     private MenuVariant requireScopedVariant(MenuItem item, UUID variantId) {

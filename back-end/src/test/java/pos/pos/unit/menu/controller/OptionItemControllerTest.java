@@ -126,7 +126,7 @@ class OptionItemControllerTest {
         private OptionItemResponse createResponse;
 
         StubOptionItemService() {
-            super(null, null, null, null, null);
+            super(null, null, null, null, null, null);
         }
 
         @Override

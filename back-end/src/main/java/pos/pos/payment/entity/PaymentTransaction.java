@@ -90,6 +90,13 @@ public class PaymentTransaction extends AbstractTimestampedEntity {
     @Column(name = "processed_at", nullable = false, columnDefinition = "timestamptz")
     private OffsetDateTime processedAt;
 
+    // Why a refund or void was made, and by whom.
+    @Column(name = "reason", columnDefinition = "text")
+    private String reason;
+
+    @Column(name = "created_by", columnDefinition = "uuid")
+    private java.util.UUID createdBy;
+
     @Override
     protected void normalizeFields() {
         gatewayTransactionId = NormalizationUtils.normalize(gatewayTransactionId);
@@ -98,6 +105,7 @@ public class PaymentTransaction extends AbstractTimestampedEntity {
         responseCode = NormalizationUtils.normalizeUpper(responseCode);
         responseMessage = NormalizationUtils.normalize(responseMessage);
         payload = NormalizationUtils.normalize(payload);
+        reason = NormalizationUtils.normalize(reason);
         amount = amount == null ? BigDecimal.ZERO : amount;
         if (processedAt == null) {
             processedAt = OffsetDateTime.now(ZoneOffset.UTC);

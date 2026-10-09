@@ -47,5 +47,6 @@ public class UpsertKdsStationRequest {
     private UUID deviceId;
 
     @Valid
-    private List<KdsStationRoutingRequest> routings;
+    @Size(max = 1000, message = "routings can have at most 1000 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") KdsStationRoutingRequest> routings;
 }

@@ -138,6 +138,31 @@ abstract class AbstractUserIntegrationTest {
     private final AtomicInteger roleSequence = new AtomicInteger(1);
     private final AtomicInteger ipSequence = new AtomicInteger(200);
 
+    @Autowired
+    private pos.pos.restaurant.repository.RestaurantRepository testRestaurants;
+
+    private UUID testRestaurantId;
+
+    // People and custom roles in these tests work at one restaurant, as staff do in production.
+    protected UUID testRestaurantId() {
+        if (testRestaurantId == null) {
+            UUID adminId = adminUser().getId();
+            String key = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+            pos.pos.restaurant.entity.Restaurant restaurant = new pos.pos.restaurant.entity.Restaurant();
+            restaurant.setName("Test restaurant " + key);
+            restaurant.setLegalName("Test restaurant " + key + " LLC");
+            restaurant.setCode("test_" + key);
+            restaurant.setSlug("test-" + key);
+            restaurant.setCurrency("EUR");
+            restaurant.setTimezone("Europe/Rome");
+            restaurant.setOwnerId(adminId);
+            restaurant.setCreatedBy(adminId);
+            restaurant.setUpdatedBy(adminId);
+            testRestaurantId = testRestaurants.save(restaurant).getId();
+        }
+        return testRestaurantId;
+    }
+
     protected final AtomicReference<String> latestVerificationUrl = new AtomicReference<>();
     protected final AtomicReference<String> latestPasswordResetUrl = new AtomicReference<>();
     protected final AtomicReference<String> latestPasswordResetCode = new AtomicReference<>();
@@ -192,6 +217,7 @@ abstract class AbstractUserIntegrationTest {
     protected Role createRole(String label, long rank, boolean active, boolean assignable, boolean protectedRole) {
         int sequence = roleSequence.getAndIncrement();
         return roleRepository.save(Role.builder()
+                .restaurantId(testRestaurantId())
                 .code(("TEST_" + label + "_" + sequence).toUpperCase(Locale.ROOT))
                 .name("Test " + label + " " + sequence)
                 .description("User integration test role")
@@ -219,6 +245,7 @@ abstract class AbstractUserIntegrationTest {
         UUID adminId = adminUser().getId();
 
         User user = userRepository.save(User.builder()
+                .restaurantId(testRestaurantId())
                 .email("user." + suffix + "@pos.example")
                 .username("user." + suffix)
                 .passwordHash(passwordService.hash(DEFAULT_PASSWORD))

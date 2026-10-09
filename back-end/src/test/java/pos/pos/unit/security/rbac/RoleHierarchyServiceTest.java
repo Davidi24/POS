@@ -15,9 +15,13 @@ import pos.pos.exception.user.UserManagementNotAllowedException;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.principal.AuthenticatedUser;
+import pos.pos.security.rbac.AppRole;
 import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.settings.entity.Settings;
+import pos.pos.settings.repository.SettingsRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,8 +40,27 @@ class RoleHierarchyServiceTest {
     @Mock
     private RoleRepository roleRepository;
 
+    @Mock
+    private SettingsRepository settingsRepository;
+
+    @Mock
+    private pos.pos.user.repository.UserRepository userRepository;
+
     @InjectMocks
     private RoleHierarchyService roleHierarchyService;
+
+    // Every actor and target in these tests work at this restaurant unless a test says otherwise.
+    private static final UUID SHARED_RESTAURANT_ID = UUID.fromString("00000000-0000-0000-0000-00000000aaaa");
+
+    @org.junit.jupiter.api.BeforeEach
+    void everyoneWorksAtTheSameRestaurant() {
+        org.mockito.Mockito.lenient().when(userRepository.findById(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+            pos.pos.user.entity.User target = new pos.pos.user.entity.User();
+            target.setId(invocation.getArgument(0));
+            target.setRestaurantId(SHARED_RESTAURANT_ID);
+            return Optional.of(target);
+        });
+    }
 
     @Nested
     @DisplayName("highestActiveRank")
@@ -185,6 +208,21 @@ class RoleHierarchyServiceTest {
     class AssertCanManageUserTests {
 
         @Test
+        @DisplayName("Should deny managing someone from another restaurant, whatever the ranks")
+        void shouldDenyManagingAnotherRestaurantsUser() {
+            UUID targetUserId = UUID.randomUUID();
+            pos.pos.user.entity.User target = new pos.pos.user.entity.User();
+            target.setId(targetUserId);
+            target.setRestaurantId(UUID.randomUUID());
+            when(userRepository.findById(targetUserId)).thenReturn(Optional.of(target));
+
+            assertThatThrownBy(() -> roleHierarchyService.assertCanManageUser(authentication(false), targetUserId))
+                    .isInstanceOf(pos.pos.exception.user.UserManagementNotAllowedException.class);
+            verify(roleRepository, never()).findHighestActiveRankByUserId(targetUserId);
+        }
+
+
+        @Test
         @DisplayName("Should allow super admin without querying actor role code")
         void shouldAllowSuperAdmin() {
             UUID targetUserId = UUID.randomUUID();
@@ -276,6 +314,145 @@ class RoleHierarchyServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("Manager and Viewer floors")
+    class RoleFloorTests {
+
+        private final UUID actorUserId = UUID.randomUUID();
+        private final UUID restaurantId = SHARED_RESTAURANT_ID;
+
+        @Test
+        @DisplayName("Should stop an Admin from creating a Manager while the restaurant switch is off")
+        void shouldStopAdminAssigningManagerWhenSwitchOff() {
+            when(roleRepository.findHighestActiveRankByUserId(actorUserId)).thenReturn(AppRole.ADMIN.rank());
+            adminsCanManageManagers(false);
+
+            assertThatThrownBy(() -> roleHierarchyService.assertCanAssignRole(
+                    restaurantActor(),
+                    systemRole(AppRole.MANAGER)
+            )).isInstanceOf(RoleAssignmentNotAllowedException.class);
+        }
+
+        @Test
+        @DisplayName("Should let an Admin create a Manager once the restaurant switch is on")
+        void shouldLetAdminAssignManagerWhenSwitchOn() {
+            when(roleRepository.findHighestActiveRankByUserId(actorUserId)).thenReturn(AppRole.ADMIN.rank());
+            adminsCanManageManagers(true);
+
+            assertThatCode(() -> roleHierarchyService.assertCanAssignRole(
+                    restaurantActor(),
+                    systemRole(AppRole.MANAGER)
+            )).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("Should let a Co-Owner create a Manager without reading the switch")
+        void shouldLetCoOwnerAssignManager() {
+            when(roleRepository.findHighestActiveRankByUserId(actorUserId)).thenReturn(AppRole.CO_OWNER.rank());
+
+            assertThatCode(() -> roleHierarchyService.assertCanAssignRole(
+                    restaurantActor(),
+                    systemRole(AppRole.MANAGER)
+            )).doesNotThrowAnyException();
+
+            verify(settingsRepository, never()).findByRestaurant_Id(any());
+        }
+
+        @Test
+        @DisplayName("Should let Owner and Co-Owner create Admins")
+        void shouldLetCoOwnerAssignAdmin() {
+            when(roleRepository.findHighestActiveRankByUserId(actorUserId)).thenReturn(AppRole.CO_OWNER.rank());
+
+            assertThatCode(() -> roleHierarchyService.assertCanAssignRole(
+                    restaurantActor(),
+                    systemRole(AppRole.ADMIN)
+            )).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("Should stop a Manager from creating a Viewer but let an Admin")
+        void shouldKeepViewerForAdminsAndAbove() {
+            when(roleRepository.findHighestActiveRankByUserId(actorUserId))
+                    .thenReturn(AppRole.MANAGER.rank())
+                    .thenReturn(AppRole.ADMIN.rank());
+
+            assertThatThrownBy(() -> roleHierarchyService.assertCanAssignRole(
+                    restaurantActor(),
+                    systemRole(AppRole.VIEWER)
+            )).isInstanceOf(RoleAssignmentNotAllowedException.class);
+            assertThatCode(() -> roleHierarchyService.assertCanAssignRole(
+                    restaurantActor(),
+                    systemRole(AppRole.VIEWER)
+            )).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("Should stop an Admin from editing or deleting a Manager while the switch is off")
+        void shouldStopAdminManagingManagerWhenSwitchOff() {
+            UUID managerUserId = UUID.randomUUID();
+            when(roleRepository.findHighestActiveRankByUserId(actorUserId)).thenReturn(AppRole.ADMIN.rank());
+            when(roleRepository.findHighestActiveRankByUserId(managerUserId)).thenReturn(AppRole.MANAGER.rank());
+            when(roleRepository.findActiveRolesByUserId(managerUserId)).thenReturn(List.of(systemRole(AppRole.MANAGER)));
+            adminsCanManageManagers(false);
+
+            assertThatThrownBy(() -> roleHierarchyService.assertCanManageUser(restaurantActor(), managerUserId))
+                    .isInstanceOf(UserManagementNotAllowedException.class);
+        }
+
+        @Test
+        @DisplayName("Should let an Admin edit or delete a Manager once the switch is on")
+        void shouldLetAdminManageManagerWhenSwitchOn() {
+            UUID managerUserId = UUID.randomUUID();
+            when(roleRepository.findHighestActiveRankByUserId(actorUserId)).thenReturn(AppRole.ADMIN.rank());
+            when(roleRepository.findHighestActiveRankByUserId(managerUserId)).thenReturn(AppRole.MANAGER.rank());
+            when(roleRepository.findActiveRolesByUserId(managerUserId)).thenReturn(List.of(systemRole(AppRole.MANAGER)));
+            adminsCanManageManagers(true);
+
+            assertThatCode(() -> roleHierarchyService.assertCanManageUser(restaurantActor(), managerUserId))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("Should hide Manager from an Admin's assignable roles while the switch is off")
+        void shouldHideManagerFromAdminAssignableRoles() {
+            Role manager = systemRole(AppRole.MANAGER);
+            Role waiter = systemRole(AppRole.WAITER);
+            Role viewer = systemRole(AppRole.VIEWER);
+            when(roleRepository.findHighestActiveRankByUserId(actorUserId)).thenReturn(AppRole.ADMIN.rank());
+            when(roleRepository.findAssignableRolesForActorRank(AppRole.ADMIN.rank())).thenReturn(List.of(manager, waiter, viewer));
+            adminsCanManageManagers(false);
+
+            List<Role> result = roleHierarchyService.getAssignableRoles(restaurantActor());
+
+            assertThat(result).containsExactly(waiter, viewer);
+        }
+
+        private Authentication restaurantActor() {
+            AuthenticatedUser user = AuthenticatedUser.builder()
+                    .id(actorUserId)
+                    .restaurantId(restaurantId)
+                    .email("user@pos.local")
+                    .active(true)
+                    .build();
+
+            return new UsernamePasswordAuthenticationToken(user, null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        }
+
+        private void adminsCanManageManagers(boolean allowed) {
+            Settings settings = new Settings();
+            settings.setAdminsCanManageManagers(allowed);
+            when(settingsRepository.findByRestaurant_Id(restaurantId)).thenReturn(Optional.of(settings));
+        }
+
+        private Role systemRole(AppRole appRole) {
+            Role role = role(appRole.name(), appRole.rank());
+            role.setSystem(true);
+            role.setAssignable(appRole.assignable());
+            role.setProtectedRole(appRole.protectedRole());
+            return role;
+        }
+    }
+
     private Authentication authentication(boolean superAdmin) {
         return authentication(UUID.randomUUID(), superAdmin);
     }
@@ -283,6 +460,7 @@ class RoleHierarchyServiceTest {
     private Authentication authentication(UUID userId, boolean superAdmin) {
         AuthenticatedUser user = AuthenticatedUser.builder()
                 .id(userId)
+                .restaurantId(SHARED_RESTAURANT_ID)
                 .email("user@pos.local")
                 .active(true)
                 .build();

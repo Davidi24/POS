@@ -15,6 +15,8 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class AuthMailService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AuthMailService.class);
+
     private final JavaMailSender mailSender;
     private final AppMailProperties appMailProperties;
 
@@ -111,7 +113,13 @@ public class AuthMailService {
         message.setTo(recipientEmail);
         message.setSubject(subject);
         message.setText(body);
-        mailSender.send(message);
+        // A mail server that is down must not undo what the person just did (adding staff, resetting a password).
+        // The email can be sent again from the app; the failure is logged for whoever runs the server.
+        try {
+            mailSender.send(message);
+        } catch (org.springframework.mail.MailException ex) {
+            log.warn("Could not send the email \"{}\": {}", subject, ex.getMessage());
+        }
     }
 
     private String normalizeName(String firstName) {

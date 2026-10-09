@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -30,11 +31,14 @@ public class SettingsTransferRequest {
     private UpdateOrderRuleSettingsRequest orderRules;
 
     @Valid
-    private List<ReservationRuleTransferRequest> reservationRules;
+    @Size(max = 500, message = "reservationRules can have at most 500 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") ReservationRuleTransferRequest> reservationRules;
 
     @Valid
-    private List<BranchBusinessHoursTransferRequest> businessHours;
+    @Size(max = 5000, message = "businessHours can have at most 5000 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") BranchBusinessHoursTransferRequest> businessHours;
 
     @Valid
-    private List<BranchSpecialHoursTransferRequest> specialHours;
+    @Size(max = 5000, message = "specialHours can have at most 5000 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") BranchSpecialHoursTransferRequest> specialHours;
 }

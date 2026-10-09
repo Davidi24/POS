@@ -13,6 +13,7 @@ import pos.pos.inventory.dto.InventoryLocationResponse;
 import pos.pos.inventory.entity.InventoryLocation;
 import pos.pos.inventory.mapper.InventoryLocationMapper;
 import pos.pos.inventory.repository.InventoryLocationRepository;
+import pos.pos.inventory.repository.InventorySalesSourceRepository;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
@@ -31,6 +32,7 @@ public class InventoryLocationService {
 
     private final RestaurantScopeService restaurantScopeService;
     private final InventoryLocationRepository inventoryLocationRepository;
+    private final InventorySalesSourceRepository inventorySalesSourceRepository;
     private final InventoryLocationMapper inventoryLocationMapper;
 
     @Transactional
@@ -64,9 +66,19 @@ public class InventoryLocationService {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         InventoryLocation location = requireLocation(restaurantId, locationId);
 
+        boolean hasSalesSources = inventorySalesSourceRepository.existsByLocation_Id(locationId);
+        Branch nextBranch = resolveBranch(restaurantId, request.getBranchId());
+        boolean branchChanged = !java.util.Objects.equals(
+                location.getBranch() == null ? null : location.getBranch().getId(),
+                nextBranch == null ? null : nextBranch.getId()
+        );
+        if (hasSalesSources && (branchChanged || Boolean.FALSE.equals(request.getActive()))) {
+            throw new AuthException("Remove this location's sale stock sources before changing its branch or deactivating it", HttpStatus.CONFLICT);
+        }
+
         assertCodeAvailable(restaurantId, request.getCode(), location.getCode());
 
-        location.setBranch(resolveBranch(restaurantId, request.getBranchId()));
+        location.setBranch(nextBranch);
         location.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         inventoryLocationMapper.applyRequest(location, request);
 
@@ -99,6 +111,10 @@ public class InventoryLocationService {
     public void deactivateLocation(Authentication authentication, UUID restaurantId, UUID locationId) {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         InventoryLocation location = requireLocation(restaurantId, locationId);
+
+        if (inventorySalesSourceRepository.existsByLocation_Id(locationId)) {
+            throw new AuthException("Remove this location's sale stock sources before deactivating it", HttpStatus.CONFLICT);
+        }
 
         location.setActive(false);
         location.setUpdatedBy(restaurantScopeService.currentUserId(authentication));

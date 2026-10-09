@@ -49,7 +49,7 @@ class MenuItemControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new MenuItemController(menuItemService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new MenuItemController(menuItemService, org.mockito.Mockito.mock(pos.pos.menu.service.MenuItemImportService.class)))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -156,7 +156,7 @@ class MenuItemControllerTest {
         private MenuItemSummaryResponse availabilityResponse;
 
         StubMenuItemService() {
-            super(null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

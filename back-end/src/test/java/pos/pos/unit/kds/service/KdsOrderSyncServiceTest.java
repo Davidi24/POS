@@ -30,6 +30,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -121,5 +122,48 @@ class KdsOrderSyncServiceTest {
         assertThat(savedTicket.getItems().get(0).getOrderLineItem()).isEqualTo(lineItem);
         assertThat(savedTicket.getItems().get(0).getQuantity()).isEqualTo(2);
         assertThat(savedTicket.getItems().get(0).getPriority()).isEqualTo(KdsPriority.RUSH);
+    }
+
+    @Test
+    @DisplayName("Should never ticket a counter item even when a station route exists")
+    void shouldSkipCounterItems() {
+        Restaurant restaurant = new Restaurant();
+        restaurant.setId(RESTAURANT_ID);
+        Branch branch = new Branch();
+        branch.setId(BRANCH_ID);
+        branch.setRestaurant(restaurant);
+
+        MenuItem cola = new MenuItem();
+        cola.setId(MENU_ITEM_ID);
+        cola.setName("Cola");
+        cola.setSendToKitchen(false);
+
+        OrderLineItem lineItem = new OrderLineItem();
+        lineItem.setId(LINE_ITEM_ID);
+        lineItem.setMenuItem(cola);
+        lineItem.setItemNameSnapshot("Cola");
+        lineItem.setQuantity(1);
+        lineItem.setStatus(OrderLineItemStatus.FULFILLED);
+
+        Order order = new Order();
+        order.setId(ORDER_ID);
+        order.setRestaurant(restaurant);
+        order.setBranch(branch);
+        order.addLineItem(lineItem);
+
+        KdsStation bar = new KdsStation();
+        bar.setId(STATION_ID);
+        KdsStationRouting routing = new KdsStationRouting();
+        routing.setStation(bar);
+        routing.setMenuItem(cola);
+
+        when(kdsSupport.loadActiveBranchRoutings(BRANCH_ID)).thenReturn(List.of(routing));
+        when(kdsSupport.findActiveTicketItem(LINE_ITEM_ID)).thenReturn(Optional.empty());
+        when(kdsSupport.loadOrderTickets(ORDER_ID)).thenReturn(List.of());
+
+        kdsOrderSyncService.syncFromCurrentOrderState(order, ACTOR_ID);
+
+        verify(kdsSupport, never()).saveTickets(any());
+        verify(kdsSupport, never()).findActiveTicket(any(), any());
     }
 }

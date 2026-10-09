@@ -5,7 +5,5 @@ public enum OrderFulfillmentStatus {
     IN_PREPARATION,
     READY,
     PARTIALLY_FULFILLED,
-    FULFILLED,
-    DELIVERED,
-    CANCELLED
+    FULFILLED
 }

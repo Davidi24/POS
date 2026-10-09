@@ -64,6 +64,7 @@ public class MenuService {
     private final MenuPolicy menuPolicy;
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantValidationService restaurantValidationService;
+    private final OnlineMenuService onlineMenuService;
 
     //returns a paginated, filtered, sorted list of menus that the logged-in user is allowed to see.
     @Transactional(readOnly = true)
@@ -82,11 +83,7 @@ public class MenuService {
             restaurantScopeService.requireAccessibleRestaurant(scope, restaurantId);
         }
         //creates pagination and sorting
-        Pageable pageable = PageRequest.of(
-                page == null ? 0 : page,
-                size == null ? DEFAULT_PAGE_SIZE : size,
-                resolveSort(sortBy, direction)
-        );
+        Pageable pageable = pos.pos.utils.PageableUtils.of(page, size, DEFAULT_PAGE_SIZE, resolveSort(sortBy, direction));
         //normalizing user's search text i.e "  LUNCH  " → "%lunch%"
         String searchLike = NormalizationUtils.normalizeLowerLike(search);
         //searching menus in the db
@@ -212,6 +209,7 @@ public class MenuService {
         menu.setAvailableFromDate(request.getAvailableFromDate());
         menu.setAvailableUntilDate(request.getAvailableUntilDate());
         menu.setColor(NormalizationUtils.normalize(request.getColor()));
+        menu.setSpecial(Boolean.TRUE.equals(request.getSpecial()));
         menu.setCreatedBy(actorId);
         menu.setUpdatedBy(actorId);
 
@@ -240,6 +238,9 @@ public class MenuService {
         menu.setAvailableFromDate(request.getAvailableFromDate());
         menu.setAvailableUntilDate(request.getAvailableUntilDate());
         menu.setColor(NormalizationUtils.normalize(request.getColor()));
+        if (request.getSpecial() != null) {
+            menu.setSpecial(request.getSpecial());
+        }
         menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));//stores who updated the menu
 
         int itemCount = (int) menuItemRepository.countByMenuId(menu.getId());
@@ -273,10 +274,14 @@ public class MenuService {
                         menuItemOptionGroupRepository.deleteAll(
                                 menuItemOptionGroupRepository.findByMenuItemIdOrdered(item.getId()));
                     }
-                    menuItemRepository.deleteAll(
-                            menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId()));
+                    List<MenuItem> sectionItems = menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId());
+                    if (!sectionItems.isEmpty()) {
+                        menuItemRepository.deleteKdsRoutingsOf(sectionItems.stream().map(MenuItem::getId).toList());
+                    }
+                    menuItemRepository.deleteAll(sectionItems);
                 }
                 menuSectionRepository.deleteAll(sections);
+                onlineMenuService.removeEmptySections(menu.getRestaurant().getId());
             } else {
                 contentTransfer.preserveSections(menu, sections, restaurantScopeService.currentUserId(authentication));
             }

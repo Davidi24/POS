@@ -7,6 +7,10 @@ import com.saporini.mobile_desktop.pos.menu.domain.model.MenuPage
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuRestaurant
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuVariant
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenu
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuDish
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
+import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSectionView
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroup
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroupType
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionItem
@@ -43,7 +47,8 @@ fun MenuResponseDto.toDomain(): Menu {
         createdAt = createdAt,
         updatedAt = updatedAt,
         allFilterPosition = allFilterPosition,
-        sections = sections.map { it.toDomain() }
+        sections = sections.map { it.toDomain() },
+        special = special
     )
 }
 
@@ -75,10 +80,16 @@ fun MenuItemDto.toDomain(): MenuItem {
         basePrice = basePrice,
         imageUrl = imageUrl,
         available = available,
+        sendToKitchen = sendToKitchen,
+        showOnline = showOnline,
+        onlineSectionId = onlineSectionId,
+        onlineSectionName = onlineSectionName,
         displayOrder = displayOrder,
         ingredients = ingredients,
         variants = variants.map { it.toDomain() },
-        optionGroups = optionGroups.map { it.toDomain() }
+        optionGroups = optionGroups.map { it.toDomain() },
+        orderBeforeHours = orderBeforeHours,
+        occasionCodes = occasionCodes
     )
 }
 
@@ -144,6 +155,38 @@ fun OptionItemDto.toDomain(): OptionItem {
         name = name,
         priceDelta = priceDelta,
         available = available,
-        displayOrder = displayOrder
+        displayOrder = displayOrder,
+        inventoryRecipeId = inventoryRecipeId,
+        inventoryRecipeQuantity = inventoryRecipeQuantity
     )
 }
+
+fun OnlineMenuSectionDto.toDomain(): OnlineMenuSection =
+    OnlineMenuSection(id = id, name = name, displayOrder = displayOrder, itemCount = itemCount)
+
+fun OnlineMenuDto.toDomain(): OnlineMenu = OnlineMenu(
+    sections = sections.map { section ->
+        OnlineMenuSectionView(
+            id = section.id,
+            name = section.name,
+            items = section.items.map { item ->
+                OnlineMenuDish(
+                    id = item.id,
+                    sku = item.sku,
+                    name = item.name,
+                    description = item.description,
+                    basePrice = item.basePrice,
+                    imageUrl = item.imageUrl,
+                    ingredients = item.ingredients,
+                    available = item.available,
+                    sendToKitchen = item.sendToKitchen,
+                    displayOrder = item.displayOrder,
+                    menuName = item.menuName,
+                    menuSectionName = item.menuSectionName,
+                    visible = item.visible,
+                    hiddenReason = item.hiddenReason
+                )
+            }
+        )
+    }
+)

@@ -7,5 +7,7 @@ public enum ReservationStatus {
     SEATED,
     COMPLETED,
     CANCELLED,
-    NO_SHOW
+    NO_SHOW,
+    // A request nobody answered before the booking time. Not the guest's fault, so never a no-show.
+    EXPIRED
 }

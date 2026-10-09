@@ -47,7 +47,7 @@ public class AppAuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<AuthenticationResponse> refresh(
-            @RequestBody(required = false) RefreshRequest request,
+            @Valid @RequestBody(required = false) RefreshRequest request,
             HttpServletRequest httpRequest
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
@@ -58,7 +58,7 @@ public class AppAuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestBody(required = false) RefreshRequest request) {
+    public ResponseEntity<Void> logout(@Valid @RequestBody(required = false) RefreshRequest request) {
         String refreshToken = extractOptionalRefreshTokenFromRequest(request);
         if (refreshToken == null) {
             return ResponseEntity.noContent().build();
@@ -69,7 +69,7 @@ public class AppAuthController {
     }
 
     @PostMapping("/logout-all")
-    public ResponseEntity<Void> logoutAll(@RequestBody(required = false) RefreshRequest request) {
+    public ResponseEntity<Void> logoutAll(@Valid @RequestBody(required = false) RefreshRequest request) {
         String refreshToken = extractRefreshTokenFromRequest(request);
         authLogoutService.logoutAll(refreshToken);
         return ResponseEntity.noContent().build();

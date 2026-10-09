@@ -1,542 +1,563 @@
 package com.saporini.mobile_desktop.pos.kitchen
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.outlined.Cake
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.LocalDrink
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.LocalFireDepartment
-import androidx.compose.material.icons.outlined.LocalPizza
-import androidx.compose.material.icons.outlined.NotificationsOff
-import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.PauseCircle
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restaurant
-import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.RoomService
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.material.icons.outlined.StickyNote2
 import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.saporini.mobile_desktop.core.components.CompactStat
+import com.saporini.mobile_desktop.core.components.CountPill
+import com.saporini.mobile_desktop.core.components.GroupLabel
+import com.saporini.mobile_desktop.core.components.Kit
+import com.saporini.mobile_desktop.core.components.OverviewEmpty
+import com.saporini.mobile_desktop.core.components.OverviewTabs
+import com.saporini.mobile_desktop.core.components.SearchField
+import com.saporini.mobile_desktop.core.components.SkeletonBox
+import com.saporini.mobile_desktop.core.components.SkeletonLight
+import com.saporini.mobile_desktop.core.components.StatusChip
+import com.saporini.mobile_desktop.core.components.rememberSkeletonAlpha
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.core.ui.PlatformVerticalScrollbar
+import com.saporini.mobile_desktop.core.ui.ScreenSize
+import com.saporini.mobile_desktop.core.ui.screenSizeFor
+import com.saporini.mobile_desktop.kds.model.KdsState
+import com.saporini.mobile_desktop.pos.reservations.HeaderDropdown
+import com.saporini.mobile_desktop.pos.reservations.ToolbarHeight
+import kotlinx.coroutines.delay
+import mobile_desktop.shared.generated.resources.Res
+import mobile_desktop.shared.generated.resources.settings_orders_kitchen
+import kotlin.time.Clock
+import kotlin.time.Instant
 
-private val ActiveOlive = Color(0xFF4F7942)
-private val Ink = Color(0xFF202124)
-private val Muted = Color(0xFF6E716C)
-private val Border = Color(0xFFE7E1DC)
-private val RushRed = Color(0xFFD71920)
-private val NormalGreen = Color(0xFF3E7B32)
-private val FiredRed = Color(0xFFD71920)
-private val ProgressOrange = Color(0xFFE88228)
-private val ReadyGreen = Color(0xFF5B8A4C)
+private const val ALL_STATIONS = "All stations"
+private const val ALL_ORDERS = "All orders"
+private const val MY_ORDERS = "My orders"
+
+private fun KitchenLane.color(): Color = when (this) {
+    KitchenLane.READY -> Kit.Green
+    KitchenLane.COOKING -> Kit.Amber
+    KitchenLane.WAITING -> Kit.Blue
+}
+
+private fun KitchenLane.title(): String = when (this) {
+    KitchenLane.READY -> "Ready to serve"
+    KitchenLane.COOKING -> "Cooking"
+    KitchenLane.WAITING -> "Waiting"
+}
+
+private fun KitchenLane.icon(): ImageVector = when (this) {
+    KitchenLane.READY -> Icons.Outlined.RoomService
+    KitchenLane.COOKING -> Icons.Outlined.LocalFireDepartment
+    KitchenLane.WAITING -> Icons.Outlined.HourglassEmpty
+}
 
 @Composable
-fun KitchenStatusScreen(
-    modifier: Modifier = Modifier
-) {
-    var selectedStation by remember { mutableStateOf("All Stations") }
-    var selectedPriority by remember { mutableStateOf("All") }
-    var searchQuery by remember { mutableStateOf("") }
-
-    val filteredOrders = kitchenOrders.filter { order ->
-        (selectedStation == "All Stations" || order.station == selectedStation) &&
-            (selectedPriority == "All" || order.priority == selectedPriority) &&
-            (searchQuery.isBlank() ||
-                order.id.contains(searchQuery, ignoreCase = true) ||
-                order.table.contains(searchQuery, ignoreCase = true) ||
-                order.items.any { it.contains(searchQuery, ignoreCase = true) })
+fun KitchenStatusScreen(modifier: Modifier = Modifier) {
+    val model = org.koin.compose.koinInject<com.saporini.mobile_desktop.kds.KdsScreenModel>()
+    val state by model.state.collectAsState()
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(model, owner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) model.setActive(true)
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) model.setActive(false)
+        }
+        owner.lifecycle.addObserver(observer)
+        model.setActive(owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
+        onDispose { owner.lifecycle.removeObserver(observer); model.onDispose() }
     }
-
-    Column(
+    LaunchedEffect(state.scope, state.canRead) { if (state.canRead) model.loadPosTiming() }
+    KitchenStatusContent(
+        state = state,
+        onPickUp = { ticketIds -> ticketIds.forEach { model.pickUp(it) } },
+        onRefresh = { model.refresh() },
+        onClearMessages = model::clearMessages,
         modifier = modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .padding(horizontal = 22.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        KitchenHeader()
-        KitchenFilters(
-            selectedStation = selectedStation,
-            onStationSelected = { selectedStation = it },
-            selectedPriority = selectedPriority,
-            onPrioritySelected = { selectedPriority = it },
-            searchQuery = searchQuery,
-            onSearchChange = { searchQuery = it }
-        )
-
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            KitchenLane(
-                title = "Fired",
-                icon = Icons.Outlined.LocalFireDepartment,
-                color = FiredRed,
-                orders = filteredOrders.filter { it.stage == KitchenStage.FIRED },
-                modifier = Modifier.weight(1f)
-            )
-            KitchenLane(
-                title = "In Progress",
-                icon = Icons.Filled.Restaurant,
-                color = ProgressOrange,
-                orders = filteredOrders.filter { it.stage == KitchenStage.IN_PROGRESS },
-                modifier = Modifier.weight(1f)
-            )
-            KitchenLane(
-                title = "Ready",
-                icon = Icons.Filled.CheckCircle,
-                color = ReadyGreen,
-                orders = filteredOrders.filter { it.stage == KitchenStage.READY },
-                modifier = Modifier.weight(1.1f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun KitchenHeader() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Kitchen Status",
-                fontFamily = Inter(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 29.sp,
-                letterSpacing = 0.sp,
-                color = ActiveOlive
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Live overview of all orders in the kitchen.",
-                fontFamily = Inter(),
-                fontWeight = FontWeight.Medium,
-                fontSize = 15.sp,
-                letterSpacing = 0.sp,
-                color = Muted
-            )
-        }
-        HeaderButton("All Stations", Icons.Outlined.Tune)
-        Spacer(Modifier.width(14.dp))
-        HeaderButton("Pause Alerts", Icons.Outlined.NotificationsOff)
-    }
-}
-
-@Composable
-private fun HeaderButton(
-    text: String,
-    icon: ImageVector
-) {
-    Row(
-        modifier = Modifier
-            .height(56.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, Border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp), tint = Ink)
-        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Ink)
-        if (text == "All Stations") {
-            Icon(Icons.Outlined.ExpandMore, contentDescription = null, modifier = Modifier.size(20.dp), tint = Ink)
-        }
-    }
-}
-
-@Composable
-private fun KitchenFilters(
-    selectedStation: String,
-    onStationSelected: (String) -> Unit,
-    selectedPriority: String,
-    onPrioritySelected: (String) -> Unit,
-    searchQuery: String,
-    onSearchChange: (String) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        listOf("All Stations", "Hot Kitchen", "Pizza", "Pasta", "Dessert", "Drinks").forEach { station ->
-            StationButton(
-                text = station,
-                icon = stationIcon(station),
-                selected = station == selectedStation,
-                onClick = { onStationSelected(station) }
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        PriorityButton("All", selectedPriority == "All", null) { onPrioritySelected("All") }
-        PriorityButton("Normal", selectedPriority == "Normal", NormalGreen) { onPrioritySelected("Normal") }
-        PriorityButton("Rush", selectedPriority == "Rush", RushRed) { onPrioritySelected("Rush") }
-        KitchenSearchField(searchQuery, onSearchChange, Modifier.width(360.dp))
-    }
-}
-
-@Composable
-private fun StationButton(
-    text: String,
-    icon: ImageVector,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    TextButton(
-        onClick = onClick,
-        modifier = Modifier
-            .height(50.dp)
-            .width(if (text == "All Stations") 184.dp else 156.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) ActiveOlive else Color.White)
-            .border(1.dp, Border, RoundedCornerShape(8.dp)),
-        shape = RoundedCornerShape(8.dp),
-        contentPadding = PaddingValues(horizontal = 14.dp),
-        colors = ButtonDefaults.textButtonColors(contentColor = if (selected) Color.White else Ink)
-    ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp), tint = if (selected) Color.White else Ink)
-        Spacer(Modifier.width(10.dp))
-        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, softWrap = false)
-    }
-}
-
-@Composable
-private fun PriorityButton(
-    text: String,
-    selected: Boolean,
-    dotColor: Color?,
-    onClick: () -> Unit
-) {
-    TextButton(
-        onClick = onClick,
-        modifier = Modifier
-            .height(50.dp)
-            .width(if (text == "All") 100.dp else 142.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) ActiveOlive else Color.White)
-            .border(1.dp, Border, RoundedCornerShape(8.dp)),
-        shape = RoundedCornerShape(8.dp),
-        contentPadding = PaddingValues(horizontal = 14.dp),
-        colors = ButtonDefaults.textButtonColors(contentColor = if (selected) Color.White else Ink)
-    ) {
-        if (dotColor != null) {
-            Box(
-                modifier = Modifier
-                    .size(13.dp)
-                    .clip(CircleShape)
-                    .background(dotColor)
-            )
-            Spacer(Modifier.width(10.dp))
-        }
-        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, softWrap = false)
-    }
-}
-
-@Composable
-private fun KitchenSearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .height(50.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, Border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 15.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(Icons.Outlined.Search, contentDescription = null, modifier = Modifier.size(22.dp), tint = Ink)
-        Spacer(Modifier.width(12.dp))
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            textStyle = androidx.compose.ui.text.TextStyle(
-                fontFamily = Inter(),
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
-                letterSpacing = 0.sp,
-                color = Ink
-            ),
-            decorationBox = { innerTextField ->
-                Box {
-                    if (value.isEmpty()) {
-                        Text(
-                            text = "Search orders...",
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp,
-                            letterSpacing = 0.sp,
-                            color = Color(0xFF999999)
-                        )
-                    }
-                    innerTextField()
-                }
-            }
-        )
-    }
-}
-
-@Composable
-private fun KitchenLane(
-    title: String,
-    icon: ImageVector,
-    color: Color,
-    orders: List<KitchenOrder>,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxHeight()
-            .clip(RoundedCornerShape(14.dp))
-            .background(color.copy(alpha = 0.045f))
-            .border(1.dp, color.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
-            .padding(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(29.dp), tint = color)
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = title,
-                modifier = Modifier.weight(1f),
-                fontFamily = Inter(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 23.sp,
-                letterSpacing = 0.sp,
-                color = Ink
-            )
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(Color.White)
-                    .border(1.dp, color.copy(alpha = 0.25f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(orders.size.toString(), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 18.sp, color = color)
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            orders.forEach { order ->
-                KitchenOrderCard(order = order, laneColor = color)
-            }
-        }
-    }
-}
-
-@Composable
-private fun KitchenOrderCard(
-    order: KitchenOrder,
-    laneColor: Color
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color.White)
-            .border(1.dp, laneColor.copy(alpha = 0.28f), RoundedCornerShape(10.dp))
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = order.id,
-                modifier = Modifier.weight(1f),
-                fontFamily = Inter(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                letterSpacing = 0.sp,
-                color = Ink
-            )
-            Text(
-                text = "Table ${order.table}",
-                fontFamily = Inter(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                color = Ink
-            )
-            Spacer(Modifier.width(12.dp))
-            TimePill(order.elapsed, laneColor)
-            if (order.stage == KitchenStage.READY) {
-                Spacer(Modifier.width(10.dp))
-                Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(30.dp), tint = ReadyGreen)
-            }
-        }
-
-        PriorityRow(order.priority)
-
-        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                order.items.take(2).forEach { item -> KitchenItemText(item) }
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                order.items.drop(2).forEach { item -> KitchenItemText(item) }
-            }
-        }
-
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Border))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Groups, contentDescription = null, modifier = Modifier.size(18.dp), tint = Muted)
-            Spacer(Modifier.width(8.dp))
-            Text("Covers: ${order.covers}", fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Muted)
-            Spacer(Modifier.width(28.dp))
-            Icon(Icons.Outlined.Person, contentDescription = null, modifier = Modifier.size(18.dp), tint = Muted)
-            Spacer(Modifier.width(8.dp))
-            Text("Server: ${order.server}", fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Muted)
-            Spacer(Modifier.weight(1f))
-            order.note?.let { note ->
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(7.dp))
-                        .background(Color(0xFFF8EAD9))
-                        .padding(horizontal = 10.dp, vertical = 7.dp)
-                ) {
-                    Text(note, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFF8B5C18))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TimePill(text: String, color: Color) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = 0.08f))
-            .border(1.dp, color.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 9.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(Icons.Outlined.Timer, contentDescription = null, modifier = Modifier.size(16.dp), tint = color)
-        Spacer(Modifier.width(6.dp))
-        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = color)
-    }
-}
-
-@Composable
-private fun PriorityRow(priority: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(if (priority == "Rush") RushRed else NormalGreen)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = priority,
-            fontFamily = Inter(),
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            color = if (priority == "Rush") RushRed else NormalGreen
-        )
-    }
-}
-
-@Composable
-private fun KitchenItemText(item: String) {
-    Text(
-        text = "1 x  $item",
-        fontFamily = Inter(),
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
-        letterSpacing = 0.sp,
-        color = Ink,
-        maxLines = 1,
-        softWrap = false
     )
 }
 
-private fun stationIcon(station: String): ImageVector = when (station) {
-    "Hot Kitchen" -> Icons.Outlined.LocalFireDepartment
-    "Pizza" -> Icons.Outlined.LocalPizza
-    "Pasta" -> Icons.Outlined.Restaurant
-    "Dessert" -> Icons.Outlined.Cake
-    "Drinks" -> Icons.Outlined.LocalDrink
-    else -> Icons.Filled.Restaurant
+@Composable
+internal fun KitchenStatusContent(
+    state: KdsState,
+    onPickUp: (List<String>) -> Unit,
+    onRefresh: () -> Unit,
+    onClearMessages: () -> Unit = {},
+    modifier: Modifier = Modifier,
+    clock: () -> Instant = { Clock.System.now() }
+) {
+    var who by remember(state.scope) { mutableStateOf(ALL_ORDERS) }
+    var station by remember(state.scope) { mutableStateOf(ALL_STATIONS) }
+    var query by remember(state.scope) { mutableStateOf("") }
+    var phoneLane by remember { mutableStateOf(KitchenLane.READY) }
+    // Minutes on the cards move on by themselves.
+    var now by remember { mutableStateOf(clock()) }
+    LaunchedEffect(Unit) { while (true) { delay(15_000); now = clock() } }
+    // "Marked as picked up." fades after a moment; errors stay until closed.
+    LaunchedEffect(state.notice) { if (state.notice != null) { delay(3_000); onClearMessages() } }
+
+    val timing = state.posTiming
+    val me = state.scope?.userId
+    val all = state.kitchenOrders()
+    val stations = all.flatMap { it.stations }.distinct().sorted()
+    val shown = all
+        .filter { who == ALL_ORDERS || it.waiterId == me }
+        .filter { station == ALL_STATIONS || station in it.stations }
+        .filter { it.matches(query) }
+    val ready = shown.filter { it.lane == KitchenLane.READY }
+    val cooking = shown.filter { it.lane == KitchenLane.COOKING }
+    val waiting = shown.filter { it.lane == KitchenLane.WAITING }.sortedBy { it.held }
+    fun minutesSince(at: Instant?) = at?.let { (now - it).inWholeMinutes.coerceAtLeast(0) }
+    val slow = shown.filter { it.lane != KitchenLane.READY && !it.held && (minutesSince(it.sentAt) ?: 0) >= timing.slowAfterMinutes }
+    val waitingLongest = waiting.filterNot { it.held }.mapNotNull { minutesSince(it.sentAt) }.maxOrNull()
+    val readyTooLong = ready.count { (minutesSince(it.readySince) ?: 0) >= timing.readyWaitingMinutes }
+    val filtering = who != ALL_ORDERS || station != ALL_STATIONS || query.isNotBlank()
+
+    BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
+        val size = screenSizeFor(maxWidth)
+        val lanesSideBySide = size.isDesktop || (size == ScreenSize.TABLET && maxWidth >= 860.dp)
+        val pad = if (size.isPhone) 14.dp else 22.dp
+        Column(Modifier.fillMaxSize().padding(horizontal = pad, vertical = if (size.isPhone) 12.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            KitchenHeader(state, size, who, { who = it }, station, listOf(ALL_STATIONS) + stations, { station = it }, query, { query = it }, onRefresh)
+
+            state.actionError?.let { MessageBar(it.message, error = true, onClearMessages) }
+            state.notice?.let { MessageBar(it, error = false, onClearMessages) }
+
+            when {
+                !state.canRead -> CenterBox { OverviewEmpty("No access to the kitchen", "Ask a manager to give your role “View Kitchen Display”. Then sign in again.", Icons.Outlined.Lock) }
+                !state.loaded && state.error != null -> CenterBox {
+                    OverviewEmpty("Couldn't load the kitchen", state.error.message, Icons.Outlined.CloudOff) { RetryButton(onRefresh) }
+                }
+                !state.loaded -> KitchenSkeleton(size)
+                state.needsStationSetup -> CenterBox {
+                    OverviewEmpty("The kitchen isn't set up yet", "Once kitchen stations are added, the food for your tables shows up here.", Icons.Outlined.Restaurant, Res.drawable.settings_orders_kitchen)
+                }
+                else -> {
+                    // Slim tiles: a number and a few words, so the lanes below keep their room.
+                    val cards: List<@Composable (Modifier) -> Unit> = listOf(
+                        { m ->
+                            CompactStat("Ready to serve", "${ready.size}", Kit.Green, m,
+                                detail = if (readyTooLong > 0) "$readyTooLong waiting" else null, icon = Icons.Outlined.RoomService,
+                                valueColor = if (readyTooLong > 0) Kit.Danger else Kit.Ink,
+                                onClick = if (size.isDesktop) null else ({ phoneLane = KitchenLane.READY }))
+                        },
+                        { m ->
+                            CompactStat("Cooking", "${cooking.size}", Kit.Amber, m, icon = Icons.Outlined.LocalFireDepartment,
+                                onClick = if (size.isDesktop) null else ({ phoneLane = KitchenLane.COOKING }))
+                        },
+                        { m ->
+                            CompactStat("Waiting", "${waiting.size}", Kit.Blue, m,
+                                detail = waitingLongest?.let { "longest $it min" }, icon = Icons.Outlined.HourglassEmpty,
+                                onClick = if (size.isDesktop) null else ({ phoneLane = KitchenLane.WAITING }))
+                        },
+                        { m ->
+                            CompactStat("Taking long", "${slow.size}", if (slow.isEmpty()) Kit.Grey else Kit.Danger, m,
+                                detail = "over ${timing.slowAfterMinutes} min", icon = Icons.Outlined.Timer,
+                                valueColor = if (slow.isEmpty()) Kit.Ink else Kit.Danger)
+                        }
+                    )
+                    if (size.isDesktop) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { cards.forEach { it(Modifier.weight(1f)) } }
+                    } else {
+                        val gap = if (size.isPhone) 10.dp else 12.dp
+                        Row(horizontalArrangement = Arrangement.spacedBy(gap)) { cards[0](Modifier.weight(1f)); cards[1](Modifier.weight(1f)) }
+                        Row(horizontalArrangement = Arrangement.spacedBy(gap)) { cards[2](Modifier.weight(1f)); cards[3](Modifier.weight(1f)) }
+                    }
+                    if (state.stale && state.loaded) MessageBar("Reconnecting to the kitchen… The orders below may be a little behind.", error = false, null, warning = true)
+
+                    val lanes = mapOf(KitchenLane.READY to ready, KitchenLane.COOKING to cooking, KitchenLane.WAITING to waiting)
+                    val lane: @Composable (KitchenLane, Modifier) -> Unit = { which, m ->
+                        LaneBox(which, lanes.getValue(which), m, now, state, filtering, who == MY_ORDERS, onPickUp)
+                    }
+                    if (lanesSideBySide) {
+                        Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            lane(KitchenLane.READY, Modifier.weight(1.12f).fillMaxHeight())
+                            lane(KitchenLane.COOKING, Modifier.weight(1f).fillMaxHeight())
+                            lane(KitchenLane.WAITING, Modifier.weight(1f).fillMaxHeight())
+                        }
+                    } else {
+                        OverviewTabs(
+                            KitchenLane.entries.map { "${it.title()} (${lanes.getValue(it).size})" },
+                            "${phoneLane.title()} (${lanes.getValue(phoneLane).size})",
+                            { label -> phoneLane = KitchenLane.entries.first { label.startsWith(it.title()) } },
+                            Modifier.fillMaxWidth()
+                        )
+                        lane(phoneLane, Modifier.weight(1f).fillMaxWidth())
+                    }
+                }
+            }
+        }
+    }
 }
 
-private enum class KitchenStage {
-    FIRED,
-    IN_PROGRESS,
-    READY
+@Composable
+private fun KitchenHeader(
+    state: KdsState, size: ScreenSize,
+    who: String, onWho: (String) -> Unit,
+    station: String, stations: List<String>, onStation: (String) -> Unit,
+    query: String, onQuery: (String) -> Unit,
+    onRefresh: () -> Unit
+) {
+    val title: @Composable () -> Unit = {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Kitchen Status", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, letterSpacing = 0.sp, color = Kit.Ink)
+                LiveBadge(state)
+            }
+            Text("What the kitchen is making for your tables", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
+        }
+    }
+    val controls: @Composable (Modifier) -> Unit = { m ->
+        Row(m, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OverviewTabs(listOf(ALL_ORDERS, MY_ORDERS), who, onWho, Modifier.width(if (size.isPhone) 190.dp else 220.dp), height = ToolbarHeight)
+            if (stations.size > 2) HeaderDropdown(station, Icons.Outlined.Restaurant, Modifier.width(if (size.isPhone) 140.dp else 160.dp), stations, onStation)
+            if (!size.isPhone) SearchField(query, onQuery, Modifier.width(220.dp), placeholder = "Search table, dish…", height = ToolbarHeight)
+            RefreshButton(state.loading, onRefresh)
+        }
+    }
+    if (size.isDesktop) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { title() }
+            controls(Modifier)
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            title()
+            controls(Modifier.fillMaxWidth())
+            if (size.isPhone) SearchField(query, onQuery, Modifier.fillMaxWidth(), placeholder = "Search table, dish…", height = ToolbarHeight)
+        }
+    }
 }
 
-private data class KitchenOrder(
-    val id: String,
-    val table: String,
-    val station: String,
-    val stage: KitchenStage,
-    val priority: String,
-    val elapsed: String,
-    val covers: Int,
-    val server: String,
-    val items: List<String>,
-    val note: String? = null
-)
+// "Live" with a green dot while connected; amber while the connection comes back.
+@Composable
+private fun LiveBadge(state: KdsState) {
+    val live = state.loaded && !state.stale
+    val color = if (live) Kit.Green else Kit.Amber
+    Row(
+        Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.1f)).padding(horizontal = 9.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(color))
+        Text(if (live) "Live" else if (state.loaded) "Reconnecting" else "Connecting", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = color)
+    }
+}
 
-private val kitchenOrders = listOf(
-    KitchenOrder("#ORD-1248", "A12", "Hot Kitchen", KitchenStage.FIRED, "Rush", "02m ago", 4, "David K.", listOf("Bruschetta", "Margherita Pizza", "Spaghetti Carbonara", "Limonata")),
-    KitchenOrder("#ORD-1249", "T4", "Hot Kitchen", KitchenStage.FIRED, "Rush", "03m ago", 2, "Emma W.", listOf("Lasagna", "Caesar Salad", "Garlic Bread", "Limonata")),
-    KitchenOrder("#ORD-1250", "B2", "Pizza", KitchenStage.FIRED, "Normal", "04m ago", 3, "Michael B.", listOf("Panna Arrabbiata", "Margherita Pizza", "Tiramisu")),
-    KitchenOrder("#ORD-1251", "A3", "Pasta", KitchenStage.FIRED, "Rush", "05m ago", 2, "Sophia R.", listOf("Spaghetti Carbonara", "Garlic Bread", "Limonata")),
-    KitchenOrder("#ORD-1245", "A6", "Hot Kitchen", KitchenStage.IN_PROGRESS, "Rush", "08m ago", 4, "David K.", listOf("Spaghetti Carbonara", "Chicken Parmesan", "Garlic Bread", "Limonata"), "No onion"),
-    KitchenOrder("#ORD-1246", "T1", "Pasta", KitchenStage.IN_PROGRESS, "Normal", "07m ago", 2, "Sophia R.", listOf("Lasagna", "Caesar Salad", "Tiramisu")),
-    KitchenOrder("#ORD-1247", "B1", "Pizza", KitchenStage.IN_PROGRESS, "Normal", "06m ago", 2, "James C.", listOf("Margherita Pizza", "Spaghetti Bolognese", "Limonata")),
-    KitchenOrder("#ORD-1242", "B3", "Pasta", KitchenStage.IN_PROGRESS, "Normal", "09m ago", 2, "Ava G.", listOf("Fettuccine Alfredo", "Caesar Salad", "Limonata"), "Birthday table"),
-    KitchenOrder("#ORD-1241", "A5", "Pizza", KitchenStage.READY, "Normal", "15m ago", 2, "Liam H.", listOf("Margherita Pizza", "Bruschetta", "Tiramisu")),
-    KitchenOrder("#ORD-1240", "T3", "Hot Kitchen", KitchenStage.READY, "Rush", "14m ago", 4, "Emma W.", listOf("Lasagna", "Garlic Bread", "Limonata")),
-    KitchenOrder("#ORD-1239", "B4", "Dessert", KitchenStage.READY, "Normal", "11m ago", 2, "Michael B.", listOf("Chicken Alfredo", "Caesar Salad", "Panna Cotta")),
-    KitchenOrder("#ORD-1238", "B1", "Pasta", KitchenStage.READY, "Normal", "16m ago", 2, "Olivia M.", listOf("Spaghetti Carbonara", "Garlic Bread", "Limonata")),
-    KitchenOrder("#ORD-1237", "T2", "Drinks", KitchenStage.READY, "Normal", "17m ago", 2, "Ethan W.", listOf("Burrata", "Limonata")),
-    KitchenOrder("#ORD-1236", "R5", "Dessert", KitchenStage.READY, "Normal", "18m ago", 2, "Isabella P.", listOf("Panna Cotta", "Espresso"))
-)
+@Composable
+private fun RefreshButton(loading: Boolean, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.size(ToolbarHeight), shape = RoundedCornerShape(8.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
+        Box(contentAlignment = Alignment.Center) {
+            if (loading) CircularProgressIndicator(Modifier.size(16.dp), color = Kit.Green, strokeWidth = 2.dp)
+            else Icon(Icons.Outlined.Refresh, "Refresh", Modifier.size(18.dp), tint = Kit.Ink)
+        }
+    }
+}
+
+@Composable
+private fun RetryButton(onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = RoundedCornerShape(8.dp), color = Kit.Green) {
+        Row(Modifier.height(40.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Icon(Icons.Outlined.Refresh, null, Modifier.size(17.dp), tint = Color.White)
+            Text("Try again", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun MessageBar(text: String, error: Boolean, onDismiss: (() -> Unit)?, warning: Boolean = false) {
+    val color = when { error -> Kit.Danger; warning -> Kit.Amber; else -> Kit.Green }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(color.copy(alpha = 0.08f))
+            .border(1.dp, color.copy(alpha = 0.2f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = color)
+        if (onDismiss != null) {
+            Icon(Icons.Outlined.Close, "Dismiss", Modifier.size(24.dp).clip(CircleShape).clickable(onClick = onDismiss).padding(4.dp), tint = color)
+        }
+    }
+}
+
+@Composable
+private fun CenterBox(content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxWidth().heightIn(min = 320.dp), contentAlignment = Alignment.Center) { content() }
+}
+
+// One lane: its header with the count, then the order cards (only the ones on screen are drawn).
+@Composable
+private fun LaneBox(
+    lane: KitchenLane,
+    orders: List<KitchenOrderCard>,
+    modifier: Modifier,
+    now: Instant,
+    state: KdsState,
+    filtering: Boolean,
+    mineOnly: Boolean,
+    onPickUp: (List<String>) -> Unit
+) {
+    val color = lane.color()
+    Surface(modifier, shape = RoundedCornerShape(12.dp), color = color.copy(alpha = 0.035f), border = BorderStroke(1.dp, color.copy(alpha = 0.22f))) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(color.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                    Icon(lane.icon(), null, Modifier.size(17.dp), tint = color)
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(lane.title(), Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Kit.Ink)
+                CountPill(orders.size, color = color, background = Color.White)
+            }
+            if (orders.isEmpty()) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    when {
+                        filtering -> LaneEmpty(Icons.Outlined.SearchOff, "Nothing found", if (mineOnly) "None of your orders are here." else "Try another station or search.", color)
+                        lane == KitchenLane.READY -> LaneEmpty(Icons.Filled.CheckCircle, "Nothing to pick up", "Food shows up here as soon as the kitchen marks it ready.", color)
+                        lane == KitchenLane.COOKING -> LaneEmpty(Icons.Outlined.LocalFireDepartment, "Nothing cooking", "Orders move here when the kitchen starts them.", color)
+                        else -> LaneEmpty(Icons.Outlined.HourglassEmpty, "No orders waiting", "New orders wait here until the kitchen starts them.", color)
+                    }
+                }
+            } else {
+                val listState = rememberLazyListState()
+                Box(Modifier.weight(1f)) {
+                    LazyColumn(state = listState, modifier = Modifier.padding(end = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        var heldShown = false
+                        orders.forEach { order ->
+                            if (order.held && !heldShown) {
+                                heldShown = true
+                                item(key = "held-label") { GroupLabel("Held for later", "Not started by the kitchen yet") }
+                            }
+                            item(key = order.orderId) {
+                                OrderCard(order, now, state, onPickUp)
+                            }
+                        }
+                    }
+                    Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
+                        PlatformVerticalScrollbar(state = listState, modifier = Modifier.fillMaxHeight().width(3.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LaneEmpty(icon: ImageVector, title: String, hint: String, color: Color) {
+    Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.size(52.dp).clip(CircleShape).background(color.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(26.dp), tint = color)
+        }
+        Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Kit.Ink)
+        Text(hint, fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = Kit.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
+}
+
+@Composable
+private fun OrderCard(order: KitchenOrderCard, now: Instant, state: KdsState, onPickUp: (List<String>) -> Unit) {
+    val timing = state.posTiming
+    val laneColor = order.lane.color()
+    val sentMinutes = order.sentAt?.let { (now - it).inWholeMinutes.coerceAtLeast(0) }
+    val readyMinutes = order.readySince?.let { (now - it).inWholeMinutes.coerceAtLeast(0) }
+    val late = when (order.lane) {
+        KitchenLane.READY -> (readyMinutes ?: 0) >= timing.readyWaitingMinutes
+        else -> !order.held && (sentMinutes ?: 0) >= timing.slowAfterMinutes
+    }
+    val strip = if (late) Kit.Danger else laneColor
+    Surface(
+        Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White,
+        border = BorderStroke(1.dp, if (late) Kit.Danger.copy(alpha = 0.35f) else Kit.RowBorder), shadowElevation = if (order.lane == KitchenLane.READY) 1.dp else 0.dp
+    ) {
+        Row(Modifier.height(IntrinsicSize.Min).alpha(if (order.held) 0.72f else 1f)) {
+            Box(Modifier.width(5.dp).fillMaxHeight().background(strip))
+            Column(Modifier.weight(1f).padding(12.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TableBadge(order.table, laneColor)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(order.table?.let { "Table $it" } ?: "No table", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            listOfNotNull("#${order.orderNumber}", order.guests?.let { if (it == 1) "1 guest" else "$it guests" }).joinToString(" · "),
+                            fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    when {
+                        order.held -> StatusChip("Held", Kit.Grey, Icons.Outlined.PauseCircle)
+                        order.lane == KitchenLane.READY -> StatusChip(
+                            if (late) "Waiting ${readyMinutes} min" else "Ready ${readyMinutes?.let { "$it min" } ?: "now"}",
+                            if (late) Kit.Danger else Kit.Green, Icons.Outlined.Timer, strong = late
+                        )
+                        else -> StatusChip("${sentMinutes ?: 0} min", if (late) Kit.Danger else laneColor, Icons.Outlined.Timer, strong = late)
+                    }
+                }
+                if (order.rush || order.stations.isNotEmpty()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (order.rush) StatusChip("Rush", Kit.Danger, Icons.Outlined.Bolt)
+                        order.stations.take(3).forEach { StationTag(it) }
+                    }
+                }
+
+                Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.RowBorder))
+                val readyDishes = order.dishes.filter { it.state == DishState.READY }
+                val otherDishes = order.dishes.filter { it.state != DishState.READY }
+                if (order.lane == KitchenLane.READY) {
+                    readyDishes.forEach { DishLine(it) }
+                    if (otherDishes.isNotEmpty()) {
+                        Text("Still in the kitchen", Modifier.padding(top = 2.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Kit.Muted)
+                        otherDishes.forEach { DishLine(it, faded = true) }
+                    }
+                } else {
+                    order.dishes.forEach { DishLine(it) }
+                }
+                order.note?.let { NoteBox(it) }
+
+                if (order.lane == KitchenLane.READY && state.canPickUp) {
+                    val busy = order.readyTicketIds.any { "ticket:$it" in state.busyKeys }
+                    PickUpButton(
+                        if (otherDishes.isEmpty()) "Picked up" else "Picked up · ${order.readyCount} of ${order.totalCount}",
+                        busy
+                    ) { onPickUp(order.readyTicketIds) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TableBadge(table: String?, color: Color) {
+    Box(
+        Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (table == null) Icon(Icons.Outlined.ShoppingBag, null, Modifier.size(20.dp), tint = color)
+        else Text(table.take(4), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (table.length > 3) 12.sp else 15.sp, color = color, maxLines = 1)
+    }
+}
+
+@Composable
+private fun StationTag(name: String) {
+    Text(
+        name, Modifier.clip(RoundedCornerShape(6.dp)).background(Kit.Tint).padding(horizontal = 7.dp, vertical = 3.dp),
+        fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 10.sp, color = Kit.Muted, maxLines = 1
+    )
+}
+
+@Composable
+private fun DishLine(dish: KitchenDish, faded: Boolean = false) {
+    Row(Modifier.fillMaxWidth().alpha(if (faded) 0.6f else 1f), verticalAlignment = Alignment.Top) {
+        Box(Modifier.padding(top = 1.dp).size(16.dp), contentAlignment = Alignment.Center) {
+            when (dish.state) {
+                DishState.READY -> Icon(Icons.Filled.CheckCircle, "Ready", Modifier.size(16.dp), tint = Kit.Green)
+                DishState.COOKING -> Box(Modifier.size(10.dp).clip(CircleShape).background(Kit.Amber))
+                DishState.WAITING -> Box(Modifier.size(10.dp).clip(CircleShape).border(1.5.dp, Kit.Faint, CircleShape))
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Text("${dish.quantity}×", Modifier.width(26.dp), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink)
+        Column(Modifier.weight(1f)) {
+            Text(dish.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Ink)
+            dish.detail?.let { Text(it, fontFamily = Inter(), fontSize = 11.sp, lineHeight = 15.sp, color = Kit.Muted) }
+        }
+    }
+}
+
+@Composable
+private fun NoteBox(text: String) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFFBF3E6)).padding(horizontal = 9.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Icon(Icons.Outlined.StickyNote2, null, Modifier.size(15.dp), tint = Color(0xFF8B5C18))
+        Text(text, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp, color = Color(0xFF8B5C18))
+    }
+}
+
+@Composable
+private fun PickUpButton(text: String, busy: Boolean, onClick: () -> Unit) {
+    Surface(onClick = onClick, enabled = !busy, modifier = Modifier.fillMaxWidth().height(40.dp), shape = RoundedCornerShape(8.dp), color = Kit.Green) {
+        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            if (busy) CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+            else Icon(Icons.Outlined.DoneAll, null, Modifier.size(18.dp), tint = Color.White)
+            Spacer(Modifier.width(8.dp))
+            Text(if (busy) "Saving…" else text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun KitchenSkeleton(size: ScreenSize) {
+    val alpha = rememberSkeletonAlpha("kitchen-status")
+    Column(Modifier.fillMaxWidth().alpha(alpha), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(if (size.isDesktop) 4 else 2) {
+                Box(Modifier.weight(1f).height(82.dp).clip(RoundedCornerShape(10.dp)).border(1.dp, Kit.Border, RoundedCornerShape(10.dp))) {
+                    SkeletonBox(Modifier.padding(14.dp).size(52.dp), SkeletonLight, RoundedCornerShape(10.dp))
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            repeat(if (size.isDesktop) 3 else 1) {
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).border(1.dp, Kit.Border, RoundedCornerShape(12.dp)).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SkeletonBox(Modifier.width(120.dp).height(16.dp))
+                    repeat(3) { SkeletonBox(Modifier.fillMaxWidth().height(118.dp), SkeletonLight, RoundedCornerShape(10.dp)) }
+                }
+            }
+        }
+    }
+}

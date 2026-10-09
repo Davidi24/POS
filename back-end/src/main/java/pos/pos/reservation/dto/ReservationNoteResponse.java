@@ -19,6 +19,7 @@ public class ReservationNoteResponse {
     private UUID id;
     private String note;
     private UUID createdBy;
+    private String createdByName;
     private UUID updatedBy;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;

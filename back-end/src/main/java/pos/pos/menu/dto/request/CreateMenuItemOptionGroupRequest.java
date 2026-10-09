@@ -1,5 +1,6 @@
 package pos.pos.menu.dto.request;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -24,9 +25,11 @@ public class CreateMenuItemOptionGroupRequest {
     private Integer displayOrder;
 
     @Min(value = 0, message = "minSelectOverride must be greater than or equal to 0")
+    @Max(value = 100, message = "minSelectOverride must be at most 100")
     private Integer minSelectOverride;
 
     @Min(value = 0, message = "maxSelectOverride must be greater than or equal to 0")
+    @Max(value = 100, message = "maxSelectOverride must be at most 100")
     private Integer maxSelectOverride;
 
     private Boolean requiredOverride;

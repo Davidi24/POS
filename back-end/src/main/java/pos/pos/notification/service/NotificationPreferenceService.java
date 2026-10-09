@@ -39,9 +39,14 @@ public class NotificationPreferenceService {
             List<NotificationPreferenceRequest> requests
     ) {
         UUID userId = actorScopeService.currentUserId(authentication);
-        var user = userRepository.findActiveById(userId)
+        // Serialize a user's preference upserts. The unique key prevents duplicates,
+        // but without this lock two first-time writes race from "not found" to insert.
+        var user = userRepository.findActiveByIdForUpdate(userId)
                 .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
 
+        if (requests == null || requests.stream().anyMatch(java.util.Objects::isNull)) {
+            throw new pos.pos.exception.auth.AuthException("Preferences must not be empty", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
         for (NotificationPreferenceRequest request : requests) {
             String eventCode = NormalizationUtils.normalizeUpper(request.getEventCode());
             NotificationPreference preference = notificationPreferenceRepository

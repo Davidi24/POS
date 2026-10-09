@@ -20,10 +20,11 @@ import java.util.List;
 public class BranchBusinessHoursTransferRequest {
 
     @NotBlank(message = "branchCode is required")
+    @Size(max = 100, message = "branchCode must be at most 100 characters")
     private String branchCode;
 
     @Valid
     @NotEmpty(message = "items is required")
     @Size(min = 7, max = 7, message = "items must contain exactly 7 day definitions")
-    private List<UpsertBusinessHourRequest> items;
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UpsertBusinessHourRequest> items;
 }

@@ -1,552 +1,529 @@
 package com.saporini.mobile_desktop.pos.sales
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
-import androidx.compose.material.icons.outlined.AccessTime
-import androidx.compose.material.icons.outlined.CalendarToday
-import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.TableRestaurant
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.saporini.mobile_desktop.core.components.Kit
+import com.saporini.mobile_desktop.core.components.OverviewCompactEmpty
+import com.saporini.mobile_desktop.core.components.OverviewEmpty
+import com.saporini.mobile_desktop.core.components.OverviewPanel
+import com.saporini.mobile_desktop.core.components.OverviewStatCard
+import com.saporini.mobile_desktop.core.components.StatusChip
+import com.saporini.mobile_desktop.core.components.ValueLine
+import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.core.ui.ScreenSize
+import com.saporini.mobile_desktop.core.ui.screenSizeFor
+import com.saporini.mobile_desktop.pos.orders.domain.model.OrderDecimal
+import com.saporini.mobile_desktop.pos.reservations.CompactDatePicker
+import com.saporini.mobile_desktop.pos.reservations.HeaderButton
+import com.saporini.mobile_desktop.pos.reservations.HeaderDropdown
+import com.saporini.mobile_desktop.pos.reservations.ToolbarHeight
+import com.saporini.mobile_desktop.pos.shifts.ShiftRepository
+import com.saporini.mobile_desktop.pos.shifts.StaffPay
+import com.saporini.mobile_desktop.pos.shifts.centsText
+import com.saporini.mobile_desktop.pos.shifts.hoursText
+import com.saporini.mobile_desktop.pos.shifts.longDay
+import com.saporini.mobile_desktop.pos.shifts.toCents
+import kotlinx.coroutines.CancellationException
+import kotlinx.datetime.*
 import mobile_desktop.shared.generated.resources.Res
-import mobile_desktop.shared.generated.resources.auth_login_img
-import org.jetbrains.compose.resources.painterResource
+import mobile_desktop.shared.generated.resources.overview_guests
+import mobile_desktop.shared.generated.resources.overview_next_hours
+import mobile_desktop.shared.generated.resources.settings_payments
+import org.koin.compose.koinInject
+import kotlin.time.Clock
+import kotlin.time.Instant
 
-private val ActiveOlive = Color(0xFF4F7942)
-private val Ink = Color(0xFF202124)
-private val Muted = Color(0xFF6F716E)
-private val Border = Color(0xFFE7E1DC)
-private val SoftGreen = Color(0xFFE5F0D8)
-private val SoftGold = Color(0xFFF5E7C4)
-private val Orange = Color(0xFFE06412)
+// What the person earned: worked hours × wage + tips, for the day (or the chosen shift), the week and the month so far.
+internal data class PayBit(val minutes: Long = 0, val wages: Long = 0, val tips: Long = 0) {
+    val total get() = wages + tips
+}
+internal data class SalesPay(val currency: String, val rateCents: Long?, val day: PayBit, val week: PayBit, val month: PayBit, val missingRate: Boolean)
+
+internal fun StaffPay.salesPay(currency: String, date: LocalDate, shiftId: String?): SalesPay {
+    val weekStart = date.minus(DatePeriod(days = date.dayOfWeek.isoDayNumber - 1))
+    val monthStart = LocalDate(date.year, date.month, 1)
+    fun bit(days: ClosedRange<LocalDate>, onlyShift: String? = null): PayBit {
+        val lines = shifts.filter { line ->
+            val d = runCatching { LocalDate.parse(line.date) }.getOrNull() ?: return@filter false
+            // A chosen shift is found by itself (an overnight shift can start the day before).
+            if (onlyShift != null) line.shiftId == onlyShift else d in days
+        }
+        val tipCents = if (onlyShift != null) 0 else tipsByDay.filter { runCatching { LocalDate.parse(it.date) }.getOrNull()?.let { d -> d in days } == true }
+            .sumOf { it.tips.toCents() ?: 0 }
+        return PayBit(lines.sumOf { it.workedMinutes }, lines.sumOf { it.wages.toCents() ?: 0 }, tipCents)
+    }
+    return SalesPay(currency, hourlyRate.toCents(), bit(date..date, shiftId), bit(weekStart..date), bit(monthStart..date), missingRate)
+}
+
+private fun MySalesState.cents(value: OrderDecimal?): Long = value.toCents() ?: 0
+private fun MySalesState.amount(value: OrderDecimal?): String = value?.let { centsText(it.toCents() ?: 0, totals?.currency ?: "EUR") } ?: "–"
+private fun SalesReport?.time(value: String?): String = value?.let {
+    runCatching { Instant.parse(it).toLocalDateTime(TimeZone.of(this?.timezone ?: "UTC")).time.toString().take(5) }.getOrNull()
+} ?: "now"
 
 @Composable
-fun MySalesScreen(
-    modifier: Modifier = Modifier
+fun MySalesScreen(modifier: Modifier = Modifier, onShiftRequested: () -> Unit = {}) {
+    val model = koinInject<MySalesScreenModel>()
+    val state by model.state.collectAsState()
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(model, owner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START) model.setActive(true)
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) model.setActive(false)
+        }
+        owner.lifecycle.addObserver(observer)
+        model.setActive(owner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED))
+        onDispose { owner.lifecycle.removeObserver(observer); model.onDispose() }
+    }
+    // My pay comes from the shift records (hours × wage + tips): the month so far up to the day shown.
+    val shifts = koinInject<ShiftRepository>()
+    val session = koinInject<SessionManager>()
+    val user by session.currentUser.collectAsState()
+    val date = state.shownDate()
+    var pay by remember { mutableStateOf<SalesPay?>(null) }
+    LaunchedEffect(user?.id, date, state.filter.shiftId, state.report?.generatedAt) {
+        val r = user?.restaurantId; val b = user?.defaultBranchId
+        if (r == null || b == null || user?.permissions?.contains("SHIFT_SELF") != true) { pay = null; return@LaunchedEffect }
+        val weekStart = date.minus(DatePeriod(days = date.dayOfWeek.isoDayNumber - 1))
+        val from = minOf(weekStart, LocalDate(date.year, date.month, 1))
+        pay = try {
+            val report = shifts.pay(r, b, from.toString(), date.toString(), mine = true)
+            report.staff.firstOrNull { it.userId == user?.id }?.salesPay(report.currency, date, state.filter.shiftId)
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+    }
+    MySalesContent(state, model::date, model::shift, model::currency, { model.refresh() }, onShiftRequested, modifier, pay)
+}
+
+private fun MySalesState.shownDate(): LocalDate =
+    filter.date ?: report?.date?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        ?: Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+
+@Composable
+internal fun MySalesContent(
+    state: MySalesState, onDate: (LocalDate?) -> Unit, onShift: (String?) -> Unit,
+    onCurrency: (String) -> Unit, onRefresh: () -> Unit, onShiftRequested: () -> Unit, modifier: Modifier = Modifier,
+    pay: SalesPay? = null
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 32.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        SalesHeader()
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            KpiCard("Total Sales", "$1,284.50", "↗ 12.6% vs yesterday", Icons.Outlined.Payments, SoftGreen, Modifier.weight(1f))
-            KpiCard("Orders Served", "28", "↗ 7 vs yesterday", Icons.AutoMirrored.Outlined.ReceiptLong, SoftGold, Modifier.weight(1f))
-            KpiCard("Average Ticket", "$45.88", "↗ $3.12 vs yesterday", Icons.Outlined.CreditCard, SoftGreen, Modifier.weight(1f))
-            KpiCard("Tips Earned", "$186.40", "↗ 15.3% vs yesterday", Icons.Outlined.Payments, SoftGold, Modifier.weight(1f))
-            KpiCard("Tables Served", "14", "↗ 2 vs yesterday", Icons.Outlined.TableRestaurant, SoftGreen, Modifier.weight(1f))
-        }
+    val totals = state.totals
+    val currency = totals?.currency ?: "EUR"
+    val date = state.shownDate()
+    val today = Clock.System.now().toLocalDateTime(state.report?.timezone?.let { runCatching { TimeZone.of(it) }.getOrNull() } ?: TimeZone.currentSystemDefault()).date
+    val forShift = state.filter.shiftId != null
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            SalesChartCard(Modifier.weight(1.4f))
-            PaymentMethodsCard(Modifier.weight(0.92f))
-            ShiftSummaryCard(Modifier.weight(0.94f))
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            TopSellingItemsCard(Modifier.weight(1f))
-            TablesServedCard(Modifier.weight(0.92f))
-            RecentPaymentsCard(Modifier.weight(1.15f))
-        }
-
-        ShiftFooter()
-    }
-}
-
-@Composable
-private fun SalesHeader() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text("My Sales", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 30.sp, color = Ink, letterSpacing = 0.sp)
-            Spacer(Modifier.height(4.dp))
-            Text("Track your shift revenue, tips, and served orders.", fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Muted)
-        }
-        HeaderFilter("Today, May 24, 2025", Icons.Outlined.CalendarToday, 230.dp)
-        Spacer(Modifier.width(14.dp))
-        HeaderFilter("Lunch & Dinner Shift", Icons.Outlined.AccessTime, 235.dp)
-        Spacer(Modifier.width(14.dp))
-        HeaderPill("Today", false)
-        Spacer(Modifier.width(10.dp))
-        HeaderPill("Mine", true)
-    }
-}
-
-@Composable
-private fun HeaderFilter(text: String, icon: ImageVector, width: androidx.compose.ui.unit.Dp) {
-    Row(
-        modifier = Modifier
-            .width(width)
-            .height(42.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, Border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = Ink)
-        Spacer(Modifier.width(10.dp))
-        Text(text, modifier = Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-        Icon(Icons.Outlined.ExpandMore, contentDescription = null, modifier = Modifier.size(18.dp), tint = Ink)
-    }
-}
-
-@Composable
-private fun HeaderPill(text: String, selected: Boolean) {
-    Box(
-        modifier = Modifier
-            .width(92.dp)
-            .height(42.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) ActiveOlive else Color.White)
-            .border(1.dp, if (selected) ActiveOlive else Border, RoundedCornerShape(8.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (selected) Color.White else Ink)
-    }
-}
-
-@Composable
-private fun KpiCard(
-    title: String,
-    value: String,
-    delta: String,
-    icon: ImageVector,
-    iconBg: Color,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .height(114.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, Border, RoundedCornerShape(10.dp))
-            .background(Color.White)
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(iconBg),
-            contentAlignment = Alignment.Center
+    BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
+        val size = screenSizeFor(maxWidth)
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = if (size.isPhone) 14.dp else 22.dp, vertical = if (size.isPhone) 12.dp else 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(30.dp), tint = ActiveOlive)
+            SalesHeader(state, size, date, today, onDate, onShift, onCurrency, onRefresh)
+            val notice = when {
+                state.error != null && state.canRead -> state.error to true
+                state.stale && state.report != null -> "These numbers may be a little behind. They refresh by themselves." to false
+                totals?.ordersWithoutPayments?.let { it > 0 } == true ->
+                    "${totals.ordersWithoutPayments} closed ${if (totals.ordersWithoutPayments == 1L) "order has" else "orders have"} no payment recorded yet, so tips and collected money leave them out." to false
+                else -> null
+            }
+            notice?.let { (text, error) -> InfoBar(text, error) }
+
+            when {
+                !state.canRead -> Box(Modifier.fillMaxWidth().heightIn(min = 360.dp), Alignment.Center) {
+                    OverviewEmpty("No access to sales", state.error ?: "Your role needs “View Orders” to see sales.", Icons.Outlined.Lock)
+                }
+                state.report == null && state.loading -> Box(Modifier.fillMaxWidth().heightIn(min = 360.dp), Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(28.dp), color = Kit.Green, strokeWidth = 3.dp)
+                }
+                state.report == null -> Box(Modifier.fillMaxWidth().heightIn(min = 360.dp), Alignment.Center) {
+                    OverviewEmpty("Couldn't load your sales", "Check the connection, then refresh.", Icons.Outlined.CloudOff)
+                }
+                else -> {
+                    val cards = listOf<@Composable (Modifier) -> Unit>(
+                        { m ->
+                            OverviewStatCard("Sales", state.amount(totals?.sales),
+                                if ((totals?.ordersServed ?: 0) == 0L) "No closed orders yet" else "${totals?.ordersServed} orders · avg ${state.amount(totals?.averageTicket)}",
+                                Kit.Green, m, image = Res.drawable.settings_payments)
+                        },
+                        { m ->
+                            OverviewStatCard("Tips", state.amount(totals?.recordedTips),
+                                "${totals?.paymentCount ?: 0} ${if (totals?.paymentCount == 1L) "payment" else "payments"} recorded",
+                                Kit.Blue, m, icon = Icons.Outlined.VolunteerActivism)
+                        },
+                        { m ->
+                            OverviewStatCard(if (forShift) "Earned this shift" else if (date == today) "Earned today" else "Earned that day",
+                                pay?.let { centsText(it.day.total, it.currency) } ?: "–",
+                                when {
+                                    pay == null -> "Pay isn't available"
+                                    pay.rateCents == null -> "Your hourly wage isn't set yet"
+                                    else -> "${hoursText(pay.day.minutes)} × ${centsText(pay.rateCents, pay.currency)}${if (!forShift) " + tips" else ""}"
+                                },
+                                Kit.Amber, m, image = Res.drawable.overview_next_hours, imageScale = 1.3f)
+                        },
+                        { m ->
+                            OverviewStatCard("Tables served", "${totals?.tablesServed ?: 0}",
+                                "${totals?.guestsServed ?: 0} guests · ${totals?.openOrders ?: 0} still open",
+                                Kit.Purple, m, image = Res.drawable.overview_guests)
+                        }
+                    )
+                    if (size.isDesktop) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { cards.forEach { it(Modifier.weight(1f)) } }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { cards[0](Modifier.weight(1f)); cards[1](Modifier.weight(1f)) }
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { cards[2](Modifier.weight(1f)); cards[3](Modifier.weight(1f)) }
+                    }
+
+                    val hours: @Composable (Modifier) -> Unit = { m -> HourlyPanel(m, state, currency) }
+                    val payPanel: @Composable (Modifier) -> Unit = { m -> PayPanel(m, pay, forShift, date, today, onShiftRequested) }
+                    val methods: @Composable (Modifier) -> Unit = { m -> MethodsPanel(m, state, currency) }
+                    val items: @Composable (Modifier) -> Unit = { m -> TopItemsPanel(m, state, currency) }
+                    val floors: @Composable (Modifier) -> Unit = { m -> FloorsPanel(m, state, currency) }
+                    val recent: @Composable (Modifier) -> Unit = { m -> RecentPanel(m, state, currency) }
+                    when (size) {
+                        ScreenSize.DESKTOP -> {
+                            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                hours(Modifier.weight(1.35f).fillMaxHeight()); payPanel(Modifier.weight(1f).fillMaxHeight()); methods(Modifier.weight(1f).fillMaxHeight())
+                            }
+                            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                items(Modifier.weight(1.1f).fillMaxHeight()); floors(Modifier.weight(0.9f).fillMaxHeight()); recent(Modifier.weight(1.3f).fillMaxHeight())
+                            }
+                        }
+                        ScreenSize.TABLET -> {
+                            hours(Modifier.fillMaxWidth())
+                            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                payPanel(Modifier.weight(1f).fillMaxHeight()); methods(Modifier.weight(1f).fillMaxHeight())
+                            }
+                            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                items(Modifier.weight(1f).fillMaxHeight()); floors(Modifier.weight(1f).fillMaxHeight())
+                            }
+                            recent(Modifier.fillMaxWidth())
+                        }
+                        ScreenSize.PHONE -> {
+                            payPanel(Modifier.fillMaxWidth()); hours(Modifier.fillMaxWidth()); methods(Modifier.fillMaxWidth())
+                            items(Modifier.fillMaxWidth()); floors(Modifier.fillMaxWidth()); recent(Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            }
         }
-        Spacer(Modifier.width(16.dp))
+    }
+}
+
+@Composable
+private fun SalesHeader(
+    state: MySalesState, size: ScreenSize, date: LocalDate, today: LocalDate,
+    onDate: (LocalDate?) -> Unit, onShift: (String?) -> Unit, onCurrency: (String) -> Unit, onRefresh: () -> Unit
+) {
+    var dateMenu by remember { mutableStateOf(false) }
+    val report = state.report
+    val shiftChoices = report?.shifts.orEmpty()
+    val shiftLabel = { shift: SalesShift -> "${report.time(shift.start)} – ${report.time(shift.end)}" }
+    val selectedShift = shiftChoices.firstOrNull { it.id == state.filter.shiftId }
+    val title: @Composable () -> Unit = {
         Column {
-            Text(title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Ink)
-            Spacer(Modifier.height(6.dp))
-            Text(value, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = Ink)
-            Spacer(Modifier.height(8.dp))
-            Text(delta, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Color(0xFF2E8A2A))
+            Text("My Sales", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, letterSpacing = 0.sp, color = Kit.Ink)
+            Text("${date.longDay()} · your sales, tips and pay", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
         }
     }
-}
-
-@Composable
-private fun SalesChartCard(modifier: Modifier = Modifier) {
-    Panel(modifier.height(292.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PanelTitle("Sales During Shift", Modifier.weight(1f))
-            TextButton(
-                onClick = {},
-                modifier = Modifier
-                    .height(32.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .border(1.dp, Border, RoundedCornerShape(7.dp)),
-                shape = RoundedCornerShape(7.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp),
-                colors = ButtonDefaults.textButtonColors(contentColor = Ink)
-            ) {
-                Text("By Hour", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                Icon(Icons.Outlined.ExpandMore, contentDescription = null, modifier = Modifier.size(16.dp))
+    val controls: @Composable () -> Unit = {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconSquare(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Day before") { onDate(date.minus(DatePeriod(days = 1))) }
+            Box {
+                HeaderButton(if (date == today) "Today" else "${date.day} ${date.month.name.lowercase().replaceFirstChar { it.uppercase() }.take(3)} ${date.year}",
+                    Icons.Outlined.CalendarToday, { dateMenu = true }, Modifier.width(170.dp))
+                DropdownMenu(dateMenu, { dateMenu = false }, offset = DpOffset(0.dp, 6.dp), shape = RoundedCornerShape(12.dp), containerColor = Color.White, shadowElevation = 8.dp) {
+                    CompactDatePicker(date) { onDate(if (it == today) null else it); dateMenu = false }
+                }
+            }
+            IconSquare(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Day after", enabled = date < today) { if (date < today) onDate(date.plus(DatePeriod(days = 1)).takeIf { it != today }) }
+            if (shiftChoices.isNotEmpty()) {
+                HeaderDropdown(
+                    selectedShift?.let(shiftLabel) ?: "All day", Icons.Outlined.Schedule, Modifier.width(150.dp),
+                    listOf("All day") + shiftChoices.map(shiftLabel),
+                    { label -> onShift(shiftChoices.firstOrNull { shiftLabel(it) == label }?.id) }
+                )
+            }
+            val currencies = report?.currencies.orEmpty().map { it.currency }
+            if (currencies.size > 1) HeaderDropdown(state.totals?.currency ?: currencies.first(), Icons.Outlined.Payments, Modifier.width(110.dp), currencies, onCurrency)
+            Surface(onClick = onRefresh, modifier = Modifier.size(ToolbarHeight), shape = RoundedCornerShape(8.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (state.loading) CircularProgressIndicator(Modifier.size(16.dp), color = Kit.Green, strokeWidth = 2.dp)
+                    else Icon(Icons.Outlined.Refresh, "Refresh", Modifier.size(18.dp), tint = Kit.Ink)
+                }
             }
         }
-        Spacer(Modifier.height(18.dp))
-        SalesLineChart()
+    }
+    if (size.isDesktop) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.weight(1f)) { title() }; controls() }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { title(); Box(Modifier.horizontalScroll(rememberScrollState())) { controls() } }
     }
 }
 
 @Composable
-private fun SalesLineChart() {
-    val values = listOf(45f, 120f, 165f, 210f, 150f, 180f, 230f, 265f, 190f, 145f, 90f, 34f)
-    val labels = listOf("11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM", "6 PM", "7 PM", "8 PM", "9 PM", "10 PM")
-    Column {
-        Box(Modifier.fillMaxWidth().height(176.dp)) {
-            Canvas(Modifier.fillMaxSize()) {
-                val max = 300f
-                val left = 48f
-                val right = size.width - 8f
-                val top = 8f
-                val bottom = size.height - 24f
-                repeat(6) { index ->
-                    val y = top + (bottom - top) * index / 5f
-                    drawLine(Color(0xFFE9E5DF), Offset(left, y), Offset(right, y), strokeWidth = 1f)
-                }
-                val points = values.mapIndexed { index, value ->
-                    val x = left + (right - left) * index / (values.size - 1)
-                    val y = bottom - (bottom - top) * (value / max)
-                    Offset(x, y)
-                }
-                val area = Path().apply {
-                    moveTo(points.first().x, bottom)
-                    points.forEach { lineTo(it.x, it.y) }
-                    lineTo(points.last().x, bottom)
-                    close()
-                }
-                drawPath(area, ActiveOlive.copy(alpha = 0.12f))
-                for (i in 0 until points.lastIndex) {
-                    drawLine(ActiveOlive, points[i], points[i + 1], strokeWidth = 2.5f)
-                }
-                points.forEach { point -> drawCircle(ActiveOlive, radius = 4.5f, center = point) }
-            }
-            val yLabels = listOf("$300", "$240", "$180", "$120", "$60", "$0")
-            Column(
-                modifier = Modifier
-                    .height(154.dp)
-                    .padding(top = 1.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                yLabels.forEach { Text(it, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 11.sp, color = Muted) }
-            }
-        }
-        Row(Modifier.fillMaxWidth().padding(start = 50.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            labels.forEach { Text(it, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 10.sp, color = Ink) }
-        }
+private fun IconSquare(icon: ImageVector, description: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Surface(onClick = onClick, enabled = enabled, modifier = Modifier.size(ToolbarHeight), shape = RoundedCornerShape(8.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
+        Box(contentAlignment = Alignment.Center) { Icon(icon, description, Modifier.size(20.dp), tint = if (enabled) Kit.Ink else Kit.Faint) }
     }
 }
 
 @Composable
-private fun PaymentMethodsCard(modifier: Modifier = Modifier) {
-    Panel(modifier.height(292.dp)) {
-        PanelTitle("Payment Methods")
-        Spacer(Modifier.height(16.dp))
-        paymentMethods.forEach { method ->
-            PaymentMethodRow(method)
-            Spacer(Modifier.height(13.dp))
-        }
-        Divider()
-        Spacer(Modifier.height(10.dp))
-        Row {
-            Text("Total", modifier = Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Ink)
-            Text("100%", modifier = Modifier.width(62.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Ink)
-            Text("$1,284.50", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Ink)
-        }
-    }
-}
-
-@Composable
-private fun PaymentMethodRow(method: PaymentMethodSale) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(24.dp).clip(RoundedCornerShape(6.dp)).background(SoftGreen), contentAlignment = Alignment.Center) {
-            Text(method.short, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 10.sp, color = ActiveOlive)
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(method.name, modifier = Modifier.width(76.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-        Box(Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFFE4E7DF))) {
-            Box(Modifier.fillMaxWidth(method.percent / 60f).height(5.dp).clip(RoundedCornerShape(5.dp)).background(ActiveOlive))
-        }
-        Spacer(Modifier.width(12.dp))
-        Text("${method.percent.toInt()}%", modifier = Modifier.width(38.dp), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Ink)
-        Text(method.amount, modifier = Modifier.width(72.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-    }
-}
-
-@Composable
-private fun ShiftSummaryCard(modifier: Modifier = Modifier) {
-    Panel(modifier.height(292.dp)) {
-        PanelTitle("Shift Summary")
-        Spacer(Modifier.height(18.dp))
-        SummaryRow("Subtotal", "$1,088.70")
-        SummaryRow("Tax (8.5%)", "$92.54")
-        SummaryRow("Service Charge (10%)", "$108.87")
-        Spacer(Modifier.height(14.dp))
-        Divider()
-        Spacer(Modifier.height(14.dp))
-        SummaryRow("Tips", "$186.40", valueColor = Color(0xFF2E8A2A))
-        SummaryRow("Refunds", "-$7.01", valueColor = Color(0xFFD71920))
-        Spacer(Modifier.height(14.dp))
-        Divider()
-        Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Total Collected", modifier = Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 20.sp, color = Ink)
-            Text("$1,469.50", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 25.sp, color = Orange)
-        }
-    }
-}
-
-@Composable
-private fun TopSellingItemsCard(modifier: Modifier = Modifier) {
-    Panel(modifier.height(290.dp)) {
-        PanelTitle("Top Selling Items")
-        Spacer(Modifier.height(12.dp))
-        Row {
-            TableHeader("Item", Modifier.weight(1f))
-            TableHeader("Qty Sold", Modifier.width(90.dp))
-            TableHeader("Sales", Modifier.width(90.dp), Alignment.End)
-        }
-        topItems.forEach {
-            ItemSalesRow(it)
-            Divider()
-        }
-        LinkText("View all items")
-    }
-}
-
-@Composable
-private fun ItemSalesRow(item: TopItem) {
-    Row(Modifier.height(34.dp), verticalAlignment = Alignment.CenterVertically) {
-        Image(
-            painter = painterResource(Res.drawable.auth_login_img),
-            contentDescription = item.name,
-            modifier = Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)),
-            contentScale = ContentScale.Crop
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(item.name, modifier = Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-        Text(item.qty.toString(), modifier = Modifier.width(90.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-        Text(item.sales, modifier = Modifier.width(90.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-    }
-}
-
-@Composable
-private fun TablesServedCard(modifier: Modifier = Modifier) {
-    Panel(modifier.height(290.dp)) {
-        PanelTitle("Tables Served")
-        Spacer(Modifier.height(12.dp))
-        Row {
-            TableHeader("Area", Modifier.weight(1f))
-            TableHeader("Tables", Modifier.width(130.dp))
-            TableHeader("Sales", Modifier.width(90.dp), Alignment.End)
-        }
-        tableAreas.forEach { area ->
-            Row(Modifier.height(34.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(area.name, modifier = Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Ink)
-                Box(Modifier.width(130.dp).height(5.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFFE4E7DF))) {
-                    Box(Modifier.fillMaxWidth(area.progress).height(5.dp).clip(RoundedCornerShape(5.dp)).background(ActiveOlive))
-                }
-                Text(area.sales, modifier = Modifier.width(90.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-            }
-            Divider()
-        }
-        LinkText("View all tables")
-    }
-}
-
-@Composable
-private fun RecentPaymentsCard(modifier: Modifier = Modifier) {
-    Panel(modifier.height(290.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            PanelTitle("Recent Payments", Modifier.weight(1f))
-            Box(Modifier.width(74.dp).height(30.dp).clip(RoundedCornerShape(7.dp)).border(1.dp, Border, RoundedCornerShape(7.dp)), contentAlignment = Alignment.Center) {
-                Text("View All", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Ink)
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        recentPayments.forEach { payment ->
-            RecentPaymentRow(payment)
-            Divider()
-        }
-    }
-}
-
-@Composable
-private fun RecentPaymentRow(payment: RecentPayment) {
-    Row(Modifier.height(41.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier.size(34.dp).clip(RoundedCornerShape(7.dp)).background(payment.color),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(payment.table, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White)
-        }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text("Table ${payment.table}", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-            Text(payment.guests, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 11.sp, color = Muted)
-        }
-        Text(payment.time, modifier = Modifier.width(64.dp), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, color = Muted)
-        Text(payment.method, modifier = Modifier.width(108.dp), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, color = Ink)
-        Column(horizontalAlignment = Alignment.End) {
-            Text(payment.amount, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-            Text("Paid  ✓", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Color(0xFF2E8A2A))
-        }
-    }
-}
-
-@Composable
-private fun ShiftFooter() {
+private fun InfoBar(text: String, error: Boolean) {
+    val color = if (error) Kit.Danger else Kit.Amber
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(74.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, Border, RoundedCornerShape(10.dp))
-            .padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(color.copy(alpha = 0.08f))
+            .border(1.dp, color.copy(alpha = 0.22f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        Box(Modifier.size(48.dp).clip(CircleShape).background(ActiveOlive), contentAlignment = Alignment.Center) {
-            Text("DK", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color.White)
+        Icon(if (error) Icons.Outlined.ErrorOutline else Icons.Outlined.Info, null, Modifier.size(18.dp), tint = color)
+        Text(text, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, color = if (error) color else Color(0xFF8A5A0B))
+    }
+}
+
+// Closed sales per hour of the day, as bars with the amount on top; the busiest hour is darker.
+@Composable
+private fun HourlyPanel(modifier: Modifier, state: MySalesState, currency: String) {
+    val hourly = state.totals?.hourly.orEmpty().mapNotNull { h ->
+        val hour = h.hour.drop(11).take(2).toIntOrNull() ?: return@mapNotNull null
+        hour to (h.sales.toCents() ?: 0)
+    }.toMap()
+    OverviewPanel(Icons.Outlined.BarChart, "Sales by hour", modifier, titleExtra = "closed orders") {
+        if (hourly.isEmpty()) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 200.dp), Alignment.Center) {
+                OverviewCompactEmpty("No sales yet", "Each hour's sales show here as your orders close.", Icons.Outlined.BarChart)
+            }
+            return@OverviewPanel
         }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.width(140.dp)) {
-            Text("Dario K.", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Ink)
-            Text("Waiter", fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Muted)
+        val first = (hourly.keys.min() - 1).coerceAtLeast(0)
+        val last = (hourly.keys.max() + 1).coerceAtMost(23).coerceAtLeast(first + 5).coerceAtMost(23)
+        val hours = (first..last).toList()
+        val most = hourly.values.max().coerceAtLeast(1)
+        val peak = hourly.maxBy { it.value }.key
+        Row(Modifier.fillMaxWidth().height(200.dp).padding(horizontal = 4.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
+            hours.forEach { hour ->
+                val cents = hourly[hour] ?: 0
+                Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (cents > 0) Text(shortMoney(cents, currency), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 9.sp, color = if (hour == peak) Kit.Green else Kit.Muted, maxLines = 1)
+                    Spacer(Modifier.height(3.dp))
+                    Box(
+                        Modifier.fillMaxWidth(0.72f).height(if (cents == 0L) 3.dp else (150.dp * (cents.toFloat() / most)).coerceAtLeast(5.dp))
+                            .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
+                            .background(when { cents == 0L -> Kit.Border; hour == peak -> Kit.Green; else -> Kit.Green.copy(alpha = 0.45f) })
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Text("${hour.toString().padStart(2, '0')}", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 10.sp, color = if (hour == peak) Kit.Ink else Kit.Muted)
+                }
+            }
         }
-        FooterMetric("Shift Start", "11:00 AM")
-        FooterMetric("Current Time", "9:45 PM", Color(0xFF2E8A2A))
-        FooterMetric("Shift Duration", "10h 45m")
-        FooterMetric("Orders In Progress", "0")
-        Spacer(Modifier.weight(1f))
-        Box(
-            modifier = Modifier
-                .width(300.dp)
-                .height(52.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(ActiveOlive)
-                .clickable {},
-            contentAlignment = Alignment.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, modifier = Modifier.size(22.dp), tint = Color.White)
-                Text("End Shift", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color.White)
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(Kit.Green))
+            Text("Busiest: ${peak.toString().padStart(2, '0')}:00 · ${centsText(hourly.getValue(peak), currency)}", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted)
+        }
+    }
+}
+
+private fun shortMoney(cents: Long, currency: String): String {
+    val symbol = com.saporini.mobile_desktop.pos.shifts.currencySymbol(currency).trim()
+    val whole = cents / 100
+    return if (whole >= 1000) "$symbol${whole / 1000}.${(whole % 1000) / 100}k" else "$symbol$whole"
+}
+
+// Hours × wage + tips: for the day or shift shown, then the week and the month so far.
+@Composable
+private fun PayPanel(modifier: Modifier, pay: SalesPay?, forShift: Boolean, date: LocalDate, today: LocalDate, onShiftRequested: () -> Unit) {
+    OverviewPanel(Icons.Outlined.AccountBalanceWallet, "My pay", modifier, action = {
+        Row(Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onShiftRequested).padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("My shift", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Green)
+            Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(14.dp), tint = Kit.Green)
+        }
+    }) {
+        if (pay == null) {
+            OverviewCompactEmpty("Pay isn't available", "It shows here once you work shifts with the “My Shifts” permission.", Icons.Outlined.AccountBalanceWallet)
+            return@OverviewPanel
+        }
+        val c = pay.currency
+        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            ValueLine("Hours worked", hoursText(pay.day.minutes))
+            ValueLine("Hourly wage", pay.rateCents?.let { "${centsText(it, c)}/h" } ?: "Not set yet", valueColor = if (pay.rateCents == null) Kit.Amber else Kit.Ink)
+            ValueLine("Wages", centsText(pay.day.wages, c))
+            if (!forShift) ValueLine("Tips", centsText(pay.day.tips, c))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.Border))
+            ValueLine(if (forShift) "Earned this shift" else if (date == today) "Earned today" else "Earned that day", centsText(pay.day.total, c), strong = true, valueColor = Kit.Green)
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            PayTile("Week so far", pay.week, c, Modifier.weight(1f))
+            PayTile("Month so far", pay.month, c, Modifier.weight(1f))
+        }
+        if (pay.missingRate || pay.rateCents == null) {
+            Text("Hours without a wage aren't paid here yet. Your manager sets wages in Admin Hub.", Modifier.padding(horizontal = 4.dp),
+                fontFamily = Inter(), fontSize = 11.sp, lineHeight = 15.sp, color = Kit.Amber)
+        }
+    }
+}
+
+@Composable
+private fun PayTile(label: String, bit: PayBit, currency: String, modifier: Modifier) {
+    Column(
+        modifier.clip(RoundedCornerShape(10.dp)).background(Kit.Canvas).border(1.dp, Kit.Border, RoundedCornerShape(10.dp)).padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Kit.Muted)
+        Text(centsText(bit.total, currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Kit.Ink, maxLines = 1)
+        Text("${hoursText(bit.minutes)} · ${centsText(bit.tips, currency)} tips", fontFamily = Inter(), fontSize = 10.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun MethodsPanel(modifier: Modifier, state: MySalesState, currency: String) {
+    val totals = state.totals
+    val methods = totals?.paymentMethods.orEmpty()
+    val sum = methods.sumOf { it.collected.toCents() ?: 0 }.coerceAtLeast(1)
+    OverviewPanel(Icons.Outlined.CreditCard, "Payments", modifier, count = methods.sumOf { it.count }.toInt()) {
+        if (methods.isEmpty()) {
+            OverviewCompactEmpty("No payments yet", "Card and cash payments on your orders add up here.", Icons.Outlined.CreditCard)
+        } else {
+            methods.sortedByDescending { it.collected.toCents() ?: 0 }.forEachIndexed { index, method ->
+                val cents = method.collected.toCents() ?: 0
+                val color = listOf(Kit.Green, Kit.Blue, Kit.Amber, Kit.Purple, Kit.Grey)[index % 5]
+                Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)).background(color.copy(alpha = 0.12f)), Alignment.Center) {
+                            Icon(if (method.name.contains("cash", true)) Icons.Outlined.Payments else Icons.Outlined.CreditCard, null, Modifier.size(15.dp), tint = color)
+                        }
+                        Spacer(Modifier.width(9.dp))
+                        Text(method.name.lowercase().replaceFirstChar { it.uppercase() }.replace('_', ' '), Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Ink)
+                        Text("${method.count}×", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted)
+                        Spacer(Modifier.width(10.dp))
+                        Text(centsText(cents, currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink)
+                    }
+                    Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.12f))) {
+                        Box(Modifier.fillMaxWidth(cents.toFloat() / sum).fillMaxHeight().clip(RoundedCornerShape(50)).background(color))
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.weight(1f, fill = false))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.Border))
+        if ((totals?.refunds.toCents() ?: 0) > 0) ValueLine("Refunded", "−${state.amount(totals?.refunds)}", valueColor = Kit.Danger)
+        ValueLine("Collected", state.amount(totals?.collected), strong = true, valueColor = Kit.Green)
+    }
+}
+
+@Composable
+private fun TopItemsPanel(modifier: Modifier, state: MySalesState, currency: String) {
+    val items = state.totals?.topItems.orEmpty()
+    val most = items.maxOfOrNull { it.quantity }?.coerceAtLeast(1) ?: 1
+    OverviewPanel(Icons.Outlined.Restaurant, "Top dishes", modifier, titleExtra = "by quantity") {
+        if (items.isEmpty()) OverviewCompactEmpty("No dishes sold yet", "Your best sellers show here.", Icons.Outlined.Restaurant)
+        items.forEachIndexed { index, item ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(24.dp).clip(CircleShape).background(if (index == 0) Kit.Green else Kit.Tint), Alignment.Center) {
+                    Text("${index + 1}", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = if (index == 0) Color.White else Kit.Ink)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(item.name, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("${item.quantity}×", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted)
+                        Spacer(Modifier.width(10.dp))
+                        Text(centsText(item.sales.toCents() ?: 0, currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink)
+                    }
+                    Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(Kit.Tint)) {
+                        Box(Modifier.fillMaxWidth(item.quantity.toFloat() / most).fillMaxHeight().clip(RoundedCornerShape(50)).background(Kit.Green.copy(alpha = if (index == 0) 1f else 0.5f)))
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun FooterMetric(label: String, value: String, color: Color = Ink) {
-    Box(Modifier.width(175.dp).height(52.dp).border(1.dp, Color.Transparent), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, color = Muted)
-            Spacer(Modifier.height(6.dp))
-            Text(value, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = color)
+private fun FloorsPanel(modifier: Modifier, state: MySalesState, currency: String) {
+    val areas = state.totals?.areas.orEmpty()
+    OverviewPanel(Icons.Outlined.TableRestaurant, "Where you served", modifier) {
+        if (areas.isEmpty()) OverviewCompactEmpty("No tables yet", "Floors you served show here.", Icons.Outlined.TableRestaurant)
+        areas.forEach { area ->
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(1.dp, Kit.RowBorder, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(Kit.GreenSoft), Alignment.Center) {
+                    Icon(Icons.Outlined.Layers, null, Modifier.size(16.dp), tint = Kit.Green)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(area.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${area.tables} ${if (area.tables == 1L) "table" else "tables"}", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted)
+                }
+                Text(centsText(area.sales.toCents() ?: 0, currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink)
+            }
         }
     }
 }
 
 @Composable
-private fun Panel(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .border(1.dp, Border, RoundedCornerShape(10.dp))
-            .background(Color.White)
-            .padding(16.dp),
-        content = { content() }
-    )
-}
-
-@Composable
-private fun PanelTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier = modifier, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 17.sp, color = Ink)
-}
-
-@Composable
-private fun SummaryRow(label: String, value: String, valueColor: Color = Ink) {
-    Row(Modifier.height(34.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, modifier = Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = Ink)
-        Text(value, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = valueColor)
+private fun RecentPanel(modifier: Modifier, state: MySalesState, currency: String) {
+    val payments = state.totals?.recentPayments.orEmpty()
+    OverviewPanel(Icons.AutoMirrored.Outlined.ReceiptLong, "Latest payments", modifier, count = payments.size) {
+        if (payments.isEmpty()) OverviewCompactEmpty("No payments yet", "The latest payments on your orders show here.", Icons.AutoMirrored.Outlined.ReceiptLong)
+        payments.forEach { payment ->
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(1.dp, Kit.RowBorder, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(Kit.GreenSoft), Alignment.Center) {
+                    Text(payment.tableNumber?.take(4) ?: "—", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Kit.Green, maxLines = 1)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(payment.tableNumber?.let { "Table $it" } ?: "#${payment.orderNumber}", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink)
+                    Text(
+                        listOf(state.report.time(payment.paidAt), payment.method.lowercase().replaceFirstChar { it.uppercase() }.replace('_', ' '),
+                            if (payment.guests == 1) "1 guest" else "${payment.guests} guests").joinToString(" · "),
+                        fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(centsText(payment.collected.toCents() ?: 0, currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink)
+                    when (payment.status) {
+                        "REFUNDED" -> StatusChip("Refunded", Kit.Danger)
+                        "PARTIALLY_REFUNDED" -> StatusChip("Part refunded", Kit.Amber)
+                        else -> {}
+                    }
+                }
+            }
+        }
     }
 }
-
-@Composable
-private fun TableHeader(text: String, modifier: Modifier = Modifier, alignment: Alignment.Horizontal = Alignment.Start) {
-    Box(modifier.height(24.dp), contentAlignment = when (alignment) {
-        Alignment.End -> Alignment.CenterEnd
-        else -> Alignment.CenterStart
-    }) {
-        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = ActiveOlive)
-    }
-}
-
-@Composable
-private fun LinkText(text: String) {
-    Spacer(Modifier.height(8.dp))
-    Text("$text  ›", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color(0xFF2E8A2A))
-}
-
-@Composable
-private fun Divider() {
-    Box(Modifier.fillMaxWidth().height(1.dp).background(Border))
-}
-
-private data class PaymentMethodSale(val short: String, val name: String, val percent: Float, val amount: String)
-private data class TopItem(val name: String, val qty: Int, val sales: String)
-private data class TableArea(val name: String, val progress: Float, val sales: String)
-private data class RecentPayment(val table: String, val guests: String, val time: String, val method: String, val amount: String, val color: Color)
-
-private val paymentMethods = listOf(
-    PaymentMethodSale("C", "Card", 54f, "$693.00"),
-    PaymentMethodSale("$", "Cash", 21f, "$270.00"),
-    PaymentMethodSale("AP", "Apple Pay", 13f, "$166.50"),
-    PaymentMethodSale("G", "Google Pay", 7f, "$89.50"),
-    PaymentMethodSale("…", "Other", 5f, "$65.50")
-)
-
-private val topItems = listOf(
-    TopItem("Margherita Pizza", 12, "$216.00"),
-    TopItem("Spaghetti Carbonara", 9, "$179.10"),
-    TopItem("Tiramisu", 8, "$96.00"),
-    TopItem("Bruschetta", 10, "$75.00"),
-    TopItem("Limonata", 15, "$60.00")
-)
-
-private val tableAreas = listOf(
-    TableArea("Main Salon", 0.95f, "$624.30"),
-    TableArea("Terrace", 0.55f, "$312.40"),
-    TableArea("Round Salon", 0.34f, "$184.50"),
-    TableArea("Private Salon", 0.18f, "$113.80"),
-    TableArea("Bar", 0.10f, "$49.50")
-)
-
-private val recentPayments = listOf(
-    RecentPayment("A6", "4 guests", "9:12 PM", "Card", "$78.50", ActiveOlive),
-    RecentPayment("R3", "2 guests", "8:45 PM", "Cash", "$29.00", ActiveOlive),
-    RecentPayment("T2", "3 guests", "8:15 PM", "Split Payment", "$112.30", Color(0xFFE9B94E)),
-    RecentPayment("B1", "2 guests", "7:42 PM", "Apple Pay", "$64.20", Color(0xFFE8D4A8)),
-    RecentPayment("A3", "5 guests", "7:05 PM", "Card", "$96.80", ActiveOlive)
-)

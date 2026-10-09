@@ -61,6 +61,22 @@ fun TableLayoutResponseDto.toDomain(): BranchTableLayout {
                 status = table.status.toLayoutTableStatus(),
                 guestCount = table.guestCount,
                 seatedAt = table.seatedAt,
+                nextReservationStart = table.nextReservationStart,
+                nextReservationEnd = table.nextReservationEnd,
+                nextReservationCode = table.nextReservationCode,
+                nextReservationName = table.nextReservationName,
+                nextReservationId = table.nextReservationId,
+                nextReservationStatus = table.nextReservationStatus,
+                nextReservationHoldUntil = table.nextReservationHoldUntil,
+                nextReservationHoldWarningAt = table.nextReservationHoldWarningAt,
+                nextReservationPartySize = table.nextReservationPartySize,
+                nextReservationArrivedGuests = table.nextReservationArrivedGuests,
+                nextReservationOccasionIcon = table.nextReservationOccasionIcon,
+                nextReservationOccasionName = table.nextReservationOccasionName,
+                currentOrderId = table.currentOrderId,
+                currentOrderNumber = table.currentOrderNumber,
+                currentOrderStatus = table.currentOrderStatus,
+                currentOrderFulfillmentStatus = table.currentOrderFulfillmentStatus,
                 active = table.active
             )
         }
@@ -133,6 +149,14 @@ fun TableResponseDto.toDomain(): LayoutTable {
         status = status.toLayoutTableStatus(),
         guestCount = guestCount,
         seatedAt = seatedAt,
+        nextReservationStart = null,
+        nextReservationEnd = null,
+        nextReservationCode = null,
+        nextReservationName = null,
+        currentOrderId = null,
+        currentOrderNumber = null,
+        currentOrderStatus = null,
+        currentOrderFulfillmentStatus = null,
         active = active
     )
 }

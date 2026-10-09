@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.pos.ui.shell
 
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,10 +61,68 @@ private val PrimaryPhoneSections = listOf(
 fun PosBottomBar(
     selected: PosSection,
     onSelect: (PosSection) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onBackToWorkspaces: (() -> Unit)? = null
+) {
+    WorkspaceBottomBar(
+        moreSelected = selected in OverflowSections,
+        onLogout = onLogout,
+        onBackToWorkspaces = onBackToWorkspaces,
+        moreItems = { closeMenu ->
+            OverflowSections.forEach { section ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = section.label,
+                            fontFamily = Inter(),
+                            fontWeight = if (selected == section) {
+                                FontWeight.SemiBold
+                            } else {
+                                FontWeight.Medium
+                            },
+                            fontSize = 14.sp,
+                            color = if (selected == section) BottomBarActive else BottomBarInk
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = section.icon(),
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = if (selected == section) BottomBarActive else BottomBarMuted
+                        )
+                    },
+                    onClick = {
+                        closeMenu()
+                        onSelect(section)
+                    }
+                )
+            }
+        }
+    ) {
+        PrimaryPhoneSections.forEach { section ->
+            PhoneNavItem(
+                modifier = Modifier.weight(1f),
+                label = section.label,
+                icon = if (selected == section) section.filledPhoneIcon() else section.icon(),
+                selected = selected == section,
+                onClick = { onSelect(section) }
+            )
+        }
+    }
+}
+
+// Phone bottom bar frame shared by the POS and KDS workspaces: the workspace's own tabs, then a More
+// menu holding any extra sections followed by Switch workspace and Sign out.
+@Composable
+internal fun WorkspaceBottomBar(
+    moreSelected: Boolean,
+    onLogout: () -> Unit,
+    onBackToWorkspaces: (() -> Unit)?,
+    moreItems: @Composable (closeMenu: () -> Unit) -> Unit = {},
+    navItems: @Composable RowScope.() -> Unit,
 ) {
     var moreExpanded by remember { mutableStateOf(false) }
-    val moreSelected = selected in OverflowSections
 
     Box(
         modifier = Modifier
@@ -95,15 +155,7 @@ fun PosBottomBar(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            PrimaryPhoneSections.forEach { section ->
-                PhoneNavItem(
-                    modifier = Modifier.weight(1f),
-                    label = section.label,
-                    icon = if (selected == section) section.filledPhoneIcon() else section.icon(),
-                    selected = selected == section,
-                    onClick = { onSelect(section) }
-                )
-            }
+            navItems()
 
             Box(
                 modifier = Modifier
@@ -128,36 +180,22 @@ fun PosBottomBar(
                     tonalElevation = 0.dp,
                     shadowElevation = 12.dp
                 ) {
-                    OverflowSections.forEach { section ->
+                    moreItems { moreExpanded = false }
+
+                    onBackToWorkspaces?.let { back ->
                         DropdownMenuItem(
                             text = {
-                                Text(
-                                    text = section.label,
-                                    fontFamily = Inter(),
-                                    fontWeight = if (selected == section) {
-                                        FontWeight.SemiBold
-                                    } else {
-                                        FontWeight.Medium
-                                    },
-                                    fontSize = 14.sp,
-                                    color = if (selected == section) BottomBarActive else BottomBarInk
-                                )
+                                Text("Switch workspace", fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = BottomBarInk)
                             },
                             leadingIcon = {
-                                Icon(
-                                    imageVector = section.icon(),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = if (selected == section) BottomBarActive else BottomBarMuted
-                                )
+                                Icon(Icons.AutoMirrored.Filled.Reply, null, Modifier.size(20.dp), tint = BottomBarMuted)
                             },
                             onClick = {
                                 moreExpanded = false
-                                onSelect(section)
+                                back()
                             }
                         )
                     }
-
                     DropdownMenuItem(
                         text = {
                             Text(
@@ -188,7 +226,7 @@ fun PosBottomBar(
 }
 
 @Composable
-private fun PhoneNavItem(
+internal fun PhoneNavItem(
     modifier: Modifier,
     label: String,
     icon: ImageVector,

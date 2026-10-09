@@ -15,6 +15,7 @@ public class CreateUserRequest {
 
     @Email(message = "Invalid email format")
     @NotBlank(message = "Email is required")
+    @Size(max = 150, message = "email must be at most 150 characters")
     private String email;
 
     @NotBlank(message = "Username is required")
@@ -44,4 +45,10 @@ public class CreateUserRequest {
 
     @NotNull(message = "Role id is required")
     private UUID roleId;
+
+    // The restaurant the person works at. Only a super admin chooses it; everyone else adds staff to their own.
+    private UUID restaurantId;
+
+    // The branch the person usually works at; must belong to the restaurant.
+    private UUID defaultBranchId;
 }

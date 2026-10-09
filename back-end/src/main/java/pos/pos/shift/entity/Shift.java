@@ -109,13 +109,17 @@ public class Shift extends AbstractAuditedEntity {
     @Column(name = "status", nullable = false, length = 30)
     private ShiftStatus status = ShiftStatus.OPEN;
 
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private long version;
+
     @Column(name = "scheduled_start", columnDefinition = "timestamptz")
     private OffsetDateTime scheduledStart;
 
     @Column(name = "scheduled_end", columnDefinition = "timestamptz")
     private OffsetDateTime scheduledEnd;
 
-    @Column(name = "started_at", nullable = false, columnDefinition = "timestamptz")
+    @Column(name = "started_at", columnDefinition = "timestamptz")
     private OffsetDateTime startedAt;
 
     @Column(name = "ended_at", columnDefinition = "timestamptz")
@@ -216,7 +220,7 @@ public class Shift extends AbstractAuditedEntity {
         expectedDrawerAmount = defaultMoney(expectedDrawerAmount);
         actualDrawerAmount = nullableMoney(actualDrawerAmount);
 
-        if (startedAt == null) {
+        if (startedAt == null && (status == ShiftStatus.OPEN || status == ShiftStatus.ON_BREAK)) {
             startedAt = OffsetDateTime.now(ZoneOffset.UTC);
         }
     }
@@ -266,7 +270,7 @@ public class Shift extends AbstractAuditedEntity {
             throw new IllegalStateException("scheduledEnd must not be before scheduledStart");
         }
 
-        if (endedAt != null && endedAt.isBefore(startedAt)) {
+        if (endedAt != null && (startedAt == null || endedAt.isBefore(startedAt))) {
             throw new IllegalStateException("endedAt must not be before startedAt");
         }
     }

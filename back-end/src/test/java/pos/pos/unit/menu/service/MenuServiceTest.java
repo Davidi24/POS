@@ -93,6 +93,9 @@ class MenuServiceTest {
     @Mock
     private pos.pos.menu.service.MenuContentTransferService contentTransfer;
 
+    @Mock
+    private pos.pos.menu.service.OnlineMenuService onlineMenuService;
+
     @InjectMocks
     private MenuService menuService;
 
@@ -325,6 +328,7 @@ class MenuServiceTest {
         verify(menuSectionRepository).deleteAll(List.of(section));
         verify(menuRepository, never()).saveAndFlush(any(Menu.class));
         verify(menuRepository).delete(menu);
+        verify(onlineMenuService).removeEmptySections(RESTAURANT_ID);
     }
 
     private Authentication authentication() {

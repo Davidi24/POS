@@ -40,6 +40,11 @@ import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -254,6 +259,61 @@ class PhoneVerificationIntegrationTest {
         AuthSmsOtpCode expiredCode = authSmsOtpCodeRepository.findById(verificationCode.getId()).orElseThrow();
         assertThat(expiredCode.getFailedAttempts()).isEqualTo(5);
         assertThat(expiredCode.getUsedAt()).isNotNull();
+
+        mockMvc.perform(post("/auth/verify-phone")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tokens.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("code", issuedCode))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("AUTH-049A concurrent wrong phone codes cannot bypass the attempt limit")
+    void concurrentWrongPhoneCodesCannotBypassAttemptLimit() throws Exception {
+        User user = createUser("auth049a", false);
+        AuthTokens tokens = webLogin(user.getUsername(), DEFAULT_PASSWORD, nextIp(), "AUTH-049A-login", status().isOk());
+        mockMvc.perform(post("/auth/request-phone-verification")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tokens.accessToken())))
+                .andExpect(status().isNoContent());
+
+        String issuedCode = latestPhoneVerificationCode.get();
+        String wrongCode = differentCodeFrom(issuedCode);
+        AuthSmsOtpCode issued = latestPhoneCodeFor(user.getId());
+        int requests = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(requests);
+        CountDownLatch ready = new CountDownLatch(requests);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            java.util.List<Future<Integer>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < requests; i++) {
+                results.add(pool.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Concurrent phone verification requests did not start");
+                    }
+                    return mockMvc.perform(post("/auth/verify-phone")
+                                    .header(HttpHeaders.AUTHORIZATION, bearer(tokens.accessToken()))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(Map.of("code", wrongCode))))
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            for (Future<Integer> result : results) {
+                assertThat(result.get(20, TimeUnit.SECONDS)).isEqualTo(401);
+            }
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+
+        AuthSmsOtpCode exhausted = authSmsOtpCodeRepository.findById(issued.getId()).orElseThrow();
+        assertThat(exhausted.getFailedAttempts()).isEqualTo(5);
+        assertThat(exhausted.getUsedAt()).isNotNull();
+        assertThat(userRepository.findById(user.getId()).orElseThrow().isPhoneVerified()).isFalse();
 
         mockMvc.perform(post("/auth/verify-phone")
                         .header(HttpHeaders.AUTHORIZATION, bearer(tokens.accessToken()))

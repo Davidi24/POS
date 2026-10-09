@@ -39,20 +39,24 @@ private val ActiveOlive = Color(0xFF4F7942)
 internal fun AddItemCard(
     onClick: () -> Unit,
     isPhone: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    enabled: Boolean = true
 ) {
     val shape = RoundedCornerShape(8.dp)
 
     Box(
         modifier = modifier
-            .then(if (isPhone) {
+            .then(if (compact) {
+                Modifier.size(width = 172.dp, height = 112.dp)
+            } else if (isPhone) {
                 Modifier.height(88.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)).padding(vertical = 4.dp)
             } else {
                 Modifier.aspectRatio(1.05f).fillMaxSize().padding(40.dp)
             })
             .clip(shape)
             .background(Color(0xFFF3F3F1))
-            .clickable(onClick = onClick),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Canvas(Modifier.fillMaxSize()) {

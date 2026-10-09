@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface KdsTicketRepository extends JpaRepository<KdsTicket, UUID> {
+public interface KdsTicketRepository extends JpaRepository<KdsTicket, UUID>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<KdsTicket> {
 
     @EntityGraph(attributePaths = {
             "station",
@@ -56,14 +56,14 @@ public interface KdsTicketRepository extends JpaRepository<KdsTicket, UUID> {
     })
     List<KdsTicket> findAllByBranch_IdAndStatusInOrderByCreatedAtAsc(UUID branchId, Collection<KdsTicketStatus> statuses);
 
+    // This latest-ticket lookup has a max-results limit. Keep item collection loading lazy so Hibernate can limit
+    // tickets in SQL; callers access items inside the current transaction.
     @EntityGraph(attributePaths = {
             "station",
             "station.device",
             "order",
             "order.customer",
-            "order.restaurantTable",
-            "items",
-            "items.orderLineItem"
+            "order.restaurantTable"
     })
     Optional<KdsTicket> findTopByOrder_IdAndStation_IdAndStatusInOrderByCreatedAtDesc(
             UUID orderId,

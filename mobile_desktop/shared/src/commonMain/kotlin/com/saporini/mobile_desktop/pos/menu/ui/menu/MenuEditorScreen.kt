@@ -127,9 +127,12 @@ internal fun MenuEditorDialog(
         availableFromDate: String?,
         availableUntilDate: String?,
         color: String
-    ) -> Unit
+    ) -> Unit,
+    // A special menu (occasion extras, an event night's menu); reported beside onSave.
+    onSpecialChange: (Boolean) -> Unit = {}
 ) {
     var name by remember(menu?.id) { mutableStateOf(menu?.name.orEmpty()) }
+    var special by remember(menu?.id) { mutableStateOf(menu?.special ?: false) }
     var description by remember(menu?.id) { mutableStateOf(menu?.description.orEmpty()) }
     var active by remember(menu?.id) { mutableStateOf(menu?.active ?: true) }
     var availableAllDay by remember(menu?.id) {
@@ -205,6 +208,7 @@ internal fun MenuEditorDialog(
     fun trySave() {
         if (requirementsMet) {
             attemptedSubmit = false
+            onSpecialChange(special)
             onSave(
                 name.trim(),
                 description.trim().takeIf { it.isNotEmpty() },
@@ -262,6 +266,8 @@ internal fun MenuEditorDialog(
                             onDescriptionChange = { description = it },
                             active = active,
                             onActiveChange = { active = it },
+                            special = special,
+                            onSpecialChange = { special = it },
                             availableAllDay = availableAllDay,
                             onAvailableAllDayChange = { availableAllDay = it },
                             availableFrom = availableFrom,
@@ -381,6 +387,8 @@ internal fun MenuEditorDialog(
                                         onDescriptionChange = { description = it },
                                         active = active,
                                         onActiveChange = { active = it },
+                                        special = special,
+                                        onSpecialChange = { special = it },
                                         availableAllDay = availableAllDay,
                                         onAvailableAllDayChange = { availableAllDay = it },
                                         availableFrom = availableFrom,
@@ -457,6 +465,8 @@ internal fun MenuEditorDialog(
                                         onDescriptionChange = { description = it },
                                         active = active,
                                         onActiveChange = { active = it },
+                                        special = special,
+                                        onSpecialChange = { special = it },
                                         availableAllDay = availableAllDay,
                                         onAvailableAllDayChange = { availableAllDay = it },
                                         availableFrom = availableFrom,
@@ -1147,6 +1157,8 @@ private fun MenuEditorFields(
     onDescriptionChange: (String) -> Unit,
     active: Boolean,
     onActiveChange: (Boolean) -> Unit,
+    special: Boolean = false,
+    onSpecialChange: ((Boolean) -> Unit)? = null,
     availableAllDay: Boolean,
     onAvailableAllDayChange: (Boolean) -> Unit,
     availableFrom: String,
@@ -1219,6 +1231,15 @@ private fun MenuEditorFields(
                     color = Color(0xFFD6453D)
                 )
             }
+        }
+
+        if (onSpecialChange != null) {
+            AvailabilityCheckbox(
+                label = "Special menu (occasion extras or an event night)",
+                checked = special,
+                enabled = !isSaving,
+                onCheckedChange = onSpecialChange
+            )
         }
 
         AvailabilityCheckbox(

@@ -140,6 +140,12 @@ class MenuApi(
 
     // Menu items
 
+    suspend fun importItems(menuId: String, sectionId: String, request: ImportMenuItemsRequestDto): List<MenuItemDto> =
+        client.post(endpoint("/menus/$menuId/sections/$sectionId/items/import")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
     suspend fun createItem(
         menuId: String,
         sectionId: String,
@@ -314,6 +320,11 @@ class MenuApi(
         }.body()
     }
 
+    suspend fun getOptionGroup(groupId: String, includeItems: Boolean = false): OptionGroupDto =
+        client.get(endpoint("/option-groups/$groupId")) {
+            parameter("includeItems", includeItems)
+        }.body()
+
     suspend fun deleteOptionGroup(groupId: String) {
         client.delete(endpoint("/option-groups/$groupId"))
     }
@@ -332,7 +343,48 @@ class MenuApi(
         }.body()
     }
 
+    suspend fun updateOptionItem(
+        groupId: String,
+        itemId: String,
+        request: UpdateOptionItemRequestDto
+    ): OptionItemDto {
+        return client.put(endpoint("/option-groups/$groupId/items/$itemId")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+    }
+
     suspend fun deleteOptionItem(groupId: String, itemId: String) {
         client.delete(endpoint("/option-groups/$groupId/items/$itemId"))
+    }
+
+    // Online menu
+
+    suspend fun getOnlineMenu(restaurantId: String): OnlineMenuDto =
+        client.get(endpoint("/restaurants/$restaurantId/online-menu")).body()
+
+    suspend fun getOnlineMenuSections(restaurantId: String): List<OnlineMenuSectionDto> =
+        client.get(endpoint("/restaurants/$restaurantId/online-menu/sections")).body()
+
+    suspend fun renameOnlineMenuSection(restaurantId: String, sectionId: String, request: RenameOnlineMenuSectionRequestDto): OnlineMenuSectionDto =
+        client.patch(endpoint("/restaurants/$restaurantId/online-menu/sections/$sectionId")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun reorderOnlineMenuSections(restaurantId: String, request: ReorderOnlineMenuSectionsRequestDto): List<OnlineMenuSectionDto> =
+        client.put(endpoint("/restaurants/$restaurantId/online-menu/sections/order")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun reorderOnlineMenuItems(restaurantId: String, sectionId: String, request: ReorderOnlineMenuItemsRequestDto): OnlineMenuDto =
+        client.put(endpoint("/restaurants/$restaurantId/online-menu/sections/$sectionId/items/order")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun deleteOnlineMenuSection(restaurantId: String, sectionId: String) {
+        client.delete(endpoint("/restaurants/$restaurantId/online-menu/sections/$sectionId"))
     }
 }

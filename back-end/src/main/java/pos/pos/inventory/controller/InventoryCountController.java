@@ -19,13 +19,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import pos.pos.common.dto.PageResponse;
 import pos.pos.inventory.dto.InventoryCountCreateRequest;
 import pos.pos.inventory.dto.InventoryCountLineUpsertRequest;
 import pos.pos.inventory.dto.InventoryCountResponse;
 import pos.pos.inventory.enums.InventoryCountStatus;
 import pos.pos.inventory.service.InventoryCountService;
 
-import java.util.List;
 import java.util.UUID;
 
 // A physical stock count moves through DRAFT -> IN_PROGRESS -> COMPLETED -> APPROVED (or
@@ -57,12 +57,14 @@ public class InventoryCountController {
     @GetMapping
     @PreAuthorize("hasAuthority('SETTINGS_READ')")
     @Operation(summary = "List counts, optionally filtered by status")
-    public ResponseEntity<List<InventoryCountResponse>> listCounts(
+    public ResponseEntity<PageResponse<InventoryCountResponse>> listCounts(
             @PathVariable UUID restaurantId,
             @RequestParam(required = false) InventoryCountStatus status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(inventoryCountService.listCounts(authentication, restaurantId, status));
+        return ResponseEntity.ok(inventoryCountService.listCounts(authentication, restaurantId, status, page, size));
     }
 
     @GetMapping("/{countId}")

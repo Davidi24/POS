@@ -13,6 +13,17 @@ public interface KdsStationRoutingRepository extends JpaRepository<KdsStationRou
     @EntityGraph(attributePaths = {"station", "menuItem"})
     List<KdsStationRouting> findAllByStation_IdOrderByDisplayOrderAscCreatedAtAsc(UUID stationId);
 
+    @Query("""
+        SELECT routing
+        FROM KdsStationRouting routing
+        JOIN FETCH routing.station station
+        JOIN FETCH station.restaurant restaurant
+        JOIN FETCH routing.menuItem menuItem
+        WHERE menuItem.id IN :menuItemIds
+        ORDER BY menuItem.id ASC, routing.displayOrder ASC, routing.createdAt ASC, routing.id ASC
+        """)
+    List<KdsStationRouting> findAllByMenuItemIdInOrdered(List<UUID> menuItemIds);
+
     @EntityGraph(attributePaths = {"station", "menuItem"})
     @Query("""
         SELECT routing

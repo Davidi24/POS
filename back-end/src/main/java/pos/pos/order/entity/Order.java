@@ -127,6 +127,13 @@ public class Order extends AbstractAuditedEntity {
     @Column(name = "currency", nullable = false, length = 3, columnDefinition = "char(3)")
     private String currency;
 
+    @Column(name = "tax_rate_snapshot", nullable = false, precision = 7, scale = 4)
+    private BigDecimal taxRateSnapshot;
+
+    @Column(name = "tax_inclusive_snapshot", nullable = false)
+    private boolean taxInclusiveSnapshot;
+
+
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, length = 30)
     private OrderType orderType = OrderType.DINE_IN;
@@ -168,6 +175,10 @@ public class Order extends AbstractAuditedEntity {
     @Column(name = "total", nullable = false, precision = 19, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
+    // Paid before the order existed (e.g. an online pre-order); covers the total, or part of it if more was ordered at the table.
+    @Column(name = "prepaid_total", nullable = false, precision = 19, scale = 2)
+    private BigDecimal prepaidTotal = BigDecimal.ZERO;
+
     @Column(name = "opened_at", nullable = false, columnDefinition = "timestamptz")
     private OffsetDateTime openedAt;
 
@@ -199,7 +210,7 @@ public class Order extends AbstractAuditedEntity {
     private List<OrderLineItem> lineItems = new ArrayList<>();
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("createdAt ASC")
+    @OrderBy("discountSequence ASC")
     private List<OrderDiscount> discounts = new ArrayList<>();
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -237,6 +248,11 @@ public class Order extends AbstractAuditedEntity {
             return;
         }
 
+        int nextSequence = discounts.stream()
+                .mapToInt(OrderDiscount::getDiscountSequence)
+                .max()
+                .orElse(-1) + 1;
+        discount.setDiscountSequence(nextSequence);
         discounts.add(discount);
         discount.setOrder(this);
     }
@@ -276,8 +292,10 @@ public class Order extends AbstractAuditedEntity {
         subtotal = defaultMoney(subtotal);
         discountTotal = defaultMoney(discountTotal);
         taxTotal = defaultMoney(taxTotal);
+        taxRateSnapshot = defaultMoney(taxRateSnapshot);
         serviceChargeTotal = defaultMoney(serviceChargeTotal);
         total = defaultMoney(total);
+        prepaidTotal = defaultMoney(prepaidTotal);
 
         if (openedAt == null) {
             openedAt = OffsetDateTime.now(ZoneOffset.UTC);
@@ -299,6 +317,7 @@ public class Order extends AbstractAuditedEntity {
         validateMoney(taxTotal, "taxTotal");
         validateMoney(serviceChargeTotal, "serviceChargeTotal");
         validateMoney(total, "total");
+        validateMoney(prepaidTotal, "prepaidTotal");
 
         if (currency == null || currency.length() != 3) {
             throw new IllegalStateException("currency must be a 3-letter code");
@@ -362,18 +381,6 @@ public class Order extends AbstractAuditedEntity {
             if (!Objects.equals(reservation.getCustomer().getId(), customer.getId())) {
                 throw new IllegalStateException("order customer must match reservation customer");
             }
-        }
-
-        if (status == OrderStatus.CANCELLED || status == OrderStatus.VOIDED) {
-            if (fulfillmentStatus != OrderFulfillmentStatus.CANCELLED) {
-                throw new IllegalStateException("cancelled or voided orders must use CANCELLED fulfillmentStatus");
-            }
-        }
-
-        if (fulfillmentStatus == OrderFulfillmentStatus.CANCELLED
-                && status != OrderStatus.CANCELLED
-                && status != OrderStatus.VOIDED) {
-            throw new IllegalStateException("CANCELLED fulfillmentStatus requires CANCELLED or VOIDED order status");
         }
     }
 

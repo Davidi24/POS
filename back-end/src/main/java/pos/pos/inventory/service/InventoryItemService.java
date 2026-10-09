@@ -13,6 +13,7 @@ import pos.pos.inventory.dto.InventoryItemResponse;
 import pos.pos.inventory.entity.InventoryItem;
 import pos.pos.inventory.mapper.InventoryItemMapper;
 import pos.pos.inventory.repository.InventoryItemRepository;
+import pos.pos.inventory.repository.InventorySalesSourceRepository;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.utils.NormalizationUtils;
@@ -31,6 +32,7 @@ public class InventoryItemService {
 
     private final RestaurantScopeService restaurantScopeService;
     private final InventoryItemRepository inventoryItemRepository;
+    private final InventorySalesSourceRepository inventorySalesSourceRepository;
     private final InventoryItemMapper inventoryItemMapper;
 
 
@@ -65,6 +67,11 @@ public class InventoryItemService {
         //Identifies the current user from and authenticate and check if the user is allowed to manage it
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         InventoryItem item = requireItem(restaurantId, itemId);
+
+        if ((Boolean.FALSE.equals(request.getActive()) || Boolean.FALSE.equals(request.getTrackInventory()))
+                && inventorySalesSourceRepository.existsByInventoryItem_Id(itemId)) {
+            throw new AuthException("Remove this item's sale stock sources before deactivating inventory tracking", HttpStatus.CONFLICT);
+        }
 
         assertBarcodeAvailable(restaurantId, request.getBarcode(), item.getBarcode());
         assertCodeAvailable(restaurantId, request.getCode(), item.getCode());
@@ -163,6 +170,10 @@ public class InventoryItemService {
             return;
         }
 
+        if (inventorySalesSourceRepository.existsByInventoryItem_Id(itemId)) {
+            throw new AuthException("Remove this item's sale stock sources before deactivating it", HttpStatus.CONFLICT);
+        }
+
         item.setActive(false);
         item.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         saveItem(item);
@@ -204,7 +215,7 @@ public class InventoryItemService {
             return;
         }
 
-        inventoryItemRepository.findByRestaurant_IdAndCodeAndDeletedAtIsNull(restaurantId, normalizedCode)
+        inventoryItemRepository.findByRestaurant_IdAndCode(restaurantId, normalizedCode)
                 .ifPresent(existing -> {
                     throw new AuthException(
                             "This code is already used by " + existing.getName() + " in this restaurant",
@@ -215,6 +226,17 @@ public class InventoryItemService {
 
 
 
+    private String integrityConstraintName(DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
+                return violation.getConstraintName();
+            }
+            cause = cause.getCause();
+        }
+        return null;
+    }
+
     //
     private InventoryItem saveItem(InventoryItem item) {
         try {
@@ -223,6 +245,13 @@ public class InventoryItemService {
             return inventoryItemRepository.saveAndFlush(item);
             //Item violated Spring Database rules
         } catch (DataIntegrityViolationException ex) {
+            String constraint = integrityConstraintName(ex);
+            if ("uk_inventory_items_restaurant_code".equals(constraint)) {
+                throw new AuthException("This code is already used in this restaurant", HttpStatus.CONFLICT);
+            }
+            if ("uk_inventory_items_restaurant_barcode_active".equals(constraint)) {
+                throw new AuthException("This barcode is already registered in this restaurant", HttpStatus.CONFLICT);
+            }
             throw new AuthException("Inventory item update violates a data constraint", HttpStatus.BAD_REQUEST);
         } catch (IllegalStateException ex) {
             throw new AuthException(ex.getMessage(), HttpStatus.BAD_REQUEST);

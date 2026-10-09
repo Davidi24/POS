@@ -400,11 +400,19 @@ class UserRepositoryTest extends AbstractTestProfilePostgresTest {
             Role waiterRole = persistRole(waiterCode, uniqueName("Waiter"), 10_000L, true, false);
             Role protectedRole = persistRole(protectedCode, uniqueName("Protected"), 100_000L, false, true);
 
-            User visibleUser = repository.save(user(uniqueEmail("visible"), uniqueUsername("visible"), "+49-555-0100", true, null));
+            UUID restaurantId = UUID.randomUUID();
+            User visibleUser = user(uniqueEmail("visible"), uniqueUsername("visible"), "+49-555-0100", true, null);
+            visibleUser.setRestaurantId(restaurantId);
+            visibleUser = repository.save(visibleUser);
             User hiddenProtectedUser = repository.save(user(uniqueEmail("protected"), uniqueUsername("protected"), "+49-555-0101", true, null));
             User inactiveUser = repository.save(user(uniqueEmail("inactive"), uniqueUsername("inactive"), "+49-555-0102", false, null));
             User deletedUser = repository.save(user(uniqueEmail("deleted"), uniqueUsername("deleted"), "+49-555-0103", true, OffsetDateTime.now(ZoneOffset.UTC)));
+            // Same filters, but working at another restaurant: never visible.
+            User otherRestaurantUser = user(uniqueEmail("visible-elsewhere"), uniqueUsername("visx"), "+49-555-0199", true, null);
+            otherRestaurantUser.setRestaurantId(UUID.randomUUID());
+            otherRestaurantUser = repository.save(otherRestaurantUser);
 
+            persistAssignment(otherRestaurantUser, waiterRole);
             persistAssignment(visibleUser, waiterRole);
             persistAssignment(hiddenProtectedUser, protectedRole);
             persistAssignment(inactiveUser, waiterRole);
@@ -419,6 +427,7 @@ class UserRepositoryTest extends AbstractTestProfilePostgresTest {
                     waiterCode,
                     false,
                     managerRole.getRank(),
+                    restaurantId,
                     PageRequest.of(0, 20)
             );
 
@@ -446,6 +455,7 @@ class UserRepositoryTest extends AbstractTestProfilePostgresTest {
                     null,
                     true,
                     Long.MAX_VALUE,
+                    null,
                     PageRequest.of(0, 20)
             );
 

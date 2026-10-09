@@ -20,6 +20,10 @@ import pos.pos.menu.mapper.MenuMapper;
 import pos.pos.menu.repository.OptionGroupRepository;
 import pos.pos.menu.repository.OptionItemRepository;
 import pos.pos.menu.util.MenuCodeNormalizer;
+import pos.pos.recipe.entity.Recipe;
+import pos.pos.recipe.enums.RecipeStatus;
+import pos.pos.recipe.enums.RecipeType;
+import pos.pos.recipe.repository.RecipeRepository;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.service.RestaurantScopeService;
@@ -38,6 +42,7 @@ public class OptionItemService {
     private final MenuMapper menuMapper;
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantValidationService restaurantValidationService;
+    private final RecipeRepository recipeRepository;
 
     @Transactional(readOnly = true)
     public List<OptionItemResponse> getOptionItems(Authentication authentication, UUID groupId, Boolean available) {
@@ -68,6 +73,7 @@ public class OptionItemService {
         item.setPriceDelta(request.getPriceDelta());
         item.setAvailable(request.getAvailable() == null || request.getAvailable());
         item.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
+        applyInventoryRecipe(item, group, request.getInventoryRecipeId(), request.getInventoryRecipeQuantity());
 
         return menuMapper.toOptionItemResponse(optionItemRepository.saveAndFlush(item));
     }
@@ -90,6 +96,7 @@ public class OptionItemService {
         item.setPriceDelta(request.getPriceDelta());
         item.setAvailable(Boolean.TRUE.equals(request.getAvailable()));
         item.setDisplayOrder(request.getDisplayOrder());
+        applyInventoryRecipe(item, group, request.getInventoryRecipeId(), request.getInventoryRecipeQuantity());
 
         return menuMapper.toOptionItemResponse(optionItemRepository.saveAndFlush(item));
     }
@@ -146,6 +153,34 @@ public class OptionItemService {
             throw new AuthException(emptyMessage, HttpStatus.BAD_REQUEST);
         }
         return normalizedCode;
+    }
+
+    private void applyInventoryRecipe(
+            OptionItem item,
+            OptionGroup group,
+            UUID recipeId,
+            java.math.BigDecimal requestedQuantity
+    ) {
+        if (recipeId == null) {
+            if (requestedQuantity != null) {
+                throw new AuthException("inventoryRecipeId is required when an inventory recipe quantity is provided", HttpStatus.BAD_REQUEST);
+            }
+            item.setInventoryRecipe(null);
+            item.setInventoryRecipeQuantity(null);
+            return;
+        }
+
+        Recipe recipe = recipeRepository.findByIdAndRestaurant_Id(recipeId, group.getRestaurant().getId())
+                .orElseThrow(() -> new AuthException("inventoryRecipeId must belong to the same restaurant", HttpStatus.BAD_REQUEST));
+        if (recipe.getRecipeType() == RecipeType.FINISHED_DISH) {
+            throw new AuthException("A modifier must reference a prep-batch or sub-recipe", HttpStatus.BAD_REQUEST);
+        }
+        if (recipe.getStatus() != RecipeStatus.ACTIVE) {
+            throw new AuthException("A modifier inventory recipe must be active", HttpStatus.BAD_REQUEST);
+        }
+
+        item.setInventoryRecipe(recipe);
+        item.setInventoryRecipeQuantity(requestedQuantity == null ? recipe.getYieldQuantity() : requestedQuantity);
     }
 
     private void assertUniqueName(UUID groupId, String name, UUID itemIdToExclude) {

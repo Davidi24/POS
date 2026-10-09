@@ -72,6 +72,12 @@ class AuthRegisterServiceTest {
     @Mock
     private UserIdentityService userIdentityService;
 
+    @Mock
+    private pos.pos.restaurant.repository.RestaurantRepository restaurantRepository;
+
+    @Mock
+    private pos.pos.restaurant.repository.BranchRepository branchRepository;
+
     @InjectMocks
     private AuthRegisterService authRegisterService;
 
@@ -116,6 +122,9 @@ class AuthRegisterServiceTest {
         });
         when(userMapper.toUserResponse(any(User.class), eq(List.of("MANAGER")))).thenReturn(mappedResponse);
 
+        UUID restaurantId = UUID.randomUUID();
+        when(roleHierarchyService.actorRestaurantId(authentication)).thenReturn(restaurantId);
+
         UserResponse response = authRegisterService.register(request, authentication);
 
         assertThat(response).isSameAs(mappedResponse);
@@ -127,6 +136,7 @@ class AuthRegisterServiceTest {
         assertThat(savedUser.getEmail()).isEqualTo("cashier@pos.local");
         assertThat(savedUser.getUsername()).isEqualTo("cashier.one");
         assertThat(savedUser.getPasswordHash()).isEqualTo("hashed-password");
+        assertThat(savedUser.getRestaurantId()).isEqualTo(restaurantId);
         assertThat(savedUser.getFirstName()).isEqualTo("John");
         assertThat(savedUser.getLastName()).isEqualTo("Doe");
         assertThat(savedUser.getPhone()).isEqualTo(" +49 555 0100 ");
@@ -247,6 +257,41 @@ class AuthRegisterServiceTest {
         verify(userRepository, never()).save(any(User.class));
         verify(userRoleRepository, never()).save(any(UserRole.class));
         verifyNoInteractions(passwordService, userMapper, emailVerificationService);
+    }
+
+    @Test
+    @DisplayName("Staff can only add people to their own restaurant, at one of its branches")
+    void shouldKeepNewStaffInTheActorsRestaurant() {
+        UUID actorUserId = UUID.randomUUID();
+        UUID roleId = UUID.randomUUID();
+        UUID restaurantId = UUID.randomUUID();
+        Authentication authentication = authentication(actorUserId);
+        CreateUserRequest request = validRequest();
+        request.setRoleId(roleId);
+        Role role = Role.builder().id(roleId).code("WAITER").name("Waiter").rank(10_000L).isActive(true).assignable(true).build();
+        when(userIdentityService.normalizeAndAssertUnique(any(), any(), any()))
+                .thenReturn(new UserIdentityService.NormalizedUserIdentity("new@pos.local", "new.person", null));
+        when(roleRepository.findById(roleId)).thenReturn(Optional.of(role));
+        when(roleHierarchyService.actorRestaurantId(authentication)).thenReturn(restaurantId);
+
+        request.setRestaurantId(UUID.randomUUID());
+        assertThatThrownBy(() -> authRegisterService.register(request, authentication))
+                .isInstanceOf(pos.pos.exception.auth.AuthException.class)
+                .hasMessageContaining("your own restaurant");
+
+        request.setRestaurantId(null);
+        request.setDefaultBranchId(UUID.randomUUID());
+        when(branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(request.getDefaultBranchId(), restaurantId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> authRegisterService.register(request, authentication))
+                .isInstanceOf(pos.pos.exception.auth.AuthException.class)
+                .hasMessageContaining("defaultBranchId");
+
+        when(roleHierarchyService.actorRestaurantId(authentication)).thenReturn(null);
+        request.setDefaultBranchId(null);
+        assertThatThrownBy(() -> authRegisterService.register(request, authentication))
+                .isInstanceOf(pos.pos.exception.auth.AuthException.class)
+                .hasMessageContaining("Only staff of a restaurant");
+        verify(userRepository, never()).save(any(User.class));
     }
 
     private Authentication authentication(UUID actorUserId) {
