@@ -36,7 +36,24 @@ class TablesScreenModel(
     private var loadJob: Job? = null
 
     init {
-        load()
+        // Back on Tables: the tables seen last show at once and refresh quietly behind (opening Tables showed the
+        // loading shapes every time; user, 2026-10-31).
+        val cached = LastTables.state?.takeIf { LastTables.key != null && LastTables.key == cacheKey() }
+        if (cached != null) {
+            _state.value = cached
+            load(showLoading = false)
+        } else {
+            load()
+        }
+        screenModelScope.launch {
+            _state.collect { latest ->
+                val key = cacheKey()
+                if (key != null && latest.loaded && latest.errorMessage == null && latest.tableLayout != null) {
+                    LastTables.key = key
+                    LastTables.state = latest.copy(isLoading = false, isSaving = false)
+                }
+            }
+        }
         screenModelScope.launch {
             repository.layoutChanges.collectLatest { change ->
                 val scope = currentBranchScope()
@@ -59,6 +76,13 @@ class TablesScreenModel(
 
     fun load() {
         load(showLoading = true)
+    }
+
+    private fun cacheKey(): String? {
+        val user = sessionManager.currentUser.value ?: return null
+        val restaurantId = user.restaurantId ?: return null
+        val branchId = user.defaultBranchId ?: return null
+        return "${user.id}/$restaurantId/$branchId"
     }
 
     private fun load(showLoading: Boolean) {
@@ -103,6 +127,7 @@ class TablesScreenModel(
 
                 _state.value = _state.value.copy(
                     isLoading = false,
+                    loaded = true,
                     floorLayouts = result.first,
                     planImageBytes = images,
                     tableLayout = result.second,
@@ -113,6 +138,7 @@ class TablesScreenModel(
             } catch (error: Throwable) {
                 _state.value = _state.value.copy(
                     isLoading = false,
+                    loaded = true,
                     errorMessage = error.message
                         ?: "Could not load the table layout"
                 )
@@ -398,7 +424,7 @@ class TablesScreenModel(
         }
     }
 
-    fun seatGuests(tableId: String, guestCount: Int, onSuccess: () -> Unit = {}) {
+    fun seatGuests(tableId: String, guestCount: Int, moreComing: Boolean? = null, onSuccess: () -> Unit = {}) {
         val scope = currentBranchScope() ?: return
 
         launchSaving {
@@ -407,9 +433,12 @@ class TablesScreenModel(
                 branchId = scope.branchId,
                 tableId = tableId,
                 status = LayoutTableStatus.OCCUPIED,
-                guestCount = guestCount.coerceAtLeast(1)
+                guestCount = guestCount.coerceAtLeast(1),
+                moreComing = moreComing
             )
             replaceCachedTable(updated)
+            // Merged tables get their share of the guests too.
+            load(showLoading = false)
             onSuccess()
         }
     }
@@ -417,7 +446,7 @@ class TablesScreenModel(
     fun saveTableMerge(
         primaryTableId: String,
         childTableIds: List<String>,
-        previousPrimaryTableIds: List<String>,
+        tablesToUnmerge: List<String>,
         onSuccess: () -> Unit = {}
     ) {
         val scope = currentBranchScope() ?: return
@@ -428,11 +457,71 @@ class TablesScreenModel(
                 branchId = scope.branchId,
                 primaryTableId = primaryTableId,
                 childTableIds = childTableIds,
-                previousPrimaryTableIds = previousPrimaryTableIds
+                tablesToUnmerge = tablesToUnmerge
             )
             _state.value = _state.value.copy(tableLayout = saved)
             onSuccess()
         }
+    }
+
+    // ---- Settings → Tables → Special cases ----
+
+    fun can(permission: String): Boolean = permission in sessionManager.currentUser.value?.permissions.orEmpty()
+
+    fun loadSpecialActions() {
+        val scope = currentBranchScope() ?: return
+        screenModelScope.launch {
+            runCatching { repository.specialCaseActions(scope.restaurantId, scope.branchId) }
+                .onSuccess { actions -> _state.value = _state.value.copy(specialActions = actions) }
+        }
+    }
+
+    fun giveMoreTime(tableId: String, minutes: Int, onSuccess: () -> Unit = {}) = specialCaseWrite(onSuccess) { scope ->
+        repository.giveMoreTime(scope.restaurantId, scope.branchId, tableId, minutes)
+    }
+
+    fun stillHere(tableId: String, onSuccess: () -> Unit = {}) = specialCaseWrite(onSuccess) { scope ->
+        repository.stillHere(scope.restaurantId, scope.branchId, tableId)
+    }
+
+    fun bookingWaits(reservationId: String, onSuccess: () -> Unit = {}) = specialCaseWrite(onSuccess) { scope ->
+        repository.bookingWaits(scope.restaurantId, scope.branchId, reservationId)
+    }
+
+    fun moveBooking(tableId: String, option: com.saporini.mobile_desktop.pos.tables.domain.model.BookingTableOption, onSuccess: () -> Unit = {}) =
+        specialCaseWrite(onSuccess) { scope -> repository.moveBooking(scope.restaurantId, scope.branchId, tableId, option) }
+
+    fun returnSpecialAction(actionId: String, tableId: String?, onSuccess: () -> Unit = {}) = specialCaseWrite(onSuccess) { scope ->
+        repository.returnSpecialCaseAction(scope.restaurantId, scope.branchId, actionId, tableId)
+    }
+
+    suspend fun bookingOptions(tableId: String): List<com.saporini.mobile_desktop.pos.tables.domain.model.BookingTableOption> {
+        val scope = currentBranchScope() ?: return emptyList()
+        return runCatching { repository.bookingOptions(scope.restaurantId, scope.branchId, tableId) }.getOrDefault(emptyList())
+    }
+
+    private fun specialCaseWrite(onSuccess: () -> Unit, write: suspend (BranchScope) -> com.saporini.mobile_desktop.pos.tables.domain.model.BranchTableLayout) {
+        val scope = currentBranchScope() ?: return
+        launchSaving {
+            val saved = write(scope)
+            _state.value = _state.value.copy(tableLayout = saved)
+            loadSpecialActions()
+            onSuccess()
+        }
+    }
+
+    fun setBillRequested(orderId: String, requested: Boolean, onSuccess: () -> Unit = {}) {
+        val scope = currentBranchScope() ?: return
+
+        launchSaving {
+            val saved = repository.setBillRequested(scope.restaurantId, scope.branchId, orderId, requested)
+            _state.value = _state.value.copy(tableLayout = saved)
+            onSuccess()
+        }
+    }
+
+    fun unmergeSome(tableId: String, freeTableIds: List<String>, keepTableId: String?, onSuccess: () -> Unit = {}) = specialCaseWrite(onSuccess) { scope ->
+        repository.unmergeSome(scope.restaurantId, scope.branchId, tableId, freeTableIds, keepTableId)
     }
 
     fun separateTable(primaryTableId: String, onSuccess: () -> Unit = {}) {
@@ -449,7 +538,7 @@ class TablesScreenModel(
         }
     }
 
-    fun updateGuestCount(tableId: String, guestCount: Int, onSuccess: () -> Unit = {}) {
+    fun updateGuestCount(tableId: String, guestCount: Int, moreComing: Boolean? = null, onSuccess: () -> Unit = {}) {
         val scope = currentBranchScope() ?: return
 
         launchSaving {
@@ -458,9 +547,12 @@ class TablesScreenModel(
                 branchId = scope.branchId,
                 tableId = tableId,
                 status = LayoutTableStatus.OCCUPIED,
-                guestCount = guestCount.coerceAtLeast(1)
+                guestCount = guestCount.coerceAtLeast(1),
+                moreComing = moreComing
             )
             replaceCachedTable(updated)
+            // Merged tables get their share of the guests too.
+            load(showLoading = false)
             onSuccess()
         }
     }
@@ -594,6 +686,7 @@ class TablesScreenModel(
         if (restaurantId == null || branchId == null) {
             _state.value = _state.value.copy(
                 isLoading = false,
+                loaded = true,
                 isSaving = false,
                 errorMessage = "No restaurant branch is assigned to this user"
             )
@@ -611,4 +704,10 @@ class TablesScreenModel(
         val restaurantId: String,
         val branchId: String
     )
+}
+
+// The tables last seen (one branch), kept while the app runs so Tables opens without waiting.
+private object LastTables {
+    var key: String? = null
+    var state: TablesUiState? = null
 }

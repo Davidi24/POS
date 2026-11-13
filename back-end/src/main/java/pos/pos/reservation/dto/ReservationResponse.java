@@ -50,6 +50,7 @@ public class ReservationResponse {
     private OffsetDateTime completedAt;
     private OffsetDateTime noShowAt;
     private OffsetDateTime expiredAt;
+    private OffsetDateTime noActionAt;
     // When the table stops waiting for the guests: the booking time plus the hold, or later if staff held it longer.
     private OffsetDateTime holdUntil;
     // "3 of 6 arrived"; empty until check-in.
@@ -61,6 +62,8 @@ public class ReservationResponse {
     // "✓ Attendance confirmed" and by whom (STAFF after a call, GUEST from the reminder).
     private OffsetDateTime attendanceConfirmedAt;
     private pos.pos.reservation.enums.AttendanceConfirmedVia attendanceConfirmedVia;
+    // Staff called and couldn't reach the guest ("Couldn't reach").
+    private OffsetDateTime attendanceUnreachableAt;
     // For confirmed bookings: CONFIRMED, WAITING (not due yet), CONFIRM_NOW (booked less than 2 h ahead),
     // NOT_CONFIRMED (the deadline passed). Empty for other statuses.
     private String attendance;

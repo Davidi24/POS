@@ -5,7 +5,6 @@ import androidx.compose.runtime.getValue
 import com.saporini.mobile_desktop.admin.inventory.InventoryRepository
 import com.saporini.mobile_desktop.admin.inventory.InventoryScreenModel
 import com.saporini.mobile_desktop.admin.inventory.InventoryTab
-import com.saporini.mobile_desktop.admin.inventory.MenuChoice
 import com.saporini.mobile_desktop.admin.inventory.RecipeComponentDto
 import com.saporini.mobile_desktop.admin.inventory.RecipeComponentRequestDto
 import com.saporini.mobile_desktop.admin.inventory.RecipeDto
@@ -29,6 +28,23 @@ import com.saporini.mobile_desktop.admin.inventory.StockMovementDto
 import com.saporini.mobile_desktop.admin.inventory.ui.InventoryContent
 import com.saporini.mobile_desktop.admin.inventory.ui.InventoryView
 import com.saporini.mobile_desktop.admin.inventory.ui.SuppliersContent
+import com.saporini.mobile_desktop.admin.inventory.ui.SupplierDialog
+import com.saporini.mobile_desktop.admin.inventory.ui.SupplierPage
+import com.saporini.mobile_desktop.admin.inventory.PurchaseLine
+import com.saporini.mobile_desktop.admin.inventory.PurchaseOrder
+import com.saporini.mobile_desktop.admin.inventory.SupplierBook
+import com.saporini.mobile_desktop.admin.inventory.SupplierPlace
+import com.saporini.mobile_desktop.admin.inventory.CatalogField
+import com.saporini.mobile_desktop.admin.inventory.catalogItemDraft
+import com.saporini.mobile_desktop.admin.inventory.catalogOf
+import com.saporini.mobile_desktop.admin.inventory.importCatalog
+import com.saporini.mobile_desktop.admin.inventory.linkProduct
+import com.saporini.mobile_desktop.admin.inventory.ui.SupplierPart
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import com.saporini.mobile_desktop.pos.orders.domain.model.OrderDecimal
 import kotlin.test.Test
 import kotlin.time.Clock
@@ -92,6 +108,11 @@ private class GalleryInventory : InventoryRepository {
         approvedAt = ago(60 * 26), varianceValue = d("-1.65"), updatedAt = ago(60 * 26)))
 
     override suspend fun items(restaurantId: String, includeInactive: Boolean) = items
+    // Suppliers are kept by the server: one per supplier written on the items, linked to them.
+    override suspend fun suppliers(restaurantId: String) = items.mapNotNull { it.supplierName }.distinct().mapIndexed { index, name ->
+        com.saporini.mobile_desktop.admin.inventory.SupplierDto("s${index + 1}", name, items = items.filter { it.supplierName == name }
+            .map { com.saporini.mobile_desktop.admin.inventory.SupplierItemDto(it.id, it.supplierSku) })
+    }
     override suspend fun searchItems(restaurantId: String, keyword: String) = items
     override suspend fun saveItem(restaurantId: String, itemId: String?, request: StockItemRequestDto) = items.first()
     override suspend fun deactivateItem(restaurantId: String, itemId: String) {}
@@ -119,9 +140,9 @@ private class GalleryRecipes : RecipesRepository {
             RecipeComponentDto("rc5", "INVENTORY_ITEM", "i1", "San Marzano tomatoes", quantity = d("3"), unit = "KILOGRAM", yieldLossPercent = d("10")),
             RecipeComponentDto("rc6", "INVENTORY_ITEM", "i4", "Extra virgin olive oil", quantity = d("0.15"), unit = "LITER")
         ))
-    val margherita = RecipeDto("r1", "menu-1", "Margherita", "PIZ-1", "Margherita", "Our classic: San Marzano, fior di latte, basil.", "FINISHED_DISH",
-        "ACTIVE", 4, d("1"), "PORTION", 10, 2, "Stretch the dough to 30 cm.\nSpread the sauce, leave a 2 cm edge.\nAdd torn mozzarella.\nBake 90 seconds at 450 °C.\nFinish with basil and oil.",
-        d("2.31"), "Giulia Rossi", ago(60 * 3), listOf(
+    val margherita = RecipeDto("r1", code = "HOUSE-1", name = "Margherita sauce", description = "Our house-made tomato sauce.", recipeType = "PREP_BATCH",
+        status = "ACTIVE", version = 4, yieldQuantity = d("1"), yieldUnit = "PORTION", prepTimeMinutes = 10, cookTimeMinutes = 2,
+        instructions = "Cook the tomatoes with basil and oil.", theoreticalCost = d("2.31"), updatedByUserName = "Giulia Rossi", updatedAt = ago(60 * 3), components = listOf(
             RecipeComponentDto("rc1", "INVENTORY_ITEM", "i3", "Flour type 00", quantity = d("250"), unit = "GRAM", displayOrder = 0),
             RecipeComponentDto("rc2", "SUB_RECIPE", childRecipeId = "r2", childRecipeName = "Tomato sauce", quantity = d("80"), unit = "MILLILITER", displayOrder = 1),
             RecipeComponentDto("rc3", "INVENTORY_ITEM", "i2", "Fior di latte mozzarella", quantity = d("125"), unit = "GRAM", yieldLossPercent = d("5"), displayOrder = 2),
@@ -142,12 +163,10 @@ private class GalleryRecipes : RecipesRepository {
 }
 
 class AdminInventoryGalleryTest {
-    private val menu = listOf(MenuChoice("menu-1", "Margherita", "Dinner", "Pizza"), MenuChoice("menu-2", "Diavola", "Dinner", "Pizza"))
-
     @Test
     fun inventory() = gallery {
         val model = InventoryScreenModel(GalleryInventory(), gallerySession())
-        val recipes = RecipesScreenModel(GalleryRecipes(), gallerySession()) { menu }
+        val recipes = RecipesScreenModel(GalleryRecipes(), gallerySession())
         model.setActive(true); settle()
         fun shot(name: String, view: InventoryView, width: Int = 1440, height: Int = 960, required: List<String> = emptyList()) =
             render(name, width, height, required) {
@@ -158,32 +177,65 @@ class AdminInventoryGalleryTest {
         shot("inventory-stock", InventoryView.STOCK, required = listOf("Inventory", "Stock on hand", "San Marzano tomatoes", "Running low"))
         shot("inventory-stock-phone", InventoryView.STOCK, 420, 900)
         model.tab(InventoryTab.ITEMS); settle()
-        shot("inventory-items", InventoryView.ITEMS, required = listOf("Stock items", "Sold from"))
+        shot("inventory-items", InventoryView.ITEMS, required = listOf("All kinds", "San Marzano tomatoes"))
         model.tab(InventoryTab.PLACES); settle()
-        shot("inventory-places", InventoryView.PLACES, required = listOf("Walk-in fridge"))
+        shot("inventory-places", InventoryView.OVERVIEW, required = listOf("Walk-in fridge"))
         model.tab(InventoryTab.HISTORY); settle()
         shot("inventory-history", InventoryView.HISTORY, required = listOf("Stock history", "Delivery note 81"))
         model.tab(InventoryTab.COUNTS); settle()
-        shot("inventory-counts", InventoryView.COUNTS, required = listOf("CNT-12"))
+        shot("inventory-counts", InventoryView.COUNTS, required = listOf("Stock counts", "Walk-in fridge", "Continue"))
         model.openCount("c1"); settle()
         shot("inventory-count-dialog", InventoryView.COUNTS)
         model.openCount(null); settle()
-        recipes.setActive(true); settle(); recipes.open("r1"); settle()
-        shot("inventory-recipes", InventoryView.RECIPES, required = listOf("Margherita", "Ingredients", "Tomato sauce"))
-        shot("inventory-recipes-tablet", InventoryView.RECIPES, 1000, 1000)
-        recipes.newComponent("i2", "GRAM"); recipes.changeComponent { it.copy(quantityText = "125", lossText = "5") }; settle()
-        shot("inventory-recipe-ingredient", InventoryView.RECIPES, required = listOf("Takes"))
-        recipes.cancelComponent(); recipes.editRecipe(); settle()
-        shot("inventory-recipe-editor", InventoryView.RECIPES, required = listOf("Dish on the menu"))
-        recipes.cancelRecipe()
+        recipes.setActive(true); settle(); model.tab(InventoryTab.ITEMS); settle()
+        recipes.newSubRecipe(); settle()
+        shot("inventory-sub-recipe", InventoryView.ITEMS, required = listOf("Add House-made", "ONE BATCH MAKES"))
+        recipes.cancelSubRecipe()
         model.tab(InventoryTab.STOCK); settle()
         model.startMove(StockMoveKind.RECEIVE, "i1", "l3"); settle()
         shot("inventory-move", InventoryView.STOCK, required = listOf("Receive stock"))
         model.cancelMove(); model.editItem("i1"); settle()
         shot("inventory-item-editor", InventoryView.STOCK, required = listOf("COST AND LEVELS"))
         model.cancelItem(); model.newLocation(); settle()
-        shot("inventory-place-editor", InventoryView.PLACES)
+        shot("inventory-place-editor", InventoryView.ITEMS)
         model.cancelLocation()
+        recipes.onDispose(); model.onDispose()
+    }
+
+    /** Every Inventory page as the user's phone shows it (384 dp wide, 2.8 pixels per dp), for checking room and padding. */
+    @Test
+    fun phonePages() = gallery {
+        val model = InventoryScreenModel(GalleryInventory(), gallerySession())
+        val recipes = RecipesScreenModel(GalleryRecipes(), gallerySession())
+        model.setActive(true); recipes.setActive(true); settle()
+        fun shot(name: String, view: InventoryView, tab: InventoryTab, height: Int = 820) {
+            model.tab(tab); settle()
+            render(name, 384, height, density = 2f) {
+                val state by model.state.collectAsState()
+                val recipeState by recipes.state.collectAsState()
+                InventoryContent(state, model, recipeState, recipes, view, {})
+            }
+        }
+        shot("phone-overview", InventoryView.OVERVIEW, InventoryTab.OVERVIEW, 2200)
+        shot("phone-stock", InventoryView.STOCK, InventoryTab.STOCK)
+        shot("phone-items", InventoryView.ITEMS, InventoryTab.ITEMS)
+        shot("phone-counts", InventoryView.COUNTS, InventoryTab.COUNTS)
+        shot("phone-history", InventoryView.HISTORY, InventoryTab.HISTORY)
+        model.tab(InventoryTab.SUPPLIERS); settle()
+        val state0 = model.state.value
+        SupplierBook.open(state0.restaurantId, state0.items)
+        render("phone-suppliers", 384, 820, density = 2f) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model)
+        }
+        render("phone-supplier", 384, 1600, density = 2f) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialSupplier = "Green Farm")
+        }
+        render("phone-orders", 384, 820, density = 2f) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialPage = SupplierPage.ORDERS)
+        }
         recipes.onDispose(); model.onDispose()
     }
 
@@ -191,18 +243,96 @@ class AdminInventoryGalleryTest {
     fun suppliers() = gallery {
         val model = InventoryScreenModel(GalleryInventory(), gallerySession())
         model.tab(InventoryTab.SUPPLIERS); model.setActive(true); settle()
-        render("suppliers", required = listOf("Suppliers", "Green Farm", "Choose a supplier")) {
+        // The suppliers written on the items come in; then sample places and orders, as someone would add them.
+        val state0 = model.state.value
+        SupplierBook.open(state0.restaurantId, state0.items)
+        val farm = SupplierBook.suppliers.first { it.name == "Green Farm" }
+        SupplierBook.update(farm.copy(contactName = "Arben Hoxha", phone = "+355 69 222 1100", email = "orders@greenfarm.al"))
+        SupplierBook.savePlace(SupplierPlace("", farm.id, "Main warehouse", "Rruga e Kavajës 120, Tirana", "+355 4 222 1100", setOf(1, 3, 5)))
+        SupplierBook.savePlace(SupplierPlace("", farm.id, "Durrës depot", "Lagjja 13, Durrës", deliveryDays = setOf(2, 6)))
+        val today = Clock.System.now().toLocalDateTime(TimeZone.of("Europe/Tirane")).date
+        val place = SupplierBook.placesOf(farm.id).first()
+        val open = SupplierBook.placeOrder(PurchaseOrder("", "", farm.id, place.id, "l3", today.minus(DatePeriod(days = 1)), today.plus(DatePeriod(days = 1)),
+            listOf(PurchaseLine("i1", 15.0, 320), PurchaseLine("i4", 6.0, 850), PurchaseLine("i5", 500.0, 3))))
+        val beverage = SupplierBook.suppliers.first { it.name == "Beverage Co" }
+        SupplierBook.placeOrder(PurchaseOrder("", "", beverage.id, null, "l2", today.minus(DatePeriod(days = 4)), today.minus(DatePeriod(days = 1)),
+            listOf(PurchaseLine("i6", 96.0, 95), PurchaseLine("i7", 72.0, 70))))
+        val done = SupplierBook.placeOrder(PurchaseOrder("", "", farm.id, place.id, "l3", today.minus(DatePeriod(days = 8)), today.minus(DatePeriod(days = 6)),
+            listOf(PurchaseLine("i1", 10.0, 320))))
+        SupplierBook.markArrived(done.id, mapOf("i1" to 10.0), today.minus(DatePeriod(days = 6)))
+        SupplierBook.saveCount(done.id, mapOf("i1" to 10.0), mapOf("i1" to "l3"))
+        SupplierBook.confirmInStock(done.id, today.minus(DatePeriod(days = 6)))
+        // The open order arrived (one item short) and is being counted, to show steps 2–3.
+        SupplierBook.markArrived(open.id, mapOf("i1" to 12.0, "i4" to 6.0, "i5" to 500.0), today)
+        render("suppliers", required = listOf("Suppliers", "Green Farm", "Their places", "Items you buy")) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialSupplier = "Green Farm")
+        }
+        render("suppliers-tablet", 1024, 1100) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialSupplier = "Green Farm")
+        }
+        render("suppliers-orders", required = listOf("Orders", "INTO YOUR STOCK")) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialPage = SupplierPage.ORDERS)
+        }
+        render("suppliers-phone", 390, 844) {
             val state by model.state.collectAsState()
             SuppliersContent(state, model)
         }
-        render("suppliers-detail", required = listOf("To order", "Download order list")) {
+        render("suppliers-phone-detail", 390, 1500) {
             val state by model.state.collectAsState()
-            SuppliersContent(state, model, initialSupplier = "green farm")
+            SuppliersContent(state, model, initialSupplier = "Green Farm")
         }
-        render("suppliers-phone", 420, 900) {
+        render("suppliers-add", required = listOf("Add supplier", "Supplier name")) {
             val state by model.state.collectAsState()
-            SuppliersContent(state, model)
+            SuppliersContent(state, model, initialSupplier = "Green Farm", initialDialog = SupplierDialog.Add)
         }
+        render("suppliers-new-order", 1440, 1000, required = listOf("New order", "Each item goes to its own stock place")) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialSupplier = "Green Farm", initialDialog = SupplierDialog.NewOrder(farm.id, setOf("i1", "i4", "i5")))
+        }
+        render("suppliers-receive", 1440, 1000, required = listOf("Counted & put in place", "Save count")) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialSupplier = "Green Farm", initialDialog = SupplierDialog.Order(open.id, receiving = true))
+        }
+        render("suppliers-receive-phone", 390, 844) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialDialog = SupplierDialog.Order(open.id, receiving = true))
+        }
+        render("suppliers-import", 1440, 1000, required = listOf("Load their price list", "Pick a CSV file")) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialSupplier = "Green Farm", initialDialog = SupplierDialog.ImportCatalog(farm.id))
+        }
+        render("suppliers-orders-phone", 390, 844) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialPage = SupplierPage.ORDERS)
+        }
+        // Their price list: one product already in your stock, the rest with "Put in your stock".
+        SupplierBook.importCatalog(farm.id, listOf(
+            mapOf(CatalogField.NAME to "Cherry tomatoes", CatalogField.CODE to "GF-114", CatalogField.UNIT to "kg", CatalogField.PACK to "3 kg crate",
+                CatalogField.PRICE to "4.20", CatalogField.CATEGORY to "Vegetables"),
+            mapOf(CatalogField.NAME to "Rocket", CatalogField.CODE to "GF-208", CatalogField.UNIT to "kg", CatalogField.PACK to "1 kg box",
+                CatalogField.PRICE to "9.50", CatalogField.CATEGORY to "Leaves"),
+            mapOf(CatalogField.NAME to "Basil", CatalogField.CODE to "GF-031", CatalogField.UNIT to "bunch", CatalogField.PRICE to "1.10", CatalogField.CATEGORY to "Herbs")
+        ))
+        val rocket = SupplierBook.catalogOf(farm.id).first { it.code == "GF-208" }
+        SupplierBook.linkProduct(SupplierBook.catalogOf(farm.id).first { it.code == "GF-114" }.id, "i1")
+        render("suppliers-catalog", required = listOf("Their catalog", "Put in your stock", "Rocket", "Their places")) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialSupplier = "Green Farm", initialPart = SupplierPart.CATALOG)
+        }
+        render("suppliers-catalog-phone", 390, 1100) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialSupplier = "Green Farm", initialPart = SupplierPart.CATALOG)
+        }
+        // "Put in your stock" opens the item form filled in from the product (all but the photo).
+        model.newItemPrefilled(catalogItemDraft(rocket, farm.name)) { saved -> SupplierBook.linkProduct(rocket.id, saved.id) }
+        render("suppliers-catalog-item", 1440, 1100, required = listOf("New stock item", "Filled in from Green Farm's price list", "Rocket")) {
+            val state by model.state.collectAsState()
+            SuppliersContent(state, model, initialSupplier = "Green Farm", initialPart = SupplierPart.CATALOG)
+        }
+        model.cancelItem()
         model.onDispose()
     }
 }

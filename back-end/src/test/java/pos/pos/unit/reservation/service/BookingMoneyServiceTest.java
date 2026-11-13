@@ -278,4 +278,27 @@ class BookingMoneyServiceTest {
         special.setSpecial(false);
         assertThatThrownBy(() -> money.addExtra(booking, cake.getId(), 1, NOW)).hasMessageContaining("special menu");
     }
+
+    @Test
+    @DisplayName("a dish on an event night's menu can't be added as a booking extra")
+    void eventMenuDishIsNoExtra() {
+        Menu valentines = new Menu();
+        valentines.setId(UUID.randomUUID());
+        valentines.setRestaurant(booking.getRestaurant());
+        valentines.setSpecial(true);
+        MenuSection section = new MenuSection();
+        section.setMenu(valentines);
+        MenuItem tasting = new MenuItem();
+        tasting.setId(UUID.randomUUID());
+        tasting.setSection(section);
+        tasting.setName("Tasting menu");
+        tasting.setBasePrice(new BigDecimal("80.00"));
+        tasting.setAvailable(true);
+        when(menuItemRepository.findById(tasting.getId())).thenReturn(Optional.of(tasting));
+        when(menuItemRepository.isEventMenu(valentines.getId())).thenReturn(true);
+        booking.setReservationStart(NOW.plusDays(3));
+
+        assertThatThrownBy(() -> money.addExtra(booking, tasting.getId(), 1, NOW))
+                .hasMessageContaining("event night's menu");
+    }
 }

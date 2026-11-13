@@ -113,7 +113,7 @@ internal fun PreOrderCardContent(
                 else preOrder?.let { StatusPill(preOrderStatusLabel(it.status), preOrderStatusColor(it.status)) }
             }
             state.error?.takeIf { !state.editing && !state.confirmCancel }?.let { MessageBar(it, MessageKind.ERROR, onDismiss = model::clearMessages) }
-            state.notice?.let { MessageBar(it, MessageKind.SUCCESS, onDismiss = model::clearMessages) }
+            com.saporini.mobile_desktop.core.components.BottomToast(state.notice, onDismiss = model::clearMessages)
             if (preOrder == null || preOrder.items.isEmpty()) {
                 if (!state.loading) Text(
                     "Nothing ordered ahead. Take the guests' food now and the kitchen gets it a set time before they come.",

@@ -185,9 +185,9 @@ abstract class AbstractUserIntegrationTest {
         }).when(authMailService).sendEmailVerificationEmail(anyString(), anyString(), anyString(), anyString(), any(Duration.class));
 
         doAnswer(invocation -> {
-            latestPasswordResetUrl.set(invocation.getArgument(3, String.class));
+            latestPasswordResetUrl.set(invocation.getArgument(2, String.class));
             return invocation.callRealMethod();
-        }).when(authMailService).sendPasswordResetEmail(anyString(), anyString(), anyString(), anyString(), any(Duration.class));
+        }).when(authMailService).sendPasswordResetEmail(any(pos.pos.user.entity.User.class), anyString(), anyString(), any(Duration.class), any(java.time.OffsetDateTime.class));
 
         doAnswer(invocation -> {
             latestPasswordResetCode.set(invocation.getArgument(2, String.class));

@@ -33,13 +33,14 @@ class ShiftServiceTest {
     @Mock AuditLogRepository audits;
     @Mock pos.pos.settings.repository.SettingsRepository settings;
     @Mock pos.pos.shift.repository.StaffPayRateRepository payRates;
+    @Mock pos.pos.role.service.RolePayService rolePay;
     ShiftService service;
     UUID r = UUID.randomUUID(), b = UUID.randomUUID(), actor = UUID.randomUUID(), other = UUID.randomUUID();
     Restaurant restaurant; Branch branch; User user; Shift shift;
     Authentication self, manager;
 
     @BeforeEach void setup() {
-        service = new ShiftService(repository, scope, em, audits, settings, payRates);
+        service = new ShiftService(repository, scope, em, audits, settings, payRates, rolePay);
         restaurant = new Restaurant(); restaurant.setId(r); restaurant.setTimezone("Europe/Berlin");
         branch = new Branch(); branch.setId(b); branch.setRestaurant(restaurant);
         user = user(actor); shift = new Shift(); shift.setId(UUID.randomUUID()); shift.setRestaurant(restaurant); shift.setBranch(branch); shift.setUser(user); shift.setStatus(ShiftStatus.OPEN); shift.setVersion(3); shift.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC).minusHours(2));
@@ -49,13 +50,15 @@ class ShiftServiceTest {
         lenient().when(em.find(eq(User.class), eq(actor), eq(LockModeType.PESSIMISTIC_WRITE))).thenReturn(user);
         lenient().when(em.getReference(eq(User.class), eq(actor))).thenReturn(user);
         lenient().when(repository.findById(shift.getId())).thenReturn(Optional.of(shift));
+        lenient().when(rolePay.peoplePay(any(), any())).thenReturn(Map.of(actor, new pos.pos.role.service.RolePayService.Pay(true, "WAITERS", null, null)));
         lenient().when(repository.saveAndFlush(any())).thenAnswer(call -> { Shift s = call.getArgument(0); s.setVersion(s.getVersion()+1); return s; });
     }
     private User user(UUID id) { User u = new User(); u.setId(id); u.setRestaurantId(r); u.setDefaultBranchId(b); u.setActive(true); u.setFirstName("Test"); u.setLastName("Staff"); return u; }
     private Authentication auth(String... permissions) { return new UsernamePasswordAuthenticationToken("test", "", Arrays.stream(permissions).map(SimpleGrantedAuthority::new).toList()); }
     private void status(int expected, org.junit.jupiter.api.function.Executable action) { assertEquals(expected, assertThrows(ResponseStatusException.class, action).getStatusCode().value()); }
 
-    @Test void waiterCannotReadTeamRoster() { status(403, () -> service.board(self, r,b,LocalDate.now(),LocalDate.now(),false)); verifyNoInteractions(repository); }
+    @Test void waiterSeesTheTeamOnlyAroundToday() { status(400, () -> service.board(self, r,b,LocalDate.now().minusMonths(3),LocalDate.now().minusMonths(3),false)); status(400, () -> service.board(self, r,b,LocalDate.now().plusMonths(3),LocalDate.now().plusMonths(3),false)); }
+    @Test void noShiftPermissionCannotReadTheTeam() { status(403, () -> service.board(auth("ORDER_READ"), r,b,LocalDate.now(),LocalDate.now(),false)); verifyNoInteractions(repository); }
     @Test void waiterCannotSchedule() { status(403, () -> service.schedule(self,r,b,null,new Schedule(actor,OffsetDateTime.now(),OffsetDateTime.now().plusHours(4),null,0))); }
     @Test void tenantScopeCheckedBeforeReadingShifts() {
         when(scope.requireAccessibleBranch(self,r,b)).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN));

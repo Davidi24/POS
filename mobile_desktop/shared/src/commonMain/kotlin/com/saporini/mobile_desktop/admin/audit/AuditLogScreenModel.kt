@@ -72,8 +72,11 @@ data class AuditLogState(
     val pages: Int = 0,
     val total: Long = 0,
     val hasNext: Boolean = false,
-    // Narrows what is already loaded: the kind of setting (entityType) and free text.
+    // Narrows what is already loaded: the kind of setting (entityType), who made the change, and free text.
     val area: String? = null,
+    val actor: String? = null,
+    // What kind of change ([actionKind]): ADDED, CHANGED, REMOVED, RESET.
+    val kind: String? = null,
     val search: String = "",
     val loading: Boolean = false,
     val loadingMore: Boolean = false,
@@ -82,14 +85,32 @@ data class AuditLogState(
 ) {
     val areas: List<String> get() = entries.mapNotNull { it.entityType }.distinct().sorted()
 
+    /** Who made the loaded changes, most changes first ("System" for changes nobody made by hand). */
+    val actors: List<Pair<String, Int>> get() = entries.groupingBy { actorLabel(it) }.eachCount().entries.sortedByDescending { it.value }.map { it.key to it.value }
+
     val visible: List<AuditEntryDto> get() {
         val words = search.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
-        return entries.filter { area == null || it.entityType == area }.filter { entry ->
+        return entries.filter { (area == null || it.entityType == area) && (actor == null || actorLabel(it) == actor) && (kind == null || actionKind(it.action) == kind) }
+            .filter { entry ->
             val text = listOfNotNull(entry.message, entry.action, entry.entityType, entry.actorName).joinToString(" ").lowercase()
             words.all { it in text }
         }
     }
 }
+
+/** The kind of a change from its action: ADDED, REMOVED, RESET or CHANGED (the default). */
+fun actionKind(action: String?): String {
+    val code = action.orEmpty().uppercase()
+    return when {
+        "CREATE" in code || "ADD" in code -> "ADDED"
+        "DELETE" in code || "REMOVE" in code -> "REMOVED"
+        "RESET" in code || "RESTORE" in code || "IMPORT" in code -> "RESET"
+        else -> "CHANGED"
+    }
+}
+
+/** The name shown for who made a change: their name, "System" for automatic changes, "Someone" when the name is gone. */
+fun actorLabel(entry: AuditEntryDto): String = entry.actorName ?: if (entry.actorUserId == null) "System" else "Someone"
 
 /**
  * Admin Hub → Audit log: who changed which setting and when, newest first. Paged; a refresh reloads every page
@@ -132,6 +153,10 @@ class AuditLogScreenModel(
     }
 
     fun area(area: String?) = mutable.update { it.copy(area = area) }
+
+    fun actor(name: String?) = mutable.update { it.copy(actor = name) }
+
+    fun kind(kind: String?) = mutable.update { it.copy(kind = kind) }
 
     fun search(text: String) = mutable.update { it.copy(search = text.take(200)) }
 

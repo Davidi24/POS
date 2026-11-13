@@ -21,7 +21,7 @@ public interface RestaurantAddressRepository extends JpaRepository<RestaurantAdd
     Optional<RestaurantAddress> findByRestaurantIdAndIsPrimaryTrueAndDeletedAtIsNull(UUID restaurantId);
 
     // Clears all primary flags for a restaurant in one UPDATE to avoid the select→update race condition.
-    // The caller is responsible for re-marking the desired address as primary via save().
+    // Exclude the selected row: bulk JPQL bypasses its managed JPA snapshot.
     @Modifying
     @Query("""
             UPDATE RestaurantAddress a
@@ -29,9 +29,11 @@ public interface RestaurantAddressRepository extends JpaRepository<RestaurantAdd
             WHERE a.restaurant.id = :restaurantId
               AND a.isPrimary = true
               AND a.deletedAt IS NULL
+              AND (:keepId IS NULL OR a.id <> :keepId)
             """)
     void clearAllPrimary(
             @Param("restaurantId") UUID restaurantId,
-            @Param("actorId") UUID actorId
+            @Param("actorId") UUID actorId,
+            @Param("keepId") UUID keepId
     );
 }

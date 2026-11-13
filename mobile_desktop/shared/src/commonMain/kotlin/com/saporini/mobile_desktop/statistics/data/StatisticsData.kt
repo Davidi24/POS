@@ -23,7 +23,9 @@ data class StatsPeriodDto(
     val previousTo: String? = null,
     val timezone: String? = null,
     val currency: String = "EUR",
-    val branchId: String? = null
+    val branchId: String? = null,
+    // Every currency the restaurant has sold in, its own first (two after a currency change).
+    val currencies: List<String> = emptyList()
 )
 
 /** One figure and the same figure for the period just before. */
@@ -44,6 +46,9 @@ data class KpisDto(
     val removedItemsValue: KpiDto = KpiDto(),
     val cancelledOrders: KpiDto = KpiDto(),
     val voidedOrders: KpiDto = KpiDto(),
+    // Orders closed as unpaid and still unpaid (guests walked out, will pay later), and what they owe.
+    val unpaidOrders: KpiDto = KpiDto(),
+    val unpaidValue: KpiDto = KpiDto(),
     val openOrders: Long = 0,
     val otherCurrencyOrders: Long = 0
 )
@@ -116,7 +121,8 @@ data class StatsStaffDto(val period: StatsPeriodDto, val staff: List<StaffStatsD
 @Serializable
 data class ReportInfoDto(val code: String, val title: String, val description: String = "")
 
-data class StatsQuery(val restaurantId: String, val branchId: String?, val from: LocalDate, val to: LocalDate)
+/** [currency] null: the restaurant's own currency. */
+data class StatsQuery(val restaurantId: String, val branchId: String?, val from: LocalDate, val to: LocalDate, val currency: String? = null)
 
 interface StatisticsRepository {
     suspend fun overview(query: StatsQuery): StatsOverviewDto
@@ -126,7 +132,13 @@ interface StatisticsRepository {
 
     /** The CSV text of one report (UTF-8, with a byte order mark for spreadsheets). */
     suspend fun report(query: StatsQuery, code: String): String
+
+    /** The order types the restaurant takes (DINE_IN, TAKEAWAY, DELIVERY) from its settings; null when they can't be read. */
+    suspend fun orderTypesOn(restaurantId: String): Set<String>? = null
 }
+
+@Serializable
+private data class OrderChannelsDto(val enableTakeaway: Boolean? = null, val enableDelivery: Boolean? = null)
 
 class StatisticsApi(
     private val client: HttpClient,
@@ -140,6 +152,7 @@ class StatisticsApi(
         parameter("from", query.from.toString())
         parameter("to", query.to.toString())
         query.branchId?.let { parameter("branchId", it) }
+        query.currency?.let { parameter("currency", it) }
     }
 
     override suspend fun overview(query: StatsQuery): StatsOverviewDto =
@@ -153,6 +166,11 @@ class StatisticsApi(
 
     override suspend fun reports(restaurantId: String): List<ReportInfoDto> =
         client.get(path(restaurantId, "reports")).body()
+
+    override suspend fun orderTypesOn(restaurantId: String): Set<String>? {
+        val settings: OrderChannelsDto = client.get("${baseUrlProvider().trimEnd('/')}/restaurants/${restaurantId.encodeURLPathPart()}/settings").body()
+        return setOfNotNull("DINE_IN", "TAKEAWAY".takeIf { settings.enableTakeaway == true }, "DELIVERY".takeIf { settings.enableDelivery == true })
+    }
 
     override suspend fun report(query: StatsQuery, code: String): String {
         require(code.matches(Regex("[a-z-]{1,40}"))) { "Unknown report" }

@@ -1,6 +1,8 @@
 package com.saporini.mobile_desktop.pos.tables.domain.repository
 
+import com.saporini.mobile_desktop.pos.tables.domain.model.BookingTableOption
 import com.saporini.mobile_desktop.pos.tables.domain.model.BranchTableLayout
+import com.saporini.mobile_desktop.pos.tables.domain.model.SpecialCaseAction
 import com.saporini.mobile_desktop.pos.tables.domain.model.FloorLayout
 import com.saporini.mobile_desktop.pos.tables.domain.model.LayoutTable
 import com.saporini.mobile_desktop.pos.tables.domain.model.LayoutTableStatus
@@ -11,6 +13,8 @@ data class TableLayoutChange(
     val restaurantId: String,
     val branchId: String
 )
+
+private fun unsupported(): Nothing = throw UnsupportedOperationException("Not available here.")
 
 interface TableLayoutRepository {
 
@@ -78,7 +82,8 @@ interface TableLayoutRepository {
         branchId: String,
         tableId: String,
         status: LayoutTableStatus,
-        guestCount: Int? = null
+        guestCount: Int? = null,
+        moreComing: Boolean? = null
     ): LayoutTable
 
     suspend fun saveTableMerge(
@@ -86,7 +91,14 @@ interface TableLayoutRepository {
         branchId: String,
         primaryTableId: String,
         childTableIds: List<String>,
-        previousPrimaryTableIds: List<String> = emptyList()
+        tablesToUnmerge: List<String> = emptyList()
+    ): BranchTableLayout
+
+    suspend fun setBillRequested(
+        restaurantId: String,
+        branchId: String,
+        orderId: String,
+        requested: Boolean
     ): BranchTableLayout
 
     suspend fun separateTable(
@@ -94,6 +106,10 @@ interface TableLayoutRepository {
         branchId: String,
         primaryTableId: String
     ): BranchTableLayout
+
+    // Some tables leave the group and become free; [keepTableId] keeps the guests and the order (null: the server picks).
+    suspend fun unmergeSome(restaurantId: String, branchId: String, tableId: String, freeTableIds: List<String>, keepTableId: String?): BranchTableLayout =
+        throw UnsupportedOperationException("Not available here.")
 
     suspend fun deleteTable(
         restaurantId: String,
@@ -127,6 +143,20 @@ interface TableLayoutRepository {
         sectionId: String,
         tableIds: Set<String>
     )
+
+    suspend fun giveMoreTime(restaurantId: String, branchId: String, tableId: String, minutes: Int): BranchTableLayout = unsupported()
+
+    suspend fun stillHere(restaurantId: String, branchId: String, tableId: String): BranchTableLayout = unsupported()
+
+    suspend fun bookingWaits(restaurantId: String, branchId: String, reservationId: String): BranchTableLayout = unsupported()
+
+    suspend fun bookingOptions(restaurantId: String, branchId: String, tableId: String): List<BookingTableOption> = unsupported()
+
+    suspend fun moveBooking(restaurantId: String, branchId: String, tableId: String, option: BookingTableOption): BranchTableLayout = unsupported()
+
+    suspend fun specialCaseActions(restaurantId: String, branchId: String): List<SpecialCaseAction> = emptyList()
+
+    suspend fun returnSpecialCaseAction(restaurantId: String, branchId: String, actionId: String, tableId: String?): BranchTableLayout = unsupported()
 
     suspend fun getFreeTableIds(
         restaurantId: String,

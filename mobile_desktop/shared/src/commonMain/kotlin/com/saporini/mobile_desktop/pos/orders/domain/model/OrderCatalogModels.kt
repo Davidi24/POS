@@ -12,8 +12,13 @@ data class OrderCatalogMenu(
     val restaurant: OrderCatalogRestaurant? = null,
     val availableFrom: String? = null, val availableUntil: String? = null,
     val availableFromDate: String? = null, val availableUntilDate: String? = null,
-    val sections: List<OrderCatalogSection>? = null
-)
+    val sections: List<OrderCatalogSection>? = null,
+    // A special menu's event icon, e.g. ❤️.
+    val eventIcon: String? = null
+) {
+    // "❤️ Valentine's Menu" for a special menu, the plain name otherwise.
+    val label: String get() = listOfNotNull(eventIcon?.takeIf { it.isNotBlank() }, name).joinToString(" ")
+}
 
 data class OrderCatalogSection(
     val id: String, val name: String, val active: Boolean,

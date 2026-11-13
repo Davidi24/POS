@@ -93,6 +93,17 @@ class RestaurantAdminServiceTest {
     @Spy
     private BranchMapper branchMapper = new BranchMapper();
 
+    @Mock private pos.pos.restaurant.service.RestaurantClosureGuard closureGuard;
+
+    @Mock
+    private pos.pos.restaurant.repository.RestaurantCardRepository restaurantCardRepository;
+
+    @Mock
+    private pos.pos.restaurant.service.RestaurantDeviceRetirement deviceRetirement;
+
+    @Mock
+    private pos.pos.settings.service.SettingsAuditService auditService;
+
     @InjectMocks
     private RestaurantAdminService restaurantAdminService;
 
@@ -267,6 +278,114 @@ class RestaurantAdminServiceTest {
     }
 
     @Test
+    @DisplayName("createRestaurant takes the list position only after the ordering lock, so simultaneous creations never tie")
+    void shouldTakeNextPositionUnderLock() {
+        Authentication authentication = authentication();
+        CreateRestaurantRequest request = CreateRestaurantRequest.builder()
+                .name("Second")
+                .legalName("Second LLC")
+                .email("second@pos.local")
+                .phone("+355691234567")
+                .currency("EUR")
+                .timezone("Europe/Tirane")
+                .build();
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(restaurantValidationService.normalizeAndValidateFields(null, null, "Second", "Europe/Tirane", null))
+                .willReturn(new RestaurantValidationService.NormalizedRestaurantFields("SECOND", "second"));
+        given(restaurantCardRepository.nextDisplayOrder()).willReturn(12);
+        given(restaurantRepository.save(any(Restaurant.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        restaurantAdminService.createRestaurant(authentication, request);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(restaurantCardRepository, restaurantRepository);
+        order.verify(restaurantCardRepository).lockDisplayOrder();
+        order.verify(restaurantCardRepository).nextDisplayOrder();
+        order.verify(restaurantRepository).save(any(Restaurant.class));
+        ArgumentCaptor<Restaurant> saved = ArgumentCaptor.forClass(Restaurant.class);
+        verify(restaurantRepository).save(saved.capture());
+        assertThat(saved.getValue().getDisplayOrder()).isEqualTo(12);
+        verify(branchRepository).save(any(pos.pos.restaurant.entity.Branch.class));
+    }
+
+    @Test
+    @DisplayName("updateRestaurant refuses to clear the email or phone, even past request validation")
+    void shouldRefuseClearingContactDetails() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+        UpdateRestaurantRequest request = UpdateRestaurantRequest.builder()
+                .name("POS Main")
+                .legalName("POS Main LLC")
+                .code("POS_MAIN")
+                .slug("pos-main")
+                .email("hello@pos.local")
+                .phone("   ")
+                .currency("USD")
+                .timezone("Europe/Berlin")
+                .ownerUserId(OWNER_ID)
+                .isActive(true)
+                .status(RestaurantStatus.ACTIVE)
+                .expectedVersion(0L)
+                .build();
+        given(actorScopeService.resolve(authentication)).willReturn(actorScope(true, null));
+        given(restaurantScopeService.requireManageableRestaurant(any(ActorScope.class), eq(TARGET_RESTAURANT_ID)))
+                .willReturn(restaurant);
+
+        assertThatThrownBy(() -> restaurantAdminService.updateRestaurant(authentication, TARGET_RESTAURANT_ID, request))
+                .isInstanceOfSatisfying(AuthException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(error.getMessage()).contains("email and a phone");
+                });
+        verify(restaurantRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("updateRestaurant points an owner change to Transfer ownership")
+    void shouldPointOwnerChangesToTransfer() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+        UpdateRestaurantRequest request = UpdateRestaurantRequest.builder()
+                .name("POS Main").legalName("POS Main LLC").code("POS_MAIN").slug("pos-main")
+                .email("hello@pos.local").phone("+355691234567").currency("USD").timezone("Europe/Berlin")
+                .ownerUserId(UUID.randomUUID()).isActive(true).status(RestaurantStatus.ACTIVE).expectedVersion(0L)
+                .build();
+        given(actorScopeService.resolve(authentication)).willReturn(actorScope(true, null));
+        given(restaurantScopeService.requireManageableRestaurant(any(ActorScope.class), eq(TARGET_RESTAURANT_ID)))
+                .willReturn(restaurant);
+
+        assertThatThrownBy(() -> restaurantAdminService.updateRestaurant(authentication, TARGET_RESTAURANT_ID, request))
+                .isInstanceOfSatisfying(AuthException.class, error -> {
+                    assertThat(error.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(error.getMessage()).contains("Transfer ownership");
+                });
+    }
+
+    @Test
+    @DisplayName("closing a restaurant for good through its status retires its devices; suspending it doesn't")
+    void shouldRetireDevicesOnlyWhenArchivedByStatus() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+        given(restaurantScopeService.requirePlatformManagedRestaurant(eq(authentication), eq(TARGET_RESTAURANT_ID), org.mockito.ArgumentMatchers.anyString()))
+                .willReturn(restaurant);
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
+
+        UpdateRestaurantStatusRequest suspend = new UpdateRestaurantStatusRequest();
+        suspend.setIsActive(false);
+        suspend.setStatus(RestaurantStatus.SUSPENDED);
+        restaurantAdminService.updateRestaurantStatus(authentication, TARGET_RESTAURANT_ID, suspend);
+        verify(deviceRetirement, never()).retireRestaurant(any(), any(), any());
+
+        UpdateRestaurantStatusRequest archive = new UpdateRestaurantStatusRequest();
+        archive.setIsActive(false);
+        archive.setStatus(RestaurantStatus.ARCHIVED);
+        given(deviceRetirement.retireRestaurant(eq(TARGET_RESTAURANT_ID), eq(ACTOR_ID), any())).willReturn(3);
+        restaurantAdminService.updateRestaurantStatus(authentication, TARGET_RESTAURANT_ID, archive);
+
+        verify(deviceRetirement).retireRestaurant(eq(TARGET_RESTAURANT_ID), eq(ACTOR_ID), any());
+        verify(auditService).log(same(restaurant), eq(null), eq("RESTAURANT"), eq(TARGET_RESTAURANT_ID), eq("ARCHIVE"),
+                org.mockito.ArgumentMatchers.contains("devices retired=3"), eq(ACTOR_ID));
+    }
+
+    @Test
     @DisplayName("createRestaurant should reject duplicate normalized codes")
     void shouldRejectDuplicateCodes() {
         Authentication authentication = authentication();
@@ -331,11 +450,9 @@ class RestaurantAdminServiceTest {
         given(actorScopeService.resolve(authentication)).willReturn(actorScope(false, ACTOR_RESTAURANT_ID));
         given(restaurantScopeService.requireManageableRestaurant(any(ActorScope.class), eq(TARGET_RESTAURANT_ID)))
                 .willReturn(restaurant);
-        org.mockito.Mockito.doThrow(new RestaurantOwnershipChangeNotAllowedException())
-                .when(restaurantPolicy).assertCanChangeOwner(any(ActorScope.class), eq(restaurant), eq(null));
 
         assertThatThrownBy(() -> restaurantAdminService.updateRestaurant(authentication, TARGET_RESTAURANT_ID, request))
-                .isInstanceOf(RestaurantOwnershipChangeNotAllowedException.class);
+                .isInstanceOfSatisfying(AuthException.class, error -> assertThat(error.getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
     }
 
     @Test
@@ -348,7 +465,7 @@ class RestaurantAdminServiceTest {
         request.setIsActive(true);
         request.setStatus(RestaurantStatus.SUSPENDED);
 
-        given(restaurantScopeService.requireManageableRestaurant(authentication, TARGET_RESTAURANT_ID))
+        given(restaurantScopeService.requirePlatformManagedRestaurant(eq(authentication), eq(TARGET_RESTAURANT_ID), org.mockito.ArgumentMatchers.anyString()))
                 .willReturn(restaurant);
         org.mockito.Mockito.doThrow(new AuthException(
                 "Non-active restaurant statuses must have isActive=false",
@@ -391,6 +508,40 @@ class RestaurantAdminServiceTest {
 
         verify(branchRepository).softDeleteAllByRestaurantId(eq(TARGET_RESTAURANT_ID), any(), eq(ACTOR_ID));
         verify(restaurantRepository).save(restaurant);
+    }
+
+    @Test
+    @DisplayName("deleteRestaurant retires every device before archiving the branches, and records it")
+    void shouldRetireDevicesWhenArchiving() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant(TARGET_RESTAURANT_ID, OWNER_ID);
+        given(restaurantScopeService.requireExistingRestaurant(TARGET_RESTAURANT_ID)).willReturn(restaurant);
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
+        given(deviceRetirement.retireRestaurant(eq(TARGET_RESTAURANT_ID), eq(ACTOR_ID), any())).willReturn(2);
+
+        restaurantAdminService.deleteRestaurant(authentication, TARGET_RESTAURANT_ID);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(closureGuard, deviceRetirement, branchRepository, restaurantRepository);
+        order.verify(closureGuard).restaurant(TARGET_RESTAURANT_ID, RestaurantStatus.ARCHIVED);
+        order.verify(deviceRetirement).retireRestaurant(eq(TARGET_RESTAURANT_ID), eq(ACTOR_ID), any());
+        order.verify(branchRepository).softDeleteAllByRestaurantId(eq(TARGET_RESTAURANT_ID), any(), eq(ACTOR_ID));
+        order.verify(restaurantRepository).save(restaurant);
+        verify(auditService).log(same(restaurant), eq(null), eq("RESTAURANT"), eq(TARGET_RESTAURANT_ID), eq("ARCHIVE"),
+                org.mockito.ArgumentMatchers.contains("devices retired=2"), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("deleteRestaurant retires nothing when unfinished work blocks the archive")
+    void shouldNotRetireDevicesWhenArchiveIsBlocked() {
+        Authentication authentication = authentication();
+        given(restaurantScopeService.requireExistingRestaurant(TARGET_RESTAURANT_ID)).willReturn(restaurant(TARGET_RESTAURANT_ID, OWNER_ID));
+        org.mockito.Mockito.doThrow(new AuthException("Finish open orders first", HttpStatus.CONFLICT))
+                .when(closureGuard).restaurant(TARGET_RESTAURANT_ID, RestaurantStatus.ARCHIVED);
+
+        assertThatThrownBy(() -> restaurantAdminService.deleteRestaurant(authentication, TARGET_RESTAURANT_ID))
+                .isInstanceOf(AuthException.class);
+        verify(deviceRetirement, never()).retireRestaurant(any(), any(), any());
+        verify(branchRepository, never()).softDeleteAllByRestaurantId(any(), any(), any());
     }
 
     @Test

@@ -23,6 +23,7 @@ import com.saporini.mobile_desktop.auth.data.dto.RefreshRequest
 import com.saporini.mobile_desktop.core.session.SessionManager
 import io.ktor.client.call.body
 import io.ktor.client.request.post
+import io.ktor.client.request.get
 import io.ktor.client.request.setBody
 
 object ApiConfig {
@@ -76,6 +77,10 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
                     println("Unparsed API error: ${response.status.value}")
                     "Something went wrong. Please try again."
                 }
+                if (response.headers["X-POS-Context-Invalid"] == "true") {
+                    sessionManager.rejectRestaurantContext(response.call.request.headers["X-Restaurant-Id"],
+                        response.call.request.headers["X-Branch-Id"], message)
+                }
                 throw ApiException(response.status.value, message)
             }
         }
@@ -101,6 +106,7 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
             }
             refreshTokens {
                 val currentRefreshToken = TokenStore.refreshToken.value ?: return@refreshTokens null
+                val refreshingUser = sessionManager.currentUser.value?.id
 
                 try {
                     // Call the refresh endpoint with a fresh HttpClient (no auth plugin)
@@ -111,19 +117,23 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
                         setBody(RefreshRequest(currentRefreshToken))
                     }.body()
 
+                    if (sessionManager.currentUser.value?.id != refreshingUser || TokenStore.refreshToken.value != currentRefreshToken) return@refreshTokens null
+
                     // Save the new tokens
                     TokenStore.save(refreshResponse.accessToken, refreshResponse.refreshToken)
+                    sessionManager.signIn(refreshResponse.user)
 
                     BearerTokens(refreshResponse.accessToken, refreshResponse.refreshToken)
                 } catch (e: ApiException) {
-                    // The server refused the refresh token (expired, revoked or reused): log in again.
-                    if (e.status in 400..499) sessionManager.signOut()
+                    // Expired/revoked credentials end the session. Rate limits and outages remain retryable.
+                    if (e.status !in listOf(400, 401, 403)) throw e
+                    if (sessionManager.currentUser.value?.id == refreshingUser && TokenStore.refreshToken.value == currentRefreshToken) sessionManager.signOut()
                     null
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    // No connection: keep the session; the next request tries to refresh again.
-                    null
+                    // Preserve the connection error so a permission recheck does not mistake it for an expired session.
+                    throw e
                 }
             }
             sendWithoutRequest { request ->
@@ -135,5 +145,13 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
     }
     defaultRequest {
         contentType(ContentType.Application.Json)
+        // Super admins work inside the restaurant (and branch) they entered; the server reads them from these headers
+        // and ignores them for everyone else. Read on every request, so entering another restaurant takes effect at once.
+        sessionManager.actingRestaurant.value?.let { acting ->
+            headers.append("X-Restaurant-Id", acting.restaurantId)
+            acting.branchId?.let { headers.append("X-Branch-Id", it) }
+        }
     }
+}.also { client ->
+    sessionManager.setUserLoader { client.get("${ApiConfig.BASE_URL}/auth/me").body() }
 }

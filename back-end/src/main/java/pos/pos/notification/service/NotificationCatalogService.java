@@ -18,7 +18,7 @@ public class NotificationCatalogService {
                 .generatedAt(OffsetDateTime.now(ZoneOffset.UTC))
                 .items(List.of(
                         capability(NotificationTopic.ORDER, "Orders, order items, and operational order state", NotificationCapabilityStatus.LIVE,
-                                List.of("ORDER_ORDER_UPSERT", "ORDER_ORDER_DELETE", "ORDER_ORDER_LINE_ITEM_UPSERT")),
+                                List.of("ORDER_ORDER_UPSERT", "ORDER_ORDER_DELETE", "ORDER_ORDER_LINE_ITEM_UPSERT", "ORDER_CLOSED_UNPAID")),
                         capability(NotificationTopic.KDS, "Kitchen display stations, tickets, and workflow", NotificationCapabilityStatus.LIVE,
                                 List.of("KDS_KDS_STATION_UPSERT", "KDS_KDS_TICKET_UPSERT", "KDS_KDS_TICKET_ITEM_UPSERT")),
                         capability(NotificationTopic.DEVICE, "Branch devices, assignments, and pairing tokens", NotificationCapabilityStatus.LIVE,
@@ -26,7 +26,7 @@ public class NotificationCatalogService {
                         capability(NotificationTopic.SETTINGS, "Restaurant settings, templates, and operational config", NotificationCapabilityStatus.LIVE,
                                 List.of("SETTINGS_SETTINGS_UPSERT", "SETTINGS_SETTINGS_TEMPLATE_UPSERT", "SETTINGS_SETTINGS_SPECIAL_HOUR_UPSERT")),
                         capability(NotificationTopic.TABLE, "Table map, layout, merge, and status changes", NotificationCapabilityStatus.LIVE,
-                                List.of("TABLE_RESTAURANT_TABLE_UPSERT", "TABLE_TABLE_CATEGORY_UPSERT")),
+                                List.of("TABLE_RESTAURANT_TABLE_UPSERT", "TABLE_TABLE_CATEGORY_UPSERT", "TABLE_SEATING_OVER_LIMIT", "SPECIAL_CASE_ACTION")),
                         capability(NotificationTopic.RESERVATION, "Reservation lifecycle, notes, deposits, and table assignments", NotificationCapabilityStatus.LIVE,
                                 List.of("RESERVATION_RESERVATION_UPSERT", "RESERVATION_RESERVATION_NOTE_UPSERT", "RESERVATION_RESERVATION_TABLE_ASSIGNMENT_UPSERT")),
                         capability(NotificationTopic.MENU, "Menus, sections, items, variants, options, and routing changes", NotificationCapabilityStatus.LIVE,

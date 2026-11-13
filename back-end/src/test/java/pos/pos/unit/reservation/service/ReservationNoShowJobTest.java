@@ -57,7 +57,8 @@ class ReservationNoShowJobTest {
         ReservationLifecycleService lifecycle = new ReservationLifecycleService(
                 null, support, notifications, policy, null, null, null, null, event -> { });
         lifecycle.useClock(Clock.fixed(NOW.toInstant(), ZoneOffset.UTC));
-        return new ReservationNoShowJob(reservationRepository, lifecycle, policy, support, notifications);
+        return new ReservationNoShowJob(reservationRepository, lifecycle, policy, support, notifications,
+                org.mockito.Mockito.mock(pos.pos.tables.specialcase.SpecialCaseService.class));
     }
 
     private static Restaurant restaurant() {

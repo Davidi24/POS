@@ -204,10 +204,15 @@ public class LocalMenuSeedRunner implements CommandLineRunner {
     }
 
     private MenuItem upsertItem(MenuSection section, LocalMenuSeedData.ItemSpec spec) {
-        MenuItem item = menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId()).stream()
+        // A demo dish that already exists keeps what was changed in the app (its photo, price, sold out...): every local
+        // start used to write the seed back over it, which wiped the dish photos.
+        var existingItem = menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId()).stream()
                 .filter(existing -> spec.name().equals(existing.getName()))
-                .findFirst()
-                .orElseGet(MenuItem::new);
+                .findFirst();
+        if (existingItem.isPresent()) {
+            return existingItem.get();
+        }
+        MenuItem item = new MenuItem();
 
         item.setSection(section);
         item.setSku(spec.sku());

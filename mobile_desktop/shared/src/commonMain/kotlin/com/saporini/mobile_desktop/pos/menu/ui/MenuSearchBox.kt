@@ -53,6 +53,8 @@ internal fun <T> MenuSearchBox(
     itemPrice: (T) -> String,
     itemAvailable: (T) -> Boolean,
     onSuggestionClick: (T) -> Unit,
+    // The dish's stored photo for the suggestion row (none: the "no photo" tile).
+    itemImageUrl: (T) -> String? = { null },
     modifier: Modifier = Modifier,
     height: androidx.compose.ui.unit.Dp = 52.dp
 ) {
@@ -104,6 +106,7 @@ internal fun <T> MenuSearchBox(
                             category = itemCategory(item),
                             price = itemPrice(item),
                             available = itemAvailable(item),
+                            imageUrl = itemImageUrl(item),
                             onClick = {
                                 expanded = false
                                 onSuggestionClick(item)
@@ -156,6 +159,7 @@ private fun MenuSearchSuggestionRow(
     category: String,
     price: String,
     available: Boolean,
+    imageUrl: String?,
     onClick: () -> Unit
 ) {
     Row(
@@ -165,14 +169,14 @@ private fun MenuSearchSuggestionRow(
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter = painterResource(Res.drawable.auth_login_img),
+        com.saporini.mobile_desktop.pos.menu.ui.item.MenuPhoto(
+            url = imageUrl,
             contentDescription = name,
             modifier = Modifier
                 .size(width = 58.dp, height = 42.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .graphicsLayer(alpha = if (available) 1f else 0.45f),
-            contentScale = ContentScale.Crop
+            iconSize = 18.dp
         )
 
         Spacer(Modifier.width(12.dp))

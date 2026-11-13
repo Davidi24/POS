@@ -70,7 +70,7 @@ class OrdersUiScreenshotTest {
             if (width >= 1000) {
                 // Desktop: the order sits beside the list with Items / Order info / Notes / History tabs.
                 click("History"); snap("03-activity"); assertTrue(all().any { label(it).contains("Order created") })
-                click("Items"); click("Add item"); snap("07-composer")
+                click("Items"); click("Edit order"); snap("07-edit-menu"); click("Order items"); snap("07-composer"); assertTrue(all().any { label(it).contains("Edit order items") })
                 // "New order" is the draggable edge button here; the list is what matters after closing.
                 model.closeOrderDetails(); snap("scratch"); assertTrue(all().any { label(it).contains("#1041") })
             } else {

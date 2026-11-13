@@ -124,6 +124,8 @@ class RestaurantAdminControllerTest {
                 .legalName("POS Main LLC")
                 .currency("USD")
                 .timezone("Europe/Berlin")
+                .email("restaurant@example.test")
+                .phone("+355690123456")
                 .owner(CreateRestaurantOwnerRequest.builder()
                         .email("owner@pos.local")
                         .username("owner.main")
@@ -157,11 +159,41 @@ class RestaurantAdminControllerTest {
     }
 
     @Test
+    @DisplayName("PUT /restaurants/{restaurantId} without the restaurant's email or phone is a 400")
+    void shouldRequireContactDetailsOnUpdate() throws Exception {
+        UpdateRestaurantRequest request = UpdateRestaurantRequest.builder()
+                .name("POS Main")
+                .legalName("POS Main LLC")
+                .code("POS_MAIN")
+                .slug("pos-main")
+                .email(" ")
+                .currency("USD")
+                .timezone("Europe/Berlin")
+                .isActive(true)
+                .status(RestaurantStatus.ACTIVE)
+                .expectedVersion(1L)
+                .build();
+
+        mockMvc.perform(put("/restaurants/{restaurantId}", RESTAURANT_ID)
+                        .principal(authentication)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("email: email is required"),
+                        org.hamcrest.Matchers.containsString("phone: phone is required"))));
+
+        verifyNoInteractions(restaurantAdminService);
+    }
+
+    @Test
     @DisplayName("PUT /restaurants/{restaurantId} should validate the request body")
     void shouldValidateUpdateRestaurantBody() throws Exception {
         UpdateRestaurantRequest request = UpdateRestaurantRequest.builder()
                 .name("")
                 .legalName("POS Main LLC")
+                .email("hello@pos.example")
+                .phone("+355691234567")
                 .code("POS_MAIN")
                 .slug("pos-main")
                 .currency("USD")

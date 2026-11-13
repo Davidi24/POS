@@ -60,6 +60,16 @@ public final class MenuRoleResponseMapper {
                 .description(response.getDescription())
                 .active(response.getActive())
                 .displayOrder(response.getDisplayOrder())
+                .restaurant(response.getRestaurant())
+                .color(response.getColor())
+                .availableFrom(response.getAvailableFrom())
+                .availableUntil(response.getAvailableUntil())
+                .availableFromDate(response.getAvailableFromDate())
+                .availableUntilDate(response.getAvailableUntilDate())
+                .special(response.getSpecial())
+                .event(response.getEvent())
+                .shownToWaiters(response.getShownToWaiters())
+                .itemCount(response.getItemCount())
                 .sections(response.getSections())
                 .build();
     }

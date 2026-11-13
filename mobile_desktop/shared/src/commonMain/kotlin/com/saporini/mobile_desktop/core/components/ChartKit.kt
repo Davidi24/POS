@@ -1,10 +1,27 @@
 package com.saporini.mobile_desktop.core.components
 
+import kotlin.math.roundToInt
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -49,14 +66,23 @@ import com.saporini.mobile_desktop.core.theme.Inter
 /** The colours charts cycle through, in the kit's tones. */
 internal val ChartPalette = listOf(Kit.Green, Kit.Blue, Kit.Amber, Kit.Purple, Kit.Danger, Kit.Grey, Color(0xFF3E8E6A), Color(0xFFB0662E))
 
-internal data class BarDatum(val label: String, val value: Float, val display: String = "", val highlight: Boolean = false)
+internal data class BarDatum(val label: String, val value: Float, val display: String = "", val highlight: Boolean = false, val tooltip: String? = null)
 
 /**
  * Vertical bars with the value written on top and the label below. The tallest bar fills [height]; a bar with no
- * value is a thin grey line so empty hours or days still show.
+ * value is a thin grey line so empty hours or days still show. Bars with a [BarDatum.tooltip] show it above the bar
+ * when hovered (desktop) or tapped (touch screens, tap again to hide). [tip] draws a richer tip instead (several
+ * lines, on the same dark box) for the bar at that index.
  */
 @Composable
-internal fun BarChart(bars: List<BarDatum>, modifier: Modifier = Modifier, height: Dp = 190.dp, color: Color = Kit.Green, showValues: Boolean = true) {
+internal fun BarChart(
+    bars: List<BarDatum>,
+    modifier: Modifier = Modifier,
+    height: Dp = 190.dp,
+    color: Color = Kit.Green,
+    showValues: Boolean = true,
+    tip: (@Composable ColumnScope.(index: Int) -> Unit)? = null
+) {
     val most = bars.maxOfOrNull { it.value }?.takeIf { it > 0f } ?: 1f
     val labelEvery = when {
         bars.size > 40 -> 7
@@ -64,25 +90,62 @@ internal fun BarChart(bars: List<BarDatum>, modifier: Modifier = Modifier, heigh
         bars.size > 14 -> 2
         else -> 1
     }
-    Row(modifier.fillMaxWidth().height(height), horizontalArrangement = Arrangement.spacedBy(if (bars.size > 20) 2.dp else 6.dp), verticalAlignment = Alignment.Bottom) {
-        bars.forEachIndexed { index, bar ->
-            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally) {
-                if (showValues && bar.value > 0f && bars.size <= 16) {
-                    Text(bar.display, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 9.sp,
-                        color = if (bar.highlight) color else Kit.Muted, maxLines = 1, overflow = TextOverflow.Clip)
-                    Spacer(Modifier.height(3.dp))
+    val interactive = tip != null || bars.any { it.tooltip != null }
+    var active by remember(bars.size) { mutableStateOf<Int?>(null) }
+    var chartWidth by remember { mutableStateOf(0) }
+    var tipSize by remember { mutableStateOf(IntSize.Zero) }
+    val barHeight = { bar: BarDatum ->
+        if (bar.value <= 0f) 3.dp else ((height - 40.dp) * (bar.value / most).coerceIn(0f, 1f)).coerceAtLeast(4.dp)
+    }
+    Box(modifier.fillMaxWidth().height(height).onSizeChanged { chartWidth = it.width }) {
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(if (bars.size > 20) 2.dp else 6.dp), verticalAlignment = Alignment.Bottom) {
+            bars.forEachIndexed { index, bar ->
+                val interaction = remember { MutableInteractionSource() }
+                val hovered by interaction.collectIsHoveredAsState()
+                if (interactive) LaunchedEffect(hovered) { if (hovered) active = index else if (active == index) active = null }
+                val lit = bar.highlight || active == index
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().then(
+                        if (interactive) Modifier.hoverable(interaction).pointerHoverIcon(PointerIcon.Hand)
+                            .clickable(interactionSource = interaction, indication = null) { active = if (active == index) null else index }
+                        else Modifier
+                    ),
+                    verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (showValues && bar.value > 0f && bars.size <= 16) {
+                        Text(bar.display, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 9.sp,
+                            color = if (bar.highlight) color else Kit.Muted, maxLines = 1, overflow = TextOverflow.Clip)
+                        Spacer(Modifier.height(3.dp))
+                    }
+                    Box(
+                        Modifier.fillMaxWidth(if (bars.size > 20) 0.9f else 0.7f)
+                            .height(barHeight(bar))
+                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                            .background(when { bar.value <= 0f -> if (active == index) Kit.Faint else Kit.Border; lit -> color; else -> color.copy(alpha = 0.5f) })
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Text(if (index % labelEvery == 0 || active == index) bar.label else "", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 10.sp,
+                        color = if (lit) Kit.Ink else Kit.Muted, maxLines = 1, overflow = TextOverflow.Clip, textAlign = TextAlign.Center)
                 }
-                val fraction = (bar.value / most).coerceIn(0f, 1f)
-                Box(
-                    Modifier.fillMaxWidth(if (bars.size > 20) 0.9f else 0.7f)
-                        .height(if (bar.value <= 0f) 3.dp else ((height - 40.dp) * fraction).coerceAtLeast(4.dp))
-                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                        .background(when { bar.value <= 0f -> Kit.Border; bar.highlight -> color; else -> color.copy(alpha = 0.5f) })
-                )
-                Spacer(Modifier.height(5.dp))
-                Text(if (index % labelEvery == 0) bar.label else "", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 10.sp,
-                    color = if (bar.highlight) Kit.Ink else Kit.Muted, maxLines = 1, overflow = TextOverflow.Clip, textAlign = TextAlign.Center)
             }
+        }
+        // The tooltip: centred over the bar, just above its top, kept inside the chart.
+        val index = active
+        val text = index?.let { bars.getOrNull(it) }?.tooltip
+        if (index != null && index in bars.indices && (tip != null || text != null) && chartWidth > 0) {
+            val bar = bars[index]
+            val place = Modifier
+                .offset {
+                    val center = chartWidth * (index + 0.5f) / bars.size
+                    val x = (center - tipSize.width / 2f).coerceIn(0f, (chartWidth - tipSize.width).coerceAtLeast(0).toFloat())
+                    val barTop = (height - 20.dp - barHeight(bar)).roundToPx()
+                    IntOffset(x.roundToInt(), (barTop - tipSize.height - 6.dp.roundToPx()).coerceAtLeast(0))
+                }
+                .onSizeChanged { tipSize = it }
+                .clip(RoundedCornerShape(8.dp)).background(Kit.Ink)
+            if (tip != null) Column(place.padding(horizontal = 12.dp, vertical = 9.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) { tip(index) }
+            else Text(text!!, place.padding(horizontal = 10.dp, vertical = 6.dp),
+                fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Color.White, maxLines = 1)
         }
     }
 }
@@ -154,16 +217,16 @@ internal fun TrendChart(
 
 internal data class ShareDatum(val label: String, val value: Float, val display: String, val detail: String? = null)
 
-/** Labelled horizontal bars with the share in percent, largest first. */
+/** Labelled horizontal bars with the share in percent, largest first. With [color] every bar is that one hue (magnitude, not identity). */
 @Composable
-internal fun ShareBars(items: List<ShareDatum>, modifier: Modifier = Modifier, max: Int = 8) {
+internal fun ShareBars(items: List<ShareDatum>, modifier: Modifier = Modifier, max: Int = 8, color: Color? = null) {
     val total = items.sumOf { it.value.toDouble() }.toFloat().takeIf { it > 0f } ?: 1f
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
         items.sortedByDescending { it.value }.take(max).forEachIndexed { index, item ->
-            val color = ChartPalette[index % ChartPalette.size]
+            val tone = color ?: ChartPalette[index % ChartPalette.size]
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(9.dp).clip(CircleShape).background(color))
+                    Box(Modifier.size(9.dp).clip(CircleShape).background(tone))
                     Spacer(Modifier.width(8.dp))
                     Text(item.label, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Ink,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -174,17 +237,18 @@ internal fun ShareBars(items: List<ShareDatum>, modifier: Modifier = Modifier, m
                     Text(item.display, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink, maxLines = 1)
                     Text("  ${percentText(item.value / total)}", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1)
                 }
-                Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.12f))) {
-                    Box(Modifier.fillMaxWidth((item.value / total).coerceIn(0f, 1f)).fillMaxHeight().clip(RoundedCornerShape(50)).background(color))
+                Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)).background(tone.copy(alpha = 0.12f))) {
+                    Box(Modifier.fillMaxWidth((item.value / total).coerceIn(0f, 1f)).fillMaxHeight().clip(RoundedCornerShape(50)).background(tone))
                 }
             }
         }
     }
 }
 
-/** A ring split by share, with the total (or any text) in the middle. */
+/** A ring split by share, with the total (or any text) in the middle. [colors] gives each part its own colour (e.g. a status). */
 @Composable
-internal fun RingChart(values: List<Float>, centerTitle: String, centerDetail: String, modifier: Modifier = Modifier, size: Dp = 140.dp) {
+internal fun RingChart(values: List<Float>, centerTitle: String, centerDetail: String, modifier: Modifier = Modifier, size: Dp = 140.dp,
+                       colors: List<Color>? = null) {
     val total = values.sum().takeIf { it > 0f } ?: 0f
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
@@ -197,7 +261,8 @@ internal fun RingChart(values: List<Float>, centerTitle: String, centerDetail: S
                 var start = -90f
                 values.forEachIndexed { index, value ->
                     val sweep = 360f * value / total
-                    drawArc(ChartPalette[index % ChartPalette.size], start, (sweep - 1.5f).coerceAtLeast(0.5f), false, topLeft, arcSize, style = Stroke(stroke))
+                    if (value > 0f) drawArc(colors?.getOrNull(index) ?: ChartPalette[index % ChartPalette.size], start, (sweep - 1.5f).coerceAtLeast(0.5f), false,
+                        topLeft, arcSize, style = Stroke(stroke))
                     start += sweep
                 }
             }

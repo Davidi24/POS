@@ -181,7 +181,9 @@ public class OrderSupport {
         if (branchId == null) {
             throw new AuthException("branchId is required", HttpStatus.BAD_REQUEST);
         }
-        return restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
+        Branch branch = restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
+        pos.pos.restaurant.service.RestaurantOperations.requireOpen(branch);
+        return branch;
     }
 
     public Branch resolveAccessibleBranch(org.springframework.security.core.Authentication authentication, UUID restaurantId, UUID branchId) {
@@ -361,15 +363,6 @@ public class OrderSupport {
         }
 
         assertTableCanReceiveOrder(table);
-
-        Settings settings = loadSettings(table.getRestaurant());
-        if (!settings.isAllowOpenTickets()
-                && orderRepository.findTopByRestaurantTable_IdAndStatusInOrderByOpenedAtDesc(
-                        table.getId(),
-                        OPEN_ORDER_STATUSES
-                ).isPresent()) {
-            throw new AuthException("This table already has an open order", HttpStatus.BAD_REQUEST);
-        }
     }
 
     public void assertTableCanReceiveOrder(RestaurantTable table) {
@@ -384,6 +377,11 @@ public class OrderSupport {
         }
         if (table.getStatus() != TableStatus.AVAILABLE && table.getStatus() != TableStatus.OCCUPIED) {
             throw new AuthException("This table is not available for a new order", HttpStatus.CONFLICT);
+        }
+        // One open order per table (user, 2026-11-01), for a new order and for one moved or split onto it. "Open tabs" is
+        // about orders with no table, so it doesn't change this.
+        if (orderRepository.findTopByRestaurantTable_IdAndStatusInOrderByOpenedAtDesc(table.getId(), OPEN_ORDER_STATUSES).isPresent()) {
+            throw new AuthException(table.getTableNumber() + " already has an open order", HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -471,6 +469,11 @@ public class OrderSupport {
 
     public void notifyOrderBranchChanged(Order order) {
         orderChangeNotifier.changedAfterCommit(order.getRestaurant().getId(), order.getBranch().getId());
+    }
+
+    // What is still to pay on the order, by the payment rules (cash rounding included).
+    public BigDecimal balanceDue(Order order) {
+        return paymentCalculator.balanceDue(order, loadSettings(order.getRestaurant()));
     }
 
     public void addEvent(Order order, OrderEventType eventType, String note, UUID actorId) {
@@ -766,9 +769,8 @@ public class OrderSupport {
 
         boolean allFulfilled = activeLineItems.stream().allMatch(lineItem -> lineItem.getStatus() == OrderLineItemStatus.FULFILLED);
         // Counter items (not sent to the kitchen) are ready to serve as soon as they're ordered.
-        boolean allReadyOrFulfilled = activeLineItems.stream().allMatch(lineItem ->
+        boolean allReady = activeLineItems.stream().allMatch(lineItem ->
                 lineItem.getStatus() == OrderLineItemStatus.READY
-                        || lineItem.getStatus() == OrderLineItemStatus.FULFILLED
                         || (lineItem.getStatus() == OrderLineItemStatus.PENDING && !lineItem.goesToKitchen())
         );
         boolean anyFulfilled = activeLineItems.stream().anyMatch(lineItem -> lineItem.getStatus() == OrderLineItemStatus.FULFILLED);
@@ -783,12 +785,13 @@ public class OrderSupport {
             order.setFulfillmentStatus(OrderFulfillmentStatus.FULFILLED);
             return;
         }
-        if (allReadyOrFulfilled) {
-            order.setFulfillmentStatus(OrderFulfillmentStatus.READY);
-            return;
-        }
+        // Some served, whatever the others are doing, ready ones too (user, 2026-11-01).
         if (anyFulfilled) {
             order.setFulfillmentStatus(OrderFulfillmentStatus.PARTIALLY_FULFILLED);
+            return;
+        }
+        if (allReady) {
+            order.setFulfillmentStatus(OrderFulfillmentStatus.READY);
             return;
         }
         if (anyProgress) {

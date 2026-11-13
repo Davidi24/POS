@@ -28,7 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -318,7 +318,7 @@ internal fun MenuFormDialog(
                     ) {
                         if (isPhone) {
                             IconButton(onClick = onDismiss, enabled = isDismissable, modifier = Modifier.size(44.dp)) {
-                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", tint = FormInk)
+                                Icon(Icons.AutoMirrored.Filled.Reply, "Back", tint = FormInk)
                             }
                             Spacer(Modifier.width(8.dp))
                         }

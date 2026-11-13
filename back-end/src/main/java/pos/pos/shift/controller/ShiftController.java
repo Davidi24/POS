@@ -56,6 +56,6 @@ public class ShiftController {
     @PutMapping("/pay-rates/{userId}")
     @PreAuthorize("hasAuthority('SHIFT_MANAGE')")
     public PayRate setPayRate(Authentication a, @PathVariable UUID restaurantId, @PathVariable UUID branchId, @PathVariable UUID userId, @Valid @RequestBody PayRate r) {
-        return new PayRate(pay.setRate(a, restaurantId, branchId, userId, r));
+        return pay.setRate(a, restaurantId, branchId, userId, r);
     }
 }

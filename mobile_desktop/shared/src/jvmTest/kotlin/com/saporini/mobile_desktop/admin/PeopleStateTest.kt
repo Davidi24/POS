@@ -57,7 +57,8 @@ private fun person(n: Int, active: Boolean = true, roles: List<String> = listOf(
 
 private val WAITER = RoleDto("r-waiter", "WAITER", "Waiter", rank = 50)
 private val MANAGER = RoleDto("r-manager", "MANAGER", "Manager", rank = 20)
-private val CUSTOM = RoleDto("r-custom", "HOST", "Host", rank = 60, isSystem = false)
+// Below Manager, so the signed-in Manager of RolesScreenModelTest may change it (only someone above a role may).
+private val CUSTOM = RoleDto("r-custom", "HOST", "Host", rank = 15, isSystem = false)
 private val SYSTEM = RoleDto("r-owner", "OWNER", "Owner", rank = 10, isSystem = true, isProtected = true)
 private val READ = PermissionDto("p-read", "ORDER_READ", "Read orders")
 private val CREATE = PermissionDto("p-create", "ORDER_CREATE", "Create orders")
@@ -227,28 +228,29 @@ class StaffScreenModelTest {
     }
 
     @Test
-    fun loadsActiveStaffAndPagesOnWithoutDuplicates() = runTest(dispatcher) {
+    // People go page by page, ten at a time (user rule).
+    fun loadsActiveStaffOnePageAtATime() = runTest(dispatcher) {
         check { model, repo ->
-            assertEquals(40, model.state.value.people.size)
+            assertEquals(com.saporini.mobile_desktop.admin.people.PEOPLE_PAGE_SIZE, model.state.value.people.size)
             assertEquals(95, model.state.value.total)
             assertEquals(true, model.state.value.filter.active)
-            model.loadMore(); runCurrent()
-            model.loadMore(); runCurrent()
-            assertEquals(95, model.state.value.people.size)
+            assertTrue(model.state.value.hasNext)
+            model.goToPage(9); runCurrent()
+            assertEquals(5, model.state.value.people.size)
             assertFalse(model.state.value.hasNext)
-            model.loadMore(); runCurrent()
-            assertEquals(listOf(0, 1, 2), repo.staffCalls.map { it.second })
+            assertEquals(listOf(0, 9), repo.staffCalls.map { it.second })
         }
     }
 
     @Test
-    fun aRefreshReloadsEveryPageAlreadyShown() = runTest(dispatcher) {
+    fun aRefreshReloadsThePageShown() = runTest(dispatcher) {
         check { model, repo ->
-            model.loadMore(); runCurrent()
+            model.goToPage(2); runCurrent()
             repo.staffCalls.clear()
             model.refresh(); runCurrent()
-            assertEquals(listOf(0, 1), repo.staffCalls.map { it.second })
-            assertEquals(80, model.state.value.people.size)
+            assertEquals(listOf(2), repo.staffCalls.map { it.second })
+            assertEquals(2, model.state.value.page)
+            assertEquals(com.saporini.mobile_desktop.admin.people.PEOPLE_PAGE_SIZE, model.state.value.people.size)
         }
     }
 
@@ -418,7 +420,7 @@ class StaffScreenModelTest {
         val session = SessionManager().apply { signIn(user(id = "me", permissions = listOf("USERS_READ"))) }
         val model = StaffScreenModel(repo, session)
         runCurrent(); model.setActive(true); runCurrent()
-        assertEquals(40, model.state.value.people.size)
+        assertEquals(com.saporini.mobile_desktop.admin.people.PEOPLE_PAGE_SIZE, model.state.value.people.size)
         session.signOut(); runCurrent()
         assertTrue(model.state.value.people.isEmpty())
         assertFalse(model.state.value.canRead)
@@ -435,7 +437,7 @@ class RolesScreenModelTest {
     private suspend fun TestScope.check(
         repo: FakePeople = FakePeople(),
         permissions: List<String> = listOf("ROLES_READ", "ROLES_CREATE", "ROLES_UPDATE", "ROLES_DELETE", "ROLES_ASSIGN_PERMISSIONS", "ORDER_READ", "ORDER_CREATE"),
-        roles: List<String> = emptyList(),
+        roles: List<String> = listOf("MANAGER"),
         block: suspend TestScope.(RolesScreenModel, FakePeople) -> Unit
     ) {
         val session = SessionManager().apply { signIn(user(permissions = permissions).copy(roles = roles)) }
@@ -450,7 +452,7 @@ class RolesScreenModelTest {
     @Test
     fun rolesComeInRankOrderAndTheFirstIsOpened() = runTest(dispatcher) {
         check { model, _ ->
-            assertEquals(listOf("r-owner", "r-manager", "r-waiter", "r-custom"), model.state.value.roles.map { it.id })
+            assertEquals(listOf("r-owner", "r-custom", "r-manager", "r-waiter"), model.state.value.roles.map { it.id })
             assertEquals("r-owner", model.state.value.selectedId)
             assertEquals(setOf("p-read", "p-audit"), model.state.value.savedPermissionIds)
         }
@@ -460,7 +462,7 @@ class RolesScreenModelTest {
     fun builtInRolesAreReadOnly() = runTest(dispatcher) {
         check { model, repo ->
             model.toggle("p-create")
-            assertEquals("Built-in roles can't be changed. Copy it to make your own.", model.state.value.error)
+            assertEquals("Only someone above this role can change it", model.state.value.error)
             model.startRename("r-owner")
             assertNull(model.state.value.form)
             model.askDelete("r-owner")

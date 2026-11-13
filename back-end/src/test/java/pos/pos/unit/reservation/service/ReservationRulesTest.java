@@ -249,7 +249,7 @@ class ReservationRulesTest {
     }
 
     @Test
-    @DisplayName("undo seat: staff within 15 minutes, then a manager with a reason; never with orders on it")
+    @DisplayName("undo seat: no time limit while no order is on it; never with orders on it")
     void undoSeatRules() {
         Reservation booking = booking(ReservationStatus.SEATED, NOW.minusMinutes(30), 2);
         booking.setCheckedInAt(NOW.minusMinutes(25));
@@ -263,14 +263,21 @@ class ReservationRulesTest {
         assertThat(booking.getSeatedAt()).isNull();
         assertThat(table.getStatus()).isEqualTo(TableStatus.AVAILABLE);
 
+        // Seated long ago, nothing ordered: staff can still undo it (user rule, 2026-11-02).
         Reservation late = booking(ReservationStatus.SEATED, NOW.minusMinutes(40), 2);
         late.setCheckedInAt(NOW.minusMinutes(35));
         late.setSeatedAt(NOW.minusMinutes(20));
-        table(late, "T2", TableStatus.OCCUPIED);
-        assertThatThrownBy(() -> lifecycle.undoSeat(late, null, STAFF)).hasMessageContaining("Only a manager");
+        RestaurantTable lateTable = table(late, "T2", TableStatus.OCCUPIED);
+        lifecycle.undoSeat(late, null, STAFF);
+        assertThat(late.getStatus()).isEqualTo(ReservationStatus.CHECKED_IN);
+        assertThat(lateTable.getStatus()).isEqualTo(TableStatus.AVAILABLE);
 
-        when(orderRepository.existsByReservation_IdAndStatusIn(eq(late.getId()), any())).thenReturn(true);
-        assertThatThrownBy(() -> lifecycle.undoSeat(late, "Wrong booking", MANAGER)).hasMessageContaining("has orders");
+        Reservation ordered = booking(ReservationStatus.SEATED, NOW.minusMinutes(40), 2);
+        ordered.setCheckedInAt(NOW.minusMinutes(35));
+        ordered.setSeatedAt(NOW.minusMinutes(20));
+        table(ordered, "T3", TableStatus.OCCUPIED);
+        when(orderRepository.existsByReservation_IdAndStatusIn(eq(ordered.getId()), any())).thenReturn(true);
+        assertThatThrownBy(() -> lifecycle.undoSeat(ordered, "Wrong booking", MANAGER)).hasMessageContaining("has orders");
     }
 
     @Test

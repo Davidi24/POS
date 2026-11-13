@@ -3,6 +3,7 @@ package pos.pos.payment.dto;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Everything a printed or emailed receipt shows, already filtered by the restaurant's receipt settings: a field the
@@ -17,6 +18,8 @@ public record ReceiptResponse(
         String taxNumber,
         String vatNumber,
         boolean showLogo,
+        // The restaurant's logo when it has one and the receipt settings show it.
+        String logoUrl,
         String orderNumber,
         String tableNumber,
         String serverName,
@@ -41,7 +44,7 @@ public record ReceiptResponse(
         boolean showQrCode,
         int copies
 ) {
-    public record Line(String name, String variant, int quantity, BigDecimal unitPrice, List<String> options,
+    public record Line(UUID lineId, String name, String variant, int quantity, BigDecimal unitPrice, List<String> options,
                        BigDecimal lineTotal, boolean removed, String notes) {
     }
 

@@ -25,9 +25,13 @@ public class InventoryItemResponse {
     private String name;
     private String description;
     private InventoryItemType itemType;
+    // The restaurant's own kind (itemType CUSTOM).
+    private UUID kindId;
+    private String kindName;
     private InventoryUnit baseUnit;
     private String barcode;
     private String supplierName;
+    private java.util.UUID supplierId;
     private String supplierSku;
     private BigDecimal costPerUnit;
     private BigDecimal reorderPoint;
@@ -35,6 +39,9 @@ public class InventoryItemResponse {
     private boolean trackInventory;
     private boolean active;
     private String storageNotes;
+    private String imageUrl;
+    /** The sub-recipe that makes this item when it's made here (a sauce, a dough); null for bought items. */
+    private UUID recipeId;
     private String createdByUserName;
     private String updatedByUserName;
     private OffsetDateTime createdAt;

@@ -106,6 +106,6 @@ public class BranchAddressService {
     }
 
     private void clearExistingPrimary(UUID branchId, UUID keepAddressId, UUID actorId) {
-        branchAddressRepository.clearAllPrimary(branchId, actorId);
+        branchAddressRepository.clearAllPrimary(branchId, actorId, keepAddressId);
     }
 }

@@ -50,6 +50,7 @@ public class RestaurantTableMapper {
         } else {
             table.setGuestCount(null);
             table.setSeatedAt(null);
+            table.setMoreComing(false);
         }
         table.setActive(request.getActive() == null || request.getActive());
         table.setQrCodeValue(request.getQrCodeValue());
@@ -110,6 +111,7 @@ public class RestaurantTableMapper {
                 .shape(table.getShape())
                 .status(table.getStatus())
                 .guestCount(table.getGuestCount())
+                .moreComing(table.isMoreComing())
                 .seatedAt(table.getSeatedAt())
                 .active(table.isActive())
                 .build();

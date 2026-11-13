@@ -35,7 +35,7 @@ public class KdsBoardController {
     private final KdsTicketWorkflowService kdsTicketWorkflowService;
 
     @GetMapping("/board")
-    @PreAuthorize("hasAuthority('KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('KDS_READ', 'ORDER_READ')")
     @Operation(summary = "Get the KDS board for one branch")
     public ResponseEntity<List<KdsStationBoardResponse>> getBoard(
             @PathVariable UUID restaurantId,
@@ -51,7 +51,7 @@ public class KdsBoardController {
     }
 
     @GetMapping("/display")
-    @PreAuthorize("hasAuthority('KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('KDS_READ', 'ORDER_READ')")
     @Operation(summary = "Get the KDS display board for one device")
     public ResponseEntity<KdsStationBoardResponse> getDisplay(
             @PathVariable UUID restaurantId,
@@ -66,7 +66,7 @@ public class KdsBoardController {
     }
 
     @GetMapping("/tickets/{ticketId}")
-    @PreAuthorize("hasAuthority('KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('KDS_READ', 'ORDER_READ')")
     @Operation(summary = "Get one KDS ticket")
     public ResponseEntity<KdsTicketResponse> getTicket(
             @PathVariable UUID restaurantId,
@@ -122,6 +122,21 @@ public class KdsBoardController {
         );
     }
 
+    @PostMapping("/tickets/{ticketId}/back")
+    @PreAuthorize("hasAuthority('KDS_UPDATE')")
+    @Operation(summary = "Send one KDS ticket back a step (ready to cooking, cooking to new)")
+    public ResponseEntity<KdsTicketResponse> sendTicketBack(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            @PathVariable UUID ticketId,
+            @Valid @RequestBody(required = false) KdsActionRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                kdsTicketWorkflowService.sendTicketBack(authentication, restaurantId, branchId, ticketId, request)
+        );
+    }
+
     @PostMapping("/tickets/{ticketId}/complete")
     @PreAuthorize("hasAuthority('KDS_UPDATE')")
     @Operation(summary = "Complete one KDS ticket")
@@ -155,9 +170,9 @@ public class KdsBoardController {
 
     // The POS Kitchen Status timings from Admin Hub → Settings → Orders & kitchen (defaults when not set yet).
     @GetMapping("/pos-timing")
-    @PreAuthorize("hasAuthority('KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('KDS_READ', 'ORDER_READ')")
     @Operation(summary = "When the POS Kitchen Status marks orders slow and ready food as waiting")
-    public ResponseEntity<java.util.Map<String, Integer>> posTiming(
+    public ResponseEntity<java.util.Map<String, Object>> posTiming(
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
             Authentication authentication

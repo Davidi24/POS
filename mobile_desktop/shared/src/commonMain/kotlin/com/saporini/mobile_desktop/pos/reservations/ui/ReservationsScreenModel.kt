@@ -595,6 +595,15 @@ class ReservationsScreenModel(
             repository.confirmAttendance(scope.restaurantId, reservationId, reason)
         }
 
+    fun couldNotReach(reservationId: String, reason: String? = null): Job =
+        mutateReservation(withGuest("Marked as couldn't reach", reservationId)) { scope ->
+            repository.couldNotReach(scope.restaurantId, reservationId, reason)
+        }
+
+    // One booking, fresh from the server (the next booking on a late guest's table, to move it).
+    suspend fun reservation(reservationId: String): Result<Reservation> =
+        query(READ_PERMISSION) { scope -> repository.getReservation(scope.restaurantId, reservationId) }
+
     fun clearNoShowWarning(reservationId: String, reason: String): Job =
         mutateReservation(withGuest("No-show warning cleared", reservationId)) { scope ->
             repository.clearNoShowWarning(scope.restaurantId, reservationId, reason)

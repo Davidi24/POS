@@ -17,7 +17,7 @@ import java.util.UUID;
 public class KdsHistoryController {
     private final KdsHistoryService service;
     @GetMapping("/history")
-    @PreAuthorize("hasAuthority('KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('KDS_READ', 'ORDER_READ')")
     public KdsHistoryResponse history(@PathVariable UUID restaurantId, @PathVariable UUID branchId,
             @RequestParam(required = false) UUID stationId, @RequestParam(required = false) UUID deviceId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,

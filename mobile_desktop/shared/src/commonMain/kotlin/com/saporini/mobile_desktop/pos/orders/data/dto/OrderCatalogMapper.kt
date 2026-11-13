@@ -25,7 +25,8 @@ internal fun OrderCatalogMenuDto.toDomain(): OrderCatalogMenu = OrderCatalogMenu
     availableUntil = availableUntil,
     availableFromDate = availableFromDate,
     availableUntilDate = availableUntilDate,
-    sections = sections?.map { it.toDomain() }
+    sections = sections?.map { it.toDomain() },
+    eventIcon = event?.icon
 )
 
 internal fun OrderCatalogSectionDto.toDomain(): OrderCatalogSection = OrderCatalogSection(

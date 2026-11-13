@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Workspaces
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -61,6 +61,9 @@ import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.launch
 
+// A phone's bars have smaller buttons.
+internal val LocalCompactToolbar = androidx.compose.runtime.compositionLocalOf { false }
+
 @Composable
 fun TableLayoutToolbar(
     searchQuery: String,
@@ -74,17 +77,22 @@ fun TableLayoutToolbar(
     selectedTableLabels: Set<String>,
     onBackRequested: () -> Unit,
     onSaveChanges: () -> Unit,
+    // Done while tables are picked: back to the edit bar (the changes wait for Save changes there).
+    onSelectionDone: () -> Unit = {},
     onAddTable: (TableShape, Int) -> Unit,
-    onGroupTables: () -> Unit,
     onDuplicateSelectedTables: () -> Unit,
     onRotateSelectedTable: (Float) -> Unit,
     onScaleSelectedTable: (Float) -> Unit,
+    // Every table on the floor a little smaller or bigger at once (user, 2026-11-01).
+    onScaleAllTables: (Float) -> Unit = {},
     onDeleteSelectedTable: (onSuccess: () -> Unit, onFailure: (String) -> Unit) -> Unit,
     onBackgroundSelected: (ByteArray, String, String) -> Unit,
     onRemoveBackground: () -> Unit,
     onPlanMoveModeChanged: (Boolean) -> Unit,
     onScalePlan: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Phones: smaller buttons on lines that wrap, so all of them show (user, 2026-11-02).
+    compact: Boolean = false
 ) {
     var showAddTableDialog by remember { mutableStateOf(false) }
     var showRemovePlanConfirm by remember { mutableStateOf(false) }
@@ -106,16 +114,17 @@ fun TableLayoutToolbar(
 
     if (editMode) {
         val doneButtonText = if (hasChanges) "Save changes" else "Done"
-        Row(
-            modifier = modifier
-                .background(Color(0xFFF7F5F2), RoundedCornerShape(12.dp))
-                .border(1.dp, Color(0xFFE1DCD8), RoundedCornerShape(12.dp))
-                .padding(6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBackRequested, modifier = Modifier.size(38.dp)) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", modifier = Modifier.size(20.dp), tint = Color(0xFF303033))
+        val bar = modifier
+            .background(Color(0xFFF7F5F2), RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0xFFE1DCD8), RoundedCornerShape(12.dp))
+            .padding(6.dp)
+        val items: @Composable () -> Unit = {
+            // With tables picked, back steps back to the edit bar, like Done; otherwise it leaves editing.
+            IconButton(
+                onClick = { if (!planOnlyMode && selectedTableLabels.isNotEmpty()) onSelectionDone() else onBackRequested() },
+                modifier = Modifier.size(if (compact) 40.dp else 38.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(20.dp), tint = Color(0xFF303033))
             }
             if (planOnlyMode) {
                 UploadPlanIconButton(
@@ -163,17 +172,16 @@ fun TableLayoutToolbar(
                         }
                     )
                 }
-                ToolbarButton(
-                    text = "Add table",
-                    icon = Icons.Filled.Add,
-                    accent = true
-                ) { showAddTableDialog = true }
-                ToolbarButton(
-                    text = "Group tables",
-                    icon = Icons.Outlined.Workspaces,
-                    onClick = onGroupTables
-                )
-                if (selectedTableLabels.isNotEmpty()) {
+                // With tables picked, the bar is only about them (user, 2026-10-31).
+                if (selectedTableLabels.isEmpty()) {
+                    ToolbarButton(
+                        text = "Add table",
+                        icon = Icons.Filled.Add,
+                        accent = true
+                    ) { showAddTableDialog = true }
+                    PlanAdjustButton(Icons.Filled.Remove, "Make all tables smaller") { onScaleAllTables(-AllTablesStep) }
+                    PlanAdjustButton(Icons.Filled.Add, "Make all tables bigger") { onScaleAllTables(AllTablesStep) }
+                } else {
                     PlanAdjustButton(
                         icon = Icons.Outlined.ContentCopy,
                         contentDescription = "Duplicate selected tables",
@@ -183,9 +191,21 @@ fun TableLayoutToolbar(
                     ToolbarButton("↷ 5°") { onRotateSelectedTable(5f) }
                     ToolbarButton("− Size") { onScaleSelectedTable(-0.03f) }
                     ToolbarButton("+ Size") { onScaleSelectedTable(0.03f) }
+                    ToolbarButton("Done", primary = true) { onSelectionDone() }
                 }
-                ToolbarButton(doneButtonText, primary = true) { onSaveChanges() }
+                if (selectedTableLabels.isEmpty()) ToolbarButton(doneButtonText, primary = true) { onSaveChanges() }
             }
+        }
+        androidx.compose.runtime.CompositionLocalProvider(LocalCompactToolbar provides compact) {
+            if (compact) androidx.compose.foundation.layout.FlowRow(
+                bar.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) { items() } else Row(
+                bar,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) { items() }
         }
     } else {
         Row(
@@ -234,12 +254,12 @@ fun TableLayoutToolbar(
                     shape = RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
                 ) {
-                    Text("Remove", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Text("Remove", letterSpacing = 0.sp, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRemovePlanConfirm = false }) {
-                    Text("Cancel", fontFamily = Inter(), color = Color(0xFF71736E))
+                    Text("Cancel", letterSpacing = 0.sp, fontFamily = Inter(), color = Color(0xFF71736E))
                 }
             }
         )
@@ -311,7 +331,7 @@ fun TableLayoutToolbar(
                         shape = RoundedCornerShape(percent = 50),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB13A2F))
                     ) {
-                        Text("Delete", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text("Delete", letterSpacing = 0.sp, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
                     }
                 }
             },
@@ -323,7 +343,7 @@ fun TableLayoutToolbar(
                             deleteTableStatus = DialogActionStatus.Idle
                         }
                     ) {
-                        Text("Cancel", fontFamily = Inter(), color = Color(0xFF71736E))
+                        Text("Cancel", letterSpacing = 0.sp, fontFamily = Inter(), color = Color(0xFF71736E))
                     }
                 }
             }
@@ -331,7 +351,7 @@ fun TableLayoutToolbar(
     }
 }
 
-private fun imageContentType(fileName: String): String {
+internal fun imageContentType(fileName: String): String {
     return when (fileName.substringAfterLast('.', "").lowercase()) {
         "jpg", "jpeg" -> "image/jpeg"
         "webp" -> "image/webp"
@@ -347,7 +367,7 @@ private fun UploadPlanIconButton(
 ) {
     Box(
         modifier = Modifier
-            .size(42.dp)
+            .size(if (LocalCompactToolbar.current) 40.dp else 42.dp)
             .clickable(enabled = !isLoading, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -380,6 +400,9 @@ private fun UploadPlanIconButton(
     }
 }
 
+// A small step, so it's clicked a few times to get the size just right.
+private const val AllTablesStep = 0.01f
+
 @Composable
 private fun PlanAdjustButton(
     icon: ImageVector,
@@ -388,7 +411,7 @@ private fun PlanAdjustButton(
 ) {
     Box(
         modifier = Modifier
-            .size(42.dp)
+            .size(if (LocalCompactToolbar.current) 40.dp else 42.dp)
             .background(Color.White, RoundedCornerShape(8.dp))
             .border(1.dp, Color(0xFFD9D5D0), RoundedCornerShape(8.dp))
             .clickable(onClick = onClick),
@@ -406,11 +429,12 @@ private fun PlanAdjustButton(
 @Composable
 fun EditLayoutIconButton(
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     Row(
         modifier = modifier
-            .size(44.dp)
+            .size(if (compact) 36.dp else 44.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(Color.White)
             .border(1.dp, Color(0xFF4F7942), RoundedCornerShape(8.dp))
@@ -421,7 +445,7 @@ fun EditLayoutIconButton(
         Icon(
             imageVector = Icons.Outlined.Edit,
             contentDescription = "Edit layout",
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(if (compact) 17.dp else 18.dp),
             tint = Color(0xFF4F7942)
         )
     }
@@ -437,7 +461,7 @@ internal fun AddTableDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add table", fontFamily = Inter(), fontWeight = FontWeight.SemiBold) },
+        title = { Text("Add table", letterSpacing = 0.sp, fontFamily = Inter(), fontWeight = FontWeight.SemiBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -496,7 +520,7 @@ private fun StepButton(text: String, enabled: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ToolbarButton(
+internal fun ToolbarButton(
     text: String,
     primary: Boolean = false,
     destructive: Boolean = false,
@@ -504,8 +528,10 @@ private fun ToolbarButton(
     icon: ImageVector? = null,
     isLoading: Boolean = false,
     enabled: Boolean = true,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val compact = LocalCompactToolbar.current
     val background = when {
         destructive -> Color(0xFFB13A2F)
         primary -> Color(0xFF4F7942)
@@ -520,13 +546,13 @@ private fun ToolbarButton(
     val borderColor = if (accent) Color(0xFF4F7942) else Color(0xFFD9D5D0)
     val contentAlpha = if (enabled) 1f else 0.45f
     Row(
-        modifier = Modifier
-            .height(46.dp)
+        modifier = modifier
+            .height(if (compact) 40.dp else 46.dp)
             .background(background.copy(alpha = if (primary || destructive) contentAlpha else 1f), RoundedCornerShape(9.dp))
             .then(if (destructive || primary) Modifier else Modifier.border(1.dp, borderColor, RoundedCornerShape(9.dp)))
             .clickable(enabled = enabled && !isLoading, onClick = onClick)
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+            .padding(horizontal = if (compact) 12.dp else 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isLoading) {
@@ -550,6 +576,7 @@ private fun ToolbarButton(
             fontFamily = Inter(),
             fontWeight = FontWeight.SemiBold,
             fontSize = 13.sp,
+            letterSpacing = 0.sp,
             color = foreground
         )
     }

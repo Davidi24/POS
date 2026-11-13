@@ -120,7 +120,8 @@ class OrderPricingSafetyTest {
         }
         var domain = new pos.pos.order.service.OrderDomainSupport(orders,support);
         var workflow = new pos.pos.order.service.OrderWorkflowService(restaurantScopeService,support,domain,
-                mock(pos.pos.kds.service.KdsOrderSyncService.class), mock(pos.pos.inventory.service.InventorySaleConsumptionService.class));
+                mock(pos.pos.kds.service.KdsOrderSyncService.class), mock(pos.pos.inventory.service.InventorySaleConsumptionService.class),
+                mock(org.springframework.context.ApplicationEventPublisher.class), mock(pos.pos.tables.repository.RestaurantTableRepository.class));
         workflow.mergeOrders(null,target.getRestaurant().getId(),target.getId(),new pos.pos.order.dto.OrderMergeRequest(source.getId(),null));
         assertThat(target.getDiscountTotal()).isEqualByComparingTo("20"); assertThat(target.getTotal()).isEqualByComparingTo("180");
         assertThat(source.getTotal()).isEqualByComparingTo("0");
@@ -133,7 +134,8 @@ class OrderPricingSafetyTest {
         when(orders.saveAndFlush(order)).thenReturn(order);
         var domain = new pos.pos.order.service.OrderDomainSupport(orders, support);
         var workflow = new pos.pos.order.service.OrderWorkflowService(restaurantScopeService, support, domain,
-                mock(pos.pos.kds.service.KdsOrderSyncService.class), mock(pos.pos.inventory.service.InventorySaleConsumptionService.class));
+                mock(pos.pos.kds.service.KdsOrderSyncService.class), mock(pos.pos.inventory.service.InventorySaleConsumptionService.class),
+                mock(org.springframework.context.ApplicationEventPublisher.class), mock(pos.pos.tables.repository.RestaurantTableRepository.class));
         workflow.markOrderReady(null, order.getRestaurant().getId(), order.getId(), new pos.pos.order.dto.OrderActionRequest());
         assertThat(order.getFulfillmentStatus()).isEqualTo(pos.pos.order.enums.OrderFulfillmentStatus.FULFILLED);
     }
@@ -159,7 +161,8 @@ class OrderPricingSafetyTest {
         when(orders.saveAndFlush(order)).thenReturn(order);
         var domain = new pos.pos.order.service.OrderDomainSupport(orders,support);
         var workflow = new pos.pos.order.service.OrderWorkflowService(restaurantScopeService, support, domain,
-                mock(pos.pos.kds.service.KdsOrderSyncService.class), mock(pos.pos.inventory.service.InventorySaleConsumptionService.class));
+                mock(pos.pos.kds.service.KdsOrderSyncService.class), mock(pos.pos.inventory.service.InventorySaleConsumptionService.class),
+                mock(org.springframework.context.ApplicationEventPublisher.class), mock(pos.pos.tables.repository.RestaurantTableRepository.class));
         workflow.cancelOrder(null,restaurant.getId(),order.getId(),new pos.pos.order.dto.OrderActionRequest());
         assertThat(order.getStatus()).isEqualTo(pos.pos.order.enums.OrderStatus.CANCELLED);
     }

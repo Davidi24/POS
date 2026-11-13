@@ -18,6 +18,7 @@ import pos.pos.menu.dto.update.UpdateMenuSectionStatusRequest;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
+import pos.pos.menu.image.MenuImageReleaser;
 import pos.pos.menu.mapper.MenuMapper;
 import pos.pos.menu.policy.MenuPolicy;
 import pos.pos.menu.repository.MenuItemOptionGroupRepository;
@@ -35,6 +36,7 @@ import pos.pos.menu.util.MenuNames;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -55,6 +57,8 @@ public class MenuSectionService {
     private final MenuPolicy menuPolicy;
     private final RestaurantValidationService restaurantValidationService;
     private final OnlineMenuService onlineMenuService;
+    private final MenuImageReleaser menuImageReleaser;
+    private final pos.pos.menu.recipe.DishRecipeCleanup dishRecipeCleanup;
 
     @Transactional(readOnly = true)
     public List<MenuSectionSummaryResponse> getSections(
@@ -171,7 +175,11 @@ public class MenuSectionService {
                     menuItemOptionGroupRepository.deleteAll(
                             menuItemOptionGroupRepository.findByMenuItemIdOrdered(item.getId()));
                 }
+                dishRecipeCleanup.releaseDishes(items.stream().map(MenuItem::getId).toList());
                 menuItemRepository.deleteAll(items);
+                // Their photos go too, once this is saved (unless another dish still shows them).
+                items.stream().map(MenuItem::getImageUrl).filter(Objects::nonNull).distinct()
+                        .forEach(menuImageReleaser::releaseAfterCommit);
                 onlineMenuService.removeEmptySections(menu.getRestaurant().getId());
             } else {
                 contentTransfer.preserveItems(section, items);

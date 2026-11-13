@@ -45,7 +45,7 @@ class ReservationNotificationsTest {
 
     private ReservationNotifications notifications() {
         ReservationSupport support = new ReservationSupport(null, null, null, null, null, null, null, null);
-        return new ReservationNotifications(publisher, userRepository, support);
+        return new ReservationNotifications(publisher, userRepository, support, null);
     }
 
     private Reservation reservation() {

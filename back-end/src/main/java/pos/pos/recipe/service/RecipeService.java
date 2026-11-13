@@ -14,6 +14,7 @@ import pos.pos.exception.recipe.RecipeNotFoundException;
 import pos.pos.inventory.entity.InventoryItem;
 import pos.pos.inventory.repository.InventoryItemRepository;
 import pos.pos.inventory.service.InventoryUnitConversion;
+import pos.pos.inventory.service.InventoryChangeNotifier;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.recipe.dto.RecipeComponentUpsertRequest;
@@ -58,6 +59,7 @@ public class RecipeService {
     private final MenuItemRepository menuItemRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final RecipeMapper recipeMapper;
+    private final InventoryChangeNotifier inventoryChangeNotifier;
 
 
     // Takes the request from the API and checks the user, after that the method checks if this recipe
@@ -78,7 +80,9 @@ public class RecipeService {
         recipe.setUpdatedBy(actorId);
         recipeMapper.applyRequest(recipe, request);
 
-        return recipeMapper.toResponse(saveRecipe(recipe));
+        Recipe saved = saveRecipe(recipe);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return recipeMapper.toResponse(saved);
     }
 
 
@@ -97,10 +101,17 @@ public class RecipeService {
         assertCodeAvailable(restaurantId, request.getCode(), recipe.getCode());
 
         recipe.setMenuItem(menuItem);
-        recipe.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        recipe.setUpdatedBy(actorId);
         recipeMapper.applyRequest(recipe, request);
+        if (recipe.getOutputItem() != null && recipe.getRecipeType() == RecipeType.FINISHED_DISH) {
+            throw new AuthException("A sub-recipe that makes an item can't become a dish's recipe", HttpStatus.BAD_REQUEST);
+        }
 
-        return recipeMapper.toResponse(saveRecipe(recipe));
+        Recipe saved = saveRecipe(recipe);
+        syncOutputItem(saved, actorId);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return recipeMapper.toResponse(saved);
     }
 
     // Returns the recipe from ID
@@ -215,7 +226,10 @@ public class RecipeService {
         component.setDisplayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : 0);
         component.setNotes(request.getNotes());
 
-        return recipeMapper.toResponse(saveRecipe(recipe));
+        Recipe saved = saveRecipe(recipe);
+        syncOutputItem(saved, restaurantScopeService.currentUserId(authentication));
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return recipeMapper.toResponse(saved);
     }
 
 
@@ -234,7 +248,10 @@ public class RecipeService {
 
         recipe.removeComponent(component);
 
-        return recipeMapper.toResponse(saveRecipe(recipe));
+        Recipe saved = saveRecipe(recipe);
+        syncOutputItem(saved, restaurantScopeService.currentUserId(authentication));
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return recipeMapper.toResponse(saved);
     }
 
     //Only changes the Status of the Recipe
@@ -245,9 +262,13 @@ public class RecipeService {
 
         recipe.setStatus(RecipeStatus.ARCHIVED);
         recipe.setRetiredAt(OffsetDateTime.now(ZoneOffset.UTC));
-        recipe.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        recipe.setUpdatedBy(actorId);
 
-        return recipeMapper.toResponse(saveRecipe(recipe));
+        Recipe saved = saveRecipe(recipe);
+        syncOutputItem(saved, actorId);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return recipeMapper.toResponse(saved);
     }
 
 
@@ -260,14 +281,58 @@ public class RecipeService {
         BigDecimal cost = accumulateCost(recipe, BigDecimal.ONE, new HashSet<>());
 
         recipe.setTheoreticalCost(cost.setScale(2, RoundingMode.HALF_UP));
-        recipe.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        recipe.setUpdatedBy(actorId);
 
-        return recipeMapper.toResponse(saveRecipe(recipe));
+        Recipe saved = saveRecipe(recipe);
+        syncOutputItem(saved, actorId);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return recipeMapper.toResponse(saved);
+    }
+
+    /** What one batch of [recipe] costs from today's stock prices, nested preparations included. */
+    public BigDecimal costOf(Recipe recipe) {
+        return accumulateCost(recipe, BigDecimal.ONE, new HashSet<>());
     }
 
     // This method takes each component, calls the method yieldAdjusted quantity and calculates what is the
     // exact quantity needed to have the recipe with this needed quantity(so it calculates loss and other stuff)
     // and puts the whole result in a variable and returns it as total
+    /** Recalculate from the final ingredient costs, including corrections and nested recipes. */
+    @Transactional
+    public void recalculateAllCosts(UUID restaurantId, UUID actorId, int scale) {
+        for(Recipe recipe:recipeRepository.findAllByRestaurant_IdOrderByNameAsc(restaurantId)) {
+            recipe.setTheoreticalCost(accumulateCost(recipe,BigDecimal.ONE,new HashSet<>()).setScale(scale,RoundingMode.HALF_UP));
+            recipe.setUpdatedBy(actorId);
+            recipeRepository.save(recipe);
+            syncOutputItem(recipe, actorId);
+        }
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+    }
+
+    /**
+     * Keeps a sub-recipe's item in step with it: the same name and unit, the cost of one unit (a batch's cost from
+     * today's prices over what a batch makes), and switched on only while the recipe is in use.
+     */
+    public void syncOutputItem(Recipe recipe, UUID actorId) {
+        InventoryItem item = recipe.getOutputItem();
+        if (item == null) {
+            return;
+        }
+        BigDecimal batchCost;
+        try {
+            batchCost = costOf(recipe);
+        } catch (RuntimeException ex) {
+            batchCost = recipe.getTheoreticalCost() == null ? BigDecimal.ZERO : recipe.getTheoreticalCost();
+        }
+        item.setName(recipe.getName());
+        item.setBaseUnit(recipe.getYieldUnit());
+        item.setCostPerUnit(batchCost.divide(recipe.getYieldQuantity(), 4, RoundingMode.HALF_UP));
+        item.setActive(recipe.getStatus() == RecipeStatus.ACTIVE);
+        item.setUpdatedBy(actorId);
+        inventoryItemRepository.saveAndFlush(item);
+    }
+
     private BigDecimal accumulateCost(Recipe recipe, BigDecimal multiplier, Set<UUID> visitedRecipeIds) {
         if (!visitedRecipeIds.add(recipe.getId())) {
             throw new RecipeComponentValidationException(
@@ -299,7 +364,7 @@ public class RecipeService {
     }
 
     // Refuses to put [child] inside [parent] when [parent] is already somewhere inside [child]: the recipe would contain itself.
-    private void assertNotInside(Recipe parent, Recipe child) {
+    void assertNotInside(Recipe parent, Recipe child) {
         java.util.Deque<Recipe> pending = new java.util.ArrayDeque<>();
         Set<UUID> seen = new HashSet<>();
         pending.push(child);

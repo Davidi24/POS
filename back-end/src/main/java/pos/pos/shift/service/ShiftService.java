@@ -33,30 +33,61 @@ public class ShiftService {
     private final AuditLogRepository audits;
     private final pos.pos.settings.repository.SettingsRepository settings;
     private final pos.pos.shift.repository.StaffPayRateRepository payRates;
+    private final pos.pos.role.service.RolePayService rolePay;
     private static final UUID NONE = new UUID(0, 0);
 
     @Transactional(readOnly=true)
     public Board board(Authentication auth, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to, boolean mine) {
-        require(auth, mine ? "SHIFT_SELF" : "SHIFT_READ");
+        // POS → My shift → Team: anyone with their own shifts may see who works (user, 2026-10-31), but only from last month to
+        // next month and without other people's notes. Everyone working, or only their own role (Admin Hub → Settings → Shifts).
+        boolean teamOnly = !mine && !has(auth, "SHIFT_READ") && !has(auth, "SHIFT_MANAGE");
+        require(auth, mine || teamOnly ? "SHIFT_SELF" : "SHIFT_READ");
         Branch branch = scope.requireAccessibleBranch(auth, restaurantId, branchId);
         UUID actor = scope.currentUserId(auth);
         if (from == null || to == null || to.isBefore(from) || to.isAfter(from.plusDays(30))) bad("Choose a date range of up to 31 days.");
         ZoneId zone = ZoneId.of(branch.getRestaurant().getTimezone());
         OffsetDateTime now = now();
+        if (teamOnly) {
+            LocalDate thisMonth = now.atZoneSameInstant(zone).toLocalDate().withDayOfMonth(1);
+            if (from.isBefore(thisMonth.minusMonths(1)) || !to.isBefore(thisMonth.plusMonths(2))) bad("Who works shows from last month to next month.");
+        }
         List<Shift> items = shifts.inWindow(restaurantId, branchId, mine ? actor : null,
                 from.atStartOfDay(zone).toOffsetDateTime(), to.plusDays(1).atStartOfDay(zone).toOffsetDateTime(), PageRequest.of(0, 5001));
         if (items.size() > 5000) bad("Too many shifts in this range. Choose a shorter date range.");
+        java.util.function.Predicate<UUID> visible = id -> true;
+        if (!mine) {
+            Set<UUID> people = new HashSet<>(List.of(actor));
+            items.forEach(s -> people.add(s.getUser().getId()));
+            shifts.staff(restaurantId, branchId).forEach(u -> people.add(u.getId()));
+            Map<UUID, Long> ranks = new HashMap<>();
+            shifts.topRanks(people).forEach(row -> ranks.put((UUID) row[0], (Long) row[1]));
+            // Nothing about the super admin shows inside a restaurant.
+            long platform = pos.pos.security.rbac.AppRole.CO_SUPER_ADMIN.rank();
+            boolean platformViewer = ranks.getOrDefault(actor, 0L) >= platform;
+            Map<UUID, Set<String>> roles = new HashMap<>();
+            boolean ownRoleOnly = teamOnly && !settings.findByRestaurant_Id(restaurantId).map(pos.pos.settings.entity.Settings::isStaffSeeWholeTeam).orElse(true);
+            if (ownRoleOnly) shifts.roleNames(people).forEach(row -> roles.computeIfAbsent((UUID) row[0], ignored -> new HashSet<>()).add((String) row[1]));
+            visible = id -> id.equals(actor) || ((platformViewer || ranks.getOrDefault(id, 0L) < platform)
+                    && (!ownRoleOnly || !Collections.disjoint(roles.getOrDefault(id, Set.of()), roles.getOrDefault(actor, Set.of()))));
+        }
+        java.util.function.Predicate<UUID> canSee = visible;
         Shift current = has(auth, "SHIFT_SELF") ? shifts.findActive(actor).filter(s -> s.getBranch().getId().equals(branchId)).orElse(null) : null;
         List<Staff> staff = List.of();
         if (!mine) {
-            List<User> roster = shifts.staff(restaurantId, branchId);
+            // Only people who get paid can be put on shifts (user, 2026-10-31).
+            List<User> everyone = shifts.staff(restaurantId, branchId);
+            Map<UUID, pos.pos.role.service.RolePayService.Pay> pay = rolePay.peoplePay(restaurantId, everyone.stream().map(User::getId).toList());
+            List<User> roster = everyone.stream().filter(u -> pay.containsKey(u.getId()) && pay.get(u.getId()).paid() && canSee.test(u.getId())).toList();
             Map<UUID, List<String>> roleNames = new HashMap<>();
             if (!roster.isEmpty()) shifts.roleNames(roster.stream().map(User::getId).toList()).forEach(row ->
                     roleNames.computeIfAbsent((UUID) row[0], ignored -> new ArrayList<>()).add((String) row[1]));
             staff = roster.stream().map(u -> new Staff(u.getId(), name(u), roleNames.getOrDefault(u.getId(), List.of()))).toList();
         }
         Shift eligible = has(auth, "SHIFT_SELF") ? shifts.eligible(actor, branchId, now, now.plusMinutes(clockInEarlyMinutes(restaurantId))).stream().findFirst().orElse(null) : null;
-        return new Board(zone.getId(), now, items.stream().map(s -> item(s, now)).toList(), current == null ? null : item(current, now), staff, eligible == null ? null : item(eligible, now), clockInEarlyMinutes(restaurantId));
+        List<Item> shown = items.stream().filter(s -> canSee.test(s.getUser().getId())).map(s -> item(s, now))
+                .map(i -> teamOnly && !i.userId().equals(actor) ? new Item(i.id(), i.version(), i.userId(), i.userName(), i.status(), i.scheduledStart(), i.scheduledEnd(), i.startedAt(), i.endedAt(), i.workedMinutes(), i.breakMinutes(), null, i.breaks()) : i)
+                .toList();
+        return new Board(zone.getId(), now, shown, current == null ? null : item(current, now), staff, eligible == null ? null : item(eligible, now), clockInEarlyMinutes(restaurantId));
     }
 
     public Item schedule(Authentication auth, UUID restaurantId, UUID branchId, UUID id, Schedule request) {
@@ -65,6 +96,10 @@ public class ShiftService {
         User user = lockUser(request.userId());
         if (!Objects.equals(user.getRestaurantId(), restaurantId) || (user.getDefaultBranchId() != null && !user.getDefaultBranchId().equals(branchId))) bad("Choose a staff member who belongs to this branch.");
         validateWindow(request.scheduledStart(), request.scheduledEnd());
+        if (id == null) {
+            pos.pos.role.service.RolePayService.Pay pay = rolePay.peoplePay(restaurantId, List.of(user.getId())).get(user.getId());
+            if (pay == null || !pay.paid()) bad("Only people who get paid can be put on shifts. Make one of their roles paid in Admin Hub → Users.");
+        }
         Shift shift;
         String before = null;
         if (id == null) {
@@ -86,6 +121,7 @@ public class ShiftService {
     public Item clockIn(Authentication auth, UUID restaurantId, UUID branchId, ClockIn request) {
         require(auth, "SHIFT_SELF");
         Branch branch = scope.requireAccessibleBranch(auth, restaurantId, branchId);
+        pos.pos.restaurant.service.RestaurantOperations.requireOpen(branch);
         User user = lockUser(scope.currentUserId(auth));
         if (!has(auth, "SHIFT_MANAGE") && user.getDefaultBranchId() != null && !user.getDefaultBranchId().equals(branchId)) forbidden();
         if (shifts.findActive(user.getId()).isPresent()) conflict("You already have an active shift. Refresh to see it, or return to the branch where you clocked in.");

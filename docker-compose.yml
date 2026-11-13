@@ -1,0 +1,60 @@
+# The POS backend with its database and a mail catcher, all in Docker. ./start.sh uses this file;
+# on its own: `docker compose up -d --build`.
+#
+# It's separate from back-end/docker-compose.yml (only the database and mail, for running the backend jar yourself):
+# its own containers and database, and the database isn't opened to this computer, so nothing clashes with that one.
+#
+# Changeable from the environment (./start.sh passes them on):
+#   POS_API_PORT  (8080)       where the backend answers on this computer
+#   POS_MAIL_PORT (8025)       Mailpit's page with every email the backend sent
+#   POS_BIND      (127.0.0.1)  0.0.0.0 lets other devices on your network (a phone) reach the backend
+#   POS_TZ        (UTC)        the backend's time zone; ./start.sh passes this computer's
+name: pos
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: pos_local
+      POSTGRES_USER: pos_user
+      POSTGRES_PASSWORD: pos_pass
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pos_user -d pos_local"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  mail:
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "${POS_BIND:-127.0.0.1}:${POS_MAIL_PORT:-8025}:8025"
+
+  backend:
+    build: ./back-end
+    image: pos-backend:local
+    depends_on:
+      db:
+        condition: service_healthy
+      mail:
+        condition: service_started
+    environment:
+      # The local profile: demo restaurants, the local super admin, photos kept in /app/uploads.
+      SPRING_PROFILES_ACTIVE: local
+      DB_HOST: db
+      MAIL_HOST: mail
+      MAIL_PORT: "1025"
+      MAIL_SMTP_AUTH: "false"
+      MAIL_SMTP_STARTTLS_ENABLE: "false"
+      PUBLIC_BASE_URL: http://localhost:${POS_API_PORT:-8080}
+      TZ: ${POS_TZ:-UTC}
+      JAVA_OPTS: -Xmx512m -XX:+UseSerialGC
+    ports:
+      - "${POS_BIND:-127.0.0.1}:${POS_API_PORT:-8080}:8080"
+    volumes:
+      - uploads:/app/uploads
+
+volumes:
+  db_data:
+  uploads:

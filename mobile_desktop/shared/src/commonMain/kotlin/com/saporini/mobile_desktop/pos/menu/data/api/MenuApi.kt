@@ -5,6 +5,10 @@ import com.saporini.mobile_desktop.pos.menu.data.dto.*
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
+import io.ktor.http.HttpHeaders
+import io.ktor.http.Headers
+import io.ktor.client.request.forms.formData
+import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
@@ -13,6 +17,7 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.encodeURLPathPart
 
 class MenuApi(
     private val client: HttpClient,
@@ -53,6 +58,50 @@ class MenuApi(
             parameter("size", size)
             parameter("sortBy", sortBy)
             parameter("direction", direction)
+        }.body()
+    }
+
+    // The menus on right now for waiters: scheduled for this day and time, chosen in "Menus shown", and only the event
+    // menu on a special-menu-only event night. The server decides; one page holds them all.
+    suspend fun getMenusAvailableNow(restaurantId: String): MenuPageResponseDto =
+        client.get(endpoint("/menus/available-now")) { parameter("restaurantId", restaurantId) }.body()
+
+    suspend fun saveMenuOrder(request: MenuOrderRequestDto) {
+        client.put(endpoint("/menus/order")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+    }
+
+    suspend fun getWaiterView(restaurantId: String): MenuWaiterViewDto =
+        client.get(endpoint("/menus/waiter-view")) { parameter("restaurantId", restaurantId) }.body()
+
+    suspend fun saveWaiterView(request: MenuWaiterViewRequestDto): MenuWaiterViewDto =
+        client.put(endpoint("/menus/waiter-view")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    // The restaurant's event nights (an event menu belongs to one of them).
+    suspend fun getEventNights(restaurantId: String): List<MenuEventNightDto> {
+        return client.get(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/events")).body()
+    }
+
+    suspend fun updateEventNight(restaurantId: String, eventId: String, request: MenuEventNightRequestDto): MenuEventNightDto {
+        return client.put(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/events/${eventId.encodeURLPathPart()}")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+    }
+
+    suspend fun deleteEventNight(restaurantId: String, eventId: String) {
+        client.delete(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/events/${eventId.encodeURLPathPart()}"))
+    }
+
+    suspend fun createEventNight(restaurantId: String, request: MenuEventNightRequestDto): MenuEventNightDto {
+        return client.post(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/events")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
         }.body()
     }
 
@@ -174,6 +223,49 @@ class MenuApi(
             setBody(request)
         }.body()
     }
+
+    // The dish's photo (PNG, JPEG or WebP, up to 5 MB); replaces any earlier one.
+    suspend fun uploadItemImage(
+        menuId: String,
+        sectionId: String,
+        itemId: String,
+        imageBytes: ByteArray,
+        fileName: String,
+        contentType: String
+    ): MenuItemDto {
+        return client.put(endpoint("/menus/$menuId/sections/$sectionId/items/$itemId/image")) {
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append(
+                            key = "file",
+                            value = imageBytes,
+                            headers = Headers.build {
+                                append(HttpHeaders.ContentType, contentType)
+                                append(HttpHeaders.ContentDisposition, "filename=\"${fileName.replace("\"", "")}\"")
+                            }
+                        )
+                    }
+                )
+            )
+        }.body()
+    }
+
+    suspend fun removeItemImage(menuId: String, sectionId: String, itemId: String): MenuItemDto =
+        client.delete(endpoint("/menus/$menuId/sections/$sectionId/items/$itemId/image")).body()
+
+    // The dish's ingredients from stock (its recipe), and what it can be made with.
+    suspend fun getDishRecipe(menuId: String, sectionId: String, itemId: String): DishRecipeDto =
+        client.get(endpoint("/menus/$menuId/sections/$sectionId/items/$itemId/recipe")).body()
+
+    suspend fun saveDishRecipe(menuId: String, sectionId: String, itemId: String, request: DishRecipeRequestDto): DishRecipeDto =
+        client.put(endpoint("/menus/$menuId/sections/$sectionId/items/$itemId/recipe")) {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun ingredientChoices(menuId: String): List<IngredientChoiceDto> =
+        client.get(endpoint("/menus/$menuId/ingredient-choices")).body()
 
     suspend fun updateItemAvailability(
         menuId: String,

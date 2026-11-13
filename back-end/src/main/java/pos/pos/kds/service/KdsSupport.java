@@ -232,6 +232,14 @@ public class KdsSupport {
     }
 
     public void applyItemStatus(KdsTicketItem item, KdsTicketStatus status, OffsetDateTime now) {
+        applyItemStatus(item, status, now, false);
+    }
+
+    /**
+     * [allowBack]: the kitchen sent the food back a step on purpose ("started by mistake", "not ready after all"), so a
+     * ready dish may go back to cooking and a cooking one back to fired. Otherwise statuses only move forward.
+     */
+    public void applyItemStatus(KdsTicketItem item, KdsTicketStatus status, OffsetDateTime now, boolean allowBack) {
         if (item == null || status == null) {
             return;
         }
@@ -251,7 +259,8 @@ public class KdsSupport {
                 item.setCompletedAt(null);
             }
             case FIRED -> {
-                if (phaseOf(item.getStatus()) > phaseOf(KdsTicketStatus.FIRED)) {
+                if (phaseOf(item.getStatus()) > phaseOf(KdsTicketStatus.FIRED)
+                        && !(allowBack && item.getStatus() == KdsTicketStatus.IN_PROGRESS)) {
                     return;
                 }
                 item.setStatus(KdsTicketStatus.FIRED);
@@ -262,7 +271,8 @@ public class KdsSupport {
                 item.setCompletedAt(null);
             }
             case IN_PROGRESS -> {
-                if (phaseOf(item.getStatus()) > phaseOf(KdsTicketStatus.IN_PROGRESS)) {
+                if (phaseOf(item.getStatus()) > phaseOf(KdsTicketStatus.IN_PROGRESS)
+                        && !(allowBack && (item.getStatus() == KdsTicketStatus.READY || item.getStatus() == KdsTicketStatus.EXPO_READY))) {
                     return;
                 }
                 item.setStatus(KdsTicketStatus.IN_PROGRESS);

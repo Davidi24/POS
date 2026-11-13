@@ -70,6 +70,7 @@ class RestaurantCoreApiIntegrationTest {
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "restaurant-core-test-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "restaurant-core-test-email-verification-pepper");
         registry.add("SMS_CODE_PEPPER", () -> "restaurant-core-test-sms-pepper");
+        registry.add("app.storage.menu-images.provider", () -> "disabled");
         registry.add("MAIL_HOST", () -> "localhost");
         registry.add("MAIL_PORT", () -> "2525");
         registry.add("MAIL_USERNAME", () -> "integration");
@@ -148,6 +149,8 @@ class RestaurantCoreApiIntegrationTest {
                                 "legalName", "Main Restaurant LLC",
                                 "currency", "USD",
                                 "timezone", "Europe/Berlin",
+                                "email", "contact@pos.example",
+                                "phone", "+355690001111",
                                 "owner", Map.of(
                                         "email", OWNER_EMAIL,
                                         "username", OWNER_USERNAME,
@@ -211,9 +214,10 @@ class RestaurantCoreApiIntegrationTest {
         assertThat(ownerRestaurant.get("name").asText()).isEqualTo("Main Restaurant");
 
         JsonNode updatedRestaurant = bodyOf(mockMvc.perform(put("/restaurants/{restaurantId}", restaurantId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerAccessToken))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
+                        .content(objectMapper.writeValueAsString(withContact(Map.of(
+                                "expectedVersion", ownerRestaurant.get("version").asLong(),
                                 "name", "Main Restaurant Updated",
                                 "legalName", "Main Restaurant Updated LLC",
                                 "code", "MAIN_RESTAURANT_UPDATED",
@@ -223,7 +227,7 @@ class RestaurantCoreApiIntegrationTest {
                                 "ownerUserId", owner.getId().toString(),
                                 "isActive", true,
                                 "status", "ACTIVE"
-                        ))))
+                        )))))
                 .andExpect(status().isOk())
                 .andReturn());
         assertThat(updatedRestaurant.get("name").asText()).isEqualTo("Main Restaurant Updated");
@@ -231,22 +235,24 @@ class RestaurantCoreApiIntegrationTest {
         mockMvc.perform(put("/restaurants/{restaurantId}", restaurantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
+                        .content(objectMapper.writeValueAsString(withContact(Map.of(
+                                "expectedVersion", ownerRestaurant.get("version").asLong(),
                                 "name", "Main Restaurant Updated",
                                 "legalName", "Main Restaurant Updated LLC",
                                 "code", "MAIN_RESTAURANT_UPDATED",
                                 "slug", "main-restaurant-updated",
-                                "currency", "USD",
+                                "currency", "ZZZ",
                                 "timezone", "Europe/Berlin",
                                 "isActive", true,
                                 "status", "ACTIVE"
-                        ))))
+                        )))))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(put("/restaurants/{restaurantId}", restaurantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(ownerAccessToken))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
+                        .content(objectMapper.writeValueAsString(withContact(Map.of(
+                                "expectedVersion", ownerRestaurant.get("version").asLong(),
                                 "name", "Main Restaurant Updated",
                                 "legalName", "Main Restaurant Updated LLC",
                                 "code", "MAIN_RESTAURANT_UPDATED",
@@ -255,7 +261,7 @@ class RestaurantCoreApiIntegrationTest {
                                 "timezone", "Europe/Berlin",
                                 "isActive", true,
                                 "status", "ACTIVE"
-                        ))))
+                        )))))
                 .andExpect(status().isForbidden());
 
         JsonNode suspendedRestaurant = bodyOf(mockMvc.perform(patch("/restaurants/{restaurantId}/status", restaurantId)
@@ -328,5 +334,13 @@ class RestaurantCoreApiIntegrationTest {
         }
 
         return messageText.substring(tokenStart, end);
+    }
+
+    // Guests see the restaurant's email and phone, so every update carries both.
+    private static Map<String, Object> withContact(Map<String, Object> body) {
+        Map<String, Object> withContact = new java.util.HashMap<>(body);
+        withContact.put("email", "hello@main-restaurant.example");
+        withContact.put("phone", "+355691234567");
+        return withContact;
     }
 }

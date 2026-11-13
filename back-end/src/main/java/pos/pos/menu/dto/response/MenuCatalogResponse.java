@@ -12,7 +12,9 @@ import java.util.UUID;
 
 /**
  * Operational menu view for read-only POS users such as waiters and kitchen
- * staff. Internal restaurant and audit metadata are intentionally omitted.
+ * staff. Audit metadata is intentionally omitted; the restaurant's id/name and
+ * the display fields (colour, hours, special menu and its event) are included,
+ * because the till checks the restaurant and waiters' menus follow Menu → "Menus shown".
  */
 @Getter
 @Setter
@@ -28,5 +30,15 @@ public class MenuCatalogResponse implements MenuViewResponse {
     private String description;
     private Boolean active;
     private Integer displayOrder;
+    private MenuRestaurantSummaryResponse restaurant;
+    private String color;
+    private java.time.LocalTime availableFrom;
+    private java.time.LocalTime availableUntil;
+    private java.time.LocalDate availableFromDate;
+    private java.time.LocalDate availableUntilDate;
+    private Boolean special;
+    private MenuEventSummaryResponse event;
+    private Boolean shownToWaiters;
+    private Integer itemCount;
     private List<MenuSectionSummaryResponse> sections;
 }

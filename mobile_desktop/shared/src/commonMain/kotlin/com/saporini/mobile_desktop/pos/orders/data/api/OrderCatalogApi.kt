@@ -25,6 +25,13 @@ class OrderCatalogApi(
             parameter("direction", "asc")
         }.body()
 
+    // The menus to offer right now: scheduled for this day and time, or only the event menu on a
+    // special-menu-only event night. The server decides; one page holds them all.
+    suspend fun getMenusAvailableNow(restaurantId: String): OrderCatalogPageDto =
+        client.get(endpoint("/menus/available-now")) {
+            parameter("restaurantId", restaurantId)
+        }.body()
+
     suspend fun getMenu(menuId: String): OrderCatalogMenuDto =
         client.get(endpoint("/menus/${menuId.encodeURLPathPart()}")) {
             parameter("includeSections", true)

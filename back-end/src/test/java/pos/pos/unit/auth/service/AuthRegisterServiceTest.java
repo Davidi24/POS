@@ -281,7 +281,7 @@ class AuthRegisterServiceTest {
 
         request.setRestaurantId(null);
         request.setDefaultBranchId(UUID.randomUUID());
-        when(branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(request.getDefaultBranchId(), restaurantId)).thenReturn(Optional.empty());
+        when(branchRepository.findForAssignment(request.getDefaultBranchId(), restaurantId)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> authRegisterService.register(request, authentication))
                 .isInstanceOf(pos.pos.exception.auth.AuthException.class)
                 .hasMessageContaining("defaultBranchId");

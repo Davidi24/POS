@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -17,7 +18,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import pos.pos.menu.dto.request.CreateMenuItemRequest;
 import pos.pos.menu.dto.response.MenuItemSummaryResponse;
 import pos.pos.menu.dto.update.UpdateMenuItemAvailabilityRequest;
@@ -37,7 +40,7 @@ public class MenuItemController {
     private final pos.pos.menu.service.MenuItemImportService menuItemImportService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "List items for one section")
     public ResponseEntity<List<MenuItemSummaryResponse>> getItems(
             Authentication authentication,
@@ -58,7 +61,7 @@ public class MenuItemController {
     }
 
     @GetMapping("/{itemId}")
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "Get one item scoped to its section")
     public ResponseEntity<MenuItemSummaryResponse> getItem(
             Authentication authentication,
@@ -128,6 +131,31 @@ public class MenuItemController {
             @Valid @RequestBody UpdateMenuItemAvailabilityRequest request
     ) {
         return ResponseEntity.ok(menuItemService.updateItemAvailability(authentication, menuId, sectionId, itemId, request));
+    }
+
+    @PutMapping(value = "/{itemId}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('MENUS_UPDATE', 'MENUS_CREATE')")
+    @Operation(summary = "Upload the item's photo (PNG, JPEG or WebP, up to 5 MB); replaces any earlier photo")
+    public ResponseEntity<MenuItemSummaryResponse> uploadItemImage(
+            Authentication authentication,
+            @PathVariable UUID menuId,
+            @PathVariable UUID sectionId,
+            @PathVariable UUID itemId,
+            @RequestPart("file") MultipartFile file
+    ) {
+        return ResponseEntity.ok(menuItemService.uploadItemImage(authentication, menuId, sectionId, itemId, file));
+    }
+
+    @DeleteMapping("/{itemId}/image")
+    @PreAuthorize("hasAuthority('MENUS_UPDATE')")
+    @Operation(summary = "Remove the item's photo")
+    public ResponseEntity<MenuItemSummaryResponse> removeItemImage(
+            Authentication authentication,
+            @PathVariable UUID menuId,
+            @PathVariable UUID sectionId,
+            @PathVariable UUID itemId
+    ) {
+        return ResponseEntity.ok(menuItemService.removeItemImage(authentication, menuId, sectionId, itemId));
     }
 
     @DeleteMapping("/{itemId}")

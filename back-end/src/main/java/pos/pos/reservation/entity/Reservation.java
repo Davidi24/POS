@@ -167,9 +167,15 @@ public class Reservation extends AbstractAuditedEntity {
     @Column(name = "expired_at", columnDefinition = "timestamptz")
     private OffsetDateTime expiredAt;
 
+    @Column(name = "no_action_at", columnDefinition = "timestamptz")
+    private OffsetDateTime noActionAt;
+
     // Staff kept the table longer for a late guest; empty means the booking time plus the hold setting.
     @Column(name = "hold_until", columnDefinition = "timestamptz")
     private OffsetDateTime holdUntil;
+
+    @Column(name = "schedule_changed_at", columnDefinition = "timestamptz")
+    private OffsetDateTime scheduleChangedAt;
 
     // "3 of 6 arrived": set on check-in while the rest of the group is still coming.
     @Column(name = "arrived_guests")
@@ -185,6 +191,10 @@ public class Reservation extends AbstractAuditedEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "attendance_confirmed_via", length = 20)
     private pos.pos.reservation.enums.AttendanceConfirmedVia attendanceConfirmedVia;
+
+    // Staff called and couldn't reach the guest (a mark, never a cancel; user, 2026-11-02).
+    @Column(name = "attendance_unreachable_at", columnDefinition = "timestamptz")
+    private OffsetDateTime attendanceUnreachableAt;
 
     // The occasion as picked (a copy, so renaming the occasion later doesn't change past bookings).
     @Column(name = "occasion_code", length = 40)
@@ -348,6 +358,10 @@ public class Reservation extends AbstractAuditedEntity {
 
         if (expiredAt != null && status != ReservationStatus.EXPIRED) {
             throw new IllegalStateException("expiredAt requires EXPIRED status");
+        }
+
+        if (noActionAt != null && status != ReservationStatus.NO_ACTION) {
+            throw new IllegalStateException("noActionAt requires NO_ACTION status");
         }
 
         if (arrivedGuests != null && arrivedGuests <= 0) {

@@ -74,4 +74,11 @@ class RefreshRateLimiterTest {
                         jdbcTemplate, 1, 1, 1, "short"))
                 .isInstanceOf(IllegalStateException.class);
     }
+    @Test
+    void usesConfiguredSchemaForBothQueries() {
+        org.springframework.test.util.ReflectionTestUtils.setField(limiter, "schemaName", "foundation_local");
+        limiter.check("203.0.113.77");
+        verify(jdbcTemplate).update(org.mockito.ArgumentMatchers.contains("\"foundation_local\".auth_refresh_rate_limit"));
+        verify(jdbcTemplate).queryForList(org.mockito.ArgumentMatchers.contains("INSERT INTO \"foundation_local\".auth_refresh_rate_limit"), any(Object[].class));
+    }
 }

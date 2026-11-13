@@ -34,12 +34,13 @@ class ShiftPayServiceTest {
     @Mock RestaurantScopeService scope;
     @Mock EntityManager em;
     @Mock AuditLogRepository audits;
+    @Mock pos.pos.role.service.RolePayService rolePay;
     ShiftPayService service;
     UUID r = UUID.randomUUID(), b = UUID.randomUUID(), me = UUID.randomUUID();
     Restaurant restaurant; Branch branch; User user;
 
     @BeforeEach void setup() {
-        service = new ShiftPayService(shifts, rates, scope, em, audits);
+        service = new ShiftPayService(shifts, rates, scope, em, audits, rolePay);
         restaurant = new Restaurant(); restaurant.setId(r); restaurant.setTimezone("Europe/Berlin"); restaurant.setCurrency("EUR");
         branch = new Branch(); branch.setId(b); branch.setRestaurant(restaurant);
         user = new User(); user.setId(me); user.setRestaurantId(r); user.setActive(true); user.setFirstName("Test"); user.setLastName("Waiter");

@@ -74,7 +74,9 @@ class PasswordIntegrationTest {
     private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String DEFAULT_PASSWORD = "StrongPass123!";
     private static final String NEW_PASSWORD = "ResetPass123!";
-    private static final String INVALID_TOKEN_MESSAGE = "Invalid token";
+    // Emailed links that no longer work answer 400 with what to do instead (PasswordResetService.linkProblem).
+    private static final String INVALID_TOKEN_MESSAGE = "This link isn't valid. Check that you copied the whole link from the email.";
+    private static final String USED_TOKEN_MESSAGE = "This link was already used, so your password is set. Sign in with it, or use \"Forgot password?\" if you don't remember it.";
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
@@ -149,9 +151,9 @@ class PasswordIntegrationTest {
         Mockito.reset(authMailService, smsMessageService);
 
         doAnswer(invocation -> {
-            latestPasswordResetUrl.set(invocation.getArgument(3, String.class));
+            latestPasswordResetUrl.set(invocation.getArgument(2, String.class));
             return invocation.callRealMethod();
-        }).when(authMailService).sendPasswordResetEmail(anyString(), anyString(), anyString(), anyString(), any(Duration.class));
+        }).when(authMailService).sendPasswordResetEmail(any(pos.pos.user.entity.User.class), anyString(), anyString(), any(Duration.class), any(java.time.OffsetDateTime.class));
 
         doAnswer(invocation -> {
             latestPasswordResetCode.set(invocation.getArgument(2, String.class));
@@ -273,7 +275,7 @@ class PasswordIntegrationTest {
                                 "token", "not-a-valid-reset-token",
                                 "newPassword", NEW_PASSWORD
                         ))))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isBadRequest())
                 .andReturn();
 
         assertThat(bodyOf(invalidResult).get("message").asText()).isEqualTo(INVALID_TOKEN_MESSAGE);
@@ -295,10 +297,10 @@ class PasswordIntegrationTest {
                                 "token", resetToken,
                                 "newPassword", "AnotherPass123!"
                         ))))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isBadRequest())
                 .andReturn();
 
-        assertThat(bodyOf(reusedResult).get("message").asText()).isEqualTo(INVALID_TOKEN_MESSAGE);
+        assertThat(bodyOf(reusedResult).get("message").asText()).isEqualTo(USED_TOKEN_MESSAGE);
     }
 
     @Test

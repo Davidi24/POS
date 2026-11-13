@@ -45,6 +45,9 @@ data class CreateOrderRequestDto(
 )
 
 @Serializable
+data class OrderCloseUnpaidRequestDto(val reason: String)
+
+@Serializable
 data class OrderActionRequestDto(
     val reason: String? = null,
     val note: String? = null

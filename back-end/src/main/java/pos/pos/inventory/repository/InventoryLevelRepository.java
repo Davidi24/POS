@@ -14,23 +14,24 @@ import java.util.UUID;
 public interface InventoryLevelRepository extends JpaRepository<InventoryLevel, UUID> {
 
     /** Apply a stock movement without a read/modify/write race (including first movement for a new level). */
+    // {h-schema} is required: hibernate's default_schema doesn't reach native SQL.
     @Modifying(flushAutomatically = true)
     @Query(value = """
-            INSERT INTO inventory_levels (
+            INSERT INTO {h-schema}inventory_levels AS lvl (
                 id, location_id, inventory_item_id, on_hand_quantity, committed_quantity,
                 created_at, updated_at, last_movement_at
             ) SELECT
                 :id, :locationId, :itemId, GREATEST(:quantityDelta, 0), 0,
                 :occurredAt, :occurredAt, :occurredAt
             WHERE :quantityDelta >= 0 OR EXISTS (
-                SELECT 1 FROM inventory_levels
+                SELECT 1 FROM {h-schema}inventory_levels
                 WHERE location_id = :locationId AND inventory_item_id = :itemId
             )
             ON CONFLICT (location_id, inventory_item_id) DO UPDATE
-            SET on_hand_quantity = inventory_levels.on_hand_quantity + :quantityDelta,
+            SET on_hand_quantity = lvl.on_hand_quantity + :quantityDelta,
                 last_movement_at = EXCLUDED.last_movement_at,
                 updated_at = EXCLUDED.updated_at
-            WHERE inventory_levels.on_hand_quantity + :quantityDelta >= 0
+            WHERE lvl.on_hand_quantity + :quantityDelta >= 0
             """, nativeQuery = true)
     int applyMovementDelta(
             @Param("id") UUID id,
@@ -45,6 +46,16 @@ public interface InventoryLevelRepository extends JpaRepository<InventoryLevel, 
     List<InventoryLevel> findAllByLocation_IdOrderByInventoryItem_NameAsc(UUID locationId);
 
     List<InventoryLevel> findAllByInventoryItem_IdOrderByLocation_NameAsc(UUID itemId);
+
+    // A deleted item leaves no stock lines behind (its movements stay in History).
+    @Modifying(flushAutomatically = true)
+    @Query("delete from InventoryLevel lvl where lvl.inventoryItem.id = :itemId")
+    int deleteAllForItem(@Param("itemId") UUID itemId);
+
+    // A deleted place leaves no stock lines behind (its movements stay in History).
+    @Modifying(flushAutomatically = true)
+    @Query("delete from InventoryLevel lvl where lvl.location.id = :locationId")
+    int deleteAllForLocation(@Param("locationId") UUID locationId);
 
     @Query("""
             SELECT lvl FROM InventoryLevel lvl

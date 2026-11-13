@@ -70,8 +70,27 @@ data class OrderPaymentSummaryDto(
     val tipSuggestions: List<Int> = emptyList(),
     val maxTipPercent: Int = 50,
     val splitBillsAllowed: Boolean = true,
-    val payments: List<PaymentDto> = emptyList()
+    val payments: List<PaymentDto> = emptyList(),
+    val lines: List<BillLineDto> = emptyList()
 )
+
+/** A dish on the bill. [amount] is what all of it costs of the bill, with its share of discounts, tax and service. */
+@Serializable
+data class BillLineDto(
+    val lineId: String,
+    val name: String,
+    val variant: String? = null,
+    val options: List<String> = emptyList(),
+    val quantity: Int,
+    val paidQuantity: Int = 0,
+    val amount: OrderDecimal,
+    val imageUrl: String? = null
+) {
+    val left: Int get() = (quantity - paidQuantity).coerceAtLeast(0)
+}
+
+@Serializable
+data class PaidLineDto(val lineId: String, val quantity: Int)
 
 @Serializable
 data class TakePaymentRequestDto(
@@ -84,7 +103,8 @@ data class TakePaymentRequestDto(
     val externalReference: String? = null,
     val gatewayName: String? = null,
     val notes: String? = null,
-    val closeOrderWhenPaid: Boolean? = null
+    val closeOrderWhenPaid: Boolean? = null,
+    val lines: List<PaidLineDto>? = null
 )
 
 @Serializable
@@ -120,6 +140,8 @@ data class ReceiptDto(
     val taxNumber: String? = null,
     val vatNumber: String? = null,
     val showLogo: Boolean = true,
+    // The restaurant's logo when it has one and the receipt settings show it.
+    val logoUrl: String? = null,
     val orderNumber: String? = null,
     val tableNumber: String? = null,
     val serverName: String? = null,
@@ -153,7 +175,8 @@ data class ReceiptDto(
         val options: List<String> = emptyList(),
         val lineTotal: OrderDecimal,
         val removed: Boolean = false,
-        val notes: String? = null
+        val notes: String? = null,
+        val lineId: String? = null
     )
 
     @Serializable

@@ -77,6 +77,16 @@ class RoleAdminServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    // Pay settings aren't what these tests are about: answer as the plain role mapping, as before pay settings existed.
+    @Mock
+    private pos.pos.role.service.RolePayService rolePayService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void plainRoleResponses() {
+        org.mockito.Mockito.lenient().when(rolePayService.response(any(), any()))
+                .thenAnswer(call -> pos.pos.role.mapper.RoleMapper.toResponse(call.getArgument(0)));
+    }
+
     @InjectMocks
     private RoleAdminService roleAdminService;
 

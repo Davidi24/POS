@@ -52,15 +52,15 @@ internal fun TicketDetailDialog(state: KdsState, model: KdsScreenModel) {
     val id = state.selectedTicketId ?: return
     val ticket = state.selectedTicket ?: state.tickets.firstOrNull { it.id == id } ?: state.history.items.firstOrNull { it.id == id }
     val busy = "ticket:$id" in state.busyKeys
-    AppDialog(ticket?.title() ?: "Ticket", model::closeTicket, maxWidth = 640.dp,
-        subtitle = ticket?.let { t -> listOfNotNull("#${t.ticketNumber.ifBlank { t.orderNumber }}", t.stationName, t.courseName).joinToString(" · ") },
+    AppDialog(ticket?.let { "#${it.ticketNumber.ifBlank { it.orderNumber }.takeLast(6)} · ${it.forWhom()}" } ?: "Ticket", model::closeTicket, maxWidth = 640.dp,
+        subtitle = ticket?.let { t -> listOfNotNull(t.kind().label, t.stationName, t.courseName, t.guestCount?.let { if (it == 1) "1 guest" else "$it guests" }).joinToString(" · ") },
         buttons = {
             KitButton("Close", model::closeTicket, style = ButtonStyle.SECONDARY)
             if (ticket != null && state.canUpdate) {
                 if (ticket.allows(KdsAction.FIRE)) KitButton("Send to the kitchen", { model.perform(id, KdsAction.FIRE) },
                     icon = Icons.Outlined.LocalFireDepartment, style = ButtonStyle.SECONDARY, enabled = !busy)
                 ticket.nextAction(ticket.lane())?.let { action ->
-                    KitButton(when (action) { KdsAction.START -> "Start cooking"; KdsAction.READY -> "All ready"; KdsAction.COMPLETE -> "Served"; else -> "Send" },
+                    KitButton(when (action) { KdsAction.START -> "Start cooking"; KdsAction.READY -> "All ready"; else -> "Send" },
                         { model.perform(id, action) }, loading = busy)
                 }
             }
@@ -84,9 +84,10 @@ internal fun TicketDetailDialog(state: KdsState, model: KdsScreenModel) {
                 }
                 StatusPill(itemStatusLabel(item.status), itemStatusColor(item.status))
                 if (state.canUpdate) {
-                    val step = item.nextAction() ?: KdsAction.COMPLETE.takeIf { ticket.allows(it, item.id) }
+                    // Start and ready only: serving is the waiter's (user rule).
+                    val step = item.nextAction()
                     if (step != null && ticket.allows(step, item.id)) {
-                        KitButton(when (step) { KdsAction.START -> "Start"; KdsAction.READY -> "Ready"; KdsAction.COMPLETE -> "Served"; else -> "Send" },
+                        KitButton(when (step) { KdsAction.START -> "Start"; KdsAction.READY -> "Ready"; else -> "Send" },
                             { model.perform(id, step, item.id) }, style = ButtonStyle.SECONDARY, enabled = !busy)
                     }
                 }
@@ -114,7 +115,8 @@ internal fun TicketDetailDialog(state: KdsState, model: KdsScreenModel) {
 @Composable
 private fun Timeline(ticket: KdsTicket) {
     val zone = RestaurantTime.zone
-    val steps = listOf("Sent" to (ticket.firedAt ?: ticket.createdAt), "Started" to ticket.startedAt, "Ready" to ticket.readyAt, "Served" to ticket.completedAt)
+    // The kitchen's part: sent, started, ready (serving is the waiter's, from the POS).
+    val steps = listOf("Sent" to (ticket.firedAt ?: ticket.createdAt), "Started" to ticket.startedAt, "Ready to pick up" to ticket.readyAt)
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Kit.Canvas).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically) {
         steps.forEachIndexed { index, (label, at) ->

@@ -77,6 +77,10 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Branch extends AbstractAuditedSoftDeleteEntity {
 
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private long version;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "restaurant_id",
@@ -100,6 +104,10 @@ public class Branch extends AbstractAuditedSoftDeleteEntity {
 
     @Column(name = "phone", length = 50)
     private String phone;
+
+    // The picture on the branch's card when a super admin chooses a branch.
+    @Column(name = "cover_url", length = 2048)
+    private String coverUrl;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;

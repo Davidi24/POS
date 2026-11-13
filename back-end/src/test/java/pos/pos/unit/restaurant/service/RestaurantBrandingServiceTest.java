@@ -46,6 +46,8 @@ class RestaurantBrandingServiceTest {
     @Spy
     private RestaurantBrandingMapper restaurantBrandingMapper = new RestaurantBrandingMapper();
 
+    @Mock private pos.pos.menu.image.MenuImageReleaser imageReleaser;
+
     @InjectMocks
     private RestaurantBrandingService restaurantBrandingService;
 
@@ -140,6 +142,7 @@ class RestaurantBrandingServiceTest {
 
         RestaurantBrandingResponse response = restaurantBrandingService.upsertBranding(authentication, RESTAURANT_ID, request);
 
+        verify(imageReleaser).releaseAfterCommit("https://cdn.pos.local/old-logo.png");
         assertThat(existing.getLogoUrl()).isEqualTo("https://cdn.pos.local/new-logo.png");
         assertThat(existing.getPrimaryColor()).isEqualTo("#112233");
         assertThat(existing.getSecondaryColor()).isEqualTo("#445566");

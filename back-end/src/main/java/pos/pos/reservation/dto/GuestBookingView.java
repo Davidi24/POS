@@ -21,6 +21,9 @@ public class GuestBookingView {
     private String token;
     private String reservationCode;
     private String restaurantName;
+    // How guests reach the restaurant: the branch's own phone/email, otherwise the restaurant's.
+    private String restaurantPhone;
+    private String restaurantEmail;
     // The restaurant's time zone, to show times as the restaurant does.
     private String timezone;
     private ReservationStatus status;

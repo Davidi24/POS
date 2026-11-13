@@ -44,7 +44,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private fun recipe(id: String, name: String, status: String = "ACTIVE", components: List<RecipeComponentDto> = emptyList()) =
-    RecipeDto(id = id, name = name, recipeType = "FINISHED_DISH", status = status, components = components, theoreticalCost = OrderDecimal("1.20"))
+    RecipeDto(id = id, name = name, recipeType = "PREP_BATCH", status = status, components = components, theoreticalCost = OrderDecimal("1.20"))
 
 private class FakeRecipes : RecipesRepository {
     val recipes = mutableListOf(recipe("pizza", "Margherita", components = listOf(
@@ -55,6 +55,8 @@ private class FakeRecipes : RecipesRepository {
     val components = mutableListOf<RecipeComponentRequestDto>()
     val saved = mutableListOf<RecipeRequestDto>()
     var failure: Exception? = null
+    var failComponentCallAfterCommit: Int? = null
+    private var componentCall = 0
 
     override suspend fun recipes(restaurantId: String, type: String?, status: String?): List<RecipeDto> {
         calls += "list $type $status"; failure?.let { throw it }
@@ -73,10 +75,20 @@ private class FakeRecipes : RecipesRepository {
 
     override suspend fun putComponent(restaurantId: String, recipeId: String, request: RecipeComponentRequestDto): RecipeDto {
         components += request
-        return recipes.first { it.id == recipeId }.let { r ->
-            r.copy(components = r.components + RecipeComponentDto("c${r.components.size + 1}", request.componentType, request.inventoryItemId,
-                childRecipeId = request.childRecipeId, quantity = request.quantity, unit = request.unit))
+        componentCall++
+        val savedRecipe = recipes.first { it.id == recipeId }.let { r ->
+            val existing = r.components.indexOfFirst { it.inventoryItemId == request.inventoryItemId && it.childRecipeId == request.childRecipeId }
+            val component = RecipeComponentDto(if (existing >= 0) r.components[existing].id else "c${r.components.size + 1}", request.componentType,
+                request.inventoryItemId, childRecipeId = request.childRecipeId, quantity = request.quantity, unit = request.unit,
+                displayOrder = request.displayOrder ?: 0)
+            r.copy(components = if (existing >= 0) r.components.toMutableList().apply { this[existing] = component }
+                else r.components + component)
         }.also { saved -> recipes.replaceAll { if (it.id == saved.id) saved else it } }
+        if (componentCall == failComponentCallAfterCommit) {
+            failComponentCallAfterCommit = null
+            throw java.io.IOException("response lost after component saved")
+        }
+        return savedRecipe
     }
 
     override suspend fun removeComponent(restaurantId: String, recipeId: String, componentId: String): RecipeDto {
@@ -98,17 +110,17 @@ private class FakeRecipes : RecipesRepository {
 class RecipeRulesTest {
     @Test
     fun recipesAreCheckedAgainstTheServersLimits() {
-        val ok = RecipeDraft(name = "Margherita", menuItemId = "menu-1", yieldText = "1", yieldUnit = "PORTION", prepText = "10", cookText = "")
+        val ok = RecipeDraft(name = "Margherita", recipeType = "PREP_BATCH", yieldText = "1", yieldUnit = "PORTION", prepText = "10", cookText = "",
+            ingredients = listOf(com.saporini.mobile_desktop.admin.inventory.IngredientDraft(0, inventoryItemId = "tom", quantityText = "1", unit = "KILOGRAM")))
         assertNull(recipeProblem(ok))
-        assertEquals("Choose the dish on the menu this recipe makes", recipeProblem(ok.copy(menuItemId = null)))
-        assertNull(recipeProblem(ok.copy(menuItemId = null, recipeType = "PREP_BATCH")))
+        assertEquals("Add at least one ingredient it's made from", recipeProblem(ok.copy(ingredients = emptyList())))
         assertEquals("Enter a name", recipeProblem(ok.copy(name = " ")))
         assertEquals("The name can be at most 150 characters", recipeProblem(ok.copy(name = "N".repeat(151))))
         assertEquals("Makes: At most 3 decimals", recipeProblem(ok.copy(yieldText = "1.0001")))
         assertEquals("Choose the unit it makes", recipeProblem(ok.copy(yieldUnit = null)))
         assertEquals("Prep time: enter whole minutes", recipeProblem(ok.copy(prepText = "ten")))
         assertEquals("Cooking time: 0 to 10080 minutes", recipeProblem(ok.copy(cookText = "10081")))
-        assertEquals("Instructions can be at most 10000 characters", recipeProblem(ok.copy(instructions = "i".repeat(10001))))
+        assertEquals("Instructions can be at most 20000 characters", recipeProblem(ok.copy(instructions = "i".repeat(20001))))
         assertEquals("The description can be at most 2000 characters", recipeProblem(ok.copy(description = "d".repeat(2001))))
         val request = recipeRequest(ok.copy(name = " Margherita ", code = " ", yieldText = "", prepText = " 10 "))
         assertEquals("Margherita", request.name)
@@ -146,7 +158,7 @@ class RecipesScreenModelTest {
 
     private suspend fun TestScope.check(
         repo: FakeRecipes = FakeRecipes(),
-        permissions: List<String> = listOf("SETTINGS_READ", "SETTINGS_UPDATE"),
+        permissions: List<String> = listOf("INVENTORY_READ", "INVENTORY_UPDATE"),
         block: suspend TestScope.(RecipesScreenModel, FakeRecipes) -> Unit
     ) {
         val session = SessionManager().apply { signIn(user(permissions = permissions)) }
@@ -196,16 +208,43 @@ class RecipesScreenModelTest {
     @Test
     fun newRecipesAreCheckedSavedAndOpened() = runTest(dispatcher) {
         check { model, repo ->
-            model.newRecipe(menuItemId = "menu-1")
+            model.newRecipe()
             model.saveRecipe(); runCurrent()
             assertEquals("Enter a name", model.state.value.error)
-            model.change { it.copy(name = " Calzone ", id = "hijack") }
+            model.change { it.copy(name = " Calzone ", id = "hijack",
+                ingredients = listOf(com.saporini.mobile_desktop.admin.inventory.IngredientDraft(0, inventoryItemId = "tom", quantityText = "1", unit = "KILOGRAM"))) }
             assertNull(model.state.value.draft?.id)
             model.saveRecipe(); runCurrent()
-            assertEquals("menu-1", repo.saved.single().menuItemId)
+            assertNull(repo.saved.single().menuItemId)
+            assertEquals("PREP_BATCH", repo.saved.single().recipeType)
+            assertEquals(1, repo.components.size)
             assertEquals("new", model.state.value.open?.id)
             assertTrue(model.state.value.recipes.any { it.name == "Calzone" })
             assertEquals("Calzone was saved", model.state.value.notice)
+        }
+    }
+
+    @Test
+    fun retryingHouseMadeAfterAComponentResponseIsLostResumesWithoutDuplicateIngredients() = runTest(dispatcher) {
+        check { model, repo ->
+            model.newRecipe()
+            model.change { it.copy(name = "Tomato sauce", ingredients = listOf(
+                com.saporini.mobile_desktop.admin.inventory.IngredientDraft(0, inventoryItemId = "tom", quantityText = "1", unit = "KILOGRAM"),
+                com.saporini.mobile_desktop.admin.inventory.IngredientDraft(1, childRecipeId = "dough", quantityText = "2", unit = "PORTION")
+            )) }
+            repo.failComponentCallAfterCommit = 2
+
+            model.saveRecipe(); runCurrent()
+
+            assertEquals("new", model.state.value.draft?.id, model.state.value.toString())
+            assertTrue(model.state.value.error.orEmpty().contains("not every ingredient could be added"))
+            assertEquals(2, repo.recipes.single { it.id == "new" }.components.size)
+
+            model.saveRecipe(); runCurrent()
+
+            assertNull(model.state.value.draft)
+            assertEquals(2, repo.recipes.single { it.id == "new" }.components.size)
+            assertEquals(4, repo.components.size, "the retry safely upserts both ingredient references")
         }
     }
 
@@ -227,14 +266,14 @@ class RecipesScreenModelTest {
 
     @Test
     fun readOnlyPeopleCantChangeRecipes() = runTest(dispatcher) {
-        check(permissions = listOf("SETTINGS_READ")) { model, repo ->
+        check(permissions = listOf("INVENTORY_READ")) { model, repo ->
             model.open("pizza"); runCurrent()
             model.newRecipe()
             assertNull(model.state.value.draft)
             model.recalculateCost(); runCurrent()
             model.newComponent("tom")
             assertNull(model.state.value.component)
-            assertEquals("You can only look at recipes", model.state.value.error)
+            assertEquals("You can only look at sub-recipes", model.state.value.error)
             assertTrue(repo.calls.none { it.startsWith("cost") })
         }
     }
@@ -243,7 +282,8 @@ class RecipesScreenModelTest {
     fun aFailedSaveKeepsTheDraft() = runTest(dispatcher) {
         check { model, repo ->
             model.newRecipe()
-            model.change { it.copy(name = "Soup", recipeType = "PREP_BATCH") }
+            model.change { it.copy(name = "Soup", recipeType = "PREP_BATCH",
+                ingredients = listOf(com.saporini.mobile_desktop.admin.inventory.IngredientDraft(0, inventoryItemId = "tom", quantityText = "1", unit = "KILOGRAM"))) }
             repo.failure = ApiException(409, "A recipe with this code already exists")
             model.saveRecipe(); runCurrent()
             assertEquals("A recipe with this code already exists", model.state.value.error)

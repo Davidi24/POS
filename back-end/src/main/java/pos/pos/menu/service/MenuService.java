@@ -16,6 +16,9 @@ import pos.pos.exception.menu.MenuCodeAlreadyExistsException;
 import pos.pos.exception.menu.MenuDeletionRequiresConfirmationException;
 import pos.pos.exception.menu.MenuNotFoundException;
 import pos.pos.menu.dto.request.CreateMenuRequest;
+import pos.pos.menu.dto.request.MenuOrderRequest;
+import pos.pos.menu.dto.request.SpecialMenuKind;
+import pos.pos.menu.dto.response.MenuEventSummaryResponse;
 import pos.pos.menu.dto.response.MenuResponse;
 import pos.pos.menu.dto.update.UpdateMenuRequest;
 import pos.pos.menu.dto.update.UpdateMenuStatusRequest;
@@ -24,6 +27,7 @@ import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
 import pos.pos.menu.entity.MenuItemOptionGroup;
 import pos.pos.menu.entity.MenuVariant;
+import pos.pos.menu.image.MenuImageReleaser;
 import pos.pos.menu.mapper.MenuMapper;
 import pos.pos.menu.policy.MenuPolicy;
 import pos.pos.menu.repository.MenuItemOptionGroupRepository;
@@ -32,6 +36,8 @@ import pos.pos.menu.repository.MenuRepository;
 import pos.pos.menu.repository.MenuSectionRepository;
 import pos.pos.menu.repository.MenuVariantRepository;
 import pos.pos.menu.util.MenuCodeNormalizer;
+import pos.pos.reservation.entity.RestaurantEvent;
+import pos.pos.reservation.service.ReservationPolicy;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.service.RestaurantScopeService;
@@ -41,8 +47,12 @@ import pos.pos.security.scope.ActorScopeService;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -65,6 +75,10 @@ public class MenuService {
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantValidationService restaurantValidationService;
     private final OnlineMenuService onlineMenuService;
+    private final SpecialMenuEventLinks specialMenuEventLinks;
+    private final MenuWaiterViewService menuWaiterViewService;
+    private final MenuImageReleaser menuImageReleaser;
+    private final pos.pos.menu.recipe.DishRecipeCleanup dishRecipeCleanup;
 
     //returns a paginated, filtered, sorted list of menus that the logged-in user is allowed to see.
     @Transactional(readOnly = true)
@@ -106,12 +120,75 @@ public class MenuService {
                                 MenuItemRepository.MenuItemCountRow::getMenuId,
                                 row -> row.getItemCount().intValue()
                         ));
+        Map<UUID, RestaurantEvent> eventsByMenuId = specialMenuEventLinks.eventsOf(menuIds);
         List<MenuResponse> items = menuEntities.stream()
-                .map(menu -> menuMapper.toMenuResponse(menu, itemCountsByMenuId.getOrDefault(menu.getId(), 0)))
+                .map(menu -> withEvent(
+                        menuMapper.toMenuResponse(menu, itemCountsByMenuId.getOrDefault(menu.getId(), 0)),
+                        eventsByMenuId.get(menu.getId())
+                ))
                 .toList();
 
         //returns a paged list of menus
         return PageResponse.from(new PageImpl<>(items, pageable, menusPage.getTotalElements()));
+    }
+
+    // What the till offers right now: the menus waiters see (Menu → "Menus shown") whose days and hours cover this
+    // moment in the restaurant's time, event menus included on their event's days. On an event night set to "only the
+    // special menu", just that menu (even outside its hours, so the till is never empty that night).
+    @Transactional(readOnly = true)
+    public PageResponse<MenuResponse> getMenusAvailableNow(Authentication authentication, UUID restaurantId) {
+        ActorScope scope = actorScopeService.resolve(authentication);
+        Restaurant restaurant = restaurantScopeService.requireAccessibleRestaurant(scope, restaurantId);
+        LocalDateTime now = LocalDateTime.now(restaurantZone(restaurant));
+        List<Menu> activeMenus = menuRepository.searchVisibleMenus(
+                restaurantId,
+                true,
+                null,
+                scope.superAdmin(),
+                scope.restaurantId(),
+                scope.userId(),
+                PageRequest.of(0, 500, resolveSort("displayOrder", "asc"))
+        ).getContent();
+        // The restaurant's day starts at 06:00, so at 01:00 last night's menus (and event) are still on.
+        LocalDate serviceDate = now.minusHours(ReservationPolicy.SERVICE_DAY_START_HOUR).toLocalDate();
+        List<Menu> onNow = activeMenus.stream()
+                .filter(menu -> menu.isAvailableAt(now)
+                        || (menu.isAvailableOn(serviceDate) && menu.isOpenAt(now.toLocalTime())))
+                .toList();
+        List<Menu> shown = MenuWaiterViewService.forWaiters(onNow, menuWaiterViewService.specialMenusOnly(restaurantId));
+
+        RestaurantEvent tonight = specialMenuEventLinks.activeEventOn(restaurantId, serviceDate).orElse(null);
+        if (tonight != null && tonight.isSpecialMenuOnly() && tonight.getMenuId() != null) {
+            List<Menu> eventMenu = activeMenus.stream().filter(menu -> menu.getId().equals(tonight.getMenuId())).toList();
+            if (!eventMenu.isEmpty()) {
+                shown = eventMenu;
+            }
+        }
+
+        List<UUID> menuIds = shown.stream().map(Menu::getId).toList();
+        Map<UUID, Integer> itemCountsByMenuId = menuIds.isEmpty()
+                ? Map.of()
+                : menuItemRepository.countItemsByMenuIds(menuIds).stream()
+                        .collect(Collectors.toMap(
+                                MenuItemRepository.MenuItemCountRow::getMenuId,
+                                row -> row.getItemCount().intValue()
+                        ));
+        Map<UUID, RestaurantEvent> eventsByMenuId = specialMenuEventLinks.eventsOf(menuIds);
+        List<MenuResponse> items = shown.stream()
+                .map(menu -> withEvent(
+                        menuMapper.toMenuResponse(menu, itemCountsByMenuId.getOrDefault(menu.getId(), 0)),
+                        eventsByMenuId.get(menu.getId())
+                ))
+                .toList();
+        return PageResponse.from(new PageImpl<>(items, PageRequest.of(0, Math.max(1, items.size())), items.size()));
+    }
+
+    private static ZoneId restaurantZone(Restaurant restaurant) {
+        try {
+            return ZoneId.of(restaurant.getTimezone());
+        } catch (Exception ex) {
+            return ZoneOffset.UTC;
+        }
     }
 
     //finds one menu, checks if the user can access it, and returns it with or without sections/items.
@@ -129,7 +206,7 @@ public class MenuService {
         menuPolicy.assertCanAccess(scope, menu);//checks if the user is allowed to see the menu
         int itemCount = (int) menuItemRepository.countByMenuId(menuId);
         if (!includeSections && !includeItems) {
-            return menuMapper.toMenuResponse(menu, itemCount);
+            return withEvent(menuMapper.toMenuResponse(menu, itemCount));
         }
         //gets all sections of the menu ordered by displayOrder, name
         List<MenuSection> sections = menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(menuId);
@@ -173,7 +250,7 @@ public class MenuService {
             }
         }
 
-        return menuMapper.toMenuResponse(
+        return withEvent(menuMapper.toMenuResponse(
                 menu,
                 sections,
                 itemsBySectionId,
@@ -183,7 +260,7 @@ public class MenuService {
                 includeOptionGroups,
                 optionGroupsByItemId,
                 itemCount
-        );
+        ));
     }
 
     //checked
@@ -213,7 +290,11 @@ public class MenuService {
         menu.setCreatedBy(actorId);
         menu.setUpdatedBy(actorId);
 
-        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), 0);
+        menu.setShownToWaiters(!Boolean.FALSE.equals(request.getShownToWaiters()));
+
+        Menu saved = menuRepository.saveAndFlush(menu);
+        applySpecial(saved, request.getSpecial(), request.getSpecialKind(), request.getEventId());
+        return withEvent(menuMapper.toMenuResponse(saved, 0));
     }
 
     //checked
@@ -238,13 +319,46 @@ public class MenuService {
         menu.setAvailableFromDate(request.getAvailableFromDate());
         menu.setAvailableUntilDate(request.getAvailableUntilDate());
         menu.setColor(NormalizationUtils.normalize(request.getColor()));
-        if (request.getSpecial() != null) {
-            menu.setSpecial(request.getSpecial());
-        }
         menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));//stores who updated the menu
+        if (request.getShownToWaiters() != null) {
+            if (!request.getShownToWaiters() && menu.isShownToWaiters()
+                    && menuWaiterViewService.isLastShownMenu(menu)) {
+                throw new AuthException("At least one menu must show in POS", HttpStatus.BAD_REQUEST);
+            }
+            menu.setShownToWaiters(request.getShownToWaiters());
+        }
+        applySpecial(menu, request.getSpecial(), request.getSpecialKind(), request.getEventId());
 
         int itemCount = (int) menuItemRepository.countByMenuId(menu.getId());
-        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), itemCount);
+        return withEvent(menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), itemCount));
+    }
+
+    // Saves the order menus are shown in (Menu → "Menus shown" → Change position): the listed menus first, in that
+    // order; any menu not listed keeps its place after them.
+    @Transactional
+    public void reorderMenus(Authentication authentication, MenuOrderRequest request) {
+        Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, request.getRestaurantId());
+        assertMenuWriteAllowed(restaurant);
+        List<Menu> menus = menuRepository.findAllByRestaurantId(restaurant.getId());
+        Map<UUID, Menu> byId = menus.stream().collect(Collectors.toMap(Menu::getId, Function.identity()));
+        List<UUID> requested = request.getMenuIds().stream().distinct().toList();
+        if (!byId.keySet().containsAll(requested)) {
+            throw new AuthException("Choose this restaurant's menus", HttpStatus.BAD_REQUEST);
+        }
+        List<Menu> ordered = new java.util.ArrayList<>(requested.stream().map(byId::get).toList());
+        menus.stream()
+                .filter(menu -> !requested.contains(menu.getId()))
+                .sorted(java.util.Comparator.comparingInt(Menu::getDisplayOrder).thenComparing(Menu::getName))
+                .forEach(ordered::add);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        for (int index = 0; index < ordered.size(); index++) {
+            Menu menu = ordered.get(index);
+            if (menu.getDisplayOrder() != index) {
+                menu.setDisplayOrder(index);
+                menu.setUpdatedBy(actorId);
+                menuRepository.save(menu);
+            }
+        }
     }
 
     //checked
@@ -255,7 +369,7 @@ public class MenuService {
         menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));//stores who updated it
 
         int itemCount = (int) menuItemRepository.countByMenuId(menu.getId());
-        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), itemCount);
+        return withEvent(menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), itemCount));
     }
 
     //checked
@@ -278,7 +392,11 @@ public class MenuService {
                     if (!sectionItems.isEmpty()) {
                         menuItemRepository.deleteKdsRoutingsOf(sectionItems.stream().map(MenuItem::getId).toList());
                     }
+                    dishRecipeCleanup.releaseDishes(sectionItems.stream().map(MenuItem::getId).toList());
                     menuItemRepository.deleteAll(sectionItems);
+                    // Their photos go too, once this is saved (unless another dish still shows them).
+                    sectionItems.stream().map(MenuItem::getImageUrl).filter(Objects::nonNull).distinct()
+                            .forEach(menuImageReleaser::releaseAfterCommit);
                 }
                 menuSectionRepository.deleteAll(sections);
                 onlineMenuService.removeEmptySections(menu.getRestaurant().getId());
@@ -288,6 +406,48 @@ public class MenuService {
         }
 
         menuRepository.delete(menu);
+    }
+
+    // A special menu is booking extras (no event) or one event night's menu; special = false makes it a regular menu.
+    // specialKind is read only with special = true (null keeps what it is). An event menu always keeps its event's days.
+    private void applySpecial(Menu menu, Boolean special, SpecialMenuKind kind, UUID eventId) {
+        if (Boolean.FALSE.equals(special)) {
+            menu.setSpecial(false);
+            specialMenuEventLinks.menuLeavesEvent(menu);
+        } else if (Boolean.TRUE.equals(special)) {
+            menu.setSpecial(true);
+            if (kind == SpecialMenuKind.EVENT) {
+                if (eventId == null) {
+                    throw new AuthException("Choose the event this menu is for", HttpStatus.BAD_REQUEST);
+                }
+                specialMenuEventLinks.menuJoinsEvent(menu, eventId);
+            } else if (kind == SpecialMenuKind.BOOKING_EXTRAS) {
+                specialMenuEventLinks.menuLeavesEvent(menu);
+            }
+        }
+        specialMenuEventLinks.keepEventDays(menu);
+    }
+
+    private MenuResponse withEvent(MenuResponse response) {
+        if (response == null) {
+            return null;
+        }
+        return withEvent(response, specialMenuEventLinks.eventOf(response.getId()).orElse(null));
+    }
+
+    private static MenuResponse withEvent(MenuResponse response, RestaurantEvent event) {
+        if (response != null && event != null) {
+            response.setEvent(MenuEventSummaryResponse.builder()
+                    .id(event.getId())
+                    .name(event.getName())
+                    .icon(event.getIcon())
+                    .startDate(event.getStartDate())
+                    .endDate(event.getEndDate())
+                    .active(event.isActive())
+                    .specialMenuOnly(event.isSpecialMenuOnly())
+                    .build());
+        }
+        return response;
     }
 
     //helper funct, finds a menu only if its restaurant it's not deleted

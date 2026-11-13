@@ -20,6 +20,7 @@ data class OrderSummary(
     val fulfillmentStatus: OrderFulfillmentStatus,
     val total: OrderDecimal,
     val itemCount: Int? = null,
+    val notSentItems: Int = 0,
     val openedAt: String,
     val tableId: String? = null,
     val tableNumber: String? = null,
@@ -29,7 +30,9 @@ data class OrderSummary(
     val guestCount: Int? = null,
     val notes: String? = null,
     val closedAt: String? = null,
-    val createdBy: String? = null
+    val createdBy: String? = null,
+    val unpaidAt: String? = null,
+    val unpaidAmount: OrderDecimal? = null
 )
 
 data class OrderAudit(
@@ -92,6 +95,8 @@ data class OrderLineItem(
     val menuItemId: String,
     val variantId: String? = null,
     val itemNameSnapshot: String,
+    // The dish's photo from the menu.
+    val imageUrl: String? = null,
     val variantNameSnapshot: String? = null,
     val skuSnapshot: String? = null,
     val quantity: Int,
@@ -144,10 +149,20 @@ data class Order(
     val total: OrderDecimal,
     val openedAt: String,
     val closedAt: String? = null,
+    // When the guests asked for the bill; null when they haven't (or added dishes since).
+    val billRequestedAt: String? = null,
+    // Closed as unpaid (guests walked out, will pay later): the order is VOIDED with these filled in, until it's
+    // reopened for payment. The note is what staff wrote; the reason is OTHER, or NO_ACTION when the system closed it.
+    val unpaidReason: String? = null,
+    val unpaidNote: String? = null,
+    val unpaidAmount: OrderDecimal? = null,
+    val unpaidAt: String? = null,
     val createdAt: String,
     val updatedAt: String,
     val createdBy: String? = null,
     val updatedBy: String? = null,
+    // Dishes still to be sent to the kitchen.
+    val notSentItems: Int = 0,
     val lineItems: List<OrderLineItem>? = null,
     val discounts: List<OrderDiscount>? = null,
     val events: List<OrderEvent>? = null

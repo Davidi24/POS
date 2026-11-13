@@ -40,9 +40,12 @@ internal class Gallery {
         height: Int = 960,
         required: List<String> = emptyList(),
         absent: List<String> = emptyList(),
+        // Pixels per dp: 1 renders at the window's size; 2 or 3 renders a phone as sharp as its screen.
+        density: Float = 1f,
         content: @Composable () -> Unit
     ) {
-        val scene = ImageComposeScene(width, height, coroutineContext = dispatcher) { SaporiniTheme { content() } }
+        val scene = ImageComposeScene((width * density).toInt(), (height * density).toInt(), androidx.compose.ui.unit.Density(density),
+            coroutineContext = dispatcher) { SaporiniTheme { content() } }
         try {
             repeat(8) {
                 scheduler.advanceTimeBy(120); scheduler.runCurrent()

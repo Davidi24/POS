@@ -113,6 +113,9 @@ class DefaultReservationRepository(
     override suspend fun confirmAttendance(restaurantId: String, reservationId: String, reason: String?): Reservation =
         api.confirmAttendance(restaurantId, reservationId, ReservationActionRequestDto(reason = reason)).toDomain()
 
+    override suspend fun couldNotReach(restaurantId: String, reservationId: String, reason: String?): Reservation =
+        api.couldNotReach(restaurantId, reservationId, ReservationActionRequestDto(reason = reason)).toDomain()
+
     override suspend fun getGuestHistory(restaurantId: String, reservationId: String): GuestHistory =
         api.getGuestHistory(restaurantId, reservationId).toDomain()
 

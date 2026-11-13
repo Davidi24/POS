@@ -78,7 +78,8 @@ public class OrderPublicService {
         orderSupport.assertQrOrderingEnabled(order.getRestaurant());
         assertPublicOrderEditable(order);
 
-        request.getItems().forEach(itemRequest -> order.addLineItem(orderSupport.buildLineItem(order, itemRequest)));
+request.getItems().forEach(itemRequest -> order.addLineItem(orderSupport.buildLineItem(order, itemRequest)));
+        order.setBillRequestedAt(null);
         if (request.getGuestCount() != null && request.getGuestCount() > order.getGuestCount()) {
             order.setGuestCount(request.getGuestCount());
         }

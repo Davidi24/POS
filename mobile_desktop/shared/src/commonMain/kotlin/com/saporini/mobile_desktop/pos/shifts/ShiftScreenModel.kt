@@ -15,14 +15,25 @@ internal data class ShiftState(
     // My shift (POS): my pay for the week shown; null until loaded or when it couldn't be read.
     val pay: PayReport? = null,
     val error: String? = null, val notice: String? = null, val userId: String? = null,
-    val permissions: Set<String> = emptySet(), val ready: Boolean = false
+    val permissions: Set<String> = emptySet(), val ready: Boolean = false,
+    // The signed-in person's roles: they see shifts of people at their level or below (ShiftVisibility).
+    val viewerRoles: List<String> = emptyList(),
+    // Adding several shifts at once: how far it got.
+    val planning: PlanProgress? = null,
+    // My shift → Team: who works in the month shown (last month to next month).
+    val team: ShiftBoard? = null, val teamMonth: LocalDate? = null, val teamLoading: Boolean = false
 ) {
+    val viewerRank get() = ShiftVisibility.rankOf(viewerRoles)
     val zone get() = board?.timezone?.let { runCatching { TimeZone.of(it) }.getOrNull() } ?: TimeZone.currentSystemDefault()
     val canManage get() = "SHIFT_MANAGE" in permissions
     val canSelf get() = "SHIFT_SELF" in permissions
     val canRead get() = "SHIFT_READ" in permissions || canManage
     val weekStart get() = date.minus(DatePeriod(days = date.dayOfWeek.ordinal))
 }
+internal data class PlanProgress(val done: Int, val total: Int)
+/** How adding several shifts went: how many were added, and why the others weren't. */
+internal data class PlanOutcome(val added: Int, val problems: List<Pair<PlannedShift, String>>)
+
 internal class ShiftScreenModel(private val repository: ShiftRepository, private val session: SessionManager) : ScreenModel {
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutable = MutableStateFlow(ShiftState())
@@ -40,7 +51,8 @@ internal class ShiftScreenModel(private val repository: ShiftRepository, private
             session.currentUser.collectLatest { user ->
                 generation++; refreshJob?.cancel()
                 restaurant = user?.restaurantId; branch = user?.defaultBranchId
-                mutable.value = ShiftState(userId = user?.id, permissions = user?.permissions.orEmpty().toSet(), ready = restaurant != null && branch != null)
+                mutable.value = ShiftState(userId = user?.id, permissions = user?.permissions.orEmpty().toSet(), ready = restaurant != null && branch != null,
+                    viewerRoles = user?.roles.orEmpty())
                 refresh()
             }
         }
@@ -77,13 +89,79 @@ internal class ShiftScreenModel(private val repository: ShiftRepository, private
             val from = if (s.monthView) LocalDate(s.date.year, s.date.month, 1) else s.weekStart
             val to = if (s.monthView) from.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1)) else from.plus(DatePeriod(days = weekSpan()))
             val board = repository.board(r, b, from.toString(), to.toString(), !admin)
+            // The usual shifts come from the server too; the shifts still show when they can't be read.
+            ShiftTemplates.connect(repository, r, b)
+            runCatching { repository.templates(r, b) }.onFailure { if (it is CancellationException) throw it }.getOrNull()?.let(ShiftTemplates::fill)
             // My pay for the week on screen. Pay is extra: the shifts still show when it can't be read.
             val pay = if (admin) null else runCatching { repository.pay(r, b, from.toString(), from.plus(DatePeriod(days = 6)).toString(), mine = true) }
                 .onFailure { if (it is CancellationException) throw it }.getOrNull()
             if (token == generation) mutable.update { it.copy(board = board, boardFrom = from, boardTo = to, loading = false, error = null, pay = pay) }
+            if (!admin && teamActive && token == generation) teamMonth(mutable.value.teamMonth ?: today())
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { if (token == generation) mutable.update { it.copy(loading = false, error = friendly(e)) } }
     }
+
+    // My shift → Team: who works, one month at a time. The server shares it with everyone who has shifts of their own, from
+    // last month to next month and only people at their level or below.
+    private var teamActive = false
+    private var teamJob: Job? = null
+    private fun today() = Clock.System.now().toLocalDateTime(mutable.value.zone).date
+    fun showTeam(active: Boolean) {
+        if (teamActive == active) return
+        teamActive = active
+        if (active) teamMonth(mutable.value.teamMonth ?: today())
+    }
+    /** Shows [date]'s month, kept between last month and next month. */
+    fun teamMonth(date: LocalDate) {
+        val r = restaurant ?: return; val b = branch ?: return
+        val thisMonth = today().let { LocalDate(it.year, it.month, 1) }
+        val month = LocalDate(date.year, date.month, 1).coerceIn(thisMonth.minus(DatePeriod(months = 1)), thisMonth.plus(DatePeriod(months = 1)))
+        // Another month starts from its loading shapes; the same month refreshes quietly.
+        mutable.update { it.copy(teamMonth = month, team = it.team.takeIf { _ -> it.teamMonth == month }, teamLoading = true) }
+        teamJob?.cancel()
+        val token = generation
+        teamJob = work.launch {
+            try {
+                val team = repository.board(r, b, month.toString(), month.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1)).toString(), mine = false)
+                if (token == generation) mutable.update { it.copy(team = team, teamLoading = false) }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (token == generation) mutable.update { it.copy(teamLoading = false, error = friendly(e)) } }
+        }
+    }
+
+    /**
+     * Adds [shifts] one by one (the server saves one shift per request), counting as it goes. A shift the server
+     * refuses (say the person already works then) is reported in the outcome; the others are still added.
+     */
+    fun planMany(shifts: List<PlannedShift>, done: (PlanOutcome) -> Unit) {
+        if (mutable.value.busy || shifts.isEmpty()) return
+        refreshJob?.cancel()
+        val r = restaurant ?: return; val b = branch ?: return; val token = generation
+        mutable.update { it.copy(busy = true, error = null, notice = null, planning = PlanProgress(0, shifts.size)) }
+        work.launch {
+            val problems = mutableListOf<Pair<PlannedShift, String>>()
+            var added = 0
+            shifts.forEachIndexed { index, shift ->
+                try {
+                    repository.schedule(r, b, null, ShiftSchedule(shift.userId, shift.start.toString(), shift.end.toString(), shift.notes))
+                    added++
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { problems += shift to friendly(e) }
+                if (token == generation) mutable.update { it.copy(planning = PlanProgress(index + 1, shifts.size)) }
+            }
+            if (token != generation) return@launch
+            mutable.update {
+                it.copy(busy = false, planning = null,
+                    notice = when { problems.isNotEmpty() -> null; added == 1 -> "Shift added."; else -> "$added shifts added." })
+            }
+            done(PlanOutcome(added, problems))
+            load(token)
+        }
+    }
+    /** A notice from a dialog that saved something itself. */
+    fun say(message: String) { mutable.update { it.copy(notice = message) } }
+    /** A plan was saved: say so, and show the shifts it made. */
+    fun planSaved(message: String) { say(message); refresh() }
     private fun mutate(message: String, onSuccess: () -> Unit, action: suspend (String, String) -> Unit) {
         if (mutable.value.busy) return
         refreshJob?.cancel()

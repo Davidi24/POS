@@ -13,6 +13,7 @@ import pos.pos.reservation.entity.ReservationTableAssignment;
 import pos.pos.reservation.repository.ReservationTableAssignmentRepository;
 import pos.pos.restaurant.service.RestaurantScopeService;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -167,6 +168,53 @@ public class ReservationTableAssignmentService {
         return reservationSupport.mapAssignments(reservation);
     }
 
+    // ---- Settings → Tables → Special cases ----
+
+    // Free tables the booking fits, for the time it has left.
+    public List<ReservationAvailabilityOptionResponse> freeOptions(Reservation reservation) {
+        OffsetDateTime now = OffsetDateTime.now(java.time.ZoneOffset.UTC);
+        OffsetDateTime from = reservation.getReservationStart().isAfter(now) ? reservation.getReservationStart() : now;
+        if (!reservation.getReservationEnd().isAfter(from)) {
+            return List.of();
+        }
+        var current = reservation.getTableAssignments().stream().map(assignment -> assignment.getRestaurantTable().getId()).toList();
+        return reservationAvailabilitySupport.availabilityOptionsForBranch(reservation.getBranch(), from, reservation.getReservationEnd(), reservation.getPartySize(), 12)
+                .stream()
+                .filter(option -> option.getTableIds().stream().noneMatch(current::contains))
+                .toList();
+    }
+
+    public void moveTo(Reservation reservation, Collection<UUID> tableIds, UUID primaryTableId, UUID actorId) {
+        replaceReservationTables(reservation, tableIds, primaryTableId, actorId);
+    }
+
+    // The system never joins tables by itself, and stays on the floor: only one table there that fits. Answers its number,
+    // or null when none does.
+    public String moveToFreeTable(Reservation reservation, java.util.function.Predicate<UUID> allowed) {
+        for (ReservationAvailabilityOptionResponse option : freeOptions(reservation)) {
+            if (option.getTableIds().size() != 1 || !allowed.test(option.getTableIds().get(0))) {
+                continue;
+            }
+            try {
+                replaceReservationTables(reservation, option.getTableIds(), option.getPrimaryTableId(), null);
+                return option.getTableNumbers().get(0);
+            } catch (AuthException taken) {
+                // Taken in the meantime: try the next one.
+            }
+        }
+        return null;
+    }
+
+    // Back on the table it came from, guests there or not: staff asked for it.
+    public void putBack(Reservation reservation, pos.pos.tables.entity.RestaurantTable table, UUID actorId) {
+        new ArrayList<>(reservation.getTableAssignments()).forEach(reservation::removeTableAssignment);
+        ReservationTableAssignment assignment = new ReservationTableAssignment();
+        assignment.setRestaurantTable(table);
+        assignment.setPrimaryAssignment(true);
+        assignment.setAssignedBy(actorId);
+        reservation.addTableAssignment(assignment);
+    }
+
     void replaceReservationTables(Reservation reservation, Collection<UUID> tableIds, UUID primaryTableId, UUID actorId) {
         if (tableIds == null) {
             return;
@@ -199,7 +247,7 @@ public class ReservationTableAssignmentService {
     }
 
     // Re-checks the reservation's current tables after its time or party size changed.
-    void revalidateCurrentTables(Reservation reservation) {
+    public void revalidateCurrentTables(Reservation reservation) {
         List<UUID> tableIds = reservation.getTableAssignments().stream()
                 .map(assignment -> assignment.getRestaurantTable().getId())
                 .toList();

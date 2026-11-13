@@ -35,9 +35,9 @@ private class GalleryAudit : AuditLogRepository {
     override suspend fun entries(restaurantId: String, page: Int, size: Int) = AuditPageDto(entries, 0, size, 48, 1, false)
 }
 
-private class GalleryDevices : DevicesRepository {
+internal class GalleryDevices : DevicesRepository {
     val devices = listOf(
-        DeviceDto("d1", "branch-1", "TILL-1", "Front till", "TERMINAL", "Sunmi", "T2s", status = "ACTIVE", online = true, appVersion = "1.4.0", ipAddress = "192.168.1.21", platform = "Android", osVersion = "13"),
+        DeviceDto("d1", "branch-1", "TILL-1", "Front till", "POS_TERMINAL", "Sunmi", "T2s", status = "ACTIVE", online = true, appVersion = "1.4.0", ipAddress = "192.168.1.21", platform = "Android", osVersion = "13"),
         DeviceDto("d2", "branch-1", "TAB-1", "Terrace tablet", "TABLET", "Samsung", "Tab A9", status = "ACTIVE", online = false, lastSeenAt = ago(35)),
         DeviceDto("d3", "branch-1", "KDS-1", "Grill screen", "KDS", status = "ACTIVE", online = true),
         DeviceDto("d4", "branch-1", "KDS-2", "Pastry screen", "KDS", status = "MAINTENANCE", online = false, lastSeenAt = ago(60 * 30)),
@@ -70,7 +70,24 @@ class AdminSystemGalleryTest {
     fun audit() = gallery {
         val model = AuditLogScreenModel(GalleryAudit(), gallerySession())
         model.setActive(true); settle()
-        render("admin-audit", required = listOf("Audit log", "Giulia Rossi", "Tips switched on")) {
+        render("admin-audit", required = listOf("Audit log", "Giulia Rossi", "Tips switched on", "Kind of change", "Fold all days")) {
+            val state by model.state.collectAsState()
+            AuditLogContent(state, model)
+        }
+        render("admin-audit-phone", 390, 900) {
+            val state by model.state.collectAsState()
+            AuditLogContent(state, model)
+        }
+        // The responsive pass: phones (360, 412), small tablets (600, 768) and a tablet (1024).
+        listOf(360 to 900, 412 to 900, 600 to 960, 768 to 1000, 1024 to 900).forEach { (width, height) ->
+            render("size-audit-$width", width, height, required = listOf("Audit log", "Tips switched on", "Search changes")) {
+                val state by model.state.collectAsState()
+                AuditLogContent(state, model)
+            }
+        }
+        // Only one person's changes, picked in "Who changed things".
+        model.actor("Giulia Rossi")
+        render("admin-audit-filtered", required = listOf("Who changed things", "Tips switched on")) {
             val state by model.state.collectAsState()
             AuditLogContent(state, model)
         }
@@ -81,19 +98,46 @@ class AdminSystemGalleryTest {
     fun devices() = gallery {
         val model = DevicesScreenModel(GalleryDevices(), gallerySession())
         model.setActive(true); settle()
-        render("admin-devices", required = listOf("Devices", "Front till", "Kitchen printer")) {
+        listOf("admin-devices" to (1440 to 1000), "admin-devices-tablet" to (1024 to 1300), "admin-devices-phone" to (390 to 1100)).forEach { (name, size) ->
+            // The phone card shows a number bubble instead of the words "to confirm".
+            render(name, size.first, size.second, required = listOf("Devices", "Tills", "Printers", "Cash drawers") + if (name.endsWith("phone")) emptyList() else listOf("to confirm")) {
+                val state by model.state.collectAsState()
+                DevicesContent(state, model)
+            }
+        }
+        // A kind's own page: its devices to open, edit or remove (like a role in Users).
+        listOf("admin-devices-kind" to (1440 to 1000), "admin-devices-kind-phone" to (390 to 1100)).forEach { (name, size) ->
+            render(name, size.first, size.second, required = listOf("Tablets & screens", "Grill screen", "Add a tablet")) {
+                val state by model.state.collectAsState()
+                DevicesContent(state, model, startKind = com.saporini.mobile_desktop.admin.devices.ui.DeviceKind.TABLET)
+            }
+        }
+        render("admin-devices-kind-waiting", 1440, 1000, required = listOf("Card terminals", "To confirm", "Card terminal bar", "Confirm")) {
             val state by model.state.collectAsState()
-            DevicesContent(state, model)
+            DevicesContent(state, model, startKind = com.saporini.mobile_desktop.admin.devices.ui.DeviceKind.CARD)
+        }
+        render("admin-devices-add", 1440, 1000, required = listOf("What are you adding?", "A cash drawer")) {
+            val state by model.state.collectAsState()
+            DevicesContent(state, model, startAdding = true)
         }
         model.select("d1"); settle()
-        render("admin-devices-detail", required = listOf("Pairing codes", "Who uses it")) {
+        render("admin-devices-detail", 1440, 1300, required = listOf("Pairing codes", "Who uses it")) {
             val state by model.state.collectAsState()
-            DevicesContent(state, model)
+            DevicesContent(state, model, startOpen = "d1")
         }
-        model.newPairingCode(15); settle()
-        render("admin-devices-code", required = listOf("X7QK-2MPA-9RTL")) {
+        model.select("d5"); settle()
+        render("admin-devices-confirm", 1440, 1100, required = listOf("Confirm Card terminal bar", "Make a pairing code")) {
             val state by model.state.collectAsState()
-            DevicesContent(state, model)
+            DevicesContent(state, model, startConfirming = "d5")
+        }
+        model.newPairingCode(60); settle()
+        render("admin-devices-confirm-code", 1440, 1100, required = listOf("X7QK-2MPA-9RTL")) {
+            val state by model.state.collectAsState()
+            DevicesContent(state, model, startConfirming = "d5")
+        }
+        render("admin-devices-confirm-scanner", 1440, 1100, required = listOf("Test scan")) {
+            val state by model.state.collectAsState()
+            DevicesContent(state, model, startConfirming = "mock-scan-2")
         }
         model.onDispose()
     }

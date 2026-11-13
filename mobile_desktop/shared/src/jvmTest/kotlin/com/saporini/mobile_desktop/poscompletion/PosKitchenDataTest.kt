@@ -4,7 +4,7 @@ import com.saporini.mobile_desktop.pos.kitchen.*
 import kotlin.test.*
 import kotlin.time.Instant
 
-// The waiter's Kitchen Status: one card per order across stations, in the lane of what to do next.
+// The waiter's Kitchen Status: the kitchen's board with one card per order across stations.
 class PosKitchenDataTest {
     private val now = Instant.parse("2026-09-25T12:00:00Z")
     private fun ticket(id: String = "t", status: String = "FIRED", order: String = "o", station: String = "s", itemStatus: String = status) =
@@ -17,34 +17,27 @@ class PosKitchenDataTest {
             boards = tickets.groupBy { it.stationId }.map { (station, list) -> KdsBoard(station, stationName = station.uppercase(), tickets = list) })
 
     @Test fun waiterNeedsOnlyReadPermission() {
-        assertEquals(1, state(ticket()).kitchenOrders().size)
-        assertTrue(state(ticket(), permissions = emptySet()).kitchenOrders().isEmpty())
-    }
-    @Test fun dishKeepsQuantityVariantModifiersAndNotes() {
-        val dish = state(ticket()).kitchenOrders().single().dishes.single()
-        assertEquals(2, dish.quantity); assertEquals("Pizza", dish.name); assertEquals("Large · 2× Cheese · No olives", dish.detail)
+        assertEquals(1, state(ticket(), permissions = setOf("ORDER_READ")).orderTickets().size)
+        assertTrue(state(ticket(), permissions = emptySet()).orderTickets().isEmpty())
     }
     @Test fun ticketsOfOneOrderFromTwoStationsAreOneCard() {
-        val card = state(ticket("a", "IN_PROGRESS", station = "grill"), ticket("b", "READY", station = "bar")).kitchenOrders().single()
-        assertEquals(KitchenLane.READY, card.lane)
-        assertEquals(listOf("b"), card.readyTicketIds)
-        assertEquals(2, card.readyCount); assertEquals(4, card.totalCount)
-        assertEquals(setOf("GRILL", "BAR"), card.stations.toSet())
+        val card = state(ticket("a", "IN_PROGRESS", station = "grill"), ticket("b", "READY", station = "bar")).orderTickets().single()
+        // One ready dish is enough for Ready to serve.
+        assertEquals("READY", card.status)
+        assertEquals("o", card.id)
+        assertEquals(listOf("READY", "IN_PROGRESS"), card.items.map { it.status })
+        assertEquals(setOf("GRILL", "BAR"), card.stationName.orEmpty().split(", ").toSet())
+        assertEquals("2026-09-25T11:58:00Z", card.readyAt)
     }
-    @Test fun lanesFollowTheFoodState() {
-        val cards = state(ticket("a", "FIRED", order = "1"), ticket("b", "IN_PROGRESS", order = "2")).kitchenOrders().associateBy { it.orderId }
-        assertEquals(KitchenLane.WAITING, cards.getValue("1").lane)
-        assertEquals(KitchenLane.COOKING, cards.getValue("2").lane)
+    @Test fun statusFollowsTheFood() {
+        val cards = state(ticket("a", "FIRED", order = "1"), ticket("b", "IN_PROGRESS", order = "2")).orderTickets().associateBy { it.id }
+        assertEquals("FIRED", cards.getValue("1").status)
+        assertEquals("IN_PROGRESS", cards.getValue("2").status)
     }
     @Test fun finishedTicketsAreLeftOut() {
-        assertTrue(state(ticket(status = "COMPLETED")).kitchenOrders().isEmpty())
+        assertTrue(state(ticket(status = "COMPLETED")).orderTickets().isEmpty())
     }
-    @Test fun heldTicketsAreMarked() {
-        val card = state(ticket("hold", "PENDING").copy(priority = "HOLD_FIRE")).kitchenOrders().single()
-        assertTrue(card.held)
-    }
-    @Test fun searchFindsTableAndDish() {
-        val card = state(ticket()).kitchenOrders().single()
-        assertTrue(card.matches("t5")); assertTrue(card.matches("pizza")); assertFalse(card.matches("pasta"))
+    @Test fun heldTicketsWaitInUpcoming() {
+        assertTrue(state(ticket("hold", "PENDING").copy(priority = "HOLD_FIRE")).orderTickets().isEmpty())
     }
 }

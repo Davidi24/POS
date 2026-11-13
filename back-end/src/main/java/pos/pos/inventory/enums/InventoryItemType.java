@@ -7,5 +7,9 @@ public enum InventoryItemType {
     BEVERAGE,
     ALCOHOL,
     PACKAGING,
-    SUPPLY
+    SUPPLY,
+    // Where items go when their kind is deleted.
+    UNCATEGORIZED,
+    // One of the restaurant's own kinds (InventoryItem.kind).
+    CUSTOM
 }

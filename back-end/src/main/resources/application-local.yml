@@ -76,6 +76,9 @@ app:
     floor-plans:
       provider: local
       local-directory: ${FLOOR_PLAN_UPLOAD_DIRECTORY:uploads/floor-plans}
+    menu-images:
+      # Set MENU_IMAGE_STORAGE_PROVIDER=r2 (with the R2_* variables) to try the real bucket locally.
+      provider: ${MENU_IMAGE_STORAGE_PROVIDER:local}
 
   security:
     cookie:

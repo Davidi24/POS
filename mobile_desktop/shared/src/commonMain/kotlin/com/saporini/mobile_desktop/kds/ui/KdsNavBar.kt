@@ -1,7 +1,5 @@
 package com.saporini.mobile_desktop.kds.ui
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Receipt
@@ -12,17 +10,12 @@ import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.RestaurantMenu
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.dp
-import com.saporini.mobile_desktop.pos.ui.shell.PhoneNavItem
-import com.saporini.mobile_desktop.pos.ui.shell.TopBarNavItem
-import com.saporini.mobile_desktop.pos.ui.shell.WorkspaceBottomBar
-import com.saporini.mobile_desktop.pos.ui.shell.WorkspaceTopBar
-import mobile_desktop.shared.generated.resources.Res
-import mobile_desktop.shared.generated.resources.pos_simple_logo
-import org.jetbrains.compose.resources.painterResource
+import com.saporini.mobile_desktop.pos.ui.shell.NavEntry
+import com.saporini.mobile_desktop.pos.ui.shell.WorkspaceNavBottomBar
+import com.saporini.mobile_desktop.pos.ui.shell.WorkspaceNavTopBar
+
+// The KDS uses the POS bar; its four places all fit, so there's no More.
 
 @Composable
 fun KdsTopBar(
@@ -31,27 +24,8 @@ fun KdsTopBar(
     onLogout: () -> Unit,
     onBackToWorkspaces: (() -> Unit)? = null,
 ) {
-    WorkspaceTopBar(
-        onLogout = onLogout,
-        onBackToWorkspaces = onBackToWorkspaces,
-        logo = {
-            Image(
-                painter = painterResource(Res.drawable.pos_simple_logo),
-                contentDescription = "Saporini",
-                modifier = Modifier.size(82.dp),
-                contentScale = ContentScale.Fit
-            )
-        }
-    ) {
-        KdsSection.entries.forEach { section ->
-            TopBarNavItem(
-                label = section.label,
-                icon = section.icon(),
-                selected = selected == section,
-                onClick = { onSelect(section) }
-            )
-        }
-    }
+    WorkspaceNavTopBar(kdsNavEntries(), fixed = 3, selected = selected, onSelect = onSelect, onLogout = onLogout,
+        onBackToWorkspaces = onBackToWorkspaces)
 }
 
 @Composable
@@ -61,22 +35,10 @@ fun KdsBottomBar(
     onLogout: () -> Unit,
     onBackToWorkspaces: (() -> Unit)? = null,
 ) {
-    WorkspaceBottomBar(
-        moreSelected = false,
-        onLogout = onLogout,
-        onBackToWorkspaces = onBackToWorkspaces
-    ) {
-        KdsSection.entries.forEach { section ->
-            PhoneNavItem(
-                modifier = Modifier.weight(1f),
-                label = section.label,
-                icon = if (selected == section) section.filledIcon() else section.icon(),
-                selected = selected == section,
-                onClick = { onSelect(section) }
-            )
-        }
-    }
+    WorkspaceNavBottomBar(kdsNavEntries(), selected, onSelect, onLogout, onBackToWorkspaces)
 }
+
+private fun kdsNavEntries(): List<NavEntry<KdsSection>> = KdsSection.entries.map { NavEntry(it, it.label, it.icon(), it.filledIcon()) }
 
 private fun KdsSection.icon(): ImageVector = when (this) {
     KdsSection.TICKETS -> Icons.Outlined.Receipt

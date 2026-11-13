@@ -11,6 +11,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.security.core.Authentication;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.repository.MenuRepository;
+import pos.pos.menu.service.SpecialMenuEventLinks;
 import pos.pos.reservation.dto.ReservationOccasionDto;
 import pos.pos.reservation.dto.RestaurantEventDto;
 import pos.pos.reservation.entity.Reservation;
@@ -123,7 +124,7 @@ class OccasionsAndEventsTest {
     // ---- Events ----
 
     private RestaurantEventService events() {
-        return new RestaurantEventService(scope, eventRepository, menuRepository, support);
+        return new RestaurantEventService(scope, eventRepository, menuRepository, support, new SpecialMenuEventLinks(eventRepository, menuRepository));
     }
 
     @Test
@@ -161,5 +162,79 @@ class OccasionsAndEventsTest {
         assertThatThrownBy(() -> events().createEvent(authentication, restaurant.getId(), RestaurantEventDto.builder()
                 .name("Party").icon("🎉").startDate(LocalDate.of(2026, 12, 31)).endDate(LocalDate.of(2026, 12, 30)).build()))
                 .hasMessageContaining("end on or after");
+    }
+
+    @Test
+    @DisplayName("a menu already used by another event can't be picked, and the message names that event")
+    void menuUsedByAnotherEvent() {
+        Menu menu = specialMenu("Valentine's menu");
+        RestaurantEvent valentines = new RestaurantEvent();
+        valentines.setId(UUID.randomUUID());
+        valentines.setName("Valentine's");
+        valentines.setMenuId(menu.getId());
+        when(eventRepository.findFirstByMenuId(menu.getId())).thenReturn(Optional.of(valentines));
+
+        assertThatThrownBy(() -> events().createEvent(authentication, restaurant.getId(), RestaurantEventDto.builder()
+                .name("Carnival").icon("🎭").startDate(LocalDate.of(2027, 3, 1)).endDate(LocalDate.of(2027, 3, 1))
+                .menuId(menu.getId()).build()))
+                .hasMessageContaining("already the menu for Valentine's");
+    }
+
+    @Test
+    @DisplayName("giving an event another menu hides the old one, no longer special and without the event's days")
+    void eventChangesMenu() {
+        Menu oldMenu = specialMenu("Old Valentine's");
+        oldMenu.setActive(true);
+        oldMenu.setAvailableFromDate(LocalDate.of(2027, 2, 14));
+        oldMenu.setAvailableUntilDate(LocalDate.of(2027, 2, 14));
+        Menu newMenu = specialMenu("New Valentine's");
+        when(menuRepository.findAllByRestaurantId(restaurant.getId())).thenReturn(java.util.List.of(oldMenu,newMenu));
+        RestaurantEvent valentines = new RestaurantEvent();
+        valentines.setId(UUID.randomUUID());
+        valentines.setRestaurantId(restaurant.getId());
+        valentines.setMenuId(oldMenu.getId());
+        when(eventRepository.findByIdAndRestaurantId(valentines.getId(), restaurant.getId())).thenReturn(Optional.of(valentines));
+        when(eventRepository.saveAndFlush(any(RestaurantEvent.class))).thenAnswer(call -> call.getArgument(0));
+
+        events().updateEvent(authentication, restaurant.getId(), valentines.getId(), RestaurantEventDto.builder()
+                .name("Valentine's").icon("❤️").startDate(LocalDate.of(2027, 2, 14)).endDate(LocalDate.of(2027, 2, 14))
+                .menuId(newMenu.getId()).build());
+
+        assertThat(valentines.getMenuId()).isEqualTo(newMenu.getId());
+        assertThat(newMenu.isSpecial()).isTrue();
+        assertThat(oldMenu.isSpecial()).isFalse();
+        assertThat(oldMenu.isActive()).isTrue();
+        assertThat(oldMenu.isShownToWaiters()).isFalse();
+        assertThat(oldMenu.getAvailableFromDate()).isNull();
+        assertThat(oldMenu.getAvailableUntilDate()).isNull();
+    }
+
+    @Test
+    @DisplayName("removing an event makes its menu regular and preserves the last visible menu")
+    void eventRemoved() {
+        Menu menu = specialMenu("Valentine's menu");
+        menu.setActive(true);
+        RestaurantEvent valentines = new RestaurantEvent();
+        valentines.setId(UUID.randomUUID());
+        valentines.setMenuId(menu.getId());
+        when(eventRepository.findByIdAndRestaurantId(valentines.getId(), restaurant.getId())).thenReturn(Optional.of(valentines));
+
+        events().deleteEvent(authentication, restaurant.getId(), valentines.getId());
+
+        assertThat(menu.isSpecial()).isFalse();
+        assertThat(menu.isActive()).isTrue();
+        assertThat(menu.isShownToWaiters()).as("last visible menu remains available").isTrue();
+        verify(eventRepository).delete(valentines);
+    }
+
+    private Menu specialMenu(String name) {
+        Menu menu = new Menu();
+        menu.setId(UUID.randomUUID());
+        menu.setName(name);
+        menu.setRestaurant(restaurant);
+        menu.setSpecial(true);
+        when(menuRepository.findByIdAndRestaurantDeletedAtIsNull(menu.getId())).thenReturn(Optional.of(menu));
+        when(menuRepository.findById(menu.getId())).thenReturn(Optional.of(menu));
+        return menu;
     }
 }

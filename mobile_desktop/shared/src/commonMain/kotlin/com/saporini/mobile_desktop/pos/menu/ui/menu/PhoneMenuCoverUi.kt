@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.CormorantGaramond
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.pos.menu.ui.justCreated
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
 import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.brand_logo
@@ -88,6 +89,8 @@ internal fun PhoneMenuBookCover(
     isReordering: Boolean,
     isDragging: Boolean,
     canManageMenus: Boolean,
+    hiddenFromWaiters: Boolean = false,
+    highlighted: Boolean = false,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier
@@ -105,6 +108,7 @@ internal fun PhoneMenuBookCover(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .justCreated(highlighted, shape)
                 .graphicsLayer {
                     scaleX = dragScale
                     scaleY = dragScale
@@ -214,6 +218,21 @@ internal fun PhoneMenuBookCover(
                     )
                 }
             }
+
+            if (!menu.active) {
+                InactiveCoverVeil(compact = true, spineWidth = spineWidth, modifier = Modifier.matchParentSize())
+            } else if (hiddenFromWaiters) {
+                InactiveCoverVeil(compact = true, spineWidth = spineWidth, label = "Hidden from waiters", modifier = Modifier.matchParentSize())
+            }
+        }
+
+        // A special menu's event icon on the top-left corner, like the desktop covers.
+        menu.event?.let { event ->
+            EventIconBadge(
+                event = event,
+                size = 34.dp,
+                modifier = Modifier.align(Alignment.TopStart).offset(x = spineWidth + 6.dp, y = -CoverActionOverhang)
+            )
         }
 
         // Outside the clipped face so the edit button can sit on the top-right corner, a little past the top and

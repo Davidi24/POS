@@ -35,6 +35,8 @@ public class KdsTicketResponse {
     private UUID customerId;
     private String customerName;
     private Integer guestCount;
+    // DINE_IN, TAKEAWAY or DELIVERY: where the food goes (the board's order-type tabs).
+    private String orderType;
     private KdsTicketStatus status;
     private KdsPriority priority;
     private String courseName;

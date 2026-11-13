@@ -32,10 +32,18 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.ktor.clientOkhttp)
+            // Scanning barcodes with the camera: CameraX for the picture, ZXing to read the code.
+            implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.lifecycle)
+            implementation(libs.androidx.camera.view)
+            implementation(libs.zxing.core)
         }
         jvmMain.dependencies {
             implementation(libs.ktor.clientOkhttp)
             implementation(libs.kotlinx.coroutinesSwing)
+            // Scanning barcodes with a webcam: openpnp-capture for the picture, ZXing to read the code.
+            implementation(libs.openpnp.capture)
+            implementation(libs.zxing.core)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
@@ -79,4 +87,9 @@ kotlin {
 
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
+}
+
+// Session/logout tests must never load or erase the developer's saved desktop login.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    systemProperty("user.home", layout.buildDirectory.dir("test-home").get().asFile.absolutePath)
 }

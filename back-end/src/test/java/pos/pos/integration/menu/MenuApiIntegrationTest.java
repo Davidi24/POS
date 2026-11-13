@@ -9,6 +9,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -67,6 +68,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -103,6 +105,7 @@ class MenuApiIntegrationTest {
         registry.add("TRUSTED_PROXIES", () -> "127.0.0.1,::1");
         registry.add("COOKIE_DOMAIN", () -> "pos.example");
         registry.add("SPRINGDOC_API_DOCS_ENABLED", () -> "true");
+        registry.add("app.storage.menu-images.provider", () -> "disabled");
         registry.add("BOOTSTRAP_SUPER_ADMIN_ENABLED", () -> "true");
         registry.add("BOOTSTRAP_SUPER_ADMIN_EMAIL", () -> ADMIN_EMAIL);
         registry.add("BOOTSTRAP_SUPER_ADMIN_USERNAME", () -> ADMIN_USERNAME);
@@ -227,6 +230,26 @@ class MenuApiIntegrationTest {
         String token = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "PROTECT-FALLBACK");
         mockMvc.perform(delete("/menus/{menuId}/sections/{sectionId}", menu.getId(), fallback.getId())
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))).andExpect(status().isConflict());
+    }
+
+    @Test
+    void rejectsTruncatedPngThroughMenuPhotoUploadApi() throws Exception {
+        User admin = adminUser();
+        Restaurant restaurant = createRestaurant("invalid-photo", admin.getId());
+        Menu menu = createMenu(restaurant, "dinner", "Dinner", true, 0, admin.getId());
+        MenuSection section = createSection(menu, "Mains", null, true, 0);
+        MenuItem item = createItem(section, "BURGER", "Burger", new BigDecimal("12.00"), true, 0);
+        String token = accessTokenFor(ADMIN_USERNAME, ADMIN_PASSWORD, "INVALID-MENU-IMAGE");
+        MockMultipartFile truncatedPng = new MockMultipartFile("file", "dish.png", "image/png",
+                new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a});
+
+        mockMvc.perform(multipart("/menus/{menuId}/sections/{sectionId}/items/{itemId}/image",
+                        menu.getId(), section.getId(), item.getId())
+                        .file(truncatedPng)
+                        .with(request -> { request.setMethod("PUT"); return request; })
+                        .header(HttpHeaders.AUTHORIZATION, bearer(token)))
+                .andExpect(status().isUnsupportedMediaType());
+        assertThat(menuItemRepository.findById(item.getId()).orElseThrow().getImageUrl()).isNull();
     }
 
     @Test

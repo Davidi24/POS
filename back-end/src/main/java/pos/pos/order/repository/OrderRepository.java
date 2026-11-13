@@ -88,6 +88,47 @@ public interface OrderRepository extends JpaRepository<Order, UUID>, org.springf
 
     boolean existsByRestaurant_IdAndOrderNumber(UUID restaurantId, String orderNumber);
 
+    // How much of each order has been served, by dish count, leaving out what was cancelled.
+    @org.springframework.data.jpa.repository.Query("""
+            select l.order.id as orderId,
+                   sum(l.quantity) as total,
+                   sum(case when l.status = pos.pos.order.enums.OrderLineItemStatus.FULFILLED then l.quantity else 0 end) as served
+            from OrderLineItem l
+            where l.order.id in :orderIds
+              and l.status not in (pos.pos.order.enums.OrderLineItemStatus.CANCELLED, pos.pos.order.enums.OrderLineItemStatus.VOIDED)
+            group by l.order.id
+            """)
+    List<OrderServedCount> countServed(Collection<UUID> orderIds);
+
+    /** When each of these tables last had an order closed and fully paid: table id, closed at. */
+    @org.springframework.data.jpa.repository.Query("""
+            select o.restaurantTable.id, max(o.closedAt) from Order o
+            where o.restaurantTable.id in :tableIds and o.status = pos.pos.order.enums.OrderStatus.CLOSED
+              and o.paymentStatus = pos.pos.order.enums.OrderPaymentStatus.PAID
+            group by o.restaurantTable.id
+            """)
+    List<Object[]> lastPaidCloseByTable(Collection<UUID> tableIds);
+
+    /** When the dishes of each of these orders last changed: order id, time. */
+    @org.springframework.data.jpa.repository.Query("""
+            select l.order.id, max(l.updatedAt) from OrderLineItem l where l.order.id in :orderIds group by l.order.id
+            """)
+    List<Object[]> lastLineChange(Collection<UUID> orderIds);
+
+    /** Orders reopened only to take their payment. */
+    @org.springframework.data.jpa.repository.Query("""
+            select o.id from Order o where o.status = pos.pos.order.enums.OrderStatus.OPEN and o.unpaidAt is not null
+            """)
+    List<UUID> findIdsOpenForPaymentOnly();
+
+    interface OrderServedCount {
+        UUID getOrderId();
+
+        Long getTotal();
+
+        Long getServed();
+    }
+
     @EntityGraph(attributePaths = {"customer", "restaurantTable"})
     Optional<Order> findTopByRestaurantTable_IdAndStatusInOrderByOpenedAtDesc(UUID tableId, Collection<OrderStatus> statuses);
 

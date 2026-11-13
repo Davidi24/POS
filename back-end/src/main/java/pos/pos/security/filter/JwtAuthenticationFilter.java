@@ -33,11 +33,14 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private final pos.pos.restaurant.repository.RestaurantRepository restaurantRepository;
+    private final pos.pos.restaurant.repository.BranchRepository branchRepository;
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final UserRoleRepository userRoleRepository;
@@ -48,6 +51,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final AntPathMatcher matcher = new AntPathMatcher();
 
+    public static final String ACTING_RESTAURANT_HEADER = "X-Restaurant-Id";
+    public static final String ACTING_BRANCH_HEADER = "X-Branch-Id";
+    private static final Set<String> PLATFORM_ROLES = Set.of("SUPER_ADMIN", "CO_SUPER_ADMIN");
+
     @Autowired
     public JwtAuthenticationFilter(
             JwtService jwtService,
@@ -56,8 +63,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             RoleRepository roleRepository,
             PermissionRepository permissionRepository,
             UserSessionRepository userSessionRepository,
-            AuthCookieProperties authCookieProperties
+            AuthCookieProperties authCookieProperties,
+            pos.pos.restaurant.repository.RestaurantRepository restaurantRepository,
+            pos.pos.restaurant.repository.BranchRepository branchRepository
     ) {
+        this.restaurantRepository = restaurantRepository;
+        this.branchRepository = branchRepository;
         this.jwtService = jwtService;
         this.userRepository = userRepository;
         this.userRoleRepository = userRoleRepository;
@@ -113,7 +124,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         User user = userRepository.findActiveById(userId).orElse(null);
 
-        if (user == null) {
+        // Staff of a restaurant that was suspended, closed or removed lose access at once (their refresh is refused too).
+        if (user == null || userRepository.worksAtClosedRestaurant(userId)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -140,9 +152,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .map(code -> new SimpleGrantedAuthority("ROLE_" + code))
                 .toList();
 
-        List<SimpleGrantedAuthority> permissionAuthorities = activeRoleIds.isEmpty()
-                ? List.of()
-                : permissionRepository.findCodesByRoleIds(activeRoleIds)
+        // Their roles as their restaurant has them, less what's switched off for them (the Super Admin's ticks per
+        // Co-Super-Admin, an owner's per-person changes), plus what's given to them alone.
+        List<SimpleGrantedAuthority> permissionAuthorities = pos.pos.role.service.EffectivePermissions
+                .forUser(permissionRepository, userId, user.getRestaurantId(), activeRoleIds)
                 .stream()
                 .map(SimpleGrantedAuthority::new)
                 .toList();
@@ -153,9 +166,41 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         SecurityContextHolder.clearContext();
 
+        // The Super Admin and Co-Super-Admins act in the restaurant (and branch) they entered in the app, sent with
+        // every request. Everyone else always acts in their own restaurant; the headers mean nothing for them.
+        boolean platformAdmin = activeRoles.stream()
+                .map(Role::getCode)
+                .anyMatch(code -> PLATFORM_ROLES.contains(code));
+        UUID actingRestaurant = null;
+        UUID actingBranch = null;
+        if (platformAdmin) {
+            try {
+                actingRestaurant = headerId(request, ACTING_RESTAURANT_HEADER);
+                actingBranch = headerId(request, ACTING_BRANCH_HEADER);
+            } catch (IllegalArgumentException invalid) {
+                contextError(response, 400, "Invalid restaurant or branch selection");
+                return;
+            }
+            var selectedRestaurant = actingRestaurant == null ? null : restaurantRepository.findByIdAndDeletedAtIsNull(actingRestaurant).orElse(null);
+            var selectedBranch = actingBranch == null || actingRestaurant == null ? null
+                    : branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(actingBranch, actingRestaurant).orElse(null);
+            boolean canSelect = permissionAuthorities.stream().anyMatch(a -> a.getAuthority().equals("RESTAURANTS_READ"));
+            if ((actingRestaurant != null && (!canSelect || selectedRestaurant == null))
+                    || (actingBranch != null && (selectedBranch == null || !selectedBranch.isActive()
+                        || selectedBranch.getStatus() != pos.pos.restaurant.enums.BranchStatus.ACTIVE
+                        || selectedRestaurant == null || !selectedRestaurant.isActive()
+                        || selectedRestaurant.getStatus() != pos.pos.restaurant.enums.RestaurantStatus.ACTIVE))) {
+                contextError(response, 403, "The selected restaurant or branch is no longer available. Choose another selection.");
+                return;
+            }
+        }
+        AuthenticatedUser principal = platformAdmin
+                ? AuthenticatedUser.actingFor(user, actingRestaurant, actingBranch)
+                : AuthenticatedUser.from(user);
+
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(
-                        AuthenticatedUser.from(user),
+                        principal,
                         null,
                         authorities
                 );
@@ -186,5 +231,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = header.substring(7).trim();
         return StringUtils.hasText(token) ? token : null;
+    }
+
+    private void contextError(HttpServletResponse response, int status, String message) throws IOException {
+        response.setStatus(status);
+        response.setHeader("X-POS-Context-Invalid", "true");
+        response.setContentType("application/json");
+        response.getWriter().write("{\"message\":\"" + message + "\"}");
+    }
+
+    private UUID headerId(HttpServletRequest request, String header) {
+        String value = request.getHeader(header);
+        return StringUtils.hasText(value) ? UUID.fromString(value.trim()) : null;
     }
 }

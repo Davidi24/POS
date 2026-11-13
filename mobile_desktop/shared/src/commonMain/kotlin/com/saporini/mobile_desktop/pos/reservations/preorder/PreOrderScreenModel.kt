@@ -87,7 +87,8 @@ class PreOrderScreenModel(
                 mutable.value = PreOrderState(
                     restaurantId = user?.takeIf { it.isActive }?.restaurantId,
                     branchId = user?.defaultBranchId,
-                    canRead = "ORDER_READ" in permissions,
+                    // The KDS's Upcoming reads pre-orders with KDS_READ.
+                    canRead = "ORDER_READ" in permissions || "KDS_READ" in permissions,
                     canPlace = "ORDER_CREATE" in permissions,
                     canCancel = "ORDER_CANCEL" in permissions,
                     canSend = "ORDER_UPDATE" in permissions,

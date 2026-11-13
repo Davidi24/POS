@@ -78,6 +78,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.admin.inventory.RecipeDto
+import com.saporini.mobile_desktop.pos.menu.data.dto.DishIngredientRequestDto
+import com.saporini.mobile_desktop.pos.menu.data.dto.DishRecipeDto
+import com.saporini.mobile_desktop.pos.menu.data.dto.IngredientChoiceDto
 import com.saporini.mobile_desktop.pos.menu.ui.MenuCategory
 import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
 import com.saporini.mobile_desktop.pos.menu.ui.menu.DialogActionStatus
@@ -89,10 +92,11 @@ import com.saporini.mobile_desktop.pos.menu.ui.menu.isPhoneMenuWindow
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.name
+import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.launch
 import kotlin.math.round
 import mobile_desktop.shared.generated.resources.Res
-import mobile_desktop.shared.generated.resources.auth_login_img
+import org.jetbrains.compose.resources.decodeToImageBitmap
 import org.jetbrains.compose.resources.painterResource
 
 private val ItemEditorOlive = Color(0xFF4F7942)
@@ -142,6 +146,8 @@ data class EditableMenuItem(
     val sku: String?,
     val description: String?,
     val imageFileName: String?,
+    // The dish's stored photo, shown in the editor until it's changed or removed.
+    val imageUrl: String? = null,
     val available: Boolean,
     val sendToKitchen: Boolean = true,
     val showOnline: Boolean = false,
@@ -157,47 +163,11 @@ internal data class OnlinePlacement(
     val sectionName: String? = null
 )
 
-private data class MockIngredient(
-    val id: String,
-    val name: String,
-    val defaultUnit: String,
-    val category: String
-)
-
-private data class SelectedIngredientRow(
-    val id: String,
-    val name: String,
-    val quantity: String,
-    val unit: String
-)
-
 private data class OptionChoiceInput(
     val name: String,
     val priceDelta: String,
     val inventoryRecipeId: String? = null,
     val inventoryRecipeQuantity: String = ""
-)
-
-private val MockIngredients = listOf(
-    MockIngredient("tomato", "Tomato", "g", "Produce"),
-    MockIngredient("basil", "Fresh Basil", "g", "Produce"),
-    MockIngredient("mozzarella", "Mozzarella", "g", "Dairy"),
-    MockIngredient("olive_oil", "Olive Oil", "ml", "Pantry"),
-    MockIngredient("garlic", "Garlic", "g", "Produce"),
-    MockIngredient("flour", "00 Flour", "g", "Pantry"),
-    MockIngredient("parmesan", "Parmesan", "g", "Dairy"),
-    MockIngredient("black_pepper", "Black Pepper", "g", "Spices"),
-    MockIngredient("salt", "Salt", "g", "Spices"),
-    MockIngredient("chicken_breast", "Chicken Breast", "g", "Meat"),
-    MockIngredient("ground_beef", "Ground Beef", "g", "Meat"),
-    MockIngredient("onion", "Onion", "g", "Produce"),
-    MockIngredient("butter", "Butter", "g", "Dairy"),
-    MockIngredient("heavy_cream", "Heavy Cream", "ml", "Dairy"),
-    MockIngredient("sugar", "Sugar", "g", "Pantry")
-)
-
-private val IngredientCategories = listOf(
-    "All", "Produce", "Dairy", "Meat", "Pantry", "Spices"
 )
 
 // A setting with a short explanation that follows the switch, e.g. "Send to kitchen".
@@ -448,6 +418,9 @@ internal fun ItemEditorDialog(
     onSuccessSettled: () -> Unit = {},
     // Loads the online menu's sections for the "Show in online menu" chooser.
     loadOnlineSections: suspend () -> Result<List<OnlineMenuSection>> = { Result.success(emptyList()) },
+    // The stock items and preparations dishes can be made with, and (for a saved dish) its amounts from stock.
+    loadIngredientChoices: suspend () -> Result<List<IngredientChoiceDto>> = { Result.success(emptyList()) },
+    loadDishRecipe: (suspend () -> Result<DishRecipeDto>)? = null,
     onDismiss: () -> Unit,
     onDeleteItem: (() -> Unit)? = null,
     onSave: (
@@ -455,12 +428,14 @@ internal fun ItemEditorDialog(
         priceLabel: String,
         sku: String?,
         description: String?,
-        imageFileName: String?,
+        photo: PhotoChange,
         available: Boolean,
         sendToKitchen: Boolean,
         online: OnlinePlacement,
         ingredients: List<DraftIngredient>,
-        sectionId: String?
+        sectionId: String?,
+        // The dish's ingredients from stock to save as its recipe; null leaves the recipe as it is.
+        stock: List<DishIngredientRequestDto>?
     ) -> Unit,
     // Items in a special menu (occasion extras): shown only when not null, reported just before onSave.
     extras: ItemExtras? = null,
@@ -485,16 +460,44 @@ internal fun ItemEditorDialog(
     var onlineChooserOpen by remember { mutableStateOf(false) }
     // The dish's own section here, which the online chooser offers as the default section name.
     val staffSectionName = movableSections.firstOrNull { it.id == selectedSectionId }?.name ?: sectionName
-    var selectedImageName by remember { mutableStateOf(existingItem?.imageFileName) }
-    var ingredientSearchOpen by remember { mutableStateOf(false) }
-    var pendingIngredient by remember { mutableStateOf<MockIngredient?>(null) }
+    // The photo: kept, replaced by a picked file, or removed. Checked here (type, size, really a picture) so a bad
+    // file is caught before anything is saved.
+    var photoChange by remember { mutableStateOf<PhotoChange>(PhotoChange.Keep) }
+    var photoError by remember { mutableStateOf<String?>(null) }
+    val pickedPhoto = photoChange as? PhotoChange.Replace
+    val pickedBitmap = remember(pickedPhoto) { pickedPhoto?.bytes?.let { runCatching { it.decodeToImageBitmap() }.getOrNull() } }
+    val keptPhotoUrl = existingItem?.imageUrl.takeIf { photoChange == PhotoChange.Keep }
+    val hasPhoto = pickedPhoto != null || keptPhotoUrl != null
+    val photoLabel = pickedPhoto?.fileName ?: if (keptPhotoUrl != null) "Current photo" else "No photo"
+    // The ingredients: names guests see, with the amounts from stock (the dish's recipe) put on the ones that have them.
     var selectedIngredients by remember {
-        mutableStateOf(
-            existingItem?.ingredients?.map { draft ->
-                val matchedId = MockIngredients.firstOrNull { it.name.equals(draft.name, ignoreCase = true) }?.id
-                    ?: draft.name.lowercase().replace(" ", "_")
-                SelectedIngredientRow(id = matchedId, name = draft.name, quantity = draft.quantity, unit = draft.unit)
-            } ?: emptyList<SelectedIngredientRow>()
+        mutableStateOf(existingItem?.ingredients.orEmpty().map { IngredientRow(name = it.name) })
+    }
+    var recipeLoad by remember { mutableStateOf(if (loadDishRecipe == null) DishRecipeLoad.None else DishRecipeLoad.Loading) }
+    // What the server had, so an unchanged recipe isn't saved again.
+    var loadedStock by remember { mutableStateOf<List<DishIngredientRequestDto>?>(null) }
+    var ingredientChoices by remember { mutableStateOf<List<IngredientChoiceDto>?>(null) }
+    var ingredientChoicesError by remember { mutableStateOf<String?>(null) }
+    var choicesAttempt by remember { mutableStateOf(0) }
+    var ingredientSearchOpen by remember { mutableStateOf(false) }
+    // Choosing the amount of a newly picked ingredient, or changing one already listed.
+    var amountFor by remember { mutableStateOf<Pair<IngredientChoiceDto, IngredientRow?>?>(null) }
+    LaunchedEffect(choicesAttempt) {
+        ingredientChoicesError = null
+        loadIngredientChoices().fold(
+            onSuccess = { ingredientChoices = it },
+            onFailure = { ingredientChoicesError = it.message ?: "the server didn't answer" }
+        )
+    }
+    LaunchedEffect(Unit) {
+        val load = loadDishRecipe ?: return@LaunchedEffect
+        load().fold(
+            onSuccess = { recipe ->
+                selectedIngredients = mergeRecipe(selectedIngredients, recipe)
+                loadedStock = stockRequest(selectedIngredients)
+                recipeLoad = DishRecipeLoad.Loaded
+            },
+            onFailure = { recipeLoad = DishRecipeLoad.Failed(it.message ?: "the server didn't answer") }
         )
     }
 
@@ -506,13 +509,29 @@ internal fun ItemEditorDialog(
     val imagePicker = rememberFilePickerLauncher(type = FileKitType.Image) { file ->
         if (file != null) {
             scope.launch {
-                selectedImageName = file.name
+                val contentType = photoContentType(file.name)
+                if (contentType == null) {
+                    photoError = "Use a PNG, JPEG or WebP photo."
+                    return@launch
+                }
+                val bytes = runCatching { file.readBytes() }.getOrNull()
+                photoError = when {
+                    bytes == null -> "This photo couldn't be read. Try another one."
+                    bytes.size > MaxPhotoBytes -> "This photo is too big. Use one under 5 MB."
+                    runCatching { bytes.decodeToImageBitmap() }.isFailure -> "This file can't be opened as a photo."
+                    else -> null
+                }
+                if (photoError == null && bytes != null) {
+                    photoChange = PhotoChange.Replace(bytes, file.name, contentType)
+                }
             }
         }
     }
 
-    LaunchedEffect(selectedIngredients.size) {
-        if (selectedIngredients.isNotEmpty()) {
+    // After adding an ingredient, show the end of the form where it landed (not when the dish's amounts load).
+    var ingredientsAdded by remember { mutableStateOf(0) }
+    LaunchedEffect(ingredientsAdded) {
+        if (ingredientsAdded > 0) {
             formScrollState.animateScrollTo(formScrollState.maxValue)
         }
     }
@@ -530,7 +549,7 @@ internal fun ItemEditorDialog(
                 formatItemPrice(basePrice),
                 sku.trim().takeIf { it.isNotEmpty() },
                 description.trim().takeIf { it.isNotEmpty() },
-                selectedImageName,
+                photoChange,
                 available,
                 sendToKitchen,
                 OnlinePlacement(
@@ -538,8 +557,14 @@ internal fun ItemEditorDialog(
                     sectionId = onlineSectionId.takeIf { showOnline },
                     sectionName = onlineSectionName.takeIf { showOnline }
                 ),
-                selectedIngredients.map { DraftIngredient(it.name, it.quantity, it.unit) },
-                if (isEditing && selectedSectionId != currentSectionId) selectedSectionId else null
+                selectedIngredients.map { DraftIngredient(it.name.trim(), it.quantity, it.unit) },
+                if (isEditing && selectedSectionId != currentSectionId) selectedSectionId else null,
+                // Only once the dish's own amounts are known (a new dish has none), and only when they changed.
+                when (recipeLoad) {
+                    DishRecipeLoad.None -> stockRequest(selectedIngredients).takeIf { it.isNotEmpty() }
+                    DishRecipeLoad.Loaded -> stockRequest(selectedIngredients).takeIf { it != loadedStock }
+                    else -> null
+                }
             )
         },
         saveLabel = if (isEditing) "Save Changes" else "Add Item",
@@ -795,282 +820,135 @@ internal fun ItemEditorDialog(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (selectedImageName != null) {
-                Image(
-                    painter = painterResource(Res.drawable.auth_login_img),
-                    contentDescription = "Current item photo",
-                    modifier = Modifier
-                        .size(width = 64.dp, height = 52.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(Modifier.width(12.dp))
-            }
-            Row(
+            // The photo itself: the picked file, the stored photo, or the "no photo" tile.
+            Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(ItemEditorSurface)
-                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
-                    .clickable { imagePicker.launch() }
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(width = 76.dp, height = 60.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(8.dp))
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.FileUpload,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = ItemEditorOlive
-                )
-                Text(
-                    text = if (selectedImageName != null) "Change Image" else "Import Image",
-                    fontFamily = Inter(),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp,
-                    color = ItemEditorOlive
-                )
+                val picked = pickedBitmap
+                if (picked != null) {
+                    Image(picked, "New item photo", Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else {
+                    MenuPhoto(url = keptPhotoUrl, contentDescription = "Current item photo", modifier = Modifier.fillMaxSize(), iconSize = 22.dp)
+                }
             }
-            if (!isPhone) {
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = selectedImageName ?: "No image selected",
-                    fontFamily = Inter(),
-                    fontSize = 12.sp,
-                    color = if (selectedImageName != null) ItemEditorInk else ItemEditorMuted,
-                    maxLines = 1
-                )
-            }
-        }
-
-        if (isPhone) {
-            Text(
-                text = selectedImageName ?: "No image selected",
-                modifier = Modifier.fillMaxWidth(),
-                fontFamily = Inter(),
-                fontSize = 12.sp,
-                color = ItemEditorMuted,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        ItemEditorFieldLabel(text = "Recipe / Ingredients")
-
-        if (selectedIngredients.isNotEmpty()) {
-            Column(
-                modifier = Modifier.padding(bottom = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                selectedIngredients.forEach { ingredient ->
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
                             .clip(RoundedCornerShape(9.dp))
                             .background(ItemEditorSurface)
                             .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
+                            .clickable { imagePicker.launch() }
                             .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Image(
-                            painter = painterResource(Res.drawable.auth_login_img),
-                            contentDescription = ingredient.name,
-                            modifier = Modifier
-                                .size(width = 44.dp, height = 36.dp)
-                                .clip(RoundedCornerShape(6.dp)),
-                            contentScale = ContentScale.Crop
+                        Icon(
+                            imageVector = Icons.Outlined.FileUpload,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = ItemEditorOlive
                         )
-                        Spacer(Modifier.width(10.dp))
                         Text(
-                            text = ingredient.name,
-                            modifier = Modifier.weight(1f),
+                            text = if (hasPhoto) "Change photo" else "Add photo",
                             fontFamily = Inter(),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 13.sp,
-                            color = ItemEditorInk
+                            color = ItemEditorOlive
                         )
-                        Text(
-                            text = "${ingredient.quantity} ${ingredient.unit}".trim(),
-                            fontFamily = Inter(),
-                            fontSize = 12.sp,
-                            color = ItemEditorMuted
-                        )
-                        Spacer(Modifier.width(10.dp))
-                        IconButton(
-                            onClick = {
-                                selectedIngredients = selectedIngredients.filterNot { it.id == ingredient.id }
-                            },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Close,
-                                contentDescription = "Remove ingredient",
-                                modifier = Modifier.size(15.dp),
-                                tint = ItemEditorMuted
-                            )
-                        }
                     }
+                    if (hasPhoto) {
+                        Text(
+                            text = "Remove",
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(9.dp))
+                                .clickable {
+                                    photoError = null
+                                    photoChange = if (existingItem?.imageUrl != null) PhotoChange.Remove else PhotoChange.Keep
+                                }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            fontFamily = Inter(),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = Color(0xFFB13A2F)
+                        )
+                    }
+                }
+                Text(
+                    text = photoError ?: (photoLabel + if (pickedPhoto != null) " · uploads when you save" else ""),
+                    fontFamily = Inter(),
+                    fontSize = 12.sp,
+                    color = if (photoError != null) Color(0xFFB13A2F) else ItemEditorMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (photoError == null && !hasPhoto) {
+                    Text(
+                        text = "PNG, JPEG or WebP, up to 5 MB.",
+                        fontFamily = Inter(),
+                        fontSize = 11.sp,
+                        color = ItemEditorMuted
+                    )
                 }
             }
         }
 
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(9.dp))
-                .background(ItemEditorSurface)
-                .border(1.dp, ItemEditorBorder, RoundedCornerShape(9.dp))
-                .clickable { ingredientSearchOpen = true }
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Add,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = ItemEditorOlive
-            )
-            Text(
-                text = "Add Ingredient",
-                fontFamily = Inter(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
-                color = ItemEditorOlive
-            )
-        }
+        ItemEditorFieldLabel(text = "Recipe / Ingredients")
+        DishIngredientsSection(
+            rows = selectedIngredients,
+            load = recipeLoad,
+            choices = ingredientChoices,
+            price = basePrice.trim().toDoubleOrNull(),
+            onAdd = { ingredientSearchOpen = true },
+            onEdit = { row ->
+                val choice = ingredientChoices?.firstOrNull { it.key == row.key }
+                    ?: IngredientChoiceDto(row.kind.orEmpty(), row.refId.orEmpty(), row.name, baseUnit = row.unit,
+                        units = listOf(com.saporini.mobile_desktop.pos.menu.data.dto.UnitCostDto(row.unit)))
+                amountFor = choice to row
+            },
+            onRemove = { row -> selectedIngredients = selectedIngredients.filterNot { it.key == row.key } }
+        )
     }
 
     if (ingredientSearchOpen) {
-        IngredientCommandPalette(
-            alreadySelectedIds = selectedIngredients.map { it.id }.toSet(),
+        IngredientPickerDialog(
+            choices = ingredientChoices,
+            choicesError = ingredientChoicesError,
+            // Amounts from stock that couldn't be loaded can't be changed; names still can.
+            stockAllowed = recipeLoad !is DishRecipeLoad.Failed && recipeLoad != DishRecipeLoad.Loading,
+            alreadyAdded = selectedIngredients.map { it.key }.toSet(),
+            onRetry = { choicesAttempt++ },
             onDismiss = { ingredientSearchOpen = false },
-            onSelect = { suggestion ->
+            onPick = { choice ->
                 ingredientSearchOpen = false
-                pendingIngredient = suggestion
+                amountFor = choice to null
+            },
+            onPickName = { typed ->
+                ingredientSearchOpen = false
+                selectedIngredients = selectedIngredients + IngredientRow(name = typed)
+                ingredientsAdded++
             }
         )
     }
 
-    pendingIngredient?.let { ingredient ->
-        var popupQuantity by remember(ingredient) { mutableStateOf("") }
-        // Locked to the ingredient's inventory unit — there's no unit-conversion logic
-        // anywhere in the app, so letting a recipe use a different unit than the one
-        // Inventory tracks stock in would silently break stock deduction, cost-per-dish,
-        // and low-stock alerts. If unit conversion gets built later, this can reopen.
-        val popupUnit = ingredient.defaultUnit
-
-        MenuNestedDialog(
-            onDismissRequest = { pendingIngredient = null },
-            containerColor = Color.White,
-            titleContentColor = ItemEditorInk,
-            textContentColor = ItemEditorMuted,
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(Res.drawable.auth_login_img),
-                        contentDescription = ingredient.name,
-                        modifier = Modifier
-                            .size(width = 44.dp, height = 36.dp)
-                            .clip(RoundedCornerShape(6.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = ingredient.name,
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        color = ItemEditorInk
-                    )
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Enter the quantity used in this recipe.",
-                        fontFamily = Inter(),
-                        fontSize = 13.sp,
-                        color = ItemEditorMuted
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            ItemEditorFieldLabel(text = "Quantity", required = true)
-                            OutlinedTextField(
-                                value = popupQuantity,
-                                onValueChange = { popupQuantity = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Qty") },
-                                singleLine = true,
-                                shape = RoundedCornerShape(8.dp),
-                                colors = itemEditorOutlinedTextFieldColors()
-                            )
-                        }
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            ItemEditorFieldLabel(text = "Unit", required = true)
-                            // Read-only — set by this ingredient's Inventory unit, not
-                            // editable here (see note above).
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(ItemEditorSurface)
-                                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = popupUnit,
-                                    modifier = Modifier.weight(1f),
-                                    fontFamily = Inter(),
-                                    fontSize = 14.sp,
-                                    color = ItemEditorMuted
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        selectedIngredients = selectedIngredients + SelectedIngredientRow(
-                            id = ingredient.id,
-                            name = ingredient.name,
-                            quantity = popupQuantity,
-                            unit = popupUnit
-                        )
-                        pendingIngredient = null
-                    },
-                    enabled = popupQuantity.isNotBlank(),
-                    shape = RoundedCornerShape(percent = 50),
-                    colors = ButtonDefaults.buttonColors(containerColor = ItemEditorOlive)
-                ) {
-                    Text(
-                        text = "Add",
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingIngredient = null }) {
-                    Text(
-                        text = "Cancel",
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.SemiBold,
-                        color = ItemEditorMuted
-                    )
-                }
+    amountFor?.let { (choice, row) ->
+        IngredientAmountDialog(
+            name = choice.name,
+            units = choice.units.ifEmpty { listOf(com.saporini.mobile_desktop.pos.menu.data.dto.UnitCostDto(choice.baseUnit)) },
+            startQuantity = row?.quantity.orEmpty(),
+            startUnit = row?.unit?.takeIf { it.isNotBlank() } ?: preferredUnit(choice),
+            saveText = if (row == null) "Add" else "Save",
+            onDismiss = { amountFor = null },
+            onSave = { quantity, unit ->
+                val next = IngredientRow(choice.name, choice.kind, choice.id, quantity, unit)
+                selectedIngredients = if (row == null) selectedIngredients + next
+                    else selectedIngredients.map { if (it.key == row.key) next else it }
+                if (row == null) ingredientsAdded++
+                amountFor = null
             }
         )
     }
@@ -1942,7 +1820,7 @@ private fun OptionGroupEditorDialog(
         validChoices.isEmpty() -> "Add at least one choice."
         duplicateChoice -> "Choice names in the same group must be unique."
         !choicesValid -> "Use valid price adjustments, for example +2.00 or -1.50."
-        !recipeQuantitiesValid -> "Enter a positive recipe quantity for every linked modifier."
+        !recipeQuantitiesValid -> "Enter a positive amount for every option that uses a preparation."
         else -> null
     }
 
@@ -2272,8 +2150,8 @@ private fun OptionChoiceEditorRow(
                     Text(
                         text = when {
                             selectedRecipe != null -> "Uses ${selectedRecipe.name}"
-                            choice.inventoryRecipeId != null -> "Linked recipe unavailable · select or clear"
-                            else -> "No inventory recipe"
+                            choice.inventoryRecipeId != null -> "Linked preparation unavailable · select or clear"
+                            else -> "No preparation"
                         },
                         fontFamily = Inter(),
                         color = ItemEditorOlive
@@ -2281,7 +2159,7 @@ private fun OptionChoiceEditorRow(
                 }
                 DropdownMenu(expanded = recipeMenuOpen, onDismissRequest = { recipeMenuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text("No inventory recipe") },
+                        text = { Text("No preparation") },
                         onClick = { recipeMenuOpen = false; onInventoryRecipeChange(null) }
                     )
                     inventoryRecipes.forEach { recipe ->
@@ -2292,7 +2170,7 @@ private fun OptionChoiceEditorRow(
                     }
                     if (inventoryRecipes.isEmpty()) {
                         DropdownMenuItem(
-                            text = { Text("No active prep recipes available") },
+                            text = { Text("No active preparations (Admin Hub → Inventory → Preparations)") },
                             enabled = false,
                             onClick = { recipeMenuOpen = false }
                         )
@@ -2311,210 +2189,6 @@ private fun OptionChoiceEditorRow(
                     shape = RoundedCornerShape(8.dp),
                     colors = itemEditorOutlinedTextFieldColors()
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun IngredientCommandPalette(
-    alreadySelectedIds: Set<String>,
-    onDismiss: () -> Unit,
-    onSelect: (MockIngredient) -> Unit
-) {
-    val isPhone = isPhoneMenuWindow()
-    var query by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("All") }
-    val focusRequester = remember { FocusRequester() }
-    val results = remember(query, alreadySelectedIds, selectedCategory) {
-        val available = MockIngredients.filter { it.id !in alreadySelectedIds }
-        val inCategory = if (selectedCategory == "All") {
-            available
-        } else {
-            available.filter { it.category == selectedCategory }
-        }
-        if (query.isBlank()) {
-            inCategory
-        } else {
-            inCategory.filter { it.name.contains(query, ignoreCase = true) }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false
-        )
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.34f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                )
-                .then(if (isPhone) Modifier.safeDrawingPadding().imePadding() else Modifier)
-                .padding(if (isPhone) 16.dp else 24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .width(minOf(maxWidth, 560.dp))
-                    .heightIn(max = if (isPhone) minOf(480.dp, maxHeight * 0.9f) else 480.dp)
-                    .shadow(24.dp, RoundedCornerShape(14.dp))
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color.White)
-                    .border(1.dp, ItemEditorBorder, RoundedCornerShape(14.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { }
-                    )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = ItemEditorMuted
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    BasicTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .focusRequester(focusRequester)
-                            .padding(vertical = 14.dp),
-                        singleLine = true,
-                        textStyle = TextStyle(
-                            fontFamily = Inter(),
-                            fontSize = 15.sp,
-                            color = ItemEditorInk
-                        ),
-                        cursorBrush = SolidColor(ItemEditorInk),
-                        decorationBox = { innerTextField ->
-                            if (query.isEmpty()) {
-                                Text(
-                                    text = "Search inventory ingredients",
-                                    fontFamily = Inter(),
-                                    fontSize = 15.sp,
-                                    color = ItemEditorPlaceholder
-                                )
-                            }
-                            innerTextField()
-                        }
-                    )
-                }
-
-                HorizontalDivider(color = ItemEditorBorder)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    IngredientCategories.forEach { category ->
-                        val isSelected = category == selectedCategory
-                        Text(
-                            text = category,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(if (isSelected) ItemEditorOlive else ItemEditorSurface)
-                                .border(
-                                    1.dp,
-                                    if (isSelected) ItemEditorOlive else ItemEditorBorder,
-                                    RoundedCornerShape(50)
-                                )
-                                .clickable { selectedCategory = category }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            fontFamily = Inter(),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp,
-                            color = if (isSelected) Color.White else ItemEditorInk
-                        )
-                    }
-                }
-
-                HorizontalDivider(color = ItemEditorBorder)
-
-                if (results.isEmpty()) {
-                    Text(
-                        text = "Ingredient not found? Manage ingredients in Inventory →",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = { })
-                            .padding(horizontal = 16.dp, vertical = 20.dp),
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
-                        color = ItemEditorOlive
-                    )
-                } else {
-                    Text(
-                        text = "INGREDIENTS",
-                        modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp),
-                        fontFamily = Inter(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        color = ItemEditorMuted
-                    )
-                    Column(
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        results.forEach { ingredient ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { onSelect(ingredient) }
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Image(
-                                    painter = painterResource(Res.drawable.auth_login_img),
-                                    contentDescription = ingredient.name,
-                                    modifier = Modifier
-                                        .size(width = 44.dp, height = 36.dp)
-                                        .clip(RoundedCornerShape(6.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                                Spacer(Modifier.width(10.dp))
-                                Text(
-                                    text = ingredient.name,
-                                    modifier = Modifier.weight(1f),
-                                    fontFamily = Inter(),
-                                    fontSize = 14.sp,
-                                    color = ItemEditorInk
-                                )
-                                Text(
-                                    text = ingredient.defaultUnit,
-                                    fontFamily = Inter(),
-                                    fontSize = 12.sp,
-                                    color = ItemEditorMuted
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
     }

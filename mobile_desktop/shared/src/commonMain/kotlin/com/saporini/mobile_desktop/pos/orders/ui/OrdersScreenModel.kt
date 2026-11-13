@@ -47,7 +47,7 @@ class OrdersScreenModel(
                 _state.value = OrdersUiState(scope = h.scope, permissions = if(h.canRead) setOf("ORDER_READ") else emptySet(),
                     orders = h.items, selectedOrderId = h.selectedId, selectedOrder = h.detail,
                     filter = OrderListFilter(mode = OrderListMode.HISTORY, from = h.filter.from?.toString(), to = h.filter.to?.toString(),
-                        status = h.filter.status, customerId = h.filter.customerId),
+                        status = h.filter.status, customerId = h.filter.customerId, unpaidOnly = h.filter.unpaidOnly),
                     searchQuery = h.filter.search, isLoading = h.loading, isLoadingDetails = h.detailLoading,
                     error = (h.error ?: h.detailError)?.let { OrderFailure(OrderErrorKind.CONNECTION, it) },
                     historyTotal = h.totalElements, historyLoadedPages = h.loadedPages,
@@ -115,10 +115,26 @@ class OrdersScreenModel(
         }
     }
 
+    fun hasPermission(permission: String): Boolean = permission in sessionManager.currentUser.value?.permissions.orEmpty()
+
+    // Orders are reopened only from History (user, 2026-11-01). History's own list follows by itself once refreshed.
+    suspend fun reopenForPaymentFromHistory(orderId: String): Result<com.saporini.mobile_desktop.pos.orders.domain.model.Order> =
+        reopening { scope -> repository.reopenForPayment(scope.restaurantId, orderId) }
+
+    suspend fun reopenFromHistory(orderId: String): Result<com.saporini.mobile_desktop.pos.orders.domain.model.Order> =
+        reopening { scope -> repository.reopenOrder(restaurantId = scope.restaurantId, orderId = orderId) }
+
+    private suspend fun reopening(
+        call: suspend (OrdersScope) -> com.saporini.mobile_desktop.pos.orders.domain.model.Order
+    ): Result<com.saporini.mobile_desktop.pos.orders.domain.model.Order> {
+        val scope = _state.value.scope ?: return Result.failure(IllegalStateException("Sign in again"))
+        return runCatching { call(scope) }.onSuccess { refreshNow() }
+    }
+
     fun setFilter(filter: OrderListFilter) {
         if (historyOnly) {
             history!!.setFilter(history.state.value.filter.copy(from = filter.from?.let { kotlin.time.Instant.parse(it) },
-                to = filter.to?.let { kotlin.time.Instant.parse(it) }, status = filter.status, customerId = filter.customerId)); return
+                to = filter.to?.let { kotlin.time.Instant.parse(it) }, status = filter.status, customerId = filter.customerId, unpaidOnly = filter.unpaidOnly)); return
         }
         searchJob?.cancel()
         listRevision++

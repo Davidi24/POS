@@ -113,6 +113,10 @@ public class Shift extends AbstractAuditedEntity {
     @Column(nullable = false)
     private long version;
 
+    // The ShiftPlan that made this shift, if any.
+    @Column(name = "plan_id", columnDefinition = "uuid")
+    private java.util.UUID planId;
+
     @Column(name = "scheduled_start", columnDefinition = "timestamptz")
     private OffsetDateTime scheduledStart;
 

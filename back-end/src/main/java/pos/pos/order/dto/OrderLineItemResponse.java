@@ -23,6 +23,8 @@ public class OrderLineItemResponse {
     private UUID menuItemId;
     private UUID variantId;
     private String itemNameSnapshot;
+    // The dish's photo from the menu, as it is now.
+    private String imageUrl;
     private String variantNameSnapshot;
     private String skuSnapshot;
     private Integer quantity;

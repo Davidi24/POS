@@ -19,7 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.outlined.DragIndicator
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.CircularProgressIndicator
@@ -152,6 +152,7 @@ internal fun OnlineMenuContent(
             itemCategory = { it.category },
             itemPrice = { it.price },
             itemAvailable = { it.available },
+            itemImageUrl = { it.imageUrl },
             onSuggestionClick = { item ->
                 searchQuery = item.name
                 selectedCategory = item.category
@@ -169,7 +170,7 @@ internal fun OnlineMenuContent(
         ) {
             if (isPhone) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to menus", tint = Ink) }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.Reply, "Back to menus", tint = Ink) }
                     Icon(Icons.Outlined.Public, null, Modifier.padding(end = 2.dp), tint = Olive)
                     Text("Online menu", Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Ink, maxLines = 1)
                 }
@@ -185,7 +186,7 @@ internal fun OnlineMenuContent(
                 )
             } else {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to menus", tint = Ink) }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.Reply, "Back to menus", tint = Ink) }
                     Icon(Icons.Outlined.Public, null, Modifier.padding(end = 2.dp), tint = Olive)
                     Text("Online menu", Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Ink, maxLines = 1)
                     Text("Website preview", fontFamily = Inter(), fontSize = 12.sp, color = Muted)
@@ -248,6 +249,7 @@ internal fun OnlineMenuContent(
                                         MenuItemCard(
                                             name = item.name,
                                             description = item.description,
+                                            imageUrl = item.imageUrl,
                                             ingredients = item.ingredients.map { it.name },
                                             price = item.price,
                                             category = item.category,
@@ -390,6 +392,7 @@ private fun OnlineMenuDish.toUi(section: OnlineMenuSectionView): MenuItem {
         sendToKitchen = sendToKitchen,
         showOnline = true,
         sku = sku,
+        imageUrl = imageUrl,
         ingredients = ingredients.map { DraftIngredient(it, "", "") },
         id = id,
         sectionId = section.id,

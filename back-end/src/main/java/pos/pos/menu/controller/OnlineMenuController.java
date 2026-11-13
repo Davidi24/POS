@@ -38,14 +38,14 @@ public class OnlineMenuController {
     private final OnlineMenuService onlineMenuService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "Preview the online menu as customers see it today, including dishes hidden right now")
     public ResponseEntity<OnlineMenuResponse> getPreview(@PathVariable UUID restaurantId, Authentication authentication) {
         return ResponseEntity.ok(onlineMenuService.getPreview(authentication, restaurantId));
     }
 
     @GetMapping("/sections")
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "List the online menu's sections")
     public ResponseEntity<List<OnlineMenuSectionResponse>> getSections(@PathVariable UUID restaurantId, Authentication authentication) {
         return ResponseEntity.ok(onlineMenuService.getSections(authentication, restaurantId));

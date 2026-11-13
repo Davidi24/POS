@@ -29,7 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Check
@@ -178,7 +178,7 @@ object CreatePinScreen : Screen {
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.Reply,
                         contentDescription = "Back",
                         tint = Color.Black
                     )
@@ -385,7 +385,7 @@ private fun CircleIcon(
 }
 
 @Composable
-private fun AnimatedSuccessCheck(successGreen: Color) {
+internal fun AnimatedSuccessCheck(successGreen: Color) {
     var startDrawing by remember { mutableStateOf(false) }
     var checkVisible by remember { mutableStateOf(false) }
 

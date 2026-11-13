@@ -26,9 +26,11 @@ public interface BranchContactRepository extends JpaRepository<BranchContact, UU
             WHERE c.branch.id = :branchId
               AND c.isPrimary = true
               AND c.deletedAt IS NULL
+              AND (:keepId IS NULL OR c.id <> :keepId)
             """)
     void clearAllPrimary(
             @Param("branchId") UUID branchId,
-            @Param("actorId") UUID actorId
+            @Param("actorId") UUID actorId,
+            @Param("keepId") UUID keepId
     );
 }

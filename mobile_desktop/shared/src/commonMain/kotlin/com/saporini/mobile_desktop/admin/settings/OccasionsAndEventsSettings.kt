@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -20,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -103,23 +106,43 @@ private fun OccasionsEditor(restaurantId: String, canEdit: Boolean) {
     }
 
     Card("Occasions", "Staff pick one when booking (🎂 Birthday…) with its options; it shows on the booking, the table and the kitchen ticket.") {
-        drafts.forEachIndexed { index, draft ->
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallField(draft.icon, "🎂", Modifier.width(52.dp), canEdit) { value -> drafts = drafts.toMutableList().also { it[index] = draft.copy(icon = value.take(8)) } }
-                SmallField(draft.name, "Name", Modifier.width(150.dp), canEdit) { value -> drafts = drafts.toMutableList().also { it[index] = draft.copy(name = value.take(80)) } }
-                SmallField(draft.options, "Options, separated by commas", Modifier.weight(1f), canEdit) { value ->
-                    drafts = drafts.toMutableList().also { it[index] = draft.copy(options = value.take(800)) }
-                }
-                Switch(
-                    checked = draft.active, enabled = canEdit,
-                    onCheckedChange = { value -> drafts = drafts.toMutableList().also { it[index] = draft.copy(active = value) } },
-                    colors = SwitchDefaults.colors(checkedTrackColor = Green, checkedThumbColor = Color.White)
-                )
-                if (canEdit) {
-                    Icon(
-                        Icons.Outlined.DeleteOutline, "Remove ${draft.name}",
-                        Modifier.size(20.dp).clickable { drafts = drafts.toMutableList().also { it.removeAt(index) } }, tint = Muted
-                    )
+        // A line per occasion; on a phone its options go on a second line, under the icon and the name.
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val narrow = maxWidth < 460.dp
+            Column(verticalArrangement = Arrangement.spacedBy(if (narrow) 14.dp else 10.dp)) {
+                drafts.forEachIndexed { index, draft ->
+                    val update = { changed: OccasionDraft -> drafts = drafts.toMutableList().also { it[index] = changed } }
+                    val icon: @Composable (Modifier) -> Unit = { m -> SmallField(draft.icon, "🎂", m, canEdit) { value -> update(draft.copy(icon = value.take(8))) } }
+                    val name: @Composable (Modifier) -> Unit = { m -> SmallField(draft.name, "Name", m, canEdit) { value -> update(draft.copy(name = value.take(80))) } }
+                    val options: @Composable (Modifier) -> Unit = { m ->
+                        SmallField(draft.options, "Options, separated by commas", m, canEdit) { value -> update(draft.copy(options = value.take(800))) }
+                    }
+                    val onAndRemove: @Composable () -> Unit = {
+                        Switch(
+                            checked = draft.active, enabled = canEdit,
+                            onCheckedChange = { value -> update(draft.copy(active = value)) },
+                            colors = SwitchDefaults.colors(checkedTrackColor = Green, checkedThumbColor = Color.White)
+                        )
+                        if (canEdit) {
+                            Icon(
+                                Icons.Outlined.DeleteOutline, "Remove ${draft.name}",
+                                Modifier.size(20.dp).clickable { drafts = drafts.toMutableList().also { it.removeAt(index) } }, tint = Muted
+                            )
+                        }
+                    }
+                    if (narrow) Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            icon(Modifier.width(52.dp))
+                            name(Modifier.weight(1f))
+                            onAndRemove()
+                        }
+                        options(Modifier.fillMaxWidth())
+                    } else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        icon(Modifier.width(52.dp))
+                        name(Modifier.width(150.dp))
+                        options(Modifier.weight(1f))
+                        onAndRemove()
+                    }
                 }
             }
         }
@@ -225,7 +248,9 @@ private fun EventsEditor(restaurantId: String, canEdit: Boolean) {
     }
 
     editing?.let { event ->
-        EventDialog(event, menuChoices, onDismiss = { editing = null }) { draft ->
+        // One menu per event: menus other events already use can't be picked here.
+        val usedByOthers = events.filter { it.id != event.id && it.menuId != null }.associate { it.menuId!! to it.name }
+        EventDialog(event, menuChoices, usedByOthers, onDismiss = { editing = null }) { draft ->
             coroutines.launch {
                 try {
                     api.saveEvent(restaurantId, draft.toDto())
@@ -244,7 +269,12 @@ private fun EventsEditor(restaurantId: String, canEdit: Boolean) {
         AlertDialog(
             onDismissRequest = { deleting = null },
             title = { Text("Remove ${event.name}?", fontFamily = Inter(), fontWeight = FontWeight.Bold) },
-            text = { Text("Bookings stay as they are. Its menu stays in Menu.", fontFamily = Inter()) },
+            text = {
+                Text(
+                    "Bookings stay as they are." + (event.menuName?.let { " Its menu \"$it\" stays in Menu, hidden in POS and no longer special." } ?: ""),
+                    fontFamily = Inter()
+                )
+            },
             confirmButton = {
                 TextButton(onClick = {
                     val id = event.id
@@ -263,8 +293,17 @@ private fun EventsEditor(restaurantId: String, canEdit: Boolean) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun EventDialog(event: RestaurantEvent, menus: List<Pair<String, String>>, onDismiss: () -> Unit, onSave: (RestaurantEvent) -> Unit) {
+private fun EventDialog(
+    event: RestaurantEvent,
+    menus: List<Pair<String, String>>,
+    usedByOthers: Map<String, String>,
+    onDismiss: () -> Unit,
+    onSave: (RestaurantEvent) -> Unit
+) {
     var draft by remember(event) { mutableStateOf(event) }
+    // What the till shows that evening is a deliberate choice: nothing picked for a new event.
+    var onlyEventMenu by remember(event) { mutableStateOf(if (event.id == null) null else event.specialMenuOnly) }
+    var triedSave by remember(event) { mutableStateOf(false) }
     val start = runCatching { LocalDate.parse(draft.startDate) }.getOrNull()
     val end = runCatching { LocalDate.parse(draft.endDate.ifBlank { draft.startDate }) }.getOrNull()
     val problem = when {
@@ -273,6 +312,7 @@ private fun EventDialog(event: RestaurantEvent, menus: List<Pair<String, String>
         start == null -> "Write the first day as 2027-02-14."
         end == null -> "Write the last day as 2027-02-14."
         end < start -> "The last day can't be before the first."
+        draft.menuId != null && onlyEventMenu == null -> "Choose what the till shows that evening."
         else -> null
     }
     AlertDialog(
@@ -292,26 +332,39 @@ private fun EventDialog(event: RestaurantEvent, menus: List<Pair<String, String>
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     (listOf<Pair<String?, String>>(null to "None") + menus).forEach { (id, name) ->
                         val picked = draft.menuId == id
+                        val usedFor = id?.let { usedByOthers[it] }
                         Text(
-                            name,
+                            if (usedFor == null) name else "$name · $usedFor",
                             Modifier.clip(RoundedCornerShape(8.dp)).background(if (picked) Color(0xFFEEF3EB) else Color.White)
                                 .border(1.dp, if (picked) Green else Border, RoundedCornerShape(8.dp))
-                                .clickable { draft = draft.copy(menuId = id, menuName = name.takeIf { id != null }) }
+                                .clickable(enabled = usedFor == null) { draft = draft.copy(menuId = id, menuName = name.takeIf { id != null }) }
                                 .padding(horizontal = 10.dp, vertical = 7.dp),
                             fontFamily = Inter(), fontWeight = if (picked) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp,
-                            color = if (picked) Green else Ink
+                            color = when {
+                                picked -> Green
+                                usedFor != null -> Muted.copy(alpha = 0.6f)
+                                else -> Ink
+                            }
                         )
                     }
                 }
+                if (usedByOthers.isNotEmpty()) {
+                    Text("A menu belongs to one event; greyed-out menus are already used by the event shown.", fontFamily = Inter(), fontSize = 11.sp, color = Muted)
+                }
+                val letGoOf = event.menuName?.takeIf { event.menuId != null && event.menuId != draft.menuId }
+                if (letGoOf != null) {
+                    Text(
+                        "\"$letGoOf\" will be hidden in POS and stop being a special menu.",
+                        fontFamily = Inter(), fontSize = 11.sp, color = Danger
+                    )
+                }
                 if (draft.menuId != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Only the special menu that evening", Modifier.weight(1f), fontFamily = Inter(), fontSize = 13.sp, color = Ink)
-                        Switch(
-                            checked = draft.specialMenuOnly, onCheckedChange = { draft = draft.copy(specialMenuOnly = it) },
-                            colors = SwitchDefaults.colors(checkedTrackColor = Green, checkedThumbColor = Color.White)
-                        )
-                    }
-                    Text("The menu shows only on the event's days.", fontFamily = Inter(), fontSize = 11.sp, color = Muted)
+                    com.saporini.mobile_desktop.pos.menu.ui.menu.TillMenuChoice(
+                        onlyEventMenu = onlyEventMenu,
+                        onChange = { onlyEventMenu = it },
+                        isError = triedSave && onlyEventMenu == null
+                    )
+                    Text("The event's menu shows only on the event's days.", fontFamily = Inter(), fontSize = 11.sp, color = Muted)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("On", Modifier.weight(1f), fontFamily = Inter(), fontSize = 13.sp, color = Ink)
@@ -320,13 +373,26 @@ private fun EventDialog(event: RestaurantEvent, menus: List<Pair<String, String>
                         colors = SwitchDefaults.colors(checkedTrackColor = Green, checkedThumbColor = Color.White)
                     )
                 }
-                problem?.let { Text(it, fontFamily = Inter(), fontSize = 12.sp, color = Danger) }
+                // The till choice shows its own message.
+                problem?.takeIf { !(draft.menuId != null && onlyEventMenu == null) }?.let { Text(it, fontFamily = Inter(), fontSize = 12.sp, color = Danger) }
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                if (problem == null) onSave(draft.copy(name = draft.name.trim(), icon = draft.icon.trim(), endDate = draft.endDate.ifBlank { draft.startDate }))
-            }) { Text("Save", fontFamily = Inter(), fontWeight = FontWeight.Bold, color = if (problem == null) Green else Muted) }
+            Button(
+                onClick = {
+                    triedSave = true
+                    if (problem == null) {
+                        onSave(
+                            draft.copy(
+                                name = draft.name.trim(), icon = draft.icon.trim(), endDate = draft.endDate.ifBlank { draft.startDate },
+                                specialMenuOnly = draft.menuId != null && onlyEventMenu == true
+                            )
+                        )
+                    }
+                },
+                shape = RoundedCornerShape(percent = 50),
+                colors = ButtonDefaults.buttonColors(containerColor = if (problem == null) Green else Green.copy(alpha = 0.45f))
+            ) { Text("Save", fontFamily = Inter(), fontWeight = FontWeight.Bold, color = Color.White) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Back", fontFamily = Inter(), color = Muted) } },
         containerColor = Color.White

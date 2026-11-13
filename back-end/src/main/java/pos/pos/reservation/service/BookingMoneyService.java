@@ -109,6 +109,9 @@ public class BookingMoneyService {
                 || !item.getSection().getMenu().isSpecial() || !item.isAvailable()) {
             throw bad("Pick an extra from a special menu");
         }
+        if (menuItemRepository.isEventMenu(item.getSection().getMenu().getId())) {
+            throw bad(item.getName() + " is on an event night's menu, so it can't be added as an extra");
+        }
         String codes = item.getOccasionCodes();
         if (codes != null && !codes.isBlank()) {
             List<String> offeredFor = Arrays.stream(codes.split(",")).map(String::trim).toList();

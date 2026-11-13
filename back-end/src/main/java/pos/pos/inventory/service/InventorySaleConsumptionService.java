@@ -55,7 +55,7 @@ public class InventorySaleConsumptionService {
             throw new AuthException("A branch is required to consume sale inventory", HttpStatus.CONFLICT);
         }
 
-        Recipe recipe = recipeRepository.findByRestaurant_IdAndMenuItem_IdAndStatus(
+        Recipe recipe = recipeRepository.findFirstByRestaurant_IdAndMenuItem_IdAndStatusOrderByVersionDesc(
                 order.getRestaurant().getId(), lineItem.getMenuItem().getId(), RecipeStatus.ACTIVE
         ).orElse(null);
         Map<UUID, RequiredItem> requiredItems = new HashMap<>();

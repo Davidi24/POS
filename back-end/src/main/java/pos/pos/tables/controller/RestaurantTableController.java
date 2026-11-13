@@ -288,6 +288,22 @@ public class RestaurantTableController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{tableId}/unmerge-tables")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
+    @Operation(summary = "Take some tables out of a merged group; they become free and one table keeps the guests and order")
+    public ResponseEntity<TableResponse> unmergeTables(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            @PathVariable UUID tableId,
+            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody pos.pos.tables.dto.UnmergeTablesRequest request,
+            Authentication authentication
+    ) {
+        TableResponse response = restaurantTableService.unmergeTables(authentication, restaurantId, branchId, tableId,
+                request.getFreeTableIds(), request.getKeepTableId());
+        layoutChangeNotifier.notifyBranchChanged(restaurantId, branchId);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/{tableId}/unmerge")
     @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
     @Operation(summary = "Unmerge a child table or all child tables from a primary table")

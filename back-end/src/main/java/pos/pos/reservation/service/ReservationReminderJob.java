@@ -62,11 +62,19 @@ public class ReservationReminderJob {
     @Transactional
     public void sendReminders(OffsetDateTime now) {
         guestReminders(now);
+        secondGuestReminders(now);
         callReminders(now);
         dayBeforeReminders(now);
+        reviewAlerts(now);
     }
 
     // The guest's "See you soon? [Confirm] [Cancel]" email, the reminder time (24 h) before, once.
+    private boolean alreadyReminded(Reservation booking,ReservationEventType type){
+        return booking.getScheduleChangedAt()==null
+            ? reservationEventRepository.existsByReservation_IdAndType(booking.getId(),type)
+            : reservationEventRepository.existsByReservation_IdAndTypeAndCreatedAtGreaterThanEqual(booking.getId(),type,booking.getScheduleChangedAt());
+    }
+
     private void guestReminders(OffsetDateTime now) {
         if (reservationMailService == null) {
             return;
@@ -77,10 +85,50 @@ public class ReservationReminderJob {
             }
             int hours = reservationPolicy.values(booking.getRestaurant()).guestReminderHours();
             if (now.isBefore(booking.getReservationStart().minusHours(hours))
-                    || reservationEventRepository.existsByReservation_IdAndType(booking.getId(), ReservationEventType.GUEST_REMINDED)) {
+                    || alreadyReminded(booking,ReservationEventType.GUEST_REMINDED)) {
                 continue;
             }
             reservationMailService.reminder(booking);
+        }
+    }
+
+    // No answer to the first email: asked again the second reminder time (6 h) before, once. Only when the first
+    // went out before that, so a booking made late doesn't get two emails in a row.
+    private void secondGuestReminders(OffsetDateTime now) {
+        if (reservationMailService == null) {
+            return;
+        }
+        for (Reservation booking : reservationRepository.findAwaitingAttendance(ReservationStatus.CONFIRMED, now, now.plusDays(3))) {
+            if (booking.getContactEmail() == null || booking.getContactEmail().isBlank()) {
+                continue;
+            }
+            int hours = reservationPolicy.values(booking.getRestaurant()).guestSecondReminderHours();
+            OffsetDateTime askAgainAt = booking.getReservationStart().minusHours(hours);
+            if (hours <= 0 || now.isBefore(askAgainAt)
+                    || !alreadyReminded(booking, ReservationEventType.GUEST_REMINDED)
+                    || !reservationEventRepository.existsByReservation_IdAndTypeAndCreatedAtBefore(booking.getId(), ReservationEventType.GUEST_REMINDED, askAgainAt)
+                    || alreadyReminded(booking, ReservationEventType.GUEST_REMINDED_AGAIN)) {
+                continue;
+            }
+            reservationMailService.reminderAgain(booking);
+        }
+    }
+
+    // Visits staff must look at (checked in and never seated after their time, still open from an earlier day):
+    // the chosen roles are told once per booking (user, 2026-11-02).
+    private void reviewAlerts(OffsetDateTime now) {
+        for (Reservation booking : reservationRepository.findAllByStatusInAndReservationStartBetween(
+                EnumSet.of(ReservationStatus.CHECKED_IN, ReservationStatus.SEATED), now.minusDays(2), now)) {
+            String reason = reservationSupport.reviewReason(booking, now);
+            if (reason == null || alreadyReminded(booking, ReservationEventType.REVIEW_NOTIFIED)) {
+                continue;
+            }
+            reservationNotifications.needsReview(booking, reason);
+            ReservationEvent event = new ReservationEvent();
+            event.setReservation(booking);
+            event.setType(ReservationEventType.REVIEW_NOTIFIED);
+            event.setDetail("Told: " + reason);
+            reservationEventRepository.save(event);
         }
     }
 
@@ -88,7 +136,7 @@ public class ReservationReminderJob {
         for (Reservation booking : reservationRepository.findAwaitingAttendance(ReservationStatus.CONFIRMED, now, now.plusDays(1))) {
             int callBefore = reservationPolicy.values(booking.getRestaurant()).attendanceCallMinutes();
             if (Duration.between(now, booking.getReservationStart()).toMinutes() > callBefore
-                    || reservationEventRepository.existsByReservation_IdAndType(booking.getId(), ReservationEventType.CALL_REMINDED)) {
+                    || alreadyReminded(booking,ReservationEventType.CALL_REMINDED)) {
                 continue;
             }
             reservationNotifications.callGuest(booking);

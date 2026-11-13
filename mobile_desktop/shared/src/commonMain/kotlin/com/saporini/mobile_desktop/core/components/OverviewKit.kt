@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
@@ -42,7 +43,7 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
 // The Reservations overview look, shared by the POS screens built after it (Kitchen Status, My shift, My Sales) and
-// Admin Hub → Hours & pay: white cards with a thin green-grey border, a coloured strip on summary cards, bold titles.
+// Admin Hub → Salary: white cards with a thin green-grey border, a coloured strip on summary cards, bold titles.
 internal object Kit {
     val Border = Color(0xFFE3E8E1)
     val RowBorder = Color(0xFFE8ECE6)
@@ -81,29 +82,34 @@ internal fun OverviewStatCard(
         shape = RoundedCornerShape(10.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border), shadowElevation = 1.dp
     ) {
         BoxWithConstraints {
-            // Narrow cards (two per row on a phone) skip the picture so the numbers keep their room.
-            val showPicture = maxWidth >= 200.dp
-            Row(Modifier.height(82.dp)) {
-                Box(Modifier.width(5.dp).fillMaxHeight().background(accent))
-                Row(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (showPicture && image != null) {
-                        Image(painterResource(image), null, Modifier.size(52.dp).scale(imageScale), contentScale = ContentScale.Fit)
-                        Spacer(Modifier.width(11.dp))
-                    } else if (showPicture && icon != null) {
-                        Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-                            Icon(icon, null, Modifier.size(24.dp), tint = accent)
+            // Narrow cards (two per row on a phone) keep their picture, just smaller, with smaller text.
+            val narrow = maxWidth < 200.dp
+            Row(Modifier.height(if (narrow) 78.dp else 82.dp)) {
+                Box(Modifier.width(if (narrow) 4.dp else 5.dp).fillMaxHeight().background(accent))
+                Row(Modifier.weight(1f).fillMaxHeight().padding(horizontal = if (narrow) 9.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (image != null) {
+                        Image(painterResource(image), null, Modifier.size(if (narrow) 30.dp else 52.dp).scale(imageScale), contentScale = ContentScale.Fit)
+                        Spacer(Modifier.width(if (narrow) 7.dp else 11.dp))
+                    } else if (icon != null) {
+                        Box(Modifier.size(if (narrow) 28.dp else 44.dp).clip(RoundedCornerShape(if (narrow) 8.dp else 12.dp)).background(accent.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center) {
+                            Icon(icon, null, Modifier.size(if (narrow) 16.dp else 24.dp), tint = accent)
                         }
-                        Spacer(Modifier.width(11.dp))
+                        Spacer(Modifier.width(if (narrow) 7.dp else 11.dp))
                     }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (narrow) 1.dp else 2.dp)) {
+                        Text(title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = if (narrow) 11.sp else 12.sp, color = Kit.Muted, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
                         Row(verticalAlignment = Alignment.Bottom) {
-                            Text(value, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = valueColor, maxLines = 1)
+                            Text(value, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (narrow) 16.sp else 20.sp, color = valueColor, maxLines = 1)
                             suffix?.let {
-                                Text(" $it", Modifier.padding(bottom = 2.dp), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(" $it", Modifier.padding(bottom = if (narrow) 1.dp else 2.dp), fontFamily = Inter(), fontWeight = FontWeight.Medium,
+                                    fontSize = if (narrow) 10.sp else 12.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
-                        Text(detail, fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // Narrow cards give the detail two lines instead of cutting it off.
+                        Text(detail, fontFamily = Inter(), fontSize = if (narrow) 10.sp else 11.sp, lineHeight = if (narrow) 12.sp else 14.sp, color = Kit.Muted,
+                            maxLines = if (narrow && progress == null) 2 else 1, overflow = TextOverflow.Ellipsis)
                         progress?.let { fraction ->
                             Box(Modifier.padding(top = 2.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(50)).background(accent.copy(alpha = 0.14f))) {
                                 Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(3.dp).clip(RoundedCornerShape(50)).background(accent))
@@ -127,21 +133,40 @@ internal fun OverviewPanel(
     titleColor: Color = Kit.Ink,
     iconTint: Color = titleColor,
     action: (@Composable () -> Unit)? = null,
+    // 0 for a list that should scroll right to the panel's bottom edge (give the list its own bottom padding instead).
+    bottomPadding: Dp = 12.dp,
+    // Just the content, without the box and the title row: for a phone, where the page itself already says what the list is.
+    flat: Boolean = false,
+    // The count right after the title instead of at the right edge (Inventory → Items, where a button sits on the right).
+    countBesideTitle: Boolean = false,
+    // Room between the panel's rows (filters, the list); a phone page may want more.
+    gap: Dp = 8.dp,
+    // false: no title row (the page above already says what the list is), so the list gets the room.
+    showTitle: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    if (flat) {
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(gap), content = content)
+        return
+    }
     Surface(modifier, shape = RoundedCornerShape(12.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = bottomPadding), verticalArrangement = Arrangement.spacedBy(gap)) {
+            if (showTitle) Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, null, Modifier.size(18.dp), tint = iconTint)
                 Spacer(Modifier.width(8.dp))
                 Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = titleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                titleExtra?.let {
+                if (countBesideTitle) count?.let {
                     Spacer(Modifier.width(8.dp))
-                    Text(it, Modifier.weight(1f, fill = false), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    CountPill(it)
                 }
-                Spacer(Modifier.weight(1f))
+                // The extra text takes all the free room itself, so the action and count stay at the right edge (a second
+                // weighted spacer would split the room and leave the count in the middle).
+                if (titleExtra != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(titleExtra, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                } else Spacer(Modifier.weight(1f))
                 action?.invoke()
-                count?.let {
+                if (!countBesideTitle) count?.let {
                     Spacer(Modifier.width(6.dp))
                     CountPill(it)
                 }

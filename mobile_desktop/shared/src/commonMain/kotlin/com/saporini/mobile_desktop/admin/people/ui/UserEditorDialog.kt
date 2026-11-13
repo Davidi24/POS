@@ -18,6 +18,17 @@ import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.saporini.mobile_desktop.core.components.SettingsSwitch
+import com.saporini.mobile_desktop.core.components.SettingsRow
+import com.saporini.mobile_desktop.core.components.SettingsCard
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.automirrored.outlined.Login
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -32,16 +43,12 @@ import com.saporini.mobile_desktop.admin.people.StaffScreenModel
 import com.saporini.mobile_desktop.admin.people.StaffState
 import com.saporini.mobile_desktop.core.components.AppDialog
 import com.saporini.mobile_desktop.core.components.ButtonStyle
-import com.saporini.mobile_desktop.core.components.CheckRow
-import com.saporini.mobile_desktop.core.components.CheckState
-import com.saporini.mobile_desktop.core.components.FieldBlock
 import com.saporini.mobile_desktop.core.components.FieldPair
 import com.saporini.mobile_desktop.core.components.Kit
 import com.saporini.mobile_desktop.core.components.KitButton
 import com.saporini.mobile_desktop.core.components.MessageBar
 import com.saporini.mobile_desktop.core.components.MessageKind
 import com.saporini.mobile_desktop.core.components.TextInput
-import com.saporini.mobile_desktop.core.components.ToggleRow
 import com.saporini.mobile_desktop.core.theme.Inter
 
 /** Adding a person (email, username, temporary password) or editing one (name, phone, on/off, roles). */
@@ -90,27 +97,37 @@ internal fun UserEditorDialog(state: StaffState, model: StaffScreenModel) {
         )
         TextInput(draft.phone, { v -> model.edit { it.copy(phone = v) } }, label = "Phone", optional = true, icon = Icons.Outlined.Phone,
             placeholder = "+39 333 123 4567", problem = problems[StaffField.PHONE], maxLength = MAX_PHONE, keyboardType = KeyboardType.Phone)
-        if (!draft.isNew) {
-            ToggleRow("Can sign in", draft.active, { v -> model.edit { it.copy(active = v) } },
-                detail = "Switch off someone who left or is away for a long time. You can switch them on again later.")
-        }
-        FieldBlock("Roles", required = true, problem = problems[StaffField.ROLES],
-            hint = "What they can do comes from their roles. You can only give roles below your own.") {
-            Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(1.dp, Kit.Border, RoundedCornerShape(10.dp))
-                    .background(Kit.Canvas).padding(6.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                when {
-                    loadingRoles -> Text("Loading their roles…", Modifier.padding(8.dp), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
-                    state.assignableRoles.isEmpty() -> Text("No roles you can give. Ask an owner to give you permission to manage roles.",
-                        Modifier.padding(8.dp), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
-                    else -> state.assignableRoles.forEach { role ->
-                        CheckRow(role.label(), if (role.id in draft.roleIds) CheckState.ON else CheckState.OFF, { model.toggleRole(role.id) },
-                            detail = role.description?.takeIf { it.isNotBlank() })
+        // What they may do, set like the Settings pages: signing in, then a switch for each role you can give.
+        SettingsCard("Access", note = "What they can do comes from their roles. You can give roles below your own.", icon = Icons.Outlined.Key) {
+            Spacer(Modifier.height(6.dp))
+            if (!draft.isNew) {
+                SettingsRow("Can sign in", "Switch off someone who left or is away for a long time. You can switch them on again later.", divider = false,
+                    onClick = { model.edit { it.copy(active = !it.active) } },
+                    leading = {
+                        Box(Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(Kit.Green.copy(alpha = 0.12f)), Alignment.Center) {
+                            Icon(Icons.AutoMirrored.Outlined.Login, null, Modifier.size(17.dp), tint = Kit.Green)
+                        }
+                    }) {
+                    SettingsSwitch(draft.active, { v -> model.edit { it.copy(active = v) } })
+                }
+            }
+            when {
+                loadingRoles -> Text("Loading their roles…", Modifier.padding(vertical = 10.dp), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
+                state.assignableRoles.isEmpty() -> Text("No roles you can give. Ask an owner to give you permission to manage roles.",
+                    Modifier.padding(vertical = 10.dp), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
+                else -> state.assignableRoles.forEachIndexed { index, role ->
+                    SettingsRow(role.label(), role.description?.takeIf { it.isNotBlank() }, divider = index > 0 || !draft.isNew,
+                        onClick = { model.toggleRole(role.id) },
+                        leading = {
+                            Box(Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(Kit.Blue.copy(alpha = 0.12f)), Alignment.Center) {
+                                Icon(Icons.Outlined.AdminPanelSettings, null, Modifier.size(17.dp), tint = Kit.Blue)
+                            }
+                        }) {
+                        SettingsSwitch(role.id in draft.roleIds, { model.toggleRole(role.id) })
                     }
                 }
             }
+            problems[StaffField.ROLES]?.let { Text(it, Modifier.padding(top = 4.dp), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Danger) }
         }
     }
 }

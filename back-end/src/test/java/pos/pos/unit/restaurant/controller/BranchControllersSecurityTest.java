@@ -80,6 +80,9 @@ class BranchControllersSecurityTest {
     private BranchAdminService branchAdminService;
 
     @MockBean
+    private pos.pos.restaurant.service.BranchRemovalService branchRemovalService;
+
+    @MockBean
     private BranchAddressService branchAddressService;
 
     @MockBean

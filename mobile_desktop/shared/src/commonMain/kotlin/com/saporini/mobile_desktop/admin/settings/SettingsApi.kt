@@ -23,6 +23,9 @@ class SettingsApi(
     private fun url(restaurantId: String, path: String): String =
         "${baseUrlProvider().trimEnd('/')}/restaurants/${restaurantId.encodeURLPathPart()}/settings$path"
 
+    // The restaurant's roles, for "who is told" settings.
+    suspend fun roles(): JsonArray = client.get("${baseUrlProvider().trimEnd('/')}/roles").body()
+
     suspend fun getObject(restaurantId: String, path: String): JsonObject = client.get(url(restaurantId, path)).body()
 
     suspend fun getArray(restaurantId: String, path: String): JsonArray = client.get(url(restaurantId, path)).body()

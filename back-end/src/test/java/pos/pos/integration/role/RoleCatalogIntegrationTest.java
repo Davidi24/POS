@@ -38,8 +38,8 @@ class RoleCatalogIntegrationTest extends AbstractRoleIntegrationTest {
     }
 
     @Test
-    @DisplayName("ROLE-001 GET /roles returns active non-deleted roles in expected order")
-    void role001ReturnsActiveNonDeletedRolesInExpectedOrder() throws Exception {
+    @DisplayName("ROLE-001 GET /roles returns non-deleted roles in expected order, switched-off ones too")
+    void role001ReturnsNonDeletedRolesInExpectedOrder() throws Exception {
         Role alphaRankRole = createRole("ROLE001_ALPHA", "Role001 Alpha", "alpha", 45_000L, false, true, true, false);
         Role betaRankRole = createRole("ROLE001_BETA", "Role001 Beta", "beta", 45_000L, false, true, true, false);
         Role floorLead = createRole("ROLE001_FLOOR_LEAD", "Role001 Floor Lead", "floor", 15_000L, false, true, true, false);
@@ -51,9 +51,14 @@ class RoleCatalogIntegrationTest extends AbstractRoleIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        List<String> codes = codesOf(bodyOf(result));
-        assertThat(codes).contains(alphaRankRole.getCode(), betaRankRole.getCode(), floorLead.getCode());
-        assertThat(codes).doesNotContain(inactiveRole.getCode(), deletedRole.getCode());
+        // Switched-off roles are listed too (dimmed in the app), so they can be switched back on.
+        JsonNode body = bodyOf(result);
+        List<String> codes = codesOf(body);
+        assertThat(codes).contains(alphaRankRole.getCode(), betaRankRole.getCode(), floorLead.getCode(), inactiveRole.getCode());
+        assertThat(codes).doesNotContain(deletedRole.getCode());
+        body.forEach(node -> {
+            if (inactiveRole.getCode().equals(node.get("code").asText())) assertThat(node.get("isActive").asBoolean()).isFalse();
+        });
         assertThat(indexOf(codes, "SUPER_ADMIN")).isLessThan(indexOf(codes, alphaRankRole.getCode()));
         assertThat(indexOf(codes, alphaRankRole.getCode())).isLessThan(indexOf(codes, betaRankRole.getCode()));
         assertThat(indexOf(codes, betaRankRole.getCode())).isLessThan(indexOf(codes, "CO_OWNER"));
@@ -178,15 +183,15 @@ class RoleCatalogIntegrationTest extends AbstractRoleIntegrationTest {
                 .andReturn();
 
         List<String> codes = codesOf(bodyOf(result));
-        // Admins hand out Viewer; Managers are left to Owner and Co-Owner unless the restaurant allows Admins too.
-        assertThat(codes).containsExactly("ROLE007_SHIFT_LEAD", "ROLE007_CASHIER", "WAITER", "VIEWER");
+        // Their own level and below (an Admin may add another Admin), Viewer, Cleaner and Extra worker; Managers are left
+        // to Owner and Co-Owner unless the restaurant allows Admins too.
+        assertThat(codes).containsExactly("ADMIN", "ROLE007_SHIFT_LEAD", "ROLE007_CASHIER", "WAITER", "VIEWER", "CLEANER", "EXTRA_WORKER");
         assertThat(codes).doesNotContain(
                 "MANAGER",
                 aboveActor.getCode(),
                 inactiveAssignable.getCode(),
                 unassignable.getCode(),
                 protectedRole.getCode(),
-                "ADMIN",
                 "OWNER",
                 "CO_OWNER",
                 "SUPER_ADMIN"
