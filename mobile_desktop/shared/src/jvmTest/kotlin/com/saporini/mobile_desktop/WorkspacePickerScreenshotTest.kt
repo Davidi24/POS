@@ -33,7 +33,7 @@ import kotlin.test.assertSame
 // Output: build/reports/app-ui/workspace/.
 class WorkspacePickerScreenshotTest {
     private val everything = listOf("POS_ACCESS", "KDS_ACCESS", "ADMIN_ACCESS")
-    private val platformPermissions = everything + listOf("RESTAURANTS_READ", "STATISTICS_ACCESS", "FRAUD_ACCESS", "SETTINGS_READ")
+    private val platformPermissions = everything + listOf("RESTAURANTS_READ", "STATISTICS_ACCESS", "FRAUD_ACCESS", "SETTINGS_READ", "INVENTORY_ACCESS", "INVENTORY_READ")
 
     @Test fun desktopThree() = capture(1280, 800, everything, "desktop-3")
     @Test fun desktopTwo() = capture(1280, 800, listOf("POS_ACCESS", "ADMIN_ACCESS"), "desktop-2")

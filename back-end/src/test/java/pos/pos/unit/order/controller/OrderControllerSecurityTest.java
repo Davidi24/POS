@@ -90,6 +90,8 @@ class OrderControllerSecurityTest {
     private OrderItemService orderItemService;
     @MockBean
     private OrderPublicService orderPublicService;
+    @MockBean
+    private pos.pos.tables.realtime.TableLayoutChangeNotifier tableLayoutChangeNotifier;
 
     @Test
     @DisplayName("GET restaurant orders should allow ORDER_READ")

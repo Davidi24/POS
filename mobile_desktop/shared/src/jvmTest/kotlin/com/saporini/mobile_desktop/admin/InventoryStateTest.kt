@@ -312,7 +312,7 @@ class InventoryScreenModelTest {
 
     private suspend fun TestScope.check(
         repo: FakeInventory = FakeInventory(),
-        permissions: List<String> = listOf("SETTINGS_READ", "SETTINGS_UPDATE"),
+        permissions: List<String> = listOf("INVENTORY_READ", "INVENTORY_UPDATE"),
         pendingMoveStorage: PendingInventoryMoveStorage? = null,
         block: suspend TestScope.(InventoryScreenModel, FakeInventory) -> Unit
     ) {
@@ -392,7 +392,8 @@ class InventoryScreenModelTest {
 
             fake.calls.clear()
             model.refresh(); runCurrent()
-            assertEquals(listOf("counts 0", "counts 1"), fake.calls.filter { it.startsWith("counts ") })
+            // The list's pages again first; then the count schedule reads this week's approved counts.
+            assertEquals(listOf("counts 0", "counts 1"), fake.calls.filter { it.startsWith("counts ") }.take(2))
             assertEquals(COUNT_PAGE_SIZE + 1, model.state.value.counts.size)
 
             model.countFilter("IN_PROGRESS"); runCurrent()
@@ -554,7 +555,7 @@ class InventoryScreenModelTest {
     fun uncertainMovementSurvivesModelRestartAndReplaysTheSameKeyOnce() = runTest(dispatcher) {
         val storage = FakePendingInventoryMoveStorage()
         val repo = FakeInventory()
-        val session = SessionManager().apply { signIn(user(permissions = listOf("SETTINGS_READ", "SETTINGS_UPDATE"))) }
+        val session = SessionManager().apply { signIn(user(permissions = listOf("INVENTORY_READ", "INVENTORY_UPDATE"))) }
         val first = InventoryScreenModel(repo, session, storage)
         runCurrent(); first.setActive(true); runCurrent()
         first.startMove(StockMoveKind.RECEIVE, itemId = "tom", locationId = "kitchen")
@@ -691,7 +692,7 @@ class InventoryScreenModelTest {
 
     @Test
     fun readOnlyPeopleSeeStockButChangeNothing() = runTest(dispatcher) {
-        check(permissions = listOf("SETTINGS_READ")) { model, repo ->
+        check(permissions = listOf("INVENTORY_READ")) { model, repo ->
             assertEquals(3, model.state.value.visibleItems.size)
             model.newItem()
             assertNull(model.state.value.itemDraft)
