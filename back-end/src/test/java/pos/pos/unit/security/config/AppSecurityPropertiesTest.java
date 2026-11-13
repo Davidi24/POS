@@ -32,6 +32,7 @@ class AppSecurityPropertiesTest {
             ))
             .withUserConfiguration(TestConfig.class)
             .withPropertyValues(
+                    "app.security.cookie.access-token-name=access-token",
                     "app.security.cookie.refresh-token-name=refreshToken",
                     "app.security.cookie.refresh-token-path=/auth/web",
                     "app.security.cookie.same-site=Strict",

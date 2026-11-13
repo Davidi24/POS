@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.auth.dto.ChangePasswordRequest;
 import pos.pos.auth.dto.ForgotPasswordRequest;
+import pos.pos.auth.dto.PasswordLinkCheckRequest;
+import pos.pos.auth.dto.PasswordLinkView;
 import pos.pos.auth.dto.ResetPasswordRequest;
 import pos.pos.auth.dto.ResetPasswordWithCodeRequest;
 import pos.pos.auth.service.ChangePasswordService;
@@ -39,6 +41,12 @@ public class PasswordController {
     public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         passwordResetService.requestReset(request);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/password-link")
+    @Operation(summary = "Check an emailed password link: what it's for, whose it is and whether it still works")
+    public PasswordLinkView checkPasswordLink(@Valid @RequestBody PasswordLinkCheckRequest request) {
+        return passwordResetService.checkLink(request.getToken());
     }
 
     @PostMapping("/reset-password")

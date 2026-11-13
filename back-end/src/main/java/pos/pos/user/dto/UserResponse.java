@@ -21,5 +21,7 @@ public class UserResponse {
     private Boolean emailVerified;
     private Boolean phoneVerified;
     private List<String> roles;
+    private UUID restaurantId;
+    private UUID defaultBranchId;
 
 }

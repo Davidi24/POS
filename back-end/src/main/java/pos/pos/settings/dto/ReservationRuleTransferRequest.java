@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
@@ -23,6 +24,7 @@ import java.time.OffsetDateTime;
 @AllArgsConstructor
 public class ReservationRuleTransferRequest {
 
+    @Size(max = 100, message = "branchCode must be at most 100 characters")
     private String branchCode;
 
     @NotBlank(message = "ruleName is required")
@@ -31,6 +33,7 @@ public class ReservationRuleTransferRequest {
 
     @NotNull(message = "priority is required")
     @Min(value = 0, message = "priority must not be negative")
+    @Max(value = 100000, message = "priority must be at most 100000")
     private Integer priority;
 
     @NotNull(message = "active is required")
@@ -42,22 +45,27 @@ public class ReservationRuleTransferRequest {
 
     @NotNull(message = "advanceBookingDays is required")
     @Min(value = 0, message = "advanceBookingDays must not be negative")
+    @Max(value = 3650, message = "advanceBookingDays must be at most 3650")
     private Integer advanceBookingDays;
 
     @NotNull(message = "minPartySize is required")
     @Min(value = 1, message = "minPartySize must be greater than 0")
+    @Max(value = 1000, message = "minPartySize must be at most 1000")
     private Integer minPartySize;
 
     @NotNull(message = "maxPartySize is required")
     @Min(value = 1, message = "maxPartySize must be greater than 0")
+    @Max(value = 1000, message = "maxPartySize must be at most 1000")
     private Integer maxPartySize;
 
     @NotNull(message = "defaultDurationMinutes is required")
     @Min(value = 1, message = "defaultDurationMinutes must be greater than 0")
+    @Max(value = 1440, message = "defaultDurationMinutes must be at most 1440")
     private Integer defaultDurationMinutes;
 
     @NotNull(message = "bufferMinutes is required")
     @Min(value = 0, message = "bufferMinutes must not be negative")
+    @Max(value = 1440, message = "bufferMinutes must be at most 1440")
     private Integer bufferMinutes;
 
     @NotNull(message = "allowOnlineReservations is required")
@@ -77,5 +85,6 @@ public class ReservationRuleTransferRequest {
 
     @NotNull(message = "cancellationWindowHours is required")
     @Min(value = 0, message = "cancellationWindowHours must not be negative")
+    @Max(value = 8760, message = "cancellationWindowHours must be at most 8760")
     private Integer cancellationWindowHours;
 }

@@ -28,9 +28,11 @@ public interface RestaurantContactRepository extends JpaRepository<RestaurantCon
             WHERE c.restaurant.id = :restaurantId
               AND c.isPrimary = true
               AND c.deletedAt IS NULL
+              AND (:keepId IS NULL OR c.id <> :keepId)
             """)
     void clearAllPrimary(
             @Param("restaurantId") UUID restaurantId,
-            @Param("actorId") UUID actorId
+            @Param("actorId") UUID actorId,
+            @Param("keepId") UUID keepId
     );
 }

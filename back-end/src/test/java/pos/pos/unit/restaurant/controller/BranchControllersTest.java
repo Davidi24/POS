@@ -70,7 +70,7 @@ class BranchControllersTest {
     void setUp() {
         objectMapper = new ObjectMapper().findAndRegisterModules();
 
-        BranchAdminController branchAdminController = new BranchAdminController(branchAdminService);
+        BranchAdminController branchAdminController = new BranchAdminController(branchAdminService, org.mockito.Mockito.mock(pos.pos.restaurant.service.BranchRemovalService.class));
         BranchAddressController branchAddressController = new BranchAddressController(branchAddressService);
         BranchContactController branchContactController = new BranchContactController(branchContactService);
 

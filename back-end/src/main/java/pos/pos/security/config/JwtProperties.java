@@ -10,6 +10,8 @@ import java.time.Duration;
 @Getter
 @Setter
 public class JwtProperties {
+    private String privateKey;
+    private String publicKey;
     private Duration accessExpiration;
     private Duration refreshExpiration;
 }

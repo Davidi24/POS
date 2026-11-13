@@ -82,16 +82,17 @@ class RoleCloneIntegrationTest extends AbstractRoleIntegrationTest {
     void role020RejectsDuplicateTargetNameOrDerivedTargetCode() throws Exception {
         User actor = createUser("role020-admin", role("ADMIN"));
         createRole("ASSISTANT_MANAGER", "Assistant Manager", "existing", 12_000L, false, true, true, false);
+        // Admins may not manage Managers by default, so the source is a role they can manage.
         String accessToken = accessTokenFor(actor, "ROLE-020-login");
 
-        MvcResult duplicateNameResult = mockMvc.perform(post("/roles/{roleId}/clone", role("MANAGER").getId())
+        MvcResult duplicateNameResult = mockMvc.perform(post("/roles/{roleId}/clone", role("WAITER").getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("name", "Assistant Manager"))))
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        MvcResult duplicateCodeResult = mockMvc.perform(post("/roles/{roleId}/clone", role("MANAGER").getId())
+        MvcResult duplicateCodeResult = mockMvc.perform(post("/roles/{roleId}/clone", role("WAITER").getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("name", "Assistant-Manager"))))

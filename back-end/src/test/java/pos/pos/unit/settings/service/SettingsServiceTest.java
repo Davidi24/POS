@@ -13,9 +13,14 @@ import pos.pos.exception.auth.AuthException;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.security.principal.AuthenticatedUser;
+import pos.pos.security.rbac.AppRole;
+import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.settings.dto.SettingsResponse;
 import pos.pos.settings.dto.UpdateSettingsBillingRequest;
 import pos.pos.settings.dto.UpdateSettingsDefaultBranchRequest;
+import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
+import pos.pos.settings.dto.UpdateSettingsReservationPolicyRequest;
+import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.entity.Settings;
 import pos.pos.settings.mapper.SettingsMapper;
 import pos.pos.settings.service.SettingsAuditService;
@@ -23,6 +28,7 @@ import pos.pos.settings.service.SettingsDomainSupport;
 import pos.pos.settings.service.SettingsService;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,6 +56,9 @@ class SettingsServiceTest {
 
     @Mock
     private SettingsAuditService settingsAuditService;
+
+    @Mock
+    private RoleHierarchyService roleHierarchyService;
 
     @InjectMocks
     private SettingsService settingsService;
@@ -220,6 +229,250 @@ class SettingsServiceTest {
         assertThat(settings.getUpdatedBy()).isEqualTo(ACTOR_ID);
         verify(settingsDomainSupport).resolveBranch(RESTAURANT_ID, branch.getId());
         verify(settingsAuditService).log(eq(restaurant), eq(branch), eq("SETTINGS"), isNull(), eq("UPDATE_DEFAULT_BRANCH"), anyString(), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("Should refuse Admins changing the staff permissions switch")
+    void shouldRefuseAdminsChangingStaffPermissions() {
+        Authentication authentication = authentication();
+        UpdateSettingsStaffPermissionsRequest request = UpdateSettingsStaffPermissionsRequest.builder()
+                .adminsCanManageManagers(true)
+                .build();
+
+        when(roleHierarchyService.actorRank(authentication)).thenReturn(AppRole.ADMIN.rank());
+
+        assertThatThrownBy(() -> settingsService.updateStaffPermissions(authentication, RESTAURANT_ID, request))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Only the Owner or a Co-Owner can change staff permissions");
+
+        verify(settingsDomainSupport, never()).saveSettings(any(Settings.class));
+    }
+
+    @Test
+    @DisplayName("Should let a Co-Owner allow Admins to manage Managers")
+    void shouldLetCoOwnerAllowAdminsToManageManagers() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+        UpdateSettingsStaffPermissionsRequest request = UpdateSettingsStaffPermissionsRequest.builder()
+                .adminsCanManageManagers(true)
+                .build();
+
+        when(roleHierarchyService.actorRank(authentication)).thenReturn(AppRole.CO_OWNER.rank());
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+        when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+
+        settingsService.updateStaffPermissions(authentication, RESTAURANT_ID, request);
+
+        assertThat(settings.isAdminsCanManageManagers()).isTrue();
+        verify(settingsAuditService).log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_STAFF_PERMISSIONS"), anyString(), eq(ACTOR_ID));
+    }
+
+    private Settings stubSettings(Authentication authentication, Restaurant restaurant, boolean save) {
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        if (save) {
+            when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+            when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+        }
+        return settings;
+    }
+
+    @Test
+    @DisplayName("Should save tips and refund rules, taking tip buttons as a list or as text")
+    void shouldUpdatePaymentSettings() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = stubSettings(authentication, restaurant, true);
+
+        settingsService.updatePayments(authentication, RESTAURANT_ID, pos.pos.settings.dto.UpdateSettingsPaymentsRequest.builder()
+                .tipsEnabled(true).tipSuggestionsText(" 15, 5 ,10 ").maxTipPercent(40).autoClosePaidOrders(false).refundWindowDays(7).build());
+        assertThat(settings.getTipSuggestions()).isEqualTo("5,10,15");
+        assertThat(settings.getMaxTipPercent()).isEqualTo(40);
+        assertThat(settings.isAutoClosePaidOrders()).isFalse();
+        assertThat(settings.getRefundWindowDays()).isEqualTo(7);
+
+        settingsService.updatePayments(authentication, RESTAURANT_ID, pos.pos.settings.dto.UpdateSettingsPaymentsRequest.builder()
+                .tipsEnabled(false).tipSuggestions(java.util.List.of(20, 10)).maxTipPercent(40).autoClosePaidOrders(true).refundWindowDays(0).build());
+        assertThat(settings.getTipSuggestions()).isEqualTo("10,20");
+        assertThat(settings.isTipsEnabled()).isFalse();
+        verify(settingsAuditService, org.mockito.Mockito.times(2))
+                .log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_PAYMENTS"), anyString(), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("Should refuse tip buttons above the biggest tip, out of range, or missing")
+    void shouldRefuseBadTipButtons() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        stubSettings(authentication, restaurant, false);
+        var base = pos.pos.settings.dto.UpdateSettingsPaymentsRequest.builder().tipsEnabled(true).maxTipPercent(20)
+                .autoClosePaidOrders(true).refundWindowDays(30);
+        assertThatThrownBy(() -> settingsService.updatePayments(authentication, RESTAURANT_ID, base.tipSuggestions(java.util.List.of(25)).build()))
+                .isInstanceOf(AuthException.class).hasMessageContaining("above the biggest tip");
+        assertThatThrownBy(() -> settingsService.updatePayments(authentication, RESTAURANT_ID, base.tipSuggestions(null).tipSuggestionsText("0,5").build()))
+                .isInstanceOf(AuthException.class).hasMessageContaining("between 1 and 100");
+        assertThatThrownBy(() -> settingsService.updatePayments(authentication, RESTAURANT_ID, base.tipSuggestions(null).tipSuggestionsText(null).build()))
+                .isInstanceOf(AuthException.class).hasMessageContaining("tipSuggestions is required");
+        verify(settingsDomainSupport, never()).saveSettings(any());
+    }
+
+    @Test
+    @DisplayName("Should save fraud thresholds and switched-off checks, refusing unknown checks")
+    void shouldUpdateFraudChecks() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = stubSettings(authentication, restaurant, true);
+        var request = pos.pos.settings.dto.UpdateSettingsFraudRequest.builder()
+                .fraudDiscountPercent(25).fraudRefundAmount(new java.math.BigDecimal("75.00")).fraudVoidsPerDay(3)
+                .fraudTipPercent(40).fraudCashRefundsPerDay(1).fraudDisabledRules(java.util.Set.of("HIGH_TIP", "large_refund")).build();
+        settingsService.updateFraudChecks(authentication, RESTAURANT_ID, request);
+        assertThat(settings.getFraudDiscountPercent()).isEqualTo(25);
+        assertThat(settings.getFraudRefundAmount()).isEqualByComparingTo("75.00");
+        assertThat(settings.getFraudDisabledRules()).isEqualTo("HIGH_TIP,LARGE_REFUND");
+
+        request.setFraudDisabledRules(java.util.Set.of("STEALING"));
+        assertThatThrownBy(() -> settingsService.updateFraudChecks(authentication, RESTAURANT_ID, request))
+                .isInstanceOf(AuthException.class).hasMessageContaining("Unknown fraud rule");
+    }
+
+    @Test
+    @DisplayName("Should turn pre-orders on with the chosen kitchen lead time")
+    void shouldUpdatePreOrderSettings() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+        when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+
+        settingsService.updatePreOrders(authentication, RESTAURANT_ID, UpdateSettingsPreOrdersRequest.builder()
+                .preOrdersEnabled(true)
+                .preOrderLeadMinutes(25)
+                .build());
+
+        assertThat(settings.isPreOrdersEnabled()).isTrue();
+        assertThat(settings.getPreOrderLeadMinutes()).isEqualTo(25);
+        verify(settingsAuditService).log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_PRE_ORDERS"), anyString(), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("Should save the reservation times and limits")
+    void shouldUpdateReservationPolicy() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+        when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+
+        settingsService.updateReservationPolicy(authentication, RESTAURANT_ID, reservationPolicy()
+                .holdMinutes(45)
+                .holdWarningMinutes(35)
+                .lateAfterMinutes(10)
+                .confirmReminderTime(LocalTime.of(16, 30))
+                .guestReminderHours(48)
+                .noShowWarningFrom(2)
+                .depositFromGuests(10)
+                .build());
+
+        assertThat(settings.getHoldMinutes()).isEqualTo(45);
+        assertThat(settings.getHoldWarningMinutes()).isEqualTo(35);
+        assertThat(settings.getLateAfterMinutes()).isEqualTo(10);
+        assertThat(settings.getConfirmReminderTime()).isEqualTo(LocalTime.of(16, 30));
+        assertThat(settings.getGuestReminderHours()).isEqualTo(48);
+        assertThat(settings.getNoShowWarningFrom()).isEqualTo(2);
+        assertThat(settings.getDepositFromGuests()).isEqualTo(10);
+        assertThat(settings.getUndoSeatMinutes()).isEqualTo(15);
+        verify(settingsAuditService).log(eq(restaurant), isNull(), eq("SETTINGS"), isNull(), eq("UPDATE_RESERVATION_POLICY"), anyString(), eq(ACTOR_ID));
+    }
+
+    @Test
+    @DisplayName("Should refuse a hold warning that is not before the hold ends")
+    void shouldRejectHoldWarningAfterHold() {
+        UpdateSettingsReservationPolicyRequest request = reservationPolicy().holdMinutes(30).holdWarningMinutes(30).build();
+
+        assertThatThrownBy(() -> settingsService.updateReservationPolicy(authentication(), RESTAURANT_ID, request))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("The hold warning must come before the hold ends");
+        verify(settingsDomainSupport, never()).saveSettings(any());
+    }
+
+    @Test
+    @DisplayName("Should refuse marking guests late only after the hold ends")
+    void shouldRejectLateAfterHold() {
+        UpdateSettingsReservationPolicyRequest request = reservationPolicy().holdMinutes(30).lateAfterMinutes(30).build();
+
+        assertThatThrownBy(() -> settingsService.updateReservationPolicy(authentication(), RESTAURANT_ID, request))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("A guest must count as late before the hold ends");
+        verify(settingsDomainSupport, never()).saveSettings(any());
+    }
+
+    @Test
+    @DisplayName("Should put the reservation times back to the agreed defaults on reset")
+    void shouldResetReservationPolicy() {
+        Authentication authentication = authentication();
+        Restaurant restaurant = restaurant();
+        Settings settings = new Settings();
+        settings.setRestaurant(restaurant);
+        settings.setHoldMinutes(60);
+        settings.setHoldWarningMinutes(50);
+        settings.setLargeGroupFrom(8);
+        settings.setConfirmReminderTime(LocalTime.of(9, 0));
+        settings.setNoShowWarningFrom(3);
+        settings.setPreOrderLeadMinutes(90);
+
+        when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
+        when(settingsDomainSupport.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).thenReturn(restaurant);
+        when(settingsDomainSupport.loadOrCreateSettings(restaurant, ACTOR_ID)).thenReturn(settings);
+        when(settingsDomainSupport.saveSettings(settings)).thenReturn(settings);
+        when(settingsMapper.toResponse(settings)).thenReturn(SettingsResponse.builder().restaurantId(RESTAURANT_ID).build());
+
+        settingsService.resetSettings(authentication, RESTAURANT_ID);
+
+        assertThat(settings.getHoldMinutes()).isEqualTo(30);
+        assertThat(settings.getHoldWarningMinutes()).isEqualTo(20);
+        assertThat(settings.getLargeGroupFrom()).isEqualTo(5);
+        assertThat(settings.getConfirmReminderTime()).isEqualTo(LocalTime.of(15, 0));
+        assertThat(settings.getNoShowWarningFrom()).isEqualTo(1);
+        assertThat(settings.getPreOrderLeadMinutes()).isEqualTo(30);
+    }
+
+    // The agreed defaults; each test changes what it needs.
+    private UpdateSettingsReservationPolicyRequest.UpdateSettingsReservationPolicyRequestBuilder reservationPolicy() {
+        return UpdateSettingsReservationPolicyRequest.builder()
+                .largeGroupFrom(5)
+                .largeGroupExtraMinutes(15)
+                .approvalGroupSize(7)
+                .holdMinutes(30)
+                .holdWarningMinutes(20)
+                .checkInOpensMinutes(120)
+                .confirmReminderTime(LocalTime.of(15, 0))
+                .sameDayConfirmMinutes(120)
+                .attendanceCallMinutes(120)
+                .reopenWindowMinutes(60)
+                .undoSeatMinutes(15)
+                .runningLateMaxMinutes(30)
+                .lateAfterMinutes(15)
+                .guestReminderHours(24)
+                .noShowWarningFrom(1)
+                .depositFromGuests(7);
     }
 
     private Authentication authentication() {

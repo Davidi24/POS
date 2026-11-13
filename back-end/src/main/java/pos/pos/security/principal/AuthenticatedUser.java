@@ -19,6 +19,8 @@ public final class AuthenticatedUser implements AuthenticatedPrincipal, Serializ
     private static final long serialVersionUID = 1L;
 
     private final UUID id;
+    private final UUID restaurantId;
+    private final UUID defaultBranchId;
     private final String email;
     private final String username;
     private final String firstName;
@@ -31,6 +33,28 @@ public final class AuthenticatedUser implements AuthenticatedPrincipal, Serializ
     public static AuthenticatedUser from(User user) {
         return AuthenticatedUser.builder()
                 .id(user.getId())
+                .restaurantId(user.getRestaurantId())
+                .defaultBranchId(user.getDefaultBranchId())
+                .email(user.getEmail())
+                .username(user.getUsername())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .phone(user.getPhone())
+                .active(user.isActive())
+                .emailVerified(user.isEmailVerified())
+                .phoneVerified(user.isPhoneVerified())
+                .build();
+    }
+
+    /**
+     * The Super Admin or a Co-Super-Admin working inside one restaurant (the app sends the restaurant and branch they
+     * entered). They belong to no restaurant themselves, so outside one both are null.
+     */
+    public static AuthenticatedUser actingFor(User user, UUID restaurantId, UUID branchId) {
+        return AuthenticatedUser.builder()
+                .id(user.getId())
+                .restaurantId(restaurantId)
+                .defaultBranchId(restaurantId == null ? null : branchId)
                 .email(user.getEmail())
                 .username(user.getUsername())
                 .firstName(user.getFirstName())

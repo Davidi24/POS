@@ -11,6 +11,7 @@ import pos.pos.device.entity.DevicePrinterProfile;
 import pos.pos.device.enums.DeviceStatus;
 import pos.pos.device.enums.DeviceType;
 import pos.pos.device.enums.PrinterConnectionType;
+import pos.pos.device.repository.DevicePairingTokenRepository;
 import pos.pos.device.repository.DeviceRepository;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.device.DeviceNotFoundException;
@@ -37,6 +38,7 @@ import java.util.UUID;
 public class DeviceSettingsService {
 
     private final DeviceRepository deviceRepository;
+    private final DevicePairingTokenRepository devicePairingTokenRepository;
     private final SettingsDomainSupport settingsDomainSupport;
     private final SettingsAuditService settingsAuditService;
 
@@ -257,7 +259,9 @@ public class DeviceSettingsService {
             UUID deviceId,
             UpdateDeviceStatusRequest request
     ) {
-        Device device = requireBranchDevice(authentication, restaurantId, branchId, deviceId);
+        // Pair-token issuance takes this same row lock. This serializes deactivation
+        // with pairing so a token cannot remain usable after the device is disabled.
+        Device device = requireBranchDeviceForUpdate(authentication, restaurantId, branchId, deviceId);
 
         if (request.getStatus() != null) {
             device.setStatus(request.getStatus());
@@ -269,6 +273,15 @@ public class DeviceSettingsService {
 
         if (request.getOnline() != null) {
             device.setOnline(request.getOnline());
+        }
+
+        if (!isPairable(device)) {
+            revokeOpenPairingTokens(device.getId());
+            // A disabled/retired/maintenance device must not regain access with a previously
+            // issued secret if an administrator later changes its status back to ACTIVE.
+            device.setAuthSecretHash(null);
+            device.setAuthSecretRotatedAt(null);
+            device.setOnline(false);
         }
 
         stampAuditFields(device, settingsDomainSupport.currentActorId(authentication));
@@ -375,6 +388,33 @@ public class DeviceSettingsService {
 
         return deviceRepository.findBranchNonPrinterById(deviceId, restaurantId, branchId)
                 .orElseThrow(DeviceNotFoundException::new);
+    }
+
+    private Device requireBranchDeviceForUpdate(Authentication authentication, UUID restaurantId, UUID branchId, UUID deviceId) {
+        settingsDomainSupport.requireAccessibleBranch(authentication, restaurantId, branchId);
+
+        Device device = deviceRepository.findForUpdateByIdAndRestaurantId(deviceId, restaurantId)
+                .filter(candidate -> candidate.getBranch() != null
+                        && branchId.equals(candidate.getBranch().getId())
+                        && candidate.getDeviceType() != DeviceType.PRINTER)
+                .orElseThrow(DeviceNotFoundException::new);
+        return device;
+    }
+
+    private boolean isPairable(Device device) {
+        return device.isActive()
+                && (device.getStatus() == DeviceStatus.PROVISIONING || device.getStatus() == DeviceStatus.ACTIVE);
+    }
+
+    private void revokeOpenPairingTokens(UUID deviceId) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        var openTokens = devicePairingTokenRepository
+                .findAllByDevice_IdAndUsedAtIsNullAndRevokedAtIsNull(deviceId);
+        if (openTokens.isEmpty()) {
+            return;
+        }
+        openTokens.forEach(token -> token.revokeAt(now));
+        devicePairingTokenRepository.saveAllAndFlush(openTokens);
     }
 
     private Device saveDevice(Device device, String constraintMessage) {

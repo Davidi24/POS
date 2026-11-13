@@ -24,5 +24,6 @@ public class SettingsAuditLogResponse {
     private String action;
     private String message;
     private UUID actorUserId;
+    private String actorName;
     private OffsetDateTime occurredAt;
 }

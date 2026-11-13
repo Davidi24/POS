@@ -78,6 +78,19 @@ public class Customer extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    public String displayName() {
+        if (firstName == null && lastName == null) {
+            return null;
+        }
+        if (firstName == null) {
+            return lastName;
+        }
+        if (lastName == null) {
+            return firstName;
+        }
+        return firstName + " " + lastName;
+    }
+
     @Override
     protected void normalizeFields() {
         code = NormalizationUtils.normalizeCode(code);

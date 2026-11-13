@@ -19,7 +19,7 @@ class AuthProfileServiceTest {
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000011");
 
-    private final AuthProfileService authProfileService = new AuthProfileService(new CurrentUserMapper());
+    private final AuthProfileService authProfileService = new AuthProfileService(new CurrentUserMapper(org.mockito.Mockito.mock(pos.pos.restaurant.repository.BranchRepository.class)));
 
     @Test
     @DisplayName("Should map authenticated user fields and split roles from permissions")

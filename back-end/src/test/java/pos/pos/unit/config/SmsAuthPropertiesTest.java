@@ -8,7 +8,12 @@ import org.springframework.boot.autoconfigure.validation.ValidationAutoConfigura
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import pos.pos.auth.enums.SmsDeliveryMode;
+
+import java.io.IOException;
 import pos.pos.config.properties.SmsAuthProperties;
 
 import java.time.Duration;
@@ -25,6 +30,46 @@ class SmsAuthPropertiesTest {
                     ValidationAutoConfiguration.class
             ))
             .withUserConfiguration(TestConfig.class);
+
+    @Test
+    @DisplayName("Should disable SMS authentication by default")
+    void shouldDisableSmsByDefault() {
+        loadYaml("application.yml")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    SmsAuthProperties properties = context.getBean(SmsAuthProperties.class);
+                    assertThat(properties.getDeliveryMode()).isEqualTo(SmsDeliveryMode.DISABLED);
+                    assertThat(properties.isEnabled()).isFalse();
+                    assertThat(context.getEnvironment().getProperty("spring.profiles.default")).isNull();
+                    assertThat(context.getEnvironment().getProperty("app.storage.floor-plans.provider")).isEqualTo("disabled");
+                });
+    }
+
+    @Test
+    @DisplayName("Should enable log-only SMS only in the local profile")
+    void shouldEnableLogOnlySmsInLocalProfile() {
+        loadYaml("application.yml", "application-local.yml")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    SmsAuthProperties properties = context.getBean(SmsAuthProperties.class);
+                    assertThat(properties.getDeliveryMode()).isEqualTo(SmsDeliveryMode.LOG_ONLY);
+                    assertThat(properties.isEnabled()).isTrue();
+                    assertThat(context.getEnvironment().getProperty("app.storage.floor-plans.provider")).isEqualTo("local");
+                });
+    }
+
+    @Test
+    @DisplayName("Should keep SMS disabled in the production profile by default")
+    void shouldDisableSmsInProductionProfile() {
+        loadYaml("application.yml", "application-prod.yml")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    SmsAuthProperties properties = context.getBean(SmsAuthProperties.class);
+                    assertThat(properties.getDeliveryMode()).isEqualTo(SmsDeliveryMode.DISABLED);
+                    assertThat(properties.isEnabled()).isFalse();
+                    assertThat(context.getEnvironment().getProperty("app.storage.floor-plans.provider")).isEqualTo("disabled");
+                });
+    }
 
     @Test
     @DisplayName("Should bind SMS auth properties and expose enabled flag")
@@ -82,6 +127,21 @@ class SmsAuthPropertiesTest {
                         "app.auth.sms.code-pepper=test-sms-pepper"
                 )
                 .run(context -> assertThat(context).hasFailed());
+    }
+
+    private ApplicationContextRunner loadYaml(String... classpathResources) {
+        return contextRunner.withInitializer(context -> {
+            YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
+            for (int index = classpathResources.length - 1; index >= 0; index--) {
+                Resource resource = new ClassPathResource(classpathResources[index]);
+                try {
+                    loader.load(classpathResources[index], resource).forEach(source ->
+                            context.getEnvironment().getPropertySources().addLast(source));
+                } catch (IOException exception) {
+                    throw new IllegalStateException("Failed to load " + classpathResources[index], exception);
+                }
+            }
+        });
     }
 
     @Configuration(proxyBeanMethods = false)

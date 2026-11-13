@@ -56,18 +56,15 @@ class SmsMessageServiceTest {
         }
 
         @Test
-        @DisplayName("Should log reset code message content when delivery is enabled")
-        void shouldLogResetCodeMessageContentWhenDeliveryIsEnabled(CapturedOutput output) {
+        @DisplayName("Should not log the reset code, recipient or message body")
+        void shouldNotLogResetCodeRecipientOrBody(CapturedOutput output) {
             SmsMessageService service = new SmsMessageService(properties(SmsDeliveryMode.LOG_ONLY));
 
             service.sendPasswordResetCode("+49-555-0101", " Mila ", "123456", Duration.ofMinutes(10));
 
             assertThat(output.getOut())
-                    .contains("SMS delivery [LOG_ONLY] -> +49-555-0101")
-                    .contains("Hello Mila,")
-                    .contains("Your POS password reset code is: 123456")
-                    .contains("This code expires in 10 minutes.")
-                    .contains("If you did not request this, you can ignore this message.");
+                    .contains("SMS delivery [LOG_ONLY] requested; recipient and body omitted from logs")
+                    .doesNotContain("+49-555-0101", "Mila", "123456", "password reset code", "expires in 10 minutes");
         }
     }
 
@@ -76,17 +73,15 @@ class SmsMessageServiceTest {
     class SendPhoneVerificationCodeTests {
 
         @Test
-        @DisplayName("Should log phone verification message content when delivery is enabled")
-        void shouldLogPhoneVerificationMessageContentWhenDeliveryIsEnabled(CapturedOutput output) {
+        @DisplayName("Should not log the verification code, recipient or message body")
+        void shouldNotLogVerificationCodeRecipientOrBody(CapturedOutput output) {
             SmsMessageService service = new SmsMessageService(properties(SmsDeliveryMode.LOG_ONLY));
 
             service.sendPhoneVerificationCode("+49-555-0202", "Nora", "654321", Duration.ofMinutes(5));
 
             assertThat(output.getOut())
-                    .contains("SMS delivery [LOG_ONLY] -> +49-555-0202")
-                    .contains("Hello Nora,")
-                    .contains("Your POS phone verification code is: 654321")
-                    .contains("This code expires in 5 minutes.");
+                    .contains("SMS delivery [LOG_ONLY] requested; recipient and body omitted from logs")
+                    .doesNotContain("+49-555-0202", "Nora", "654321", "phone verification code", "expires in 5 minutes");
         }
 
         @Test
@@ -97,8 +92,8 @@ class SmsMessageServiceTest {
             service.sendPhoneVerificationCode("+49-555-0303", "   ", "111222", Duration.ofSeconds(30));
 
             assertThat(output.getOut())
-                    .contains("Hello there,")
-                    .contains("This code expires in 1 minutes.");
+                    .contains("SMS delivery [LOG_ONLY] requested; recipient and body omitted from logs")
+                    .doesNotContain("+49-555-0303", "111222", "Hello there", "expires in 1 minutes");
         }
     }
 

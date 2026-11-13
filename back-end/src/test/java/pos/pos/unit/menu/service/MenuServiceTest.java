@@ -15,16 +15,17 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.auth.AuthException;
-import pos.pos.exception.menu.MenuDeletionBlockedException;
-import pos.pos.menu.dto.CreateMenuRequest;
-import pos.pos.menu.dto.MenuResponse;
-import pos.pos.menu.dto.UpdateMenuStatusRequest;
+import pos.pos.menu.dto.request.CreateMenuRequest;
+import pos.pos.menu.dto.response.MenuResponse;
+import pos.pos.menu.dto.update.UpdateMenuStatusRequest;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.mapper.MenuMapper;
 import pos.pos.menu.policy.MenuPolicy;
+import pos.pos.menu.repository.MenuItemOptionGroupRepository;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.menu.repository.MenuRepository;
 import pos.pos.menu.repository.MenuSectionRepository;
+import pos.pos.menu.repository.MenuVariantRepository;
 import pos.pos.menu.service.MenuService;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
@@ -69,6 +70,12 @@ class MenuServiceTest {
     private MenuItemRepository menuItemRepository;
 
     @Mock
+    private MenuVariantRepository menuVariantRepository;
+
+    @Mock
+    private MenuItemOptionGroupRepository menuItemOptionGroupRepository;
+
+    @Mock
     private ActorScopeService actorScopeService;
 
     @Spy
@@ -82,6 +89,24 @@ class MenuServiceTest {
 
     @Spy
     private MenuMapper menuMapper = new MenuMapper();
+
+    @Mock
+    private pos.pos.menu.service.MenuContentTransferService contentTransfer;
+
+    @Mock
+    private pos.pos.menu.service.OnlineMenuService onlineMenuService;
+
+    @Mock
+    private pos.pos.menu.service.SpecialMenuEventLinks specialMenuEventLinks;
+
+    @Mock
+    private pos.pos.menu.service.MenuWaiterViewService menuWaiterViewService;
+
+    @Mock
+    private pos.pos.menu.image.MenuImageReleaser menuImageReleaser;
+
+    @Mock
+    private pos.pos.menu.recipe.DishRecipeCleanup dishRecipeCleanup;
 
     @InjectMocks
     private MenuService menuService;
@@ -229,6 +254,24 @@ class MenuServiceTest {
     }
 
     @Test
+    void shouldSaveAllPositionAndPreserveItWhenOlderClientsOmitIt() {
+        Authentication authentication = authentication();
+        Menu menu = menu(restaurant(RestaurantStatus.ACTIVE));
+        given(actorScopeService.resolve(authentication)).willReturn(actorScope(false, RESTAURANT_ID));
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(java.util.Optional.of(menu));
+        given(menuRepository.saveAndFlush(menu)).willReturn(menu);
+        var request = new pos.pos.menu.dto.update.UpdateMenuRequest();
+        request.setName("Breakfast");
+        request.setActive(true);
+        request.setDisplayOrder(0);
+        request.setAllFilterPosition(1);
+        assertThat(menuService.updateMenu(authentication, MENU_ID, request).getAllFilterPosition()).isEqualTo(1);
+        assertThat(menu.getAllFilterPosition()).isEqualTo(1);
+        request.setAllFilterPosition(null);
+        assertThat(menuService.updateMenu(authentication, MENU_ID, request).getAllFilterPosition()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("updateMenuStatus should reject archived restaurants")
     void shouldRejectStatusUpdateForArchivedRestaurant() {
         Authentication authentication = authentication();
@@ -249,22 +292,129 @@ class MenuServiceTest {
     }
 
     @Test
-    @DisplayName("deleteMenu should reject menus that still have sections")
-    void shouldRejectDeleteWhenSectionsExist() {
+    @DisplayName("deleteMenu should move sections to an Uncategorized menu when deleteItems is false")
+    void shouldMoveSectionsToUncategorizedOnDelete() {
         Authentication authentication = authentication();
         ActorScope scope = actorScope(false, RESTAURANT_ID);
         Restaurant restaurant = restaurant(RestaurantStatus.ACTIVE);
         Menu menu = menu(restaurant);
+        pos.pos.menu.entity.MenuSection section = new pos.pos.menu.entity.MenuSection();
+        section.setId(UUID.fromString("00000000-0000-0000-0000-000000000104"));
+        section.setMenu(menu);
+        section.setName("Mains");
+        section.setActive(true);
+        section.setDisplayOrder(1);
 
         given(actorScopeService.resolve(authentication)).willReturn(scope);
         given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(java.util.Optional.of(menu));
-        given(menuSectionRepository.existsByMenuId(MENU_ID)).willReturn(true);
+        given(menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(MENU_ID)).willReturn(List.of(section));
+        given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
 
-        assertThatThrownBy(() -> menuService.deleteMenu(authentication, MENU_ID))
-                .isInstanceOf(MenuDeletionBlockedException.class)
-                .hasMessage("Menu cannot be deleted while it still has sections");
+        menuService.deleteMenu(authentication, MENU_ID, false);
 
-        verify(menuRepository, never()).delete(any(Menu.class));
+        verify(contentTransfer).preserveSections(menu, List.of(section), ACTOR_ID);
+        verify(menuRepository).delete(menu);
+    }
+
+    @Test
+    @DisplayName("deleteMenu should cascade-delete sections when deleteItems is true")
+    void shouldDeleteSectionsWithMenuWhenRequested() {
+        Authentication authentication = authentication();
+        ActorScope scope = actorScope(false, RESTAURANT_ID);
+        Restaurant restaurant = restaurant(RestaurantStatus.ACTIVE);
+        Menu menu = menu(restaurant);
+        pos.pos.menu.entity.MenuSection section = new pos.pos.menu.entity.MenuSection();
+        section.setId(UUID.fromString("00000000-0000-0000-0000-000000000104"));
+        section.setMenu(menu);
+        section.setName("Mains");
+        section.setActive(true);
+        section.setDisplayOrder(1);
+
+        given(actorScopeService.resolve(authentication)).willReturn(scope);
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(java.util.Optional.of(menu));
+        given(menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(MENU_ID)).willReturn(List.of(section));
+        given(menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId())).willReturn(List.of());
+
+        menuService.deleteMenu(authentication, MENU_ID, true);
+
+        verify(menuSectionRepository).deleteAll(List.of(section));
+        verify(menuRepository, never()).saveAndFlush(any(Menu.class));
+        verify(menuRepository).delete(menu);
+        verify(onlineMenuService).removeEmptySections(RESTAURANT_ID);
+    }
+
+    @Test
+    @DisplayName("an event menu joins its event; the answer says which event it belongs to")
+    void shouldMakeEventMenu() {
+        Authentication authentication = authentication();
+        Menu menu = menu(restaurant(RestaurantStatus.ACTIVE));
+        UUID eventId = UUID.randomUUID();
+        pos.pos.reservation.entity.RestaurantEvent valentines = new pos.pos.reservation.entity.RestaurantEvent();
+        valentines.setId(eventId);
+        valentines.setName("Valentine's");
+        valentines.setIcon("❤️");
+        valentines.setStartDate(java.time.LocalDate.of(2027, 2, 14));
+        valentines.setEndDate(java.time.LocalDate.of(2027, 2, 14));
+        given(actorScopeService.resolve(authentication)).willReturn(actorScope(false, RESTAURANT_ID));
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(java.util.Optional.of(menu));
+        given(menuRepository.saveAndFlush(menu)).willReturn(menu);
+        given(specialMenuEventLinks.eventOf(MENU_ID)).willReturn(java.util.Optional.of(valentines));
+
+        MenuResponse response = menuService.updateMenu(authentication, MENU_ID, specialRequest(true,
+                pos.pos.menu.dto.request.SpecialMenuKind.EVENT, eventId));
+
+        assertThat(menu.isSpecial()).isTrue();
+        verify(specialMenuEventLinks).menuJoinsEvent(menu, eventId);
+        assertThat(response.getEvent().getId()).isEqualTo(eventId);
+        assertThat(response.getEvent().getName()).isEqualTo("Valentine's");
+    }
+
+    @Test
+    @DisplayName("an event menu needs its event")
+    void shouldRequireTheEvent() {
+        Authentication authentication = authentication();
+        Menu menu = menu(restaurant(RestaurantStatus.ACTIVE));
+        given(actorScopeService.resolve(authentication)).willReturn(actorScope(false, RESTAURANT_ID));
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(java.util.Optional.of(menu));
+
+        assertThatThrownBy(() -> menuService.updateMenu(authentication, MENU_ID, specialRequest(true,
+                pos.pos.menu.dto.request.SpecialMenuKind.EVENT, null)))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("Choose the event this menu is for");
+        verify(menuRepository, never()).saveAndFlush(any(Menu.class));
+    }
+
+    @Test
+    @DisplayName("booking extras and regular menus free the event they had")
+    void shouldLeaveEvent() {
+        Authentication authentication = authentication();
+        Menu menu = menu(restaurant(RestaurantStatus.ACTIVE));
+        menu.setSpecial(true);
+        given(actorScopeService.resolve(authentication)).willReturn(actorScope(false, RESTAURANT_ID));
+        given(menuRepository.findByIdAndRestaurantDeletedAtIsNull(MENU_ID)).willReturn(java.util.Optional.of(menu));
+        given(menuRepository.saveAndFlush(menu)).willReturn(menu);
+
+        menuService.updateMenu(authentication, MENU_ID, specialRequest(true,
+                pos.pos.menu.dto.request.SpecialMenuKind.BOOKING_EXTRAS, null));
+        assertThat(menu.isSpecial()).isTrue();
+
+        menuService.updateMenu(authentication, MENU_ID, specialRequest(false, null, null));
+        assertThat(menu.isSpecial()).isFalse();
+
+        verify(specialMenuEventLinks, org.mockito.Mockito.times(2)).menuLeavesEvent(menu);
+        verify(specialMenuEventLinks, never()).menuJoinsEvent(any(), any());
+    }
+
+    private pos.pos.menu.dto.update.UpdateMenuRequest specialRequest(
+            boolean special, pos.pos.menu.dto.request.SpecialMenuKind kind, UUID eventId) {
+        var request = new pos.pos.menu.dto.update.UpdateMenuRequest();
+        request.setName("Breakfast");
+        request.setActive(true);
+        request.setDisplayOrder(0);
+        request.setSpecial(special);
+        request.setSpecialKind(kind);
+        request.setEventId(eventId);
+        return request;
     }
 
     private Authentication authentication() {

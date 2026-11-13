@@ -1,5 +1,7 @@
 package pos.pos.reservation.dto;
 
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -27,8 +29,10 @@ public class ReservationValidationRequest {
 
     @NotNull(message = "partySize is required")
     @Min(value = 1, message = "partySize must be greater than 0")
+    @Max(value = 1000, message = "partySize must be at most 1000")
     private Integer partySize;
 
-    private List<UUID> tableIds;
+    @Size(max = 50, message = "tableIds can have at most 50 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UUID> tableIds;
     private UUID primaryTableId;
 }

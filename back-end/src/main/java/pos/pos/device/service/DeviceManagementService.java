@@ -1,5 +1,7 @@
 package pos.pos.device.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,7 @@ import pos.pos.device.entity.Device;
 import pos.pos.device.entity.DeviceAssignment;
 import pos.pos.device.entity.DevicePairingToken;
 import pos.pos.device.enums.DeviceAssignmentType;
+import pos.pos.device.enums.DeviceStatus;
 import pos.pos.device.repository.DeviceAssignmentRepository;
 import pos.pos.device.repository.DevicePairingTokenRepository;
 import pos.pos.device.repository.DeviceRepository;
@@ -40,6 +43,7 @@ import java.util.UUID;
 public class DeviceManagementService {
 
     private final DeviceRepository deviceRepository;
+    private final EntityManager entityManager;
     private final DeviceAssignmentRepository deviceAssignmentRepository;
     private final DevicePairingTokenRepository devicePairingTokenRepository;
     private final UserRepository userRepository;
@@ -171,6 +175,9 @@ public class DeviceManagementService {
         // Pairing token is the technical side of onboarding the device.
         // The device/app uses this short-lived token to complete pairing with the backend.
         Device device = requireManageableDevice(authentication, restaurantId, deviceId);
+        if (!device.isActive() || (device.getStatus() != DeviceStatus.PROVISIONING && device.getStatus() != DeviceStatus.ACTIVE)) {
+            throw new AuthException("Only active or provisioning devices can be paired", HttpStatus.CONFLICT);
+        }
         UUID actorId = settingsDomainSupport.currentActorId(authentication);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
@@ -249,7 +256,14 @@ public class DeviceManagementService {
 
     private Device requireManageableDevice(Authentication authentication, UUID restaurantId, UUID deviceId) {
         settingsDomainSupport.requireManageableRestaurant(authentication, restaurantId);
-        return requireDeviceInRestaurant(restaurantId, deviceId);
+        Device device = requireDeviceInRestaurant(restaurantId, deviceId);
+        Device lockedDevice = deviceRepository.findForUpdateByIdAndRestaurantId(device.getId(), restaurantId)
+                .orElseThrow(DeviceNotFoundException::new);
+        // The scoped lookup above may already have placed this row in the persistence
+        // context before the lock waited. Refresh so lifecycle checks see the winner's
+        // committed state after acquiring the lock.
+        entityManager.refresh(lockedDevice, LockModeType.PESSIMISTIC_WRITE);
+        return lockedDevice;
     }
 
     private Device requireDeviceInRestaurant(UUID restaurantId, UUID deviceId) {

@@ -71,7 +71,13 @@ class RestaurantAdminControllerSecurityTest {
     private ObjectMapper objectMapper;
 
     @MockBean
+    private pos.pos.restaurant.service.RestaurantPlatformService restaurantPlatformService;
+
+    @MockBean
     private RestaurantAdminService restaurantAdminService;
+
+    @MockBean
+    private pos.pos.restaurant.service.RestaurantOwnershipTransferService ownershipTransferService;
 
     @MockBean
     private RestaurantSummaryService restaurantSummaryService;
@@ -118,6 +124,8 @@ class RestaurantAdminControllerSecurityTest {
                 .legalName("POS Main LLC")
                 .currency("USD")
                 .timezone("Europe/Berlin")
+                .email("restaurant@example.test")
+                .phone("+355690123456")
                 .owner(CreateRestaurantOwnerRequest.builder()
                         .email("owner@pos.local")
                         .username("owner.main")

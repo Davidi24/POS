@@ -1,5 +1,6 @@
 package pos.pos.reservation.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,7 +19,8 @@ import java.util.UUID;
 public class UpdateReservationTablesRequest {
 
     @NotEmpty(message = "tableIds is required")
-    private List<UUID> tableIds;
+    @Size(max = 50, message = "tableIds can have at most 50 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UUID> tableIds;
 
     private UUID primaryTableId;
 }

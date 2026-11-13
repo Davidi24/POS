@@ -19,5 +19,9 @@ public class RoleResponse {
     private Boolean isActive;
     private Boolean isAssignable;
     private Boolean isProtected;
+    // Inside the restaurant being worked in: whether its people get paid, the Salary team, and its picture.
+    private Boolean paid;
+    private String payTeam;
+    private String picture;
 
 }

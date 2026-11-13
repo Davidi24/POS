@@ -20,11 +20,20 @@ import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
 import pos.pos.device.entity.Device;
+import pos.pos.audit.entity.AuditLog;
+import pos.pos.inventory.entity.InventoryCount;
+import pos.pos.inventory.entity.InventoryLocation;
+import pos.pos.kds.entity.KdsStation;
+import pos.pos.kds.entity.KdsTicket;
+import pos.pos.notification.entity.Notification;
+import pos.pos.payment.entity.Payment;
+import pos.pos.report.entity.ReportDefinition;
 import pos.pos.restaurant.enums.BranchStatus;
 import pos.pos.restaurant.util.BranchFieldNormalizer;
 import pos.pos.settings.entity.SettingsBusinessHour;
 import pos.pos.settings.entity.SettingsReservationRule;
 import pos.pos.settings.entity.SettingsSpecialHour;
+import pos.pos.shift.entity.Shift;
 import pos.pos.utils.NormalizationUtils;
 
 import java.util.ArrayList;
@@ -68,6 +77,10 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Branch extends AbstractAuditedSoftDeleteEntity {
 
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private long version;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "restaurant_id",
@@ -92,6 +105,10 @@ public class Branch extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "phone", length = 50)
     private String phone;
 
+    // The picture on the branch's card when a super admin chooses a branch.
+    @Column(name = "cover_url", length = 2048)
+    private String coverUrl;
+
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
@@ -105,6 +122,33 @@ public class Branch extends AbstractAuditedSoftDeleteEntity {
 
     @OneToMany(mappedBy = "branch")
     private List<Device> devices = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<InventoryLocation> inventoryLocations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<InventoryCount> inventoryCounts = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<KdsStation> kdsStations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<KdsTicket> kdsTickets = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<Payment> payments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<Shift> shifts = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<ReportDefinition> reportDefinitions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<Notification> notifications = new ArrayList<>();
+
+    @OneToMany(mappedBy = "branch")
+    private List<AuditLog> auditLogs = new ArrayList<>();
 
     @OneToMany(mappedBy = "branch")
     private List<SettingsBusinessHour> businessHours = new ArrayList<>();

@@ -21,6 +21,8 @@ import java.util.UUID;
 @AllArgsConstructor
 public class UpdateBranchRequest {
 
+    private Long expectedVersion;
+
     @NotBlank(message = "name is required")
     @Size(max = 150, message = "name must be at most 150 characters")
     private String name;
@@ -29,6 +31,7 @@ public class UpdateBranchRequest {
     @Size(max = 100, message = "code must be at most 100 characters")
     private String code;
 
+    @Size(max = 2000, message = "description must be at most 2000 characters")
     private String description;
 
     @Email(message = "email must be a valid email")

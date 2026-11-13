@@ -55,6 +55,8 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
 """)
     List<Role> findByIsActiveTrueOrderByRankDescNameAsc();
 
+    List<Role> findByDeletedAtIsNullOrderByRankDescNameAsc();
+
     @Query("""
     SELECT r
     FROM Role r
@@ -74,7 +76,7 @@ public interface RoleRepository extends JpaRepository<Role, UUID> {
       AND r.deletedAt IS NULL
       AND r.assignable = true
       AND r.protectedRole = false
-      AND r.rank < :actorRank
+      AND r.rank <= :actorRank
     ORDER BY r.rank DESC, r.name ASC
 """)
     List<Role> findAssignableRolesForActorRank(long actorRank);

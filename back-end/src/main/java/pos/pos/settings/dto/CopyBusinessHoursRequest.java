@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,5 +19,6 @@ import java.util.UUID;
 public class CopyBusinessHoursRequest {
 
     @NotEmpty(message = "targetBranchIds is required")
-    private List<UUID> targetBranchIds;
+    @Size(max = 500, message = "targetBranchIds can have at most 500 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UUID> targetBranchIds;
 }

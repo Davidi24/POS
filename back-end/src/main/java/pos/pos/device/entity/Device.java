@@ -11,8 +11,10 @@ import org.hibernate.type.SqlTypes;
 import pos.pos.common.entity.AbstractAuditedEntity;
 import pos.pos.device.enums.DeviceStatus;
 import pos.pos.device.enums.DeviceType;
+import pos.pos.kds.entity.KdsStation;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
+import pos.pos.shift.entity.Shift;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
@@ -135,6 +137,12 @@ public class Device extends AbstractAuditedEntity {
 
     @OneToOne(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private DevicePrinterProfile printerProfile;
+
+    @OneToOne(mappedBy = "device", fetch = FetchType.LAZY)
+    private KdsStation kdsStation;
+
+    @OneToMany(mappedBy = "device")
+    private List<Shift> shifts = new ArrayList<>();
 
     // add or remove one DeviceAssignment from the list
     public void addAssignment(DeviceAssignment assignment) {

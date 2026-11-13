@@ -11,6 +11,9 @@ public final class PageableUtils {
     private PageableUtils() {
     }
 
+    // The biggest page anyone gets; asking for more returns this many.
+    public static final int MAX_PAGE_SIZE = 200;
+
     public static Pageable create(
             Integer page,
             Integer size,
@@ -18,11 +21,20 @@ public final class PageableUtils {
             String sortProperty,
             int defaultPageSize
     ) {
-        return PageRequest.of(
-                page == null ? 0 : page,
-                size == null ? defaultPageSize : size,
-                Sort.by(resolveDirection(direction), sortProperty)
-        );
+        return of(page, size, defaultPageSize, Sort.by(resolveDirection(direction), sortProperty));
+    }
+
+    /** A page request from user input: a negative page or a size below 1 is refused, a huge size is capped. */
+    public static PageRequest of(Integer page, Integer size, int defaultPageSize, Sort sort) {
+        int resolvedPage = page == null ? 0 : page;
+        int resolvedSize = size == null ? defaultPageSize : size;
+        if (resolvedPage < 0) {
+            throw new AuthException("page must not be negative", HttpStatus.BAD_REQUEST);
+        }
+        if (resolvedSize < 1) {
+            throw new AuthException("size must be at least 1", HttpStatus.BAD_REQUEST);
+        }
+        return PageRequest.of(resolvedPage, Math.min(resolvedSize, MAX_PAGE_SIZE), sort);
     }
 
     public static Sort.Direction resolveDirection(String direction) {

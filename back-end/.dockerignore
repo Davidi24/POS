@@ -1,0 +1,6 @@
+# Only what the image build needs goes to Docker (never target/, uploads/ or .env files).
+*
+!.mvn/
+!mvnw
+!pom.xml
+!src/main/

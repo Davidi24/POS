@@ -11,6 +11,7 @@ public class ReviewRestaurantRegistrationRequest {
     @NotNull(message = "decision is required")
     private RestaurantRegistrationDecision decision;
 
+    // Required when rejecting: the applicant sees it.
     @Size(max = 500, message = "rejectionReason must be at most 500 characters")
     private String rejectionReason;
 }

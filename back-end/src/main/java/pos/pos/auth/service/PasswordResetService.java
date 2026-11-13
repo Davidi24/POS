@@ -5,11 +5,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.dto.ForgotPasswordRequest;
+import pos.pos.auth.dto.PasswordLinkView;
 import pos.pos.auth.dto.ResetPasswordRequest;
 import pos.pos.auth.dto.ResetPasswordWithCodeRequest;
 import pos.pos.auth.entity.AuthPasswordResetToken;
 import pos.pos.auth.entity.AuthSmsOtpCode;
 import pos.pos.auth.enums.ClientLinkTarget;
+import pos.pos.auth.enums.PasswordLinkPurpose;
+import pos.pos.auth.enums.PasswordLinkStatus;
 import pos.pos.auth.enums.RecoveryChannel;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.enums.SmsOtpPurpose;
@@ -30,6 +33,7 @@ import pos.pos.user.repository.UserRepository;
 import pos.pos.utils.FrontendUrlUtils;
 import pos.pos.utils.NormalizationUtils;
 
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
@@ -53,6 +57,7 @@ public class PasswordResetService {
     private final OneTimeCodeService oneTimeCodeService;
     private final SmsMessageService smsMessageService;
     private final RoleRepository roleRepository;
+    private final pos.pos.restaurant.repository.RestaurantRepository restaurantRepository;
 
     // Routes the reset request to email or SMS based on the channel in the request
     @Transactional
@@ -87,34 +92,92 @@ public class PasswordResetService {
             );
         }
 
-        OpaqueTokenService.IssuedToken issuedToken = replacePasswordResetToken(user, now);
-        authMailService.sendAccountSetupEmail(
-                user.getEmail(),
-                user.getFirstName(),
-                buildResetUrl(clientTarget, issuedToken),
-                passwordResetProperties.getTokenTtl(),
-                restaurantName
-        );
+        sendInvite(user, clientTarget, restaurantName, now);
     }
 
-    // Resets the password using a token from the email reset link
+    /**
+     * What an emailed link is for and whether it still works, for the page or screen where the person chooses their
+     * password. Unknown links say so without telling anything about any account.
+     */
+    @Transactional(readOnly = true)
+    public PasswordLinkView checkLink(String rawToken) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        AuthPasswordResetToken token = rawToken == null || rawToken.isBlank() ? null : authPasswordResetTokenRepository
+                .findByTokenHash(opaqueTokenService.hash(rawToken.trim(), passwordResetProperties.getTokenPepper()))
+                .orElse(null);
+        User user = token == null ? null : userRepository.findById(token.getUserId()).orElse(null);
+        PasswordLinkStatus status = statusOf(token, user, now);
+        PasswordLinkPurpose purpose = token == null ? null : token.getPurpose();
+        if (status != PasswordLinkStatus.VALID) {
+            return new PasswordLinkView(status, purpose, linkProblem(status, purpose), null, null, null, null, null);
+        }
+        String restaurantName = user.getRestaurantId() == null ? null : restaurantRepository
+                .findByIdAndDeletedAtIsNull(user.getRestaurantId()).map(restaurant -> restaurant.getName()).orElse(null);
+        return new PasswordLinkView(status, purpose, null, user.getFirstName(), user.getUsername(), user.getEmail(),
+                restaurantName, token.getExpiresAt());
+    }
+
+    /** The newest invitation link sent to this person, and what it can still do. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<InviteLink> latestInvite(User user) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        return authPasswordResetTokenRepository.findTopByUserIdAndPurposeOrderByCreatedAtDesc(user.getId(), PasswordLinkPurpose.INVITE)
+                .map(token -> new InviteLink(statusOf(token, user, now), token.getExpiresAt()));
+    }
+
+    public record InviteLink(PasswordLinkStatus status, OffsetDateTime expiresAt) {
+    }
+
+    /** What to tell someone whose link no longer works, and what to do instead. */
+    public static String linkProblem(PasswordLinkStatus status, PasswordLinkPurpose purpose) {
+        boolean invite = purpose == PasswordLinkPurpose.INVITE;
+        return switch (status) {
+            case VALID -> null;
+            case EXPIRED -> invite
+                    ? "This invitation link has expired. Ask for a new invitation, or use \"Forgot password?\" in the POS app with your email to get a new link."
+                    : "This link has expired. Use \"Forgot password?\" in the POS app to get a new one.";
+            case USED -> "This link was already used, so your password is set. Sign in with it, or use \"Forgot password?\" if you don't remember it.";
+            case REPLACED -> invite
+                    ? "A newer invitation replaced this link. Use the link in the most recent email."
+                    : "A newer email replaced this link. Use the link in the most recent email.";
+            case UNAVAILABLE -> "This account has been switched off. Contact whoever set it up for you.";
+            case INVALID -> "This link isn't valid. Check that you copied the whole link from the email.";
+        };
+    }
+
+    // Sets the password from an emailed link: an owner's first password, or a reset
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        String tokenHash = opaqueTokenService.hash(request.getToken(), passwordResetProperties.getTokenPepper());
+        String tokenHash = opaqueTokenService.hash(request.getToken().trim(), passwordResetProperties.getTokenPepper());
 
-        AuthPasswordResetToken resetToken = authPasswordResetTokenRepository
-                .findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(tokenHash, now)
-                .orElseThrow(InvalidTokenException::new);
+        AuthPasswordResetToken resetToken = authPasswordResetTokenRepository.findByTokenHashForUpdate(tokenHash).orElse(null);
+        User user = resetToken == null ? null : userRepository.findById(resetToken.getUserId()).orElse(null);
+        PasswordLinkStatus status = statusOf(resetToken, user, now);
+        if (status != PasswordLinkStatus.VALID) {
+            throw new AuthException(linkProblem(status, resetToken == null ? null : resetToken.getPurpose()), HttpStatus.BAD_REQUEST);
+        }
 
-        User user = userRepository.findById(resetToken.getUserId())
-                .filter(foundUser -> foundUser.getDeletedAt() == null && foundUser.isActive())
-                .orElseThrow(InvalidTokenException::new);
+        String problem = PasswordRules.problem(request.getNewPassword());
+        if (problem != null) {
+            throw new AuthException(problem, HttpStatus.BAD_REQUEST);
+        }
 
-        applyNewPassword(user, request.getNewPassword(), now, SessionRevocationReason.PASSWORD_RESET.name());
+        // Someone choosing their first password doesn't need a "your password was changed" email.
+        boolean firstPassword = resetToken.getPurpose() == PasswordLinkPurpose.INVITE;
+        applyNewPassword(user, request.getNewPassword(), now, SessionRevocationReason.PASSWORD_RESET.name(), !firstPassword);
 
         resetToken.setUsedAt(now);
         authPasswordResetTokenRepository.save(resetToken);
+    }
+
+    private static PasswordLinkStatus statusOf(AuthPasswordResetToken token, User user, OffsetDateTime now) {
+        if (token == null) return PasswordLinkStatus.INVALID;
+        if (token.getUsedAt() != null) return PasswordLinkStatus.USED;
+        if (token.getSupersededAt() != null) return PasswordLinkStatus.REPLACED;
+        if (!token.getExpiresAt().isAfter(now)) return PasswordLinkStatus.EXPIRED;
+        if (user == null || user.getDeletedAt() != null || !user.isActive()) return PasswordLinkStatus.UNAVAILABLE;
+        return PasswordLinkStatus.VALID;
     }
 
     // Resets the password using an SMS code — user is identified by phone number
@@ -146,14 +209,14 @@ public class PasswordResetService {
             throw new InvalidTokenException();
         }
 
-        applyNewPassword(user, request.getNewPassword(), now, SessionRevocationReason.PASSWORD_RESET.name());
+        applyNewPassword(user, request.getNewPassword(), now, SessionRevocationReason.PASSWORD_RESET.name(), true);
 
         code.setUsedAt(now);
         authSmsOtpCodeRepository.save(code);
     }
 
     // Applies the new password, revokes all active sessions, and notifies the user via email
-    private void applyNewPassword(User user, String newPassword, OffsetDateTime now, String revocationReason) {
+    private void applyNewPassword(User user, String newPassword, OffsetDateTime now, String revocationReason, boolean notify) {
         user.setPasswordHash(passwordService.hash(newPassword));
         user.setPasswordUpdatedAt(now);
         user.setFailedLoginAttempts(0);
@@ -170,28 +233,38 @@ public class PasswordResetService {
                 revocationReason
         );
 
-        authMailService.sendPasswordChangedNotificationEmail(user.getEmail(), user.getFirstName());
+        if (notify) {
+            authMailService.sendPasswordChangedNotificationEmail(user.getEmail(), user.getFirstName());
+        }
     }
 
     private void requestEmailReset(ForgotPasswordRequest request, OffsetDateTime now) {
-        // 1. Find user by email and validate (active + email verified)
+        // 1. Find user by email and validate (active)
         String normalizedEmail = requiredEmail(request.getEmail());
         User user = userRepository.findByEmailAndDeletedAtIsNull(normalizedEmail).orElse(null);
-        if (user == null || !user.isActive() || !user.isEmailVerified()) {
+        if (user == null || !user.isActive()) {
             return;
         }
 
-        // 2. Check cooldown — if a reset was requested recently, do nothing
+        // 2. Check cooldown — if a link was sent recently, do nothing
         OffsetDateTime cooldownCutoff = now.minus(passwordResetProperties.getRequestCooldown());
         if (authPasswordResetTokenRepository.existsByUserIdAndCreatedAtAfter(user.getId(), cooldownCutoff)) {
             return;
         }
 
-        // 3. Delete old reset tokens
-        OpaqueTokenService.IssuedToken issuedToken = replacePasswordResetToken(user, now);
+        // 3. An owner who never finished their invitation gets a fresh invitation; others need a confirmed email
+        if (!user.isEmailVerified()) {
+            if (authPasswordResetTokenRepository.existsByUserIdAndPurpose(user.getId(), PasswordLinkPurpose.INVITE)) {
+                String restaurantName = user.getRestaurantId() == null ? null : restaurantRepository
+                        .findByIdAndDeletedAtIsNull(user.getRestaurantId()).map(restaurant -> restaurant.getName()).orElse(null);
+                sendInvite(user, request.getClientTarget(), restaurantName, now);
+            }
+            return;
+        }
 
-        // 5. Send the reset link via email
-        sendResetEmail(user, request.getClientTarget(), issuedToken);
+        // 4. Replace older links and send the new one
+        OpaqueTokenService.IssuedToken issuedToken = replacePasswordResetToken(user, now);
+        sendResetEmail(user, request.getClientTarget(), issuedToken, now);
     }
 
     private void issueAdminEmailReset(User user, ClientLinkTarget clientTarget, OffsetDateTime now) {
@@ -208,41 +281,56 @@ public class PasswordResetService {
             );
         }
 
-        sendResetEmail(user, clientTarget, replacePasswordResetToken(user, now));
+        sendResetEmail(user, clientTarget, replacePasswordResetToken(user, now), now);
     }
 
     private void sendResetEmail(
             User user,
             ClientLinkTarget clientTarget,
-            OpaqueTokenService.IssuedToken issuedToken
+            OpaqueTokenService.IssuedToken issuedToken,
+            OffsetDateTime now
     ) {
         authMailService.sendPasswordResetEmail(
-                user.getEmail(),
-                user.getFirstName(),
+                user,
                 passwordResetProperties.getSubject(),
                 buildResetUrl(clientTarget, issuedToken),
-                passwordResetProperties.getTokenTtl()
+                passwordResetProperties.getTokenTtl(),
+                now.plus(passwordResetProperties.getTokenTtl())
         );
     }
 
+    private void sendInvite(User user, ClientLinkTarget clientTarget, String restaurantName, OffsetDateTime now) {
+        Duration ttl = passwordResetProperties.getInviteTokenTtl();
+        OpaqueTokenService.IssuedToken issuedToken = issueLink(user, PasswordLinkPurpose.INVITE, ttl, now);
+        authMailService.sendAccountSetupEmail(user, buildResetUrl(clientTarget, issuedToken), ttl, now.plus(ttl), restaurantName);
+    }
+
     private OpaqueTokenService.IssuedToken replacePasswordResetToken(User user, OffsetDateTime now) {
-        authPasswordResetTokenRepository.deleteByUserId(user.getId());
+        return issueLink(user, PasswordLinkPurpose.RESET, passwordResetProperties.getTokenTtl(), now);
+    }
+
+    // Only the newest link works; the older ones stay (marked replaced) so they can explain why.
+    private OpaqueTokenService.IssuedToken issueLink(User user, PasswordLinkPurpose purpose, Duration ttl, OffsetDateTime now) {
+        authPasswordResetTokenRepository.supersedeOpenLinks(user.getId(), now);
 
         OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(passwordResetProperties.getTokenPepper());
         authPasswordResetTokenRepository.save(
                 AuthPasswordResetToken.builder()
                         .userId(user.getId())
                         .tokenHash(issuedToken.tokenHash())
-                        .expiresAt(now.plus(passwordResetProperties.getTokenTtl()))
+                        .purpose(purpose)
+                        .expiresAt(now.plus(ttl))
                         .build()
         );
 
         return issuedToken;
     }
 
+    // The page that takes the link (served by this backend unless a website takes over).
     private String buildResetUrl(ClientLinkTarget clientTarget, OpaqueTokenService.IssuedToken issuedToken) {
+        String linkBaseUrl = passwordResetProperties.getLinkBaseUrl();
         return FrontendUrlUtils.buildTokenUrl(
-                frontendProperties.resolveBaseUrl(clientTarget),
+                linkBaseUrl == null || linkBaseUrl.isBlank() ? frontendProperties.resolveBaseUrl(clientTarget) : linkBaseUrl.trim(),
                 passwordResetProperties.getResetPath(),
                 issuedToken.rawToken()
         );

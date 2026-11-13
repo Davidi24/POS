@@ -10,6 +10,7 @@ import pos.pos.auth.enums.RecoveryChannel;
 public class ForgotPasswordRequest {
 
     @Email
+    @Size(max = 150, message = "email must be at most 150 characters")
     private String email;
 
     @Size(max = 50, message = "Phone must be at most 50 characters")

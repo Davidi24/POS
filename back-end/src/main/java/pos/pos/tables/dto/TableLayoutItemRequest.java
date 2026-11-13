@@ -1,6 +1,7 @@
 package pos.pos.tables.dto;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -27,10 +28,20 @@ public class TableLayoutItemRequest {
     private String floor;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "positionX must not be negative")
+    @DecimalMax(value = "99999999.99", message = "positionX is out of range")
     private BigDecimal positionX;
 
     @DecimalMin(value = "0.0", inclusive = true, message = "positionY must not be negative")
+    @DecimalMax(value = "99999999.99", message = "positionY is out of range")
     private BigDecimal positionY;
+
+    @DecimalMin(value = "0.0", inclusive = true, message = "rotationDegrees must not be negative")
+    @DecimalMax(value = "359.999", inclusive = true, message = "rotationDegrees must be less than 360")
+    private BigDecimal rotationDegrees;
+
+    @DecimalMin(value = "0.25", inclusive = true, message = "layoutScale must be at least 0.25")
+    @DecimalMax(value = "4.00", inclusive = true, message = "layoutScale must not exceed 4.00")
+    private BigDecimal layoutScale;
 
     private TableShape shape;
 }

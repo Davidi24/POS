@@ -21,7 +21,7 @@ import java.util.List;
 public class SmsAuthProperties {
 
     @NotNull
-    private SmsDeliveryMode deliveryMode = SmsDeliveryMode.LOG_ONLY;
+    private SmsDeliveryMode deliveryMode = SmsDeliveryMode.DISABLED;
 
     @NotNull
     private Duration passwordResetCodeTtl = Duration.ofMinutes(10);

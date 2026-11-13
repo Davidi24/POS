@@ -11,6 +11,17 @@ import java.util.Objects;
 
 @Component
 public class CurrentUserMapper {
+    private final pos.pos.restaurant.repository.BranchRepository branches;
+
+    public CurrentUserMapper(pos.pos.restaurant.repository.BranchRepository branches) { this.branches = branches; }
+
+    /** Login, refresh and session restoration never revive a closed or removed default branch. */
+    private java.util.UUID availableBranch(java.util.UUID restaurantId, java.util.UUID branchId) {
+        if (restaurantId == null || branchId == null) return null;
+        return branches.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId, restaurantId)
+                .filter(b -> b.isActive() && b.getStatus() == pos.pos.restaurant.enums.BranchStatus.ACTIVE)
+                .map(pos.pos.restaurant.entity.Branch::getId).orElse(null);
+    }
 
     public CurrentUserResponse toCurrentUserResponse(User user, List<String> roles, List<String> permissions) {
         if (user == null) {
@@ -19,6 +30,8 @@ public class CurrentUserMapper {
 
         return CurrentUserResponse.builder()
                 .id(user.getId())
+                .restaurantId(user.getRestaurantId())
+                .defaultBranchId(availableBranch(user.getRestaurantId(), user.getDefaultBranchId()))
                 .email(user.getEmail())
                 .username(user.getUsername())
                 .firstName(user.getFirstName())
@@ -43,6 +56,8 @@ public class CurrentUserMapper {
 
         return CurrentUserResponse.builder()
                 .id(user.getId())
+                .restaurantId(user.getRestaurantId())
+                .defaultBranchId(availableBranch(user.getRestaurantId(), user.getDefaultBranchId()))
                 .email(user.getEmail())
                 .username(user.getUsername())
                 .firstName(user.getFirstName())

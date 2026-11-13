@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.common.dto.PageResponse;
+import pos.pos.restaurant.dto.BranchRemovalCheckResponse;
 import pos.pos.restaurant.dto.BranchResponse;
 import pos.pos.restaurant.dto.CreateBranchRequest;
 import pos.pos.restaurant.dto.UpdateBranchRequest;
@@ -38,6 +39,7 @@ import java.util.UUID;
 public class BranchAdminController {
 
     private final BranchAdminService branchAdminService;
+    private final pos.pos.restaurant.service.BranchRemovalService branchRemovalService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('RESTAURANTS_READ')")
@@ -118,15 +120,29 @@ public class BranchAdminController {
         );
     }
 
+    @GetMapping("/{branchId}/removal-check")
+    @PreAuthorize("hasAuthority('RESTAURANTS_READ')")
+    @Operation(summary = "What still uses a branch, and whether it can be removed")
+    public ResponseEntity<BranchRemovalCheckResponse> removalCheck(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(branchAdminService.removalCheck(authentication, restaurantId, branchId)
+                .withArchive(branchRemovalService.preview(authentication, restaurantId, branchId)));
+    }
+
     @DeleteMapping("/{branchId}")
     @PreAuthorize("hasAuthority('RESTAURANTS_UPDATE')")
     @Operation(summary = "Soft delete a branch")
     public ResponseEntity<Void> deleteBranch(
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
+            @Valid @RequestBody(required=false) pos.pos.restaurant.dto.BranchRemovalRequest request,
             Authentication authentication
     ) {
-        branchAdminService.deleteBranch(authentication, restaurantId, branchId);
+        if(request==null) branchAdminService.deleteBranch(authentication, restaurantId, branchId);
+        else branchRemovalService.remove(authentication, restaurantId, branchId, request);
         return ResponseEntity.noContent().build();
     }
 }

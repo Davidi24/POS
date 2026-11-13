@@ -64,6 +64,11 @@ class BranchAdminServiceTest {
     @Spy
     private BranchMapper branchMapper = new BranchMapper();
 
+    @Mock private pos.pos.security.scope.ActorScopeService actorScopeService;
+    @Mock private pos.pos.restaurant.repository.RestaurantUsageRepository restaurantUsageRepository;
+
+    @Mock private pos.pos.restaurant.service.RestaurantClosureGuard closureGuard;
+
     @InjectMocks
     private BranchAdminService branchAdminService;
 
@@ -79,7 +84,7 @@ class BranchAdminServiceTest {
                 .managerUserId(MANAGER_ID)
                 .build();
 
-        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant);
+        given(restaurantScopeService.requirePlatformManagedRestaurant(eq(authentication), eq(RESTAURANT_ID), org.mockito.ArgumentMatchers.anyString())).willReturn(restaurant);
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
         given(branchValidationService.normalizeAndValidateFields("down town", "Downtown", RESTAURANT_ID, null))
                 .willReturn(new BranchValidationService.NormalizedBranchFields("DOWN_TOWN"));
@@ -111,7 +116,7 @@ class BranchAdminServiceTest {
                 .code("DOWN_TOWN")
                 .build();
 
-        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant);
+        given(restaurantScopeService.requirePlatformManagedRestaurant(eq(authentication), eq(RESTAURANT_ID), org.mockito.ArgumentMatchers.anyString())).willReturn(restaurant);
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
         given(branchValidationService.normalizeAndValidateFields("DOWN_TOWN", "Downtown", RESTAURANT_ID, null))
                 .willThrow(new BranchCodeAlreadyExistsException());
@@ -206,7 +211,7 @@ class BranchAdminServiceTest {
     void shouldUpdateBranch() {
         Authentication authentication = authentication();
         Branch branch = branch();
-        UpdateBranchRequest request = UpdateBranchRequest.builder()
+        UpdateBranchRequest request = UpdateBranchRequest.builder().expectedVersion(branch.getVersion())
                 .name("Uptown")
                 .code("UPTOWN")
                 .isActive(true)
@@ -214,13 +219,15 @@ class BranchAdminServiceTest {
                 .managerUserId(MANAGER_ID)
                 .build();
 
-        given(restaurantScopeService.requireManageableBranch(authentication, RESTAURANT_ID, BRANCH_ID))
+        var scope = new pos.pos.security.scope.ActorScope(pos.pos.user.entity.User.builder().id(ACTOR_ID).build(),true,java.util.Set.of("SUPER_ADMIN"),java.util.Set.of());
+        given(actorScopeService.resolve(authentication)).willReturn(scope);
+        given(restaurantScopeService.requireManageableBranch(scope, RESTAURANT_ID, BRANCH_ID))
                 .willReturn(branch);
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
         given(branchValidationService.normalizeAndValidateFields("UPTOWN", "Uptown", RESTAURANT_ID, BRANCH_ID))
                 .willReturn(new BranchValidationService.NormalizedBranchFields("UPTOWN"));
         given(branchValidationService.validateManagerUser(MANAGER_ID, RESTAURANT_ID)).willReturn(MANAGER_ID);
-        given(branchRepository.save(branch)).willReturn(branch);
+        given(branchRepository.saveAndFlush(branch)).willReturn(branch);
 
         BranchResponse response = branchAdminService.updateBranch(authentication, RESTAURANT_ID, BRANCH_ID, request);
 
@@ -281,6 +288,9 @@ class BranchAdminServiceTest {
         given(restaurantScopeService.requireManageableBranch(authentication, RESTAURANT_ID, BRANCH_ID)).willReturn(branch);
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
 
+        given(branchRepository.countByRestaurantIdAndDeletedAtIsNull(RESTAURANT_ID)).willReturn(2L);
+        given(restaurantUsageRepository.branchUsage(eq(RESTAURANT_ID),eq(BRANCH_ID),any()))
+                .willReturn(new pos.pos.restaurant.repository.RestaurantUsageRepository.BranchUsage(0,0,0,0,0));
         branchAdminService.deleteBranch(authentication, RESTAURANT_ID, BRANCH_ID);
 
         assertThat(branch.isActive()).isFalse();

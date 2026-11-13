@@ -26,8 +26,8 @@ public class RoleCatalogController {
     @GetMapping("/roles")
     @PreAuthorize("hasAuthority('ROLES_READ')")
     @Operation(summary = "List all active roles")
-    public ResponseEntity<List<RoleResponse>> getRoles() {
-        return ResponseEntity.ok(roleCatalogService.getRoles());
+    public ResponseEntity<List<RoleResponse>> getRoles(Authentication authentication) {
+        return ResponseEntity.ok(roleCatalogService.getRoles(authentication));
     }
 
     @GetMapping("/roles/system")
@@ -40,8 +40,8 @@ public class RoleCatalogController {
     @GetMapping("/roles/{roleId}")
     @PreAuthorize("hasAuthority('ROLES_READ')")
     @Operation(summary = "Get one role by id")
-    public ResponseEntity<RoleResponse> getRole(@PathVariable UUID roleId) {
-        return ResponseEntity.ok(roleCatalogService.getRole(roleId));
+    public ResponseEntity<RoleResponse> getRole(@PathVariable UUID roleId, Authentication authentication) {
+        return ResponseEntity.ok(roleCatalogService.getRole(authentication, roleId));
     }
 
     @GetMapping("/permissions")
@@ -54,8 +54,8 @@ public class RoleCatalogController {
     @GetMapping("/roles/{roleId}/permissions")
     @PreAuthorize("hasAuthority('ROLES_READ')")
     @Operation(summary = "List permissions assigned to one role")
-    public ResponseEntity<List<PermissionResponse>> getRolePermissions(@PathVariable UUID roleId) {
-        return ResponseEntity.ok(roleCatalogService.getRolePermissions(roleId));
+    public ResponseEntity<List<PermissionResponse>> getRolePermissions(@PathVariable UUID roleId, Authentication authentication) {
+        return ResponseEntity.ok(roleCatalogService.getRolePermissions(authentication, roleId));
     }
 
     @GetMapping("/roles/assignable")

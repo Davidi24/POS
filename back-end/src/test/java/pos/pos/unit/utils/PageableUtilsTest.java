@@ -29,4 +29,20 @@ class PageableUtilsTest {
                 .isInstanceOf(AuthException.class)
                 .hasMessage("Invalid sort direction");
     }
+
+    @Test
+    @DisplayName("of() refuses a negative page or a size below 1 and caps huge sizes")
+    void shouldGuardPageInput() {
+        assertThatThrownBy(() -> PageableUtils.of(-1, 10, 20, org.springframework.data.domain.Sort.unsorted()))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("page must not be negative");
+        assertThatThrownBy(() -> PageableUtils.of(0, 0, 20, org.springframework.data.domain.Sort.unsorted()))
+                .isInstanceOf(AuthException.class)
+                .hasMessage("size must be at least 1");
+        assertThatThrownBy(() -> PageableUtils.create(Integer.MIN_VALUE, null, "asc", "createdAt", 20))
+                .isInstanceOf(AuthException.class);
+        assertThat(PageableUtils.of(3, Integer.MAX_VALUE, 20, org.springframework.data.domain.Sort.unsorted()).getPageSize())
+                .isEqualTo(PageableUtils.MAX_PAGE_SIZE);
+        assertThat(PageableUtils.of(null, null, 25, org.springframework.data.domain.Sort.unsorted()).getPageSize()).isEqualTo(25);
+    }
 }

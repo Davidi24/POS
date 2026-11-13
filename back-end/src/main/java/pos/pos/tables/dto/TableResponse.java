@@ -35,8 +35,12 @@ public class TableResponse {
     private String floor;
     private BigDecimal positionX;
     private BigDecimal positionY;
+    private BigDecimal rotationDegrees;
+    private BigDecimal layoutScale;
     private TableShape shape;
     private TableStatus status;
+    private Integer guestCount;
+    private OffsetDateTime seatedAt;
     private Boolean active;
     private String qrCodeValue;
     private OffsetDateTime createdAt;

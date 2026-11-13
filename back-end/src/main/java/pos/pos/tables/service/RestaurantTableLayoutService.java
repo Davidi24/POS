@@ -33,6 +33,7 @@ public class RestaurantTableLayoutService {
 
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantTableSupport restaurantTableSupport;
+    private final TableSeatingRules tableSeatingRules;
 
     @Transactional(readOnly = true)
     public TableLayoutResponse getTableLayout(Authentication authentication, UUID restaurantId, UUID branchId) {
@@ -109,6 +110,7 @@ public class RestaurantTableLayoutService {
 
         for (RestaurantTable table : changedTables) {
             table.setFloor(renameMap.get(table.getFloor()));
+            table.setLayoutOnly(true);
             table.setUpdatedBy(actorId);
         }
 
@@ -161,12 +163,21 @@ public class RestaurantTableLayoutService {
         if (item.getShape() != null) {
             table.setShape(item.getShape());
         }
+        if (item.getRotationDegrees() != null) {
+            table.setRotationDegrees(item.getRotationDegrees());
+        }
+        if (item.getLayoutScale() != null) {
+            table.setLayoutScale(item.getLayoutScale());
+        }
+        table.setLayoutOnly(true);
         table.setUpdatedBy(actorId);
     }
 
     private TableLayoutResponse buildLayoutResponse(UUID restaurantId, UUID branchId) {
         BranchTableSnapshot snapshot = restaurantTableSupport.loadBranchTables(restaurantId, branchId);
-        return restaurantTableSupport.buildLayoutResponse(snapshot);
+        TableLayoutResponse layout = restaurantTableSupport.buildLayoutResponse(snapshot);
+        tableSeatingRules.fill(restaurantId, layout.getTables());
+        return layout;
     }
 
     private List<RestaurantTable> selectAutoArrangeTargets(List<RestaurantTable> branchTables, AutoArrangeTableLayoutRequest request) {
@@ -206,6 +217,7 @@ public class RestaurantTableLayoutService {
 
         table.setPositionX(settings.startX().add(settings.horizontalSpacing().multiply(BigDecimal.valueOf(column))));
         table.setPositionY(settings.startY().add(settings.verticalSpacing().multiply(BigDecimal.valueOf(row))));
+        table.setLayoutOnly(true);
         table.setUpdatedBy(actorId);
     }
 

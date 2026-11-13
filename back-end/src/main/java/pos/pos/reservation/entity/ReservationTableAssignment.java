@@ -60,6 +60,7 @@ public class ReservationTableAssignment extends AbstractTimestampedEntity {
     )
     private RestaurantTable restaurantTable;
 
+    // it saved the primary table of the reservation, not the one that were attached to this table
     @Column(name = "is_primary", nullable = false)
     private boolean primaryAssignment = false;
 

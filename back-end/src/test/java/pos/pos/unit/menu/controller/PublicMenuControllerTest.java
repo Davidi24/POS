@@ -7,9 +7,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import pos.pos.exception.handler.GlobalExceptionHandler;
 import pos.pos.menu.controller.PublicMenuController;
-import pos.pos.menu.dto.PublicMenuItemResponse;
-import pos.pos.menu.dto.PublicMenuResponse;
-import pos.pos.menu.dto.PublicMenuSectionResponse;
+import pos.pos.menu.dto.response.PublicMenuItemResponse;
+import pos.pos.menu.dto.response.PublicMenuResponse;
+import pos.pos.menu.dto.response.PublicMenuSectionResponse;
 import pos.pos.menu.service.PublicMenuService;
 
 import java.math.BigDecimal;
