@@ -2,3 +2,8 @@
 /back-end/app*.log
 /back-end/app.pid
 /mobile_desktop/app.pid
+# Local environment files may contain credentials
+.env*
+!.env.example
+# Java downloaded by start.sh for this project only
+/.tools/
