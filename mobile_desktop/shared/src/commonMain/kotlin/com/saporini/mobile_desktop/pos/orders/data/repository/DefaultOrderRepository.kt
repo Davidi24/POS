@@ -259,6 +259,12 @@ class DefaultOrderRepository(private val api: OrderApi) : OrderRepository {
         return api.markOrderReady(restaurantId = restaurantId, orderId = orderId, request = request.toDto()).toDomain()
     }
 
+    override suspend fun requestBill(restaurantId: String, orderId: String): Order {
+        require(restaurantId.isNotBlank()) { "restaurantId is required" }
+        require(orderId.isNotBlank()) { "orderId is required" }
+        return api.requestBill(restaurantId = restaurantId, orderId = orderId).toDomain()
+    }
+
     override suspend fun fulfillOrder(
         restaurantId: String,
         orderId: String,
@@ -301,6 +307,20 @@ class DefaultOrderRepository(private val api: OrderApi) : OrderRepository {
         require(orderId.isNotBlank()) { "orderId is required" }
         request.validate()
         return api.cancelOrder(restaurantId = restaurantId, orderId = orderId, request = request.toDto()).toDomain()
+    }
+
+    override suspend fun closeUnpaid(restaurantId: String, orderId: String, reason: String): Order {
+        require(restaurantId.isNotBlank()) { "restaurantId is required" }
+        require(orderId.isNotBlank()) { "orderId is required" }
+        require(reason.isNotBlank()) { "Write why it wasn't paid" }
+        require(reason.length <= 2000) { "The reason can have at most 2000 characters" }
+        return api.closeUnpaid(restaurantId, orderId, OrderCloseUnpaidRequestDto(reason.trim())).toDomain()
+    }
+
+    override suspend fun reopenForPayment(restaurantId: String, orderId: String): Order {
+        require(restaurantId.isNotBlank()) { "restaurantId is required" }
+        require(orderId.isNotBlank()) { "orderId is required" }
+        return api.reopenForPayment(restaurantId, orderId).toDomain()
     }
 
     override suspend fun voidOrder(

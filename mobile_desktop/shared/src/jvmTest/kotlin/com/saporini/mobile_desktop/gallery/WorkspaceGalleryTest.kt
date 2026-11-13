@@ -53,10 +53,17 @@ private fun kpi(now: String, before: String) = KpiDto(d(now), d(before))
 private fun minutesAgo(minutes: Int) = (Clock.System.now() - minutes.minutes).toString()
 
 private class GalleryStats : StatisticsRepository {
+    // Each branch has its share; the days before (the comparison) a little less.
+    private fun factor(query: StatsQuery): Double = (when (query.branchId) { "b1" -> 0.52; "b2" -> 0.3; "b3" -> 0.18; else -> 1.0 }) *
+        (if (query.to < LocalDate(2026, 10, 2)) 0.88 else 1.0)
+    private fun m(text: String, query: StatsQuery) = d(String.format(java.util.Locale.ROOT, "%.2f", text.toDouble() * factor(query)))
+    private fun n(value: Long, query: StatsQuery) = (value * factor(query)).toLong()
+    private fun k(now: String, before: String, query: StatsQuery) = KpiDto(m(now, query), m(before, query))
+    private fun kc(now: Long, before: Long, query: StatsQuery) = KpiDto(d("${n(now, query)}"), d("${n(before, query)}"))
     private fun period(query: StatsQuery) = StatsPeriodDto(query.from.toString(), query.to.toString())
     private fun days(query: StatsQuery): List<DaySalesDto> {
         val sales = listOf("1840.50", "2210.00", "1625.40", "2480.90", "3120.00", "3560.75", "2050.10")
-        return (0..6).map { i -> DaySalesDto(query.to.minus(DatePeriod(days = 6 - i)).toString(), d(sales[i]), 60L + i * 7, 110L + i * 12) }
+        return (0..6).map { i -> DaySalesDto(query.to.minus(DatePeriod(days = 6 - i)).toString(), m(sales[i], query), n(60L + i * 7, query), n(110L + i * 12, query)) }
     }
     private val items = listOf(
         ItemSalesDto("m1", "Margherita", "Pizza", 212, d("2120.00")), ItemSalesDto("m2", "Diavola", "Pizza", 140, d("1680.00")),
@@ -66,27 +73,28 @@ private class GalleryStats : StatisticsRepository {
     )
     override suspend fun overview(query: StatsQuery) = StatsOverviewDto(
         period(query),
-        KpisDto(sales = kpi("16887.65", "15020.10"), orders = kpi("483", "455"), guests = kpi("958", "901"), averageTicket = kpi("34.96", "33.01"),
-            averagePerGuest = kpi("17.63", "16.67"), tips = kpi("812.40", "760.00"), collected = kpi("17700.05", "15780.10"), refunds = kpi("64.00", "120.00"),
-            discounts = kpi("410.20", "300.00"), removedItemsValue = kpi("96.50", "140.00"), cancelledOrders = kpi("6", "9"), voidedOrders = kpi("2", "1"),
-            openOrders = 3),
+        KpisDto(sales = k("16887.65", "15020.10", query), orders = kc(483, 455, query), guests = kc(958, 901, query), averageTicket = kpi("34.96", "33.01"),
+            averagePerGuest = kpi("17.63", "16.67"), tips = k("812.40", "760.00", query), collected = k("17700.05", "15780.10", query),
+            refunds = k("64.00", "120.00", query), discounts = k("410.20", "300.00", query), removedItemsValue = k("96.50", "140.00", query),
+            cancelledOrders = kc(6, 9, query), voidedOrders = kc(2, 1, query), openOrders = 3),
         days(query),
-        listOf(MethodTotalDto("CARD", d("11240.30"), 302, d("640.00")), MethodTotalDto("CASH", d("4120.75"), 141, d("150.40")),
-            MethodTotalDto("CONTACTLESS", d("2339.00"), 61, d("22.00"))),
-        listOf(ShareDto("DINE_IN", d("13110.00"), 371), ShareDto("TAKEAWAY", d("2780.65"), 82), ShareDto("DELIVERY", d("997.00"), 30)),
-        items
+        listOf(MethodTotalDto("CARD", m("11240.30", query), n(302, query), m("640.00", query)), MethodTotalDto("CASH", m("4120.75", query), n(141, query), m("150.40", query)),
+            MethodTotalDto("CONTACTLESS", m("2339.00", query), n(61, query), m("22.00", query))),
+        listOf(ShareDto("DINE_IN", m("13110.00", query), n(371, query)), ShareDto("TAKEAWAY", m("2780.65", query), n(82, query)),
+            ShareDto("DELIVERY", m("997.00", query), n(30, query))),
+        items.map { it.copy(quantity = n(it.quantity, query), sales = m(it.sales.value, query)) }
     )
     override suspend fun sales(query: StatsQuery) = StatsSalesDto(
         period(query), days(query),
         (11..23).map { h -> HourSalesDto(h, d(listOf(120, 980, 1840, 1210, 420, 210, 180, 650, 1960, 3120, 2880, 1740, 640)[h - 11].toString()), 10L + h) },
         listOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY").mapIndexed { i, day ->
             WeekdaySalesDto(i + 1, day, d("0"), 0, d(listOf("1840", "1620", "1900", "2210", "3120", "3560", "2480")[i])) },
-        listOf(ShareDto("DINE_IN", d("13110.00"), 371), ShareDto("TAKEAWAY", d("2780.65"), 82)),
+        listOf(ShareDto("DINE_IN", d("13110.00"), 371), ShareDto("TAKEAWAY", d("2780.65"), 82), ShareDto("DELIVERY", d("997.00"), 30)),
         listOf(ShareDto("POS", d("14200"), 410), ShareDto("QR_TABLE", d("1900"), 52), ShareDto("PHONE", d("787.65"), 21)),
         listOf(ShareDto("Main room", d("10240"), 290), ShareDto("Terrace", d("4890"), 140)),
         listOf(SectionSalesDto("Pizza", 352, d("3800")), SectionSalesDto("Pasta", 96, d("1344")), SectionSalesDto("Drinks", 348, d("1744")),
             SectionSalesDto("Desserts", 120, d("780"))),
-        items,
+        items.map { it.copy(quantity = n(it.quantity, query), sales = m(it.sales.value, query)) },
         listOf(ItemSalesDto("m9", "Insalata di farro", "Starters", 3, d("33.00")), ItemSalesDto("m10", "Calzone vegano", "Pizza", 5, d("65.00")))
     )
     override suspend fun staff(query: StatsQuery) = StatsStaffDto(period(query), listOf(
@@ -156,20 +164,35 @@ class WorkspaceGalleryTest {
 
     @Test
     fun statistics() = gallery {
-        val model = StatisticsScreenModel(GalleryStats(), gallerySession()) { today }
+        val branches = listOf(com.saporini.mobile_desktop.statistics.StatsBranch("b1", "Main Branch"),
+            com.saporini.mobile_desktop.statistics.StatsBranch("b2", "Blloku"), com.saporini.mobile_desktop.statistics.StatsBranch("b3", "Durrës"))
+        val model = StatisticsScreenModel(GalleryStats(), gallerySession(), today = { today }, branchesOf = { branches })
         model.setActive(true); settle()
         fun shot(name: String, width: Int = 1440, height: Int = 1500, required: List<String> = emptyList()) = render(name, width, height, required) {
             val state by model.state.collectAsState()
             StatisticsContent(state, model, {})
         }
-        shot("stats-overview", required = listOf("Overview", "Sales by day", "Money in", "Best sellers", "Worth a look"))
-        shot("stats-overview-phone", 420, 2200)
-        model.tab(StatsTab.SALES); settle()
-        shot("stats-sales", height = 1900, required = listOf("Busiest hours", "Weekdays", "Dishes sold"))
-        model.tab(StatsTab.STAFF); settle()
-        shot("stats-staff", height = 1000, required = listOf("Leaderboard", "Giulia Rossi"))
+        shot("stats-overview", height = 1450, required = listOf("Overview", "Total sales", "Sales by day", "Payment methods", "Contactless", "Best-selling dishes", "Branches"))
+        shot("stats-overview-phone", 400, 2900)
+        shot("stats-overview-tablet", 1024, 2000)
         model.tab(StatsTab.REPORTS); settle()
-        shot("stats-reports", height = 800, required = listOf("Sales per day", "Download"))
+        shot("stats-reports", height = 1100, required = listOf("Sales per day", "Order details", "Tax and accounting summary", "Download"))
+        shot("stats-reports-phone", 400, 2700)
+        model.tab(StatsTab.SALES); settle()
+        shot("stats-sales", height = 4000, required = listOf("Sales & orders", "Day by day", "Sales by hour", "Sales by branch", "Orders by day",
+            "What happened to orders", "Busy hours and days"))
+        shot("stats-sales-phone", 400, 7600)
+        model.tab(StatsTab.DISHES); settle()
+        shot("stats-dishes", height = 4300, required = listOf("Dishes & stock", "Sales by dish", "Popularity and margin", "Stock in and out", "Cost and margin by dish"))
+        model.tab(StatsTab.PAYMENTS); settle()
+        shot("stats-payments", height = 2900, required = listOf("Payments & finance", "Payments by day", "From the bills to the money kept", "Tax summary",
+            "Check against the terminal and the bank"))
+        model.tab(StatsTab.TEAM); settle()
+        shot("stats-team", height = 3300, required = listOf("Team & bookings", "Everyone side by side", "Giulia Rossi", "Bookings by day", "How full the tables were"))
+        shot("stats-team-tablet", 1024, 4200)
+        // One filter on: only takeaway (the figures follow its share for now).
+        model.tab(StatsTab.OVERVIEW); model.filters { it.copy(orderType = "TAKEAWAY") }; settle()
+        shot("stats-overview-filtered", height = 1400, required = listOf("Showing only", "Takeaway"))
         model.onDispose()
     }
 

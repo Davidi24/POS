@@ -1,0 +1,12 @@
+MOCK sample supplier banners (Wikimedia Commons; see each page for author and licence):
+adriatik-seafood.jpg: https://commons.wikimedia.org/wiki/File:Fish_stalls_at_Valencia_Public_Market_01.jpg
+balkan-beverages.jpg: https://commons.wikimedia.org/wiki/File:Asahi_Wilkinson_Tansan_Case_20160919.jpg
+city-wholesale.jpg: https://commons.wikimedia.org/wiki/File:Flaps_held_open_with_clips_that_allow_boxes_to_be_stacked_for_transport_while_open.jpg
+ecopack-supplies.jpg: https://commons.wikimedia.org/wiki/File:Cardboard_boxes_by_Henry_S%C3%B6derlund.jpg
+fresh-farm-tirana.jpg: https://commons.wikimedia.org/wiki/File:Fruit_and_Vegetable_Stall,_Borough_Market,_London_SE1_-_geograph.org.uk_-_4725650.jpg
+kasapi-meats.jpg: https://commons.wikimedia.org/wiki/File:Meat_display_in_butcher%27s_shop,_Bodmin,_Cornwall_-_January_2023.jpg
+lakti-dairy.jpg: https://commons.wikimedia.org/wiki/File:Dairy_cows_grazing_with_visible_graze_line.jpg
+mokka-roasters-tirana.jpg: https://commons.wikimedia.org/wiki/File:Closer_look_at_the_coffee_beans_from_the_coffee_roasting_machine_looking_at_their_progress.jpg
+olive-grove-berat.jpg: https://commons.wikimedia.org/wiki/File:Naxos_Olive_Groves.jpg
+vino-spirits-durr-s.jpg: https://commons.wikimedia.org/wiki/File:Yerevan,_Brandy_barrels,_Armenia.jpg
+baker-s-corner.jpg: https://commons.wikimedia.org/wiki/File:Granier_-_Bakery_and_Caf%C3%A9_in_Wood_Green_-_2.jpg

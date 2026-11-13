@@ -171,6 +171,10 @@ class ReservationApi(
     suspend fun confirmAttendance(restaurantId: String, reservationId: String, request: ReservationActionRequestDto = ReservationActionRequestDto()): ReservationResponseDto =
         reservationAction(restaurantId, reservationId, "confirm-attendance", request)
 
+    // Staff called and nobody answered: a grey "Couldn't reach" mark, never a cancel.
+    suspend fun couldNotReach(restaurantId: String, reservationId: String, request: ReservationActionRequestDto = ReservationActionRequestDto()): ReservationResponseDto =
+        reservationAction(restaurantId, reservationId, "could-not-reach", request)
+
     suspend fun clearNoShowWarning(restaurantId: String, reservationId: String, request: ReservationActionRequestDto): ReservationResponseDto =
         reservationAction(restaurantId, reservationId, "clear-no-show-warning", request)
 

@@ -16,7 +16,12 @@ data class CreateMenuRequestDto(
     val availableFromDate: String? = null,
     val availableUntilDate: String? = null,
     val color: String? = null,
-    val special: Boolean? = null
+    val special: Boolean? = null,
+    // BOOKING_EXTRAS or EVENT (with eventId); read only with special = true.
+    val specialKind: String? = null,
+    val eventId: String? = null,
+    // Show in POS (to waiters and at the till); null keeps it.
+    val shownToWaiters: Boolean? = null
 )
 
 @Serializable
@@ -32,7 +37,12 @@ data class UpdateMenuRequestDto(
     val availableFromDate: String? = null,
     val availableUntilDate: String? = null,
     val color: String? = null,
-    val special: Boolean? = null
+    val special: Boolean? = null,
+    // BOOKING_EXTRAS or EVENT (with eventId); read only with special = true.
+    val specialKind: String? = null,
+    val eventId: String? = null,
+    // Show in POS (to waiters and at the till); null keeps it.
+    val shownToWaiters: Boolean? = null
 )
 
 @Serializable

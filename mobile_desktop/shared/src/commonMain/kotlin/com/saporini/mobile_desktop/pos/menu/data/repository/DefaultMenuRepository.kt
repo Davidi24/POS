@@ -47,10 +47,67 @@ class DefaultMenuRepository(
                 availableFromDate = input.availableFromDate,
                 availableUntilDate = input.availableUntilDate,
                 color = input.color,
-                special = input.special
+                special = input.special,
+                specialKind = input.specialKind?.name,
+                eventId = input.eventId,
+                shownToWaiters = input.shownToWaiters
             )
         ).toDomain()
     }
+
+    override suspend fun getMenusAvailableNow(restaurantId: String): List<Menu> =
+        api.getMenusAvailableNow(restaurantId).toDomain().items
+
+    override suspend fun saveMenuOrder(restaurantId: String, menuIds: List<String>) {
+        api.saveMenuOrder(MenuOrderRequestDto(restaurantId = restaurantId, menuIds = menuIds))
+    }
+
+    override suspend fun getWaiterView(restaurantId: String): MenuWaiterView =
+        api.getWaiterView(restaurantId).let { MenuWaiterView(it.specialMenusOnly, it.shownMenuIds.toSet()) }
+
+    override suspend fun saveWaiterView(restaurantId: String, view: MenuWaiterView): MenuWaiterView =
+        api.saveWaiterView(
+            MenuWaiterViewRequestDto(
+                restaurantId = restaurantId,
+                specialMenusOnly = view.specialMenusOnly,
+                shownMenuIds = view.shownMenuIds.toList()
+            )
+        ).let { MenuWaiterView(it.specialMenusOnly, it.shownMenuIds.toSet()) }
+
+    override suspend fun getEventNights(restaurantId: String): List<MenuEventNight> =
+        api.getEventNights(restaurantId).map { it.toDomain() }
+
+    override suspend fun updateEventNight(restaurantId: String, event: MenuEventNight, input: MenuEventNightInput): MenuEventNight =
+        api.updateEventNight(
+            restaurantId,
+            event.id,
+            MenuEventNightRequestDto(
+                name = input.name,
+                icon = input.icon,
+                startDate = input.startDate,
+                endDate = input.endDate,
+                specialMenuOnly = input.specialMenuOnly,
+                active = event.active,
+                menuId = event.menuId
+            )
+        ).toDomain()
+
+    override suspend fun deleteEventNight(restaurantId: String, eventId: String) {
+        api.deleteEventNight(restaurantId, eventId)
+    }
+
+    override suspend fun createEventNight(restaurantId: String, input: MenuEventNightInput): MenuEventNight =
+        api.createEventNight(
+            restaurantId,
+            MenuEventNightRequestDto(
+                name = input.name,
+                icon = input.icon,
+                startDate = input.startDate,
+                endDate = input.endDate,
+                specialMenuOnly = input.specialMenuOnly,
+                active = true
+            )
+        ).toDomain()
 
     override suspend fun getMenu(
         menuId: String,
@@ -86,7 +143,10 @@ class DefaultMenuRepository(
                 availableFromDate = input.availableFromDate,
                 availableUntilDate = input.availableUntilDate,
                 color = input.color,
-                special = input.special
+                special = input.special,
+                specialKind = input.specialKind?.name,
+                eventId = input.eventId,
+                shownToWaiters = input.shownToWaiters
             )
         ).toDomain()
     }
@@ -168,6 +228,26 @@ class DefaultMenuRepository(
 
     override suspend fun importItems(menuId: String, sectionId: String, itemIds: List<String>): List<MenuItem> =
         api.importItems(menuId, sectionId, ImportMenuItemsRequestDto(itemIds)).map { it.toDomain() }
+
+    override suspend fun uploadItemImage(
+        menuId: String,
+        sectionId: String,
+        itemId: String,
+        imageBytes: ByteArray,
+        fileName: String,
+        contentType: String
+    ): MenuItem = api.uploadItemImage(menuId, sectionId, itemId, imageBytes, fileName, contentType).toDomain()
+
+    override suspend fun removeItemImage(menuId: String, sectionId: String, itemId: String): MenuItem =
+        api.removeItemImage(menuId, sectionId, itemId).toDomain()
+
+    override suspend fun getDishRecipe(menuId: String, sectionId: String, itemId: String) =
+        api.getDishRecipe(menuId, sectionId, itemId)
+
+    override suspend fun saveDishRecipe(menuId: String, sectionId: String, itemId: String, ingredients: List<DishIngredientRequestDto>) =
+        api.saveDishRecipe(menuId, sectionId, itemId, DishRecipeRequestDto(ingredients))
+
+    override suspend fun ingredientChoices(menuId: String) = api.ingredientChoices(menuId)
 
     override suspend fun updateItem(
         menuId: String,

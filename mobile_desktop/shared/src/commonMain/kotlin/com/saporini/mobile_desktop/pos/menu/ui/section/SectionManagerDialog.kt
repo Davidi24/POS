@@ -75,6 +75,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.pos.menu.ui.justCreated
+import com.saporini.mobile_desktop.pos.menu.ui.rememberJustCreated
 import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
 import com.saporini.mobile_desktop.pos.menu.ui.MenuCategory
 import com.saporini.mobile_desktop.pos.menu.ui.MenuCategoryIcon
@@ -130,6 +132,8 @@ internal fun SectionManagerDialog(
     var sectionBeingEdited by remember { mutableStateOf<MenuCategory?>(null) }
     var sectionToDelete by remember { mutableStateOf<MenuCategory?>(null) }
     var addSectionOpen by remember { mutableStateOf(false) }
+    // A section just added here: its row is scrolled to and marked for a moment.
+    val justAdded = rememberJustCreated()
     fun realIndexOf(name: String) = workingSections.filter { it.name != "All" }.indexOfFirst { it.name == name }
 
     // Same "looks disabled but stays clickable" pattern as Create Menu / Edit Order:
@@ -155,7 +159,11 @@ internal fun SectionManagerDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    // Closing while editing keeps what was already saved (added, renamed, deleted sections), like Done; closing while
+    // changing the order drops the unsaved order.
+    val close: () -> Unit = { if (isReordering) onDismiss() else onDoneEditing(workingSections) }
+
+    Dialog(onDismissRequest = close, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.34f))
                 .then(if (isPhone) Modifier.safeDrawingPadding().imePadding() else Modifier)
@@ -194,7 +202,7 @@ internal fun SectionManagerDialog(
                             .clip(CircleShape)
                             .background(SectionSurface)
                             .border(1.dp, SectionBorder, CircleShape)
-                            .clickable(onClick = onDismiss),
+                            .clickable(onClick = close),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -217,6 +225,7 @@ internal fun SectionManagerDialog(
                         mode = mode,
                         allowDelete = allowCreateDelete,
                         itemCountFor = { section -> itemCounts[section.name] ?: 0 },
+                        highlightedName = justAdded.value,
                         onReorder = { workingSections = it },
                         onEdit = { sectionBeingEdited = it },
                         onDelete = { sectionToDelete = it }
@@ -335,6 +344,7 @@ internal fun SectionManagerDialog(
             onAdded = { newSection ->
                 workingSections = (workingSections + newSection).inFilterOrder()
                 addSectionOpen = false
+                justAdded.value = newSection.name
             }
         )
     }
@@ -347,6 +357,7 @@ private fun SectionReorderList(
     mode: SectionManagerMode,
     allowDelete: Boolean,
     itemCountFor: (MenuCategory) -> Int,
+    highlightedName: String? = null,
     onReorder: (List<MenuCategory>) -> Unit,
     onEdit: (MenuCategory) -> Unit,
     onDelete: (MenuCategory) -> Unit
@@ -440,7 +451,7 @@ private fun SectionReorderList(
                     onDelete = { onDelete(section) },
                     dragHandleModifier = dragModifier,
                     modifier = Modifier.width(listWidth).heightIn(min = rowHeight, max = rowHeight)
-                        .zIndex(if (isDragging) 2f else 0f)
+                        .zIndex(if (isDragging) 2f else if (section.name == highlightedName) 1f else 0f)
                         .offset { if (isDragging) IntOffset(0, draggedY.roundToInt()) else animatedOffset }
                         .graphicsLayer {
                             if (isDragging) {
@@ -448,6 +459,7 @@ private fun SectionReorderList(
                                 scaleY = 1.015f
                             }
                         }
+                        .justCreated(section.name == highlightedName, RoundedCornerShape(10.dp))
                 )
             }
         }

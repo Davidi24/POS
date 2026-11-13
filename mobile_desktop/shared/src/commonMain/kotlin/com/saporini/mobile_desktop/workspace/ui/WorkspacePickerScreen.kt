@@ -75,11 +75,16 @@ import com.saporini.mobile_desktop.core.session.accessibleWorkspaces
 import com.saporini.mobile_desktop.core.theme.Inter
 import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.pos_simple_logo
+import com.saporini.mobile_desktop.core.components.HideOnScrollBar
+import com.saporini.mobile_desktop.core.components.rememberHideOnScroll
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import mobile_desktop.shared.generated.resources.workspace_admin
+import mobile_desktop.shared.generated.resources.workspace_inventory
 import mobile_desktop.shared.generated.resources.workspace_kds
 import mobile_desktop.shared.generated.resources.workspace_pos
 import mobile_desktop.shared.generated.resources.workspace_statistics
 import mobile_desktop.shared.generated.resources.workspace_fraud
+import mobile_desktop.shared.generated.resources.workspace_restaurants
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 
@@ -108,7 +113,10 @@ object WorkspacePickerScreen : Screen {
         val screenModel = koinInject<WorkspaceScreenModel>()
         val state by screenModel.state.collectAsState()
         val user by sessionManager.currentUser.collectAsState()
-        val workspaces = user?.let { accessibleWorkspaces(it) }.orEmpty().sortedBy { it.ordinal }
+        val acting by sessionManager.actingRestaurant.collectAsState()
+        // Restaurant isn't a card, not even for super admins (user rule, 2026-10-29): they manage restaurants from the
+        // restaurant list, and a closed or branch-less restaurant's "Manage" opens its page straight from there.
+        val workspaces = user?.let { accessibleWorkspaces(it) }.orEmpty().filter { it != Workspace.RESTAURANT }.sortedBy { it.ordinal }
 
         LaunchedEffect(state.loggedOut) {
             if (state.loggedOut) navigator.replaceAll(LoginScreen)
@@ -117,12 +125,18 @@ object WorkspacePickerScreen : Screen {
         BoxWithConstraints(Modifier.fillMaxSize().background(PageBackground)) {
             val narrow = maxWidth < 760.dp
             val fitsFourInRow = maxWidth >= 1240.dp
-            val twoRows = workspaces.size > 3 && Workspace.FRAUD_DETECTION in workspaces
-            val five = workspaces.size == 5
-            // Five choices get smaller cards so the two rows sit comfortably on one screen.
+            val twoRows = (workspaces.size > 3 && Workspace.FRAUD_DETECTION in workspaces) || workspaces.size >= 5
+            val five = workspaces.size >= 5
+            // Five or more choices get smaller cards so the rows sit comfortably on one screen. Never more than three in a
+            // row (user rule): seven cards are 3 + 3 + 1.
             val threeColumnCardWidth = ((maxWidth - 104.dp) / 3).coerceAtMost(if (five) 236.dp else 300.dp)
             PageDecorations(Modifier.fillMaxSize(), narrow)
             val windowHeight = maxHeight
+            // A phone: the bar sits above the cards and slides away while they scroll down, back as they scroll up.
+            val hideBar = rememberHideOnScroll(narrow)
+            Column(Modifier.fillMaxSize()) {
+            if (narrow) HideOnScrollBar(hideBar) { PickerTopBar(user = user, loggingOut = state.isLoggingOut, onLogout = screenModel::logout, compact = true) }
+            Box(Modifier.fillMaxWidth().weight(1f).nestedScroll(hideBar.connection)) {
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                     // Two rows of cards sit in the middle of the window (lower than the top), still scrolling on short windows.
@@ -131,22 +145,39 @@ object WorkspacePickerScreen : Screen {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = if (twoRows && !narrow) Arrangement.Center else Arrangement.Top
             ) {
-                Spacer(Modifier.height(if (narrow) 84.dp else if (twoRows) 90.dp else 150.dp))
+                Spacer(Modifier.height(if (narrow) 24.dp else if (twoRows) 90.dp else 150.dp))
                 // "Welcome, David" in black, then "Choose your workspace" smaller and grey.
                 val firstName = user?.firstName?.trim().orEmpty().ifBlank { user?.username.orEmpty() }
-                Text(
-                    if (firstName.isBlank()) "Welcome" else "Welcome, $firstName",
-                    fontFamily = Inter(), fontWeight = FontWeight.Bold,
-                    fontSize = if (narrow) 26.sp else 38.sp, color = TitleInk,
-                    textAlign = TextAlign.Center
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Super admins: back to the branches (or the restaurants), on the same line as the welcome.
+                    if (acting != null) {
+                        com.saporini.mobile_desktop.platform.ui.BackArrow(
+                            if (acting?.branchCount ?: 1 > 1) "Back to the branches" else "Back to the restaurants"
+                        ) { if (!navigator.pop()) navigator.replaceAll(com.saporini.mobile_desktop.platform.ui.RestaurantListScreen) }
+                        Spacer(Modifier.width(if (narrow) 6.dp else 10.dp))
+                    }
+                    Text(
+                        if (firstName.isBlank()) "Welcome" else "Welcome, $firstName",
+                        fontFamily = Inter(), fontWeight = FontWeight.Bold,
+                        fontSize = if (narrow) 22.sp else 28.sp, color = TitleInk,
+                        textAlign = TextAlign.Center
+                    )
+                }
                 Spacer(Modifier.height(if (narrow) 4.dp else 8.dp))
                 Text(
                     "Choose your workspace",
                     fontFamily = Inter(), fontWeight = FontWeight.Medium,
-                    fontSize = if (narrow) 16.sp else 20.sp, color = Muted,
+                    fontSize = if (narrow) 14.sp else 16.sp, color = Muted,
                     textAlign = TextAlign.Center
                 )
+                // Super admins: which restaurant and branch they're in, with a way back to the list or to another branch.
+                acting?.let { restaurant ->
+                    Spacer(Modifier.height(if (narrow) 10.dp else 14.dp))
+                    com.saporini.mobile_desktop.platform.ui.ActingRestaurantBar(
+                        restaurant,
+                        onAllRestaurants = { navigator.replaceAll(com.saporini.mobile_desktop.platform.ui.RestaurantListScreen) }
+                    )
+                }
                 Spacer(Modifier.height(if (narrow || twoRows) 24.dp else 44.dp))
                 if (narrow) {
                     Column(Modifier.widthIn(max = 440.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -199,19 +230,21 @@ object WorkspacePickerScreen : Screen {
                 Spacer(Modifier.height(if (narrow || twoRows) 24.dp else 72.dp))
             }
             // Logo on the left; notifications and the profile menu (with log out) on the right.
-            WorkspaceTopBar(
+            if (!narrow) PickerTopBar(
                 user = user,
                 loggingOut = state.isLoggingOut,
                 onLogout = screenModel::logout,
-                compact = narrow
+                compact = false
             )
+            }
+            }
         }
     }
 }
 
 // Soft green shapes in the top-right and bottom-left corners, each with a thin curved line.
 @Composable
-private fun PageDecorations(modifier: Modifier, narrow: Boolean) {
+internal fun PageDecorations(modifier: Modifier, narrow: Boolean) {
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -246,12 +279,20 @@ private fun PageDecorations(modifier: Modifier, narrow: Boolean) {
 }
 
 @Composable
-private fun WorkspaceTopBar(user: CurrentUserResponse?, loggingOut: Boolean, onLogout: () -> Unit, compact: Boolean) {
+internal fun PickerTopBar(
+    user: CurrentUserResponse?, loggingOut: Boolean, onLogout: () -> Unit, compact: Boolean,
+    // Inside a workspace on a phone: back to "Choose your workspace" instead of the logo and smaller controls (user,
+    // 2026-10-30); the page under it keeps some room instead of a line.
+    onBack: (() -> Unit)? = null
+) {
+    val slim = onBack != null
+    Column(Modifier.fillMaxWidth()) {
     Row(
-        Modifier.fillMaxWidth().height(if (compact) 60.dp else 76.dp).padding(horizontal = if (compact) 14.dp else 28.dp),
+        Modifier.fillMaxWidth().height(if (slim) 52.dp else if (compact) 60.dp else 76.dp).padding(horizontal = if (slim) 10.dp else if (compact) 14.dp else 28.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
+        if (onBack != null) com.saporini.mobile_desktop.platform.ui.BackArrow("Back to workspaces", onBack)
+        else Image(
             painter = painterResource(Res.drawable.pos_simple_logo),
             contentDescription = "Saporini",
             modifier = Modifier.size(width = if (compact) 30.dp else 40.dp, height = if (compact) 40.dp else 54.dp),
@@ -270,20 +311,37 @@ private fun WorkspaceTopBar(user: CurrentUserResponse?, loggingOut: Boolean, onL
             val center = org.koin.compose.getKoin().getOrNull<com.saporini.mobile_desktop.notifications.NotificationCenter>()
             com.saporini.mobile_desktop.notifications.NotificationBell(
                 tint = Ink,
-                iconSize = 26.dp,
+                buttonSize = if (slim) 36.dp else 42.dp,
+                iconSize = if (slim) 22.dp else 26.dp,
                 onOpen = { notification ->
                     // Open POS on the reservation the notification points at.
                     center?.requestOpen(notification)
                     if (user?.let { Workspace.POS in accessibleWorkspaces(it) } == true) navigator.push(com.saporini.mobile_desktop.pos.ui.PosScreen)
                 }
             )
-            ProfileMenu(user, loggingOut, onLogout, compact)
+            ProfileMenu(user, loggingOut, onLogout, compact, small = slim)
+            // Always in sight on wider windows; on a phone Log out is only in the profile menu (user, 2026-10-30).
+            if (!compact) Surface(
+                onClick = onLogout, enabled = !loggingOut, shape = RoundedCornerShape(50), color = Color.White,
+                border = BorderStroke(1.dp, CardBorder)
+            ) {
+                Row(
+                    Modifier.height(if (slim) 34.dp else if (compact) 40.dp else 46.dp).padding(horizontal = if (slim) 8.dp else if (compact) 10.dp else 14.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    if (loggingOut) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFFB13A2F))
+                    else Icon(Icons.AutoMirrored.Outlined.Logout, "Log out", Modifier.size(if (slim) 16.dp else 18.dp), tint = Color(0xFFB13A2F))
+                    if (!compact) Text(if (loggingOut) "Logging out…" else "Log out", fontFamily = Inter(), fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp, color = Color(0xFFB13A2F))
+                }
+            }
         }
+    }
     }
 }
 
 @Composable
-private fun ProfileMenu(user: CurrentUserResponse?, loggingOut: Boolean, onLogout: () -> Unit, compact: Boolean) {
+private fun ProfileMenu(user: CurrentUserResponse?, loggingOut: Boolean, onLogout: () -> Unit, compact: Boolean, small: Boolean = false) {
     var open by remember { mutableStateOf(false) }
     val name = user?.let { "${it.firstName} ${it.lastName}".trim().ifBlank { it.username } } ?: "Signed in"
     val initials = user?.let { listOf(it.firstName, it.lastName).mapNotNull { part -> part.firstOrNull()?.uppercaseChar() }.joinToString("") }
@@ -297,12 +355,12 @@ private fun ProfileMenu(user: CurrentUserResponse?, loggingOut: Boolean, onLogou
             border = BorderStroke(1.dp, CardBorder)
         ) {
             Row(
-                Modifier.padding(start = 5.dp, end = if (compact) 8.dp else 12.dp, top = 5.dp, bottom = 5.dp),
+                Modifier.padding(start = if (small) 3.dp else 5.dp, end = if (compact) 8.dp else 12.dp, top = if (small) 3.dp else 5.dp, bottom = if (small) 3.dp else 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(if (small) 6.dp else 10.dp)
             ) {
-                Box(Modifier.size(36.dp).clip(CircleShape).background(Green), contentAlignment = Alignment.Center) {
-                    Text(initials, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White)
+                Box(Modifier.size(if (small) 28.dp else 36.dp).clip(CircleShape).background(Green), contentAlignment = Alignment.Center) {
+                    Text(initials, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = if (small) 11.sp else 13.sp, color = Color.White)
                 }
                 if (!compact) {
                     Column {
@@ -346,16 +404,20 @@ private fun WorkspaceCard(workspace: Workspace, modifier: Modifier, compact: Boo
     val (title, subtitle) = when (workspace) {
         Workspace.POS -> "POS" to "Point of Sale \u2014 orders, tables and payments"
         Workspace.KDS -> "KDS" to "Kitchen Display System"
-        Workspace.ADMIN -> "Admin Hub" to "Inventory, suppliers, devices and settings"
+        Workspace.ADMIN -> "Admin Hub" to "Shifts, salary, users, devices and settings"
+        Workspace.INVENTORY -> "Inventory" to "Stock, items, counts and suppliers"
         Workspace.STATISTICS -> "Statistics" to "Sales, performance and reports"
         Workspace.FRAUD_DETECTION -> "Fraud Detection" to "Suspicious activity and alerts"
+        Workspace.RESTAURANT -> "Restaurant" to "Details, branches, currency and time zone"
     }
     val illustration = when (workspace) {
         Workspace.POS -> Res.drawable.workspace_pos
         Workspace.KDS -> Res.drawable.workspace_kds
         Workspace.ADMIN -> Res.drawable.workspace_admin
+        Workspace.INVENTORY -> Res.drawable.workspace_inventory
         Workspace.STATISTICS -> Res.drawable.workspace_statistics
         Workspace.FRAUD_DETECTION -> Res.drawable.workspace_fraud
+        Workspace.RESTAURANT -> Res.drawable.workspace_restaurants
     }
     val shape = RoundedCornerShape(if (compact) 14.dp else 16.dp)
     Surface(

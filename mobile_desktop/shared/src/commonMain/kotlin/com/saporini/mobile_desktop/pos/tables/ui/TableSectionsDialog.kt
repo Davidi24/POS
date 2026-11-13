@@ -1,5 +1,7 @@
 package com.saporini.mobile_desktop.pos.tables.ui
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -143,7 +145,7 @@ internal fun TableSectionsDialog(
         loadError = null
         onLoadSections().fold(
             onSuccess = { loaded -> sections = loaded.sortedBy { it.displayOrder } },
-            onFailure = { error -> loadError = error.message ?: "Could not load sections." }
+            onFailure = { error -> loadError = error.message ?: "Could not load the areas." }
         )
     }
 
@@ -188,7 +190,7 @@ internal fun TableSectionsDialog(
         if (section == null) {
             val owner = sections.orEmpty().firstOrNull { tableId in it.tableIds }
             notify(
-                if (owner != null) "Table ${table.label} is in ${owner.name}" else "Table ${table.label} is not in a section yet",
+                if (owner != null) "Table ${table.label} is in ${owner.name}" else "Table ${table.label} is not in an area yet",
                 TableNotificationTone.Info
             )
             return
@@ -218,6 +220,9 @@ internal fun TableSectionsDialog(
             contentAlignment = Alignment.Center
         ) {
             val expanded = pickingSection != null || showMap
+            // No room for the list beside the plan (phones, small tablets): the plan goes under the list (user, 2026-11-02).
+            val stacked = maxWidth < 760.dp
+            val pickerHeight = (maxWidth * 0.75f + 78.dp).coerceAtMost(maxHeight * 0.6f)
             val listWidth by animateDpAsState(
                 targetValue = minOf(maxWidth, if (expanded) ExpandedListWidth else ListWidth),
                 animationSpec = tween(420, easing = FastOutSlowInEasing),
@@ -239,22 +244,22 @@ internal fun TableSectionsDialog(
                     .shadow(22.dp, RoundedCornerShape(16.dp)).clip(RoundedCornerShape(16.dp))
                     .background(Color.White).border(1.dp, SectionBorder, RoundedCornerShape(16.dp))
             ) {
-                Row(Modifier.fillMaxSize()) {
-                    Column(Modifier.width(listWidth).fillMaxHeight()) {
+                val listPane: @Composable (Modifier) -> Unit = { listModifier ->
+                    Column(listModifier) {
                         Row(
                             Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text("Group tables", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = SectionInk)
+                                Text("Booking areas", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = SectionInk)
                                 Text(
-                                    if (reorderMode) "Drag the six-dot handle to set the priority. The top group is used first when suggesting tables."
-                                    else "Create sections like Main Salon or Terrace. Click a section to add its tables from the plan.",
+                                    if (reorderMode) "Drag the six-dot handle to set the order. Bookings get tables from the top area first."
+                                    else "Make areas like Main Salon or Terrace and pick their tables on the plan. Bookings get tables from the top area first.",
                                     fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = SectionMuted
                                 )
                             }
                             if (!expanded) {
-                                CloseCircleButton("Close sections", closeDialog)
+                                CloseCircleButton("Close areas", closeDialog)
                             }
                         }
                         HorizontalDivider(color = SectionBorder)
@@ -271,7 +276,7 @@ internal fun TableSectionsDialog(
                                     verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Text(loadError.orEmpty(), fontFamily = Inter(), fontSize = 13.sp, color = SectionDanger)
-                                    TextButton(onClick = { loadToken++ }) { Text("Try again", color = SectionGreen) }
+                                    TextButton(onClick = { loadToken++ }) { Text("Try again", letterSpacing = 0.sp, color = SectionGreen) }
                                 }
                                 loaded == null -> Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
                                     CircularProgressIndicator(Modifier.size(32.dp), color = SectionGreen, strokeWidth = 3.dp)
@@ -294,7 +299,7 @@ internal fun TableSectionsDialog(
                                 else -> {
                                     if (loaded.isEmpty()) {
                                         Text(
-                                            "No sections yet. Tap + to create the first one.",
+                                            "No areas yet. Tap + to make the first one.",
                                             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                                             fontFamily = Inter(), fontSize = 13.sp, color = SectionMuted
                                         )
@@ -326,12 +331,12 @@ internal fun TableSectionsDialog(
                                                 .clickable { addSectionOpen = true },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(Icons.Outlined.Add, "Add new section", Modifier.size(21.dp), tint = SectionInk)
+                                            Icon(Icons.Outlined.Add, "Add an area", Modifier.size(21.dp), tint = SectionInk)
                                         }
                                     }
                                     if (pickingSection != null) {
                                         Text(
-                                            "Unselect all to see all groups",
+                                            "Unselect all to see all areas",
                                             modifier = Modifier.fillMaxWidth()
                                                 .clip(RoundedCornerShape(6.dp))
                                                 .clickable {
@@ -353,7 +358,7 @@ internal fun TableSectionsDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TextButton(onClick = { reorderMode = false }, enabled = !savingOrder) {
-                                Text("Cancel", color = SectionMuted, fontFamily = Inter(), fontWeight = FontWeight.SemiBold)
+                                Text("Cancel", letterSpacing = 0.sp, color = SectionMuted, fontFamily = Inter(), fontWeight = FontWeight.SemiBold)
                             }
                             Spacer(Modifier.width(10.dp))
                             Button(
@@ -378,89 +383,100 @@ internal fun TableSectionsDialog(
                                 shape = RoundedCornerShape(percent = 50),
                                 colors = ButtonDefaults.buttonColors(containerColor = SectionGreen)
                             ) {
-                                Text("Save order", fontFamily = Inter(), fontWeight = FontWeight.Bold)
+                                Text("Save order", letterSpacing = 0.sp, fontFamily = Inter(), fontWeight = FontWeight.Bold)
                             }
-                        } else Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (isWidePhone) 6.dp else 10.dp),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
+                        } else BoxWithConstraints(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (isWidePhone) 6.dp else 10.dp)
                         ) {
-                            val canReorder = sections.orEmpty().size >= 2
-                            val reorderInk = if (canReorder) SectionInk else SectionInk.copy(alpha = 0.4f)
-                            Button(
-                                onClick = {
+                            // Narrow (phones): the two side buttons keep only their icons, so Done always fits.
+                            val iconsOnly = maxWidth < 360.dp
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val canReorder = sections.orEmpty().size >= 2
+                                SectionFooterButton(
+                                    icon = Icons.Outlined.DragIndicator,
+                                    label = "Change position",
+                                    iconsOnly = iconsOnly,
+                                    ink = if (canReorder) SectionInk else SectionInk.copy(alpha = 0.4f)
+                                ) {
                                     if (canReorder) {
                                         openPicker(null)
                                         showMap = false
                                         workingOrder = sections.orEmpty()
                                         reorderMode = true
                                     } else {
-                                        notify("Add at least 2 groups to change their order", TableNotificationTone.Info)
+                                        notify("Add at least 2 areas to change their order", TableNotificationTone.Info)
                                     }
-                                },
-                                shape = RoundedCornerShape(9.dp),
-                                border = BorderStroke(1.dp, reorderInk),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = reorderInk)
-                            ) {
-                                Icon(Icons.Outlined.DragIndicator, null, Modifier.size(18.dp), tint = reorderInk)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Change position", fontFamily = Inter(), fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(Modifier.weight(1f))
-                            Button(
-                                onClick = {
+                                }
+                                Spacer(Modifier.weight(1f))
+                                SectionFooterButton(
+                                    icon = Icons.Outlined.Map,
+                                    label = if (expanded) "Hide map" else "Show map",
+                                    iconsOnly = iconsOnly,
+                                    ink = SectionInk
+                                ) {
                                     if (expanded) {
                                         showMap = false
                                         openPicker(null)
                                     } else {
                                         showMap = true
                                     }
-                                },
-                                shape = RoundedCornerShape(9.dp),
-                                border = BorderStroke(1.dp, SectionInk),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = SectionInk)
-                            ) {
-                                Icon(Icons.Outlined.Map, null, Modifier.size(18.dp), tint = SectionInk)
-                                Spacer(Modifier.width(6.dp))
-                                Text(if (expanded) "Hide map" else "Show map", fontFamily = Inter(), fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Button(
-                                onClick = onDismiss,
-                                shape = RoundedCornerShape(percent = 50),
-                                colors = ButtonDefaults.buttonColors(containerColor = SectionGreen)
-                            ) {
-                                Text("Done", fontFamily = Inter(), fontWeight = FontWeight.Bold)
+                                }
+                                Button(
+                                    onClick = onDismiss,
+                                    shape = RoundedCornerShape(percent = 50),
+                                    contentPadding = PaddingValues(horizontal = 20.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = SectionGreen)
+                                ) {
+                                    Text("Done", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                                        letterSpacing = 0.sp, maxLines = 1, softWrap = false)
+                                }
                             }
                         }
                     }
 
+                }
+                val pickerPane: @Composable () -> Unit = {
+                    val section = pickingSection
+                    val allSections = sections.orEmpty()
+                    TablePickerPane(
+                        section = section,
+                        stacked = stacked,
+                        floorPlan = floorPlan,
+                        highlightedLabels = section?.let { picked ->
+                            tables.filter { it.id in picked.tableIds }.map { it.label }.toSet()
+                        },
+                        outlines = if (section == null) {
+                            allSections.mapIndexed { index, each ->
+                                tables.filter { it.id in each.tableIds }.map { it.label }.toSet() to sectionColor(index)
+                            }
+                        } else {
+                            emptyList()
+                        },
+                        onTableClick = ::onPlanTableClick,
+                        onClose = { if (section != null) openPicker(null) else showMap = false }
+                    )
+                }
+                if (stacked) Column(Modifier.fillMaxSize()) {
+                    listPane(Modifier.fillMaxWidth().weight(1f))
+                    if (expanded) {
+                        HorizontalDivider(color = SectionBorder)
+                        Box(Modifier.fillMaxWidth().height(pickerHeight)) { pickerPane() }
+                    }
+                } else Row(Modifier.fillMaxSize()) {
+                    listPane(Modifier.width(listWidth).fillMaxHeight())
                     AnimatedVisibility(
                         visible = expanded,
                         modifier = Modifier.weight(1f, fill = false),
                         enter = fadeIn(tween(260, delayMillis = 160)),
                         exit = fadeOut(tween(140))
                     ) {
-                        val section = pickingSection
                         Row(Modifier.fillMaxHeight()) {
                             VerticalDivider(color = SectionBorder)
-                            val allSections = sections.orEmpty()
-                            TablePickerPane(
-                                section = section,
-                                floorPlan = floorPlan,
-                                highlightedLabels = section?.let { picked ->
-                                    tables.filter { it.id in picked.tableIds }.map { it.label }.toSet()
-                                },
-                                outlines = if (section == null) {
-                                    allSections.mapIndexed { index, each ->
-                                        tables.filter { it.id in each.tableIds }.map { it.label }.toSet() to sectionColor(index)
-                                    }
-                                } else {
-                                    emptyList()
-                                },
-                                onTableClick = ::onPlanTableClick,
-                                onClose = { if (section != null) openPicker(null) else showMap = false }
-                            )
+                            pickerPane()
                         }
                     }
                 }
@@ -547,6 +563,7 @@ internal fun TableSectionsDialog(
 @Composable
 private fun TablePickerPane(
     section: TableSection?,
+    stacked: Boolean = false,
     floorPlan: @Composable (highlightedLabels: Set<String>?, outlines: List<Pair<Set<String>, Color>>, onTableClick: (FloorPlanTable) -> Unit, modifier: Modifier) -> Unit,
     highlightedLabels: Set<String>?,
     outlines: List<Pair<Set<String>, Color>>,
@@ -555,33 +572,37 @@ private fun TablePickerPane(
 ) {
     Column(Modifier.fillMaxSize().background(SectionSurface)) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 22.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+            Modifier.fillMaxWidth().padding(start = if (stacked) 12.dp else 22.dp, end = 12.dp, top = if (stacked) 6.dp else 10.dp, bottom = if (stacked) 6.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            if (!stacked) Box(
                 Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(SectionGreenSoft),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(if (section == null) Icons.Outlined.Map else Icons.Outlined.TouchApp, null, Modifier.size(21.dp), tint = SectionGreen)
             }
-            Spacer(Modifier.width(12.dp))
+            if (!stacked) Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     buildAnnotatedString {
                         if (section == null) {
-                            append("All sections on the plan")
+                            append("All areas on the plan")
                         } else {
                             append("Choose the tables you want to add to ")
                             withStyle(SpanStyle(color = SectionGreen)) { append(section.name) }
                         }
                     },
-                    fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = SectionInk,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                    fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (stacked) 14.sp else 17.sp, color = SectionInk,
+                    letterSpacing = 0.sp, maxLines = if (stacked) 2 else 1, overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    if (section == null) "Each section has its own color. Click a section on the left to edit its tables."
-                    else "Tap a table on the plan to add it. Remove tables with the × in the list on the left.",
-                    fontFamily = Inter(), fontSize = 12.sp, color = SectionMuted
+                    when {
+                        stacked && section == null -> "Each area has its own color."
+                        stacked -> "Tap a table to add it. The × in the list removes it."
+                        section == null -> "Each area has its own color. Click an area on the left to edit its tables."
+                        else -> "Tap a table on the plan to add it. Remove tables with the × in the list on the left."
+                    },
+                    fontFamily = Inter(), fontSize = 12.sp, letterSpacing = 0.sp, color = SectionMuted
                 )
             }
             Spacer(Modifier.width(12.dp))
@@ -589,10 +610,10 @@ private fun TablePickerPane(
         }
         HorizontalDivider(color = SectionBorder)
         Box(
-            Modifier.weight(1f).fillMaxWidth().padding(10.dp)
+            Modifier.weight(1f).fillMaxWidth().padding(if (stacked) 6.dp else 10.dp)
                 .clip(RoundedCornerShape(12.dp)).background(Color.White)
                 .border(1.dp, SectionBorder, RoundedCornerShape(12.dp))
-                .padding(6.dp)
+                .padding(if (stacked) 2.dp else 6.dp)
         ) {
             floorPlan(highlightedLabels, outlines, onTableClick, Modifier.fillMaxSize())
         }
@@ -726,9 +747,9 @@ private fun TableSectionNameDialog(
         sections.any { it.id != section?.id && it.name.equals(trimmed, ignoreCase = true) }
     val valid = trimmed.length in 2..40 && !isDuplicate
     val errorText = when {
-        trimmed.isEmpty() -> "Section name is required."
+        trimmed.isEmpty() -> "The area needs a name."
         trimmed.length < 2 -> "Use at least 2 characters."
-        isDuplicate -> "A section with this name already exists."
+        isDuplicate -> "An area with this name already exists."
         else -> null
     }
     val isIdle = status is DialogActionStatus.Idle
@@ -746,7 +767,7 @@ private fun TableSectionNameDialog(
                     status = DialogActionStatus.Success(if (section == null) "$trimmed added" else "$trimmed saved")
                 },
                 onFailure = { error ->
-                    status = DialogActionStatus.Failed(message = error.message ?: "Could not save this section.")
+                    status = DialogActionStatus.Failed(message = error.message ?: "Could not save this area.")
                 }
             )
         }
@@ -756,14 +777,14 @@ private fun TableSectionNameDialog(
         onDismissRequest = { if (isIdle) onDismiss() },
         title = {
             Text(
-                if (section == null) "Add section" else "Rename section",
+                if (section == null) "Add area" else "Rename area",
                 fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp
             )
         },
         text = {
             if (isIdle) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Section name", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SectionInk)
+                    Text("Area name", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SectionInk)
                     OutlinedTextField(
                         value = name,
                         onValueChange = { if (it.length <= 40) name = it },
@@ -800,13 +821,13 @@ private fun TableSectionNameDialog(
                         containerColor = if (valid) SectionGreen else SectionGreen.copy(alpha = 0.45f)
                     )
                 ) {
-                    Text(if (section == null) "Add" else "Save", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Text(if (section == null) "Add" else "Save", letterSpacing = 0.sp, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
                 }
             }
         },
         dismissButton = {
             if (isIdle) {
-                TextButton(onClick = onDismiss) { Text("Cancel", color = SectionMuted) }
+                TextButton(onClick = onDismiss) { Text("Cancel", letterSpacing = 0.sp, color = SectionMuted) }
             }
         }
     )
@@ -834,7 +855,7 @@ private fun DeleteTableSectionDialog(
         text = {
             if (isIdle) {
                 Text(
-                    "The section will be removed. Its tables stay on the floor plan, they just won't belong to a section.",
+                    "The area will be removed. Its tables stay on the floor plan, in no area.",
                     fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = SectionMuted
                 )
             } else {
@@ -856,7 +877,7 @@ private fun DeleteTableSectionDialog(
                             onDeleteSection(section.id).fold(
                                 onSuccess = { status = DialogActionStatus.Removed("${section.name} deleted") },
                                 onFailure = { error ->
-                                    status = DialogActionStatus.Failed(message = error.message ?: "Could not delete this section.")
+                                    status = DialogActionStatus.Failed(message = error.message ?: "Could not delete this area.")
                                 }
                             )
                         }
@@ -864,13 +885,13 @@ private fun DeleteTableSectionDialog(
                     shape = RoundedCornerShape(percent = 50),
                     colors = ButtonDefaults.buttonColors(containerColor = SectionDanger)
                 ) {
-                    Text("Delete", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Text("Delete", letterSpacing = 0.sp, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
                 }
             }
         },
         dismissButton = {
             if (isIdle) {
-                TextButton(onClick = onDismiss) { Text("Cancel", color = SectionMuted) }
+                TextButton(onClick = onDismiss) { Text("Cancel", letterSpacing = 0.sp, color = SectionMuted) }
             }
         }
     )
@@ -903,11 +924,11 @@ private fun AddTableToSectionDialog(
                 shape = RoundedCornerShape(percent = 50),
                 colors = ButtonDefaults.buttonColors(containerColor = SectionGreen)
             ) {
-                Text("Confirm", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text("Confirm", letterSpacing = 0.sp, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White)
             }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text("Cancel", color = SectionMuted) }
+            TextButton(onClick = onCancel) { Text("Cancel", letterSpacing = 0.sp, color = SectionMuted) }
         }
     )
 }
@@ -944,7 +965,7 @@ private fun MoveTableDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text("Cancel", color = SectionMuted) }
+            TextButton(onClick = onCancel) { Text("Cancel", letterSpacing = 0.sp, color = SectionMuted) }
         }
     )
 }
@@ -987,6 +1008,26 @@ private fun PriorityRow(
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Outlined.DragIndicator, "Drag ${section.name}", Modifier.size(24.dp), tint = SectionInk)
+        }
+    }
+}
+
+/** A white, outlined footer button; [iconsOnly] makes it a square with just its icon (narrow windows). */
+@Composable
+private fun SectionFooterButton(icon: ImageVector, label: String, iconsOnly: Boolean, ink: Color, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = if (iconsOnly) Modifier.size(40.dp) else Modifier,
+        shape = RoundedCornerShape(9.dp),
+        border = BorderStroke(1.dp, ink),
+        contentPadding = if (iconsOnly) PaddingValues(0.dp) else PaddingValues(horizontal = 12.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = ink)
+    ) {
+        Icon(icon, if (iconsOnly) label else null, Modifier.size(18.dp), tint = ink)
+        if (!iconsOnly) {
+            Spacer(Modifier.width(6.dp))
+            Text(label, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 0.sp,
+                maxLines = 1, softWrap = false)
         }
     }
 }

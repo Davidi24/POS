@@ -96,6 +96,7 @@ class FraudScreenModel(
                 val to = today()
                 mutable.value = FraudState(
                     restaurantId = user?.takeIf { it.isActive }?.restaurantId,
+                    branchId = user?.defaultBranchId.takeIf { com.saporini.mobile_desktop.core.session.isPlatformAdmin(user) },
                     canRead = user != null && "FRAUD_READ" in user.permissions,
                     canReview = user != null && "FRAUD_REVIEW" in user.permissions,
                     canEditRules = user != null && "SETTINGS_UPDATE" in user.permissions,

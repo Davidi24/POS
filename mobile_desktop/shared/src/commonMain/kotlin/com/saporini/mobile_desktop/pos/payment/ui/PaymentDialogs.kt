@@ -90,6 +90,10 @@ internal fun ReceiptDialog(state: PaymentUiState, model: PaymentScreenModel, onC
         // Paper look: narrow, monospaced, dashed lines between parts.
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(Color(0xFFFCFBF8)).padding(horizontal = 20.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            receipt.logoUrl?.takeIf { receipt.showLogo }?.let { url ->
+                com.saporini.mobile_desktop.core.ui.RemoteImage(url, null, Modifier.size(56.dp),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit) {}
+            }
             receipt.restaurantName?.let { Mono(it, bold = true, size = 16, center = true) }
             receipt.legalName?.takeIf { it != receipt.restaurantName }?.let { Mono(it, center = true) }
             receipt.addressLines.forEach { Mono(it, center = true) }

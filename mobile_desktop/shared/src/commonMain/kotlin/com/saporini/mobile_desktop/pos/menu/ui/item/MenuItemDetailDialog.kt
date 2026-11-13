@@ -25,7 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -115,11 +115,11 @@ private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                         .height(162.dp)
                         .clip(RoundedCornerShape(12.dp))
                 ) {
-                    Image(
-                        painter = painterResource(Res.drawable.auth_login_img),
+                    MenuPhoto(
+                        url = item.imageUrl,
                         contentDescription = item.name,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        iconSize = 40.dp
                     )
                     AvailabilityButton(
                         available = item.available,
@@ -487,7 +487,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to menu items", tint = TextInk)
+                Icon(Icons.AutoMirrored.Filled.Reply, "Back to menu items", tint = TextInk)
             }
             Text("Item details", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = TextInk)
         }
@@ -497,11 +497,11 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Box(Modifier.fillMaxWidth().height(if (isWidePhone) 116.dp else 150.dp).clip(RoundedCornerShape(12.dp))) {
-                Image(
-                    painter = painterResource(Res.drawable.auth_login_img),
+                MenuPhoto(
+                    url = item.imageUrl,
                     contentDescription = item.name,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    iconSize = 36.dp
                 )
                 AvailabilityButton(
                     available = item.available,

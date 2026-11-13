@@ -78,6 +78,9 @@ object LoginScreen : Screen {
                 centerContent = true,
                 onPinClick = { navigator.push(PinLoginScreen) },
                 onForgetPassClick = { navigator.push(ForgotPasswordScreen) },
+                onSetPasswordClick = { navigator.push(ResetPasswordScreen()) },
+                onApplyClick = { navigator.push(com.saporini.mobile_desktop.auth.ui.apply.ApplyRestaurantScreen) },
+                onCheckApplicationClick = { navigator.push(com.saporini.mobile_desktop.auth.ui.apply.ApplicationStatusScreen()) },
                 onLoginSuccess = { user -> navigator.replaceAll(resolveStartScreen(user)) }
             )
 
@@ -92,6 +95,9 @@ private fun LoginForm(
     centerContent: Boolean = false,
     onPinClick: () -> Unit = {},
     onForgetPassClick: () -> Unit = {},
+    onSetPasswordClick: () -> Unit = {},
+    onApplyClick: () -> Unit = {},
+    onCheckApplicationClick: () -> Unit = {},
     onLoginSuccess: (CurrentUserResponse) -> Unit = {},
 ) {
     val screenModel = koinInject<LoginScreenModel>()
@@ -299,6 +305,20 @@ private fun LoginForm(
                     .height(30.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
+                // An owner's invitation email has a link to set the first password; it can be pasted here too.
+                TextButton(
+                    onClick = onSetPasswordClick,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier.height(30.dp).align(Alignment.CenterStart)
+                ) {
+                    Text(
+                        text = "Got an invitation?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = mutedText,
+                        fontWeight = FontWeight.Normal,
+                        textDecoration = TextDecoration.Underline
+                    )
+                }
                 TextButton(
                     onClick = onForgetPassClick ,
                     contentPadding = PaddingValues(0.dp),
@@ -417,6 +437,35 @@ private fun LoginForm(
                     tint = primaryText,
                     modifier = Modifier.size(pinIconInner)
                 )
+            }
+
+            Spacer(modifier = Modifier.height(sectionSpacing))
+
+            // New restaurants apply here; a super admin reviews each application before it can sign in.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onApplyClick, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                    Text(
+                        text = "Open a restaurant",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = primaryText,
+                        fontWeight = FontWeight.SemiBold,
+                        textDecoration = TextDecoration.Underline
+                    )
+                }
+                Text(text = "·", color = mutedText, style = MaterialTheme.typography.bodyMedium)
+                TextButton(onClick = onCheckApplicationClick, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                    Text(
+                        text = "Check an application",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = mutedText,
+                        fontWeight = FontWeight.Normal,
+                        textDecoration = TextDecoration.Underline
+                    )
+                }
             }
 
             if (isCompact) {

@@ -29,7 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.MarkAsUnread
@@ -66,6 +66,7 @@ import com.saporini.mobile_desktop.core.theme.Belleza
 import com.saporini.mobile_desktop.core.theme.CormorantGaramond
 import com.saporini.mobile_desktop.getPlatform
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.brand_logo
 import org.jetbrains.compose.resources.painterResource
@@ -79,8 +80,10 @@ object ForgotPasswordScreen : Screen {
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val goBack: () -> Unit = {
-            navigator.replaceAll(UiPreviewScreen)
+            if (navigator.canPop) navigator.pop() else navigator.replaceAll(LoginScreen)
         }
+        val repository = org.koin.compose.koinInject<com.saporini.mobile_desktop.auth.data.repository.AuthRepository>()
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
 
         AuthImageScaffold {
             BoxWithConstraints(
@@ -105,6 +108,32 @@ object ForgotPasswordScreen : Screen {
             val fieldShape = RoundedCornerShape(10.dp)
             var email by remember { mutableStateOf("") }
             var resetLinkSent by remember { mutableStateOf(false) }
+            var sending by remember { mutableStateOf(false) }
+            var error by remember { mutableStateOf<String?>(null) }
+            val send: () -> Unit = send@{
+                val address = email.trim()
+                if (sending) return@send
+                if (!Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$").matches(address)) {
+                    error = "Write the email address you sign in with."
+                    return@send
+                }
+                sending = true
+                error = null
+                scope.launch {
+                    try {
+                        repository.requestPasswordReset(address)
+                        resetLinkSent = true
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: com.saporini.mobile_desktop.core.network.ApiException) {
+                        error = e.message
+                    } catch (e: Exception) {
+                        error = "Couldn't reach the server. Check the connection and try again."
+                    } finally {
+                        sending = false
+                    }
+                }
+            }
 
             if (!resetLinkSent) {
                 IconButton(
@@ -114,7 +143,7 @@ object ForgotPasswordScreen : Screen {
                         .padding(12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.Reply,
                         contentDescription = "Back",
                         tint = primaryText
                     )
@@ -151,7 +180,8 @@ object ForgotPasswordScreen : Screen {
                             smallSpacing = smallSpacing,
                             logoHeight = logoHeight,
                             buttonHeight = buttonHeight,
-                            onBackToLogin = { navigator.pop() }
+                            onBackToLogin = goBack,
+                            onHaveLink = { navigator.push(ResetPasswordScreen()) }
                         )
                     } else {
                         Column(
@@ -202,7 +232,7 @@ object ForgotPasswordScreen : Screen {
 
                             OutlinedTextField(
                                 value = email,
-                                onValueChange = { email = it },
+                                onValueChange = { email = it; error = null },
                                 placeholder = {
                                     Text("Enter your email", color = mutedText)
                                 },
@@ -236,29 +266,45 @@ object ForgotPasswordScreen : Screen {
 
                             Spacer(modifier = Modifier.height(sectionSpacing * 1.5f))
 
+                            error?.let {
+                                Text(text = it, color = Color(0xFFB24443), style = MaterialTheme.typography.bodyMedium)
+                                Spacer(modifier = Modifier.height(smallSpacing))
+                            }
+
                             Button(
-                                onClick = { resetLinkSent = true },
+                                onClick = send,
+                                enabled = !sending,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(buttonHeight),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color.Black,
-                                    contentColor = Color.White
+                                    contentColor = Color.White,
+                                    disabledContainerColor = Color.Black,
+                                    disabledContentColor = Color.White
                                 ),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text(
-                                    text = "Send reset link",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.sp
-                                )
+                                if (sending) {
+                                    androidx.compose.material3.CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Send reset link",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.sp
+                                    )
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(sectionSpacing))
 
                             TextButton(
-                                onClick = { navigator.pop() },
+                                onClick = goBack,
                                 modifier = Modifier.align(Alignment.CenterHorizontally),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
@@ -291,7 +337,8 @@ private fun ResetLinkSentContent(
     smallSpacing: androidx.compose.ui.unit.Dp,
     logoHeight: androidx.compose.ui.unit.Dp,
     buttonHeight: androidx.compose.ui.unit.Dp,
-    onBackToLogin: () -> Unit
+    onBackToLogin: () -> Unit,
+    onHaveLink: () -> Unit
 ) {
     val successGreen = Color(0xFF2F8F4E)
 
@@ -399,7 +446,7 @@ private fun ResetLinkSentContent(
         Spacer(modifier = Modifier.height(smallSpacing * 2))
 
         Text(
-            text = "We've sent a password reset link to\nyour email address.",
+            text = "If an account uses this email, we've sent it\na link to choose a new password.",
             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 19.sp),
             color = mutedText,
             fontFamily = Belleza(),
@@ -434,6 +481,18 @@ private fun ResetLinkSentContent(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.height(smallSpacing))
+
+        TextButton(onClick = onHaveLink, contentPadding = PaddingValues(0.dp)) {
+            Text(
+                text = "I have the link",
+                style = MaterialTheme.typography.bodyMedium,
+                color = primaryText,
+                fontWeight = FontWeight.Medium,
+                textDecoration = TextDecoration.Underline
             )
         }
     }

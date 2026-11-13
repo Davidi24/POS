@@ -42,7 +42,9 @@ data class TableResponseDto(
 @Serializable
 data class UpdateTableStatusRequestDto(
     val status: String,
-    val guestCount: Int? = null
+    val guestCount: Int? = null,
+    // "More will come"; left out keeps what was set.
+    val moreComing: Boolean? = null
 )
 
 @Serializable

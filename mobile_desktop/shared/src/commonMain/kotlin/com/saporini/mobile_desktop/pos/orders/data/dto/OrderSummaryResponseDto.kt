@@ -20,6 +20,7 @@ data class OrderSummaryResponseDto(
     val fulfillmentStatus: OrderFulfillmentStatus,
     val total: OrderDecimal,
     val itemCount: Int? = null,
+    val notSentItems: Int = 0,
     val openedAt: String,
     val tableId: String? = null,
     val tableNumber: String? = null,
@@ -29,5 +30,7 @@ data class OrderSummaryResponseDto(
     val guestCount: Int? = null,
     val notes: String? = null,
     val closedAt: String? = null,
-    val createdBy: String? = null
+    val createdBy: String? = null,
+    val unpaidAt: String? = null,
+    val unpaidAmount: OrderDecimal? = null
 )

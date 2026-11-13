@@ -17,8 +17,8 @@ import kotlinx.serialization.Serializable
 // Admin Hub → Devices: tills, tablets, kitchen screens and payment terminals of a branch, the restaurant's
 // printers, and the one-time codes that pair a new device.
 
-/** Device kinds a branch can register (printers live on their own list). "TERMINAL" is the server's name for a till. */
-val DEVICE_TYPES = listOf("TERMINAL", "TABLET", "KDS", "CUSTOMER_DISPLAY", "PAYMENT_TERMINAL")
+/** Device kinds a branch can register (printers live on their own list). "POS_TERMINAL" is the server's name for a till. */
+val DEVICE_TYPES = listOf("POS_TERMINAL", "TABLET", "KDS", "CUSTOMER_DISPLAY", "PAYMENT_TERMINAL")
 val DEVICE_STATUSES = listOf("PROVISIONING", "ACTIVE", "INACTIVE", "BLOCKED", "MAINTENANCE", "RETIRED")
 val PRINTER_CONNECTIONS = listOf("NETWORK", "USB", "BLUETOOTH", "SERIAL")
 

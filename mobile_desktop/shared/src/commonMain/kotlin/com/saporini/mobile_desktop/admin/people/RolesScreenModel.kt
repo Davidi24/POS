@@ -20,8 +20,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** A role being named: a new one, a renamed one, or a copy of [sourceId]. */
-data class RoleForm(val roleId: String? = null, val sourceId: String? = null, val name: String = "", val description: String = "") {
+/**
+ * A role being made or changed: a new one, an edited one, or a copy of [sourceId]; with its picture and whether its
+ * people get paid, in which Salary team (user, 2026-10-31). [payOnly]: a built-in role, where only the pay can change.
+ */
+data class RoleForm(
+    val roleId: String? = null, val sourceId: String? = null, val name: String = "", val description: String = "",
+    val picture: String? = null, val paid: Boolean = true, val payTeam: String = PayTeams.EXTRA, val payOnly: Boolean = false
+) {
     val mode: Mode get() = when {
         sourceId != null -> Mode.COPY
         roleId != null -> Mode.RENAME
@@ -31,9 +37,21 @@ data class RoleForm(val roleId: String? = null, val sourceId: String? = null, va
     enum class Mode { NEW, RENAME, COPY }
 }
 
+/** The Salary teams a role's people can be paid in, as the server names them. */
+object PayTeams {
+    const val MANAGERS = "MANAGERS"
+    const val KITCHEN = "KITCHEN"
+    const val WAITERS = "WAITERS"
+    const val CLEANING = "CLEANING"
+    const val EXTRA = "EXTRA"
+    val all = listOf(MANAGERS to "Managers", KITCHEN to "Kitchen", WAITERS to "Waiters", CLEANING to "Cleaning", EXTRA to "Extra workers")
+    fun label(team: String?) = all.firstOrNull { it.first == team }?.second ?: "Extra workers"
+}
+
 data class RolesState(
     val restaurantId: String? = null,
     val myPermissions: Set<String> = emptySet(),
+    val myRoleCodes: Set<String> = emptySet(),
     val superAdmin: Boolean = false,
     val canRead: Boolean = false,
     val canCreate: Boolean = false,
@@ -62,8 +80,18 @@ data class RolesState(
     /** Built-in roles are fixed; custom roles can be changed by people who hold every permission they would give. */
     fun editable(role: RoleDto?): Boolean = role != null && !role.isSystem && !role.isProtected
 
-    fun canEditPermissions(): Boolean = canAssign && editable(selected) &&
-        canSavePermissions(savedPermissionIds.mapNotNull { codesById[it] }.toSet(), myPermissions, superAdmin)
+    /** The highest rank among the signed-in person's roles (platform roles outrank every restaurant role). */
+    private val myRank: Long get() = roles.filter { it.code in myRoleCodes }.maxOfOrNull { it.rank ?: 0 } ?: 0
+
+    /**
+     * Whose permissions can be changed here: your restaurant's own roles, and inside a restaurant the built-in ones too
+     * (for that restaurant only; user, 2026-10-30), as long as the role is below you and not a protected one.
+     */
+    fun permissionsEditable(role: RoleDto?): Boolean = role != null && !role.isProtected &&
+        (!role.isSystem || restaurantId != null) && (superAdmin || myRank > (role.rank ?: 0))
+
+    fun canEditPermissions(): Boolean = canAssign && permissionsEditable(selected) && (selected?.isSystem == true ||
+        canSavePermissions(savedPermissionIds.mapNotNull { codesById[it] }.toSet(), myPermissions, superAdmin))
 
     /** The editor's ticks, grouped by area; a permission the signed-in person lacks can't be given. */
     val groups: List<Pair<String, List<PermissionChoice>>> get() = permissionGroups(catalog.map {
@@ -101,6 +129,7 @@ class RolesScreenModel(
                 mutable.value = RolesState(
                     restaurantId = user?.takeIf { it.isActive }?.restaurantId,
                     myPermissions = permissions,
+                    myRoleCodes = user?.roles.orEmpty().toSet(),
                     superAdmin = user?.roles.orEmpty().contains(SUPER_ADMIN),
                     canRead = "ROLES_READ" in permissions,
                     canCreate = "ROLES_CREATE" in permissions,
@@ -188,6 +217,9 @@ class RolesScreenModel(
     fun toggleGroup(group: String, on: Boolean) =
         tick(state.value.catalog.filter { it.code.substringBefore('_') == group }.map { it.id }, on)
 
+    /** Switches a whole workspace card on or off (only what you have yourself can be given). */
+    fun tickAll(ids: List<String>, on: Boolean) = tick(ids, on)
+
     private fun tick(ids: List<String>, on: Boolean) {
         val current = state.value
         if (current.loadingRole || !current.canEditPermissions()) {
@@ -220,7 +252,7 @@ class RolesScreenModel(
 
     private fun whyLocked(state: RolesState): String = when {
         !state.canAssign -> "You can't change what roles may do"
-        state.selected?.isSystem == true || state.selected?.isProtected == true -> "Built-in roles can't be changed. Copy it to make your own."
+        state.selected?.isProtected == true || !state.permissionsEditable(state.selected) -> "Only someone above this role can change it"
         else -> "This role has permissions you don't have, so only someone above you can change it"
     }
 
@@ -228,13 +260,16 @@ class RolesScreenModel(
 
     fun startNew() = openForm(RoleForm(), state.value.canCreate)
 
+    /** Edits a restaurant's own role (name, picture, pay), or only the pay of a built-in role. */
     fun startRename(roleId: String) {
         val role = state.value.roles.firstOrNull { it.id == roleId } ?: return
-        if (!state.value.editable(role)) {
+        val builtIn = !state.value.editable(role)
+        if (builtIn && !state.value.permissionsEditable(role)) {
             mutable.update { it.copy(error = "Built-in roles can't be renamed") }
             return
         }
-        openForm(RoleForm(roleId = roleId, name = role.name, description = role.description.orEmpty()), state.value.canUpdate)
+        openForm(RoleForm(roleId = roleId, name = role.name, description = role.description.orEmpty(), picture = role.picture,
+            paid = role.paid ?: true, payTeam = role.payTeam ?: PayTeams.EXTRA, payOnly = builtIn), state.value.canUpdate)
     }
 
     fun startCopy(roleId: String) {
@@ -255,12 +290,26 @@ class RolesScreenModel(
 
     fun formDescription(text: String) = mutable.update { it.copy(form = it.form?.copy(description = text.take(MAX_ROLE_DESCRIPTION + 20))) }
 
+    fun formPicture(key: String) = mutable.update { it.copy(form = it.form?.copy(picture = key)) }
+
+    fun formPaid(paid: Boolean) = mutable.update { it.copy(form = it.form?.copy(paid = paid)) }
+
+    fun formPayTeam(team: String) = mutable.update { it.copy(form = it.form?.copy(payTeam = team)) }
+
     fun cancelForm() = mutable.update { it.copy(form = null) }
 
     fun saveForm() {
         val current = state.value
         val form = current.form ?: return
         if (current.saving) return
+        if (form.payOnly) {
+            val roleId = form.roleId ?: return
+            write(onStale = ::load) {
+                val saved = repository.setRolePay(roleId, form.paid, form.payTeam)
+                mutable.update { state -> state.copy(roles = state.roles.map { if (it.id == saved.id) saved else it }, form = null, notice = "Saved") }
+            }
+            return
+        }
         roleProblem(form.name, form.description)?.let { problem ->
             mutable.update { it.copy(error = problem) }
             return
@@ -270,7 +319,8 @@ class RolesScreenModel(
             mutable.update { it.copy(error = "A role called $name already exists") }
             return
         }
-        val request = RoleNameRequestDto(name, form.description.trim().takeIf { it.isNotEmpty() })
+        // A restaurant's own role is a Salary team of its own, so no team is sent; a new one starts with the general figure.
+        val request = RoleNameRequestDto(name, form.description.trim().takeIf { it.isNotEmpty() }, form.picture ?: "role_general", form.paid)
         write(onStale = ::load) {
             val saved = when (form.mode) {
                 RoleForm.Mode.NEW -> repository.createRole(request)
@@ -289,8 +339,9 @@ class RolesScreenModel(
     fun setRoleActive(roleId: String, active: Boolean) {
         val current = state.value
         val role = current.roles.firstOrNull { it.id == roleId } ?: return
-        if (!current.canUpdate || !current.editable(role)) {
-            mutable.update { it.copy(error = if (!current.canUpdate) "You don't have permission to do this." else "Built-in roles are always on") }
+        // A built-in role can be switched off in this restaurant by someone above it (user, 2026-10-31).
+        if (!current.canUpdate || !(current.editable(role) || current.permissionsEditable(role))) {
+            mutable.update { it.copy(error = if (!current.canUpdate) "You don't have permission to do this." else "You can't switch this role off") }
             return
         }
         if (role.isActive == active) return

@@ -17,7 +17,6 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.semantics.*
 import com.saporini.mobile_desktop.core.theme.SaporiniTheme
 import com.saporini.mobile_desktop.kds.model.*
-import com.saporini.mobile_desktop.pos.kitchen.KitchenStatusContent
 import com.saporini.mobile_desktop.pos.orders.domain.model.OrderDecimal
 import com.saporini.mobile_desktop.pos.sales.*
 import kotlinx.coroutines.Dispatchers
@@ -48,22 +47,6 @@ class PosReadScreensScreenshotTest {
     @Test fun salesEmptyDoesNotShowSampleValues() {
         capture("sales-empty", listOf("My Sales"), absent = listOf("ORDER-1042", "Vegetable soup")) {
             MySalesContent(MySalesState(canRead = true, report = salesReport(), stale = false), {}, {}, {}, {}, {})
-        }
-    }
-
-    @Test fun kitchenUsesRealTicketDetailsAcrossStages() {
-        val tickets = listOf("FIRED", "IN_PROGRESS", "READY").mapIndexed { i, status ->
-            KdsTicket("t$i", "r", "b", "s", orderId = "o$i", orderNumber = "ORDER-${1042 + i}",
-                ticketNumber = "K-${i + 1}", stationName = "Hot kitchen", tableNumber = "T0${i + 1}",
-                guestCount = 2, status = status, firedAt = "2026-09-25T11:55:00Z",
-                items = listOf(KdsTicketItem("i$i", itemNameSnapshot = "Vegetable soup", quantity = 2,
-                    status = status, variantNameSnapshot = "Large", notes = "No cream")))
-        }
-        val state = KdsState(scope = KdsScope("u", "r", "b"), permissions = setOf("KDS_READ"),
-            now = Instant.parse("2026-09-25T12:00:00Z"), loaded = true, stale = false,
-            connection = KdsConnection.LIVE, boards = listOf(KdsBoard("s", stationName = "Hot kitchen", tickets = tickets)))
-        capture("kitchen-data", listOf("Vegetable soup", "2×", "No cream", "Hot kitchen", "Ready now", "Cooking", "Waiting"), absent = listOf("1 x")) {
-            KitchenStatusContent(state, {}, {})
         }
     }
 

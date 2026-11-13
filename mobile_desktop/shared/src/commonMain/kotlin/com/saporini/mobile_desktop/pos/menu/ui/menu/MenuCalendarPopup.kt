@@ -16,12 +16,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,7 +59,6 @@ internal fun MenuDateInput(
     enabled: Boolean,
     isError: Boolean,
     calendarOnly: Boolean,
-    colors: TextFieldColors,
     minimumDate: String? = null
 ) {
     var calendarOpen by remember { mutableStateOf(false) }
@@ -71,26 +70,20 @@ internal fun MenuDateInput(
         calendarOpen = true
     }
     Box(Modifier.fillMaxWidth()) {
-        OutlinedTextField(
+        MenuEditorInput(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("YYYY-MM-DD") },
-            singleLine = true,
+            placeholder = "YYYY-MM-DD",
             enabled = enabled,
             readOnly = calendarOnly,
             isError = isError,
-            trailingIcon = {
-                IconButton(onClick = openCalendar, enabled = enabled) {
-                    Icon(Icons.Outlined.CalendarToday, "Choose $title")
-                }
-            },
-            shape = RoundedCornerShape(9.dp),
-            colors = colors
+            trailingIcon = Icons.Outlined.CalendarToday,
+            trailingIconLabel = "Choose $title",
+            onTrailingIconClick = openCalendar
         )
         if (calendarOnly) {
             Box(
-                Modifier.matchParentSize().clip(RoundedCornerShape(9.dp))
+                Modifier.matchParentSize().clip(RoundedCornerShape(8.dp))
                     .clickable(enabled = enabled, onClickLabel = "Choose $title", onClick = openCalendar)
                     .semantics { contentDescription = "$title: ${value.ifBlank { "Choose date" }}" }
             )
@@ -204,10 +197,15 @@ private fun MenuCalendarPopup(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onDateSelected(selectedDate) }) {
-                Text("Use date", color = CalendarOlive, fontWeight = FontWeight.SemiBold)
+            // The main action is filled, like every form's right-hand button.
+            Button(
+                onClick = { onDateSelected(selectedDate) },
+                shape = RoundedCornerShape(percent = 50),
+                colors = ButtonDefaults.buttonColors(containerColor = CalendarOlive, contentColor = Color.White)
+            ) {
+                Text("Use date", fontFamily = Inter(), fontWeight = FontWeight.SemiBold)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = CalendarInk) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", fontFamily = Inter(), color = CalendarInk) } }
     )
 }

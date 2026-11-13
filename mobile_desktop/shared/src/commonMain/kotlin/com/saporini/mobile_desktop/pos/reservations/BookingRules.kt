@@ -17,6 +17,18 @@ import kotlin.time.Instant
 // which actions a booking offers, when only a manager with a reason may act, and the short labels on cards
 // ("12 min late", "Hold ends in 8 min", "3 of 6 arrived", "Waiting for table", "Needs review").
 
+// From a booking to its table on Tables and to its order in Orders (user, 2026-11-02), for every card and the panel.
+internal class BookingLinks(
+    // The seated booking's open order on its table: id and number.
+    val orderOf: (Reservation) -> Pair<String, String>?,
+    val goToTable: (Reservation) -> Unit,
+    val goToOrder: (String) -> Unit,
+    // The colour its table has on Tables right now, for a booking whose guests are there (checked in or seated).
+    val tableColor: (Reservation) -> Color? = { null }
+)
+
+internal val LocalBookingLinks = staticCompositionLocalOf<BookingLinks?> { null }
+
 // Admin Hub reservation timers for every card and panel below the reservations screen.
 internal val LocalReservationPolicy = staticCompositionLocalOf { ReservationPolicy() }
 
@@ -30,7 +42,10 @@ internal enum class BookingAction(val label: String, val danger: Boolean = false
     ACCEPT("Accept request"),
     DECLINE("Decline request", danger = true),
     GUEST_ARRIVED("Guest arrived"),
-    CONFIRM_ATTENDANCE("Attendance confirmed"),
+    // A button only while the guest hasn't confirmed; after that the booking just says "Attendance confirmed" (user, 2026-11-02).
+    CONFIRM_ATTENDANCE("Confirm attendance"),
+    // Called and nobody answered: a grey mark, never a cancel (user, 2026-11-02).
+    COULD_NOT_REACH("Couldn't reach"),
     ARRIVED_COUNT("Change arrived guests"),
     SEAT("Seat guests"),
     UNDO_SEAT("Undo seating"),
@@ -103,6 +118,9 @@ internal fun bookingActions(
                 // After calling the guest (or they called): the booking gets "✓ Attendance confirmed".
                 secondary = offer(BookingAction.CONFIRM_ATTENDANCE).takeIf { reservation.attendance != "CONFIRMED" && now < end },
                 menu = listOfNotNull(
+                    offer(BookingAction.COULD_NOT_REACH).takeIf {
+                        reservation.attendance != "CONFIRMED" && reservation.attendanceUnreachableAt == null && now < end
+                    },
                     offer(BookingAction.HOLD_LONGER).takeIf { now < end && now >= start - policy.checkInOpensMinutes.minutes },
                     offer(BookingAction.NO_SHOW).takeIf { now >= start },
                     offer(BookingAction.CANCEL)
@@ -119,7 +137,8 @@ internal fun bookingActions(
             menu = listOf(
                 offer(BookingAction.ARRIVED_COUNT),
                 offer(BookingAction.LEFT_WITHOUT_ORDERING),
-                offer(BookingAction.UNDO_SEAT, reservation.seatedAt?.instant(), policy.undoSeatMinutes, "seated")
+                // No time limit while there's no order on it (user, 2026-11-02); the server refuses once there is one.
+                offer(BookingAction.UNDO_SEAT)
             )
         )
         ReservationStatus.NO_SHOW -> {
@@ -135,6 +154,9 @@ internal fun bookingActions(
         ReservationStatus.EXPIRED -> BookingActions(
             primary = offer(BookingAction.REOPEN, reservation.expiredAt?.instant(), policy.reopenWindowMinutes, "expired")
         )
+        ReservationStatus.NO_ACTION -> BookingActions(
+            primary = offer(BookingAction.REOPEN, reservation.noActionAt?.instant(), policy.reopenWindowMinutes, "closed as no action taken")
+        )
         ReservationStatus.COMPLETED -> BookingActions()
     }
 }
@@ -147,11 +169,6 @@ internal fun bookingFlags(reservation: Reservation, policy: ReservationPolicy, n
     if (reservation.needsReview) flags += BookingFlag("Needs review", ReviewColor)
     reservation.guestNoShows?.takeIf { it >= policy.noShowWarningFrom }?.let { count ->
         flags += BookingFlag("⚠ $count ${if (count == 1) "no-show" else "no-shows"} before", ReviewColor)
-    }
-    when (reservation.attendance) {
-        "CONFIRMED" -> flags += BookingFlag("✓ Attendance confirmed", AttendanceColor)
-        "NOT_CONFIRMED" -> flags += BookingFlag("Not confirmed", ReviewColor)
-        "CONFIRM_NOW" -> flags += BookingFlag("Confirm now", LateColor)
     }
     val start = reservation.reservationStart.instant()
     val waiting = reservation.status == ReservationStatus.CONFIRMED || reservation.status == ReservationStatus.PENDING
@@ -181,6 +198,39 @@ internal fun bookingFlags(reservation: Reservation, policy: ReservationPolicy, n
         flags += BookingFlag("Waiting for table", WaitingColor)
     }
     return flags
+}
+
+internal val UnreachableColor = Color(0xFF8A8D88)
+// A plain green and red for the reservation cards (user, 2026-11-03: "use a normal red and green").
+internal val PlainGreen = Color(0xFF16A34A)
+internal val PlainRed = Color(0xFFDC2626)
+internal val GuestConfirmedColor = Color(0xFF15803D)
+private val ConfirmLateColor = Color(0xFFC2410C)
+
+internal fun ReservationStatus.pillLabel(): String = when (this) {
+    ReservationStatus.PENDING -> "Pending"
+    ReservationStatus.CONFIRMED -> "Confirmed"
+    ReservationStatus.CHECKED_IN -> "Checked in"
+    ReservationStatus.SEATED -> "Seated"
+    ReservationStatus.COMPLETED -> "Completed"
+    ReservationStatus.CANCELLED -> "Cancelled"
+    ReservationStatus.NO_SHOW -> "No show"
+    ReservationStatus.EXPIRED -> "Request expired"
+    ReservationStatus.NO_ACTION -> "No action taken"
+}
+
+// The one state a booking shows, never "Confirmed" beside "hasn't confirmed" (user, 2026-11-02: "not both, make a state
+// like confirmed by app"). A confirmed booking says who confirmed it: the app (the guest hasn't yet; orange-red once the
+// deadline to confirm passed or it was booked too late to ask), the guest, or nobody could be reached.
+internal fun bookingState(reservation: Reservation): BookingFlag {
+    val label = reservation.status.pillLabel()
+    if (reservation.status != ReservationStatus.CONFIRMED) return BookingFlag(label, StatusDotColors[label] ?: UnreachableColor)
+    return when {
+        reservation.attendance == "CONFIRMED" -> BookingFlag("Guest confirmed", GuestConfirmedColor)
+        reservation.attendanceUnreachableAt != null -> BookingFlag("Couldn't reach", UnreachableColor)
+        reservation.attendance == "NOT_CONFIRMED" || reservation.attendance == "CONFIRM_NOW" -> BookingFlag("Confirmed by app", ConfirmLateColor)
+        else -> BookingFlag("Confirmed by app", StatusDotColors[label] ?: GuestConfirmedColor)
+    }
 }
 
 // The restaurant's day runs from the service start (06:00) to the same time next morning.

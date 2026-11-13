@@ -11,6 +11,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +28,8 @@ import kotlinx.coroutines.sync.withLock
 data class StaffState(
     val restaurantId: String? = null,
     val myId: String? = null,
+    // The signed-in person's role codes (Users shows only the roles at their level or below).
+    val myRoles: List<String> = emptyList(),
     val myBranchId: String? = null,
     val canRead: Boolean = false,
     val canCreate: Boolean = false,
@@ -33,6 +38,10 @@ data class StaffState(
     val filter: StaffFilter = StaffFilter(active = true),
     val people: List<StaffUserDto> = emptyList(),
     val pages: Int = 0,
+    // The page of people shown (Users → a role's people go page by page, PEOPLE_PAGE_SIZE at a time).
+    val page: Int = 0,
+    // How many people a page holds: as many as fit the list (the screen says), 10 until it does.
+    val pageSize: Int = PEOPLE_PAGE_SIZE,
     val total: Long = 0,
     val hasNext: Boolean = false,
     val loading: Boolean = false,
@@ -48,11 +57,46 @@ data class StaffState(
     val confirmRemove: String? = null,
     // Whole-team numbers from the server (not from the loaded pages), for the summary cards and filters.
     val counts: StaffCounts? = null,
+    // Per role code: how many have it (active, switched off) and the first few names, for the role cards.
+    val roleStats: Map<String, RoleStats> = emptyMap(),
+    // The role cards' numbers have been asked for once (loaded or not), so the page can stop showing its loading shapes.
+    val roleStatsLoaded: Boolean = false,
+    // The signed-in person's permissions (a person's own permissions can only gain what they have themselves).
+    val myPermissions: Set<String> = emptySet(),
+    val superAdmin: Boolean = false,
+    // A person's own permissions being changed (Users → a role → a person's Permissions).
+    val personPermissions: PersonPermissionsEditor? = null,
     val notice: String? = null,
     val error: String? = null
 ) {
     fun canEdit(person: StaffUserDto): Boolean = canUpdate && person.id != myId
     fun canRemove(person: StaffUserDto): Boolean = canDelete && person.id != myId
+}
+
+/**
+ * One person's own permissions in the editor: what their roles give them ([fromRoles]), what they had when it opened
+ * ([saved]) and what's ticked now ([ticked]).
+ */
+data class PersonPermissionsEditor(
+    val personId: String,
+    val name: String,
+    val roleName: String,
+    val fromRoles: Set<String> = emptySet(),
+    val saved: Set<String> = emptySet(),
+    val ticked: Set<String> = emptySet(),
+    val loading: Boolean = true,
+    val saving: Boolean = false,
+    val error: String? = null
+) {
+    val dirty: Boolean get() = ticked != saved
+}
+
+/** How many people a role's page shows at a time. */
+const val PEOPLE_PAGE_SIZE = 10
+
+/** One role's people for its card: how many are active and switched off, and the first few names (for the faces). */
+data class RoleStats(val active: Long, val inactive: Long, val names: List<String>) {
+    val everyone: Long get() = active + inactive
 }
 
 /** How many people are active, switched off, and in each role (by role code); null when not loaded. */
@@ -91,11 +135,14 @@ class StaffScreenModel(
                 mutable.value = StaffState(
                     restaurantId = user?.takeIf { it.isActive }?.restaurantId,
                     myId = user?.id,
+                    myRoles = user?.roles.orEmpty(),
                     myBranchId = user?.defaultBranchId,
                     canRead = "USERS_READ" in permissions,
                     canCreate = "USERS_CREATE" in permissions,
                     canUpdate = "USERS_UPDATE" in permissions,
-                    canDelete = "USERS_DELETE" in permissions
+                    canDelete = "USERS_DELETE" in permissions,
+                    myPermissions = permissions,
+                    superAdmin = user?.roles.orEmpty().contains(SUPER_ADMIN)
                 )
                 if (active) load(keepPages = false)
             }
@@ -121,7 +168,9 @@ class StaffScreenModel(
         mutable.update { it.copy(filter = it.filter.copy(search = clean)) }
         searchJob = work.launch {
             delay(SEARCH_DELAY_MILLIS)
-            reload()
+            // The list shown stays until the answer comes, then changes in place: no loading shapes while typing (user,
+            // 2026-10-31: "it shows the data, then starts loading").
+            load(keepPages = false)
         }
     }
 
@@ -139,8 +188,24 @@ class StaffScreenModel(
 
     private fun reload() {
         revision++
-        mutable.update { it.copy(people = emptyList(), pages = 0, total = 0, hasNext = false, stale = true, error = null) }
+        mutable.update { it.copy(people = emptyList(), pages = 0, page = 0, total = 0, hasNext = false, stale = true, error = null) }
         load(keepPages = false)
+    }
+
+    /** A page holds [size] people (as many as fit the screen); the first person shown stays on the page shown. */
+    fun setPageSize(size: Int) {
+        val current = state.value
+        if (size < 1 || size == current.pageSize) return
+        mutable.update { it.copy(pageSize = size, page = (current.page * current.pageSize) / size) }
+        if (active && current.filter.roleCode != null) load(keepPages = true)
+    }
+
+    /** Shows another page of people. */
+    fun goToPage(page: Int) {
+        val current = state.value
+        if (page < 0 || page == current.page || current.loading) return
+        mutable.update { it.copy(page = page) }
+        load(keepPages = true)
     }
 
     fun refresh() = load(keepPages = true)
@@ -153,24 +218,18 @@ class StaffScreenModel(
         loadJob = work.launch {
             mutable.update { it.copy(loading = true) }
             try {
-                // Every page already shown comes back, so the list keeps its place.
-                val pages = if (keepPages) current.pages.coerceAtLeast(1) else 1
-                val people = mutableListOf<StaffUserDto>()
-                var total = 0L
-                var hasNext = false
-                var loaded = 0
-                for (page in 0 until pages) {
-                    val result = repository.staff(current.filter, page, ADMIN_PAGE_SIZE)
-                    people += result.items
-                    total = result.totalElements
-                    hasNext = result.hasNext
-                    loaded = page + 1
-                    if (!result.hasNext) break
+                // One page of people (the one shown); a page that emptied (someone left) steps back to the last one.
+                var page = if (keepPages) current.page else 0
+                val size = current.pageSize
+                var result = repository.staff(current.filter, page, size)
+                if (result.items.isEmpty() && page > 0 && result.totalElements > 0) {
+                    page = ((result.totalElements - 1) / size).toInt()
+                    result = repository.staff(current.filter, page, size)
                 }
                 if (token != revision) return@launch
                 mutable.update {
-                    it.copy(people = people.distinctBy { person -> person.id }, pages = loaded, total = total, hasNext = hasNext,
-                        stale = false, error = null)
+                    it.copy(people = result.items.distinctBy { person -> person.id }, page = page, pages = page + 1, total = result.totalElements,
+                        hasNext = result.hasNext, stale = false, error = null)
                 }
                 if (current.canCreate || current.canUpdate) loadRoles(token)
             } catch (e: CancellationException) {
@@ -185,7 +244,7 @@ class StaffScreenModel(
 
     private suspend fun loadRoles(token: Long) {
         try {
-            val roles = repository.assignableRoles().filter { it.isActive && it.isAssignable }
+            val roles = repository.assignableRoles().filter { it.isActive && it.isAssignable && it.code !in PlatformRoleCodes }
             if (token == revision) mutable.update { it.copy(assignableRoles = roles) }
         } catch (e: CancellationException) {
             throw e
@@ -219,13 +278,15 @@ class StaffScreenModel(
 
     // ---- Adding and editing ----
 
-    fun startNew() {
+    /** Opens the editor for a new person, with [roleId] already ticked when it's a role this person may give. */
+    fun startNew(roleId: String? = null) {
         val current = state.value
         if (!current.canCreate) {
             mutable.update { it.copy(error = "You can't add staff") }
             return
         }
-        mutable.update { it.copy(draft = StaffDraft(defaultBranchId = it.myBranchId), problems = emptyMap(), error = null, notice = null) }
+        val roles = setOfNotNull(roleId?.takeIf { id -> current.assignableRoles.any { it.id == id } })
+        mutable.update { it.copy(draft = StaffDraft(defaultBranchId = it.myBranchId, roleIds = roles), problems = emptyMap(), error = null, notice = null) }
     }
 
     /** Opens [personId] for editing; their current roles are read from the server. */
@@ -266,6 +327,70 @@ class StaffScreenModel(
     }
 
     fun cancelEdit() = mutable.update { it.copy(draft = null, problems = emptyMap()) }
+
+    // ---- One person's own permissions ----
+
+    /** Opens [personId]'s permissions: what their roles give them, with what's switched on or off for them alone. */
+    fun openPermissions(personId: String, roleName: String) {
+        val current = state.value
+        val person = current.people.firstOrNull { it.id == personId } ?: return
+        if (!current.canEdit(person)) return
+        val token = signIn
+        mutable.update { it.copy(personPermissions = PersonPermissionsEditor(personId, person.displayName, roleName), error = null, notice = null) }
+        work.launch {
+            try {
+                val loaded = repository.personPermissions(personId)
+                if (token == signIn) mutable.update { state ->
+                    val editor = state.personPermissions?.takeIf { it.personId == personId } ?: return@update state
+                    state.copy(personPermissions = editor.copy(fromRoles = loaded.fromRoles.toSet(), saved = loaded.permissions.toSet(),
+                        ticked = loaded.permissions.toSet(), loading = false))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (token == signIn) mutable.update { state ->
+                    state.copy(personPermissions = state.personPermissions?.takeIf { it.personId == personId }
+                        ?.copy(loading = false, error = adminMessage(e, write = false)))
+                }
+            }
+        }
+    }
+
+    /** Switches [codes] on or off for the person (one permission, or a whole area). */
+    fun tickPersonPermissions(codes: List<String>, on: Boolean) = mutable.update { state ->
+        val editor = state.personPermissions ?: return@update state
+        if (editor.loading || editor.saving) return@update state
+        // Nobody gives what they don't have themselves; taking it away is fine.
+        val allowed = codes.filter { !on || state.superAdmin || it in state.myPermissions || it in editor.saved }
+        state.copy(personPermissions = editor.copy(ticked = if (on) editor.ticked + allowed else editor.ticked - allowed.toSet(), error = null))
+    }
+
+    /** Back to what their roles give them, nothing extra and nothing taken away. */
+    fun resetPersonPermissions() = mutable.update { state ->
+        val editor = state.personPermissions ?: return@update state
+        state.copy(personPermissions = editor.copy(ticked = editor.fromRoles, error = null))
+    }
+
+    fun savePersonPermissions() {
+        val editor = state.value.personPermissions ?: return
+        if (editor.loading || editor.saving || !editor.dirty) return
+        val token = signIn
+        mutable.update { it.copy(personPermissions = editor.copy(saving = true, error = null)) }
+        work.launch {
+            try {
+                repository.savePersonPermissions(editor.personId, editor.ticked.sorted())
+                if (token == signIn) mutable.update { it.copy(personPermissions = null, notice = "${editor.name}'s permissions were saved") }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (token == signIn) mutable.update { state ->
+                    state.copy(personPermissions = state.personPermissions?.copy(saving = false, error = adminMessage(e, write = true)))
+                }
+            }
+        }
+    }
+
+    fun closePermissions() = mutable.update { it.copy(personPermissions = null) }
 
     fun save() {
         val current = state.value
@@ -459,6 +584,39 @@ class StaffScreenModel(
         }
     }
 
+    /**
+     * Reads each role's people for the role cards: the active ones (with the first few names) and the switched-off
+     * ones, a tiny page each. Failures leave the previous numbers.
+     */
+    fun loadRoleStats(roleCodes: List<String>) {
+        val current = state.value
+        if (!current.canRead || roleCodes.isEmpty()) return
+        if (current.restaurantId == null) {
+            mutable.update { it.copy(roleStatsLoaded = true) }
+            return
+        }
+        val token = signIn
+        work.launch {
+            try {
+                val stats = coroutineScope {
+                    roleCodes.distinct().map { code ->
+                        async {
+                            val active = repository.staff(StaffFilter(active = true, roleCode = code), 0, ROLE_FACES)
+                            val inactive = repository.staff(StaffFilter(active = false, roleCode = code), 0, 1).totalElements
+                            code to RoleStats(active.totalElements, inactive, active.items.map { it.displayName })
+                        }
+                    }.awaitAll().toMap()
+                }
+                if (token == signIn) mutable.update { it.copy(roleStats = it.roleStats + stats, roleStatsLoaded = true) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // The cards are a summary; the list itself reports problems.
+                if (token == signIn) mutable.update { it.copy(roleStatsLoaded = true) }
+            }
+        }
+    }
+
     override fun onDispose() {
         revision++
         active = false
@@ -467,6 +625,7 @@ class StaffScreenModel(
 
     companion object {
         const val SEARCH_DELAY_MILLIS = 300L
+        private const val ROLE_FACES = 5
 
         internal fun draftOf(person: StaffUserDto, roleIds: Set<String>) = StaffDraft(
             id = person.id,

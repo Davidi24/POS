@@ -9,6 +9,7 @@ import com.saporini.mobile_desktop.admin.inventory.InventoryScreenModel
 import com.saporini.mobile_desktop.admin.inventory.InventoryTab
 import com.saporini.mobile_desktop.admin.inventory.COUNT_PAGE_SIZE
 import com.saporini.mobile_desktop.admin.inventory.ItemField
+import com.saporini.mobile_desktop.admin.inventory.MOVEMENT_KIND_SAMPLE
 import com.saporini.mobile_desktop.admin.inventory.MOVEMENT_PAGE_SIZE
 import com.saporini.mobile_desktop.admin.inventory.StockCountCreateRequestDto
 import com.saporini.mobile_desktop.admin.inventory.StockCountDto
@@ -114,7 +115,7 @@ private class FakeInventory : InventoryRepository {
 
     override suspend fun saveLocation(restaurantId: String, locationId: String?, request: StockLocationRequestDto): StockLocationDto {
         calls += "location ${request.name}"
-        return StockLocationDto(locationId ?: "loc-new", request.branchId, request.code, request.name, request.locationType, request.notes, request.active)
+        return StockLocationDto(locationId ?: "loc-new", request.branchId, request.code, request.name, request.locationType, notes = request.notes, active = request.active)
             .also { saved -> locations.removeAll { it.id == saved.id }; locations += saved }
     }
 
@@ -163,12 +164,14 @@ private class FakeInventory : InventoryRepository {
     }
 
     override suspend fun movements(restaurantId: String, type: String?, itemId: String?, page: Int, size: Int): List<StockMovementDto> {
-        calls += "movements $page"
+        // The History side's counts per kind ask for one big page; they're kept apart from the list's pages.
+        calls += if (size == MOVEMENT_KIND_SAMPLE) "movement kinds" else "movements $page"
         return (0 until movementCount).drop(page * size).take(size).map { StockMovementDto("m$it", movementType = type ?: "RECEIPT") }
     }
 
     override suspend fun counts(restaurantId: String, status: String?, page: Int, size: Int): StockCountPageDto {
-        calls += "counts $page"
+        // The Counts side's totals per step ask for one-row pages; they're kept apart from the list's pages.
+        calls += if (size == 1) "count totals $status" else "counts $page"
         val all = (listOf(count) + moreCounts).distinctBy { it.id }.filter { status == null || it.status == status }
         val items = all.drop(page * size).take(size)
         val totalPages = if (all.isEmpty()) 0 else (all.size + size - 1) / size
@@ -634,6 +637,26 @@ class InventoryScreenModelTest {
             assertEquals(1, repo.moves.size, "retry with the same key replays instead of applying stock twice")
             assertNull(model.state.value.moveRequestKey)
             assertNull(model.state.value.moveDraft)
+        }
+    }
+
+    @Test
+    fun quickReceiveUsesTheSamePersistedIdempotencyRecoveryAsTheFullForm() = runTest(dispatcher) {
+        check(pendingMoveStorage = FakePendingInventoryMoveStorage()) { model, repo ->
+            repo.loseNextMoveResponse = true
+            model.quickReceive("tom", "kitchen", "2")
+            runCurrent()
+            val key = model.state.value.moveRequestKey
+            assertEquals(36, key?.length, model.state.value.toString())
+            assertTrue(model.state.value.moveOutcomeUnknown)
+            assertEquals(1, repo.moves.size)
+
+            model.saveMove(); runCurrent()
+            assertEquals(listOf(key, key), repo.moveAttempts)
+            assertEquals(1, repo.moves.size)
+            assertNull(model.state.value.moveDraft)
+            assertNull(model.state.value.moveRequestKey)
+            assertFalse(model.state.value.moveOutcomeUnknown)
         }
     }
 

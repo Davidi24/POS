@@ -3,15 +3,23 @@ package com.saporini.mobile_desktop.pos.menu.ui
 import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import com.saporini.mobile_desktop.admin.inventory.RecipeDto
+import com.saporini.mobile_desktop.pos.menu.data.dto.DishIngredientRequestDto
+import com.saporini.mobile_desktop.pos.menu.data.dto.DishRecipeDto
+import com.saporini.mobile_desktop.pos.menu.data.dto.IngredientChoiceDto
 import com.saporini.mobile_desktop.admin.inventory.RecipesRepository
 import com.saporini.mobile_desktop.core.session.SessionManager
+import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEventNight
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEventNightInput
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItem
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuVariant
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuWaiterView
 import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenu
 import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionItem
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroup
+import com.saporini.mobile_desktop.pos.menu.domain.model.SpecialMenuKind
 import com.saporini.mobile_desktop.pos.menu.domain.repository.CreateMenuInput
 import com.saporini.mobile_desktop.pos.menu.domain.repository.CreateMenuItemOptionGroupInput
 import com.saporini.mobile_desktop.pos.menu.domain.repository.CreateOptionGroupInput
@@ -46,15 +54,49 @@ class MenuScreenModel(
         loadMenus()
     }
 
-    fun loadMenus() {
+    // Managers see and manage every menu. Everyone else (waiters) sees only what the server says is on right now:
+    // scheduled for this day and time, chosen in "Menus shown", and only the event menu on a special-menu-only event
+    // night. If that can't be loaded, waiters get an error with "Try again", never a guessed list.
+    private fun managesMenus(): Boolean {
+        val permissions = sessionManager.currentUser.value?.permissions.orEmpty()
+        return "MENUS_UPDATE" in permissions || "MENUS_CREATE" in permissions || "MENUS_DELETE" in permissions
+    }
+
+    // [quiet]: a background refresh (no skeleton; a failure keeps the last list and shows the error).
+    fun loadMenus(quiet: Boolean = false) {
         val restaurantId = currentRestaurantId() ?: return
 
         loadJob?.cancel()
         loadJob = screenModelScope.launch {
-            _state.value = _state.value.copy(
-                isLoading = true,
-                errorMessage = null
-            )
+            if (!quiet) {
+                _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+            }
+
+            if (!managesMenus()) {
+                try {
+                    val onNow = repository.getMenusAvailableNow(restaurantId)
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        menus = onNow,
+                        totalElements = onNow.size.toLong(),
+                        totalPages = 1,
+                        hasNext = false,
+                        hasPrevious = false,
+                        waiterView = null,
+                        waiterViewError = null,
+                        errorMessage = null
+                    )
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        menus = if (quiet) _state.value.menus else emptyList(),
+                        errorMessage = "Couldn't load the menus that are on now. ${error.message ?: ""}".trim()
+                    )
+                }
+                return@launch
+            }
 
             try {
                 val page = repository.getMenus(
@@ -62,10 +104,22 @@ class MenuScreenModel(
                     page = 0,
                     size = _state.value.pageSize
                 )
+                // Which menus waiters see, for the "Hidden from waiters" labels. A failure is shown, not guessed.
+                var waiterViewError: String? = null
+                val waiterView = try {
+                    repository.getWaiterView(restaurantId)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    waiterViewError = error.message ?: "Couldn't load which menus waiters see"
+                    null
+                }
 
                 _state.value = _state.value.copy(
                     isLoading = false,
                     menus = page.items,
+                    waiterView = waiterView,
+                    waiterViewError = waiterViewError,
                     page = page.page,
                     totalElements = page.totalElements,
                     totalPages = page.totalPages,
@@ -150,6 +204,93 @@ class MenuScreenModel(
         _state.value = _state.value.copy(errorMessage = null)
     }
 
+    // Menu → "Menus shown" → Change position: saves the order and shows the menus in it.
+    suspend fun saveMenuOrder(menuIds: List<String>): Result<Unit> {
+        val restaurantId = currentRestaurantId() ?: return Result.failure(IllegalStateException("No restaurant selected"))
+        return try {
+            repository.saveMenuOrder(restaurantId, menuIds)
+            val position = menuIds.withIndex().associate { (index, id) -> id to index }
+            val rest = _state.value.menus.filter { it.id !in position }.sortedBy { it.displayOrder }
+            val reordered = _state.value.menus.filter { it.id in position }.sortedBy { position.getValue(it.id) } + rest
+            _state.value = _state.value.copy(menus = reordered.mapIndexed { index, menu -> menu.copy(displayOrder = index) })
+            Result.success(Unit)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Result.failure(error)
+        }
+    }
+
+    // Menu → "Menus shown": saves which menus waiters see and marks the loaded menus to match.
+    suspend fun saveWaiterView(view: MenuWaiterView): Result<MenuWaiterView> {
+        val restaurantId = currentRestaurantId() ?: return Result.failure(IllegalStateException("No restaurant selected"))
+        return try {
+            val saved = repository.saveWaiterView(restaurantId, view)
+            _state.value = _state.value.copy(
+                waiterView = saved,
+                menus = _state.value.menus.map { it.copy(shownToWaiters = it.id in saved.shownMenuIds) }
+            )
+            Result.success(saved)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Result.failure(error)
+        }
+    }
+
+    // The restaurant's event nights, for the menu editor's "Event menu" choice.
+    suspend fun loadEventNights(): Result<List<MenuEventNight>> {
+        val restaurantId = currentRestaurantId() ?: return Result.success(emptyList())
+        return try {
+            Result.success(repository.getEventNights(restaurantId))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Result.failure(error)
+        }
+    }
+
+    // Adds an event night from the menu editor's event picker.
+    suspend fun createEventNight(input: MenuEventNightInput): Result<MenuEventNight> {
+        val restaurantId = currentRestaurantId() ?: return Result.failure(IllegalStateException("No restaurant selected"))
+        return try {
+            Result.success(repository.createEventNight(restaurantId, input))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Result.failure(error)
+        }
+    }
+
+    // Changes an event night from the menu editor. Its menu's days follow, so the menus reload when it has one.
+    suspend fun updateEventNight(event: MenuEventNight, input: MenuEventNightInput): Result<MenuEventNight> {
+        val restaurantId = currentRestaurantId() ?: return Result.failure(IllegalStateException("No restaurant selected"))
+        return try {
+            val updated = repository.updateEventNight(restaurantId, event, input)
+            if (event.menuId != null) loadMenus()
+            Result.success(updated)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Result.failure(error)
+        }
+    }
+
+    // Deletes an event night from the event picker. Its menu (if any) is switched off by the server, so the
+    // menus reload when it had one.
+    suspend fun deleteEventNight(event: MenuEventNight): Result<Unit> {
+        val restaurantId = currentRestaurantId() ?: return Result.failure(IllegalStateException("No restaurant selected"))
+        return try {
+            repository.deleteEventNight(restaurantId, event.id)
+            if (event.menuId != null) loadMenus()
+            Result.success(Unit)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Result.failure(error)
+        }
+    }
+
     fun createMenu(
         name: String,
         description: String?,
@@ -160,7 +301,10 @@ class MenuScreenModel(
         availableUntilDate: String?,
         color: String,
         special: Boolean = false,
-        onSuccess: () -> Unit = {}
+        specialKind: SpecialMenuKind? = null,
+        eventId: String? = null,
+        shownToWaiters: Boolean = true,
+        onSuccess: (Menu) -> Unit = {}
     ) {
         val restaurantId = currentRestaurantId() ?: return
         val cleanName = name.trim()
@@ -188,7 +332,10 @@ class MenuScreenModel(
                         availableFromDate = availableFromDate,
                         availableUntilDate = availableUntilDate,
                         color = color,
-                        special = special
+                        special = special,
+                        specialKind = specialKind.takeIf { special },
+                        eventId = eventId.takeIf { special && specialKind == SpecialMenuKind.EVENT },
+                        shownToWaiters = shownToWaiters
                     )
                 )
 
@@ -199,7 +346,7 @@ class MenuScreenModel(
                     totalElements = _state.value.totalElements + 1,
                     errorMessage = null
                 )
-                onSuccess()
+                onSuccess(createdMenu)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -222,6 +369,9 @@ class MenuScreenModel(
         availableUntilDate: String?,
         color: String,
         special: Boolean? = null,
+        specialKind: SpecialMenuKind? = null,
+        eventId: String? = null,
+        shownToWaiters: Boolean? = null,
         onSuccess: () -> Unit = {}
     ) {
         val currentMenu = _state.value.menus.firstOrNull { it.id == menuId }
@@ -253,7 +403,10 @@ class MenuScreenModel(
                         availableFromDate = availableFromDate,
                         availableUntilDate = availableUntilDate,
                         color = color,
-                        special = special
+                        special = special,
+                        specialKind = specialKind.takeIf { special == true },
+                        eventId = eventId.takeIf { special == true && specialKind == SpecialMenuKind.EVENT },
+                        shownToWaiters = shownToWaiters
                     )
                 )
 
@@ -397,6 +550,30 @@ class MenuScreenModel(
 
     suspend fun deleteItem(menuId: String, sectionId: String, itemId: String): Result<Unit> =
         runSuspendCatching { repository.deleteItem(menuId, sectionId, itemId) }
+
+    suspend fun uploadItemImage(
+        menuId: String,
+        sectionId: String,
+        itemId: String,
+        imageBytes: ByteArray,
+        fileName: String,
+        contentType: String
+    ): Result<MenuItem> = runSuspendCatching {
+        repository.uploadItemImage(menuId, sectionId, itemId, imageBytes, fileName, contentType)
+    }
+
+    suspend fun removeItemImage(menuId: String, sectionId: String, itemId: String): Result<MenuItem> =
+        runSuspendCatching { repository.removeItemImage(menuId, sectionId, itemId) }
+
+    // The dish's ingredients from stock (its recipe underneath), and the stock items and preparations to pick from.
+    suspend fun loadDishRecipe(menuId: String, sectionId: String, itemId: String): Result<DishRecipeDto> =
+        runSuspendCatching { repository.getDishRecipe(menuId, sectionId, itemId) }
+
+    suspend fun saveDishRecipe(menuId: String, sectionId: String, itemId: String, ingredients: List<DishIngredientRequestDto>): Result<DishRecipeDto> =
+        runSuspendCatching { repository.saveDishRecipe(menuId, sectionId, itemId, ingredients) }
+
+    suspend fun loadIngredientChoices(menuId: String): Result<List<IngredientChoiceDto>> =
+        runSuspendCatching { repository.ingredientChoices(menuId) }
 
     suspend fun updateItemAvailability(
         menuId: String,

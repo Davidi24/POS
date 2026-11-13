@@ -150,7 +150,7 @@ class StatisticsScreenModelTest {
             assertEquals(TODAY, query.to)
             assertNull(query.branchId)
             assertEquals("+25%", m.state.value.overview!!.kpis.sales.let { changeText(it.value, it.previous) })
-            m.tab(StatsTab.STAFF); runCurrent()
+            m.tab(StatsTab.TEAM); runCurrent()
             assertEquals("staff", repo.queries.last().first)
             m.branch("branch-1"); runCurrent()
             assertEquals("branch-1", repo.queries.last().second.branchId)
@@ -207,7 +207,7 @@ class StatisticsScreenModelTest {
 
             repo.failure = null
             m.tab(StatsTab.SALES); runCurrent()
-            m.tab(StatsTab.STAFF); runCurrent()
+            m.tab(StatsTab.TEAM); runCurrent()
             m.tab(StatsTab.REPORTS); runCurrent()
             m.download("items"); runCurrent()
             assertNotNull(m.state.value.download)

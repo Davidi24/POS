@@ -2,6 +2,7 @@ package com.saporini.mobile_desktop.pos.payment.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,12 +24,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CheckBox
+import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -42,17 +47,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.components.ChoiceChip
 import com.saporini.mobile_desktop.core.components.Kit
 import com.saporini.mobile_desktop.core.components.KitButton
+import com.saporini.mobile_desktop.core.components.KitDivider
 import com.saporini.mobile_desktop.core.components.ButtonStyle
 import com.saporini.mobile_desktop.core.components.MessageBar
 import com.saporini.mobile_desktop.core.components.MessageKind
@@ -71,6 +80,9 @@ import com.saporini.mobile_desktop.pos.payment.PayMethod
 import com.saporini.mobile_desktop.pos.payment.PaymentFailure
 import com.saporini.mobile_desktop.pos.payment.PaymentScreenModel
 import com.saporini.mobile_desktop.pos.payment.PaymentUiState
+import com.saporini.mobile_desktop.pos.payment.data.BillLineDto
+import com.saporini.mobile_desktop.pos.payment.partCents
+import com.saporini.mobile_desktop.pos.menu.ui.item.MenuPhoto
 import com.saporini.mobile_desktop.pos.shifts.centsToDecimal
 import org.koin.compose.koinInject
 
@@ -124,8 +136,8 @@ internal fun TakePaymentContent(state: PaymentUiState, model: PaymentScreenModel
 @Composable
 private fun Header(state: PaymentUiState, model: PaymentScreenModel, onBack: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(Kit.Tint).clickable(onClick = onBack), Alignment.Center) {
-            Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to the order", Modifier.size(20.dp), tint = Kit.Ink)
+        Box(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onBack), Alignment.Center) {
+            Icon(Icons.AutoMirrored.Filled.Reply, "Back to the order", Modifier.size(20.dp), tint = Kit.Ink)
         }
         Column(Modifier.weight(1f)) {
             Text("Collect payment", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Kit.Ink)
@@ -231,16 +243,25 @@ private fun EntryCard(state: PaymentUiState, model: PaymentScreenModel) {
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // Amount
-            TextInput(draft.amountText, model::amount, label = "Amount", placeholder = centsToDecimal(quote.dueCents).value, suffix = currency,
-                keyboardType = KeyboardType.Decimal, hint = if (draft.amountText.isBlank()) "Empty means the whole bill" else null)
+            val picking = draft.picks != null
+            if (picking) {
+                // What the ticked dishes cost, so it isn't typed.
+                TextInput(if (draft.picks.isNullOrEmpty()) "" else centsToDecimal(quote.amountCents ?: 0).value, model::amount, label = "Amount",
+                    placeholder = "0.00", suffix = currency, enabled = false, hint = "What the ticked dishes cost")
+            } else {
+                TextInput(draft.amountText, model::amount, label = "Amount", placeholder = centsToDecimal(quote.dueCents).value, suffix = currency,
+                    keyboardType = KeyboardType.Decimal, hint = if (draft.amountText.isBlank()) "Empty means the whole bill" else null)
+            }
             if (summary.splitBillsAllowed) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                     Text("Split", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted)
-                    ChoiceChip("Whole bill", draft.amountText.isBlank(), { splitInto = null; model.amount("") })
+                    ChoiceChip("Whole bill", !picking && draft.amountText.isBlank(), { splitInto = null; model.amount("") })
                     listOf(2, 3, 4, 5).forEach { people ->
-                        ChoiceChip("÷ $people", splitInto == people && draft.amountText.isNotBlank(), { splitInto = people; model.splitEvenly(people) })
+                        ChoiceChip("÷ $people", !picking && splitInto == people && draft.amountText.isNotBlank(), { splitInto = people; model.splitEvenly(people) })
                     }
+                    if (summary.lines.any { it.left > 0 }) ChoiceChip("Pick dishes", picking, { splitInto = null; model.payByDishes() })
                 }
+                if (picking) DishPicker(summary.lines, draft.picks.orEmpty(), currency, model::pickDish)
             }
             // Tip
             if (summary.tipsEnabled) {
@@ -276,7 +297,7 @@ private fun EntryCard(state: PaymentUiState, model: PaymentScreenModel) {
             if (noteOpen) TextInput(draft.notes, model::notes, label = "Note", optional = true, singleLine = false, minLines = 2, maxLength = MAX_NOTES)
             else Text("+ Add a note", Modifier.clip(RoundedCornerShape(6.dp)).clickable { noteOpen = true }.padding(4.dp), fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Green)
-            ToggleRow("Close the order when it's paid", draft.closeWhenPaid, model::closeWhenPaid, detail = "Frees the table once nothing is left to pay.")
+            ToggleRow("Close the order when it's paid", draft.closeWhenPaid, model::closeWhenPaid, detail = "The table shows Paid until you set it free.")
             // Summary and the button
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Kit.Canvas).padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 SumLine("Payment", quote.amountCents?.let { moneyText(it, currency) } ?: "–")
@@ -304,6 +325,53 @@ private fun EntryCard(state: PaymentUiState, model: PaymentScreenModel) {
     }
 }
 
+// Paying by dishes (user, 2026-11-01): the guest ticks what they ate. Dishes already paid stay in the list, faded.
+@Composable
+private fun DishPicker(lines: List<BillLineDto>, picks: Map<String, Int>, currency: String, onPick: (String, Int) -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Kit.Border, RoundedCornerShape(12.dp))) {
+        lines.forEachIndexed { index, line ->
+            if (index > 0) KitDivider()
+            val picked = picks[line.lineId] ?: 0
+            val paid = line.left == 0
+            Row(Modifier.fillMaxWidth().alpha(if (paid) 0.5f else 1f).clickable(enabled = !paid) { onPick(line.lineId, if (picked > 0) 0 else line.left) }
+                .padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                when {
+                    paid -> Icon(Icons.Filled.CheckCircle, null, Modifier.size(20.dp), tint = Kit.Green)
+                    picked > 0 -> Icon(Icons.Outlined.CheckBox, "Ticked", Modifier.size(20.dp), tint = Kit.Green)
+                    else -> Icon(Icons.Outlined.CheckBoxOutlineBlank, "Not ticked", Modifier.size(20.dp), tint = Kit.Muted)
+                }
+                MenuPhoto(line.imageUrl, null, Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)), ContentScale.Crop, iconSize = 18.dp)
+                Column(Modifier.weight(1f)) {
+                    Text("${line.quantity} ${line.name}", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Kit.Ink,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val detail = listOfNotNull(line.variant, line.options.takeIf { it.isNotEmpty() }?.joinToString(", "),
+                        line.paidQuantity.takeIf { it > 0 && !paid }?.let { "$it of ${line.quantity} paid" })
+                    if (detail.isNotEmpty()) Text(detail.joinToString(" · "), fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (picked > 0 && line.left > 1) PortionStepper(picked, line.left) { onPick(line.lineId, it) }
+                if (paid) Text("Paid", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Green)
+                else Text(moneyText(partCents(line, if (picked > 0) picked else line.left), currency), fontFamily = Inter(),
+                    fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = if (picked > 0) Kit.Ink else Kit.Muted)
+            }
+        }
+    }
+}
+
+// How many of a dish's portions this guest pays for: one burger of three.
+@Composable
+private fun PortionStepper(value: Int, most: Int, onChange: (Int) -> Unit) {
+    Row(Modifier.clip(RoundedCornerShape(50)).background(Kit.Tint), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(28.dp).clip(CircleShape).clickable(enabled = value > 1) { onChange(value - 1) }, Alignment.Center) {
+            Icon(Icons.Outlined.Remove, "One less", Modifier.size(15.dp), tint = if (value > 1) Kit.Ink else Kit.Faint)
+        }
+        Text("$value", Modifier.width(22.dp), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink, textAlign = TextAlign.Center)
+        Box(Modifier.size(28.dp).clip(CircleShape).clickable(enabled = value < most) { onChange(value + 1) }, Alignment.Center) {
+            Icon(Icons.Outlined.Add, "One more", Modifier.size(15.dp), tint = if (value < most) Kit.Ink else Kit.Faint)
+        }
+    }
+}
+
 @Composable
 private fun DonePanel(state: PaymentUiState, onBack: () -> Unit, onReceipt: () -> Unit) {
     val payment = state.lastPayment
@@ -322,7 +390,7 @@ private fun DonePanel(state: PaymentUiState, onBack: () -> Unit, onReceipt: () -
                         .padding(horizontal = 16.dp, vertical = 8.dp), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF8B5C18))
                 }
             }
-            if (state.summary?.orderStatus == "CLOSED") Text("The order is closed and the table is free.", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
+            if (state.summary?.orderStatus == "CLOSED") Text("The order is closed. The table shows Paid until the guests leave.", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 6.dp)) {
                 KitButton("Receipt", onReceipt, icon = Icons.AutoMirrored.Outlined.ReceiptLong, style = ButtonStyle.SECONDARY)
                 KitButton("Back to orders", onBack)

@@ -14,7 +14,9 @@ import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 data class HistoryFilter(val from: Instant? = null, val to: Instant? = null, val status: OrderStatus? = null,
-    val customerId: String? = null, val staffId: String? = null, val search: String = "") {
+    val customerId: String? = null, val staffId: String? = null, val search: String = "",
+    // The orders closed as unpaid: the ones to reopen for payment.
+    val unpaidOnly: Boolean = false) {
     fun problem(): String? = when {
         from != null && to != null && from >= to -> "The end must be after the start."
         status != null && status !in setOf(OrderStatus.CLOSED, OrderStatus.CANCELLED, OrderStatus.VOIDED) -> "Select a finished order status."
@@ -37,6 +39,7 @@ class ApiOrderHistoryRepository(private val client: HttpClient, private val orde
             parameter("page", page); parameter("size", size)
             filter.from?.let { parameter("from", it.toString()) }; filter.to?.let { parameter("to", it.toString()) }
             filter.status?.let { parameter("status", it.name) }; filter.customerId?.let { parameter("customerId", it) }
+            if (filter.unpaidOnly) parameter("unpaidOnly", true)
             filter.staffId?.let { parameter("staffId", it) }; filter.search.trim().takeIf { it.isNotEmpty() }?.let { parameter("search", it) }
         }.body<HistoryPageDto>()
         return HistoryPage(dto.items.map { it.toDomain() }, dto.page, dto.size, dto.totalElements, dto.hasNext)

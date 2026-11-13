@@ -35,6 +35,13 @@ internal fun centsToDecimal(cents: Long): OrderDecimal {
     return OrderDecimal("${if (cents < 0) "-" else ""}${abs / 100}.${(abs % 100).toString().padStart(2, '0')}")
 }
 
+// Long totals with days first (user, 2026-10-31: "I don't like 200h"): "8d 13h 43m"; under a day as hoursText.
+internal fun daysHoursText(minutes: Long): String {
+    if (minutes < 24 * 60) return hoursText(minutes)
+    val rest = minutes % (24 * 60)
+    return "${minutes / (24 * 60)}d" + if (rest == 0L) "" else " ${hoursText(rest)}"
+}
+
 // "7h 30m", "45m", "8h"
 internal fun hoursText(minutes: Long): String {
     val h = minutes / 60
