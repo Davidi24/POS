@@ -141,6 +141,26 @@ class InventoryFlowIntegrationTest extends AbstractPosApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("inventory activity is summarized per day in restaurant currency and validates its period")
+    void inventoryActivitySummary() throws Exception {
+        World world = newWorld("inventory-activity");
+        UUID kitchen = location(world, "Kitchen", "KITCHEN");
+        UUID flour = stockItem(world, "Flour", "KILOGRAM", "2.0000");
+        post(BASE + "/receive", world.restaurantId()).as(world.ownerToken()).body(Map.of(
+                "locationId", kitchen, "inventoryItemId", flour, "quantity", new BigDecimal("5.000"))).expect(201);
+        post(BASE + "/waste", world.restaurantId()).as(world.ownerToken()).body(Map.of(
+                "locationId", kitchen, "inventoryItemId", flour, "quantity", new BigDecimal("1.250"), "reason", "Spilled")).expect(201);
+
+        JsonNode activity = get(BASE + "/activity", world.restaurantId()).as(world.ownerToken()).param("days", 7).expect(200);
+        assertThat(activity.path("days")).hasSize(7);
+        assertThat(money(activity, "received")).isEqualByComparingTo("10.00");
+        assertThat(money(activity, "wasted")).isEqualByComparingTo("2.50");
+        assertThat(activity.path("changes").asLong()).isEqualTo(2);
+        get(BASE + "/activity", world.restaurantId()).as(world.ownerToken()).param("days", 6).expect(400);
+        get(BASE + "/activity", world.restaurantId()).as(world.ownerToken()).param("days", 91).expect(400);
+    }
+
+    @Test
     @DisplayName("simultaneous stock requests with the same key apply one movement")
     void concurrentSameKeyStockMovementAppliesOnce() throws Exception {
         World world = newWorld("stock-movement-idempotency-race");

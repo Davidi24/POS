@@ -127,6 +127,24 @@ class AuthSessionIntegrationTest {
     }
 
     @Test
+    @DisplayName("Refresh limiter uses the configured schema even when the connection searches public")
+    void refreshLimiterDoesNotDependOnConnectionSearchPath() throws Exception {
+        try (var connection = java.util.Objects.requireNonNull(jdbcTemplate.getDataSource()).getConnection()) {
+            String originalSchema = connection.getSchema();
+            try {
+                connection.setSchema("public");
+                var template = new JdbcTemplate(new org.springframework.jdbc.datasource.SingleConnectionDataSource(connection, true));
+                var limiter = new RefreshRateLimiter(template, 20, 5, 1, "auth-session-refresh-token-pepper-0123456789");
+                org.springframework.test.util.ReflectionTestUtils.setField(limiter, "schemaName", SCHEMA);
+                limiter.check("198.51.100.240");
+                assertThat(template.queryForObject("SELECT COUNT(*) FROM \"" + SCHEMA + "\".auth_refresh_rate_limit", Integer.class)).isEqualTo(1);
+            } finally {
+                connection.setSchema(originalSchema);
+            }
+        }
+    }
+
+    @Test
     @DisplayName("Enforces one shared IP limit across independent limiter instances under concurrency")
     void enforcesSharedIpLimitAcrossInstancesUnderConcurrency() throws Exception {
         String ip = "198.51.100." + (ipSequence.incrementAndGet() % 200 + 1);
@@ -137,6 +155,7 @@ class AuthSessionIntegrationTest {
                 1,
                 "auth-session-refresh-token-pepper-0123456789"
         );
+        org.springframework.test.util.ReflectionTestUtils.setField(secondInstance, "schemaName", SCHEMA);
         int requestCount = 28;
         CountDownLatch ready = new CountDownLatch(requestCount);
         CountDownLatch start = new CountDownLatch(1);

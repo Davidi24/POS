@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.menu.MenuItemDeletionBlockedException;
 import pos.pos.exception.menu.MenuItemNotFoundException;
@@ -21,6 +22,9 @@ import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuItemOptionGroup;
 import pos.pos.menu.entity.MenuSection;
 import pos.pos.menu.entity.MenuVariant;
+import pos.pos.menu.image.MenuImageReleaser;
+import pos.pos.menu.image.MenuImageStorage;
+import pos.pos.menu.image.MenuImageUploads;
 import pos.pos.menu.mapper.MenuMapper;
 import pos.pos.menu.policy.MenuPolicy;
 import pos.pos.menu.repository.MenuItemOptionGroupRepository;
@@ -37,6 +41,7 @@ import pos.pos.utils.NormalizationUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -54,6 +59,9 @@ public class MenuItemService {
     private final MenuPolicy menuPolicy;
     private final RestaurantValidationService restaurantValidationService;
     private final OnlineMenuService onlineMenuService;
+    private final MenuImageStorage menuImageStorage;
+    private final MenuImageReleaser menuImageReleaser;
+    private final pos.pos.menu.recipe.DishRecipeCleanup dishRecipeCleanup;
 
     @Transactional(readOnly = true)
     public List<MenuItemSummaryResponse> getItems(
@@ -164,7 +172,18 @@ public class MenuItemService {
         item.setName(NormalizationUtils.normalize(request.getName()));
         item.setDescription(NormalizationUtils.normalize(request.getDescription()));
         item.setBasePrice(request.getBasePrice());
-        item.setImageUrl(NormalizationUtils.normalize(request.getImageUrl()));
+        // Photos change through their own upload. An update only touches the photo when it names one ("" clears it);
+        // a photo it drops is removed from storage once this is saved.
+        if (request.getImageUrl() != null) {
+            String nextImage = NormalizationUtils.normalize(request.getImageUrl());
+            String previousImage = item.getImageUrl();
+            if (!Objects.equals(nextImage, previousImage)) {
+                item.setImageUrl(nextImage);
+                if (previousImage != null) {
+                    menuImageReleaser.releaseAfterCommit(previousImage);
+                }
+            }
+        }
         item.setAvailable(Boolean.TRUE.equals(request.getAvailable()));
         if (request.getSendToKitchen() != null) {
             item.setSendToKitchen(request.getSendToKitchen());
@@ -210,10 +229,55 @@ public class MenuItemService {
         }
 
         menuItemRepository.deleteKdsRoutingsOf(List.of(item.getId()));
+        dishRecipeCleanup.releaseDishes(List.of(item.getId()));
         menuItemRepository.delete(item);
         if (item.getOnlineSection() != null) {
             onlineMenuService.removeIfEmpty(item.getOnlineSection(), item);
         }
+        if (item.getImageUrl() != null) {
+            menuImageReleaser.releaseAfterCommit(item.getImageUrl());
+        }
+    }
+
+    // Uploads the dish's photo. A photo it replaces is removed from storage once this is saved; if saving fails, the
+    // new photo is removed again.
+    @Transactional
+    public MenuItemSummaryResponse uploadItemImage(
+            Authentication authentication,
+            UUID menuId,
+            UUID sectionId,
+            UUID itemId,
+            MultipartFile file
+    ) {
+        Menu menu = requireManageableMenu(authentication, menuId);
+        assertMenuWriteAllowed(menu.getRestaurant());
+        MenuItem item = requireScopedItem(requireScopedSection(menu, sectionId), itemId);
+        MenuImageUploads.CheckedPhoto photo = MenuImageUploads.check(file);
+
+        String key = menuImageStorage.store(menu.getRestaurant().getId(), photo.content(), photo.contentType(), photo.extension());
+        menuImageReleaser.discardOnRollback(key);
+        String previousImage = item.getImageUrl();
+        item.setImageUrl(menuImageStorage.urlFor(key));
+        MenuItem saved = menuItemRepository.saveAndFlush(item);
+        if (previousImage != null) {
+            menuImageReleaser.releaseAfterCommit(previousImage);
+        }
+        return menuMapper.toMenuItemResponse(saved);
+    }
+
+    // Takes the photo off the dish (and out of storage, once saved, unless another dish still shows it).
+    @Transactional
+    public MenuItemSummaryResponse removeItemImage(Authentication authentication, UUID menuId, UUID sectionId, UUID itemId) {
+        Menu menu = requireManageableMenu(authentication, menuId);
+        assertMenuWriteAllowed(menu.getRestaurant());
+        MenuItem item = requireScopedItem(requireScopedSection(menu, sectionId), itemId);
+        String previousImage = item.getImageUrl();
+        item.setImageUrl(null);
+        MenuItem saved = menuItemRepository.saveAndFlush(item);
+        if (previousImage != null) {
+            menuImageReleaser.releaseAfterCommit(previousImage);
+        }
+        return menuMapper.toMenuItemResponse(saved);
     }
 
     private static String occasionCodes(List<String> codes) {
@@ -226,6 +290,23 @@ public class MenuItemService {
                 .distinct()
                 .toList());
         return joined.isEmpty() ? null : joined;
+    }
+
+    /** The dish, for someone who may see its menu. */
+    public MenuItem requireReadableItem(Authentication authentication, UUID menuId, UUID sectionId, UUID itemId) {
+        return requireScopedItem(requireScopedSection(requireAccessibleMenu(authentication, menuId), sectionId), itemId);
+    }
+
+    /** The dish, for someone who may change its menu (and not in an archived restaurant). */
+    public MenuItem requireWritableItem(Authentication authentication, UUID menuId, UUID sectionId, UUID itemId) {
+        return requireScopedItem(requireScopedSection(requireWritableMenu(authentication, menuId), sectionId), itemId);
+    }
+
+    /** The menu, for someone who may change it (and not in an archived restaurant). */
+    public Menu requireWritableMenu(Authentication authentication, UUID menuId) {
+        Menu menu = requireManageableMenu(authentication, menuId);
+        assertMenuWriteAllowed(menu.getRestaurant());
+        return menu;
     }
 
     private Menu requireAccessibleMenu(Authentication authentication, UUID menuId) {

@@ -6,6 +6,10 @@ import pos.pos.exception.auth.AuthException;
 public class RestaurantSlugAlreadyExistsException extends AuthException {
 
     public RestaurantSlugAlreadyExistsException() {
-        super("Restaurant slug already in use", HttpStatus.BAD_REQUEST);
+        this("Restaurant slug already in use");
+    }
+
+    public RestaurantSlugAlreadyExistsException(String message) {
+        super(message, HttpStatus.CONFLICT);
     }
 }

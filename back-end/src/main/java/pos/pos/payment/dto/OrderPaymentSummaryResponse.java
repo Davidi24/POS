@@ -28,6 +28,11 @@ public record OrderPaymentSummaryResponse(
         List<Integer> tipSuggestions,
         int maxTipPercent,
         boolean splitBillsAllowed,
-        List<PaymentResponse> payments
+        List<PaymentResponse> payments,
+        List<BillLine> lines
 ) {
+    /** A dish on the bill. {@code amount} is what all of it costs of the bill: its share of discounts, tax, service and money paid ahead. */
+    public record BillLine(UUID lineId, String name, String variant, List<String> options, int quantity, int paidQuantity,
+                           BigDecimal amount, String imageUrl) {
+    }
 }

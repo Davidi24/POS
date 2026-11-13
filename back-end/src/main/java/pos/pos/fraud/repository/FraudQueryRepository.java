@@ -110,7 +110,7 @@ public class FraudQueryRepository {
                         + "  select o.updated_by staff, cast(o.updated_at at time zone :zone as date) as day, count(*) cnt, sum(o.subtotal) value,"
                         + "   max(o.updated_at) last_at, max(o.currency) currency"
                         + "   from " + schema + "orders o where o.restaurant_id = :restaurant" + scope.branch("o")
-                        + "   and o.status = 'VOIDED' and o.updated_by is not null and o.updated_at >= :from and o.updated_at < :to group by 1, 2"
+                        + "   and o.status = 'VOIDED' and o.unpaid_at is null and o.updated_by is not null and o.updated_at >= :from and o.updated_at < :to group by 1, 2"
                         + " ) x group by x.staff, x.day having sum(x.cnt) >= :voids order by at desc limit :limit",
                 params, (rs, n) -> finding(FraudRule.MANY_VOIDS, rs, true));
     }
@@ -123,10 +123,21 @@ public class FraudQueryRepository {
                         + " (select coalesce(sum(" + GROSS + "), 0) from " + schema + "order_line_items l where l.order_id = o.id) amount,"
                         + " o.currency, null extra, null::numeric ratio"
                         + " from " + schema + "orders o where o.restaurant_id = :restaurant" + scope.branch("o")
-                        + " and o.status = :status and o.updated_at >= :from and o.updated_at < :to"
+                        + " and o.status = :status and o.unpaid_at is null and o.updated_at >= :from and o.updated_at < :to"
                         + " and exists (select 1 from " + schema + "order_line_items l where l.order_id = o.id and l.fired_at is not null)"
                         + " order by o.updated_at desc limit :limit",
                 params, (rs, n) -> finding(rule, rs, false));
+    }
+
+    // Orders closed as unpaid and still unpaid: what was owed, and why.
+    public List<Finding> closedUnpaid(Scope scope) {
+        return jdbc.query(
+                "select o.id::text ref, o.unpaid_at at, coalesce(o.unpaid_by, o.created_by) staff, o.id order_id, o.order_number, o.unpaid_amount amount,"
+                        + " o.currency, case when o.unpaid_reason = 'NO_ACTION' then 'no action taken' else o.unpaid_note end extra, null::numeric ratio"
+                        + " from " + schema + "orders o where o.restaurant_id = :restaurant" + scope.branch("o")
+                        + " and o.status = 'VOIDED' and o.unpaid_at >= :from and o.unpaid_at < :to"
+                        + " order by o.unpaid_at desc limit :limit",
+                scope.params(), (rs, n) -> finding(FraudRule.CLOSED_UNPAID, rs, false));
     }
 
     public List<Finding> largeRefunds(Scope scope, BigDecimal amount) {

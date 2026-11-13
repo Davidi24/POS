@@ -40,6 +40,8 @@ public class WaitlistService {
     private final WaitlistEntryRepository waitlistEntryRepository;
     private final RestaurantTableSupport restaurantTableSupport;
     private final RestaurantTableRepository restaurantTableRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
+    private final pos.pos.tables.service.TableSeatingRules tableSeatingRules;
     private final ReservationRepository reservationRepository;
     private final ReservationRuleResolver reservationRuleResolver;
 
@@ -86,6 +88,9 @@ public class WaitlistService {
         if (table.getStatus() != TableStatus.AVAILABLE && table.getStatus() != TableStatus.RESERVED) {
             throw new AuthException("Table " + table.getTableNumber() + " isn't free", HttpStatus.CONFLICT);
         }
+        List<RestaurantTable> group = new java.util.ArrayList<>(List.of(table));
+        group.addAll(restaurantTableRepository.findAllByMergedInto_IdOrderByTableNumberAsc(tableId));
+        tableSeatingRules.check(restaurantId, group, entry.getPartySize());
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         table.setStatus(TableStatus.OCCUPIED);
@@ -93,6 +98,9 @@ public class WaitlistService {
         table.setSeatedAt(now);
         table.setUpdatedBy(actorId);
         restaurantTableRepository.save(table);
+        events.publishEvent(new pos.pos.tables.event.GuestsSeatedEvent(
+                table.getRestaurant().getId(), table.getBranch().getId(), table.getBranch().getName(), tableId,
+                table.getTableNumber(), table.getCapacity(), entry.getPartySize(), 0, actorId));
         entry.setStatus(WaitlistStatus.SEATED);
         entry.setTableId(tableId);
         entry.setSeatedAt(now);

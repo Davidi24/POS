@@ -20,6 +20,8 @@ public class TableLayoutChangeNotifier {
     private final ConcurrentHashMap<BranchKey, CopyOnWriteArraySet<SseEmitter>>
             subscribers = new ConcurrentHashMap<>();
 
+    // The branch check reads the restaurant lazily, and open-in-view is off: it needs its own read transaction.
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public SseEmitter subscribe(
             Authentication authentication,
             UUID restaurantId,

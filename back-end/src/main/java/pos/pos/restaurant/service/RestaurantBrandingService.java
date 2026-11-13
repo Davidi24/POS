@@ -22,6 +22,7 @@ public class RestaurantBrandingService {
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantBrandingRepository restaurantBrandingRepository;
     private final RestaurantBrandingMapper restaurantBrandingMapper;
+    private final pos.pos.menu.image.MenuImageReleaser imageReleaser;
 
     @Transactional(readOnly = true)
     public RestaurantBrandingResponse getBranding(Authentication authentication, UUID restaurantId) {
@@ -43,7 +44,9 @@ public class RestaurantBrandingService {
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         RestaurantBranding branding = restaurantBrandingRepository.findByRestaurantIdAndDeletedAtIsNull(restaurantId)
                 .map(existing -> {
+                    String previous = existing.getLogoUrl();
                     restaurantBrandingMapper.updateEntity(existing, request, actorId);
+                    if (!java.util.Objects.equals(previous, existing.getLogoUrl())) imageReleaser.releaseAfterCommit(previous);
                     return existing;
                 })
                 .orElseGet(() -> restaurantBrandingMapper.toNewEntity(restaurant, request, actorId));

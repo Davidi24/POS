@@ -437,6 +437,222 @@ class OrderLifecycleIntegrationTest extends AbstractPosApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("who can join whom: a table takes in its own kind or lower, and a requested bill joins nothing")
+    void tableJoinRules() throws Exception {
+        Setup s = setup("table-join-rules");
+        UUID r = s.world().restaurantId();
+        // Free and reserved tables take in each other, nothing higher.
+        // A reserved table takes in a free one, not the other way round (user, 2026-11-01).
+        assertThat(join(s, free(s, "F1"), reserved(s, "F2"))).isEqualTo(409);
+        assertThat(join(s, reserved(s, "F3"), free(s, "F4"))).isEqualTo(200);
+        assertThat(join(s, free(s, "F5"), seated(s, "F6"))).isEqualTo(409);
+        assertThat(join(s, free(s, "F7"), tableOf(withOrder(s, "F8")))).isEqualTo(409);
+        // Guests without an order take in those and each other, not a table with an order.
+        assertThat(join(s, seated(s, "S1"), free(s, "S2"), seated(s, "S3"))).isEqualTo(200);
+        assertThat(join(s, seated(s, "S4"), tableOf(withOrder(s, "S5")))).isEqualTo(409);
+        // A table with an order takes in anything but a requested bill.
+        assertThat(join(s, tableOf(withOrder(s, "O1")), free(s, "O2"), seated(s, "O3"), tableOf(withOrder(s, "O4")))).isEqualTo(200);
+
+        String billRequest = ORDER + "/bill-request";
+        JsonNode billed = withOrder(s, "B1");
+        post(billRequest, r, id(billed)).as(s.waiterToken()).expect(200);
+        assertThat(join(s, tableOf(withOrder(s, "B2")), tableOf(billed))).isEqualTo(409);
+        assertThat(join(s, tableOf(billed), free(s, "B3"))).isEqualTo(409);
+        // Taking it back, or ordering more, frees the table again.
+        delete(billRequest, r, id(billed)).as(s.waiterToken()).expect(200);
+        assertThat(join(s, tableOf(billed), free(s, "B4"))).isEqualTo(200);
+        JsonNode more = withOrder(s, "B5");
+        post(billRequest, r, id(more)).as(s.waiterToken()).expect(200);
+        post(ORDER + "/items", r, id(more)).as(s.waiterToken()).body(Map.of("menuItemId", s.pasta(), "quantity", 1)).expect(201);
+        assertThat(join(s, tableOf(more), free(s, "B6"))).isEqualTo(200);
+
+        // The ring around a table: how much of its order is served.
+        JsonNode served = withOrder(s, "C1");
+        assertThat(servedOn(s, tableOf(served)).get("currentOrderServedItems").asInt()).isZero();
+        assertThat(servedOn(s, tableOf(served)).get("currentOrderTotalItems").asInt()).isEqualTo(1);
+        post(ORDER + "/fulfill", r, id(served)).as(s.waiterToken()).expect(200);
+        assertThat(servedOn(s, tableOf(served)).get("currentOrderServedItems").asInt()).isEqualTo(1);
+    }
+
+    private JsonNode servedOn(Setup s, UUID table) throws Exception {
+        JsonNode layout = get("/restaurants/{r}/branches/{b}/table-layout", s.world().restaurantId(), s.world().branchId())
+                .as(s.world().ownerToken()).expect(200);
+        for (JsonNode item : layout.get("tables")) {
+            if (item.get("tableId").asText().equals(table.toString())) {
+                return item;
+            }
+        }
+        throw new AssertionError("Table not on the layout: " + table);
+    }
+
+    private static UUID tableOf(JsonNode order) {
+        return UUID.fromString(order.get("tableId").asText());
+    }
+
+    @Test
+    @DisplayName("seating limits: merged tables need more than their biggest holds, and unusual numbers tell the managers, and a table has a most")
+    void tableSeatingLimits() throws Exception {
+        Setup s = setup("table-seating-limits");
+        UUID r = s.world().restaurantId();
+        UUID b = s.world().branchId();
+        String status = "/restaurants/{r}/branches/{b}/tables/{t}/status";
+        String feed = "/restaurants/{r}/notifications";
+
+        UUID main = free(s, "M1");
+        UUID other = free(s, "M2");
+        assertThat(join(s, main, other)).isEqualTo(200);
+        int seats = get("/restaurants/{r}/branches/{b}/tables/{t}", r, b, main).as(s.world().ownerToken()).expect(200).get("capacity").asInt();
+        Map<String, Object> tooFew = Map.of("status", "OCCUPIED", "guestCount", seats);
+        patch(status, r, b, main).as(s.waiterToken()).body(tooFew).expect(400);
+        patch(status, r, b, main).as(s.waiterToken()).body(Map.of("status", "OCCUPIED", "guestCount", seats + 1)).expect(200);
+        // The number can change, under the same rule; the guests are spread over both tables.
+        patch(status, r, b, main).as(s.waiterToken()).body(tooFew).expect(400);
+        assertThat(get("/restaurants/{r}/branches/{b}/tables/{t}", r, b, other).as(s.world().ownerToken()).expect(200).get("status").asText()).isEqualTo("OCCUPIED");
+
+        UUID single = free(s, "A1");
+        // Two over the seats is normal; three is unusual and tells the manager and the owner, not the waiter.
+        patch(status, r, b, single).as(s.waiterToken()).body(Map.of("status", "OCCUPIED", "guestCount", seats + 2)).expect(200);
+        assertThat(alerts(feed, r, s.managerToken())).isZero();
+        patch(status, r, b, single).as(s.waiterToken()).body(Map.of("status", "OCCUPIED", "guestCount", seats + 3)).expect(200);
+        for (int wait = 0; wait < 50 && alerts(feed, r, s.world().ownerToken()) == 0; wait++) {
+            Thread.sleep(200);
+        }
+        assertThat(alerts(feed, r, s.managerToken())).isEqualTo(1);
+        assertThat(alerts(feed, r, s.world().ownerToken())).isEqualTo(1);
+        assertThat(alerts(feed, r, s.waiterToken())).isZero();
+        // Four over is the most; five is refused.
+        patch(status, r, b, single).as(s.waiterToken()).body(Map.of("status", "OCCUPIED", "guestCount", seats + 4)).expect(200);
+        patch(status, r, b, single).as(s.waiterToken()).body(Map.of("status", "OCCUPIED", "guestCount", seats + 5)).expect(400);
+    }
+
+    @Test
+    @DisplayName("closed as unpaid: voided with what's owed, the table freed, the managers told, and reopened later for payment")
+    void closeAsUnpaid() throws Exception {
+        Setup s = setup("close-unpaid");
+        UUID r = s.world().restaurantId();
+        UUID b = s.world().branchId();
+        UUID table = seated(s, "U1");
+        JsonNode order = post("/restaurants/{r}/branches/{b}/tables/{t}/orders", r, b, table)
+                .as(s.waiterToken()).body(Map.of("items", List.of(Map.of("menuItemId", s.pasta(), "quantity", 1)))).expect(201);
+        UUID o = id(order);
+        post(ORDER + "/payments", r, o).as(s.managerToken()).body(Map.of("method", "CASH", "amount", "5", "tenderedAmount", "5")).expect(201);
+
+        Map<String, Object> walkedOut = Map.of("reason", "Left without a word");
+        // Only people who may void orders close one as unpaid.
+        post(ORDER + "/close-unpaid", r, o).as(s.waiterToken()).body(walkedOut).expect(403);
+        post(ORDER + "/close-unpaid", r, o).as(s.managerToken()).body(Map.of("reason", " ")).expect(400);
+        JsonNode closed = post(ORDER + "/close-unpaid", r, o).as(s.managerToken()).body(walkedOut).expect(200);
+        assertThat(closed.get("status").asText()).isEqualTo("VOIDED");
+        assertThat(closed.get("paymentStatus").asText()).isEqualTo("PARTIALLY_PAID");
+        assertThat(closed.get("unpaidNote").asText()).isEqualTo("Left without a word");
+        assertThat(closed.get("unpaidAmount").decimalValue()).isEqualByComparingTo(closed.get("total").decimalValue().subtract(new java.math.BigDecimal("5")));
+        assertThat(closed.get("tableNumber").asText()).isEqualTo("U1");
+        assertThat(closed.path("tableId").isNull() || closed.path("tableId").isMissingNode()).isTrue();
+        // The table is free for the next guests; the dishes stay as they were.
+        assertThat(get("/restaurants/{r}/branches/{b}/tables/{t}", r, b, table).as(s.world().ownerToken()).expect(200).get("status").asText())
+                .isEqualTo("AVAILABLE");
+        assertThat(closed.get("lineItems").get(0).get("status").asText()).isNotEqualTo("VOIDED");
+        post(ORDER + "/close-unpaid", r, o).as(s.managerToken()).body(walkedOut).expect(400);
+
+        String unpaidList = "/restaurants/{r}/branches/{b}/orders/page";
+        assertThat(get(unpaidList, r, b).as(s.managerToken()).param("unpaidOnly", "true").expect(200).get("items").size()).isEqualTo(1);
+        String feed = "/restaurants/{r}/notifications";
+        for (int wait = 0; wait < 50 && unpaidAlerts(feed, r, s.world().ownerToken()) == 0; wait++) {
+            Thread.sleep(200);
+        }
+        assertThat(unpaidAlerts(feed, r, s.world().ownerToken())).isEqualTo(1);
+        assertThat(unpaidAlerts(feed, r, s.managerToken())).isZero();
+        assertThat(unpaidAlerts(feed, r, s.waiterToken())).isZero();
+
+        // Later the guest comes back to pay: reopen it, take the rest, and it closes.
+        JsonNode reopened = post(ORDER + "/reopen-for-payment", r, o).as(s.waiterToken()).expect(200);
+        assertThat(reopened.get("status").asText()).isEqualTo("OPEN");
+        assertThat(reopened.get("unpaidNote").asText()).isEqualTo("Left without a word");
+        post(ORDER + "/reopen-for-payment", r, o).as(s.waiterToken()).expect(400);
+        // It's open only for the payment: no new dishes, no ordinary void, and it isn't on the unpaid list.
+        post(ORDER + "/items", r, o).as(s.waiterToken()).body(Map.of("menuItemId", s.pasta(), "quantity", 1)).expect(400);
+        post(ORDER + "/void", r, o).as(s.managerToken()).body(Map.of("reason", "Mistake")).expect(400);
+        assertThat(get(unpaidList, r, b).as(s.managerToken()).param("unpaidOnly", "true").expect(200).get("items").size()).isZero();
+        String rest = reopened.get("total").decimalValue().subtract(new java.math.BigDecimal("5")).toPlainString();
+        post(ORDER + "/payments", r, o).as(s.managerToken()).body(Map.of("method", "CASH", "amount", rest, "tenderedAmount", rest)).expect(201);
+        assertThat(get(ORDER, r, o).as(s.managerToken()).expect(200).get("status").asText()).isEqualTo("CLOSED");
+        assertThat(get(unpaidList, r, b).as(s.managerToken()).param("unpaidOnly", "true").expect(200).get("items").size()).isZero();
+        // Nothing owed: close it normally instead.
+        JsonNode paid = withOrder(s, "U2");
+        String all = paid.get("total").decimalValue().toPlainString();
+        post(ORDER + "/payments", r, id(paid)).as(s.managerToken()).body(Map.of("method", "CASH", "amount", all, "tenderedAmount", all)).expect(201);
+        post(ORDER + "/close-unpaid", r, id(paid)).as(s.managerToken()).body(walkedOut).expect(400);
+    }
+
+    @Test
+    @DisplayName("closed as unpaid: the kitchen stops on the order, its dishes stay on the bill, and reopening sends nothing back")
+    void closeAsUnpaidStopsTheKitchen() throws Exception {
+        Setup s = setup("close-unpaid-kitchen");
+        UUID r = s.world().restaurantId();
+        UUID b = s.world().branchId();
+        String kds = "/restaurants/{r}/branches/{b}/kds";
+        post(kds + "/stations", r, b).as(s.world().ownerToken()).body(Map.of(
+                "name", "Grill", "stationType", "GRILL", "routings", List.of(Map.of("menuItemId", s.pasta())))).expect(201);
+        JsonNode order = withOrder(s, "K1");
+        UUID o = id(order);
+        post(ORDER + "/send-to-kitchen", r, o).as(s.waiterToken()).expect(200);
+        assertThat(ticketsOnBoard(s)).isEqualTo(1);
+
+        JsonNode closed = post(ORDER + "/close-unpaid", r, o).as(s.managerToken()).body(Map.of("reason", "Couldn't pay tonight")).expect(200);
+        assertThat(ticketsOnBoard(s)).isZero();
+        assertThat(closed.get("lineItems").get(0).get("status").asText()).isNotIn("VOIDED", "CANCELLED");
+        assertThat(closed.get("total").decimalValue()).isEqualByComparingTo(order.get("total").decimalValue());
+
+        post(ORDER + "/reopen-for-payment", r, o).as(s.waiterToken()).expect(200);
+        assertThat(ticketsOnBoard(s)).isZero();
+    }
+
+    private int ticketsOnBoard(Setup s) throws Exception {
+        int tickets = 0;
+        for (JsonNode station : get("/restaurants/{r}/branches/{b}/kds/board", s.world().restaurantId(), s.world().branchId()).as(s.waiterToken()).expect(200)) {
+            tickets += station.path("tickets").size();
+        }
+        return tickets;
+    }
+
+    private int unpaidAlerts(String feed, UUID restaurant, String token) throws Exception {
+        return get(feed, restaurant).as(token).param("eventCode", "ORDER_CLOSED_UNPAID").expect(200).get("items").size();
+    }
+
+    private int alerts(String feed, UUID restaurant, String token) throws Exception {
+        return get(feed, restaurant).as(token).param("eventCode", "TABLE_SEATING_OVER_LIMIT").expect(200).get("items").size();
+    }
+
+    private UUID free(Setup s, String number) throws Exception {
+        return table(s.world(), number);
+    }
+
+    private UUID reserved(Setup s, String number) throws Exception {
+        UUID table = table(s.world(), number);
+        patch("/restaurants/{r}/branches/{b}/tables/{t}/status", s.world().restaurantId(), s.world().branchId(), table)
+                .as(s.waiterToken()).body(Map.of("status", "RESERVED")).expect(200);
+        return table;
+    }
+
+    private UUID seated(Setup s, String number) throws Exception {
+        UUID table = table(s.world(), number);
+        patch("/restaurants/{r}/branches/{b}/tables/{t}/status", s.world().restaurantId(), s.world().branchId(), table)
+                .as(s.waiterToken()).body(Map.of("status", "OCCUPIED", "guestCount", 2)).expect(200);
+        return table;
+    }
+
+    // An order on a new table.
+    private JsonNode withOrder(Setup s, String number) throws Exception {
+        return post("/restaurants/{r}/branches/{b}/tables/{t}/orders", s.world().restaurantId(), s.world().branchId(), table(s.world(), number))
+                .as(s.waiterToken()).body(Map.of("items", List.of(Map.of("menuItemId", s.pasta(), "quantity", 1)))).expect(201);
+    }
+
+    private int join(Setup s, UUID start, UUID... others) throws Exception {
+        return post("/restaurants/{r}/branches/{b}/tables/{t}/merge", s.world().restaurantId(), s.world().branchId(), start)
+                .as(s.waiterToken()).body(Map.of("tableIds", List.of(others))).send().status();
+    }
+
+    @Test
     @DisplayName("a table merge and new order cannot leave an order attached to a merged child")
     void concurrentMergeAndTableOrderKeepAssociationConsistent() throws Exception {
         Setup s = setup("table-order-merge-race");
@@ -444,6 +660,9 @@ class OrderLifecycleIntegrationTest extends AbstractPosApiIntegrationTest {
         UUID branch = s.world().branchId();
         UUID primary = table(s.world(), "RACE-P");
         UUID child = table(s.world(), "RACE-C");
+        // The main table has an order, so the merge is allowed whichever request comes first.
+        post("/restaurants/{r}/branches/{b}/tables/{t}/orders", r, branch, primary)
+                .as(s.waiterToken()).body(Map.of("items", List.of(Map.of("menuItemId", s.pasta(), "quantity", 1)))).expect(201);
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);

@@ -36,7 +36,7 @@ public class OptionItemController {
     private final OptionItemService optionItemService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "List items for one option group")
     public ResponseEntity<List<OptionItemResponse>> getOptionItems(
             Authentication authentication,

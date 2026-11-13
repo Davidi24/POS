@@ -29,6 +29,10 @@ import pos.pos.menu.dto.update.UpdateMenuRequest;
 import pos.pos.menu.dto.update.UpdateMenuStatusRequest;
 import pos.pos.menu.mapper.MenuRoleResponseMapper;
 import pos.pos.menu.service.MenuService;
+import pos.pos.menu.service.MenuWaiterViewService;
+import pos.pos.menu.dto.response.MenuWaiterViewResponse;
+import pos.pos.menu.dto.request.MenuOrderRequest;
+import pos.pos.menu.dto.request.MenuWaiterViewRequest;
 
 import java.util.UUID;
 
@@ -40,9 +44,10 @@ import java.util.UUID;
 public class MenuController {
 
     private final MenuService menuService;
+    private final MenuWaiterViewService menuWaiterViewService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "List menus with pagination and optional filters")
     public ResponseEntity<PageResponse<MenuViewResponse>> getMenus(
             Authentication authentication,
@@ -68,6 +73,48 @@ public class MenuController {
         return ResponseEntity.ok(MenuRoleResponseMapper.forActor(authentication, response));
     }
 
+    @GetMapping("/available-now")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @Operation(summary = "The menus the till offers right now (scheduled for this day and time; only the event menu on a special-menu-only event night)")
+    public ResponseEntity<PageResponse<MenuViewResponse>> getMenusAvailableNow(
+            Authentication authentication,
+            @RequestParam UUID restaurantId
+    ) {
+        PageResponse<MenuResponse> response = menuService.getMenusAvailableNow(authentication, restaurantId);
+        return ResponseEntity.ok(MenuRoleResponseMapper.forActor(authentication, response));
+    }
+
+    @PutMapping("/order")
+    @PreAuthorize("hasAuthority('MENUS_UPDATE')")
+    @Operation(summary = "Save the order menus are shown in")
+    public ResponseEntity<Void> reorderMenus(
+            @Valid @RequestBody MenuOrderRequest request,
+            Authentication authentication
+    ) {
+        menuService.reorderMenus(authentication, request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/waiter-view")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @Operation(summary = "Which menus waiters see: special menus only, or the chosen menus")
+    public ResponseEntity<MenuWaiterViewResponse> getWaiterView(
+            Authentication authentication,
+            @RequestParam UUID restaurantId
+    ) {
+        return ResponseEntity.ok(menuWaiterViewService.getView(authentication, restaurantId));
+    }
+
+    @PutMapping("/waiter-view")
+    @PreAuthorize("hasAuthority('MENUS_UPDATE')")
+    @Operation(summary = "Choose which menus waiters see")
+    public ResponseEntity<MenuWaiterViewResponse> saveWaiterView(
+            @Valid @RequestBody MenuWaiterViewRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(menuWaiterViewService.saveView(authentication, request));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('MENUS_CREATE')")
     @Operation(summary = "Create a menu")
@@ -80,7 +127,7 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}")
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "Get one menu by id")
     public ResponseEntity<MenuViewResponse> getMenu(
             Authentication authentication,

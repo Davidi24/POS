@@ -2,6 +2,7 @@ package pos.pos.payment.service;
 
 import org.springframework.stereotype.Component;
 import pos.pos.order.entity.Order;
+import pos.pos.order.entity.OrderLineItem;
 import pos.pos.order.enums.OrderPaymentStatus;
 import pos.pos.order.enums.OrderStatus;
 import pos.pos.payment.entity.Payment;
@@ -11,7 +12,11 @@ import pos.pos.settings.entity.Settings;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Bill arithmetic for an order and its payments. A refund gives back the bill part of a payment first and the tip
@@ -101,6 +106,38 @@ public class PaymentCalculator {
             return OrderPaymentStatus.PAID;
         }
         return paidTotal(order).signum() > 0 ? OrderPaymentStatus.PARTIALLY_PAID : OrderPaymentStatus.UNPAID;
+    }
+
+    /**
+     * What each dish costs of the bill: the bill less money paid ahead, spread by what the dishes cost, so discounts,
+     * tax and service are shared. The last dish takes the rounding, so the shares add up to the bill.
+     */
+    public Map<UUID, BigDecimal> lineShares(Order order, List<OrderLineItem> activeLines) {
+        BigDecimal total = order.getTotal() == null ? BigDecimal.ZERO : order.getTotal();
+        BigDecimal prepaid = order.getPrepaidTotal() == null ? BigDecimal.ZERO : order.getPrepaidTotal();
+        BigDecimal left = total.subtract(prepaid).max(BigDecimal.ZERO);
+        BigDecimal weight = activeLines.stream().map(OrderLineItem::getLineTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+        Map<UUID, BigDecimal> shares = new LinkedHashMap<>();
+        for (int index = 0; index < activeLines.size(); index++) {
+            OrderLineItem line = activeLines.get(index);
+            BigDecimal share = weight.signum() <= 0 ? BigDecimal.ZERO
+                    : index == activeLines.size() - 1 ? left
+                    : left.multiply(line.getLineTotal()).divide(weight, 2, RoundingMode.HALF_UP).min(left);
+            shares.put(line.getId(), share.setScale(2, RoundingMode.HALF_UP));
+            left = left.subtract(share);
+            weight = weight.subtract(line.getLineTotal());
+        }
+        return shares;
+    }
+
+    /** How many portions of each dish are paid. A payment given back in full, or cancelled, frees its dishes again. */
+    public Map<UUID, Integer> paidQuantities(Order order) {
+        Map<UUID, Integer> paid = new HashMap<>();
+        moneyPayments(order).stream()
+                .filter(payment -> payment.getStatus() != PaymentStatus.REFUNDED)
+                .flatMap(payment -> payment.getLines().stream())
+                .forEach(line -> paid.merge(line.getOrderLineItemId(), line.getQuantity(), Integer::sum));
+        return paid;
     }
 
     private BigDecimal rawBalance(Order order) {

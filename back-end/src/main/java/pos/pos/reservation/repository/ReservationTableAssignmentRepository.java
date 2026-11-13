@@ -24,6 +24,21 @@ public interface ReservationTableAssignmentRepository extends JpaRepository<Rese
     @EntityGraph(attributePaths = {"restaurantTable", "assignedByUser"})
     Optional<ReservationTableAssignment> findByReservation_IdAndRestaurantTable_Id(UUID reservationId, UUID tableId);
 
+    // Bookings whose guests are seated at these tables, the newest first: what they celebrate shows while they're there.
+    @EntityGraph(attributePaths = {"reservation"})
+    @Query("""
+            SELECT assignment
+            FROM ReservationTableAssignment assignment
+            WHERE assignment.restaurantTable.id IN :tableIds
+              AND assignment.reservation.status = pos.pos.reservation.enums.ReservationStatus.SEATED
+              AND assignment.reservation.seatedAt >= :since
+            ORDER BY assignment.reservation.seatedAt DESC
+            """)
+    List<ReservationTableAssignment> findSeatedByTableIds(
+            @Param("tableIds") Collection<UUID> tableIds,
+            @Param("since") OffsetDateTime since
+    );
+
     @EntityGraph(attributePaths = {"reservation"})
     @Query("""
             SELECT assignment
@@ -37,6 +52,21 @@ public interface ReservationTableAssignmentRepository extends JpaRepository<Rese
             @Param("tableIds") Collection<UUID> tableIds,
             @Param("statuses") Collection<ReservationStatus> statuses,
             @Param("from") OffsetDateTime from
+    );
+
+    // Bookings whose time has come on a table with guests or an open order; for the special cases.
+    @Query("""
+            SELECT DISTINCT r.id
+            FROM ReservationTableAssignment a JOIN a.reservation r JOIN a.restaurantTable t
+            WHERE r.status IN :statuses AND r.reservationStart <= :now AND r.reservationStart >= :since
+              AND (t.status = pos.pos.tables.enums.TableStatus.OCCUPIED OR EXISTS (
+                  SELECT o.id FROM pos.pos.order.entity.Order o WHERE o.restaurantTable = t
+                  AND o.status IN (pos.pos.order.enums.OrderStatus.DRAFT, pos.pos.order.enums.OrderStatus.OPEN)))
+            """)
+    List<UUID> findDueOnTakenTables(
+            @Param("statuses") Collection<ReservationStatus> statuses,
+            @Param("now") OffsetDateTime now,
+            @Param("since") OffsetDateTime since
     );
 
     // Bookings at a table in these statuses, whatever their time (a seated visit can run past its end).

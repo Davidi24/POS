@@ -28,7 +28,7 @@ class ReservationReminderDeliveryServiceTest {
         UUID reservationId = UUID.randomUUID();
         Reservation reservation = new Reservation();
         when(eventRepository.existsByReservation_IdAndType(reservationId, ReservationEventType.GUEST_REMINDED)).thenReturn(false);
-        when(reservationRepository.getReferenceById(reservationId)).thenReturn(reservation);
+        when(reservationRepository.findById(reservationId)).thenReturn(java.util.Optional.of(reservation));
 
         service.recordGuestReminderSent(reservationId);
 
@@ -41,11 +41,21 @@ class ReservationReminderDeliveryServiceTest {
     @Test
     void repeatedDeliveryCallbackDoesNotCreateDuplicateEvents() {
         UUID reservationId = UUID.randomUUID();
+        when(reservationRepository.findById(reservationId)).thenReturn(java.util.Optional.of(new Reservation()));
         when(eventRepository.existsByReservation_IdAndType(reservationId, ReservationEventType.GUEST_REMINDED)).thenReturn(true);
 
         service.recordGuestReminderSent(reservationId);
 
         verify(eventRepository, never()).save(any(ReservationEvent.class));
         verify(reservationRepository, never()).getReferenceById(reservationId);
+    }
+    @Test void oldReminderDoesNotSuppressDeliveryForChangedSchedule() {
+        UUID id=UUID.randomUUID(); Reservation booking=new Reservation();
+        var revision=java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);booking.setScheduleChangedAt(revision);
+        when(reservationRepository.findById(id)).thenReturn(java.util.Optional.of(booking));
+        when(eventRepository.existsByReservation_IdAndTypeAndCreatedAtGreaterThanEqual(id,ReservationEventType.GUEST_REMINDED,revision)).thenReturn(false);
+        service.recordGuestReminderSent(id);
+        verify(eventRepository).save(any(ReservationEvent.class));
+        verify(eventRepository,never()).existsByReservation_IdAndType(id,ReservationEventType.GUEST_REMINDED);
     }
 }

@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.inventory.dto.InventoryAdjustmentRequest;
+import pos.pos.inventory.dto.InventoryItemEventResponse;
+import pos.pos.inventory.dto.InventoryMovementPersonResponse;
 import pos.pos.inventory.dto.InventoryMovementResponse;
 import pos.pos.inventory.dto.InventoryReceiveRequest;
 import pos.pos.inventory.dto.InventoryReturnRequest;
@@ -44,7 +46,7 @@ public class InventoryMovementController {
     private final InventoryMovementService inventoryMovementService;
 
     @PostMapping("/receive")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Log a delivery (stock receipt)")
     @ApiResponse(responseCode = "201", description = "Receipt recorded")
     public ResponseEntity<InventoryMovementResponse> receive(
@@ -57,7 +59,7 @@ public class InventoryMovementController {
     }
 
     @PostMapping("/waste")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Log wasted or spoiled stock")
     @ApiResponse(responseCode = "201", description = "Waste recorded")
     public ResponseEntity<InventoryMovementResponse> logWaste(
@@ -70,7 +72,7 @@ public class InventoryMovementController {
     }
 
     @PostMapping("/transfer")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Move stock from one location to another")
     @ApiResponse(responseCode = "201", description = "Transfer recorded (a TRANSFER_OUT and a TRANSFER_IN movement)")
     public ResponseEntity<List<InventoryMovementResponse>> transfer(
@@ -83,7 +85,7 @@ public class InventoryMovementController {
     }
 
     @PostMapping("/returns")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Log stock returned to the supplier")
     @ApiResponse(responseCode = "201", description = "Return recorded")
     public ResponseEntity<InventoryMovementResponse> logReturn(
@@ -96,7 +98,7 @@ public class InventoryMovementController {
     }
 
     @PostMapping("/adjustments")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Log a manual stock correction")
     @ApiResponse(responseCode = "201", description = "Adjustment recorded")
     public ResponseEntity<InventoryMovementResponse> adjust(
@@ -109,7 +111,7 @@ public class InventoryMovementController {
     }
 
     @GetMapping("/movements/{movementId}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "Get one movement by id")
     @ApiResponse(responseCode = "200", description = "Movement found")
     @ApiResponse(responseCode = "404", description = "Movement not found")
@@ -122,17 +124,44 @@ public class InventoryMovementController {
     }
 
     @GetMapping("/movements")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "List movement history, optionally filtered by order line, type, and/or item")
     public ResponseEntity<List<InventoryMovementResponse>> listMovements(
             @PathVariable UUID restaurantId,
             @RequestParam(required = false) UUID orderLineItemId,
             @RequestParam(required = false) InventoryMovementType type,
             @RequestParam(required = false) UUID itemId,
+            @RequestParam(required = false) UUID createdBy,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate day,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page must be at least 0") @Max(value = 100000, message = "page is too large") int page,
             @RequestParam(defaultValue = "200") @Min(value = 1, message = "size must be at least 1") @Max(value = 500, message = "size must be at most 500") int size,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(inventoryMovementService.listMovements(authentication, restaurantId, orderLineItemId, type, itemId, page, size));
+        return ResponseEntity.ok(inventoryMovementService.listMovements(authentication, restaurantId, orderLineItemId, type, itemId, createdBy, day,
+                page, size));
+    }
+
+    @GetMapping("/item-events")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @Operation(summary = "What happened to stock items themselves (added, changed, deleted) and who did it, newest first")
+    public ResponseEntity<List<InventoryItemEventResponse>> listItemEvents(
+            @PathVariable UUID restaurantId,
+            @RequestParam(required = false) UUID itemId,
+            @RequestParam(required = false) UUID createdBy,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate day,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(inventoryMovementService.listItemEvents(authentication, restaurantId, itemId, createdBy, day));
+    }
+
+    @GetMapping("/movements/people")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @Operation(summary = "Who made stock changes (optionally for one item), with how many each")
+    public ResponseEntity<List<InventoryMovementPersonResponse>> listMovementPeople(
+            @PathVariable UUID restaurantId,
+            @RequestParam(required = false) UUID itemId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(inventoryMovementService.listPeople(authentication, restaurantId, itemId));
     }
 }

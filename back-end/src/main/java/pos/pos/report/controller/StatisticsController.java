@@ -2,6 +2,7 @@ package pos.pos.report.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
@@ -10,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 
 /** The Statistics workspace: restaurant-local days {@code from}..{@code to} (inclusive), optionally one branch. */
+@Validated
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/restaurants/{restaurantId}/statistics")
@@ -43,9 +46,10 @@ public class StatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) @Size(max = 3, message = "currency must be a 3-letter code") String currency,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(statisticsService.overview(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(statisticsService.overview(authentication, restaurantId, branchId, from, to, currency));
     }
 
     @GetMapping("/sales")
@@ -56,9 +60,10 @@ public class StatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) @Size(max = 3, message = "currency must be a 3-letter code") String currency,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(statisticsService.sales(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(statisticsService.sales(authentication, restaurantId, branchId, from, to, currency));
     }
 
     @GetMapping("/staff")
@@ -69,9 +74,10 @@ public class StatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) @Size(max = 3, message = "currency must be a 3-letter code") String currency,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(statisticsService.staff(authentication, restaurantId, branchId, from, to));
+        return ResponseEntity.ok(statisticsService.staff(authentication, restaurantId, branchId, from, to, currency));
     }
 
     @GetMapping("/reports")
@@ -90,9 +96,10 @@ public class StatisticsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) UUID branchId,
+            @RequestParam(required = false) @Size(max = 3, message = "currency must be a 3-letter code") String currency,
             Authentication authentication
     ) {
-        String csv = statisticsService.csvReport(authentication, restaurantId, branchId, from, to, code);
+        String csv = statisticsService.csvReport(authentication, restaurantId, branchId, from, to, code, currency);
         String fileName = code + "-" + from + "-to-" + to + ".csv";
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))

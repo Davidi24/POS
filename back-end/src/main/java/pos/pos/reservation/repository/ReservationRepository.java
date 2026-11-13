@@ -16,6 +16,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ReservationRepository extends JpaRepository<Reservation, UUID> {
+    List<Reservation> findAllByRestaurant_IdAndStatusInAndReservationEndAfterOrderByIdAsc(UUID restaurantId, Collection<ReservationStatus> statuses, OffsetDateTime now);
+
 
     @EntityGraph(attributePaths = {"branch", "customer"})
     List<Reservation> findAllByRestaurant_IdOrderByReservationStartDesc(UUID restaurantId);
@@ -169,6 +171,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID> 
             UUID branchId,
             Collection<ReservationStatus> statuses,
             OffsetDateTime from
+    );
+
+    @Query("select r.id from Reservation r where r.status in :statuses and r.reservationStart >= :from and r.reservationStart <= :to")
+    List<java.util.UUID> findIdsWithStatusesStartedBetween(
+            @Param("statuses") java.util.Collection<ReservationStatus> statuses,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to
     );
 
     // Confirmed bookings whose guests haven't come by the booking time. The job checks each one's hold (it depends on

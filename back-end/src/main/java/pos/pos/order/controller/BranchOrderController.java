@@ -77,12 +77,13 @@ public class BranchOrderController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "false") boolean historyOnly,
             @RequestParam(defaultValue = "false") boolean openOnly,
+            @RequestParam(defaultValue = "false") boolean unpaidOnly,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderHistoryService.orders(authentication, restaurantId, branchId,
-                from, to, status, customerId, search, page, size, historyOnly, openOnly));
+                from, to, status, customerId, search, page, size, historyOnly, openOnly, unpaidOnly));
     }
 
     @GetMapping("/orders/open")

@@ -113,7 +113,8 @@ public class GuestBookingService {
         // Big groups and restaurants that answer every booking themselves get a request; otherwise a free table
         // for the whole visit confirms it at once (and holds that table).
         boolean needsApproval = guests >= reservationPolicy.values(branch.getRestaurant()).approvalGroupSize()
-                || (rule != null && !rule.isAutoConfirmReservations());
+                || (rule != null && !rule.isAutoConfirmReservations())
+                || !reservationPolicy.values(branch.getRestaurant()).autoConfirmBookings();
         String reason;
         if (!needsApproval) {
             List<ReservationAvailabilityOptionResponse> options = reservationAvailabilitySupport.availabilityOptionsForBranch(branch, start, end, guests, 1);
@@ -276,6 +277,10 @@ public class GuestBookingService {
                 .money(money)
                 .amountDue(due)
                 .currency(reservation.getRestaurant().getCurrency())
+                .restaurantPhone(reservation.getBranch() != null && reservation.getBranch().getPhone() != null
+                        ? reservation.getBranch().getPhone() : reservation.getRestaurant().getPhone())
+                .restaurantEmail(reservation.getBranch() != null && reservation.getBranch().getEmail() != null
+                        ? reservation.getBranch().getEmail() : reservation.getRestaurant().getEmail())
                 .payUrl(due.signum() > 0 && waiting ? reservationMailService.bookingPage(reservation) + "#pay" : null)
                 .testPayments(testPayments())
                 .build();
@@ -290,6 +295,7 @@ public class GuestBookingService {
             case CANCELLED -> ReservationLifecycleService.isDeclined(reservation) ? "Sorry, we couldn't take this booking" : "Cancelled";
             case NO_SHOW -> "Missed";
             case EXPIRED -> "Sorry, we couldn't confirm this request";
+            case NO_ACTION -> "Please contact us about this booking";
         };
     }
 

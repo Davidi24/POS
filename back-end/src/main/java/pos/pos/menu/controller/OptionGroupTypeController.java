@@ -34,7 +34,7 @@ public class OptionGroupTypeController {
     private final OptionGroupTypeService optionGroupTypeService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "List option group types")
     public ResponseEntity<List<OptionGroupTypeResponse>> getTypes(
             Authentication authentication,

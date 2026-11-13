@@ -75,8 +75,9 @@ public class RestaurantValidationService {
             String candidateCode = RestaurantFieldNormalizer.withCodeSequence(baseCode, sequence);
             String candidateSlug = RestaurantFieldNormalizer.withSlugSequence(baseSlug, sequence);
 
-            if (!restaurantRepository.existsByCodeAndDeletedAtIsNull(candidateCode)
-                    && !restaurantRepository.existsBySlugAndDeletedAtIsNull(candidateSlug)) {
+            // Archived restaurants keep their code and web address, so they are skipped too.
+            if (!restaurantRepository.existsByCode(candidateCode)
+                    && !restaurantRepository.existsBySlug(candidateSlug)) {
                 return new NormalizedRestaurantFields(candidateCode, candidateSlug);
             }
         }
@@ -114,15 +115,9 @@ public class RestaurantValidationService {
     }
 
     public UUID validateOwnerUser(UUID ownerUserId, UUID restaurantId, RestaurantStatus status) {
+        // A restaurant may have no owner yet; it is added afterwards (POST /restaurants/{id}/owner).
         if (ownerUserId == null) {
-            if (allowsMissingOwner(status)) {
-                return null;
-            }
-
-            throw new AuthException(
-                    "ownerUserId is required unless restaurant status is PENDING or REJECTED",
-                    HttpStatus.BAD_REQUEST
-            );
+            return null;
         }
 
         User owner = userRepository.findByIdAndDeletedAtIsNull(ownerUserId)
@@ -139,10 +134,6 @@ public class RestaurantValidationService {
         return owner.getId();
     }
 
-    private boolean allowsMissingOwner(RestaurantStatus status) {
-        return status == RestaurantStatus.PENDING || status == RestaurantStatus.REJECTED;
-    }
-
     // Rejects timezones that are not valid IANA identifiers (e.g. "America/New_York" is valid, "EST" is not).
     private void validateTimezone(String timezone) {
         if (!RestaurantFieldNormalizer.isValidTimezone(RestaurantFieldNormalizer.normalizeTimezone(timezone))) {
@@ -150,25 +141,35 @@ public class RestaurantValidationService {
         }
     }
 
-    // On create (restaurantId=null): checks no active restaurant has this code.
-    // On update: same check but excludes the restaurant being updated so it doesn't conflict with itself.
+    // On create (restaurantId=null): checks no restaurant has this code, archived ones included (their codes stay
+    // reserved). On update: the same, leaving out the restaurant being updated.
     private void assertUniqueCode(String code, UUID restaurantId) {
         boolean exists = restaurantId == null
-                ? restaurantRepository.existsByCodeAndDeletedAtIsNull(code)
-                : restaurantRepository.existsByCodeAndIdNotAndDeletedAtIsNull(code, restaurantId);
-        if (exists) {
-            throw new RestaurantCodeAlreadyExistsException();
+                ? restaurantRepository.existsByCode(code)
+                : restaurantRepository.existsByCodeAndIdNot(code, restaurantId);
+        if (!exists) {
+            return;
         }
+        if (restaurantRepository.existsByCodeAndDeletedAtIsNotNull(code)) {
+            throw new RestaurantCodeAlreadyExistsException(
+                    "This code belonged to a removed restaurant and stays reserved. Choose another code.");
+        }
+        throw new RestaurantCodeAlreadyExistsException();
     }
 
     // Same as assertUniqueCode but for slug — the URL-friendly identifier (e.g. "burger-house").
     private void assertUniqueSlug(String slug, UUID restaurantId) {
         boolean exists = restaurantId == null
-                ? restaurantRepository.existsBySlugAndDeletedAtIsNull(slug)
-                : restaurantRepository.existsBySlugAndIdNotAndDeletedAtIsNull(slug, restaurantId);
-        if (exists) {
-            throw new RestaurantSlugAlreadyExistsException();
+                ? restaurantRepository.existsBySlug(slug)
+                : restaurantRepository.existsBySlugAndIdNot(slug, restaurantId);
+        if (!exists) {
+            return;
         }
+        if (restaurantRepository.existsBySlugAndDeletedAtIsNotNull(slug)) {
+            throw new RestaurantSlugAlreadyExistsException(
+                    "This web address belonged to a removed restaurant and stays reserved. Choose another one.");
+        }
+        throw new RestaurantSlugAlreadyExistsException();
     }
 
     public record NormalizedRestaurantFields(String code, String slug) {

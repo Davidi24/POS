@@ -38,6 +38,11 @@ public class KdsOrderSyncService {
     }
 
     public List<KdsTicket> syncFromCurrentOrderState(Order order, UUID actorId, String voidReason) {
+        return syncFromCurrentOrderState(order, actorId, voidReason, false);
+    }
+
+    /** [allowBack]: the kitchen sent food back a step, so ticket items follow their order lines backwards too. */
+    public List<KdsTicket> syncFromCurrentOrderState(Order order, UUID actorId, String voidReason, boolean allowBack) {
         if (order == null || order.getId() == null || order.getBranch() == null) {
             return List.of();
         }
@@ -101,7 +106,7 @@ public class KdsOrderSyncService {
             if (targetStatus == KdsTicketStatus.IN_PROGRESS && ticket.getStartedAt() == null) {
                 ticket.setStartedAt(now);
             }
-            kdsSupport.applyItemStatus(ticketItem, targetStatus, now);
+            kdsSupport.applyItemStatus(ticketItem, targetStatus, now, allowBack);
             ticket.setUpdatedBy(actorId);
             refreshTicketMetadata(ticket, routingByMenuItemId);
             addTicket(modifiedTickets, ticket);
@@ -113,6 +118,28 @@ public class KdsOrderSyncService {
         }
 
         return kdsSupport.loadOrderTickets(order.getId());
+    }
+
+    // The guests left without paying: the kitchen stops on this order. The dishes stay on the bill as they are.
+    public void stopOrder(Order order, UUID actorId, String reason) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        List<KdsTicket> modifiedTickets = new ArrayList<>();
+        for (OrderLineItem lineItem : order.getLineItems()) {
+            if (lineItem.getId() == null) {
+                continue;
+            }
+            for (KdsTicketItem ticketItem : kdsSupport.findActiveTicketItems(lineItem.getId())) {
+                kdsSupport.applyItemStatus(ticketItem, KdsTicketStatus.CANCELLED, now);
+                KdsTicket ticket = ticketItem.getKdsTicket();
+                ticket.setUpdatedBy(actorId);
+                ticket.setVoidReason(reason);
+                addTicket(modifiedTickets, ticket);
+            }
+        }
+        modifiedTickets.forEach(kdsSupport::refreshTicketAggregate);
+        if (!modifiedTickets.isEmpty()) {
+            kdsSupport.saveTickets(modifiedTickets);
+        }
     }
 
     public void syncLineItemNotes(OrderLineItem lineItem, UUID actorId) {

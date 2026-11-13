@@ -62,7 +62,22 @@ public class ReservationPolicy {
         if (reservation.getReservationStart() == null) {
             return null;
         }
-        return reservation.getReservationStart().plusMinutes(values(reservation.getRestaurant()).holdMinutes());
+        Values values = values(reservation.getRestaurant());
+        // A guest who never confirmed (asked in time, no answer by the deadline) gets a shorter hold (user, 2026-11-02).
+        OffsetDateTime deadline = reservation.getReservationStart().minusMinutes(values.sameDayConfirmMinutes());
+        boolean unconfirmed = reservation.getStatus() == pos.pos.reservation.enums.ReservationStatus.CONFIRMED
+                && reservation.getAttendanceConfirmedAt() == null
+                && reservation.getCreatedAt() != null && reservation.getCreatedAt().isBefore(deadline)
+                && values.unconfirmedHoldMinutes() > 0;
+        int hold = unconfirmed ? Math.min(values.holdMinutes(), values.unconfirmedHoldMinutes()) : values.holdMinutes();
+        return reservation.getReservationStart().plusMinutes(hold);
+    }
+
+    // The roles told about bookings (Settings → Reservations), e.g. OWNER and MANAGER.
+    public java.util.Set<String> bookingAlertRoles(pos.pos.restaurant.entity.Restaurant restaurant) {
+        String codes = values(restaurant).bookingAlertRoles();
+        return java.util.Arrays.stream((codes == null ? "OWNER,MANAGER" : codes).split(","))
+                .map(String::trim).filter(code -> !code.isEmpty()).collect(java.util.stream.Collectors.toSet());
     }
 
     public LocalDate serviceDate(OffsetDateTime moment, ZoneId zone) {
@@ -87,7 +102,11 @@ public class ReservationPolicy {
             int noShowWarningFrom,
             int depositFromGuests,
             java.math.BigDecimal cardFeePercent,
-            java.math.BigDecimal cardFeeFixed
+            java.math.BigDecimal cardFeeFixed,
+            boolean autoConfirmBookings,
+            int guestSecondReminderHours,
+            int unconfirmedHoldMinutes,
+            String bookingAlertRoles
     ) {
         static Values from(Settings settings) {
             return new Values(
@@ -108,7 +127,11 @@ public class ReservationPolicy {
                     settings.getNoShowWarningFrom(),
                     settings.getDepositFromGuests(),
                     settings.getCardFeePercent(),
-                    settings.getCardFeeFixed()
+                    settings.getCardFeeFixed(),
+                    settings.isAutoConfirmBookings(),
+                    settings.getGuestSecondReminderHours(),
+                    settings.getUnconfirmedHoldMinutes(),
+                    settings.getBookingAlertRoles()
             );
         }
     }

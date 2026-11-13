@@ -14,6 +14,7 @@ import pos.pos.inventory.enums.InventoryItemType;
 import pos.pos.inventory.enums.InventoryUnit;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -35,6 +36,9 @@ public class InventoryItemRequest {
     @NotNull(message = "itemType is required")
     private InventoryItemType itemType;
 
+    // Which of the restaurant's own kinds, when itemType is CUSTOM.
+    private UUID kindId;
+
     @NotNull(message = "baseUnit is required")
     private InventoryUnit baseUnit;
 
@@ -43,6 +47,9 @@ public class InventoryItemRequest {
 
     @Size(max = 150, message = "supplierName must be at most 150 characters")
     private String supplierName;
+
+    // One of the restaurant's suppliers (Inventory → Suppliers). Takes the place of supplierName, which older clients send.
+    private java.util.UUID supplierId;
 
     @Size(max = 100, message = "supplierSku must be at most 100 characters")
     private String supplierSku;

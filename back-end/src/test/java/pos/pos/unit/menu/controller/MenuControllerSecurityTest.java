@@ -124,12 +124,18 @@ class MenuControllerSecurityTest {
         StubMenuService menuService() {
             return new StubMenuService();
         }
+
+        // The controller also needs this; these tests don't call the waiter-view endpoints.
+        @Bean
+        pos.pos.menu.service.MenuWaiterViewService menuWaiterViewService() {
+            return new pos.pos.menu.service.MenuWaiterViewService(null, null, null);
+        }
     }
 
     static class StubMenuService extends MenuService {
 
         StubMenuService() {
-            super(null, null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

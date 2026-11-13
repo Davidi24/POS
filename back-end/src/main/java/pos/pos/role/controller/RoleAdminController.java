@@ -56,6 +56,17 @@ public class RoleAdminController {
         return ResponseEntity.ok(roleAdminService.updateRole(authentication, roleId, request));
     }
 
+    @PutMapping("/roles/{roleId}/pay")
+    @PreAuthorize("hasAuthority('ROLES_UPDATE')")
+    @Operation(summary = "Whether a role's people get paid here, and their Salary team")
+    public ResponseEntity<RoleResponse> setRolePay(
+            @PathVariable UUID roleId,
+            @Valid @RequestBody pos.pos.role.dto.RolePayRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(roleAdminService.setRolePay(authentication, roleId, request));
+    }
+
     @PutMapping("/roles/{roleId}/permissions")
     @PreAuthorize("hasAuthority('ROLES_ASSIGN_PERMISSIONS')")
     @Operation(summary = "Replace the permissions assigned to a role")

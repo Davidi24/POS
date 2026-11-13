@@ -103,6 +103,20 @@ public class UpdateSettingsReservationPolicyRequest {
     private java.math.BigDecimal cardFeePercent;
 
     @jakarta.validation.constraints.DecimalMin(value = "0.0", message = "cardFeeFixed must not be negative")
-    @jakarta.validation.constraints.DecimalMax(value = "10.0", message = "cardFeeFixed must be at most 10")
+    @jakarta.validation.constraints.DecimalMax(value = "1000000.0", message = "cardFeeFixed must be at most 1000000")
     private java.math.BigDecimal cardFeeFixed;
+
+    // Optional too (2026-11-02): empty keeps what's saved.
+    private Boolean autoConfirmBookings;
+
+    @Min(value = 0, message = "guestSecondReminderHours must not be negative")
+    @Max(value = 72, message = "guestSecondReminderHours must be at most 72")
+    private Integer guestSecondReminderHours;
+
+    @Min(value = 0, message = "unconfirmedHoldMinutes must not be negative")
+    @Max(value = 240, message = "unconfirmedHoldMinutes must be at most 240")
+    private Integer unconfirmedHoldMinutes;
+
+    @jakarta.validation.constraints.Size(max = 200, message = "bookingAlertRoles must be at most 200 characters")
+    private String bookingAlertRoles;
 }

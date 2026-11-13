@@ -29,7 +29,7 @@ public class InventorySalesSourceController {
     private final InventorySalesSourceService service;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     public ResponseEntity<List<InventorySalesSourceResponse>> list(
             @PathVariable UUID restaurantId,
             Authentication authentication
@@ -38,7 +38,7 @@ public class InventorySalesSourceController {
     }
 
     @PutMapping("/{branchId}/{itemId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     public ResponseEntity<InventorySalesSourceResponse> set(
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,
@@ -50,7 +50,7 @@ public class InventorySalesSourceController {
     }
 
     @DeleteMapping("/{branchId}/{itemId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     public ResponseEntity<Void> delete(
             @PathVariable UUID restaurantId,
             @PathVariable UUID branchId,

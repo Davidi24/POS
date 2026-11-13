@@ -72,7 +72,12 @@ public class StatisticsService {
 
     @Transactional(readOnly = true)
     public Overview overview(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to) {
-        Window window = window(authentication, restaurantId, branchId, from, to);
+        return overview(authentication, restaurantId, branchId, from, to, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Overview overview(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to, String currency) {
+        Window window = window(authentication, restaurantId, branchId, from, to, currency);
         return new Overview(
                 window.period(),
                 kpis(window),
@@ -85,7 +90,12 @@ public class StatisticsService {
 
     @Transactional(readOnly = true)
     public Sales sales(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to) {
-        Window window = window(authentication, restaurantId, branchId, from, to);
+        return sales(authentication, restaurantId, branchId, from, to, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Sales sales(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to, String currency) {
+        Window window = window(authentication, restaurantId, branchId, from, to, currency);
         List<DaySales> days = fillDays(repository.salesByDay(window.current()), window.from(), window.to());
         return new Sales(
                 window.period(),
@@ -103,11 +113,22 @@ public class StatisticsService {
 
     @Transactional(readOnly = true)
     public Staff staff(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to) {
-        Window window = window(authentication, restaurantId, branchId, from, to);
+        return staff(authentication, restaurantId, branchId, from, to, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Staff staff(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to, String currency) {
+        Window window = window(authentication, restaurantId, branchId, from, to, currency);
         return new Staff(window.period(), staffRows(window));
     }
 
     public Window window(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to) {
+        return window(authentication, restaurantId, branchId, from, to, null);
+    }
+
+    /** [requestedCurrency] null: the restaurant's own currency. */
+    public Window window(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to,
+                         String requestedCurrency) {
         Restaurant restaurant = restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
         if (branchId != null) {
             restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
@@ -123,14 +144,23 @@ public class StatisticsService {
             throw bad("The period can be at most " + MAX_DAYS + " days");
         }
         ZoneId zone = zone(restaurant);
-        String currency = restaurant.getCurrency() == null ? "EUR" : restaurant.getCurrency().trim().toUpperCase(Locale.ROOT);
+        String ownCurrency = restaurant.getCurrency() == null ? "EUR" : restaurant.getCurrency().trim().toUpperCase(Locale.ROOT);
+        String currency = ownCurrency;
+        if (requestedCurrency != null && !requestedCurrency.isBlank()) {
+            currency = requestedCurrency.trim().toUpperCase(Locale.ROOT);
+            if (!currency.matches("[A-Z]{3}")) {
+                throw bad("currency must be a 3-letter code such as EUR");
+            }
+        }
+        List<String> currencies = new java.util.ArrayList<>(List.of(ownCurrency));
+        repository.currencies(restaurant.getId()).stream().filter(code -> !currencies.contains(code)).forEach(currencies::add);
         LocalDate previousTo = from.minusDays(1);
         LocalDate previousFrom = previousTo.minusDays(days - 1);
         Scope current = new Scope(restaurant.getId(), branchId, currency,
                 from.atStartOfDay(zone).toOffsetDateTime(), to.plusDays(1).atStartOfDay(zone).toOffsetDateTime(), zone.getId());
         Scope previous = new Scope(restaurant.getId(), branchId, currency,
                 previousFrom.atStartOfDay(zone).toOffsetDateTime(), from.atStartOfDay(zone).toOffsetDateTime(), zone.getId());
-        Period period = new Period(from, to, previousFrom, previousTo, zone.getId(), currency, branchId);
+        Period period = new Period(from, to, previousFrom, previousTo, zone.getId(), currency, branchId, currencies);
         return new Window(restaurant, branchId, from, to, current, previous, period);
     }
 
@@ -154,6 +184,9 @@ public class StatisticsService {
                         BigDecimal.valueOf(repository.ordersEndedAs(window.previous(), "CANCELLED"))),
                 new Kpi(BigDecimal.valueOf(repository.ordersEndedAs(window.current(), "VOIDED")),
                         BigDecimal.valueOf(repository.ordersEndedAs(window.previous(), "VOIDED"))),
+                new Kpi(BigDecimal.valueOf(repository.unpaidOrders(window.current())),
+                        BigDecimal.valueOf(repository.unpaidOrders(window.previous()))),
+                new Kpi(repository.unpaidValue(window.current()), repository.unpaidValue(window.previous())),
                 repository.openOrders(window.current()),
                 repository.otherCurrencyOrders(window.current())
         );
@@ -212,7 +245,13 @@ public class StatisticsService {
 
     @Transactional(readOnly = true)
     public String csvReport(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to, String code) {
-        Window window = window(authentication, restaurantId, branchId, from, to);
+        return csvReport(authentication, restaurantId, branchId, from, to, code, null);
+    }
+
+    @Transactional(readOnly = true)
+    public String csvReport(Authentication authentication, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to, String code,
+                            String currency) {
+        Window window = window(authentication, restaurantId, branchId, from, to, currency);
         StringBuilder csv = new StringBuilder();
         switch (code) {
             case "daily-sales" -> {

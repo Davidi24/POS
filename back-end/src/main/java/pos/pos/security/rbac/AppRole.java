@@ -19,6 +19,18 @@ public enum AppRole {
             EnumSet.allOf(AppPermission.class)
     ),
 
+    // Helps the Super Admin run every restaurant. Starts with every permission; the Super Admin switches single
+    // permissions off per person (user_permission_denials). Only the Super Admin hands it out or manages its holders,
+    // and a Co-Super-Admin never reaches the Super Admin or other Co-Super-Admins.
+    CO_SUPER_ADMIN(
+            "Co-Super-Admin",
+            "Helps the Super Admin manage every restaurant",
+            55_000L,
+            false,
+            true,
+            EnumSet.allOf(AppPermission.class)
+    ),
+
     OWNER(
             "Owner",
             "Business owner - full control over the restaurant",
@@ -49,7 +61,8 @@ public enum AppRole {
                     SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
                     PAYMENT_REFUND,
                     REPORTS_READ, FRAUD_READ, FRAUD_REVIEW,
-                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS, STATISTICS_ACCESS, FRAUD_ACCESS
+                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS, STATISTICS_ACCESS, FRAUD_ACCESS,
+                    INVENTORY_ACCESS, INVENTORY_READ, INVENTORY_UPDATE
             )
     ),
 
@@ -74,7 +87,8 @@ public enum AppRole {
                     SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
                     PAYMENT_REFUND,
                     REPORTS_READ,
-                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS, STATISTICS_ACCESS
+                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS, STATISTICS_ACCESS,
+                    INVENTORY_ACCESS, INVENTORY_READ, INVENTORY_UPDATE
             )
     ),
 
@@ -97,7 +111,8 @@ public enum AppRole {
                     KDS_READ, KDS_UPDATE,
                     SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
                     PAYMENT_REFUND,
-                    POS_ACCESS, ADMIN_ACCESS
+                    POS_ACCESS, ADMIN_ACCESS,
+                    INVENTORY_ACCESS, INVENTORY_READ
             ),
             CO_OWNER
     ),
@@ -119,8 +134,7 @@ public enum AppRole {
                     ORDER_DISCOUNT_APPLY,
                     ORDER_TRANSFER,
                     SHIFT_SELF,
-                    // POS → Kitchen Status: what the kitchen is making for their tables.
-                    KDS_READ,
+                    // POS → Kitchen Status reads the kitchen with ORDER_READ; no Kitchen display permission (user, 2026-10-30).
                     POS_ACCESS
             )
     ),
@@ -141,7 +155,8 @@ public enum AppRole {
                     RESERVATION_READ,
                     ORDER_READ,
                     KDS_READ,
-                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS
+                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS,
+                    INVENTORY_ACCESS, INVENTORY_READ
             ),
             ADMIN
     ),
@@ -152,12 +167,39 @@ public enum AppRole {
             5_000L,
             false,
             false,
+            // Only the Kitchen display: its Menu and Upcoming read with KDS_READ (user, 2026-10-30: "Kitchen only KDS").
             EnumSet.of(
-                    MENUS_READ,
-                    ORDER_READ,
                     KDS_READ,
                     KDS_UPDATE,
                     KDS_ACCESS
+            )
+    ),
+
+    // Cleaning staff: they clock in and out from the POS and are paid in Salary's Cleaning team.
+    CLEANER(
+            "Cleaner",
+            "Keeps the restaurant clean - tables, floors, kitchen and toilets",
+            4_000L,
+            true,
+            false,
+            EnumSet.of(
+                    SHIFT_SELF,
+                    POS_ACCESS
+            )
+    ),
+
+    // Temporary help for busy nights and events: clock in from the POS, see the menu and orders, paid as Extra workers.
+    EXTRA_WORKER(
+            "Extra worker",
+            "Temporary help for busy nights and events, paid for the hours they come in",
+            3_000L,
+            true,
+            false,
+            EnumSet.of(
+                    MENUS_READ,
+                    ORDER_READ,
+                    SHIFT_SELF,
+                    POS_ACCESS
             )
     );
 

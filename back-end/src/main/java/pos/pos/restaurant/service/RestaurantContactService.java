@@ -100,6 +100,6 @@ public class RestaurantContactService {
     }
 
     private void clearExistingPrimary(UUID restaurantId, UUID keepContactId, UUID actorId) {
-        restaurantContactRepository.clearAllPrimary(restaurantId, actorId);
+        restaurantContactRepository.clearAllPrimary(restaurantId, actorId, keepContactId);
     }
 }

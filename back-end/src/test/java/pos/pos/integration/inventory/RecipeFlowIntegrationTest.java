@@ -3,6 +3,12 @@ package pos.pos.integration.inventory;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpHeaders;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import pos.pos.menu.image.MenuImageStorage;
 import pos.pos.integration.support.AbstractPosApiIntegrationTest;
 import pos.pos.user.entity.User;
 
@@ -16,11 +22,20 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import javax.imageio.ImageIO;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 
 @DisplayName("Recipes end to end")
 class RecipeFlowIntegrationTest extends AbstractPosApiIntegrationTest {
+
+    @MockBean
+    MenuImageStorage imageStorage;
 
     private static final String RECIPES = "/restaurants/{r}/recipes";
     private static final String KDS = "/restaurants/{r}/branches/{b}/kds";
@@ -160,6 +175,36 @@ class RecipeFlowIntegrationTest extends AbstractPosApiIntegrationTest {
         JsonNode archived = post(RECIPES + "/{id}/archive", r, pizza).as(t).expect(200);
         assertThat(archived.get("status").asText()).isEqualTo("ARCHIVED");
         assertThat(get(RECIPES, r).as(t).param("status", "ARCHIVED").expect(200).toString()).contains(pizza.toString());
+    }
+
+    @Test
+    @DisplayName("house-made photos upload, survive reads, and remove cleanly")
+    void houseMadePhotoLifecycle() throws Exception {
+        World world = newWorld("house-made-photo");
+        UUID recipeId = id(post(RECIPES, world.restaurantId()).as(world.ownerToken()).body(recipe("Tomato sauce", "PREP_BATCH", null)).expect(201));
+        byte[] png;
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), "png", out);
+            png = out.toByteArray();
+        }
+        String key = MenuImageStorage.newKey(world.restaurantId(), ".png");
+        String url = MenuImageStorage.backendUrl(key);
+        when(imageStorage.store(eq(world.restaurantId()), any(byte[].class), eq("image/png"), eq(".png"))).thenReturn(key);
+        when(imageStorage.urlFor(key)).thenReturn(url);
+        when(imageStorage.keyOf(url)).thenReturn(MenuImageStorage.keyFromBackendUrl(url));
+        MockMultipartFile file = new MockMultipartFile("file", "sauce.png", "image/png", png);
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart(HttpMethod.PUT, "/restaurants/{r}/recipes/{id}/image", world.restaurantId(), recipeId)
+                        .file(file).header(HttpHeaders.AUTHORIZATION, "Bearer " + world.ownerToken()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.imageUrl").value(url));
+        assertThat(get(RECIPES + "/{id}", world.restaurantId(), recipeId).as(world.ownerToken()).expect(200).path("imageUrl").asText()).isEqualTo(url);
+
+        mockMvc.perform(MockMvcRequestBuilders.delete("/restaurants/{r}/recipes/{id}/image", world.restaurantId(), recipeId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + world.ownerToken()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.imageUrl").doesNotExist());
+        assertThat(get(RECIPES + "/{id}", world.restaurantId(), recipeId).as(world.ownerToken()).expect(200).path("imageUrl").isNull()).isTrue();
     }
 
     @Test
@@ -597,7 +642,7 @@ class RecipeFlowIntegrationTest extends AbstractPosApiIntegrationTest {
         wordy.put("description", "d".repeat(2001));
         post(RECIPES, r).as(t).body(wordy).expect(400);
         wordy.put("description", "d".repeat(2000));
-        wordy.put("instructions", "i".repeat(10001));
+        wordy.put("instructions", "i".repeat(20001));
         post(RECIPES, r).as(t).body(wordy).expect(400);
 
         UUID batch = id(post(RECIPES, r).as(t).body(recipe("Batch", "PREP_BATCH", null)).expect(201));

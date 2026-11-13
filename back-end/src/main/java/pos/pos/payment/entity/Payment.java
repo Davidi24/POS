@@ -1,7 +1,9 @@
 package pos.pos.payment.entity;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -223,6 +225,11 @@ public class Payment extends AbstractAuditedEntity {
     @OneToMany(mappedBy = "payment", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("processedAt ASC, createdAt ASC")
     private List<PaymentTransaction> transactions = new ArrayList<>();
+
+    // The dishes this payment covered, when the guest paid by dishes.
+    @ElementCollection
+    @CollectionTable(name = "payment_lines", joinColumns = @JoinColumn(name = "payment_id"))
+    private List<PaymentLine> lines = new ArrayList<>();
 
     public void addTransaction(PaymentTransaction transaction) {
         if (transaction == null) {

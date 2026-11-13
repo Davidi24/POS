@@ -16,6 +16,8 @@ import pos.pos.auth.mapper.CurrentUserMapper;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
+import org.springframework.http.HttpStatus;
+import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.exception.auth.TooManyRequestsException;
 import pos.pos.role.entity.Role;
@@ -34,6 +36,7 @@ import pos.pos.utils.NormalizationUtils;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 // checked
@@ -44,6 +47,7 @@ public class AuthLoginService {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthLoginService.class);
     private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid username/email or password";
+    static final String RESTAURANT_CLOSED_MESSAGE = "Your restaurant is closed in the app right now, so you can't sign in. Contact support.";
     private static final String TOO_MANY_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
     private static final String TOKEN_TYPE = "Bearer";
 
@@ -108,12 +112,18 @@ public class AuthLoginService {
             throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
+        // Staff of a suspended, closed or removed restaurant can't sign in (checked after the password, so it tells
+        // nothing to someone guessing).
+        if (userRepository.worksAtClosedRestaurant(user.getId())) {
+            throw new AuthException(RESTAURANT_CLOSED_MESSAGE, HttpStatus.FORBIDDEN);
+        }
+
         enforceSessionLimit(user.getId(), now);
 
         //here it means all the check have passed so it creates a successful login.
         List<Role> activeRoles = loadActiveRoles(user.getId());
         List<String> roleCodes = activeRoles.stream().map(Role::getCode).toList();
-        List<String> permissionCodes = loadPermissionCodes(activeRoles);
+        List<String> permissionCodes = loadPermissionCodes(user, activeRoles);
 
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
@@ -151,18 +161,13 @@ public class AuthLoginService {
         return roleRepository.findActiveRolesByUserId(userId);
     }
 
-    private List<String> loadPermissionCodes(List<Role> activeRoles) {
+    private List<String> loadPermissionCodes(User user, List<Role> activeRoles) {
         List<UUID> roleIds = activeRoles.stream()
                 .map(Role::getId)
                 .toList();
 
-        if (roleIds.isEmpty()) {
-            return List.of();
-        }
-
-        return permissionRepository.findCodesByRoleIds(roleIds).stream()
-                .distinct()
-                .toList();
+        // Their roles as their restaurant has them, less what's switched off for them, plus what's given to them alone.
+        return pos.pos.role.service.EffectivePermissions.forUser(permissionRepository, user.getId(), user.getRestaurantId(), roleIds);
     }
 
 

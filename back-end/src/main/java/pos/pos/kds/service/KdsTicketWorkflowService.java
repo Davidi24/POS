@@ -76,6 +76,58 @@ public class KdsTicketWorkflowService {
     }
 
     /**
+     * The kitchen sends a ticket back one step (started or marked ready by mistake): ready food goes back to cooking,
+     * cooking food back to waiting to start. Served food never comes back.
+     */
+    @Transactional
+    public KdsTicketResponse sendTicketBack(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID branchId,
+            UUID ticketId,
+            KdsActionRequest request
+    ) {
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
+        KdsTicket ticket = kdsSupport.requireTicketInBranch(branchId, ticketId);
+        Order order = lockAndValidateOrder(ticket);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        orderDomainSupport.assertOrderEditable(order);
+
+        boolean anyReady = ticket.getItems().stream().map(KdsTicketItem::getOrderLineItem)
+                .anyMatch(line -> line != null && line.getStatus() == OrderLineItemStatus.READY);
+        boolean changed = false;
+        for (KdsTicketItem ticketItem : ticket.getItems()) {
+            OrderLineItem line = ticketItem.getOrderLineItem();
+            if (line == null) {
+                continue;
+            }
+            // One step for the whole ticket: from ready to cooking when something is ready, else from cooking to new.
+            if (anyReady && line.getStatus() == OrderLineItemStatus.READY) {
+                line.setStatus(OrderLineItemStatus.PREPARING);
+                changed = true;
+            } else if (!anyReady && line.getStatus() == OrderLineItemStatus.PREPARING) {
+                line.setStatus(OrderLineItemStatus.FIRED);
+                changed = true;
+            }
+        }
+        if (!changed) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,
+                    "This ticket can't go back a step. Refresh to see the latest.");
+        }
+        order.setUpdatedBy(actorId);
+        orderSupport.recalculateTotals(order);
+        orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, actionNote(request, "KDS ticket sent back a step"), actorId);
+        orderSupport.saveOrder(order);
+        kdsOrderSyncService.syncFromCurrentOrderState(order, actorId, request == null ? null : request.getReason(), true);
+        KdsTicket updated = kdsSupport.requireTicketInBranch(branchId, ticketId);
+        if (updated.getStatus() == pos.pos.kds.enums.KdsTicketStatus.FIRED || updated.getStatus() == pos.pos.kds.enums.KdsTicketStatus.PENDING) {
+            updated.setStartedAt(null);
+            kdsSupport.saveTickets(List.of(updated));
+        }
+        return kdsSupport.mapper().toTicketResponse(updated);
+    }
+
+    /**
      * A waiter took the ready food out: the ticket's ready items are served. Only ready food can be picked up; items
      * still cooking stay on the ticket for the kitchen.
      */

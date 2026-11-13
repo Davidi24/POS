@@ -85,6 +85,8 @@ public abstract class AbstractPosApiIntegrationTest {
         registry.add("TRUSTED_PROXIES", () -> "127.0.0.1,::1");
         registry.add("COOKIE_DOMAIN", () -> "pos.example");
         registry.add("SPRINGDOC_API_DOCS_ENABLED", () -> "true");
+        // Integration tests use the production profile but must not need live Cloudflare credentials.
+        registry.add("app.storage.menu-images.provider", () -> "disabled");
         registry.add("BOOTSTRAP_SUPER_ADMIN_ENABLED", () -> "true");
         registry.add("BOOTSTRAP_SUPER_ADMIN_EMAIL", () -> ADMIN_EMAIL);
         registry.add("BOOTSTRAP_SUPER_ADMIN_USERNAME", () -> ADMIN_USERNAME);
@@ -95,6 +97,9 @@ public abstract class AbstractPosApiIntegrationTest {
         // Scheduled jobs would race the tests' own data; the tests call what they need directly.
         registry.add("spring.task.scheduling.pool.size", () -> "1");
     }
+
+    @org.springframework.boot.test.mock.mockito.MockBean
+    protected org.springframework.mail.javamail.JavaMailSender mailSender;
 
     @Autowired
     protected MockMvc mockMvc;
@@ -161,6 +166,8 @@ public abstract class AbstractPosApiIntegrationTest {
         restaurant.setCode(("it_" + label + "_" + sequence).toLowerCase().replaceAll("[^a-z0-9_]", "_"));
         restaurant.setSlug(("it-" + label + "-" + sequence).toLowerCase().replaceAll("[^a-z0-9-]", "-"));
         restaurant.setDescription("Integration test restaurant");
+        restaurant.setEmail("it." + sequence + "@restaurant.example");
+        restaurant.setPhone("+35569" + String.format("%07d", sequence % 10_000_000));
         restaurant.setCurrency(currency);
         restaurant.setTimezone(timezone);
         restaurant.setOwnerId(superAdmin.getId());
@@ -179,7 +186,10 @@ public abstract class AbstractPosApiIntegrationTest {
         User owner = staff(restaurant, branch, "owner", "OWNER");
         restaurant.setOwnerId(owner.getId());
         restaurant = restaurantRepository.saveAndFlush(restaurant);
-        return new World(restaurant, branch, owner, token(owner));
+        World world = new World(restaurant, branch, owner, token(owner));
+        // Takeaway is off for a new restaurant (it's switched on in Admin Hub → Settings); the API tests order takeaway freely.
+        setting(world, "enable_takeaway", true);
+        return world;
     }
 
     protected User superAdmin() {

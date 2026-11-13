@@ -51,8 +51,16 @@ public class OrderResponse {
     private BigDecimal total;
     private BigDecimal prepaidTotal;
     private Integer itemCount;
+    // Dishes still to be sent to the kitchen (not counter items); 0 in history lists.
+    private int notSentItems;
     private OffsetDateTime openedAt;
     private OffsetDateTime closedAt;
+    // When the guests asked for the bill; null when they haven't (or added dishes since).
+    private OffsetDateTime billRequestedAt;
+    private pos.pos.order.enums.OrderUnpaidReason unpaidReason;
+    private String unpaidNote;
+    private BigDecimal unpaidAmount;
+    private OffsetDateTime unpaidAt;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private UUID createdBy;

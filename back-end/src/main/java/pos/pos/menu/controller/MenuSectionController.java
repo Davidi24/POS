@@ -36,7 +36,7 @@ public class MenuSectionController {
     private final MenuSectionService menuSectionService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "List sections for one menu")
     public ResponseEntity<List<MenuSectionSummaryResponse>> getSections(
             Authentication authentication,
@@ -48,7 +48,7 @@ public class MenuSectionController {
     }
 
     @GetMapping("/{sectionId}")
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "Get one section scoped to its menu")
     public ResponseEntity<MenuSectionSummaryResponse> getSection(
             Authentication authentication,

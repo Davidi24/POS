@@ -21,13 +21,35 @@ public class StaffPayRateRepository {
     }
 
     public Optional<BigDecimal> rate(UUID userId) {
-        return jdbc.queryForList("select hourly_rate from " + schema + "staff_pay_rates where user_id=:user",
+        return jdbc.queryForList("select hourly_rate from " + schema + "staff_pay_rates where user_id=:user and hourly_rate is not null",
                 Map.of("user", userId), BigDecimal.class).stream().findFirst();
+    }
+
+    public Optional<BigDecimal> salary(UUID userId) {
+        return jdbc.queryForList("select monthly_salary from " + schema + "staff_pay_rates where user_id=:user and monthly_salary is not null",
+                Map.of("user", userId), BigDecimal.class).stream().findFirst();
+    }
+
+    /** Monthly salaries per staff member; someone on one has no hourly wage. */
+    public Map<UUID, BigDecimal> salaries(UUID restaurantId) {
+        var result = new HashMap<UUID, BigDecimal>();
+        jdbc.query("select user_id, monthly_salary from " + schema + "staff_pay_rates where restaurant_id=:restaurant and monthly_salary is not null",
+                Map.of("restaurant", restaurantId), row -> { result.put(row.getObject("user_id", UUID.class), row.getBigDecimal("monthly_salary")); });
+        return result;
+    }
+
+    public void saveSalary(UUID restaurantId, UUID userId, BigDecimal salary, UUID actor) {
+        var p = new HashMap<String, Object>();
+        p.put("user", userId); p.put("restaurant", restaurantId); p.put("salary", salary);
+        p.put("now", OffsetDateTime.now(ZoneOffset.UTC)); p.put("actor", actor);
+        jdbc.update("insert into " + schema + "staff_pay_rates (user_id, restaurant_id, monthly_salary, updated_at, updated_by)"
+                + " values (:user, :restaurant, :salary, :now, :actor) on conflict (user_id) do update"
+                + " set hourly_rate=null, monthly_salary=excluded.monthly_salary, restaurant_id=excluded.restaurant_id, updated_at=excluded.updated_at, updated_by=excluded.updated_by", p);
     }
 
     public Map<UUID, BigDecimal> rates(UUID restaurantId) {
         var result = new HashMap<UUID, BigDecimal>();
-        jdbc.query("select user_id, hourly_rate from " + schema + "staff_pay_rates where restaurant_id=:restaurant",
+        jdbc.query("select user_id, hourly_rate from " + schema + "staff_pay_rates where restaurant_id=:restaurant and hourly_rate is not null",
                 Map.of("restaurant", restaurantId), row -> { result.put(row.getObject("user_id", UUID.class), row.getBigDecimal("hourly_rate")); });
         return result;
     }
@@ -38,7 +60,7 @@ public class StaffPayRateRepository {
         p.put("now", OffsetDateTime.now(ZoneOffset.UTC)); p.put("actor", actor);
         jdbc.update("insert into " + schema + "staff_pay_rates (user_id, restaurant_id, hourly_rate, updated_at, updated_by)"
                 + " values (:user, :restaurant, :rate, :now, :actor) on conflict (user_id) do update"
-                + " set hourly_rate=excluded.hourly_rate, restaurant_id=excluded.restaurant_id, updated_at=excluded.updated_at, updated_by=excluded.updated_by", p);
+                + " set hourly_rate=excluded.hourly_rate, monthly_salary=null, restaurant_id=excluded.restaurant_id, updated_at=excluded.updated_at, updated_by=excluded.updated_by", p);
     }
 
     /** Worked shifts recorded before this person had a wage take the first wage set, so later raises leave them alone. */

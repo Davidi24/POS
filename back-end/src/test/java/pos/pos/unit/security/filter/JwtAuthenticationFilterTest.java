@@ -76,7 +76,9 @@ class JwtAuthenticationFilterTest {
                 roleRepository,
                 permissionRepository,
                 userSessionRepository,
-                authCookieProperties
+                authCookieProperties,
+                org.mockito.Mockito.mock(pos.pos.restaurant.repository.RestaurantRepository.class),
+                org.mockito.Mockito.mock(pos.pos.restaurant.repository.BranchRepository.class)
         );
     }
 

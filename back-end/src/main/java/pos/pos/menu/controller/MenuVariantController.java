@@ -33,7 +33,7 @@ public class MenuVariantController {
     private final MenuVariantService menuVariantService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MENUS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
     @Operation(summary = "List variants for one menu item")
     public ResponseEntity<List<MenuVariantSummaryResponse>> getVariants(
             Authentication authentication,

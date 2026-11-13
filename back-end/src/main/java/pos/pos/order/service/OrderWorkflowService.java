@@ -52,6 +52,8 @@ public class OrderWorkflowService {
     private final OrderDomainSupport orderDomainSupport;
     private final KdsOrderSyncService kdsOrderSyncService;
     private final InventorySaleConsumptionService inventorySaleConsumptionService;
+    private final org.springframework.context.ApplicationEventPublisher events;
+    private final pos.pos.tables.repository.RestaurantTableRepository restaurantTableRepository;
 
     @Transactional
     public OrderResponse openOrder(Authentication authentication, UUID restaurantId, UUID orderId, OrderActionRequest request) {
@@ -65,6 +67,165 @@ public class OrderWorkflowService {
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.addEvent(order, OrderEventType.STATUS_UPDATED, orderDomainSupport.firstNote(request, "Order opened"), order.getUpdatedBy());
 
+        return orderSupport.toResponse(orderSupport.saveOrder(order));
+    }
+
+    /**
+     * The guests left without paying (user, 2026-11-01): the order is voided as unpaid. What was paid stays, the rest is
+     * written down as owed, the table is freed and the chosen people are told. It can be reopened later for payment.
+     */
+    @Transactional
+    public OrderResponse closeUnpaid(Authentication authentication, UUID restaurantId, UUID orderId, pos.pos.order.dto.OrderCloseUnpaidRequest request) {
+        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        Order order = orderSupport.requireOrder(restaurantId, orderId);
+        if (order.getStatus() != OrderStatus.OPEN && order.getStatus() != OrderStatus.DRAFT) {
+            throw new AuthException("Only an open order can be closed as unpaid", HttpStatus.BAD_REQUEST);
+        }
+        java.math.BigDecimal owed = orderSupport.balanceDue(order);
+        if (owed.signum() <= 0) {
+            throw new AuthException("Nothing is owed on this order. Close it instead", HttpStatus.BAD_REQUEST);
+        }
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        String reason = request.getReason().trim();
+        RestaurantTable table = order.getRestaurantTable();
+        order.setUnpaidReason(pos.pos.order.enums.OrderUnpaidReason.OTHER);
+        order.setUnpaidNote(reason);
+        order.setUnpaidAmount(owed);
+        order.setUnpaidAt(OffsetDateTime.now(ZoneOffset.UTC));
+        order.setUnpaidBy(actorId);
+        order.setUnpaidTableNumber(table == null ? null : table.getTableNumber());
+        order.setRestaurantTable(null);
+        order.setBillRequestedAt(null);
+        // Its dishes and what was paid stay as they are, so reopening it shows the same bill.
+        order.setStatus(OrderStatus.VOIDED);
+        order.setUpdatedBy(actorId);
+        orderSupport.addEvent(order, OrderEventType.VOIDED, "Closed as unpaid: " + reason, actorId);
+        orderSupport.saveOrder(order);
+        kdsOrderSyncService.stopOrder(order, actorId, "Closed as unpaid");
+        if (table != null) {
+            freeTable(table, actorId);
+        }
+        events.publishEvent(new pos.pos.order.event.OrderClosedUnpaidEvent(order.getRestaurant().getId(), order.getBranch().getId(), order.getBranch().getName(),
+                order.getId(), order.getOrderNumber(), order.getUnpaidTableNumber(), owed, order.getCurrency(), reason, actorId));
+        return orderSupport.toResponse(order);
+    }
+
+    // An order closed as unpaid comes back to take the payment; it's no longer on a table.
+    @Transactional
+    public OrderResponse reopenForPayment(Authentication authentication, UUID restaurantId, UUID orderId) {
+        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        Order order = orderSupport.requireOrder(restaurantId, orderId);
+        if (order.getStatus() != OrderStatus.VOIDED || order.getUnpaidAt() == null) {
+            throw new AuthException("Only an order closed as unpaid can be reopened for payment", HttpStatus.BAD_REQUEST);
+        }
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        order.setStatus(OrderStatus.OPEN);
+        order.setClosedAt(null);
+        // What was paid and its dishes are as they were, so the payment picks up where it stopped. The unpaid details
+        // stay: they say why it's open, and that it's open only for the payment.
+        order.setUpdatedBy(actorId);
+        orderSupport.addEvent(order, OrderEventType.REOPENED, "Reopened for payment", actorId);
+        return orderSupport.toResponse(orderSupport.saveOrder(order));
+    }
+
+    // The guests are gone: the table and the tables merged into it are free for the next guests.
+    private void freeTable(RestaurantTable table, UUID actorId) {
+        pos.pos.tables.enums.TableStatus previous = table.getStatus();
+        List<RestaurantTable> merged = restaurantTableRepository.findAllByMergedInto_IdOrderByTableNumberAsc(table.getId());
+        merged.stream().filter(child -> child.getStatus() == pos.pos.tables.enums.TableStatus.OCCUPIED).forEach(child -> {
+            child.setStatus(pos.pos.tables.enums.TableStatus.AVAILABLE);
+            child.setGuestCount(null);
+            child.setSeatedAt(null);
+            child.setUpdatedBy(actorId);
+        });
+        if (previous == pos.pos.tables.enums.TableStatus.OCCUPIED) {
+            table.setStatus(pos.pos.tables.enums.TableStatus.AVAILABLE);
+            table.setGuestCount(null);
+            table.setSeatedAt(null);
+            table.setMoreComing(false);
+            table.setUpdatedBy(actorId);
+        }
+        restaurantTableRepository.save(table);
+        restaurantTableRepository.saveAll(merged);
+        if (previous != table.getStatus()) {
+            events.publishEvent(new pos.pos.tables.event.TableStatusChangedEvent(table.getBranch().getRestaurant().getId(), table.getBranch().getId(),
+                    table.getId(), previous, table.getStatus(), actorId));
+        }
+    }
+
+    private static void clearUnpaid(Order order) {
+        order.setUnpaidReason(null);
+        order.setUnpaidNote(null);
+        order.setUnpaidAmount(null);
+        order.setUnpaidAt(null);
+        order.setUnpaidBy(null);
+    }
+
+    // Open only for its payment: it either gets paid or is closed as unpaid again.
+    private static void assertNotOpenForPaymentOnly(Order order) {
+        if (order.getStatus() == OrderStatus.OPEN && order.getUnpaidAt() != null) {
+            throw new AuthException("This order is open only to take its payment", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    // Nobody acted on it for too long (Settings → Tables → Special cases): the same as closing it as unpaid, by the system.
+    // The caller frees the table. Return puts it all back.
+    @Transactional
+    public void closeNoAction(Order order) {
+        RestaurantTable table = order.getRestaurantTable();
+        order.setUnpaidReason(pos.pos.order.enums.OrderUnpaidReason.NO_ACTION);
+        order.setUnpaidNote(null);
+        order.setUnpaidAmount(orderSupport.balanceDue(order));
+        order.setUnpaidAt(OffsetDateTime.now(ZoneOffset.UTC));
+        order.setUnpaidBy(null);
+        order.setUnpaidTableNumber(table == null ? null : table.getTableNumber());
+        order.setRestaurantTable(null);
+        order.setBillRequestedAt(null);
+        order.setStatus(OrderStatus.VOIDED);
+        order.setUpdatedBy(null);
+        orderSupport.addEvent(order, OrderEventType.VOIDED, "Closed as unpaid: No action taken", null);
+        orderSupport.saveOrder(order);
+        kdsOrderSyncService.stopOrder(order, null, "Closed as unpaid: No action taken");
+    }
+
+    // Everything was paid and it was left open, so it just closes.
+    @Transactional
+    public void closePaidNoAction(Order order) {
+        order.setStatus(OrderStatus.CLOSED);
+        order.setClosedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        order.setUpdatedBy(null);
+        orderSupport.addEvent(order, OrderEventType.CLOSED, "Closed automatically: paid and no action taken", null);
+        orderSupport.saveOrder(order);
+    }
+
+    // Nobody acted and it has no dishes: nothing to pay, so it just ends.
+    @Transactional
+    public void cancelEmptyNoAction(Order order) {
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setUpdatedBy(null);
+        orderSupport.addEvent(order, OrderEventType.CANCELLED, "Cancelled automatically: no dishes and no action taken", null);
+        orderSupport.saveOrder(order);
+    }
+
+    // Reopened for its payment and left there: back to unpaid, as it was.
+    @Transactional
+    public void backToUnpaid(Order order) {
+        order.setUnpaidAmount(orderSupport.balanceDue(order));
+        order.setStatus(OrderStatus.VOIDED);
+        order.setUpdatedBy(null);
+        orderSupport.addEvent(order, OrderEventType.VOIDED, "Closed as unpaid again: it wasn't paid after being reopened", null);
+        orderSupport.saveOrder(order);
+    }
+
+    @Transactional
+    public OrderResponse setBillRequested(Authentication authentication, UUID restaurantId, UUID orderId, boolean requested) {
+        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        Order order = orderSupport.requireOrder(restaurantId, orderId);
+        orderDomainSupport.assertOrderEditable(order);
+
+        order.setBillRequestedAt(requested ? OffsetDateTime.now(ZoneOffset.UTC) : null);
+        order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        orderSupport.addEvent(order, OrderEventType.UPDATED, requested ? "Bill requested" : "Bill request taken back", order.getUpdatedBy());
         return orderSupport.toResponse(orderSupport.saveOrder(order));
     }
 
@@ -163,10 +324,18 @@ public class OrderWorkflowService {
             throw new AuthException("Reopening closed orders is disabled for this restaurant", HttpStatus.BAD_REQUEST);
         }
 
+        // One open order per table (user, 2026-11-01): if its table has a new order by now, it's reopened without a table.
+        String reopened = orderDomainSupport.firstNote(request, "Order reopened");
+        if (order.getRestaurantTable() != null && orderSupport.findCurrentOpenOrderForTable(order.getRestaurantTable().getId()).isPresent()) {
+            reopened += "; " + order.getRestaurantTable().getTableNumber() + " has another order now, so this one has no table";
+            order.setRestaurantTable(null);
+        }
         order.setStatus(OrderStatus.OPEN);
         order.setClosedAt(null);
+        order.setBillRequestedAt(null);
+        clearUnpaid(order);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
-        orderSupport.addEvent(order, OrderEventType.REOPENED, orderDomainSupport.firstNote(request, "Order reopened"), order.getUpdatedBy());
+        orderSupport.addEvent(order, OrderEventType.REOPENED, reopened, order.getUpdatedBy());
 
         return orderSupport.toResponse(orderSupport.saveOrder(order));
     }
@@ -181,6 +350,7 @@ public class OrderWorkflowService {
         if (order.getStatus() == OrderStatus.CLOSED) {
             throw new AuthException("Closed orders must be reopened before they can be cancelled", HttpStatus.BAD_REQUEST);
         }
+        assertNotOpenForPaymentOnly(order);
         if (EnumSet.of(OrderPaymentStatus.PAID, OrderPaymentStatus.PARTIALLY_PAID).contains(order.getPaymentStatus())
                 || orderSupport.hasMoneyTaken(order)) {
             throw new AuthException("Paid orders cannot be cancelled", HttpStatus.BAD_REQUEST);
@@ -210,6 +380,7 @@ public class OrderWorkflowService {
         if (order.getStatus() == OrderStatus.CLOSED) {
             throw new AuthException("Closed orders must be reopened before they can be voided", HttpStatus.BAD_REQUEST);
         }
+        assertNotOpenForPaymentOnly(order);
         // Money taken must be given back (refund) or cancelled (void the payment) first, so it is never lost track of.
         if (orderSupport.hasMoneyTaken(order)) {
             throw new AuthException("Refund or void the payments on this order first", HttpStatus.BAD_REQUEST);
@@ -254,6 +425,7 @@ public class OrderWorkflowService {
         if (Objects.equals(targetOrder.getId(), sourceOrder.getId())) {
             throw new AuthException("sourceOrderId must be different from the target order", HttpStatus.BAD_REQUEST);
         }
+        targetOrder.setBillRequestedAt(null);
         if (!Objects.equals(targetOrder.getBranch().getId(), sourceOrder.getBranch().getId())) {
             throw new AuthException("Orders must belong to the same branch to be merged", HttpStatus.BAD_REQUEST);
         }
@@ -443,9 +615,8 @@ public class OrderWorkflowService {
         Order newOrder = new Order();
         newOrder.setRestaurant(sourceOrder.getRestaurant());
         newOrder.setBranch(sourceOrder.getBranch());
-        UUID targetTableId = request.getTargetTableId() == null
-                ? sourceOrder.getRestaurantTable() == null ? null : sourceOrder.getRestaurantTable().getId()
-                : request.getTargetTableId();
+        // One open order per table (user, 2026-11-01): split off with no table named, the new order has no table.
+        UUID targetTableId = request.getTargetTableId();
         RestaurantTable targetTable = orderSupport.resolveTableForUpdate(sourceOrder.getBranch().getId(), targetTableId);
         orderSupport.assertTableCanReceiveOrder(targetTable);
         newOrder.setRestaurantTable(targetTable);

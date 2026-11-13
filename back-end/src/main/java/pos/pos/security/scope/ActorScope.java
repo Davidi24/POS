@@ -13,10 +13,16 @@ import java.util.UUID;
 // Holds everything policies need to make access decisions without hitting the DB again.
 public record ActorScope(
         User actor,          // the logged-in user entity
-        boolean superAdmin,  // true if the user has the SuperAdmin role (bypasses most restrictions)
+        boolean superAdmin,  // true for the Super Admin and Co-Super-Admins: they reach every restaurant
         Set<String> roleCodes,       // e.g. ["OWNER", "MANAGER"]
-        Set<String> permissionCodes  // e.g. ["RESTAURANTS_READ", "USERS_DELETE"]
+        Set<String> permissionCodes, // e.g. ["RESTAURANTS_READ", "USERS_DELETE"]
+        UUID actingRestaurantId,     // the Super Admin / Co-Super-Admin: the restaurant they entered in the app (or null)
+        UUID actingBranchId
 ) {
+
+    public ActorScope(User actor, boolean superAdmin, Set<String> roleCodes, Set<String> permissionCodes) {
+        this(actor, superAdmin, roleCodes, permissionCodes, null, null);
+    }
 
     // Defensive constructor — ensures nothing is null and makes role/permission sets immutable
     public ActorScope {
@@ -32,12 +38,13 @@ public record ActorScope(
         return actor.getId();
     }
 
+    // Super admins belong to no restaurant; they act in the one they entered.
     public UUID restaurantId() {
-        return actor.getRestaurantId();
+        return superAdmin ? actingRestaurantId : actor.getRestaurantId();
     }
 
     public UUID defaultBranchId() {
-        return actor.getDefaultBranchId();
+        return superAdmin ? actingBranchId : actor.getDefaultBranchId();
     }
 
     // Returns true if this user belongs to the given restaurant (used to scope access to their own restaurant only)

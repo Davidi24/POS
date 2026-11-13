@@ -61,6 +61,7 @@ class RestaurantResourcesApiIntegrationTest {
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "restaurant-resources-test-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "restaurant-resources-test-email-verification-pepper");
         registry.add("SMS_CODE_PEPPER", () -> "restaurant-resources-test-sms-pepper");
+        registry.add("app.storage.menu-images.provider", () -> "disabled");
         registry.add("MAIL_HOST", () -> "localhost");
         registry.add("MAIL_PORT", () -> "2525");
         registry.add("MAIL_USERNAME", () -> "integration");
@@ -221,7 +222,7 @@ class RestaurantResourcesApiIntegrationTest {
         assertSingleBooleanFlag(restaurantContacts, "isPrimary", contactOneId);
 
         UUID taxProfileOneId = UUID.fromString(bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/tax-profiles", context.restaurantId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(context.adminAccessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "country", "Albania",
@@ -232,7 +233,7 @@ class RestaurantResourcesApiIntegrationTest {
                 .andReturn()).get("id").asText());
 
         UUID taxProfileTwoId = UUID.fromString(bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/tax-profiles", context.restaurantId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(context.adminAccessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "country", "Kosovo",
@@ -249,7 +250,7 @@ class RestaurantResourcesApiIntegrationTest {
         assertSingleBooleanFlag(taxProfiles, "isDefault", taxProfileTwoId);
 
         mockMvc.perform(patch("/restaurants/{restaurantId}/tax-profiles/{taxProfileId}/default", context.restaurantId(), taxProfileOneId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken())))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(context.adminAccessToken())))
                 .andExpect(status().isOk());
 
         taxProfiles = bodyOf(mockMvc.perform(get("/restaurants/{restaurantId}/tax-profiles", context.restaurantId())
@@ -259,7 +260,7 @@ class RestaurantResourcesApiIntegrationTest {
         assertSingleBooleanFlag(taxProfiles, "isDefault", taxProfileOneId);
 
         JsonNode createdBranch = bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/branches", context.restaurantId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(context.adminAccessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Downtown Branch",
@@ -275,8 +276,8 @@ class RestaurantResourcesApiIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken())))
                 .andExpect(status().isOk())
                 .andReturn());
-        assertThat(branchesPage.get("items")).hasSize(1);
-        assertThat(branchesPage.get("items").get(0).get("id").asText()).isEqualTo(branchId.toString());
+        assertThat(branchesPage.get("items")).hasSize(2);
+        assertThat(branchesPage.get("items").findValuesAsText("id")).contains(branchId.toString());
 
         UUID branchAddressOneId = UUID.fromString(bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/branches/{branchId}/addresses", context.restaurantId(), branchId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken()))
@@ -379,6 +380,8 @@ class RestaurantResourcesApiIntegrationTest {
                                 "legalName", restaurantName + " LLC",
                                 "currency", "USD",
                                 "timezone", "Europe/Berlin",
+                                "email", "contact@pos.example",
+                                "phone", "+355690001111",
                                 "owner", Map.of(
                                         "email", ownerEmail,
                                         "username", ownerUsername,
@@ -403,7 +406,7 @@ class RestaurantResourcesApiIntegrationTest {
                 .andExpect(status().isNoContent());
 
         String ownerAccessToken = accessTokenOf(webLogin(ownerUsername, OWNER_SETUP_PASSWORD));
-        return new OwnedRestaurantContext(UUID.fromString(createdRestaurant.get("id").asText()), ownerAccessToken);
+        return new OwnedRestaurantContext(UUID.fromString(createdRestaurant.get("id").asText()), ownerAccessToken, adminAccessToken);
     }
 
     private void assertSingleBooleanFlag(JsonNode items, String flagField, UUID expectedTrueId) {
@@ -475,6 +478,6 @@ class RestaurantResourcesApiIntegrationTest {
         return messageText.substring(tokenStart, end);
     }
 
-    private record OwnedRestaurantContext(UUID restaurantId, String ownerAccessToken) {
+    private record OwnedRestaurantContext(UUID restaurantId, String ownerAccessToken, String adminAccessToken) {
     }
 }

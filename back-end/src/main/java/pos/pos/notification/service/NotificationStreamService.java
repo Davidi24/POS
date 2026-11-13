@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.notification.dto.NotificationLiveEventResponse;
@@ -35,6 +36,7 @@ public class NotificationStreamService {
 
     private final ConcurrentMap<UUID, NotificationSubscriber> subscribers = new ConcurrentHashMap<>();
 
+    @Transactional(readOnly = true)
     public SseEmitter subscribe(
             Authentication authentication,
             UUID restaurantId,

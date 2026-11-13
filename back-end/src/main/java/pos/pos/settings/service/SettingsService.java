@@ -13,6 +13,7 @@ import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.settings.dto.SettingsResponse;
 import pos.pos.settings.dto.UpdateRestaurantSettingsRequest;
 import pos.pos.settings.dto.UpdateSettingsBillingRequest;
+import pos.pos.settings.dto.UpdateSettingsInventoryRequest;
 import pos.pos.settings.dto.UpdateSettingsDefaultBranchRequest;
 import pos.pos.settings.dto.UpdateSettingsLocalizationRequest;
 import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
@@ -41,6 +42,7 @@ public class SettingsService {
     private final SettingsMapper settingsMapper;
     private final SettingsAuditService settingsAuditService;
     private final RoleHierarchyService roleHierarchyService;
+    private final pos.pos.tables.repository.RestaurantTableRepository restaurantTableRepository;
 
     @Transactional
     public SettingsResponse getSettings(Authentication authentication, UUID restaurantId) {
@@ -276,6 +278,18 @@ public class SettingsService {
         if (request.getCardFeeFixed() != null) {
             settings.setCardFeeFixed(request.getCardFeeFixed());
         }
+        if (request.getAutoConfirmBookings() != null) {
+            settings.setAutoConfirmBookings(request.getAutoConfirmBookings());
+        }
+        if (request.getGuestSecondReminderHours() != null) {
+            settings.setGuestSecondReminderHours(request.getGuestSecondReminderHours());
+        }
+        if (request.getUnconfirmedHoldMinutes() != null) {
+            settings.setUnconfirmedHoldMinutes(request.getUnconfirmedHoldMinutes());
+        }
+        if (request.getBookingAlertRoles() != null) {
+            settings.setBookingAlertRoles(request.getBookingAlertRoles().trim());
+        }
 
         return saveSettingsAndAudit(
                 context,
@@ -296,10 +310,59 @@ public class SettingsService {
     }
 
     @Transactional
+    public SettingsResponse updateInventory(Authentication authentication, UUID restaurantId, UpdateSettingsInventoryRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setValuableStockFrom(request.getValuableStockFrom().setScale(2, java.math.RoundingMode.HALF_UP));
+        var frequency = request.getInventoryCountFrequency() == null ? settings.getInventoryCountFrequency() : request.getInventoryCountFrequency();
+        var period = request.getInventoryCountPeriod() == null ? settings.getInventoryCountPeriod() : request.getInventoryCountPeriod();
+        if (period == pos.pos.settings.enums.InventoryCountPeriod.WEEKLY && frequency > 7) {
+            throw new AuthException("Weekly inventory counts must be between 1 and 7", HttpStatus.BAD_REQUEST);
+        }
+        if (frequency != settings.getInventoryCountFrequency() || period != settings.getInventoryCountPeriod()) {
+            settings.setInventoryCountFrequency(frequency);
+            settings.setInventoryCountPeriod(period);
+            settings.setInventoryCountScheduleStartedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC));
+        }
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_INVENTORY", "Updated inventory settings");
+    }
+
+    @Transactional
+    public SettingsResponse updateTables(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsTablesRequest request) {
+        if (request.getSeatingMostExtraGuests() < request.getSeatingExtraGuests()) {
+            throw new AuthException("The most guests can't be below the normal number", HttpStatus.BAD_REQUEST);
+        }
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setSeatingExtraGuests(request.getSeatingExtraGuests());
+        settings.setSeatingMostExtraGuests(request.getSeatingMostExtraGuests());
+        settings.setSeatingAlertRoles(request.getSeatingAlertRoles().trim());
+        settings.setNextBookingWarningMinutes(request.getNextBookingWarningMinutes());
+        settings.setJoinBookingWarningMinutes(request.getJoinBookingWarningMinutes());
+        settings.setBookingComingMinutes(request.getBookingComingMinutes());
+        // A limit switched on starts its clock now, so nothing old is closed the moment it's saved.
+        if ((settings.getSpecialCasePaidMinutes() == 0 && request.getSpecialCasePaidMinutes() > 0)
+                || (settings.getSpecialCaseSeatedMinutes() == 0 && request.getSpecialCaseSeatedMinutes() > 0)
+                || (settings.getSpecialCaseOrderMinutes() == 0 && request.getSpecialCaseOrderMinutes() > 0)) {
+            restaurantTableRepository.restartClocks(restaurantId, java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC));
+        }
+        settings.setSpecialCasePaidMinutes(request.getSpecialCasePaidMinutes());
+        settings.setSpecialCaseSeatedMinutes(request.getSpecialCaseSeatedMinutes());
+        settings.setSpecialCaseOrderMinutes(request.getSpecialCaseOrderMinutes());
+        settings.setSpecialCaseWarningMinutes(request.getSpecialCaseWarningMinutes());
+        settings.setSpecialCaseAutoMove(request.getSpecialCaseAutoMove());
+        settings.setSpecialCaseBookingNoAction(request.getSpecialCaseBookingNoAction());
+        settings.setSpecialCaseMoreTime(request.getSpecialCaseMoreTime());
+        settings.setSpecialCaseAlertRoles(request.getSpecialCaseAlertRoles().trim());
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_TABLES", "Updated table seating settings");
+    }
+
+    @Transactional
     public SettingsResponse updateShifts(Authentication authentication, UUID restaurantId, UpdateSettingsShiftsRequest request) {
         SettingsContext context = loadSettingsContext(authentication, restaurantId);
         Settings settings = context.settings();
         settings.setClockInEarlyMinutes(request.getClockInEarlyMinutes());
+        settings.setStaffSeeWholeTeam(request.getStaffSeeWholeTeam());
         return saveSettingsAndAudit(context, settings, null, "UPDATE_SHIFTS", "Updated shift settings");
     }
 
@@ -326,6 +389,9 @@ public class SettingsService {
         settings.setMaxTipPercent(request.getMaxTipPercent());
         settings.setAutoClosePaidOrders(request.getAutoClosePaidOrders());
         settings.setRefundWindowDays(request.getRefundWindowDays());
+        if (request.getUnpaidAlertRoles() != null) {
+            settings.setUnpaidAlertRoles(request.getUnpaidAlertRoles().trim());
+        }
         return saveSettingsAndAudit(context, settings, null, "UPDATE_PAYMENTS", "Updated payment settings");
     }
 
@@ -514,7 +580,23 @@ public class SettingsService {
         settings.setCardFeeFixed(defaults.getCardFeeFixed());
         settings.setKitchenSlowAfterMinutes(defaults.getKitchenSlowAfterMinutes());
         settings.setKitchenReadyWaitingMinutes(defaults.getKitchenReadyWaitingMinutes());
+        settings.setValuableStockFrom(defaults.getValuableStockFrom());
         settings.setClockInEarlyMinutes(defaults.getClockInEarlyMinutes());
+        settings.setSeatingExtraGuests(defaults.getSeatingExtraGuests());
+        settings.setSeatingMostExtraGuests(defaults.getSeatingMostExtraGuests());
+        settings.setSeatingAlertRoles(defaults.getSeatingAlertRoles());
+        settings.setUnpaidAlertRoles(defaults.getUnpaidAlertRoles());
+        settings.setNextBookingWarningMinutes(defaults.getNextBookingWarningMinutes());
+        settings.setJoinBookingWarningMinutes(defaults.getJoinBookingWarningMinutes());
+        settings.setBookingComingMinutes(defaults.getBookingComingMinutes());
+        settings.setSpecialCasePaidMinutes(defaults.getSpecialCasePaidMinutes());
+        settings.setSpecialCaseSeatedMinutes(defaults.getSpecialCaseSeatedMinutes());
+        settings.setSpecialCaseOrderMinutes(defaults.getSpecialCaseOrderMinutes());
+        settings.setSpecialCaseWarningMinutes(defaults.getSpecialCaseWarningMinutes());
+        settings.setSpecialCaseAutoMove(defaults.isSpecialCaseAutoMove());
+        settings.setSpecialCaseBookingNoAction(defaults.isSpecialCaseBookingNoAction());
+        settings.setSpecialCaseMoreTime(defaults.getSpecialCaseMoreTime());
+        settings.setSpecialCaseAlertRoles(defaults.getSpecialCaseAlertRoles());
         settings.setTipsEnabled(defaults.isTipsEnabled());
         settings.setTipSuggestions(defaults.getTipSuggestions());
         settings.setMaxTipPercent(defaults.getMaxTipPercent());

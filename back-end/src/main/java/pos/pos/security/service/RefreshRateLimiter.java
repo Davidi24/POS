@@ -49,6 +49,14 @@ public class RefreshRateLimiter {
             RETURNING attempt_count
             """;
 
+    @Value("${spring.jpa.properties.hibernate.default_schema:public}")
+    private String schemaName = "public";
+
+    private String table() {
+        if (!schemaName.matches("[A-Za-z_][A-Za-z0-9_]*")) throw new IllegalStateException("Invalid schema");
+        return "\"" + schemaName + "\".auth_refresh_rate_limit";
+    }
+
     private final JdbcTemplate jdbcTemplate;
     private final int maxAttemptsPerIp;
     private final int maxAttemptsPerToken;
@@ -98,7 +106,7 @@ public class RefreshRateLimiter {
         cleanupExpiredRowsPeriodically(now);
 
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                UPSERT_SQL,
+                UPSERT_SQL.replace("INSERT INTO auth_refresh_rate_limit", "INSERT INTO " + table()),
                 scope,
                 hashKey(scope, rawKey),
                 windowSeconds,
@@ -119,7 +127,7 @@ public class RefreshRateLimiter {
         if (epochSecond - lastCleanup < windowSeconds || !lastCleanupEpochSecond.compareAndSet(lastCleanup, epochSecond)) {
             return;
         }
-        jdbcTemplate.update("DELETE FROM auth_refresh_rate_limit WHERE expires_at <= CURRENT_TIMESTAMP");
+        jdbcTemplate.update("DELETE FROM " + table() + " WHERE expires_at <= CURRENT_TIMESTAMP");
     }
 
     private String hashKey(String scope, String rawKey) {

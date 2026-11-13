@@ -112,12 +112,12 @@ class PaymentServiceTest {
     }
 
     private TakePaymentRequest request(PaymentMethod method, String amount) {
-        return new TakePaymentRequest(method, new BigDecimal(amount), null, null, null, null, null, null, null, null);
+        return new TakePaymentRequest(method, new BigDecimal(amount), null, null, null, null, null, null, null, null, null);
     }
 
     private TakePaymentRequest request(PaymentMethod method, String amount, String tip, String tendered, String last4, Boolean close) {
         return new TakePaymentRequest(method, new BigDecimal(amount), tip == null ? null : new BigDecimal(tip),
-                tendered == null ? null : new BigDecimal(tendered), null, last4, null, null, null, close);
+                tendered == null ? null : new BigDecimal(tendered), null, last4, null, null, null, close, null);
     }
 
     private void assertBadRequest(Runnable action, String messagePart) {

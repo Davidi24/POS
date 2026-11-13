@@ -7,6 +7,8 @@ import pos.pos.auth.dto.AuthenticationResponse;
 import pos.pos.auth.enums.SessionRevocationReason;
 import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.UserSessionRepository;
+import org.springframework.http.HttpStatus;
+import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.auth.mapper.CurrentUserMapper;
 import pos.pos.role.entity.Role;
@@ -24,6 +26,7 @@ import pos.pos.user.repository.UserRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 // checked
@@ -88,9 +91,14 @@ public class AuthRefreshService {
             throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
         }
 
+        if (userRepository.worksAtClosedRestaurant(user.getId())) {
+            revokeSession(session, now, SessionRevocationReason.RESTAURANT_CLOSED);
+            throw new AuthException(AuthLoginService.RESTAURANT_CLOSED_MESSAGE, HttpStatus.FORBIDDEN);
+        }
+
         List<Role> activeRoles = roleRepository.findActiveRolesByUserId(user.getId());
         List<String> roleCodes = activeRoles.stream().map(Role::getCode).toList();
-        List<String> permissionCodes = loadPermissionCodes(activeRoles);
+        List<String> permissionCodes = loadPermissionCodes(user, activeRoles);
 
         UUID newTokenId = UUID.randomUUID();
         String newAccessToken = jwtService.generateAccessToken(user.getId(), roleCodes, newTokenId);
@@ -113,18 +121,13 @@ public class AuthRefreshService {
                 .build();
     }
 
-    private List<String> loadPermissionCodes(List<Role> activeRoles) {
+    private List<String> loadPermissionCodes(User user, List<Role> activeRoles) {
         List<UUID> roleIds = activeRoles.stream()
                 .map(Role::getId)
                 .toList();
 
-        if (roleIds.isEmpty()) {
-            return List.of();
-        }
-
-        return permissionRepository.findCodesByRoleIds(roleIds).stream()
-                .distinct()
-                .toList();
+        // Their roles as their restaurant has them, less what's switched off for them, plus what's given to them alone.
+        return pos.pos.role.service.EffectivePermissions.forUser(permissionRepository, user.getId(), user.getRestaurantId(), roleIds);
     }
 
     //revoke the session so it can be used anymore

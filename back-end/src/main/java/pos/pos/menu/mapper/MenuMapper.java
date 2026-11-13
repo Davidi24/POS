@@ -69,6 +69,7 @@ public class MenuMapper {
                 .availableUntilDate(menu.getAvailableUntilDate())
                 .color(menu.getColor())
                 .special(menu.isSpecial())
+                .shownToWaiters(menu.isShownToWaiters())
                 .itemCount(itemCount)
                 .createdBy(menu.getCreatedBy())
                 .updatedBy(menu.getUpdatedBy())

@@ -27,6 +27,7 @@ import pos.pos.payment.repository.PaymentRepository;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.repository.BranchAddressRepository;
 import pos.pos.restaurant.repository.RestaurantAddressRepository;
+import pos.pos.restaurant.repository.RestaurantBrandingRepository;
 import pos.pos.restaurant.repository.RestaurantTaxProfileRepository;
 import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.settings.entity.Settings;
@@ -50,12 +51,14 @@ public class PaymentQueryService {
 
     private final RestaurantScopeService restaurantScopeService;
     private final PaymentRepository paymentRepository;
+    private final ReceiptIdentities identities;
     private final PaymentMapper paymentMapper;
     private final PaymentCalculator calculator;
     private final OrderSupport orderSupport;
     private final RestaurantAddressRepository restaurantAddressRepository;
     private final BranchAddressRepository branchAddressRepository;
     private final RestaurantTaxProfileRepository restaurantTaxProfileRepository;
+    private final RestaurantBrandingRepository restaurantBrandingRepository;
 
     /**
      * Payments taken at a branch, newest first. Without ORDER_AUDIT a person only sees the payments they took.
@@ -131,7 +134,7 @@ public class PaymentQueryService {
 
     @Transactional(readOnly = true)
     public ReceiptResponse receipt(Authentication authentication, UUID restaurantId, UUID orderId) {
-        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        restaurantScopeService.requireHistoricalRestaurant(authentication, restaurantId);
         Order order = orderSupport.requireOrder(restaurantId, orderId);
         Restaurant restaurant = order.getRestaurant();
         Settings settings = orderSupport.loadSettings(restaurant);
@@ -146,7 +149,16 @@ public class PaymentQueryService {
                         () -> restaurantAddressRepository.findByRestaurantIdAndIsPrimaryTrueAndDeletedAtIsNull(restaurant.getId())
                                 .ifPresent(address -> addAddress(addressLines, address.getStreetLine1(), address.getStreetLine2(),
                                         address.getPostalCode(), address.getCity(), address.getCountry())));
-        var taxProfile = restaurantTaxProfileRepository.findByRestaurantIdAndIsDefaultTrueAndDeletedAtIsNull(restaurant.getId());
+        OffsetDateTime identityTime=OffsetDateTime.now(ZoneOffset.UTC);
+        var taxProfile = restaurantTaxProfileRepository.findByRestaurantIdAndIsDefaultTrueAndDeletedAtIsNull(restaurant.getId())
+                .filter(t->(t.getEffectiveFrom()==null || !identityTime.isBefore(t.getEffectiveFrom()))
+                        && (t.getEffectiveTo()==null || identityTime.isBefore(t.getEffectiveTo())));
+        var identity=identities.find(order.getId()).orElseGet(()->new ReceiptIdentities.Identity(
+                restaurant.getName(),restaurant.getLegalName(),order.getBranch().getName(),addressLines,
+                order.getBranch().getPhone()!=null?order.getBranch().getPhone():restaurant.getPhone(),
+                taxProfile.map(t->t.getTaxNumber()).orElse(null),taxProfile.map(t->t.getVatNumber()).orElse(null),
+                receipt.isShowLogo(),receipt.isShowLogo()?restaurantBrandingRepository.findByRestaurantIdAndDeletedAtIsNull(restaurant.getId()).map(b->b.getLogoUrl()).orElse(null):null,
+                receipt.getFooterNote()));
 
         String serverName = null;
         if (receipt.isShowServerName() && order.getCreatedBy() != null) {
@@ -157,6 +169,7 @@ public class PaymentQueryService {
                 .filter(line -> receipt.isPrintVoidedItems() || isCounted(line))
                 .sorted(Comparator.comparing(OrderLineItem::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(line -> new ReceiptResponse.Line(
+                        line.getId(),
                         line.getItemNameSnapshot(),
                         line.getVariantNameSnapshot(),
                         line.getQuantity(),
@@ -173,14 +186,8 @@ public class PaymentQueryService {
                 .toList();
 
         return new ReceiptResponse(
-                restaurant.getName(),
-                restaurant.getLegalName(),
-                order.getBranch().getName(),
-                addressLines,
-                order.getBranch().getPhone(),
-                taxProfile.map(profile -> profile.getTaxNumber()).orElse(null),
-                taxProfile.map(profile -> profile.getVatNumber()).orElse(null),
-                receipt.isShowLogo(),
+                identity.restaurantName(),identity.legalName(),identity.branchName(),identity.addressLines(),
+                identity.phone(),identity.taxNumber(),identity.vatNumber(),identity.showLogo(),identity.logoUrl(),
                 receipt.isShowOrderNumber() ? order.getOrderNumber() : null,
                 receipt.isShowTableName() && order.getRestaurantTable() != null ? order.getRestaurantTable().getTableNumber() : null,
                 serverName,
@@ -217,7 +224,7 @@ public class PaymentQueryService {
                 calculator.paidTotal(order),
                 calculator.tipTotal(order),
                 calculator.balanceDue(order, settings),
-                receipt.getFooterNote(),
+                identity.footerNote(),
                 receipt.isShowQrCode(),
                 receipt.getReceiptCopies()
         );

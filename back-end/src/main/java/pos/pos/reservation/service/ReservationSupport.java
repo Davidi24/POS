@@ -121,12 +121,20 @@ public class ReservationSupport {
 
         Branch branch = branchRepository.findByRestaurant_SlugAndCodeAndDeletedAtIsNull(normalizedRestaurantSlug, normalizedBranchCode)
                 .orElseThrow(() -> new AuthException("Branch not available for public booking", HttpStatus.NOT_FOUND));
+        restaurantScopeService.lockForMutation(branch.getRestaurant());
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+            branch = restaurantScopeService.requireExistingBranch(branch.getRestaurant().getId(), branch.getId());
+        }
         assertPublicAvailability(branch.getRestaurant(), branch);
         return branch;
     }
 
     public void assertPublicAvailability(Restaurant restaurant, Branch branch) {
-        if (restaurant == null || branch == null || !restaurant.isActive() || !branch.isActive()) {
+        if (restaurant == null || branch == null || !restaurant.isActive() || !branch.isActive()
+                || restaurant.getDeletedAt() != null || branch.getDeletedAt() != null
+                || restaurant.getStatus() != pos.pos.restaurant.enums.RestaurantStatus.ACTIVE
+                || branch.getStatus() != pos.pos.restaurant.enums.BranchStatus.ACTIVE) {
             throw new AuthException("Branch not available for public booking", HttpStatus.NOT_FOUND);
         }
     }

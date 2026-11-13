@@ -53,6 +53,8 @@ public class OrderItemService {
 
         OrderLineItem lineItem = orderSupport.buildLineItem(order, request);
         order.addLineItem(lineItem);
+        // They ordered more, so they aren't waiting for the bill any more.
+        order.setBillRequestedAt(null);
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_ADDED, "Order item added", order.getUpdatedBy());
@@ -436,6 +438,11 @@ public class OrderItemService {
         }
         assertKitchenStatusAllowed(lineItem, status);
         lineItem.setStatus(status);
+        // The first dish on its way makes the order Active (user, 2026-11-01), not only sending them all.
+        if (order.getStatus() == pos.pos.order.enums.OrderStatus.DRAFT
+                && java.util.EnumSet.of(OrderLineItemStatus.FIRED, OrderLineItemStatus.PREPARING, OrderLineItemStatus.READY, OrderLineItemStatus.FULFILLED).contains(status)) {
+            order.setStatus(pos.pos.order.enums.OrderStatus.OPEN);
+        }
         order.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         orderSupport.recalculateTotals(order);
         orderSupport.addEvent(order, OrderEventType.ITEM_UPDATED, note, order.getUpdatedBy());

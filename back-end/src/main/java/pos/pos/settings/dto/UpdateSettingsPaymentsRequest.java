@@ -41,6 +41,10 @@ public class UpdateSettingsPaymentsRequest {
     @NotNull(message = "autoClosePaidOrders is required")
     private Boolean autoClosePaidOrders;
 
+    // Who is told when an order is closed as unpaid (role codes, comma separated); left out = unchanged.
+    @jakarta.validation.constraints.Size(max = 500, message = "unpaidAlertRoles can have at most 500 characters")
+    private String unpaidAlertRoles;
+
     @NotNull(message = "refundWindowDays is required")
     @Min(value = 0, message = "refundWindowDays must not be negative")
     @Max(value = 365, message = "refundWindowDays must be at most 365")

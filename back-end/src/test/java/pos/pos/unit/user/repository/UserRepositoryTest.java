@@ -427,6 +427,7 @@ class UserRepositoryTest extends AbstractTestProfilePostgresTest {
                     waiterCode,
                     false,
                     managerRole.getRank(),
+                    null,
                     restaurantId,
                     PageRequest.of(0, 20)
             );
@@ -455,6 +456,7 @@ class UserRepositoryTest extends AbstractTestProfilePostgresTest {
                     null,
                     true,
                     Long.MAX_VALUE,
+                    null,
                     null,
                     PageRequest.of(0, 20)
             );
