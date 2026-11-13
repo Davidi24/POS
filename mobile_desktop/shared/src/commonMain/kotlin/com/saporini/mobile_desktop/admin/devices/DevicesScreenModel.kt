@@ -34,7 +34,7 @@ data class DeviceDraft(
     val printer: Boolean = false,
     val code: String = "",
     val name: String = "",
-    val deviceType: String = "TERMINAL",
+    val deviceType: String = "POS_TERMINAL",
     val manufacturer: String = "",
     val model: String = "",
     val serialNumber: String = "",
@@ -131,6 +131,8 @@ data class DevicesState(
     val assignments: List<DeviceAssignmentDto> = emptyList(),
     // A new pairing code to show once; it can't be read again.
     val freshCode: PairingCodeDto? = null,
+    // The device just added, so the screen can go straight on to confirming it.
+    val justAdded: String? = null,
     val draft: DeviceDraft? = null,
     val confirmDelete: String? = null,
     val loading: Boolean = false,
@@ -271,15 +273,29 @@ class DevicesScreenModel(
 
     // ---- Adding and editing ----
 
-    fun newDevice() = needsEdit {
+    fun newDevice(type: String = "POS_TERMINAL") = needsEdit {
         if (state.value.branchId == null) {
             mutable.update { it.copy(error = "Choose a branch first") }
             return@needsEdit
         }
-        mutable.update { it.copy(draft = DeviceDraft(), notice = null) }
+        val (code, name) = suggestion(type)
+        mutable.update { it.copy(draft = DeviceDraft(deviceType = type, code = code, name = name), notice = null) }
     }
 
-    fun newPrinter() = needsEdit { mutable.update { it.copy(draft = DeviceDraft(printer = true, deviceType = "PRINTER"), notice = null) } }
+    fun newPrinter() = needsEdit {
+        val (code, name) = suggestion("PRINTER")
+        mutable.update { it.copy(draft = DeviceDraft(printer = true, deviceType = "PRINTER", code = code, name = name), notice = null) }
+    }
+
+    /** A free short code and a name for a new device of [type]: TAB-4 and "Tablet 4" when TAB-1…3 exist. */
+    private fun suggestion(type: String): Pair<String, String> {
+        val prefix = when (type) { "POS_TERMINAL" -> "TILL"; "TABLET" -> "TAB"; "KDS" -> "KDS"; "CUSTOMER_DISPLAY" -> "CD"; "PAYMENT_TERMINAL" -> "PAY"; else -> "PRN" }
+        val label = when (type) { "POS_TERMINAL" -> "Till"; "TABLET" -> "Tablet"; "KDS" -> "Kitchen screen"; "CUSTOMER_DISPLAY" -> "Guest display"
+            "PAYMENT_TERMINAL" -> "Card terminal"; else -> "Printer" }
+        val taken = (state.value.devices + state.value.printers).map { it.code.uppercase() }.toSet()
+        val next = generateSequence(1) { it + 1 }.first { "$prefix-$it" !in taken }
+        return "$prefix-$next" to "$label $next"
+    }
 
     fun edit(deviceId: String) = needsEdit {
         val current = state.value
@@ -313,8 +329,9 @@ class DevicesScreenModel(
             else repository.saveDevice(restaurantId, branchId!!, draft.id, request)
             mutable.update { state ->
                 fun List<DeviceDto>.put() = (if (any { it.id == saved.id }) map { if (it.id == saved.id) saved else it } else this + saved).sortedBy { it.name.lowercase() }
-                if (draft.printer) state.copy(printers = state.printers.put(), draft = null)
-                else state.copy(devices = state.devices.put(), draft = null)
+                val added = saved.id.takeIf { draft.id == null }
+                if (draft.printer) state.copy(printers = state.printers.put(), draft = null, justAdded = added)
+                else state.copy(devices = state.devices.put(), draft = null, justAdded = added)
             }
         }
     }
@@ -329,6 +346,46 @@ class DevicesScreenModel(
             val usable = status == "ACTIVE" || status == "PROVISIONING" || status == "MAINTENANCE"
             write(null) { restaurantId ->
                 val saved = repository.setStatus(restaurantId, branchId, deviceId, DeviceStatusRequestDto(status, usable, device.online && usable))
+                mutable.update { state -> state.copy(devices = state.devices.map { if (it.id == saved.id) saved else it }) }
+            }
+        }
+    }
+
+    /** A printer's state (in use, in repair, switched off …), saved with the rest of the printer. */
+    fun setPrinterStatus(printerId: String, status: String) {
+        val printer = state.value.printers.firstOrNull { it.id == printerId } ?: return
+        if (status !in DEVICE_STATUSES || status == printer.status) return
+        needsEdit {
+            val usable = status == "ACTIVE" || status == "PROVISIONING" || status == "MAINTENANCE"
+            val request = deviceRequest(deviceDraftOf(printer, true).copy(status = status, active = usable), null)
+            write(null) { restaurantId ->
+                val saved = repository.savePrinter(restaurantId, printerId, request)
+                mutable.update { state -> state.copy(printers = state.printers.map { if (it.id == saved.id) saved else it }) }
+            }
+        }
+    }
+
+    fun clearJustAdded() = mutable.update { it.copy(justAdded = null) }
+
+    /** Confirms a device that was set up: it works, so it's in use from now on. */
+    fun confirm(deviceId: String) {
+        val current = state.value
+        if (current.isPrinter(deviceId)) {
+            val printer = current.printers.firstOrNull { it.id == deviceId } ?: return
+            needsEdit {
+                val request = deviceRequest(deviceDraftOf(printer, true).copy(status = "ACTIVE", active = true), null)
+                write("${printer.name} is confirmed") { restaurantId ->
+                    val saved = repository.savePrinter(restaurantId, deviceId, request)
+                    mutable.update { state -> state.copy(printers = state.printers.map { if (it.id == saved.id) saved else it }) }
+                }
+            }
+            return
+        }
+        val device = current.devices.firstOrNull { it.id == deviceId } ?: return
+        val branchId = current.branchId ?: return
+        needsEdit {
+            write("${device.name} is confirmed") { restaurantId ->
+                val saved = repository.setStatus(restaurantId, branchId, deviceId, DeviceStatusRequestDto("ACTIVE", true, device.online))
                 mutable.update { state -> state.copy(devices = state.devices.map { if (it.id == saved.id) saved else it }) }
             }
         }

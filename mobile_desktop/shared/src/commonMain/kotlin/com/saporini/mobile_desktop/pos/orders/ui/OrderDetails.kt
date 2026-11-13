@@ -11,29 +11,33 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.saporini.mobile_desktop.pos.orders.domain.model.*
 
-@Composable internal fun OrderDetails(order: Order, state: OrdersUiState, onEdit: () -> Unit, onAction: (String) -> Unit, modifier: Modifier = Modifier, onFull: (() -> Unit)? = null) {
+@Composable internal fun OrderDetails(order: Order, state: OrdersUiState, onEdit: () -> Unit, onAction: (String) -> Unit, modifier: Modifier = Modifier, onFull: (() -> Unit)? = null, reopenForPayment: Boolean = false, reopenOrder: Boolean = false) {
     var activity by remember(order.id) { mutableStateOf(false) }
     var more by remember { mutableStateOf(false) }
     Column(modifier.padding(18.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             OrderText(order.orderNumber, 23, true, modifier = Modifier.weight(1f))
             Box {
-                TextButton({ more = true }) { Text("•••") }
+                if(!order.closedUnpaid) TextButton({ more = true }) { Text("•••") }
                 DropdownMenu(more, { more = false }) {
                     val actions = buildList {
-                        if(order.editable && state.can("ORDER_UPDATE")) { add("Edit information"); add("Order note"); add("Mark ready"); add("Mark fulfilled") }
+                        if(order.editable && state.can("ORDER_UPDATE")) { add("Edit information"); add("Order note"); add("Mark ready"); add("Mark as served") }
                         if(order.editable && state.can("ORDER_DISCOUNT_APPLY")) add("Apply discount")
                         if(order.editable && state.can("ORDER_TRANSFER")) { add("Move table"); add("Split order"); add("Merge orders") }
                         if(order.editable && state.can("ORDER_CANCEL")) add("Cancel order")
                         if(order.editable && state.can("ORDER_VOID")) add("Void order")
+                        if(order.canCloseUnpaid && state.can("ORDER_VOID")) add("Close as unpaid")
                         if(order.editable && state.can("ORDER_CLOSE")) add("Close order")
-                        if(order.status == OrderStatus.CLOSED && state.can("ORDER_REOPEN")) add("Reopen order")
+                        if(order.status == OrderStatus.CLOSED && reopenOrder) add("Reopen order")
                     }
                     actions.forEach { action -> DropdownMenuItem(text = { Text(action) }, enabled = !state.isSaving, onClick = { more = false; onAction(action) }) }
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OrderBadge(order.status.label()); if (order.status.showsFulfillmentProgress) OrderBadge(order.fulfillmentStatus.label()) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OrderBadge(if (order.closedUnpaid) "Unpaid" else order.status.label()); if (order.status.showsFulfillmentProgress) OrderBadge(order.fulfillmentStatus.label()); notSentNote(order.fulfillmentStatus, order.notSentItems)?.let { OrderText(it, 12, true, OrderNotSentColor) } }
+        if (order.unpaidAt != null) UnpaidStrip(order)
+        if (order.closedUnpaid && reopenForPayment) OrderButton("Reopen for payment", !state.isSaving && !state.needsReconciliation, Modifier.fillMaxWidth()) { onAction("Reopen for payment") }
+        if (order.unpaidAt != null && order.status == OrderStatus.OPEN && state.can("ORDER_CLOSE")) OrderButton("Pay", !state.isSaving && !state.needsReconciliation, Modifier.fillMaxWidth()) { onAction("Pay") }
         OrderText("${order.tableName ?: order.tableNumber?.let { "Table $it" } ?: order.orderType.label()} · ${order.guestCount ?: 1} guests")
         OrderText("Opened ${order.openedAt.orderTime()} · ${order.orderType.label()}", 12, color = OrderMuted)
         order.customerName?.let { Surface(color = OrderBackground, shape = RoundedCornerShape(10.dp)) { OrderText(it, bold = true, modifier = Modifier.fillMaxWidth().padding(14.dp)) } }

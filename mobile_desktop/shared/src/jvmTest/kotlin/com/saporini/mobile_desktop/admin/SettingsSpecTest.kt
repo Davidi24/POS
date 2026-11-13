@@ -118,7 +118,7 @@ class SettingsSpecTest {
         val withFees = values().set(G, "cardFeePercent", JsonPrimitive(1.5)).set(G, "cardFeeFixed", JsonPrimitive(0.25))
         assertNull(page.problem(withFees))
         assertEquals("The card fee must be between 0 and 20%.", page.problem(withFees.set(G, "cardFeePercent", JsonPrimitive(25))))
-        assertEquals("The fixed card fee must be between 0 and 10.", page.problem(withFees.set(G, "cardFeeFixed", JsonPrimitive(-1))))
+        assertEquals("The fixed card fee must be between 0 and 1,000,000.", page.problem(withFees.set(G, "cardFeeFixed", JsonPrimitive(-1))))
     }
 
     @Test

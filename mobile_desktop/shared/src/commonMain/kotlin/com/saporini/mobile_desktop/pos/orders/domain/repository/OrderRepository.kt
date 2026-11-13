@@ -156,6 +156,8 @@ interface OrderRepository {
         request: OrderActionInput = OrderActionInput()
     ): Order
 
+    suspend fun requestBill(restaurantId: String, orderId: String): Order = throw UnsupportedOperationException("Requesting the bill is not available here.")
+
     suspend fun fulfillOrder(
         restaurantId: String,
         orderId: String,
@@ -179,6 +181,13 @@ interface OrderRepository {
         orderId: String,
         request: OrderActionInput = OrderActionInput()
     ): Order
+
+    // Guests left without paying: the order is voided as unpaid, with the reason staff wrote.
+    suspend fun closeUnpaid(restaurantId: String, orderId: String, reason: String): Order =
+        throw UnsupportedOperationException("Closing as unpaid is not available here.")
+
+    suspend fun reopenForPayment(restaurantId: String, orderId: String): Order =
+        throw UnsupportedOperationException("Reopening for payment is not available here.")
 
     suspend fun voidOrder(
         restaurantId: String,

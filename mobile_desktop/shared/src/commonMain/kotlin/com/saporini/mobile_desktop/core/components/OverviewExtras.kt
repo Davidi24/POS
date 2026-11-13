@@ -173,6 +173,8 @@ internal fun FilterRow(
     color: Color,
     selected: Boolean = false,
     detail: String? = null,
+    // Something at the end of the line, after the count (Inventory → Items → Kinds puts a ⋮ there).
+    trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
     val lit = count == null || count > 0 || selected
@@ -206,6 +208,10 @@ internal fun FilterRow(
         if (selected) {
             Spacer(Modifier.width(7.dp))
             Icon(Icons.Filled.CheckCircle, "Selected", Modifier.size(17.dp), tint = color)
+        }
+        trailing?.let {
+            Spacer(Modifier.width(2.dp))
+            it()
         }
     }
 }

@@ -9,6 +9,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,9 +33,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarToday
@@ -46,8 +49,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -63,13 +64,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -78,9 +82,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Popup
-import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEvent
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEventNight
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEventNightInput
+import com.saporini.mobile_desktop.pos.menu.domain.model.SpecialMenuKind
 import kotlinx.coroutines.delay
 
 private val EditorOlive = Color(0xFF4F7942)
@@ -121,20 +129,43 @@ internal fun MenuEditorDialog(
     onSave: (
         name: String,
         description: String?,
-        active: Boolean,
+        shownInPos: Boolean,
         availableFrom: String?,
         availableUntil: String?,
         availableFromDate: String?,
         availableUntilDate: String?,
         color: String
     ) -> Unit,
-    // A special menu (occasion extras, an event night's menu); reported beside onSave.
-    onSpecialChange: (Boolean) -> Unit = {}
+    // A special menu (booking extras, or an event night's menu and its event); reported beside onSave.
+    onSpecialChange: (SpecialMenuChoice) -> Unit = {},
+    // The event nights an event menu can belong to.
+    eventNights: EventNightsState = EventNightsState.Loaded(emptyList()),
+    onReloadEventNights: () -> Unit = {},
+    // Adding and deleting events in the event picker (needs the settings permission).
+    canManageEvents: Boolean = false,
+    onCreateEventNight: suspend (MenuEventNightInput) -> Result<MenuEventNight> = {
+        Result.failure(IllegalStateException("Adding events isn't available here"))
+    },
+    onDeleteEventNight: suspend (MenuEventNight) -> Result<Unit> = {
+        Result.failure(IllegalStateException("Deleting events isn't available here"))
+    },
+    onUpdateEventNight: suspend (MenuEventNight, MenuEventNightInput) -> Result<MenuEventNight> = { _, _ ->
+        Result.failure(IllegalStateException("Changing events isn't available here"))
+    }
 ) {
     var name by remember(menu?.id) { mutableStateOf(menu?.name.orEmpty()) }
-    var special by remember(menu?.id) { mutableStateOf(menu?.special ?: false) }
+    var specialChoice by remember(menu?.id) {
+        mutableStateOf(
+            SpecialMenuChoice(
+                special = menu?.special ?: false,
+                kind = menu?.specialKind ?: SpecialMenuKind.BOOKING_EXTRAS,
+                eventId = menu?.event?.id
+            )
+        )
+    }
     var description by remember(menu?.id) { mutableStateOf(menu?.description.orEmpty()) }
-    var active by remember(menu?.id) { mutableStateOf(menu?.active ?: true) }
+    // "Show in POS" (to waiters and at the till). Menus have no Active switch any more; this is the one choice.
+    var active by remember(menu?.id) { mutableStateOf(menu?.shownToWaiters ?: true) }
     var availableAllDay by remember(menu?.id) {
         mutableStateOf(menu?.availableFrom.isNullOrBlank() || menu?.availableUntil.isNullOrBlank())
     }
@@ -164,6 +195,9 @@ internal fun MenuEditorDialog(
         )
     }
     var showDeleteConfirm by remember(menu?.id) { mutableStateOf(false) }
+    var eventPickerOpen by remember(menu?.id) { mutableStateOf(false) }
+    // The menu's own dates from before it became an event menu, given back if it stops being one.
+    var datesBeforeEvent by remember(menu?.id) { mutableStateOf<Triple<Boolean, String, String>?>(null) }
     val isUncategorized = menu?.code == "UNCATEGORIZED"
     var deleteItemsChecked by remember(menu?.id) { mutableStateOf(false) }
     val deleteContents = isUncategorized || deleteItemsChecked
@@ -178,19 +212,33 @@ internal fun MenuEditorDialog(
     val colorIsValid = isValidHexColor(selectedColor)
     val fromIsValid = availableAllDay || isValidTime(availableFrom)
     val untilIsValid = availableAllDay || isValidTime(availableUntil)
-    val fromDateIsValid = availableYearRound || isValidIsoDate(availableFromDate)
-    val untilDateIsValid = availableYearRound || isValidIsoDate(availableUntilDate)
-    val dateOrderIsValid = availableYearRound ||
+    // An event menu's days are its event's, so its own date fields don't count.
+    val isEventMenu = specialChoice.isEventMenu
+    val datesOwnedByUs = !availableYearRound && !isEventMenu
+    val fromDateIsValid = !datesOwnedByUs || isValidIsoDate(availableFromDate)
+    val untilDateIsValid = !datesOwnedByUs || isValidIsoDate(availableUntilDate)
+    val dateOrderIsValid = !datesOwnedByUs ||
         (fromDateIsValid && untilDateIsValid && availableFromDate <= availableUntilDate)
+    val eventMissing = isEventMenu && specialChoice.eventId == null
+    val chosenEvent = (eventNights as? EventNightsState.Loaded)?.events?.firstOrNull { it.id == specialChoice.eventId }
+        ?: menu?.event?.takeIf { it.id == specialChoice.eventId }?.let {
+            MenuEventNight(it.id, it.name, it.icon, it.startDate, it.endDate, menuId = menu.id, menuName = menu.name, active = it.active)
+        }
+    // The preview card shows the event's icon and days, like the real card.
+    val previewEvent = chosenEvent?.takeIf { specialChoice.isEventMenu }?.let {
+        MenuEvent(it.id, it.name, it.icon, it.startDate, it.endDate, it.active, it.specialMenuOnly)
+    }
     val requirementsMet = name.isNotBlank() &&
         colorIsValid &&
         fromIsValid &&
         untilIsValid &&
         fromDateIsValid &&
         untilDateIsValid &&
-        dateOrderIsValid
+        dateOrderIsValid &&
+        !eventMissing
     val canSave = requirementsMet && !isSaving
     val nameError = attemptedSubmit && name.isBlank()
+    val eventError = attemptedSubmit && eventMissing
     val showValidationMessage = toastVisible && attemptedSubmit && !requirementsMet
     val previewFrom = availableFrom.takeIf { !availableAllDay && isValidTime(it) }
     val previewUntil = availableUntil.takeIf { !availableAllDay && isValidTime(it) }
@@ -205,18 +253,60 @@ internal fun MenuEditorDialog(
         }
     }
 
+    // An event was chosen (or just added) in the picker: the menu takes the event's days, locked.
+    fun chooseEvent(event: MenuEventNight) {
+        if (!specialChoice.isEventMenu) {
+            datesBeforeEvent = Triple(availableYearRound, availableFromDate, availableUntilDate)
+        }
+        specialChoice = specialChoice.copy(special = true, kind = SpecialMenuKind.EVENT, eventId = event.id)
+        availableYearRound = false
+        availableFromDate = event.startDate
+        availableUntilDate = event.endDate
+        eventPickerOpen = false
+    }
+
+    // The chosen event's days changed (edited here): the locked dates follow.
+    fun eventChanged(updated: MenuEventNight) {
+        if (specialChoice.isEventMenu && specialChoice.eventId == updated.id) {
+            availableFromDate = updated.startDate
+            availableUntilDate = updated.endDate
+        }
+    }
+
+    fun changeSpecial(next: SpecialMenuChoice) {
+        val leavingEvent = specialChoice.isEventMenu && !next.isEventMenu
+        // Ticking "Special menu" again while it still remembers its event: back on the event's days.
+        val returningToEvent = !specialChoice.isEventMenu && next.isEventMenu
+        if (returningToEvent) {
+            val event = (eventNights as? EventNightsState.Loaded)?.events?.firstOrNull { it.id == next.eventId }
+            if (event != null) {
+                chooseEvent(event)
+                return
+            }
+        }
+        specialChoice = next
+        if (leavingEvent) {
+            // Back to the menu's own dates (all year when it never had its own).
+            val (yearRound, from, until) = datesBeforeEvent ?: Triple(true, "", "")
+            availableYearRound = yearRound
+            availableFromDate = from
+            availableUntilDate = until
+            datesBeforeEvent = null
+        }
+    }
+
     fun trySave() {
         if (requirementsMet) {
             attemptedSubmit = false
-            onSpecialChange(special)
+            onSpecialChange(specialChoice)
             onSave(
                 name.trim(),
                 description.trim().takeIf { it.isNotEmpty() },
                 active,
                 availableFrom.takeIf { !availableAllDay },
                 availableUntil.takeIf { !availableAllDay },
-                availableFromDate.takeIf { !availableYearRound },
-                availableUntilDate.takeIf { !availableYearRound },
+                availableFromDate.takeIf { datesOwnedByUs },
+                availableUntilDate.takeIf { datesOwnedByUs },
                 normalizeHexInput(selectedColor)
             )
         } else {
@@ -266,8 +356,11 @@ internal fun MenuEditorDialog(
                             onDescriptionChange = { description = it },
                             active = active,
                             onActiveChange = { active = it },
-                            special = special,
-                            onSpecialChange = { special = it },
+                            specialChoice = specialChoice,
+                            onSpecialChoiceChange = { changeSpecial(it) },
+                            onPickEvent = { eventPickerOpen = true },
+                            eventError = eventError,
+                            chosenEvent = chosenEvent,
                             availableAllDay = availableAllDay,
                             onAvailableAllDayChange = { availableAllDay = it },
                             availableFrom = availableFrom,
@@ -294,6 +387,7 @@ internal fun MenuEditorDialog(
                     },
                     visuals = {
                         PhoneMenuEditorVisuals(
+                            previewEvent = previewEvent,
                             name = name,
                             description = description,
                             active = active,
@@ -311,14 +405,14 @@ internal fun MenuEditorDialog(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color.Black.copy(alpha = 0.34f))
-                        .padding(24.dp),
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
                         modifier = Modifier
                             .widthIn(max = 1180.dp)
                             .fillMaxWidth(0.94f)
-                            .fillMaxHeight(0.9f)
+                            .fillMaxHeight(0.96f)
                             .shadow(24.dp, RoundedCornerShape(20.dp))
                             .clip(RoundedCornerShape(20.dp))
                             .background(Color.White)
@@ -387,8 +481,11 @@ internal fun MenuEditorDialog(
                                         onDescriptionChange = { description = it },
                                         active = active,
                                         onActiveChange = { active = it },
-                                        special = special,
-                                        onSpecialChange = { special = it },
+                                        specialChoice = specialChoice,
+                                        onSpecialChoiceChange = { changeSpecial(it) },
+                                        onPickEvent = { eventPickerOpen = true },
+                                        eventError = eventError,
+                                        chosenEvent = chosenEvent,
                                         availableAllDay = availableAllDay,
                                         onAvailableAllDayChange = { availableAllDay = it },
                                         availableFrom = availableFrom,
@@ -429,6 +526,7 @@ internal fun MenuEditorDialog(
                                     )
 
                                     MenuEditorVisuals(
+                                        previewEvent = previewEvent,
                                         name = name,
                                         description = description,
                                         active = active,
@@ -465,8 +563,11 @@ internal fun MenuEditorDialog(
                                         onDescriptionChange = { description = it },
                                         active = active,
                                         onActiveChange = { active = it },
-                                        special = special,
-                                        onSpecialChange = { special = it },
+                                        specialChoice = specialChoice,
+                                        onSpecialChoiceChange = { changeSpecial(it) },
+                                        onPickEvent = { eventPickerOpen = true },
+                                        eventError = eventError,
+                                        chosenEvent = chosenEvent,
                                         availableAllDay = availableAllDay,
                                         onAvailableAllDayChange = { availableAllDay = it },
                                         availableFrom = availableFrom,
@@ -493,6 +594,7 @@ internal fun MenuEditorDialog(
                                     HorizontalDivider(color = EditorBorder)
 
                                     MenuEditorVisuals(
+                                        previewEvent = previewEvent,
                                         name = name,
                                         description = description,
                                         active = active,
@@ -616,6 +718,26 @@ internal fun MenuEditorDialog(
                 }
             }
         }
+    }
+
+    if (eventPickerOpen) {
+        EventPickerDialog(
+            eventNights = eventNights,
+            selectedEventId = specialChoice.eventId,
+            menuId = menu?.id,
+            canManageEvents = canManageEvents,
+            onReload = onReloadEventNights,
+            onDismiss = { eventPickerOpen = false },
+            onPick = { chooseEvent(it) },
+            onCreateEvent = onCreateEventNight,
+            onUpdateEvent = onUpdateEventNight,
+            onEventUpdated = { eventChanged(it) },
+            onDeleteEvent = onDeleteEventNight,
+            // The menu's own event was deleted: it stays special but needs another event before saving.
+            onEventDeleted = { deleted ->
+                if (specialChoice.eventId == deleted.id) specialChoice = specialChoice.copy(eventId = null)
+            }
+        )
     }
 
     if (showDeleteConfirm) {
@@ -908,7 +1030,7 @@ private fun PhoneMenuEditorPage(
                 modifier = Modifier.size(44.dp)
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                    imageVector = Icons.AutoMirrored.Filled.Reply,
                     contentDescription = "Back to menus",
                     modifier = Modifier.size(24.dp),
                     tint = EditorInk
@@ -1034,6 +1156,7 @@ private fun PhoneMenuEditorPage(
 
 @Composable
 private fun PhoneMenuEditorVisuals(
+    previewEvent: MenuEvent? = null,
     name: String,
     description: String,
     active: Boolean,
@@ -1049,16 +1172,12 @@ private fun PhoneMenuEditorVisuals(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         EditorFieldLabel(text = "Menu color")
-        OutlinedTextField(
+        MenuEditorInput(
             value = selectedColor,
             onValueChange = onColorChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("#AEBE95") },
-            singleLine = true,
+            placeholder = "#AEBE95",
             enabled = !isSaving,
-            isError = !colorIsValid,
-            shape = RoundedCornerShape(9.dp),
-            colors = editorOutlinedTextFieldColors()
+            isError = !colorIsValid
         )
         if (!colorIsValid) {
             Text(
@@ -1114,11 +1233,12 @@ private fun PhoneMenuEditorVisuals(
             MenuCoverPreview(
                 name = name,
                 description = description,
-                active = active,
+                shownInPos = active,
                 availableFrom = availableFrom,
                 availableUntil = availableUntil,
                 color = selectedColor.takeIf { colorIsValid } ?: "#AEBE95",
-                modifier = Modifier.width(previewWidth).height(previewWidth * 1.3125f)
+                modifier = Modifier.width(previewWidth).height(previewWidth * 1.3125f),
+                event = previewEvent
             )
         }
     }
@@ -1157,8 +1277,11 @@ private fun MenuEditorFields(
     onDescriptionChange: (String) -> Unit,
     active: Boolean,
     onActiveChange: (Boolean) -> Unit,
-    special: Boolean = false,
-    onSpecialChange: ((Boolean) -> Unit)? = null,
+    specialChoice: SpecialMenuChoice = SpecialMenuChoice(),
+    onSpecialChoiceChange: ((SpecialMenuChoice) -> Unit)? = null,
+    onPickEvent: () -> Unit = {},
+    eventError: Boolean = false,
+    chosenEvent: MenuEventNight? = null,
     availableAllDay: Boolean,
     onAvailableAllDayChange: (Boolean) -> Unit,
     availableFrom: String,
@@ -1194,7 +1317,7 @@ private fun MenuEditorFields(
                 EditorFieldLabel(text = "Menu name", required = true, error = nameError)
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = if (active) "Active" else "Inactive",
+                    text = if (active) "Shown in POS" else "Hidden in POS",
                     fontFamily = Inter(),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
@@ -1212,16 +1335,12 @@ private fun MenuEditorFields(
                 )
             }
 
-            OutlinedTextField(
+            MenuEditorInput(
                 value = name,
                 onValueChange = onNameChange,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("For example: Dinner Menu") },
-                singleLine = true,
+                placeholder = "For example: Dinner Menu",
                 enabled = !isSaving,
-                isError = nameError,
-                shape = RoundedCornerShape(9.dp),
-                colors = editorOutlinedTextFieldColors()
+                isError = nameError
             )
             if (nameError) {
                 Text(
@@ -1233,23 +1352,29 @@ private fun MenuEditorFields(
             }
         }
 
-        if (onSpecialChange != null) {
-            AvailabilityCheckbox(
-                label = "Special menu (occasion extras or an event night)",
-                checked = special,
+        if (onSpecialChoiceChange != null) {
+            SpecialMenuFields(
+                choice = specialChoice,
+                onChoiceChange = onSpecialChoiceChange,
+                chosenEvent = chosenEvent,
+                onPickEvent = onPickEvent,
                 enabled = !isSaving,
-                onCheckedChange = onSpecialChange
+                eventError = eventError,
+                compact = stackFields
             )
         }
 
-        AvailabilityCheckbox(
-            label = "Available all year",
-            checked = availableYearRound,
-            enabled = !isSaving,
-            onCheckedChange = onAvailableYearRoundChange
-        )
+        // An event menu's days are the event's, shown read-only on its card above: no date fields here.
+        if (!specialChoice.isEventMenu) {
+            AvailabilityCheckbox(
+                label = "Available all year",
+                checked = availableYearRound,
+                enabled = !isSaving,
+                onCheckedChange = onAvailableYearRoundChange
+            )
+        }
 
-        if (!stackFields || !availableYearRound) {
+        if (!specialChoice.isEventMenu && (!stackFields || !availableYearRound)) {
             MenuEditorFieldPair(
                 stackFields = stackFields,
                 first = { fieldModifier ->
@@ -1262,8 +1387,7 @@ private fun MenuEditorFields(
                             onValueChange = onAvailableFromDateChange,
                             enabled = !availableYearRound && !isSaving,
                             isError = !fromDateIsValid || !dateOrderIsValid,
-                            calendarOnly = stackFields,
-                            colors = editorOutlinedTextFieldColors()
+                            calendarOnly = stackFields
                         )
                     }
                 },
@@ -1278,15 +1402,14 @@ private fun MenuEditorFields(
                             enabled = !availableYearRound && !isSaving,
                             isError = !untilDateIsValid || !dateOrderIsValid,
                             calendarOnly = stackFields,
-                            minimumDate = availableFromDate,
-                            colors = editorOutlinedTextFieldColors()
+                            minimumDate = availableFromDate
                         )
                     }
                 }
             )
         }
 
-        if (!availableYearRound && (!fromDateIsValid || !untilDateIsValid || !dateOrderIsValid)) {
+        if (!specialChoice.isEventMenu && !availableYearRound && (!fromDateIsValid || !untilDateIsValid || !dateOrderIsValid)) {
             Text(
                 text = "Use YYYY-MM-DD and make sure the end date is not before the start date.",
                 fontFamily = Inter(),
@@ -1309,19 +1432,13 @@ private fun MenuEditorFields(
                     Column(modifier = fieldModifier) {
                         EditorFieldLabel(text = "Available from")
                         Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
+                        MenuEditorInput(
                             value = availableFrom,
                             onValueChange = onAvailableFromChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("17:00") },
-                            singleLine = true,
+                            placeholder = "17:00",
                             enabled = !availableAllDay && !isSaving,
                             isError = !fromIsValid,
-                            trailingIcon = {
-                                Icon(Icons.Outlined.AccessTime, contentDescription = null)
-                            },
-                            shape = RoundedCornerShape(9.dp),
-                            colors = editorOutlinedTextFieldColors()
+                            trailingIcon = Icons.Outlined.AccessTime
                         )
                     }
                 },
@@ -1329,19 +1446,13 @@ private fun MenuEditorFields(
                     Column(modifier = fieldModifier) {
                         EditorFieldLabel(text = "Available until")
                         Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(
+                        MenuEditorInput(
                             value = availableUntil,
                             onValueChange = onAvailableUntilChange,
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("23:00") },
-                            singleLine = true,
+                            placeholder = "23:00",
                             enabled = !availableAllDay && !isSaving,
                             isError = !untilIsValid,
-                            trailingIcon = {
-                                Icon(Icons.Outlined.AccessTime, contentDescription = null)
-                            },
-                            shape = RoundedCornerShape(9.dp),
-                            colors = editorOutlinedTextFieldColors()
+                            trailingIcon = Icons.Outlined.AccessTime
                         )
                     }
                 }
@@ -1358,16 +1469,14 @@ private fun MenuEditorFields(
         }
 
         EditorFieldLabel(text = "Notes")
-        OutlinedTextField(
+        MenuEditorInput(
             value = description,
             onValueChange = onDescriptionChange,
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Add any notes about when or how this menu is used") },
-            minLines = 4,
+            placeholder = "Add any notes about when or how this menu is used",
+            singleLine = false,
+            minLines = 3,
             maxLines = 6,
-            enabled = !isSaving,
-            shape = RoundedCornerShape(9.dp),
-            colors = editorOutlinedTextFieldColors()
+            enabled = !isSaving
         )
 
         errorMessage?.let { message ->
@@ -1435,6 +1544,7 @@ private fun AvailabilityCheckbox(
 
 @Composable
 private fun MenuEditorVisuals(
+    previewEvent: MenuEvent? = null,
     name: String,
     description: String,
     active: Boolean,
@@ -1462,13 +1572,14 @@ private fun MenuEditorVisuals(
             MenuCoverPreview(
                 name = name,
                 description = description,
-                active = active,
+                shownInPos = active,
                 availableFrom = availableFrom,
                 availableUntil = availableUntil,
                 color = selectedColor.takeIf { colorIsValid } ?: "#AEBE95",
                 modifier = Modifier
                     .width(240.dp)
-                    .height(315.dp)
+                    .height(315.dp),
+                event = previewEvent
             )
         }
 
@@ -1485,16 +1596,13 @@ private fun MenuEditorVisuals(
                 fontSize = 14.sp,
                 color = EditorInk
             )
-            OutlinedTextField(
+            MenuEditorInput(
                 value = selectedColor,
                 onValueChange = onColorChange,
-                modifier = Modifier.width(132.dp),
-                placeholder = { Text("#AEBE95") },
-                singleLine = true,
+                placeholder = "#AEBE95",
+                modifier = Modifier.width(120.dp),
                 enabled = !isSaving,
-                isError = !colorIsValid,
-                shape = RoundedCornerShape(9.dp),
-                colors = editorOutlinedTextFieldColors()
+                isError = !colorIsValid
             )
         }
 
@@ -1584,13 +1692,84 @@ private fun EditorFieldLabel(
     }
 }
 
+/** Compact field in the Reservations form style: 46 dp tall, 13 sp text, light border, green when focused. */
 @Composable
-private fun editorOutlinedTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = Color.Black,
-    unfocusedBorderColor = Color.Black,
-    disabledBorderColor = Color.Black.copy(alpha = 0.45f),
-    errorBorderColor = Color(0xFFB13A2F)
-)
+internal fun MenuEditorInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    isError: Boolean = false,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    trailingIcon: ImageVector? = null,
+    trailingIconLabel: String? = null,
+    onTrailingIconClick: (() -> Unit)? = null
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val borderColor = when {
+        isError -> Color(0xFFB13A2F)
+        focused && !readOnly -> EditorOlive
+        else -> EditorBorder
+    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (singleLine) Modifier.height(46.dp) else Modifier.heightIn(min = (20 * minLines + 24).dp))
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (enabled) Color.White else EditorSurface)
+            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .padding(start = 12.dp, end = if (trailingIcon != null) 6.dp else 12.dp, top = if (singleLine) 0.dp else 12.dp, bottom = if (singleLine) 0.dp else 12.dp),
+        verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = { raw -> onValueChange(if (singleLine) raw.replace(Regex("[\\r\\n\\t]+"), " ") else raw) },
+            modifier = Modifier.weight(1f),
+            enabled = enabled,
+            readOnly = readOnly,
+            singleLine = singleLine,
+            minLines = if (singleLine) 1 else minLines,
+            maxLines = maxLines,
+            interactionSource = interaction,
+            cursorBrush = SolidColor(EditorOlive),
+            textStyle = TextStyle(
+                fontFamily = Inter(),
+                fontWeight = FontWeight.Medium,
+                fontSize = 13.sp,
+                lineHeight = 20.sp,
+                color = if (enabled) EditorInk else EditorMuted
+            ),
+            decorationBox = { inner ->
+                Box {
+                    if (value.isEmpty()) {
+                        Text(placeholder, fontFamily = Inter(), fontSize = 13.sp, lineHeight = 20.sp, color = Color(0xFF9A9B97), maxLines = if (singleLine) 1 else Int.MAX_VALUE)
+                    }
+                    inner()
+                }
+            }
+        )
+        trailingIcon?.let { icon ->
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .then(
+                        if (onTrailingIconClick != null) {
+                            Modifier.clickable(enabled = enabled, onClickLabel = trailingIconLabel, onClick = onTrailingIconClick)
+                        } else Modifier
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, trailingIconLabel, Modifier.size(18.dp), tint = if (enabled) EditorInk else EditorMuted)
+            }
+        }
+    }
+}
 
 private fun displayTime(value: String?): String? {
     if (value.isNullOrBlank()) return null

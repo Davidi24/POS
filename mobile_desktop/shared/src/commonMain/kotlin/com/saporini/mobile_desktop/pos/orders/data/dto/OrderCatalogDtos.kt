@@ -27,8 +27,12 @@ data class OrderCatalogMenuDto(
     val restaurant: OrderCatalogRestaurantDto? = null,
     val availableFrom: String? = null, val availableUntil: String? = null,
     val availableFromDate: String? = null, val availableUntilDate: String? = null,
-    val sections: List<OrderCatalogSectionDto>? = null
+    val sections: List<OrderCatalogSectionDto>? = null,
+    // A special menu's event night (its icon shows next to the menu's name).
+    val event: OrderCatalogEventDto? = null
 )
+@Serializable
+data class OrderCatalogEventDto(val name: String = "", val icon: String = "")
 @Serializable
 data class OrderCatalogSectionDto(
     val id: String, val name: String, val active: Boolean,

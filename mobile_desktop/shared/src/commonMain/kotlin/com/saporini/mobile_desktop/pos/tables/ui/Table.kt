@@ -1,8 +1,23 @@
 package com.saporini.mobile_desktop.pos.tables.ui
 
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,7 +63,10 @@ enum class TableVisualState {
     Reserved,
     // A booking's hold is running out: "Hold ends in N min".
     HoldEnding,
+    Ordered,
     BillPending,
+    // The guests have paid and are waiting to leave (user, 2026-11-01).
+    Paid,
     Unavailable
 }
 
@@ -70,31 +88,108 @@ fun Table(
     statusText: String? = null,
     servedItems: Int = 0,
     totalItems: Int = 0,
-    scale: Float = 1f
+    scale: Float = 1f,
+    nextBookingClash: Boolean = false,
+    // A free table whose booking is coming: a yellow ring, so nobody seats walk-ins there (user, 2026-11-01).
+    bookingComing: Boolean = false,
+    // The guests at it (user, 2026-11-01): chairs nobody sits on are green, and more guests than seats get extra chairs.
+    guests: Int? = null
 ) {
     val servedProgress = if (totalItems > 0) {
         servedItems.coerceIn(0, totalItems).toFloat() / totalItems
     } else 0f
-    when (shape) {
-        TableShape.Circle -> CircleTable(
-            seatCount = seatCount,
-            label = label,
-            state = state,
-            servedProgress = servedProgress,
-            modifier = modifier,
-            scale = scale
-        )
+    val seated = guests != null && guests > 0 && state in SeatedStates
+    val chairs = if (seated) maxOf(seatCount, guests!!) else seatCount
+    val takenChairs = if (seated) guests!! else chairs
+    // An occupied table's ring only means more guests are coming.
+    val ringAllowed = state != TableVisualState.Occupied || totalItems > 0
+    val body: @Composable (TableVisualState, Color?, Modifier, Boolean, Boolean) -> Unit = { bodyState, forcedColor, bodyModifier, showRing, showChairs ->
+        when (shape) {
+            TableShape.Circle -> CircleTable(
+                seatCount = seatCount,
+                label = label,
+                state = bodyState,
+                servedProgress = servedProgress,
+                modifier = bodyModifier,
+                scale = scale,
+                showRing = showRing && ringAllowed,
+                forcedColor = forcedColor,
+                chairs = if (showChairs) chairs else 0,
+                takenChairs = takenChairs
+            )
 
-        TableShape.Square -> SquareTable(
-            seatCount = seatCount,
-            label = label,
-            state = state,
-            orderLabel = orderLabel,
-            statusText = statusText,
-            servedProgress = servedProgress,
-            modifier = modifier,
-            scale = scale
-        )
+            TableShape.Square -> SquareTable(
+                seatCount = seatCount,
+                label = label,
+                state = bodyState,
+                orderLabel = orderLabel,
+                statusText = statusText,
+                servedProgress = servedProgress,
+                modifier = bodyModifier,
+                scale = scale,
+                showRing = showRing && ringAllowed,
+                forcedColor = forcedColor,
+                chairs = if (showChairs) chairs else 0,
+                takenChairs = takenChairs
+            )
+        }
+    }
+    if (!nextBookingClash) {
+        if (bookingComing && state == TableVisualState.Free) {
+            Box(modifier) {
+                body(state, null, Modifier, true, true)
+                TableRingOf(shape, seatCount, TableVisualState.HoldEnding, 1f, scale)
+            }
+            return
+        }
+        body(state, null, modifier, true, true)
+        return
+    }
+    // Guests still here and the next booking is due (user, 2026-11-01): half the colour it has now, half the booking's
+    // purple (a stronger one, so it stands apart from Ordered's blue), and the whole table pulses. Its ring stays whole on top.
+    val pulse by rememberInfiniteTransition(label = "next-booking").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(750), RepeatMode.Reverse),
+        label = "next-booking-pulse"
+    )
+    Box(
+        modifier.graphicsLayer {
+            scaleX = 1f + 0.05f * pulse
+            scaleY = 1f + 0.05f * pulse
+            alpha = 1f - 0.35f * pulse
+        }
+    ) {
+        // The chairs keep the table's own colours: only the table itself is half purple (user, 2026-11-01).
+        body(state, null, Modifier, false, true)
+        body(TableVisualState.Reserved, TableNextBookingPurple, Modifier.drawWithContent { clipRect(left = size.width / 2) { this@drawWithContent.drawContent() } }, false, false)
+        if (ringAllowed) TableRingOf(shape, seatCount, state, servedProgress, scale)
+    }
+}
+
+private val SeatedStates = setOf(TableVisualState.Occupied, TableVisualState.Ordered, TableVisualState.BillPending, TableVisualState.Paid)
+
+// A chair nobody sits on: the free table's green.
+private fun chairColor(index: Int, takenChairs: Int, colors: TableColors): Color =
+    if (index < takenChairs) colors.surface else tableStatusColor(TableVisualState.Free)
+
+// Just outside the table's edge, in the room before the chairs.
+@Composable
+private fun BoxScope.TableRingOf(shape: TableShape, seatCount: Int, state: TableVisualState, servedProgress: Float, scale: Float) {
+    val ring = tableRing(state, servedProgress) ?: return
+    val width = (TableRingWidth * scale).coerceAtLeast(TableRingMinWidth)
+    when (shape) {
+        TableShape.Circle -> Canvas(Modifier.align(Alignment.Center).size(86.dp * scale + (2.dp * scale + width) * 2)) {
+            drawCircleRing(ring, width.toPx())
+        }
+        TableShape.Square -> {
+            val bodyWidth = (if (seatCount > 4) 248.dp else 128.dp) * scale
+            val bodyHeight = (if (seatCount > 4) 112.dp else 128.dp) * scale
+            val gap = 3.dp * scale
+            Canvas(Modifier.align(Alignment.Center).size(bodyWidth + (gap + width) * 2, bodyHeight + (gap + width) * 2)) {
+                drawSquareRing(ring, (14.dp * scale + gap + width).toPx(), width.toPx())
+            }
+        }
     }
 }
 
@@ -105,12 +200,19 @@ internal fun tableStatusColor(state: TableVisualState): Color = when (state) {
     TableVisualState.Occupied -> Color(0xFFD15F00)
     TableVisualState.Reserved -> Color(0xFF8B5CF6)
     TableVisualState.HoldEnding -> Color(0xFFEAB308)
-    TableVisualState.BillPending -> Color(0xFF3B82F6)
+    TableVisualState.Ordered -> Color(0xFF3B82F6)
+    // A deep crimson, so it never reads as Occupied's orange (user, 2026-11-01).
+    TableVisualState.BillPending -> Color(0xFFBE123C)
+    // A lighter green than Free: done, about to be free.
+    TableVisualState.Paid -> Color(0xFF5FB86A)
     TableVisualState.Unavailable -> Color(0xFF6B7280)
 }
 
-private fun tableColors(state: TableVisualState, servedProgress: Float = 0f): TableColors {
-    val color = tableStatusColor(state)
+internal val TableNextBookingPurple = Color(0xFF6D28D9)
+
+private fun tableColors(state: TableVisualState, servedProgress: Float = 0f, forcedColor: Color? = null): TableColors {
+    // A booking running out is still a reserved table; its yellow is the ring around it.
+    val color = forcedColor ?: tableStatusColor(if (state == TableVisualState.HoldEnding) TableVisualState.Reserved else state)
     return TableColors(
         surface = color,
         border = color,
@@ -128,15 +230,22 @@ private fun SquareTable(
     statusText: String?,
     servedProgress: Float,
     modifier: Modifier = Modifier,
-    scale: Float = 1f
+    scale: Float = 1f,
+    showRing: Boolean = true,
+    forcedColor: Color? = null,
+    chairs: Int = seatCount,
+    takenChairs: Int = chairs
 ) {
     val showDetails = state != TableVisualState.Free && (orderLabel != null || statusText != null)
-    val colors = tableColors(state, servedProgress)
+    val colors = tableColors(state, servedProgress, forcedColor)
     val bodyWidth = (if (seatCount > 4) 248.dp else 128.dp) * scale
     val bodyHeight = (if (seatCount > 4) 112.dp else 128.dp) * scale
     val totalWidth = bodyWidth + 48.dp * scale
     val totalHeight = bodyHeight + 40.dp * scale
-    val distribution = squareSeatDistribution(seatCount)
+    val distribution = if (chairs <= 0) SquareSeatDistribution()
+        else squareSeatDistribution(seatCount).withExtraChairs(chairs - seatCount, sideRoom = if (seatCount > 4) 1 else 2)
+    // Clockwise from the top: top row, right side, bottom row, left side.
+    val colorOf: (Int) -> Color = { chairColor(it, takenChairs, colors) }
 
     Box(
         modifier = modifier
@@ -145,8 +254,8 @@ private fun SquareTable(
     ) {
         SeatRow(
             count = distribution.top,
-            seatColor = colors.surface,
-            seatBorder = colors.border,
+            firstIndex = 0,
+            colorOf = colorOf,
             scale = scale,
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -155,8 +264,8 @@ private fun SquareTable(
 
         SeatRow(
             count = distribution.bottom,
-            seatColor = colors.surface,
-            seatBorder = colors.border,
+            firstIndex = distribution.top + distribution.right,
+            colorOf = colorOf,
             scale = scale,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -165,16 +274,16 @@ private fun SquareTable(
 
         SeatColumn(
             count = distribution.left,
-            seatColor = colors.surface,
-            seatBorder = colors.border,
+            firstIndex = distribution.top + distribution.right + distribution.bottom,
+            colorOf = colorOf,
             scale = scale,
             modifier = Modifier.align(Alignment.CenterStart)
         )
 
         SeatColumn(
             count = distribution.right,
-            seatColor = colors.surface,
-            seatBorder = colors.border,
+            firstIndex = distribution.top,
+            colorOf = colorOf,
             scale = scale,
             modifier = Modifier.align(Alignment.CenterEnd)
         )
@@ -187,7 +296,7 @@ private fun SquareTable(
                 .clip(RoundedCornerShape(14.dp * scale))
                 .background(colors.surface)
                 .border(
-                    width = 1.dp,
+                    width = tableLine(scale),
                     color = colors.border,
                     shape = RoundedCornerShape(14.dp * scale)
                 ),
@@ -201,7 +310,7 @@ private fun SquareTable(
                         .size(34.dp * scale)
                         .clip(CircleShape)
                         .background(colors.labelBackground)
-                        .border(1.dp, colors.border, CircleShape),
+                        .border(tableLine(scale), colors.border, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -272,17 +381,8 @@ private fun SquareTable(
                     )
                 }
             }
-            if (state == TableVisualState.Occupied && seatCount > 4) {
-                ServedProgressLine(
-                    progress = servedProgress,
-                    scale = scale,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 8.dp * scale)
-                        .width(bodyWidth * 0.72f)
-                )
-            }
         }
+        if (showRing) TableRingOf(TableShape.Square, seatCount, state, servedProgress, scale)
     }
 }
 
@@ -293,9 +393,13 @@ private fun CircleTable(
     state: TableVisualState,
     servedProgress: Float,
     modifier: Modifier = Modifier,
-    scale: Float = 1f
+    scale: Float = 1f,
+    showRing: Boolean = true,
+    forcedColor: Color? = null,
+    chairs: Int = seatCount,
+    takenChairs: Int = chairs
 ) {
-    val colors = tableColors(state, servedProgress)
+    val colors = tableColors(state, servedProgress, forcedColor)
     val totalSize = 156.dp * scale
     val tableSize = 86.dp * scale
     val chairWidth = 34.dp * scale
@@ -306,16 +410,16 @@ private fun CircleTable(
     Box(
         modifier = modifier.size(totalSize)
     ) {
-        repeat(seatCount.coerceAtLeast(0)) { index ->
-            val angle = (-PI / 2.0) + (2.0 * PI * index / seatCount.coerceAtLeast(1))
+        repeat(chairs.coerceAtLeast(0)) { index ->
+            val angle = (-PI / 2.0) + (2.0 * PI * index / chairs.coerceAtLeast(1))
             val x = center + radius * cos(angle).toFloat() - chairWidth / 2
             val y = center + radius * sin(angle).toFloat() - chairHeight / 2
 
             Seat(
                 width = chairWidth,
                 height = chairHeight,
-                color = colors.surface,
-                borderColor = colors.border,
+                color = chairColor(index, takenChairs, colors),
+                borderColor = chairColor(index, takenChairs, colors),
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .offset(x = x, y = y)
@@ -330,7 +434,7 @@ private fun CircleTable(
                 .clip(CircleShape)
                 .background(colors.surface)
                 .border(
-                    width = 1.dp,
+                    width = tableLine(scale),
                     color = colors.border,
                     shape = CircleShape
                 ),
@@ -341,7 +445,7 @@ private fun CircleTable(
                     .size(44.dp * scale)
                     .clip(CircleShape)
                     .background(colors.labelBackground)
-                    .border(1.dp, colors.border, CircleShape),
+                    .border(tableLine(scale), colors.border, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -355,53 +459,75 @@ private fun CircleTable(
             }
         }
 
-        if (state == TableVisualState.Occupied) {
-            Canvas(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(tableSize)
-            ) {
-                drawArc(
-                    color = Color(0xFF6F43B5),
-                    startAngle = -90f,
-                    sweepAngle = 360f * servedProgress.coerceIn(0f, 1f),
-                    useCenter = false,
-                    style = Stroke(
-                        width = 6.dp.toPx() * scale,
-                        cap = StrokeCap.Round
-                    )
-                )
-            }
-        }
+        if (showRing) TableRingOf(TableShape.Circle, seatCount, state, servedProgress, scale)
     }
 }
 
-@Composable
-private fun ServedProgressLine(
-    progress: Float,
-    scale: Float,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .height(5.dp * scale)
-            .clip(RoundedCornerShape(50))
-            .background(Color.White.copy(alpha = 0.48f))
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(progress.coerceIn(0f, 1f))
-                .height(5.dp * scale)
-                .background(Color(0xFF5F35A4), RoundedCornerShape(50))
-        )
+// The ring around a table (user, 2026-10-31): a stronger blue fills as the order is served, a stronger purple as the
+// booking's guests come, and yellow all round in the last minutes before a late booking goes.
+internal data class TableRing(val color: Color, val progress: Float, val track: Color?)
+
+internal val TableRingServed = Color(0xFF1E3A8A)
+internal val TableRingEnding = Color(0xFFFACC15)
+// Seated with more guests still to come: how many are here of all who'll be.
+internal val TableRingComing = Color(0xFF9A3412)
+private val TableRingWidth = 5.dp
+// Thin enough to stay in the room before the chairs on a phone's small tables (user, 2026-11-01).
+private val TableRingMinWidth = 1.dp
+
+// A table's own outlines: a full line down to half size, then thinner with the table, so small tables never look heavy.
+private fun tableLine(scale: Float): Dp = if (scale >= 0.5f) 1.dp else 2.dp * scale
+
+internal fun tableRing(state: TableVisualState, progress: Float): TableRing? = when (state) {
+    TableVisualState.Ordered -> TableRing(TableRingServed, progress, TableRingServed.copy(alpha = 0.16f))
+    TableVisualState.HoldEnding -> TableRing(TableRingEnding, 1f, null)
+    TableVisualState.Occupied -> TableRing(TableRingComing, progress, TableRingComing.copy(alpha = 0.16f))
+    else -> null
+}
+
+internal fun DrawScope.drawCircleRing(ring: TableRing, width: Float) {
+    val topLeft = Offset(width / 2, width / 2)
+    val arcSize = Size(size.width - width, size.height - width)
+    ring.track?.let { drawArc(it, 0f, 360f, false, topLeft, arcSize, style = Stroke(width)) }
+    if (ring.progress > 0f) {
+        drawArc(ring.color, -90f, 360f * ring.progress.coerceIn(0f, 1f), false, topLeft, arcSize, style = Stroke(width, cap = StrokeCap.Round))
+    }
+}
+
+// The same ring along a rectangular table's edge, starting at the middle of its top side.
+private fun DrawScope.drawSquareRing(ring: TableRing, corner: Float, width: Float) {
+    val inset = width / 2
+    val radius = (corner - inset).coerceAtLeast(0f)
+    val left = inset
+    val top = inset
+    val right = size.width - inset
+    val bottom = size.height - inset
+    val outline = Path().apply {
+        moveTo(size.width / 2, top)
+        lineTo(right - radius, top)
+        arcTo(Rect(right - 2 * radius, top, right, top + 2 * radius), -90f, 90f, false)
+        lineTo(right, bottom - radius)
+        arcTo(Rect(right - 2 * radius, bottom - 2 * radius, right, bottom), 0f, 90f, false)
+        lineTo(left + radius, bottom)
+        arcTo(Rect(left, bottom - 2 * radius, left + 2 * radius, bottom), 90f, 90f, false)
+        lineTo(left, top + radius)
+        arcTo(Rect(left, top, left + 2 * radius, top + 2 * radius), 180f, 90f, false)
+        close()
+    }
+    ring.track?.let { drawPath(outline, it, style = Stroke(width)) }
+    if (ring.progress > 0f) {
+        val measure = PathMeasure().apply { setPath(outline, false) }
+        val filled = Path()
+        measure.getSegment(0f, measure.length * ring.progress.coerceIn(0f, 1f), filled, true)
+        drawPath(filled, ring.color, style = Stroke(width, cap = StrokeCap.Round))
     }
 }
 
 @Composable
 private fun SeatRow(
     count: Int,
-    seatColor: Color,
-    seatBorder: Color,
+    firstIndex: Int,
+    colorOf: (Int) -> Color,
     scale: Float = 1f,
     modifier: Modifier = Modifier
 ) {
@@ -413,8 +539,8 @@ private fun SeatRow(
             Seat(
                 width = 56.dp * scale,
                 height = 13.dp * scale,
-                color = seatColor,
-                borderColor = seatBorder
+                color = colorOf(firstIndex + it),
+                borderColor = colorOf(firstIndex + it)
             )
         }
     }
@@ -423,8 +549,8 @@ private fun SeatRow(
 @Composable
 private fun SeatColumn(
     count: Int,
-    seatColor: Color,
-    seatBorder: Color,
+    firstIndex: Int,
+    colorOf: (Int) -> Color,
     scale: Float = 1f,
     modifier: Modifier = Modifier
 ) {
@@ -436,8 +562,8 @@ private fun SeatColumn(
             Seat(
                 width = 13.dp * scale,
                 height = 56.dp * scale,
-                color = seatColor,
-                borderColor = seatBorder
+                color = colorOf(firstIndex + it),
+                borderColor = colorOf(firstIndex + it)
             )
         }
     }
@@ -477,6 +603,20 @@ private fun squareSeatDistribution(seatCount: Int): SquareSeatDistribution {
         left = 1,
         right = if (sideSeats == 2) 1 else 0
     )
+}
+
+// Chairs for guests beyond the seats: on the sides while there's room, then on the long sides.
+private fun SquareSeatDistribution.withExtraChairs(extra: Int, sideRoom: Int): SquareSeatDistribution {
+    var result = this
+    repeat(extra.coerceAtLeast(0)) { index ->
+        result = when {
+            result.right < sideRoom -> result.copy(right = result.right + 1)
+            result.left < sideRoom -> result.copy(left = result.left + 1)
+            index % 2 == 0 -> result.copy(top = result.top + 1)
+            else -> result.copy(bottom = result.bottom + 1)
+        }
+    }
+    return result
 }
 
 private data class SquareSeatDistribution(

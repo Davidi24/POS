@@ -21,8 +21,16 @@ datastore = "1.1.1"
 tink = "1.15.0"
 composeHotReload = "1.2.0-rc01"
 koin = "4.0.0"
+zxing = "3.5.3"
+openpnp-capture = "0.0.28-0"
+camerax = "1.4.2"
 
 [libraries]
+zxing-core                          = { module = "com.google.zxing:core",                                             version.ref = "zxing" }
+openpnp-capture                     = { module = "org.openpnp:openpnp-capture-java",                                  version.ref = "openpnp-capture" }
+androidx-camera-camera2             = { module = "androidx.camera:camera-camera2",                                    version.ref = "camerax" }
+androidx-camera-lifecycle           = { module = "androidx.camera:camera-lifecycle",                                  version.ref = "camerax" }
+androidx-camera-view                = { module = "androidx.camera:camera-view",                                       version.ref = "camerax" }
 kotlin-test                         = { module = "org.jetbrains.kotlin:kotlin-test",                                  version.ref = "kotlin" }
 kotlin-testJunit                    = { module = "org.jetbrains.kotlin:kotlin-test-junit",                            version.ref = "kotlin" }
 junit                               = { module = "junit:junit",                                                       version.ref = "junit" }

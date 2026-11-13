@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
@@ -50,12 +51,6 @@ private val BottomBarInk = Color(0xFF202426)
 private val BottomBarMuted = Color(0xFF202426)
 private val BottomBarDivider = Color(0xFFE8EBE5)
 
-private val PrimaryPhoneSections = listOf(
-    PosSection.TABLES,
-    PosSection.ORDERS,
-    PosSection.RESERVATIONS,
-    PosSection.MENU
-)
 
 @Composable
 fun PosBottomBar(
@@ -64,52 +59,8 @@ fun PosBottomBar(
     onLogout: () -> Unit,
     onBackToWorkspaces: (() -> Unit)? = null
 ) {
-    WorkspaceBottomBar(
-        moreSelected = selected in OverflowSections,
-        onLogout = onLogout,
-        onBackToWorkspaces = onBackToWorkspaces,
-        moreItems = { closeMenu ->
-            OverflowSections.forEach { section ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = section.label,
-                            fontFamily = Inter(),
-                            fontWeight = if (selected == section) {
-                                FontWeight.SemiBold
-                            } else {
-                                FontWeight.Medium
-                            },
-                            fontSize = 14.sp,
-                            color = if (selected == section) BottomBarActive else BottomBarInk
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = section.icon(),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = if (selected == section) BottomBarActive else BottomBarMuted
-                        )
-                    },
-                    onClick = {
-                        closeMenu()
-                        onSelect(section)
-                    }
-                )
-            }
-        }
-    ) {
-        PrimaryPhoneSections.forEach { section ->
-            PhoneNavItem(
-                modifier = Modifier.weight(1f),
-                label = section.label,
-                icon = if (selected == section) section.filledPhoneIcon() else section.icon(),
-                selected = selected == section,
-                onClick = { onSelect(section) }
-            )
-        }
-    }
+    // Tables, Orders, Reservations and Menu; More holds Kitchen Status, Shift, My Sales and History.
+    WorkspaceNavBottomBar(posNavEntries(), selected, onSelect, onLogout, onBackToWorkspaces)
 }
 
 // Phone bottom bar frame shared by the POS and KDS workspaces: the workspace's own tabs, then a More
@@ -117,6 +68,10 @@ fun PosBottomBar(
 @Composable
 internal fun WorkspaceBottomBar(
     moreSelected: Boolean,
+    // The More button with its menu; off when everything is in the bar and the top bar has back and sign out.
+    withMore: Boolean = true,
+    // 56 for a lower bar (Inventory on a phone, user 2026-10-30: "the nav bar looks so big").
+    barHeight: Dp = 68.dp,
     onLogout: () -> Unit,
     onBackToWorkspaces: (() -> Unit)?,
     moreItems: @Composable (closeMenu: () -> Unit) -> Unit = {},
@@ -127,13 +82,13 @@ internal fun WorkspaceBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(68.dp)
+            .height(barHeight)
     ) {
         Surface(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(68.dp),
+                .height(barHeight),
             color = Color.White,
             shadowElevation = 0.dp,
             tonalElevation = 0.dp
@@ -151,13 +106,13 @@ internal fun WorkspaceBottomBar(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(68.dp),
+                .height(barHeight),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             navItems()
 
-            Box(
+            if (withMore) Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
@@ -165,6 +120,7 @@ internal fun WorkspaceBottomBar(
             ) {
                 PhoneNavItem(
                     modifier = Modifier.fillMaxWidth(),
+                    height = barHeight,
                     label = "More",
                     icon = if (moreSelected) Icons.Filled.MoreHoriz else Icons.Outlined.MoreHoriz,
                     selected = moreSelected,
@@ -231,8 +187,10 @@ internal fun PhoneNavItem(
     label: String,
     icon: ImageVector,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    height: Dp = 68.dp
 ) {
+    val low = height < 68.dp
     val contentColor by animateColorAsState(
         targetValue = if (selected) BottomBarActive else BottomBarMuted,
         label = "bottom-nav-content-$label"
@@ -240,7 +198,7 @@ internal fun PhoneNavItem(
 
     Box(
         modifier = modifier
-            .height(68.dp)
+            .height(height)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -255,14 +213,14 @@ internal fun PhoneNavItem(
         )
 
         Column(
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = if (low) 7.dp else 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(if (low) 2.dp else 4.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(if (low) 22.dp else 24.dp),
                 tint = contentColor
             )
             Text(
@@ -278,7 +236,7 @@ internal fun PhoneNavItem(
     }
 }
 
-private fun PosSection.filledPhoneIcon(): ImageVector = when (this) {
+internal fun PosSection.filledPhoneIcon(): ImageVector = when (this) {
     PosSection.TABLES -> Icons.Filled.TableRestaurant
     PosSection.ORDERS -> Icons.AutoMirrored.Filled.ReceiptLong
     PosSection.RESERVATIONS -> Icons.AutoMirrored.Filled.EventNote

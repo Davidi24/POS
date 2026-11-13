@@ -12,6 +12,8 @@ internal data class MenuItem(
     val onlineSectionName: String? = null,
     val sku: String? = null,
     val imageFileName: String? = null,
+    // The stored photo's URL (from the server), shown on the dish's card and in its details.
+    val imageUrl: String? = null,
     val ingredients: List<DraftIngredient> = emptyList(),
     val variants: List<DraftVariant> = emptyList(),
     val optionGroups: List<DraftOptionGroup> = emptyList(),

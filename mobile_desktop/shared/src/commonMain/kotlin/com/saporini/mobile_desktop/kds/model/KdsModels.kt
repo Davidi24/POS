@@ -19,6 +19,8 @@ import kotlin.time.Instant
     val stationCode: String? = null, val stationName: String? = null, val deviceId: String? = null,
     val tableId: String? = null, val tableNumber: String? = null, val tableName: String? = null,
     val customerId: String? = null, val customerName: String? = null, val guestCount: Int? = null,
+    // DINE_IN, TAKEAWAY or DELIVERY (null from older servers: then the table decides).
+    val orderType: String? = null,
     val status: String = "UNKNOWN", val priority: String = "NORMAL", val courseName: String? = null,
     val notes: String? = null, val voidReason: String? = null, val firedAt: String? = null,
     val startedAt: String? = null, val readyAt: String? = null, val completedAt: String? = null,
@@ -85,15 +87,18 @@ import kotlin.time.Instant
     }
 }
 // When the waiters' Kitchen Status marks an order as taking long and ready food as waiting (Admin Hub settings).
-@Serializable data class KdsPosTiming(val slowAfterMinutes: Int = 20, val readyWaitingMinutes: Int = 5)
+// Also which order types the restaurant takes (Admin Hub → Settings → Order types), so the board only offers those tabs.
+@Serializable data class KdsPosTiming(val slowAfterMinutes: Int = 20, val readyWaitingMinutes: Int = 5, val takeawayEnabled: Boolean = false, val deliveryEnabled: Boolean = false)
 @Serializable data class KdsActionInput(val note: String? = null, val reason: String? = null)
 enum class KdsAction(val path: String) {
-    FIRE("fire"), START("start"), READY("ready"), COMPLETE("complete");
+    // BACK: one step back for the whole ticket (ready to cooking, cooking to new), for food moved on by mistake.
+    FIRE("fire"), START("start"), READY("ready"), COMPLETE("complete"), BACK("back");
     fun allows(status: String) = when (this) {
         FIRE -> status == "PENDING"
         START -> status in setOf("PENDING", "FIRED")
         READY -> status in setOf("PENDING", "FIRED", "IN_PROGRESS")
         COMPLETE -> status in setOf("READY", "EXPO_READY")
+        BACK -> status in setOf("IN_PROGRESS", "READY", "EXPO_READY")
     }
 }
 data class KdsScope(val userId: String, val restaurantId: String, val branchId: String)

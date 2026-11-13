@@ -23,6 +23,7 @@ import com.saporini.mobile_desktop.kds.model.KdsTicketPage
 import com.saporini.mobile_desktop.kds.ui.KdsSection
 import com.saporini.mobile_desktop.kds.ui.KdsSectionContent
 import com.saporini.mobile_desktop.kds.ui.StationsDialog
+import com.saporini.mobile_desktop.pos.kitchen.KitchenStatusContent
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItem
 import com.saporini.mobile_desktop.pos.reservations.preorder.PreOrderDto
 import com.saporini.mobile_desktop.pos.reservations.preorder.PreOrderItemDto
@@ -67,6 +68,8 @@ private class GalleryKds : KdsRepository {
     override suspend fun board(scope: KdsScope, stationId: String?, deviceId: String?) = listOf(
         KdsBoard("st1", "GRL", "Grill", tickets = tickets.filter { it.stationId == "st1" }),
         KdsBoard("st2", "PAS", "Pastry", tickets = emptyList()))
+    // This kitchen takes takeaway too, so the board shows its order-type tabs (off by default).
+    override suspend fun posTiming(scope: KdsScope) = com.saporini.mobile_desktop.kds.model.KdsPosTiming(takeawayEnabled = true)
     override suspend fun display(scope: KdsScope, deviceId: String) = board(scope).first()
     override suspend fun ticket(scope: KdsScope, ticketId: String) = (tickets + history).first { it.id == ticketId }
     override suspend fun orderTickets(scope: KdsScope, orderId: String) =
@@ -120,26 +123,47 @@ class KdsGalleryTest {
         val model = KdsScreenModel(GalleryKds(), GalleryKdsMenu(), session)
         val preOrders = PreOrderScreenModel(GalleryPreOrders(), session)
         model.setActive(true); settle()
-        fun shot(name: String, section: KdsSection, width: Int = 1440, height: Int = 960, required: List<String> = emptyList()) =
+        fun shot(name: String, section: KdsSection, width: Int = 1440, height: Int = 960, required: List<String> = emptyList(), prep: Boolean = false) =
             render(name, width, height, required) {
                 val state by model.state.collectAsState()
-                KdsSectionContent(state, model, section, clock = { now }, preOrderModel = { preOrders })
+                KdsSectionContent(state, model, section, clock = { now }, preOrderModel = { preOrders }, showPrepList = prep)
             }
-        shot("kds-tickets", KdsSection.TICKETS, required = listOf("Kitchen", "Margherita", "Start cooking", "All day"))
+        shot("kds-tickets", KdsSection.TICKETS, required = listOf("Online", "Margherita", "Start cooking", "Ready to pick up", "Dine-in", "Takeaway"))
+        // The prep list opens as a sidebar on the right, only from its button.
+        shot("kds-tickets-prep", KdsSection.TICKETS, 1600, 960, required = listOf("still to make, added up"), prep = true)
+        // One bar, then the lanes down to the bottom edge, at the other sizes too.
+        shot("kds-tickets-1024", KdsSection.TICKETS, 1024, 768, required = listOf("Online", "Start cooking"))
+        shot("kds-tickets-768", KdsSection.TICKETS, 768, 1024, required = listOf("Online"))
         shot("kds-tickets-phone", KdsSection.TICKETS, 420, 900)
         model.selectTicket("t3"); settle()
         shot("kds-ticket-detail", KdsSection.TICKETS, required = listOf("SAME ORDER AT OTHER STATIONS"))
         model.closeTicket()
         model.selectSection(KdsSection.UPCOMING); settle()
-        shot("kds-upcoming", KdsSection.UPCOMING, required = listOf("Waiting to start", "Ordered with bookings"))
+        shot("kds-upcoming", KdsSection.UPCOMING, required = listOf("Waiting to start", "Ordered with bookings", "Send now"))
+        shot("kds-upcoming-phone", KdsSection.UPCOMING, 420, 1000)
         model.selectSection(KdsSection.MENU); settle()
-        shot("kds-menu", KdsSection.MENU, required = listOf("Sold out", "Diavola"))
+        // Menu is the POS menu screen itself (MenuScreen, from Koin); the POS menu's own look checks cover it.
         model.selectSection(KdsSection.HISTORY); settle()
-        shot("kds-history", KdsSection.HISTORY, required = listOf("History", "Guest left"))
+        shot("kds-history", KdsSection.HISTORY, required = listOf("History", "Guest left", "WENT OUT"))
         render("kds-station-editor", 1440, 1100, required = listOf("DISHES MADE HERE", "Bistecca", "Add a dish")) {
             val state by model.state.collectAsState()
             StationsDialog(state, model, GalleryKdsMenu(), openStation = "st1") {}
         }
+        model.onDispose()
+    }
+
+    // POS → Kitchen Status: the same board for waiters, one card per order, no kitchen buttons, Go to order on ready food.
+    @Test
+    fun posKitchen() = gallery {
+        val model = KdsScreenModel(GalleryKds(), GalleryKdsMenu(), gallerySession())
+        model.setActive(true); settle()
+        fun shot(name: String, width: Int, height: Int, required: List<String>) = render(name, width, height, required) {
+            val state by model.state.collectAsState()
+            KitchenStatusContent(state, model, {}, clock = { now })
+        }
+        shot("pos-kitchen", 1440, 960, listOf("Sent to kitchen", "Cooking", "Ready to serve", "Go to order", "Margherita", "Dine-in"))
+        shot("pos-kitchen-1024", 1024, 768, listOf("Ready to serve", "Go to order"))
+        shot("pos-kitchen-phone", 420, 900, listOf("Go to order"))
         model.onDispose()
     }
 }

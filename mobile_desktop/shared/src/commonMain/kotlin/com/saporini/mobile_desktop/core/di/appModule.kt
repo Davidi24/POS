@@ -51,21 +51,8 @@ private val appModule = module {
 
     single { com.saporini.mobile_desktop.pos.orders.data.api.OrderCatalogApi(client = get()) }
     single<com.saporini.mobile_desktop.pos.orders.domain.repository.OrderCatalogRepository> {
-        val reservations = get<ReservationApi>()
-        com.saporini.mobile_desktop.pos.orders.data.repository.DefaultOrderCatalogRepository(
-            api = get(),
-            // Tonight's event set to "only the special menu": orders offer just that menu.
-            onlyMenuToday = { restaurantId ->
-                // The restaurant's day starts at 06:00, so 01:00 still belongs to last night's event.
-                val serviceDate = com.saporini.mobile_desktop.pos.reservations.serviceDate(
-                    kotlin.time.Clock.System.now(),
-                    com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationPolicy()
-                )
-                reservations.getEventOn(restaurantId, serviceDate.toString())
-                    ?.takeIf { it.specialMenuOnly == true && it.active != false }
-                    ?.menuId
-            }
-        )
+        // The server picks the menus that are on now, including the event-night rule.
+        com.saporini.mobile_desktop.pos.orders.data.repository.DefaultOrderCatalogRepository(api = get())
     }
     single<com.saporini.mobile_desktop.pos.sales.MySalesRepository> { com.saporini.mobile_desktop.pos.sales.ApiMySalesRepository(get(), get()) }
     factory { com.saporini.mobile_desktop.pos.sales.MySalesScreenModel(get(), get()) }
@@ -102,7 +89,21 @@ private val appModule = module {
     single<com.saporini.mobile_desktop.pos.payment.data.PaymentRepository> { com.saporini.mobile_desktop.pos.payment.data.PaymentApi(client = get()) }
     factory { com.saporini.mobile_desktop.pos.payment.PaymentScreenModel(repository = get(), session = get()) }
     single<com.saporini.mobile_desktop.statistics.data.StatisticsRepository> { com.saporini.mobile_desktop.statistics.data.StatisticsApi(client = get()) }
-    factory { com.saporini.mobile_desktop.statistics.StatisticsScreenModel(repository = get(), session = get()) }
+    factory {
+        val platform = get<com.saporini.mobile_desktop.platform.PlatformRepository>()
+        val menus = get<MenuRepository>()
+        com.saporini.mobile_desktop.statistics.StatisticsScreenModel(repository = get(), session = get(), branchesOf = { restaurantId ->
+            platform.branches(restaurantId).filter { it.isActive }.map { com.saporini.mobile_desktop.statistics.StatsBranch(it.id, it.name) }
+        }, photosOf = { restaurantId ->
+            // Every menu's dishes that have a photo, by id and by name. The menu list carries no dishes, so each menu is read
+            // with its sections and dishes (once per restaurant).
+            menus.getMenus(restaurantId = restaurantId, size = 100).items
+                .flatMap { menu -> runCatching { menus.getMenu(menu.id, includeSections = true, includeItems = true).sections }.getOrDefault(emptyList()) }
+                .flatMap { it.items }
+                .mapNotNull { dish -> dish.imageUrl?.takeIf { it.isNotBlank() }?.let { url -> dish to url } }
+                .flatMap { (dish, url) -> listOf(dish.id to url, dish.name to url) }.toMap()
+        })
+    }
     single<com.saporini.mobile_desktop.fraud.data.FraudRepository> { com.saporini.mobile_desktop.fraud.data.FraudApi(client = get()) }
     factory { com.saporini.mobile_desktop.fraud.FraudScreenModel(repository = get(), session = get()) }
     // Admin Hub: staff, roles, inventory, devices and the settings log (state only; screens come later).
@@ -116,14 +117,17 @@ private val appModule = module {
     single<com.saporini.mobile_desktop.admin.audit.AuditLogRepository> { com.saporini.mobile_desktop.admin.audit.AuditLogApi(client = get()) }
     factory { com.saporini.mobile_desktop.admin.audit.AuditLogScreenModel(repository = get(), session = get()) }
     single<com.saporini.mobile_desktop.admin.inventory.RecipesRepository> { com.saporini.mobile_desktop.admin.inventory.RecipesApi(client = get()) }
-    factory {
-        val menus = get<MenuRepository>()
-        com.saporini.mobile_desktop.admin.inventory.RecipesScreenModel(repository = get(), session = get()) { restaurantId ->
-            com.saporini.mobile_desktop.admin.inventory.menuChoicesOf(menus, restaurantId)
-        }
-    }
+    factory { com.saporini.mobile_desktop.admin.inventory.RecipesScreenModel(repository = get(), session = get()) }
     single<com.saporini.mobile_desktop.pos.reservations.preorder.PreOrderRepository> { com.saporini.mobile_desktop.pos.reservations.preorder.PreOrderApi(client = get()) }
     factory { com.saporini.mobile_desktop.pos.reservations.preorder.PreOrderScreenModel(repository = get(), session = get()) }
+
+    // Super admins: the restaurant list, the Restaurant app (also the owner's Admin Hub → Restaurant info) and Co-Super-Admins.
+    single<com.saporini.mobile_desktop.platform.PlatformRepository> { com.saporini.mobile_desktop.platform.PlatformApi(client = get()) }
+    factory { com.saporini.mobile_desktop.platform.RestaurantListScreenModel(repository = get(), people = get(), session = get()) }
+    factory { com.saporini.mobile_desktop.platform.BranchListScreenModel(repository = get(), session = get()) }
+    factory { com.saporini.mobile_desktop.platform.RestaurantApplicationsScreenModel(repository = get(), session = get()) }
+    factory { com.saporini.mobile_desktop.platform.CoSuperAdminsScreenModel(people = get(), platform = get(), session = get()) }
+    factory { com.saporini.mobile_desktop.platform.RestaurantDetailsScreenModel(repository = get(), people = get(), session = get()) }
 
     single { com.saporini.mobile_desktop.notifications.NotificationApi(client = get()) }
     single { com.saporini.mobile_desktop.notifications.NotificationCenter(api = get(), sessionManager = get()) }

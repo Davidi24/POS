@@ -87,6 +87,8 @@ interface ReservationRepository {
     suspend fun getEventOn(restaurantId: String, date: String): RestaurantEvent?
     // "✓ Attendance confirmed" after a call.
     suspend fun confirmAttendance(restaurantId: String, reservationId: String, reason: String? = null): Reservation
+    // Called and couldn't reach the guest.
+    suspend fun couldNotReach(restaurantId: String, reservationId: String, reason: String? = null): Reservation
     suspend fun getGuestHistory(restaurantId: String, reservationId: String): GuestHistory
     // Managers clear a guest's no-show warning with a reason; the history stays.
     suspend fun clearNoShowWarning(restaurantId: String, reservationId: String, reason: String): Reservation

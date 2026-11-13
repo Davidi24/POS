@@ -327,7 +327,8 @@ class DefaultTableLayoutRepository(
         branchId: String,
         tableId: String,
         status: LayoutTableStatus,
-        guestCount: Int?
+        guestCount: Int?,
+        moreComing: Boolean?
     ): LayoutTable {
         val updated = api.updateTableStatus(
             restaurantId = restaurantId,
@@ -335,7 +336,8 @@ class DefaultTableLayoutRepository(
             tableId = tableId,
             request = UpdateTableStatusRequestDto(
                 status = status.name,
-                guestCount = guestCount
+                guestCount = guestCount,
+                moreComing = moreComing
             )
         ).toDomain()
 
@@ -358,24 +360,26 @@ class DefaultTableLayoutRepository(
         branchId: String,
         primaryTableId: String,
         childTableIds: List<String>,
-        previousPrimaryTableIds: List<String>
+        tablesToUnmerge: List<String>
     ): BranchTableLayout {
-        previousPrimaryTableIds
+        tablesToUnmerge
             .distinct()
-            .forEach { previousPrimaryTableId ->
+            .forEach { tableId ->
                 api.unmergeTables(
                     restaurantId = restaurantId,
                     branchId = branchId,
-                    primaryTableId = previousPrimaryTableId
+                    primaryTableId = tableId
                 )
             }
 
-        api.mergeTables(
-            restaurantId = restaurantId,
-            branchId = branchId,
-            primaryTableId = primaryTableId,
-            childTableIds = childTableIds
-        )
+        if (childTableIds.isNotEmpty()) {
+            api.mergeTables(
+                restaurantId = restaurantId,
+                branchId = branchId,
+                primaryTableId = primaryTableId,
+                childTableIds = childTableIds
+            )
+        }
 
         val saved = api.getTableLayout(
             restaurantId = restaurantId,
@@ -388,6 +392,59 @@ class DefaultTableLayoutRepository(
         }
         return saved
     }
+
+    private suspend fun layoutAfter(restaurantId: String, branchId: String, write: suspend () -> Unit): BranchTableLayout {
+        write()
+        return api.getTableLayout(restaurantId = restaurantId, branchId = branchId).toDomain()
+    }
+
+    override suspend fun giveMoreTime(restaurantId: String, branchId: String, tableId: String, minutes: Int) =
+        layoutAfter(restaurantId, branchId) { api.giveMoreTime(restaurantId, branchId, tableId, minutes) }
+
+    override suspend fun stillHere(restaurantId: String, branchId: String, tableId: String) =
+        layoutAfter(restaurantId, branchId) { api.stillHere(restaurantId, branchId, tableId) }
+
+    override suspend fun bookingWaits(restaurantId: String, branchId: String, reservationId: String) =
+        layoutAfter(restaurantId, branchId) { api.checkInBooking(restaurantId, reservationId) }
+
+    override suspend fun bookingOptions(restaurantId: String, branchId: String, tableId: String) =
+        api.bookingOptions(restaurantId, branchId, tableId).map {
+            com.saporini.mobile_desktop.pos.tables.domain.model.BookingTableOption(it.tableIds, it.tableNumbers, it.primaryTableId, it.totalCapacity)
+        }
+
+    override suspend fun moveBooking(restaurantId: String, branchId: String, tableId: String, option: com.saporini.mobile_desktop.pos.tables.domain.model.BookingTableOption) =
+        layoutAfter(restaurantId, branchId) { api.moveBooking(restaurantId, branchId, tableId, option.tableIds, option.primaryTableId) }
+
+    override suspend fun specialCaseActions(restaurantId: String, branchId: String) =
+        api.specialCaseActions(restaurantId, branchId).map {
+            com.saporini.mobile_desktop.pos.tables.domain.model.SpecialCaseAction(it.id, it.kind, it.summary, it.detail, it.tableNumber, it.guests, it.orderId, it.happenedAt, it.tableFree)
+        }
+
+    override suspend fun returnSpecialCaseAction(restaurantId: String, branchId: String, actionId: String, tableId: String?) =
+        layoutAfter(restaurantId, branchId) { api.returnSpecialCaseAction(restaurantId, branchId, actionId, tableId) }
+
+    override suspend fun setBillRequested(
+        restaurantId: String,
+        branchId: String,
+        orderId: String,
+        requested: Boolean
+    ): BranchTableLayout {
+        api.setBillRequested(restaurantId, orderId, requested)
+
+        val saved = api.getTableLayout(
+            restaurantId = restaurantId,
+            branchId = branchId
+        ).toDomain()
+        cacheMutex.withLock {
+            tableLayoutsByBranch[
+                BranchKey(restaurantId, branchId)
+            ] = saved
+        }
+        return saved
+    }
+
+    override suspend fun unmergeSome(restaurantId: String, branchId: String, tableId: String, freeTableIds: List<String>, keepTableId: String?) =
+        layoutAfter(restaurantId, branchId) { api.unmergeSome(restaurantId, branchId, tableId, freeTableIds, keepTableId) }
 
     override suspend fun separateTable(
         restaurantId: String,

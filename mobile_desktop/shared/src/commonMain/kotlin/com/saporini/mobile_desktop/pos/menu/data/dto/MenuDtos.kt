@@ -30,6 +30,9 @@ data class MenuResponseDto(
     val availableUntilDate: String? = null,
     val color: String? = null,
     val special: Boolean = false,
+    // The event night of an event menu.
+    val event: MenuEventDto? = null,
+    val shownToWaiters: Boolean = true,
     val itemCount: Int? = null,
     val createdBy: String? = null,
     val updatedBy: String? = null,
@@ -185,3 +188,112 @@ data class OnlineMenuItemDto(
 data class ReorderOnlineMenuItemsRequestDto(
     val itemIds: List<String>
 )
+
+@Serializable
+data class MenuEventDto(
+    val id: String,
+    val name: String,
+    val icon: String = "",
+    val startDate: String,
+    val endDate: String,
+    val active: Boolean = true,
+    val specialMenuOnly: Boolean = false
+)
+
+// GET /restaurants/{id}/events, as the menu editor needs it.
+@Serializable
+data class MenuEventNightDto(
+    val id: String,
+    val name: String,
+    val icon: String = "",
+    val startDate: String,
+    val endDate: String,
+    val menuId: String? = null,
+    val menuName: String? = null,
+    val active: Boolean? = null,
+    val specialMenuOnly: Boolean? = null
+)
+
+// POST/PUT /restaurants/{id}/events from the menu editor. Every field but menuId is always sent; an edit must send
+// the event's menuId, or the server takes the menu off the event.
+@Serializable
+data class MenuEventNightRequestDto(
+    val name: String,
+    val icon: String,
+    val startDate: String,
+    val endDate: String,
+    val specialMenuOnly: Boolean,
+    val active: Boolean,
+    val menuId: String? = null
+)
+
+// GET/PUT /menus/waiter-view: which menus waiters see.
+@Serializable
+data class MenuWaiterViewDto(
+    val specialMenusOnly: Boolean = false,
+    val shownMenuIds: List<String> = emptyList()
+)
+
+// Every field is always sent.
+@Serializable
+data class MenuWaiterViewRequestDto(
+    val restaurantId: String,
+    val specialMenusOnly: Boolean,
+    val shownMenuIds: List<String>
+)
+
+// PUT /menus/order: the menus in the order they're shown.
+@Serializable
+data class MenuOrderRequestDto(
+    val restaurantId: String,
+    val menuIds: List<String>
+)
+
+// ---- A dish's ingredients from stock (its recipe underneath) ----
+
+/** What one of [unit] costs, for an ingredient that can be measured in it. */
+@Serializable
+data class UnitCostDto(val unit: String, val cost: Double = 0.0)
+
+/** Something a dish can be made with: a STOCK item or a shared PREPARATION (sauce, dough). */
+@Serializable
+data class IngredientChoiceDto(
+    val kind: String,
+    val id: String,
+    val name: String,
+    val group: String = "",
+    val baseUnit: String,
+    val units: List<UnitCostDto> = emptyList(),
+    // Its photo (the stock item's, or the sub-recipe item's), when it has one.
+    val imageUrl: String? = null
+)
+
+@Serializable
+data class DishIngredientDto(
+    val kind: String,
+    val id: String,
+    val name: String,
+    val quantity: Double,
+    val unit: String
+)
+
+/** The dish's ingredients from stock and what one portion costs ([recipeId] null: it takes nothing from stock). */
+@Serializable
+data class DishRecipeDto(
+    val recipeId: String? = null,
+    val ingredients: List<DishIngredientDto> = emptyList(),
+    val cost: Double = 0.0,
+    val price: Double = 0.0
+)
+
+/** One ingredient to save: exactly one of [inventoryItemId] and [preparationId]. */
+@Serializable
+data class DishIngredientRequestDto(
+    val inventoryItemId: String? = null,
+    val preparationId: String? = null,
+    val quantity: Double,
+    val unit: String
+)
+
+@Serializable
+data class DishRecipeRequestDto(val ingredients: List<DishIngredientRequestDto>)

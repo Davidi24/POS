@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.pos.menu.ui.justCreated
 import com.saporini.mobile_desktop.core.ui.HoverTooltip
 import com.saporini.mobile_desktop.pos.menu.ui.MenuCategory
 import kotlinx.coroutines.delay
@@ -69,6 +70,8 @@ private val SkeletonLight = Color(0xFFE8E8E8)
 
 @Composable
 internal fun CategoryButtons(
+    // A section just created: its chip is scrolled to and marked for a moment.
+    highlighted: String? = null,
     items: List<MenuCategory>,
     selected: String,
     canManage: Boolean,
@@ -116,6 +119,7 @@ internal fun CategoryButtons(
                         .height(44.dp)
                         .semantics { this.selected = isSelected }
                         .width(if (item.name == "All") 78.dp else 128.dp)
+                        .justCreated(item.name == highlighted, RoundedCornerShape(8.dp))
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (isSelected) ActiveOlive else Color.White)
                         .border(1.dp, Border, RoundedCornerShape(8.dp)),
@@ -236,6 +240,8 @@ internal fun CategoryButtons(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun PhoneCategoryFilterRow(
+    // A section just created: its chip is scrolled to and marked for a moment.
+    highlighted: String? = null,
     sections: List<MenuCategory>,
     selectedCategory: String,
     isReorderingItems: Boolean,
@@ -277,6 +283,7 @@ internal fun PhoneCategoryFilterRow(
                         .heightIn(min = 44.dp)
                         .semantics { this.selected = selected }
                         .widthIn(max = 150.dp)
+                        .justCreated(section.name == highlighted, RoundedCornerShape(8.dp))
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (selected) ActiveOlive else Color.White)
                         .border(

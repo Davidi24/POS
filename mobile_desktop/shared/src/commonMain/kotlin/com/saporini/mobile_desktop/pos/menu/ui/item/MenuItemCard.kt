@@ -73,6 +73,8 @@ internal fun phoneMenuItemHeight(fontScale: Float) =
 internal fun MenuItemCard(
     name: String,
     description: String,
+    // The dish's stored photo; a calm "no photo" tile when there's none.
+    imageUrl: String? = null,
     price: String,
     category: String,
     available: Boolean,
@@ -94,6 +96,7 @@ internal fun MenuItemCard(
         PhoneMenuItemCard(
             name = name,
             description = description,
+            imageUrl = imageUrl,
             ingredients = ingredients,
             price = price,
             category = category,
@@ -133,13 +136,13 @@ internal fun MenuItemCard(
                     .aspectRatio(2.12f)
                     .clip(RoundedCornerShape(6.dp))
             ) {
-                Image(
-                    painter = painterResource(Res.drawable.auth_login_img),
+                MenuPhoto(
+                    url = imageUrl,
                     contentDescription = name,
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer(alpha = contentAlpha),
-                    contentScale = ContentScale.Crop
+                    iconSize = 34.dp
                 )
 
                 AvailabilityButton(
@@ -271,6 +274,7 @@ internal fun MenuItemCard(
 private fun PhoneMenuItemCard(
     name: String,
     description: String,
+    imageUrl: String?,
     price: String,
     category: String,
     available: Boolean,
@@ -310,13 +314,13 @@ private fun PhoneMenuItemCard(
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(8.dp))
         ) {
-            Image(
-                painter = painterResource(Res.drawable.auth_login_img),
+            MenuPhoto(
+                url = imageUrl,
                 contentDescription = name,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer(alpha = contentAlpha),
-                contentScale = ContentScale.Crop
+                iconSize = 28.dp
             )
 
             if (isReordering) {

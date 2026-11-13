@@ -39,6 +39,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlin.math.roundToInt
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -137,9 +142,9 @@ internal fun ToolbarIconButton(icon: ImageVector, description: String, enabled: 
 
 /** Refresh button that turns into a spinner while loading. */
 @Composable
-internal fun RefreshButton(loading: Boolean, onClick: () -> Unit) {
+internal fun RefreshButton(loading: Boolean, onClick: () -> Unit, size: Dp = PageControlHeight) {
     Surface(
-        onClick = onClick, enabled = !loading, modifier = Modifier.size(PageControlHeight), shape = RoundedCornerShape(8.dp),
+        onClick = onClick, enabled = !loading, modifier = Modifier.size(size), shape = RoundedCornerShape(8.dp),
         color = Color.White, border = BorderStroke(1.dp, Kit.Border)
     ) {
         Box(contentAlignment = Alignment.Center) {
@@ -185,7 +190,7 @@ enum class MessageKind { ERROR, WARNING, SUCCESS, INFO }
  * dismissed.
  */
 @Composable
-internal fun MessageBar(text: String, kind: MessageKind, modifier: Modifier = Modifier, onDismiss: (() -> Unit)? = null) {
+internal fun MessageBar(text: String, kind: MessageKind, modifier: Modifier = Modifier, onDismiss: (() -> Unit)? = null, trailing: (@Composable () -> Unit)? = null) {
     if (kind == MessageKind.SUCCESS && onDismiss != null) {
         LaunchedEffect(text) { delay(3_500); onDismiss() }
     }
@@ -210,6 +215,7 @@ internal fun MessageBar(text: String, kind: MessageKind, modifier: Modifier = Mo
         Icon(icon, null, Modifier.size(18.dp), tint = color)
         Text(text, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp,
             color = if (kind == MessageKind.WARNING) Color(0xFF8A5A0B) else color)
+        trailing?.invoke()
         onDismiss?.let {
             Box(Modifier.size(28.dp).clip(CircleShape).clickable(onClick = it), contentAlignment = Alignment.Center) {
                 Icon(Icons.Outlined.Close, "Dismiss", Modifier.size(16.dp), tint = Kit.Muted)
@@ -218,12 +224,14 @@ internal fun MessageBar(text: String, kind: MessageKind, modifier: Modifier = Mo
     }
 }
 
-/** Shows an error and a notice of a screen model, one under the other. */
+/**
+ * A screen model's messages. A lasting warning stays under the header; errors and notices pop up as the app's
+ * notification in the bottom-left corner (a problem first).
+ */
 @Composable
 internal fun ScreenMessages(error: String?, notice: String?, onClear: () -> Unit, warning: String? = null) {
     warning?.let { MessageBar(it, MessageKind.WARNING) }
-    error?.let { MessageBar(it, MessageKind.ERROR, onDismiss = onClear) }
-    notice?.let { MessageBar(it, MessageKind.SUCCESS, onDismiss = onClear) }
+    BottomToast(error ?: notice, isError = error != null, onDismiss = onClear)
 }
 
 /** A full-size placeholder in the middle of the page: no access, loading, could not load, or nothing yet. */
@@ -298,15 +306,22 @@ internal fun LiveBadge(live: Boolean, liveText: String = "Live", offlineText: St
     }
 }
 
-/** A row of pill filters ("All", "Active", "Off"); the chosen one is green. */
+/**
+ * A row of pill filters ("All", "Active", "Off"); the chosen one is green. When they don't all fit, the row slides the
+ * chosen pill to the middle and fades its edges, so the pills beyond it show there are more.
+ */
 @Composable
 internal fun <T> FilterPills(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        options.forEach { (value, label) ->
+    val scroll = rememberScrollState()
+    val spans = remember { mutableStateMapOf<Int, Pair<Int, Int>>() }
+    CenterChosen(scroll, options.indexOfFirst { it.first == selected }, spans)
+    Row(modifier.fadingEdges(scroll).horizontalScroll(scroll), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        options.forEachIndexed { index, (value, label) ->
             val chosen = value == selected
             Text(
                 label,
-                Modifier.clip(RoundedCornerShape(50)).background(if (chosen) Kit.Green else Color.White)
+                Modifier.onGloballyPositioned { spans[index] = it.positionInParent().x.roundToInt() to it.size.width }
+                    .clip(RoundedCornerShape(50)).background(if (chosen) Kit.Green else Color.White)
                     .border(1.dp, if (chosen) Kit.Green else Kit.Border, RoundedCornerShape(50))
                     .clickable { onSelect(value) }.padding(horizontal = 14.dp, vertical = 7.dp),
                 fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = if (chosen) Color.White else Kit.Ink, maxLines = 1

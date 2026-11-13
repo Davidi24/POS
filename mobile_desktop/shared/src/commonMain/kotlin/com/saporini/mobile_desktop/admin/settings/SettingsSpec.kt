@@ -9,13 +9,14 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import mobile_desktop.shared.generated.resources.Res
-import mobile_desktop.shared.generated.resources.overview_next_hours
-import mobile_desktop.shared.generated.resources.overview_reservations
 import mobile_desktop.shared.generated.resources.settings_notifications
 import mobile_desktop.shared.generated.resources.settings_orders_kitchen
 import mobile_desktop.shared.generated.resources.settings_payments
+import mobile_desktop.shared.generated.resources.settings_reservations
+import mobile_desktop.shared.generated.resources.settings_shifts
 import mobile_desktop.shared.generated.resources.settings_tables
 import mobile_desktop.shared.generated.resources.workspace_fraud
+import mobile_desktop.shared.generated.resources.workspace_inventory
 import mobile_desktop.shared.generated.resources.workspace_pos
 import mobile_desktop.shared.generated.resources.workspace_restaurants
 import org.jetbrains.compose.resources.DrawableResource
@@ -81,8 +82,12 @@ internal val SaveGroups: List<SaveGroup> = listOf(
     patchGroup("/pre-orders", "preOrdersEnabled", "preOrderLeadMinutes"),
     patchGroup("/sequence-prefixes", "orderSequencePrefix", "invoiceSequencePrefix"),
     patchGroup("/kitchen-status", "kitchenSlowAfterMinutes", "kitchenReadyWaitingMinutes"),
-    patchGroup("/shifts", "clockInEarlyMinutes"),
-    patchGroup("/payments", "tipsEnabled", "tipSuggestionsText", "maxTipPercent", "autoClosePaidOrders", "refundWindowDays"),
+    patchGroup("/shifts", "clockInEarlyMinutes", "staffSeeWholeTeam"),
+    patchGroup("/inventory", "valuableStockFrom", "inventoryCountFrequency", "inventoryCountPeriod"),
+    patchGroup("/tables", "seatingExtraGuests", "seatingMostExtraGuests", "seatingAlertRoles", "nextBookingWarningMinutes", "joinBookingWarningMinutes", "bookingComingMinutes",
+        "specialCasePaidMinutes", "specialCaseSeatedMinutes", "specialCaseOrderMinutes", "specialCaseWarningMinutes", "specialCaseAutoMove",
+        "specialCaseBookingNoAction", "specialCaseMoreTime", "specialCaseAlertRoles"),
+    patchGroup("/payments", "tipsEnabled", "tipSuggestionsText", "maxTipPercent", "autoClosePaidOrders", "refundWindowDays", "unpaidAlertRoles"),
     patchGroup(
         "/fraud-checks", "fraudDiscountPercent", "fraudRefundAmount", "fraudVoidsPerDay", "fraudTipPercent",
         "fraudCashRefundsPerDay", "fraudDisabledRules"
@@ -91,7 +96,8 @@ internal val SaveGroups: List<SaveGroup> = listOf(
         "/reservation-policy", "largeGroupFrom", "largeGroupExtraMinutes", "approvalGroupSize", "holdMinutes",
         "holdWarningMinutes", "checkInOpensMinutes", "confirmReminderTime", "sameDayConfirmMinutes",
         "attendanceCallMinutes", "reopenWindowMinutes", "undoSeatMinutes", "runningLateMaxMinutes", "lateAfterMinutes",
-        "guestReminderHours", "noShowWarningFrom", "depositFromGuests", "cardFeePercent", "cardFeeFixed"
+        "guestReminderHours", "noShowWarningFrom", "depositFromGuests", "cardFeePercent", "cardFeeFixed",
+        "autoConfirmBookings", "guestSecondReminderHours", "unconfirmedHoldMinutes", "bookingAlertRoles"
     ),
     SaveGroup(
         SettingsSource.ORDER_RULES,
@@ -156,6 +162,12 @@ internal data class ChoiceField(
     override val hint: String? = null, override val shownWhen: ((SettingsValues) -> Boolean)? = null
 ) : SettingField
 
+// Roles to pick any number of, kept as role codes separated by commas.
+internal data class RolesField(
+    override val source: SettingsSource, override val key: String, override val label: String,
+    override val hint: String? = null, override val shownWhen: ((SettingsValues) -> Boolean)? = null
+) : SettingField
+
 // A time of day, "HH:mm".
 internal data class TimeField(
     override val source: SettingsSource, override val key: String, override val label: String,
@@ -168,11 +180,12 @@ internal data class SettingsSection(val title: String, val fields: List<SettingF
 
 internal enum class SettingsCategory(val title: String, val description: String, val image: DrawableResource, val available: Boolean = true) {
     DEVICES("Devices & printing", "Printers, receipts and where each ticket prints", Res.drawable.workspace_pos),
-    TABLES("Tables", "Joining and moving tables, QR ordering", Res.drawable.settings_tables),
-    RESERVATIONS("Reservations", "Booking length, late guests, confirmations and groups", Res.drawable.overview_reservations),
+    TABLES("Tables", "Joining and moving tables, QR ordering, special cases", Res.drawable.settings_tables),
+    RESERVATIONS("Reservations", "Booking length, late guests, confirmations and groups", Res.drawable.settings_reservations),
     ORDERS("Orders & kitchen", "Kitchen, order changes, order types and pre-orders", Res.drawable.settings_orders_kitchen),
     PAYMENTS("Payments & receipts", "Tax, service charge, paying and what receipts show", Res.drawable.settings_payments),
-    SHIFTS("Shifts", "Clock-in, breaks and schedules", Res.drawable.overview_next_hours),
+    SHIFTS("Shifts", "Clock-in, breaks and schedules", Res.drawable.settings_shifts),
+    INVENTORY("Inventory", "Stock value and count schedule", Res.drawable.workspace_inventory),
     FRAUD("Fraud checks", "When discounts, refunds and removals are flagged for review", Res.drawable.workspace_fraud),
     NOTIFICATIONS("Notifications", "Who is told about what, and when", Res.drawable.settings_notifications),
     ONLINE_BOOKING("Online booking", "Your website booking page. Coming later", Res.drawable.workspace_restaurants, available = false)
@@ -200,7 +213,8 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
                 NumberField(RR, "minPartySize", "Smallest booking", "guests", 1, 50, 1),
                 NumberField(RR, "maxPartySize", "Largest booking", "guests", 1, 200, 1),
                 NumberField(RR, "advanceBookingDays", "Guests can book up to", "days ahead", 0, 365, 1),
-                NumberField(G, "approvalGroupSize", "Staff approval from", "guests", 1, 200, 1, "Bigger bookings wait as a request until staff approve them")
+                NumberField(G, "approvalGroupSize", "Staff approval from", "guests", 1, 200, 1, "Bigger bookings wait as a request until staff approve them"),
+                ToggleField(G, "autoConfirmBookings", "Confirm bookings by themselves", "When a table is free. Off: every booking waits for someone who can approve it")
             )
         ),
         SettingsSection(
@@ -221,9 +235,12 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
         SettingsSection(
             "Confirming attendance", listOf(
                 NumberField(G, "guestReminderHours", "Ask guests \"Still coming?\"", "h before", 1, 168, 1, "By email or text, with Confirm and Cancel"),
-                TimeField(G, "confirmReminderTime", "Remind managers the day before at", "About bookings not confirmed yet"),
+                NumberField(G, "guestSecondReminderHours", "No reply: ask again", "h before", 0, 72, 1, "0 means never"),
                 NumberField(G, "sameDayConfirmMinutes", "Same-day bookings: confirm at least", "min before", 0, 1440, 15),
-                NumberField(G, "attendanceCallMinutes", "No reply: ask staff to call", "min before", 0, 1440, 15, "Bookings are never cancelled for not replying")
+                NumberField(G, "attendanceCallMinutes", "Still no reply: ask staff to call", "min before", 0, 1440, 15, "Bookings are never cancelled for not replying"),
+                NumberField(G, "unconfirmedHoldMinutes", "Hold the table for guests who never confirmed", "min", 0, 240, 5, "After the booking time. 0 means the usual hold"),
+                TimeField(G, "confirmReminderTime", "Remind the day before at", "About bookings not confirmed yet"),
+                RolesField(G, "bookingAlertRoles", "Who is told about bookings", "The day before, and when a booking needs a look")
             )
         ),
         SettingsSection(
@@ -233,9 +250,9 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
         ),
         SettingsSection(
             "Corrections", listOf(
-                NumberField(G, "reopenWindowMinutes", "Staff can reopen a cancelled or no-show booking within", "min", 0, 1440, 15, "After that, a manager with a reason"),
-                NumberField(G, "undoSeatMinutes", "Staff can undo seating within", "min", 0, 240, 5, "If no orders or payments are on it; after that, a manager")
-            )
+                NumberField(G, "reopenWindowMinutes", "Staff can reopen a cancelled or no-show booking within", "min", 0, 1440, 15, "After that, a manager with a reason")
+            ),
+            note = "Seating can be undone until an order is made on the table."
         ),
         SettingsSection(
             "Deposit for big groups", listOf(
@@ -301,6 +318,30 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
                 ToggleField(OR, "transferOrdersEnabled", "Allow moving guests to another table"),
                 ToggleField(G, "enableQrOrdering", "QR ordering at the table", "Guests scan and order from their phone")
             )
+        ),
+        // Every special case in one place (user, 2026-11-01): what happens, and how long the system waits when nobody acts.
+        SettingsSection(
+            "Special cases", listOf(
+                NumberField(G, "nextBookingWarningMinutes", "Warn before the next booking", "minutes", 0, 240, 5, "Guests still at the table this long before it: half purple, pulsing"),
+                NumberField(G, "bookingComingMinutes", "Show a coming booking from", "minutes", 0, 1440, 5, "A free table shows a yellow ring this long before its booking. 0 means never"),
+                NumberField(G, "joinBookingWarningMinutes", "Ask when joining a table booked within", "minutes", 0, 1440, 15, "Joining a table with a booking this close asks what to do with it. 0 means never"),
+                TextSettingField(G, "specialCaseMoreTime", "Give more time buttons", 30, "10,15,30", hint = "Minutes, separated by commas (up to 5)"),
+                ToggleField(G, "specialCaseAutoMove", "Move the booking automatically", "At its time, if nobody acted and one free table fits"),
+                NumberField(G, "specialCasePaidMinutes", "Free a paid table after", "minutes", 0, 1440, 15, "With nothing done on it for this long. 0 means never"),
+                NumberField(G, "specialCaseSeatedMinutes", "Free a table with no order after", "minutes", 0, 1440, 15, "240 minutes is 4 hours. 0 means never"),
+                NumberField(G, "specialCaseOrderMinutes", "Close an unpaid order after", "minutes", 0, 1440, 15, "Closed as unpaid, No action taken, table set free. 0 means never"),
+                NumberField(G, "specialCaseWarningMinutes", "Warn before that", "minutes", 0, 240, 5, "The table's note says when, with a Still here button"),
+                ToggleField(G, "specialCaseBookingNoAction", "Close bookings nobody seated", "As No action taken, never a no-show, when the table was taken or the guests came"),
+                RolesField(G, "specialCaseAlertRoles", "Who is told when the system acts", "They get a notification right away"),
+                RolesField(G, "unpaidAlertRoles", "Who is told about unpaid orders", "When someone closes an order as unpaid, they get a notification right away"),
+                // 2 and 4 by default: a table with 4 seats takes 6 as normal and 8 at most (user, 2026-10-31).
+                NumberField(G, "seatingExtraGuests", "Extra guests that are normal", "guests", 0, 20, 1, "With 2, up to 6 is normal at a table with 4 seats"),
+                NumberField(G, "seatingMostExtraGuests", "Most extra guests", "guests", 0, 50, 1, "With 4, a table with 4 seats can't take more than 8"),
+                RolesField(G, "seatingAlertRoles", "Who is told about unusual numbers", "Above the normal number, they get a notification right away"),
+                NumberField(G, "holdMinutes", "Hold the table for a late booking", "min", 5, 240, 5, "After the booking time. Then it becomes a no-show"),
+                NumberField(G, "holdWarningMinutes", "Show the yellow ring after", "min", 0, 240, 5, "After the booking time")
+            ),
+            note = "Merged tables always need more guests than their biggest table holds."
         )
     )
     SettingsCategory.PAYMENTS -> listOf(
@@ -362,7 +403,28 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
             "Clocking in", listOf(
                 NumberField(G, "clockInEarlyMinutes", "Staff can clock in for a shift from", "min before", 0, 720, 15, "Before that, clocking in starts a shift that isn't planned")
             ),
-            note = "Hourly wages are set per person in Shifts → Hours & pay."
+            note = "Hourly wages and monthly salaries are set per person in Admin Hub → Salary."
+        ),
+        SettingsSection(
+            "Who works", listOf(
+                ToggleField(G, "staffSeeWholeTeam", "Staff see the whole team", "In POS → Shift → Team. Off: they see only people in their own role.")
+            )
+        )
+    )
+    SettingsCategory.INVENTORY -> listOf(
+        SettingsSection(
+            "Counting schedule", listOf(
+                NumberField(G, "inventoryCountFrequency", "Count each place", "times", 1, 24, 1,
+                    "Set how often each active place is counted. Weekly schedules allow up to 7; daily schedules up to 24."),
+                ChoiceField(G, "inventoryCountPeriod", "Every", listOf("DAILY" to "Day", "WEEKLY" to "Week"))
+            ),
+            note = "Counts are due separately for each active place. A weekly schedule spreads them evenly across Monday to Sunday."
+        ),
+        SettingsSection(
+            "Valuable stock", listOf(
+                // 100 by default (user, 2026-10-30). In the restaurant's currency; a currency change converts it.
+                DecimalField(G, "valuableStockFrom", "Valuable stock from", "", "An item worth this much or more in stock (at cost) shows in Inventory → Most valuable stock")
+            )
         )
     )
     SettingsCategory.FRAUD -> listOf(
@@ -399,7 +461,8 @@ internal fun SettingsCategory.problem(values: SettingsValues): String? {
                 hold != null && late != null && late >= hold -> "A guest must show as late before the hold ends."
                 values.bool(RR, "requireDeposit") && (deposit == null || deposit <= 0.0) -> "Enter the deposit amount."
                 feePercent != null && (feePercent < 0.0 || feePercent > 20.0) -> "The card fee must be between 0 and 20%."
-                feeFixed != null && (feeFixed < 0.0 || feeFixed > 10.0) -> "The fixed card fee must be between 0 and 10."
+                // Up to 1,000,000 so currencies with large numbers (ALL, JPY) fit too.
+                feeFixed != null && (feeFixed < 0.0 || feeFixed > 1_000_000.0) -> "The fixed card fee must be between 0 and 1,000,000."
                 else -> null
             }
         }
@@ -413,6 +476,23 @@ internal fun SettingsCategory.problem(values: SettingsValues): String? {
                 values.bool(G, "tipsEnabled") && tips.any { it != null && (it < 1 || it > 100) } -> "A tip button must be between 1 and 100%."
                 values.bool(G, "tipsEnabled") && maxTip != null && tips.any { it != null && it > maxTip } ->
                     "A tip button can't be above the biggest tip allowed."
+                else -> null
+            }
+        }
+        SettingsCategory.TABLES -> {
+            val extra = number(G, "seatingExtraGuests")
+            val most = number(G, "seatingMostExtraGuests")
+            if (extra != null && most != null && most < extra) "The most guests can't be below the normal number." else null
+        }
+        SettingsCategory.INVENTORY -> {
+            val from = number(G, "valuableStockFrom")
+            val frequency = number(G, "inventoryCountFrequency")
+            val period = values.text(G, "inventoryCountPeriod")
+            when {
+                from == null -> "Enter from what value stock counts as valuable."
+                from < 0.0 || from > 1_000_000.0 -> "Valuable stock must start between 0 and 1,000,000."
+                frequency == null || frequency < 1 || frequency > 24 -> "Count frequency must be between 1 and 24."
+                period == "WEEKLY" && frequency > 7 -> "A weekly schedule can have up to 7 counts per place."
                 else -> null
             }
         }

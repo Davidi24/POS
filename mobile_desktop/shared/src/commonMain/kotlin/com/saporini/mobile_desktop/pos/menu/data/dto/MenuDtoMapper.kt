@@ -2,6 +2,8 @@ package com.saporini.mobile_desktop.pos.menu.data.dto
 
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItem
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEvent
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEventNight
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItemOptionGroup
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuPage
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuRestaurant
@@ -48,9 +50,33 @@ fun MenuResponseDto.toDomain(): Menu {
         updatedAt = updatedAt,
         allFilterPosition = allFilterPosition,
         sections = sections.map { it.toDomain() },
-        special = special
+        special = special,
+        shownToWaiters = shownToWaiters,
+        event = event?.let {
+            MenuEvent(
+                id = it.id,
+                name = it.name,
+                icon = it.icon,
+                startDate = it.startDate,
+                endDate = it.endDate,
+                active = it.active,
+                specialMenuOnly = it.specialMenuOnly
+            )
+        }
     )
 }
+
+fun MenuEventNightDto.toDomain(): MenuEventNight = MenuEventNight(
+    id = id,
+    name = name,
+    icon = icon,
+    startDate = startDate,
+    endDate = endDate,
+    menuId = menuId,
+    menuName = menuName,
+    active = active != false,
+    specialMenuOnly = specialMenuOnly == true
+)
 
 fun MenuRestaurantDto.toDomain(): MenuRestaurant {
     return MenuRestaurant(

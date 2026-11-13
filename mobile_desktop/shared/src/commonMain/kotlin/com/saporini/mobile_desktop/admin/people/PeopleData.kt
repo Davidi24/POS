@@ -56,7 +56,12 @@ data class RoleDto(
     val isSystem: Boolean = false,
     val isActive: Boolean = true,
     val isAssignable: Boolean = true,
-    val isProtected: Boolean = false
+    val isProtected: Boolean = false,
+    // In the restaurant worked in: whether its people get paid (Salary and shifts show only them), their Salary team
+    // (MANAGERS, KITCHEN, WAITERS, CLEANING, EXTRA) and the picture the restaurant picked for its own role.
+    val paid: Boolean? = null,
+    val payTeam: String? = null,
+    val picture: String? = null
 )
 
 @Serializable
@@ -87,7 +92,12 @@ data class UpdateStaffRequestDto(
 data class ReplaceRolesRequestDto(val roleIds: List<String>)
 
 @Serializable
-data class RoleNameRequestDto(val name: String, val description: String? = null)
+data class RoleNameRequestDto(
+    val name: String, val description: String? = null, val picture: String? = null, val paid: Boolean? = null, val payTeam: String? = null
+)
+
+@Serializable
+data class RolePayRequestDto(val paid: Boolean, val payTeam: String? = null)
 
 @Serializable
 data class RoleStatusRequestDto(val isActive: Boolean)
@@ -117,7 +127,21 @@ interface PeopleRepository {
     suspend fun deleteRole(roleId: String)
     suspend fun cloneRole(roleId: String, request: RoleNameRequestDto): RoleDto
     suspend fun replacePermissions(roleId: String, permissionIds: List<String>): List<PermissionDto>
+
+    // One person's own permissions: what their roles give them and what they can actually do.
+    suspend fun personPermissions(userId: String): PersonPermissionsDto = throw UnsupportedOperationException("Personal permissions are unavailable")
+    /** Whether a role's people get paid in this restaurant, and their Salary team. */
+    suspend fun setRolePay(roleId: String, paid: Boolean, payTeam: String?): RoleDto = throw UnsupportedOperationException("Role pay is unavailable")
+    suspend fun savePersonPermissions(userId: String, codes: List<String>): PersonPermissionsDto =
+        throw UnsupportedOperationException("Personal permissions are unavailable")
 }
+
+/** What a person's roles give them in their restaurant ([fromRoles]) and what they can actually do ([permissions]). */
+@Serializable
+data class PersonPermissionsDto(val fromRoles: List<String> = emptyList(), val permissions: List<String> = emptyList())
+
+@Serializable
+data class PersonPermissionsRequestDto(val permissionCodes: List<String>)
 
 class PeopleApi(
     private val client: HttpClient,
@@ -177,6 +201,10 @@ class PeopleApi(
         contentType(ContentType.Application.Json); setBody(request)
     }.body()
 
+    override suspend fun setRolePay(roleId: String, paid: Boolean, payTeam: String?): RoleDto = client.put(url("/roles/${id(roleId)}/pay")) {
+        contentType(ContentType.Application.Json); setBody(RolePayRequestDto(paid, payTeam))
+    }.body()
+
     override suspend fun setRoleActive(roleId: String, active: Boolean): RoleDto = client.patch(url("/roles/${id(roleId)}/status")) {
         contentType(ContentType.Application.Json); setBody(RoleStatusRequestDto(active))
     }.body()
@@ -192,5 +220,12 @@ class PeopleApi(
     override suspend fun replacePermissions(roleId: String, permissionIds: List<String>): List<PermissionDto> =
         client.put(url("/roles/${id(roleId)}/permissions")) {
             contentType(ContentType.Application.Json); setBody(ReplacePermissionsRequestDto(permissionIds))
+        }.body()
+
+    override suspend fun personPermissions(userId: String): PersonPermissionsDto = client.get(url("/users/${id(userId)}/permissions")).body()
+
+    override suspend fun savePersonPermissions(userId: String, codes: List<String>): PersonPermissionsDto =
+        client.put(url("/users/${id(userId)}/permissions")) {
+            contentType(ContentType.Application.Json); setBody(PersonPermissionsRequestDto(codes))
         }.body()
 }

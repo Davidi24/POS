@@ -33,6 +33,7 @@ import kotlin.test.assertSame
 // Output: build/reports/app-ui/workspace/.
 class WorkspacePickerScreenshotTest {
     private val everything = listOf("POS_ACCESS", "KDS_ACCESS", "ADMIN_ACCESS")
+    private val platformPermissions = everything + listOf("RESTAURANTS_READ", "STATISTICS_ACCESS", "FRAUD_ACCESS", "SETTINGS_READ")
 
     @Test fun desktopThree() = capture(1280, 800, everything, "desktop-3")
     @Test fun desktopTwo() = capture(1280, 800, listOf("POS_ACCESS", "ADMIN_ACCESS"), "desktop-2")
@@ -58,11 +59,11 @@ class WorkspacePickerScreenshotTest {
             com.saporini.mobile_desktop.core.session.accessibleWorkspaces(custom))
     }
 
-    @Test fun fraudDetectionIsLimitedToOwnersCoOwnersAndSuperAdmins() {
+    @Test fun ownerRolesKeepLegacyFraudAccessAndPlatformRolesNeedItsPermission() {
         for (role in listOf("SUPER_ADMIN", "OWNER", "CO_OWNER", "ADMIN", "MANAGER", "WAITER", "KITCHEN")) {
             val actual = com.saporini.mobile_desktop.core.session.Workspace.FRAUD_DETECTION in
                 com.saporini.mobile_desktop.core.session.accessibleWorkspaces(user(everything).copy(roles = listOf(role)))
-            kotlin.test.assertEquals(role in listOf("SUPER_ADMIN", "OWNER", "CO_OWNER"), actual, role)
+            kotlin.test.assertEquals(role in listOf("OWNER", "CO_OWNER"), actual, role)
         }
     }
 
@@ -71,10 +72,11 @@ class WorkspacePickerScreenshotTest {
     }
 
     @Test fun superAdminGetsEveryWorkspace() {
-        val superAdmin = user(emptyList()).copy(roles = listOf("SUPER_ADMIN"))
+        val superAdmin = user(platformPermissions).copy(roles = listOf("SUPER_ADMIN"))
         kotlin.test.assertEquals(com.saporini.mobile_desktop.core.session.Workspace.entries.toSet(),
             com.saporini.mobile_desktop.core.session.accessibleWorkspaces(superAdmin))
-        assertSame(WorkspacePickerScreen, resolveStartScreen(superAdmin))
+        assertSame(com.saporini.mobile_desktop.platform.ui.RestaurantListScreen, resolveStartScreen(superAdmin))
+        kotlin.test.assertTrue(com.saporini.mobile_desktop.core.session.accessibleWorkspaces(superAdmin.copy(permissions = emptyList())).isEmpty())
     }
 
     @Test fun twoWorkspacesShowThePicker() {
@@ -105,11 +107,31 @@ class WorkspacePickerScreenshotTest {
         val scheduler = TestCoroutineScheduler()
         val dispatcher = StandardTestDispatcher(scheduler)
         Dispatchers.setMain(dispatcher)
-        val session = SessionManager().apply { signIn(user(permissions).copy(roles = roles)) }
+        val session = SessionManager().apply {
+            signIn(user(if ("SUPER_ADMIN" in roles) platformPermissions else permissions).copy(roles = roles))
+            if ("SUPER_ADMIN" in roles) enterRestaurant(com.saporini.mobile_desktop.core.session.ActingRestaurant("r-1", "Restaurant", "b-1", "Main"))
+        }
+        val platform = java.lang.reflect.Proxy.newProxyInstance(com.saporini.mobile_desktop.platform.PlatformRepository::class.java.classLoader,
+            arrayOf(com.saporini.mobile_desktop.platform.PlatformRepository::class.java)) { proxy, method, args ->
+            when (method.name) {
+                "toString" -> "Workspace test repository"
+                "hashCode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.firstOrNull()
+                "restaurant" -> com.saporini.mobile_desktop.platform.RestaurantDto("r-1", "Restaurant")
+                "branchCards" -> com.saporini.mobile_desktop.platform.BranchCardPageDto(listOf(com.saporini.mobile_desktop.platform.BranchCardDto("b-1", "Main")),
+                    totalElements = 1, allBranches = 1, openBranches = 1)
+                else -> error("Unexpected request ${method.name}")
+            }
+        } as com.saporini.mobile_desktop.platform.PlatformRepository
         val auth = AuthRepository(HttpClient(MockEngine { respondOk() }))
-        startKoin { modules(module { single { session }; factory { WorkspaceScreenModel(auth, session) } }) }
+        startKoin { modules(module { single { session }; single { platform }; factory { WorkspaceScreenModel(auth, session) } }) }
+        val owner = object : androidx.lifecycle.LifecycleOwner {
+            override val lifecycle = androidx.lifecycle.LifecycleRegistry.createUnsafe(this).apply { currentState = androidx.lifecycle.Lifecycle.State.RESUMED }
+        }
         val scene = ImageComposeScene(width, height, density = Density(1f), coroutineContext = dispatcher) {
-            SaporiniTheme { Navigator(WorkspacePickerScreen) }
+            androidx.compose.runtime.CompositionLocalProvider(androidx.lifecycle.compose.LocalLifecycleOwner provides owner) {
+                SaporiniTheme { Navigator(WorkspacePickerScreen) }
+            }
         }
         try {
             repeat(6) { scheduler.advanceTimeBy(100); scheduler.runCurrent(); scene.render(scheduler.currentTime * 1_000_000L).close(); Thread.sleep(40) }

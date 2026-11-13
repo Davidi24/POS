@@ -9,7 +9,9 @@ data class OrderListFilter(
     val from: String? = null,
     val to: String? = null,
     val status: OrderStatus? = null,
-    val customerId: String? = null
+    val customerId: String? = null,
+    // History: only the orders closed as unpaid.
+    val unpaidOnly: Boolean = false
 ) {
     init { require((from == null) == (to == null)) { "Provide both date boundaries" } }
 }

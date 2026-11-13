@@ -50,6 +50,8 @@ data class LayoutTable(
     val shape: LayoutTableShape,
     val status: LayoutTableStatus,
     val guestCount: Int? = null,
+    // Seated with more guests still to come.
+    val moreComing: Boolean = false,
     val seatedAt: String? = null,
     val nextReservationStart: String? = null,
     val nextReservationEnd: String? = null,
@@ -64,10 +66,36 @@ data class LayoutTable(
     val nextReservationArrivedGuests: Int? = null,
     val nextReservationOccasionIcon: String? = null,
     val nextReservationOccasionName: String? = null,
+    val seatedReservationId: String? = null,
+    val seatedReservationName: String? = null,
+    val seatedReservationStart: String? = null,
+    val seatedReservationPartySize: Int? = null,
+    val seatedReservationOccasionIcon: String? = null,
+    val seatedReservationOccasionName: String? = null,
     val currentOrderId: String? = null,
     val currentOrderNumber: String? = null,
     val currentOrderStatus: String? = null,
     val currentOrderFulfillmentStatus: String? = null,
+    val currentOrderBillRequested: Boolean = false,
+    // The guests have paid and are still at the table.
+    val paid: Boolean = false,
+    val currentOrderServedItems: Int = 0,
+    val currentOrderTotalItems: Int = 0,
+    val guestsMin: Int? = null,
+    val guestsUsual: Int? = null,
+    val guestsMax: Int? = null,
+    // From then the guests here are in the way of the next booking (from the server, see Settings → Tables).
+    val nextBookingClashAt: String? = null,
+    val nextBookingSoon: Boolean = false,
+    val bookingComing: Boolean = false,
+    // The "Give more time" choices, minutes separated by commas.
+    val moreTimeOptions: String? = null,
+    val nextReservationCheckedInAt: String? = null,
+    // The system moved the booking here from this table, because nobody acted.
+    val nextReservationMovedFrom: String? = null,
+    // When the system steps in on this table if nobody acts, and when it starts saying so.
+    val autoFreeAt: String? = null,
+    val autoFreeWarningAt: String? = null,
     val active: Boolean
 )
 
@@ -94,4 +122,28 @@ data class TableSection(
     val name: String,
     val displayOrder: Int,
     val tableIds: Set<String>
+)
+
+// A free place for a booking on a taken table: one table, or several joined.
+data class BookingTableOption(
+    val tableIds: List<String>,
+    val tableNumbers: List<String>,
+    val primaryTableId: String?,
+    val seats: Int?
+)
+
+// Something the system did by itself because nobody acted; it can be returned.
+data class SpecialCaseAction(
+    val id: String,
+    val kind: String,
+    val summary: String,
+    val detail: String?,
+    val tableNumber: String?,
+    // The guests who were at the table, or the booking's size.
+    val guests: Int?,
+    // The order to pay once it's returned.
+    val orderId: String?,
+    val happenedAt: String,
+    // The table it would go back to can take it; when not, another one is picked.
+    val tableFree: Boolean
 )

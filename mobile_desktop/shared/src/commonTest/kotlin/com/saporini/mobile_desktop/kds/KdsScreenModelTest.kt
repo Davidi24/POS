@@ -42,7 +42,7 @@ internal class FakeKds : KdsRepository {
     }
     override suspend fun action(scope: KdsScope, ticketId: String, itemId: String?, action: KdsAction, input: KdsActionInput): KdsTicket {
         writes++; actionGate?.let { withContext(NonCancellable) { it.await() } }
-        val next = when(action) { KdsAction.FIRE -> "FIRED"; KdsAction.START -> "IN_PROGRESS"; KdsAction.READY -> "READY"; KdsAction.COMPLETE -> "COMPLETED" }
+        val next = when(action) { KdsAction.FIRE -> "FIRED"; KdsAction.START -> "IN_PROGRESS"; KdsAction.READY -> "READY"; KdsAction.COMPLETE -> "COMPLETED"; KdsAction.BACK -> "FIRED" }
         val updated = tickets.first { it.id == ticketId }.copy(status = next, items = tickets.first { it.id == ticketId }.items.map { if(itemId == null || it.id == itemId) it.copy(status = next) else it })
         tickets = tickets.map { if(it.id == ticketId) updated else it }
         if(updated.terminal) historyItems = historyItems + updated

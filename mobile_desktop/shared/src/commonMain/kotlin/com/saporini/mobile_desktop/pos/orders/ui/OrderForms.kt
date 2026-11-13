@@ -134,9 +134,8 @@ import kotlinx.datetime.*
                     val result: Result<*> = when(title) {
                         "Send to kitchen" -> op.sendToKitchen(id)
                         "Mark ready" -> op.markOrderReady(id)
-                        "Mark fulfilled" -> op.fulfillOrder(id)
+                        "Mark as served" -> op.fulfillOrder(id)
                         "Close order" -> op.closeOrder(id)
-                        "Reopen order" -> op.reopenOrder(id)
                         "Cancel order" -> op.cancelOrder(id, request)
                         "Void order" -> op.voidOrder(id, request)
                         "Void item" -> op.voidItem(id,action.substringAfter(':'),request)

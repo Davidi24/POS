@@ -1,16 +1,23 @@
 package com.saporini.mobile_desktop.pos.menu.domain.repository
 
+import com.saporini.mobile_desktop.pos.menu.data.dto.DishIngredientRequestDto
+import com.saporini.mobile_desktop.pos.menu.data.dto.DishRecipeDto
+import com.saporini.mobile_desktop.pos.menu.data.dto.IngredientChoiceDto
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItem
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEventNight
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEventNightInput
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuItemOptionGroup
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuPage
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.MenuVariant
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuWaiterView
 import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenu
 import com.saporini.mobile_desktop.pos.menu.domain.model.OnlineMenuSection
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroup
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionGroupType
 import com.saporini.mobile_desktop.pos.menu.domain.model.OptionItem
+import com.saporini.mobile_desktop.pos.menu.domain.model.SpecialMenuKind
 
 data class CreateMenuInput(
     val restaurantId: String,
@@ -24,7 +31,12 @@ data class CreateMenuInput(
     val availableFromDate: String? = null,
     val availableUntilDate: String? = null,
     val color: String? = null,
-    val special: Boolean = false
+    val special: Boolean = false,
+    // With special: what it's for; an EVENT menu needs eventId.
+    val specialKind: SpecialMenuKind? = null,
+    val eventId: String? = null,
+    // Show in POS (to waiters and at the till).
+    val shownToWaiters: Boolean = true
 )
 
 data class UpdateMenuInput(
@@ -40,7 +52,12 @@ data class UpdateMenuInput(
     val availableUntilDate: String? = null,
     val color: String? = null,
     // Null keeps it as it is.
-    val special: Boolean? = null
+    val special: Boolean? = null,
+    // With special = true: what it's for (null keeps it); an EVENT menu needs eventId.
+    val specialKind: SpecialMenuKind? = null,
+    val eventId: String? = null,
+    // Show in POS (to waiters and at the till); null keeps it.
+    val shownToWaiters: Boolean? = null
 )
 
 data class MenuSectionInput(
@@ -144,6 +161,35 @@ interface MenuRepository {
         input: CreateMenuInput
     ): Menu
 
+    // What waiters see right now (schedule, "Menus shown", event nights), decided by the server.
+    suspend fun getMenusAvailableNow(restaurantId: String): List<Menu> =
+        getMenus(restaurantId = restaurantId, active = true, size = 100).items
+
+    // The order menus are shown in (first = shown first).
+    suspend fun saveMenuOrder(restaurantId: String, menuIds: List<String>): Unit =
+        throw UnsupportedOperationException("Changing the menu order isn't available here")
+
+    // Which menus waiters see (Menu → "Menus shown").
+    suspend fun getWaiterView(restaurantId: String): MenuWaiterView = MenuWaiterView()
+
+    suspend fun saveWaiterView(restaurantId: String, view: MenuWaiterView): MenuWaiterView =
+        throw UnsupportedOperationException("Choosing the waiters' menus isn't available here")
+
+    // The restaurant's event nights, for linking an event menu (each says which menu it already has).
+    suspend fun getEventNights(restaurantId: String): List<MenuEventNight> = emptyList()
+
+    // Adds an event night from the menu editor (the menu links to it when the menu saves).
+    suspend fun createEventNight(restaurantId: String, input: MenuEventNightInput): MenuEventNight =
+        throw UnsupportedOperationException("Adding events isn't available here")
+
+    // Changes an event night's name, icon or days, keeping its menu (whose days follow the event's).
+    suspend fun updateEventNight(restaurantId: String, event: MenuEventNight, input: MenuEventNightInput): MenuEventNight =
+        throw UnsupportedOperationException("Changing events isn't available here")
+
+    // Deletes an event night; the server switches off the menu it had.
+    suspend fun deleteEventNight(restaurantId: String, eventId: String): Unit =
+        throw UnsupportedOperationException("Deleting events isn't available here")
+
     suspend fun getMenu(
         menuId: String,
         includeSections: Boolean = false,
@@ -205,6 +251,29 @@ interface MenuRepository {
         itemId: String,
         available: Boolean
     ): MenuItem
+
+    // The dish's photo: uploaded to the server's storage (replacing any earlier one), or removed.
+    suspend fun uploadItemImage(
+        menuId: String,
+        sectionId: String,
+        itemId: String,
+        imageBytes: ByteArray,
+        fileName: String,
+        contentType: String
+    ): MenuItem = throw UnsupportedOperationException("Photo uploads aren't available here")
+
+    suspend fun removeItemImage(menuId: String, sectionId: String, itemId: String): MenuItem =
+        throw UnsupportedOperationException("Photo uploads aren't available here")
+
+    // The dish's ingredients from stock (its recipe underneath), and the stock items and preparations to pick from.
+    suspend fun getDishRecipe(menuId: String, sectionId: String, itemId: String): DishRecipeDto =
+        throw UnsupportedOperationException("Dish ingredients aren't available here")
+
+    suspend fun saveDishRecipe(menuId: String, sectionId: String, itemId: String, ingredients: List<DishIngredientRequestDto>): DishRecipeDto =
+        throw UnsupportedOperationException("Dish ingredients aren't available here")
+
+    suspend fun ingredientChoices(menuId: String): List<IngredientChoiceDto> =
+        throw UnsupportedOperationException("Dish ingredients aren't available here")
 
     suspend fun deleteItem(
         menuId: String,

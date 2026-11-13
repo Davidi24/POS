@@ -301,6 +301,12 @@ class OrderApi(
         }.body()
     }
 
+    /** The guests asked for the bill (the table turns Bill Pending everywhere). */
+    suspend fun requestBill(restaurantId: String, orderId: String): OrderResponseDto =
+        client.post(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/orders/${orderId.encodeURLPathPart()}/bill-request")) {
+            headers.append("Idempotency-Key", kotlin.uuid.Uuid.random().toString())
+        }.body()
+
     suspend fun fulfillOrder(
         restaurantId: String,
         orderId: String,
@@ -348,6 +354,18 @@ class OrderApi(
             setBody(request)
         }.body()
     }
+
+    suspend fun closeUnpaid(restaurantId: String, orderId: String, request: OrderCloseUnpaidRequestDto): OrderResponseDto =
+        client.post(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/orders/${orderId.encodeURLPathPart()}/close-unpaid")) {
+            headers.append("Idempotency-Key", kotlin.uuid.Uuid.random().toString())
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    suspend fun reopenForPayment(restaurantId: String, orderId: String): OrderResponseDto =
+        client.post(endpoint("/restaurants/${restaurantId.encodeURLPathPart()}/orders/${orderId.encodeURLPathPart()}/reopen-for-payment")) {
+            headers.append("Idempotency-Key", kotlin.uuid.Uuid.random().toString())
+        }.body()
 
     suspend fun voidOrder(
         restaurantId: String,

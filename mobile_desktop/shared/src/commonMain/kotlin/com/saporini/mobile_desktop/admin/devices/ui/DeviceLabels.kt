@@ -17,17 +17,19 @@ import com.saporini.mobile_desktop.core.format.humanize
 // Names, icons and colours for device kinds and states, shared by the list, the details and the editor.
 
 internal fun deviceTypeLabel(type: String?): String = when (type) {
-    "TERMINAL" -> "Till"
+    "POS_TERMINAL", "TERMINAL" -> "Till"
     "TABLET" -> "Tablet"
     "KDS" -> "Kitchen screen"
     "CUSTOMER_DISPLAY" -> "Customer display"
     "PAYMENT_TERMINAL" -> "Card terminal"
     "PRINTER" -> "Printer"
+    "SCANNER" -> "Barcode scanner"
+    "CASH_DRAWER" -> "Cash drawer"
     else -> humanize(type)
 }
 
 internal fun deviceTypeIcon(type: String?): ImageVector = when (type) {
-    "TERMINAL" -> Icons.Outlined.PointOfSale
+    "POS_TERMINAL", "TERMINAL" -> Icons.Outlined.PointOfSale
     "TABLET" -> Icons.Outlined.TabletAndroid
     "KDS" -> Icons.Outlined.Restaurant
     "CUSTOMER_DISPLAY" -> Icons.Outlined.DisplaySettings
@@ -37,7 +39,7 @@ internal fun deviceTypeIcon(type: String?): ImageVector = when (type) {
 }
 
 internal fun deviceStatusLabel(status: String?): String = when (status) {
-    "PROVISIONING" -> "Setting up"
+    "PROVISIONING" -> "To confirm"
     "ACTIVE" -> "In use"
     "INACTIVE" -> "Switched off"
     "BLOCKED" -> "Blocked"
@@ -48,8 +50,8 @@ internal fun deviceStatusLabel(status: String?): String = when (status) {
 
 internal fun deviceStatusColor(status: String?): Color = when (status) {
     "ACTIVE" -> Kit.Green
-    "PROVISIONING" -> Kit.Blue
-    "MAINTENANCE" -> Kit.Amber
+    "PROVISIONING" -> Kit.Amber
+    "MAINTENANCE" -> Kit.Purple
     "BLOCKED" -> Kit.Danger
     else -> Kit.Grey
 }

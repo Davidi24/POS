@@ -34,8 +34,6 @@ private val ShiftBorder = Color(0xFFE3E8E1)
 internal val ShiftBlue = Color(0xFF24748A)
 internal val ShiftAmber = Color(0xFFC8790B)
 
-internal enum class ShiftAdminView(val label: String) { SCHEDULE("Schedule"), PAY("Hours & pay") }
-
 @Composable
 fun ShiftScreen(modifier: Modifier = Modifier, management: Boolean = false) {
     val model = koinInject<ShiftScreenModel>()
@@ -48,20 +46,54 @@ fun ShiftScreen(modifier: Modifier = Modifier, management: Boolean = false) {
     ShiftContent(state, management, model, modifier)
 }
 
+/** Admin Hub → Salary: its own section next to Shifts. */
 @Composable
-internal fun ShiftContent(state: ShiftState, management: Boolean, model: ShiftScreenModel, modifier: Modifier = Modifier) {
-    if (!management) { MyShiftContent(state, model, modifier); return }
-    // Admin Hub → Shifts: the schedule, and hours & pay for managers who can see wages.
-    var view by remember { mutableStateOf(ShiftAdminView.SCHEDULE) }
-    val tabs: (@Composable () -> Unit)? = if (!state.canManage) null else ({
-        com.saporini.mobile_desktop.core.components.OverviewTabs(
-            ShiftAdminView.entries.map { it.label }, view.label, { label -> view = ShiftAdminView.entries.first { it.label == label } },
-            Modifier.width(196.dp), height = ToolbarHeight
-        )
-    })
-    when (view) {
-        ShiftAdminView.SCHEDULE -> ShiftAdminCalendar(state, model, modifier, tabs)
-        ShiftAdminView.PAY -> HoursAndPay(state, modifier, tabs)
+fun HoursAndPayScreen(modifier: Modifier = Modifier) {
+    val model = koinInject<ShiftScreenModel>()
+    val state by model.state.collectAsState()
+    DisposableEffect(model) {
+        model.start(true)
+        onDispose { model.onDispose() }
+    }
+    HoursAndPayContent(state, modifier)
+}
+
+@Composable
+internal fun ShiftContent(
+    state: ShiftState, management: Boolean, model: ShiftScreenModel, modifier: Modifier = Modifier,
+    startOnTeam: Boolean = false, openDay: kotlinx.datetime.LocalDate? = null
+) {
+    if (!management) { MyShiftContent(state, model, modifier, startOnTeam, openDay); return }
+    // Admin Hub → Shifts: the usual shifts and the month calendar, under its own title row with Plan shifts. Salary is its own
+    // section in the Admin Hub bar.
+    ShiftPage(null, null, modifier) { size, side ->
+        ShiftSchedule(state, model, size, Modifier.weight(1f), side = side, openDay = openDay)
+    }
+}
+
+@Composable
+internal fun HoursAndPayContent(
+    state: ShiftState, modifier: Modifier = Modifier, startOpen: String? = null, startEditing: String? = null, startTeam: String? = null,
+    startPaying: String? = null, startPayingPerson: String? = null
+) {
+    // Salary draws its own Inventory-style header (title left, the period on the right).
+    HoursAndPay(state, modifier, startOpen, startEditing, startTeam, startPaying, startPayingPerson)
+}
+
+/** A page with its title on top. The content pads its own sides, so an edge button can sit on the window's edge. */
+@Composable
+private fun ShiftPage(title: String?, subtitle: String?, modifier: Modifier,
+                      content: @Composable ColumnScope.(com.saporini.mobile_desktop.core.ui.ScreenSize, androidx.compose.ui.unit.Dp) -> Unit) {
+    BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
+        val size = com.saporini.mobile_desktop.core.ui.screenSizeFor(maxWidth)
+        val side = if (size.isPhone) 12.dp else 22.dp
+        Column(Modifier.fillMaxSize().padding(top = if (size.isPhone) 14.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(if (size.isPhone) 10.dp else 14.dp)) {
+            if (title != null) Column(Modifier.padding(horizontal = side)) {
+                Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (size.isPhone) 19.sp else 20.sp, letterSpacing = 0.sp, color = FormInk, maxLines = 1)
+                subtitle?.let { Text(it, fontFamily = Inter(), fontSize = 12.sp, color = FormMuted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            }
+            content(size, side)
+        }
     }
 }
 
@@ -121,19 +153,61 @@ internal fun ShiftContent(state: ShiftState, management: Boolean, model: ShiftSc
     }
 }
 @Composable internal fun ShiftDetails(item: ShiftItem, zone: TimeZone, state: ShiftState, now: Instant, onDismiss: () -> Unit, onEdit: () -> Unit, onCorrect: () -> Unit, onAction: (String) -> Unit) {
-    ShiftDialog("Shift details", state.busy, onDismiss) {
-        Text(item.userName, fontFamily = Inter(), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = FormInk)
-        ShiftBadge(item.status)
-        Muted("Times shown in ${zone.id}")
-        if (item.scheduledStart != null) DetailLine("Scheduled", "${item.scheduledStart.shiftLabel(zone)} – ${item.scheduledEnd.shiftLabel(zone)}")
-        DetailLine("Clocked in", item.startedAt.shiftLabel(zone))
-        DetailLine("Clocked out", item.endedAt.shiftLabel(zone))
-        DetailLine("Worked time", shiftDuration(item.workedMinutes))
-        DetailLine("Break time", shiftDuration(item.breakMinutes))
-        if (!item.notes.isNullOrBlank()) { HorizontalDivider(color=ShiftBorder); Text(item.notes, fontFamily = Inter(), fontSize = 13.sp, color = FormInk) }
+    val day = item.start.shiftLocal(zone)?.date
+    val role = state.board?.staff?.firstOrNull { it.id == item.userId }?.roles?.firstOrNull()
+    com.saporini.mobile_desktop.core.components.AppDialog(
+        "Shift", onDismiss, busy = state.busy, maxWidth = 580.dp,
+        subtitle = day?.let { "${it.dayOfWeek.name.lowercase().replaceFirstChar { c -> c.uppercase() }}, ${it.day} ${it.month.name.lowercase().replaceFirstChar { c -> c.uppercase() }} · times in ${zone.id}" }
+    ) {
+        // Who, and where the shift stands.
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(FormGreenSoft.copy(alpha = 0.6f)).padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ShiftAvatar(item.userName, 46.dp)
+            Column(Modifier.weight(1f)) {
+                Text(item.userName, fontFamily = Inter(), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = FormInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(role ?: "Team member", fontFamily = Inter(), fontSize = 12.sp, color = FormMuted)
+            }
+            ShiftBadge(item.status)
+        }
+        // The times, two by two.
+        val planned = item.plannedMinutes()
+        val lines = listOfNotNull(
+            item.scheduledStart?.let { "Planned" to "${it.shiftTime(zone)} – ${item.scheduledEnd.shiftTime(zone)}${if (planned > 0) "  ·  ${shiftDuration(planned)}" else ""}" },
+            "Worked" to if (item.startedAt == null) "—" else shiftDuration(item.workedMinutes),
+            "Clocked in" to item.startedAt.shiftTime(zone),
+            "Clocked out" to (item.endedAt?.shiftTime(zone) ?: if (item.active) "Still working" else "—"),
+            "Breaks" to if (item.breakMinutes > 0) shiftDuration(item.breakMinutes) else "None"
+        )
+        lines.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                pair.forEach { (label, value) ->
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).border(1.dp, ShiftBorder, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Muted(label)
+                        Text(value, fontFamily = Inter(), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = FormInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
         if (item.breaks.isNotEmpty()) {
-            Text("Breaks", fontFamily = Inter(), fontWeight = FontWeight.Bold, color = FormInk)
-            item.breaks.forEach { br -> DetailLine(if (br.paid) "Paid break" else "${br.type.lowercase().replace('_', ' ')} (unpaid)", "${br.startedAt.shiftTime(zone)} – ${br.endedAt?.shiftTime(zone) ?: "Now"}") }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Breaks", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = FormInk)
+                item.breaks.forEach { br ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Outlined.Coffee, null, Modifier.size(16.dp), tint = ShiftAmber)
+                        Text(if (br.paid) "Paid break" else "${br.type.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }} (unpaid)", Modifier.weight(1f),
+                            fontFamily = Inter(), fontSize = 13.sp, color = FormInk)
+                        Text("${br.startedAt.shiftTime(zone)} – ${br.endedAt?.shiftTime(zone) ?: "now"}", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = FormInk)
+                    }
+                }
+            }
+        }
+        if (!item.notes.isNullOrBlank()) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFFF7F9F7)).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.StickyNote2, null, Modifier.size(17.dp), tint = FormMuted)
+                Text(item.notes, fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = FormInk)
+            }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (item.userId == state.userId && state.canSelf && item.status == "SCHEDULED" && state.board?.current == null && canClockIn(item, now, state.board?.clockInEarlyMinutes ?: 120)) ShiftButton("Clock in", Icons.Outlined.PlayArrow, enabled = !state.busy) { onAction("clock-in") }
@@ -173,6 +247,19 @@ internal fun ShiftContent(state: ShiftState, management: Boolean, model: ShiftSc
             else Text(item.userName, fontFamily = Inter(), fontSize = 14.sp, color = FormInk)
         }
         if (!correction && state.board?.staff.isNullOrEmpty() && item == null) Muted("No active staff in this branch. Assign staff to the branch before scheduling.")
+        if (!correction) {
+            // A usual shift sets both times (and the next day for one that ends after midnight).
+            val templates by ShiftTemplates.all.collectAsState()
+            if (templates.isNotEmpty()) FormField("Usual shifts", optional = true) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    templates.forEach { t ->
+                        SmallToggle("${t.name} · ${t.times}", startTime == t.start.hhmm() && endTime == t.end.hhmm()) {
+                            startTime = t.start.hhmm(); endTime = t.end.hhmm(); endDate = if (t.overnight) startDate.plus(DatePeriod(days = 1)) else startDate
+                        }
+                    }
+                }
+            }
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             FormField("Start date", Modifier.weight(1f).widthIn(min = 190.dp), required = true) { DateBox(startDate) { startDate = it } }
             FormField("Start time", Modifier.weight(1f).widthIn(min = 190.dp), required = true) { InputBox(Icons.Outlined.Schedule, startTime, "HH:mm") { startTime = it.take(5) } }

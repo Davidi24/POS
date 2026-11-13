@@ -6,12 +6,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -25,6 +27,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.Close
@@ -43,11 +47,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +68,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -88,41 +96,79 @@ internal fun AppDialog(
     busy: Boolean = false,
     maxWidth: Dp = 620.dp,
     buttons: (@Composable RowScope.() -> Unit)? = null,
+    // A window that keeps one size while what's in it changes (steps of the shift planner); never taller than the screen.
+    height: Dp? = null,
+    // One step back inside the window: a plain arrow before the title (user, 2026-10-31: "the back arrow is at the top").
+    onBack: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(
-            modifier.padding(16.dp).widthIn(max = maxWidth).fillMaxWidth().heightIn(max = 820.dp),
-            shape = RoundedCornerShape(16.dp), color = Color.White
-        ) {
-            Column {
-                Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 18.dp), verticalAlignment = Alignment.Top) {
-                    Column(Modifier.weight(1f).padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(title, fontFamily = Inter(), fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Kit.Ink)
-                        subtitle?.let { Text(it, fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted) }
+        BoxWithConstraints {
+            // On a phone the dialog takes nearly the whole width and its sides are slimmer, so fields keep their room.
+            // this.maxWidth is the window's width (the parameter of the same name is the dialog's own limit).
+            val narrow = this.maxWidth < NarrowDialogWidth
+            val side = if (narrow) 18.dp else 24.dp
+            Surface(
+                modifier.padding(if (narrow) 10.dp else 16.dp).widthIn(max = maxWidth).fillMaxWidth()
+                    .then(if (height != null) Modifier.heightIn(max = height).fillMaxHeight() else Modifier.heightIn(max = 820.dp)),
+                shape = RoundedCornerShape(16.dp), color = Color.White
+            ) {
+                CompositionLocalProvider(LocalNarrowDialog provides narrow) {
+                    Column {
+                        Row(Modifier.fillMaxWidth().padding(start = if (onBack != null) side - 12.dp else side, end = if (narrow) 6.dp else 12.dp, top = if (narrow) 14.dp else 18.dp),
+                            verticalAlignment = Alignment.Top) {
+                            onBack?.let { IconButton(it, enabled = !busy) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back", tint = Kit.Ink) } }
+                            Column(Modifier.weight(1f).padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(title, fontFamily = Inter(), fontSize = if (narrow) 18.sp else 20.sp, fontWeight = FontWeight.Bold, color = Kit.Ink)
+                                subtitle?.let { Text(it, fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted) }
+                            }
+                            IconButton(onDismiss, enabled = !busy) { Icon(Icons.Outlined.Close, "Close", tint = Kit.Ink) }
+                        }
+                        val scroll = rememberScrollState()
+                        val body: @Composable BoxScope.() -> Unit = {
+                            Column(
+                                Modifier.verticalScroll(scroll).padding(horizontal = side, vertical = DialogContentPadding),
+                                verticalArrangement = Arrangement.spacedBy(14.dp),
+                                content = content
+                            )
+                            Box(Modifier.matchParentSize().padding(end = if (narrow) 4.dp else 6.dp, top = 4.dp, bottom = 4.dp)) { EdgeScrollbar(scroll) }
+                        }
+                        if (height == null) Box(Modifier.weight(1f, fill = false), content = body)
+                        else BoxWithConstraints(Modifier.weight(1f)) {
+                            CompositionLocalProvider(LocalDialogRoom provides (maxHeight - DialogContentPadding * 2).coerceAtLeast(0.dp)) { body() }
+                        }
+                        buttons?.let {
+                            KitDivider()
+                            Row(
+                                Modifier.fillMaxWidth().padding(horizontal = side, vertical = if (narrow) 12.dp else 14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                                verticalAlignment = Alignment.CenterVertically,
+                                content = it
+                            )
+                        }
                     }
-                    IconButton(onDismiss, enabled = !busy) { Icon(Icons.Outlined.Close, "Close", tint = Kit.Ink) }
-                }
-                Column(
-                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    content = content
-                )
-                buttons?.let {
-                    KitDivider()
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-                        verticalAlignment = Alignment.CenterVertically,
-                        content = it
-                    )
                 }
             }
         }
     }
 }
 
-enum class ButtonStyle { PRIMARY, SECONDARY, DANGER }
+/** Height of compact fields and filter buttons (phone filter rows). */
+internal val CompactFieldHeight = 38.dp
+
+/** Below this window width a dialog is "narrow" (a phone): slimmer sides, and [FieldPair]s stack. */
+private val NarrowDialogWidth = 480.dp
+
+/** True inside an [AppDialog] shown on a phone-wide window. */
+internal val LocalNarrowDialog = staticCompositionLocalOf { false }
+
+private val DialogContentPadding = 14.dp
+
+/** The height an [AppDialog] with a fixed `height` has for its content, so a step with little in it can sit in the middle. */
+internal val LocalDialogRoom = staticCompositionLocalOf<Dp?> { null }
+
+/** DANGER is a filled red button; DANGER_OUTLINE is white with red text and border (e.g. "Cancel order" next to a green button). */
+enum class ButtonStyle { PRIMARY, SECONDARY, DANGER, DANGER_OUTLINE, PRIMARY_OUTLINE }
 
 @Composable
 internal fun KitButton(
@@ -138,16 +184,27 @@ internal fun KitButton(
         ButtonStyle.PRIMARY -> Kit.Green
         ButtonStyle.SECONDARY -> Color.White
         ButtonStyle.DANGER -> Kit.Danger
+        ButtonStyle.DANGER_OUTLINE -> Color.White
+        ButtonStyle.PRIMARY_OUTLINE -> Color.White
     }
-    val content = if (style == ButtonStyle.SECONDARY) Kit.Ink else Color.White
+    val outlined = style == ButtonStyle.SECONDARY || style == ButtonStyle.DANGER_OUTLINE || style == ButtonStyle.PRIMARY_OUTLINE
+    val content = when (style) {
+        ButtonStyle.SECONDARY -> Kit.Ink; ButtonStyle.DANGER_OUTLINE -> Kit.Danger; ButtonStyle.PRIMARY_OUTLINE -> Kit.Green; else -> Color.White
+    }
     Button(
         onClick, modifier.heightIn(min = 44.dp), enabled = enabled && !loading, shape = RoundedCornerShape(8.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = container, contentColor = content,
-            disabledContainerColor = if (style == ButtonStyle.SECONDARY) Color.White else container.copy(alpha = 0.4f),
-            disabledContentColor = if (style == ButtonStyle.SECONDARY) Kit.Faint else Color.White
+            disabledContainerColor = if (outlined) Color.White else container.copy(alpha = 0.4f),
+            disabledContentColor = if (outlined) Kit.Faint else Color.White
         ),
-        border = if (style == ButtonStyle.SECONDARY) BorderStroke(1.dp, FormColors.Border) else null,
+        border = when (style) {
+            ButtonStyle.SECONDARY -> BorderStroke(1.dp, FormColors.Border)
+            ButtonStyle.DANGER_OUTLINE -> BorderStroke(1.dp, Kit.Danger.copy(alpha = if (enabled) 0.55f else 0.25f))
+            // Green outline: a quieter way forward next to Back, e.g. "Skip for now".
+            ButtonStyle.PRIMARY_OUTLINE -> BorderStroke(1.5.dp, Kit.Green.copy(alpha = if (enabled) 0.8f else 0.3f))
+            else -> null
+        },
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
     ) {
         if (loading) {
@@ -299,21 +356,30 @@ internal fun <T> SelectInput(
     problem: String? = null,
     hint: String? = null,
     enabled: Boolean = true,
-    placeholder: String = "Choose"
+    placeholder: String = "Choose",
+    // A smaller field for filter rows on a phone.
+    compact: Boolean = false,
+    // An icon (in its colour) for each choice in the list; the field then shows the chosen one's icon too.
+    iconOf: ((T) -> ImageVector)? = null,
+    iconColorOf: ((T) -> Color)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     val field: @Composable () -> Unit = {
         Box {
             Row(
-                Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(8.dp))
+                Modifier.fillMaxWidth().height(if (compact) CompactFieldHeight else 46.dp).clip(RoundedCornerShape(8.dp))
                     .background(if (enabled) Color.White else Kit.Canvas)
                     .border(1.dp, if (problem != null) Kit.Danger else FormColors.Border, RoundedCornerShape(8.dp))
-                    .clickable(enabled = enabled) { expanded = true }.padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    .clickable(enabled = enabled) { expanded = true }.padding(horizontal = if (compact) 10.dp else 12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 10.dp)
             ) {
-                icon?.let { Icon(it, null, Modifier.size(18.dp), tint = Kit.Ink) }
+                val chosenIcon = if (value != null && iconOf != null) iconOf(value) else icon
+                chosenIcon?.let {
+                    Icon(it, null, Modifier.size(if (compact) 16.dp else 18.dp),
+                        tint = if (value != null && iconOf != null) iconColorOf?.invoke(value) ?: Kit.Ink else Kit.Ink)
+                }
                 val text = value?.let(labelOf)
-                Text(text ?: placeholder, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                Text(text ?: placeholder, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = if (compact) 12.sp else 13.sp,
                     color = if (text == null) FormColors.Placeholder else if (enabled) Kit.Ink else Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp), tint = Kit.Ink)
             }
@@ -321,10 +387,18 @@ internal fun <T> SelectInput(
                 choices.forEach { choice ->
                     DropdownMenuItem(
                         text = {
-                            Text(labelOf(choice), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                            Text(labelOf(choice), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp,
                                 color = if (choice == value) Kit.Green else Kit.Ink)
                         },
-                        onClick = { onSelect(choice); expanded = false }
+                        onClick = { onSelect(choice); expanded = false },
+                        leadingIcon = iconOf?.let { iconFor ->
+                            {
+                                Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp))
+                                    .background((iconColorOf?.invoke(choice) ?: Kit.Ink).copy(alpha = 0.12f)), Alignment.Center) {
+                                    Icon(iconFor(choice), null, Modifier.size(16.dp), tint = iconColorOf?.invoke(choice) ?: Kit.Ink)
+                                }
+                            }
+                        }
                     )
                 }
             }
@@ -349,8 +423,9 @@ internal fun ToggleRow(title: String, checked: Boolean, onChange: (Boolean) -> U
     }
 }
 
+/** A switch; with no [onChange] it only shows its state, in its normal colours (not greyed out like a disabled one). */
 @Composable
-internal fun KitSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true, compact: Boolean = false) {
+internal fun KitSwitch(checked: Boolean, onChange: ((Boolean) -> Unit)?, enabled: Boolean = true, compact: Boolean = false) {
     if (compact) {
         // A smaller switch for dense lists; the whole row stays the touch target.
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp) {
@@ -401,7 +476,7 @@ internal fun CheckRow(
 
 /** Two fields side by side on wide dialogs, one under the other on narrow ones. */
 @Composable
-internal fun FieldPair(first: @Composable (Modifier) -> Unit, second: @Composable (Modifier) -> Unit, wide: Boolean = true) {
+internal fun FieldPair(first: @Composable (Modifier) -> Unit, second: @Composable (Modifier) -> Unit, wide: Boolean = !LocalNarrowDialog.current) {
     if (wide) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             first(Modifier.weight(1f))
@@ -446,26 +521,32 @@ internal fun <T> SearchableSelect(
     hint: String? = null,
     enabled: Boolean = true,
     placeholder: String = "Choose",
-    maxShown: Int = 60
+    maxShown: Int = 60,
+    // A smaller field for filter rows on a phone.
+    compact: Boolean = false,
+    // A picture for each choice (drawn at the size given): in every row of the list, and in the field for the chosen one.
+    leadingOf: (@Composable (T, Dp) -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     val field: @Composable () -> Unit = {
         Box {
             Row(
-                Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(8.dp))
+                Modifier.fillMaxWidth().height(if (compact) CompactFieldHeight else 46.dp).clip(RoundedCornerShape(8.dp))
                     .background(if (enabled) Color.White else Kit.Canvas)
                     .border(1.dp, if (problem != null) Kit.Danger else FormColors.Border, RoundedCornerShape(8.dp))
-                    .clickable(enabled = enabled) { query = ""; expanded = true }.padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    .clickable(enabled = enabled) { query = ""; expanded = true }.padding(horizontal = if (compact) 10.dp else 12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 10.dp)
             ) {
-                icon?.let { Icon(it, null, Modifier.size(18.dp), tint = Kit.Ink) }
+                if (value != null && leadingOf != null) leadingOf(value, if (compact) 22.dp else 28.dp)
+                else icon?.let { Icon(it, null, Modifier.size(if (compact) 16.dp else 18.dp), tint = Kit.Ink) }
                 val text = value?.let(labelOf)
-                Text(text ?: placeholder, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                Text(text ?: placeholder, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = if (compact) 12.sp else 13.sp,
                     color = if (text == null) FormColors.Placeholder else Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp), tint = Kit.Ink)
             }
-            DropdownMenu(expanded, { expanded = false }, Modifier.background(Color.White).widthIn(min = 280.dp).heightIn(max = 380.dp)) {
+            DropdownMenu(expanded, { expanded = false }, Modifier.background(Color.White).widthIn(min = 280.dp)) {
+                // The search box stays put; only the choices under it scroll.
                 Box(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                     SearchField(query, { query = it }, Modifier.widthIn(min = 260.dp), placeholder = "Type to search", height = 40.dp)
                 }
@@ -477,23 +558,31 @@ internal fun <T> SearchableSelect(
                 if (matches.isEmpty()) {
                     Text("Nothing matches", Modifier.padding(horizontal = 16.dp, vertical = 10.dp), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
                 }
+                Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
                 matches.take(maxShown).forEach { choice ->
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(labelOf(choice), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
-                                    color = if (choice == value) Kit.Green else Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                detailOf?.invoke(choice)?.takeIf { it.isNotBlank() }?.let {
-                                    Text(it, fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
+                    // Plain rows (not menu items, whose text style spaces letters out): name, detail, a tick on the chosen one.
+                    val chosen = choice == value
+                    Row(
+                        Modifier.widthIn(min = 280.dp).fillMaxWidth().padding(horizontal = 6.dp, vertical = 1.dp).clip(RoundedCornerShape(8.dp))
+                            .background(if (chosen) Kit.GreenSoft else Color.Transparent)
+                            .clickable { onSelect(choice); expanded = false }.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        leadingOf?.invoke(choice, 36.dp)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(labelOf(choice), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp,
+                                color = if (chosen) Kit.Green else Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            detailOf?.invoke(choice)?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, fontFamily = Inter(), fontSize = 11.sp, letterSpacing = 0.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                        },
-                        onClick = { onSelect(choice); expanded = false }
-                    )
+                        }
+                        if (chosen) Icon(Icons.Outlined.Check, null, Modifier.size(16.dp), tint = Kit.Green)
+                    }
                 }
                 if (matches.size > maxShown) {
                     Text("${matches.size - maxShown} more — keep typing to narrow down", Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         fontFamily = Inter(), fontSize = 11.sp, color = Kit.Faint)
+                }
                 }
             }
         }

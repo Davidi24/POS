@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.pos.reservations
 
+import com.saporini.mobile_desktop.pos.tables.ui.toUiTable
 import androidx.compose.material3.HorizontalDivider
 
 import androidx.compose.ui.draw.alpha
@@ -65,7 +66,7 @@ import kotlin.time.Duration.Companion.hours
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.ViewTimeline
@@ -175,7 +176,8 @@ private val NowGreen = Color(0xFF2E9E4F)
 // Stronger shades of each status's calendar block color.
 internal val StatusDotColors = linkedMapOf(
     "Pending" to Color(0xFFC8790B),
-    "Confirmed" to Color(0xFF8DB580),
+    // A plain green (user, 2026-11-03); it was a washed-out sage.
+    "Confirmed" to Color(0xFF16A34A),
     "Checked in" to Color(0xFF24748A),
     "Seated" to Color(0xFF4F7942),
     "Completed" to Color(0xFF8A8D88),
@@ -192,7 +194,12 @@ private val RowVerticalPadding = 8.dp
 @Composable
 fun ReservationsScreen(
     modifier: Modifier = Modifier,
-    onGoToTable: (String) -> Unit = {},
+    // Booking areas are set up here by people who may change the floor layout (user, 2026-11-02).
+    canManageAreas: Boolean = false,
+    // A table (and whose booking it is), shown on Tables.
+    onGoToTable: (String, String?) -> Unit = { _, _ -> },
+    // An order, shown in Orders.
+    onGoToOrder: (String) -> Unit = {},
     focusReservationId: String? = null,
     onFocusHandled: () -> Unit = {}
 ) {
@@ -200,6 +207,9 @@ fun ReservationsScreen(
     // Opened from a notification: show that reservation's details.
     LaunchedEffect(focusReservationId) {
         focusReservationId?.let {
+            // Opened from Tables or a notification, the model may be brand new: it sets itself up for the signed-in
+            // person first, and a booking chosen before that would be wiped.
+            model.state.first { state -> state.scope != null }
             model.selectReservation(it)
             onFocusHandled()
         }
@@ -241,7 +251,7 @@ fun ReservationsScreen(
     val policy = model.state.collectAsState().value.policy
     Box(modifier.fillMaxSize()) {
         androidx.compose.runtime.CompositionLocalProvider(LocalReservationPolicy provides policy) {
-            ReservationsCalendarContent(model = model, onGoToTable = onGoToTable, modifier = Modifier.fillMaxSize())
+            ReservationsCalendarContent(model = model, onGoToTable = onGoToTable, onGoToOrder = onGoToOrder, canManageAreas = canManageAreas, modifier = Modifier.fillMaxSize())
         }
         TableNotificationQueue(
             notifications = notices,
@@ -254,10 +264,44 @@ fun ReservationsScreen(
 @Composable
 private fun ReservationsCalendarContent(
     model: ReservationsScreenModel,
-    onGoToTable: (String) -> Unit,
-    modifier: Modifier = Modifier
+    onGoToTable: (String, String?) -> Unit,
+    modifier: Modifier = Modifier,
+    canManageAreas: Boolean = false,
+    onGoToOrder: (String) -> Unit = {}
 ) {
     val state by model.state.collectAsState()
+    val tablesById = remember(state.tableGroups) { state.tableGroups.flatMap { it.tables }.associateBy { it.id } }
+    val links = remember(tablesById, onGoToTable, onGoToOrder) {
+        BookingLinks(
+            orderOf = { reservation ->
+                if (reservation.status != ReservationStatus.SEATED) null
+                else reservation.tableAssignments.firstNotNullOfOrNull { assignment ->
+                    tablesById[assignment.tableId]?.let { table -> table.currentOrderId?.let { it to (table.currentOrderNumber ?: "Order") } }
+                }
+            },
+            goToTable = { reservation -> reservation.primaryTable?.tableNumber?.let { onGoToTable(it, reservation.displayGuestName) } },
+            goToOrder = onGoToOrder,
+            tableColor = { reservation ->
+                if (reservation.status != ReservationStatus.SEATED && reservation.status != ReservationStatus.CHECKED_IN) null
+                else reservation.primaryTable?.tableId?.let(tablesById::get)?.let { table ->
+                    com.saporini.mobile_desktop.pos.tables.ui.tableStatusColor(table.toUiTable().state)
+                }
+            }
+        )
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalBookingLinks provides links) {
+        ReservationsCalendarBody(model, state, onGoToTable, modifier, canManageAreas)
+    }
+}
+
+@Composable
+private fun ReservationsCalendarBody(
+    model: ReservationsScreenModel,
+    state: com.saporini.mobile_desktop.pos.reservations.ui.ReservationsUiState,
+    onGoToTable: (String, String?) -> Unit,
+    modifier: Modifier,
+    canManageAreas: Boolean
+) {
     // Re-picks today once the restaurant's zone arrives from the server.
     val restaurantZone = RestaurantTime.zone
     var selectedDate by remember(restaurantZone) { mutableStateOf(serviceDateOf(Clock.System.now(), restaurantZone)) }
@@ -276,6 +320,7 @@ private fun ReservationsCalendarContent(
     }
     var pickedFloor by remember { mutableStateOf<String?>(null) }
     var createOpen by remember { mutableStateOf(false) }
+    var areasOpen by remember { mutableStateOf(false) }
     var calendarOpen by remember { mutableStateOf(false) }
     var calendarView by remember { mutableStateOf(CalendarView.TIMELINE) }
     val clockNow by produceState(Clock.System.now()) {
@@ -410,6 +455,7 @@ private fun ReservationsCalendarContent(
         ) { page ->
             if (page == 0) {
                 ReservationOverviewScreen(
+                    onOpenAreas = if (canManageAreas) ({ areasOpen = true }) else null,
                     arrivals = state.arrivals,
                     arrivalsPaging = ListPaging(
                         hasMore = state.hasMoreArrivals,
@@ -566,6 +612,13 @@ private fun ReservationsCalendarContent(
                     }
                 )
         )
+        if (areasOpen) {
+            com.saporini.mobile_desktop.pos.tables.ui.BookingAreasDialog(onDismiss = {
+                areasOpen = false
+                // The calendar's areas and the suggested tables follow what changed.
+                model.refresh()
+            })
+        }
         if (createOpen) {
             CreateReservationDialog(
                 model = model,
@@ -609,7 +662,7 @@ private fun ReservationsCalendarToolbar(
     var datePickerOpen by remember { mutableStateOf(false) }
     val backAndTitle: @Composable () -> Unit = {
         IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
-            Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to overview", Modifier.size(20.dp), tint = Ink)
+            Icon(Icons.AutoMirrored.Filled.Reply, "Back to overview", Modifier.size(20.dp), tint = Ink)
         }
         Text(
             text = "Calendar",
@@ -1617,6 +1670,7 @@ internal fun HeaderDropdown(
                             fontFamily = Inter(),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp,
+                            letterSpacing = 0.sp,
                             color = Ink
                         )
                     },
@@ -1682,6 +1736,7 @@ private fun ReservationStatus.statusLabel(): String = when (this) {
     ReservationStatus.CANCELLED -> "Cancelled"
     ReservationStatus.NO_SHOW -> "No show"
     ReservationStatus.EXPIRED -> "Request expired"
+    ReservationStatus.NO_ACTION -> "No action taken"
 }
 
 private fun ReservationStatus.style(): EventStyle = when (this) {
@@ -1691,7 +1746,7 @@ private fun ReservationStatus.style(): EventStyle = when (this) {
     ReservationStatus.SEATED -> EventStyle(Color(0xFF4F7942), Color(0xFF4F7942))
     ReservationStatus.COMPLETED -> EventStyle(Color(0xFFE5E7E3), Color(0xFFD4D7D1))
     ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW -> EventStyle(Color(0xFFF0E2DE), Color(0xFFD0A39A))
-    ReservationStatus.EXPIRED -> EventStyle(Color(0xFFEDEDEB), Color(0xFFCFCFCB))
+    ReservationStatus.EXPIRED, ReservationStatus.NO_ACTION -> EventStyle(Color(0xFFEDEDEB), Color(0xFFCFCFCB))
 }
 
 private fun LocalDate.calendarLabel(): String = "${dayOfWeek.shortName()}, ${monthName()} $day, $year"
