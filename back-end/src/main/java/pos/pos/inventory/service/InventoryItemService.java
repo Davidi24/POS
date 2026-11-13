@@ -11,14 +11,27 @@ import pos.pos.exception.inventory.InventoryItemNotFoundException;
 import pos.pos.inventory.dto.InventoryItemRequest;
 import pos.pos.inventory.dto.InventoryItemResponse;
 import pos.pos.inventory.entity.InventoryItem;
+import pos.pos.inventory.entity.InventoryLevel;
+import pos.pos.inventory.enums.InventoryItemType;
+import pos.pos.inventory.enums.InventoryKindScope;
+import pos.pos.inventory.repository.InventoryCountRepository;
+import pos.pos.inventory.repository.InventoryLevelRepository;
 import pos.pos.inventory.mapper.InventoryItemMapper;
 import pos.pos.inventory.repository.InventoryItemRepository;
 import pos.pos.inventory.repository.InventorySalesSourceRepository;
+import pos.pos.recipe.entity.Recipe;
+import pos.pos.recipe.enums.RecipeStatus;
+import pos.pos.recipe.repository.RecipeRepository;
+import pos.pos.recipe.service.RecipeService;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
 import pos.pos.utils.NormalizationUtils;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 
@@ -34,6 +47,15 @@ public class InventoryItemService {
     private final InventoryItemRepository inventoryItemRepository;
     private final InventorySalesSourceRepository inventorySalesSourceRepository;
     private final InventoryItemMapper inventoryItemMapper;
+    private final SupplierService supplierService;
+    private final InventoryChangeNotifier inventoryChangeNotifier;
+    private final RecipeRepository recipeRepository;
+    private final RecipeService recipeService;
+    private final InventoryLevelRepository inventoryLevelRepository;
+    private final InventoryCountRepository inventoryCountRepository;
+    private final InventoryMovementService inventoryMovementService;
+    private final InventoryKindService inventoryKindService;
+    private final InventoryItemEvents inventoryItemEvents;
 
 
     //Finds the restaurant and the logged in user who is doing the change and then saves these Info and other info through the mapper
@@ -50,8 +72,15 @@ public class InventoryItemService {
         item.setCreatedBy(actorId);
         item.setUpdatedBy(actorId);
         inventoryItemMapper.applyRequest(item, request);
+        item.setKind(item.getItemType() == InventoryItemType.CUSTOM
+                ? inventoryKindService.requireOwnKind(restaurantId, InventoryKindScope.ITEM, request.getKindId()) : null);
+        supplierService.attachToItem(restaurantId, item, request.getSupplierId(), request.getSupplierName(), actorId);
 
-        return inventoryItemMapper.toResponse(saveItem(item));
+        InventoryItem saved = saveItem(item);
+        supplierService.linkSavedItem(saved);
+        inventoryItemEvents.record(saved, "ITEM_CREATED", "Added", actorId);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return inventoryItemMapper.toResponse(saved);
     }
 
 
@@ -76,10 +105,38 @@ public class InventoryItemService {
         assertBarcodeAvailable(restaurantId, request.getBarcode(), item.getBarcode());
         assertCodeAvailable(restaurantId, request.getCode(), item.getCode());
 
-        item.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
-        inventoryItemMapper.applyRequest(item, request);
+        // An item made here follows its sub-recipe: its unit is the batch's and its cost comes from the ingredients.
+        Recipe madeBy = recipeRepository.findByOutputItem_Id(itemId).orElse(null);
+        if (madeBy != null && request.getBaseUnit() != null && request.getBaseUnit() != madeBy.getYieldUnit()) {
+            throw new AuthException(item.getName() + " is made here: change how much a batch makes in its sub-recipe", HttpStatus.CONFLICT);
+        }
 
-        return inventoryItemMapper.toResponse(saveItem(item));
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        InventoryItemEvents.Snapshot before = InventoryItemEvents.Snapshot.of(item);
+        item.setUpdatedBy(actorId);
+        inventoryItemMapper.applyRequest(item, request);
+        item.setKind(item.getItemType() == InventoryItemType.CUSTOM
+                ? inventoryKindService.requireOwnKind(restaurantId, InventoryKindScope.ITEM, request.getKindId()) : null);
+        supplierService.attachToItem(restaurantId, item, request.getSupplierId(), request.getSupplierName(), actorId);
+
+        InventoryItem saved = saveItem(item);
+        supplierService.linkSavedItem(saved);
+        String changed = InventoryItemEvents.changes(before, saved);
+        if (!changed.isEmpty()) inventoryItemEvents.record(saved, "ITEM_UPDATED", changed, actorId);
+        if (madeBy != null) {
+            madeBy.setName(saved.getName());
+            if (saved.isActive() && madeBy.getStatus() != RecipeStatus.ACTIVE) {
+                madeBy.setStatus(RecipeStatus.ACTIVE);
+                madeBy.setRetiredAt(null);
+            } else if (!saved.isActive() && madeBy.getStatus() == RecipeStatus.ACTIVE) {
+                madeBy.setStatus(RecipeStatus.ARCHIVED);
+                madeBy.setRetiredAt(OffsetDateTime.now(ZoneOffset.UTC));
+            }
+            madeBy.setUpdatedBy(actorId);
+            recipeService.syncOutputItem(recipeRepository.saveAndFlush(madeBy), actorId);
+        }
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return withRecipe(saved);
     }
 
 
@@ -88,7 +145,7 @@ public class InventoryItemService {
     public InventoryItemResponse getItem(Authentication authentication, UUID restaurantId, UUID itemId) {
         //Check if allowed to manage
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
-        return inventoryItemMapper.toResponse(requireItem(restaurantId, itemId));
+        return withRecipe(requireItem(restaurantId, itemId));
     }
 
 
@@ -99,7 +156,7 @@ public class InventoryItemService {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
 
         String normalizedBarcode = NormalizationUtils.normalizeUpper(barcode);
-        return inventoryItemMapper.toResponse(
+        return withRecipe(
                 //If the Optional contains an item, return that InventoryItem.
                 //If it is empty, throw InventoryItemNotFoundException.
                 inventoryItemRepository.findByRestaurant_IdAndBarcodeAndDeletedAtIsNull(restaurantId, normalizedBarcode)
@@ -114,11 +171,8 @@ public class InventoryItemService {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
 
         String safeKeyword = keyword == null ? "" : keyword;
-        return inventoryItemRepository
-                .findAllByRestaurant_IdAndNameContainingIgnoreCaseAndDeletedAtIsNullOrderByNameAsc(restaurantId, safeKeyword)
-                .stream()
-                .map(inventoryItemMapper::toResponse)
-                .toList();
+        return withRecipes(restaurantId, inventoryItemRepository
+                .findAllByRestaurant_IdAndNameContainingIgnoreCaseAndDeletedAtIsNullOrderByNameAsc(restaurantId, safeKeyword));
     }
 
 
@@ -127,10 +181,7 @@ public class InventoryItemService {
     public List<InventoryItemResponse> listActiveItems(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
 
-        return inventoryItemRepository.findAllByRestaurant_IdAndActiveTrueAndDeletedAtIsNullOrderByNameAsc(restaurantId)
-                .stream()
-                .map(inventoryItemMapper::toResponse)
-                .toList();
+        return withRecipes(restaurantId, inventoryItemRepository.findAllByRestaurant_IdAndActiveTrueAndDeletedAtIsNullOrderByNameAsc(restaurantId));
     }
 
 
@@ -139,10 +190,7 @@ public class InventoryItemService {
     public List<InventoryItemResponse> listInactiveItems(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
 
-        return inventoryItemRepository.findAllByRestaurant_IdAndActiveFalseAndDeletedAtIsNullOrderByNameAsc(restaurantId)
-                .stream()
-                .map(inventoryItemMapper::toResponse)
-                .toList();
+        return withRecipes(restaurantId, inventoryItemRepository.findAllByRestaurant_IdAndActiveFalseAndDeletedAtIsNullOrderByNameAsc(restaurantId));
     }
 
 
@@ -151,10 +199,7 @@ public class InventoryItemService {
     public List<InventoryItemResponse> listAllItems(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
 
-        return inventoryItemRepository.findAllByRestaurant_IdAndDeletedAtIsNullOrderByNameAsc(restaurantId)
-                .stream()
-                .map(inventoryItemMapper::toResponse)
-                .toList();
+        return withRecipes(restaurantId, inventoryItemRepository.findAllByRestaurant_IdAndDeletedAtIsNullOrderByNameAsc(restaurantId));
     }
 
 
@@ -174,11 +219,107 @@ public class InventoryItemService {
             throw new AuthException("Remove this item's sale stock sources before deactivating it", HttpStatus.CONFLICT);
         }
 
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
         item.setActive(false);
-        item.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        item.setUpdatedBy(actorId);
         saveItem(item);
+        inventoryItemEvents.record(item, "ITEM_UPDATED", "Not in use", actorId);
+        // Switching off an item made here switches off its sub-recipe too, so dishes can't pick it any more.
+        recipeRepository.findByOutputItem_Id(itemId).filter(recipe -> recipe.getStatus() == RecipeStatus.ACTIVE).ifPresent(recipe -> {
+            recipe.setStatus(RecipeStatus.ARCHIVED);
+            recipe.setRetiredAt(OffsetDateTime.now(ZoneOffset.UTC));
+            recipe.setUpdatedBy(actorId);
+            recipeRepository.saveAndFlush(recipe);
+        });
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
     }
 
+
+    /**
+     * Deletes an item for good (Inventory → Items → Delete). Refused while a recipe still uses it (or its sub-recipe) or a
+     * count that isn't approved or cancelled holds it. What's left in stock is taken out with an "Item deleted" correction,
+     * so History and the stock value add up; its stock lines and sale places go, its own sub-recipe is archived, and its
+     * code is freed for a new item. The row stays (soft delete), so past movements, counts and orders keep their name.
+     */
+    @Transactional
+    public void deleteItem(Authentication authentication, UUID restaurantId, UUID itemId) {
+        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        InventoryItem item = requireItem(restaurantId, itemId);
+
+        List<String> recipes = recipeRepository.namesOfLiveRecipesUsingItem(itemId);
+        if (!recipes.isEmpty()) {
+            throw new AuthException(item.getName() + " is used in " + nameList(recipes) + ". Take it out of "
+                    + (recipes.size() == 1 ? "that recipe" : "those recipes") + " first.", HttpStatus.CONFLICT);
+        }
+        Recipe own = recipeRepository.findByOutputItem_Id(itemId).filter(recipe -> recipe.getStatus() != RecipeStatus.ARCHIVED).orElse(null);
+        if (own != null) {
+            List<String> users = recipeRepository.namesOfLiveRecipesUsingRecipe(own.getId());
+            if (!users.isEmpty()) {
+                throw new AuthException(item.getName() + " is used in " + nameList(users) + ". Take it out of "
+                        + (users.size() == 1 ? "that recipe" : "those recipes") + " first.", HttpStatus.CONFLICT);
+            }
+        }
+        if (inventoryCountRepository.itemInOpenCount(itemId)) {
+            throw new AuthException(item.getName() + " is in a count that isn't approved yet. Approve or cancel that count first.",
+                    HttpStatus.CONFLICT);
+        }
+
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        inventoryItemEvents.record(item, "ITEM_DELETED", "Deleted", actorId);
+        for (InventoryLevel level : inventoryLevelRepository.findAllByInventoryItem_IdOrderByLocation_NameAsc(itemId)) {
+            if (level.getOnHandQuantity() != null && level.getOnHandQuantity().signum() > 0) {
+                inventoryMovementService.writeOffForDeletion(restaurantId, level.getLocation(), item, level.getOnHandQuantity(), actorId);
+            }
+        }
+        inventoryLevelRepository.deleteAllForItem(itemId);
+        inventorySalesSourceRepository.deleteAllByInventoryItem_Id(itemId);
+        if (own != null) {
+            own.setStatus(RecipeStatus.ARCHIVED);
+            own.setRetiredAt(OffsetDateTime.now(ZoneOffset.UTC));
+            own.setUpdatedBy(actorId);
+            recipeRepository.saveAndFlush(own);
+        }
+
+        item.setActive(false);
+        item.setCode(freedCode(item.getCode()));
+        item.setDeletedAt(OffsetDateTime.now(ZoneOffset.UTC));
+        item.setUpdatedBy(actorId);
+        saveItem(item);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+    }
+
+    // "Margherita", "Margherita and Tomato sauce", "Margherita, Tomato sauce and 3 more".
+    private static String nameList(List<String> names) {
+        if (names.size() == 1) return names.get(0);
+        if (names.size() == 2) return names.get(0) + " and " + names.get(1);
+        if (names.size() == 3) return names.get(0) + ", " + names.get(1) + " and " + names.get(2);
+        return names.get(0) + ", " + names.get(1) + " and " + (names.size() - 2) + " more";
+    }
+
+    // Codes stay unique per restaurant even for deleted rows, so the deleted item's code gets a tail and a new item can take it.
+    private static String freedCode(String code) {
+        String tail = "~DEL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);
+        return (code.length() + tail.length() > 80 ? code.substring(0, 80 - tail.length()) : code) + tail;
+    }
+
+    // The item as the app gets it, with the sub-recipe that makes it when it's made here.
+    private InventoryItemResponse withRecipe(InventoryItem item) {
+        InventoryItemResponse response = inventoryItemMapper.toResponse(item);
+        recipeRepository.findByOutputItem_Id(item.getId()).ifPresent(recipe -> response.setRecipeId(recipe.getId()));
+        return response;
+    }
+
+    private List<InventoryItemResponse> withRecipes(UUID restaurantId, List<InventoryItem> items) {
+        Map<UUID, UUID> recipeByItem = new HashMap<>();
+        for (Object[] link : recipeRepository.outputItemLinks(restaurantId)) {
+            recipeByItem.put((UUID) link[0], (UUID) link[1]);
+        }
+        return items.stream().map(item -> {
+            InventoryItemResponse response = inventoryItemMapper.toResponse(item);
+            response.setRecipeId(recipeByItem.get(item.getId()));
+            return response;
+        }).toList();
+    }
 
     //Uses the repository Method to get the Item by Id and Restaurant, method optional datatype
     private InventoryItem requireItem(UUID restaurantId, UUID itemId) {

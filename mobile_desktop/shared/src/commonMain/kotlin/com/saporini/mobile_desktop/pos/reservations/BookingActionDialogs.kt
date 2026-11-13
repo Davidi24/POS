@@ -1,5 +1,13 @@
 package com.saporini.mobile_desktop.pos.reservations
 
+import androidx.compose.material.icons.outlined.TableRestaurant
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
+import com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationStatus
+import com.saporini.mobile_desktop.pos.reservations.domain.model.Reservation
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -224,5 +232,45 @@ internal fun BookingFlagChips(flags: List<BookingFlag>, modifier: Modifier = Mod
                 color = if (flag.color == HoldEndsColor) Color(0xFF8A6A00) else flag.color
             )
         }
+    }
+}
+
+// Table and Order buttons of a booking (user, 2026-11-02): both always there for a booking that's still on, each greyed
+// out until there's something to open ("No order yet" until its guests are seated with an order). Each opens it on Tables / in Orders, where it's shown.
+@Composable
+internal fun BookingLinkButtons(reservation: Reservation, modifier: Modifier = Modifier) {
+    val links = LocalBookingLinks.current ?: return
+    val table = reservation.primaryTable?.tableNumber
+    val active = reservation.status in setOf(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN, ReservationStatus.SEATED)
+    if (!active) return
+    val order = links.orderOf(reservation)
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        BookingLinkButton(
+            Icons.Outlined.TableRestaurant,
+            if (table == null) "No table yet" else "Table ${reservation.tableAssignments.mapNotNull { it.tableNumber }.joinToString(" + ")}",
+            Modifier.weight(1f), enabled = table != null
+        ) { links.goToTable(reservation) }
+        // Always both (user, 2026-11-02: "it should be just disabled").
+        BookingLinkButton(Icons.AutoMirrored.Outlined.ReceiptLong, order?.let { "Order ${it.second}" } ?: "No order yet", Modifier.weight(1f),
+            enabled = order != null) { order?.let { links.goToOrder(it.first) } }
+    }
+}
+
+@Composable
+internal fun BookingLinkButton(icon: ImageVector, text: String, modifier: Modifier = Modifier, enabled: Boolean = true, compact: Boolean = false,
+                               onClick: () -> Unit) {
+    Row(
+        modifier.height(if (compact) 30.dp else 40.dp).clip(RoundedCornerShape(8.dp))
+            .background(if (enabled) Color(0xFFF2F6F2) else Color(0xFFF6F6F4))
+            .border(1.dp, if (enabled) Color(0xFFCFDCCB) else Color(0xFFE6E6E2), RoundedCornerShape(8.dp))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = if (compact) 8.dp else 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 7.dp)
+    ) {
+        Icon(icon, null, Modifier.size(if (compact) 14.dp else 17.dp), tint = if (enabled) FormGreen else FormMuted)
+        Text(text, Modifier.weight(1f, fill = false), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = if (compact) 11.sp else 13.sp,
+            letterSpacing = 0.sp, color = if (enabled) FormInk else FormMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (enabled) Icon(Icons.Outlined.ChevronRight, null, Modifier.size(if (compact) 14.dp else 17.dp), tint = FormGreen)
     }
 }

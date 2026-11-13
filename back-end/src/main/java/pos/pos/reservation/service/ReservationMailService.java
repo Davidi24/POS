@@ -102,6 +102,16 @@ public class ReservationMailService {
                 () -> reminderDeliveryService.recordGuestReminderSent(reservation.getId()));
     }
 
+    // No answer to the first one: asked once more, a few hours before (Settings → Reservations).
+    public void reminderAgain(Reservation reservation) {
+        String body = greeting(reservation)
+                + "We haven't heard from you yet. Your table is booked for " + when(reservation) + " (" + guests(reservation) + ").\n\n"
+                + "Please confirm you're still coming, or cancel for free:\n"
+                + bookingPage(reservation) + "\n" + signature(reservation);
+        send(reservation, "Still coming today? Please confirm · " + restaurant(reservation), body,
+                () -> reminderDeliveryService.recordGuestReminderSent(reservation.getId(), pos.pos.reservation.enums.ReservationEventType.GUEST_REMINDED_AGAIN));
+    }
+
     public void paymentLink(Reservation reservation, List<MoneyLineResponse> due) {
         StringBuilder body = new StringBuilder(greeting(reservation)).append("For your booking on ").append(when(reservation)).append(":\n");
         appendDue(body, due, reservation);
@@ -167,8 +177,16 @@ public class ReservationMailService {
         return reservation.getRestaurant() == null ? "the restaurant" : reservation.getRestaurant().getName();
     }
 
+    // The restaurant's name and how to reach it (the branch's phone/email, otherwise the restaurant's).
     private String signature(Reservation reservation) {
-        return "\nSee you soon,\n" + restaurant(reservation) + "\n";
+        StringBuilder text = new StringBuilder("\nSee you soon,\n").append(restaurant(reservation)).append("\n");
+        var branch = reservation.getBranch();
+        var owner = reservation.getRestaurant();
+        String phone = branch != null && branch.getPhone() != null ? branch.getPhone() : owner == null ? null : owner.getPhone();
+        String email = branch != null && branch.getEmail() != null ? branch.getEmail() : owner == null ? null : owner.getEmail();
+        if (phone != null) text.append("Phone: ").append(phone).append("\n");
+        if (email != null) text.append("Email: ").append(email).append("\n");
+        return text.toString();
     }
 
     private static String money(MoneyLineResponse line, Reservation reservation) {

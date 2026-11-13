@@ -74,6 +74,8 @@ public class RecipeMapper {
                 .prepTimeMinutes(recipe.getPrepTimeMinutes())
                 .cookTimeMinutes(recipe.getCookTimeMinutes())
                 .instructions(recipe.getInstructions())
+                .imageUrl(recipe.getImageUrl())
+                .outputItemId(recipe.getOutputItem() == null ? null : recipe.getOutputItem().getId())
                 .theoreticalCost(recipe.getTheoreticalCost())
                 .effectiveFrom(recipe.getEffectiveFrom())
                 .retiredAt(recipe.getRetiredAt())

@@ -13,6 +13,7 @@ public class InventoryLocationMapper {
         location.setCode(request.getCode());
         location.setName(request.getName());
         location.setLocationType(request.getLocationType());
+        location.setIconCode(request.getIconCode());
         location.setNotes(request.getNotes());
         location.setActive(request.getActive() == null || request.getActive());
     }
@@ -29,6 +30,10 @@ public class InventoryLocationMapper {
                 .code(location.getCode())
                 .name(location.getName())
                 .locationType(location.getLocationType())
+                .iconCode(location.getIconCode())
+                .imageUrl(location.getImageUrl())
+                .kindId(location.getKind() == null ? null : location.getKind().getId())
+                .kindName(location.getKind() == null ? null : location.getKind().getName())
                 .notes(location.getNotes())
                 .active(location.isActive())
                 .createdByUserName(displayName(location.getCreatedByUser()))

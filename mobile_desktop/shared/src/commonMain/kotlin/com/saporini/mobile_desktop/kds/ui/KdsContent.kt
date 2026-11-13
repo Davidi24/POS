@@ -59,7 +59,9 @@ internal fun KdsSectionContent(
     modifier: Modifier = Modifier,
     clock: () -> Instant = { Clock.System.now() },
     // Food ordered with bookings has its own model, made while the Upcoming tab shows.
-    preOrderModel: @Composable () -> PreOrderScreenModel = { koinInject() }
+    preOrderModel: @Composable () -> PreOrderScreenModel = { koinInject() },
+    // Opens the tickets board with its prep list showing (look checks).
+    showPrepList: Boolean = false
 ) {
     // Ticket timers move on by themselves.
     var now by remember { mutableStateOf(clock()) }
@@ -70,13 +72,24 @@ internal fun KdsSectionContent(
     LaunchedEffect(state.notice) { if (state.notice != null) { delay(2_500); if (state.actionError == null) model.clearMessages() } }
     var stations by remember { mutableStateOf(false) }
 
+    // The kitchen's Menu is the POS menu itself, looking exactly the same (user rule): the menu books, sections and
+    // dish cards with their Available switch, as the person's menu permissions allow.
+    if (section == KdsSection.MENU) {
+        com.saporini.mobile_desktop.pos.menu.ui.MenuScreen(modifier.fillMaxSize())
+        return
+    }
+
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val size = screenSizeFor(maxWidth)
-        Column(Modifier.fillMaxSize().padding(horizontal = if (size.isPhone) 14.dp else 22.dp, vertical = if (size.isPhone) 12.dp else 18.dp),
+        // The tickets board runs down to the bottom edge (no padding there, user rule); the other tabs keep theirs.
+        val bottom = if (section == KdsSection.TICKETS && state.loaded && state.canRead && !state.needsStationSetup) 0.dp else if (size.isPhone) 12.dp else 18.dp
+        val side = if (size.isPhone) 14.dp else 22.dp
+        val top = if (size.isPhone) 12.dp else 18.dp
+        Column(Modifier.fillMaxSize().padding(start = side, end = side, top = top, bottom = bottom),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (state.needsReconciliation) ReconcileBar(state, model)
             state.actionError?.takeIf { !state.needsReconciliation }?.let { MessageBar(it.message, MessageKind.ERROR, onDismiss = model::clearMessages) }
-            state.notice?.let { MessageBar(it, MessageKind.SUCCESS, onDismiss = model::clearMessages) }
+            com.saporini.mobile_desktop.core.components.BottomToast(state.notice, onDismiss = model::clearMessages)
             if (state.loaded && state.stale && state.error != null) {
                 MessageBar("Can't reach the kitchen server right now. The tickets below may be a little behind.", MessageKind.WARNING)
             }
@@ -96,9 +109,9 @@ internal fun KdsSectionContent(
                             action = if (state.canConfigure) ({ KitButton("Set up stations", { stations = true }) }) else null)
                     }
                     else -> when (section) {
-                        KdsSection.TICKETS -> TicketsSection(state, model, size, now, if (state.canConfigure) ({ stations = true }) else null)
+                        KdsSection.TICKETS -> TicketsSection(state, model, size, now, if (state.canConfigure) ({ stations = true }) else null, startPrepList = showPrepList, pageSide = side, pageTop = top)
                         KdsSection.UPCOMING -> UpcomingSection(state, model, size, now, preOrderModel())
-                        KdsSection.MENU -> MenuSection(state, model, size)
+                        KdsSection.MENU -> Unit
                         KdsSection.HISTORY -> HistorySection(state, model, size)
                     }
                 }

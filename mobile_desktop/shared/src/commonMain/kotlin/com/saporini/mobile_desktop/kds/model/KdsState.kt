@@ -24,7 +24,9 @@ data class KdsMenuState(
     }
 }
 data class KdsAllDayItem(val menuItemId: String?, val name: String, val variant: String?, val modifiers: List<KdsModifier>,
-    val notes: String?, val optionsPerUnit: Boolean, val pending: Int, val preparing: Int, val ready: Int)
+    val notes: String?, val optionsPerUnit: Boolean, val pending: Int, val preparing: Int, val ready: Int,
+    // How many orders the dishes still to make (to start or cooking) belong to.
+    val orders: Int = 0)
 data class KdsState(
     val now: Instant = kotlin.time.Clock.System.now(), val scope: KdsScope? = null, val permissions: Set<String> = emptySet(), val accessDenied: Boolean = false,
     val section: KdsSection = KdsSection.TICKETS, val stationId: String? = null, val deviceId: String? = null,
@@ -39,11 +41,13 @@ data class KdsState(
     val stationLoading: Boolean = false, val stationError: KdsFailure? = null,
     val posTiming: KdsPosTiming = KdsPosTiming()
 ) {
-    val canRead get() = scope != null && "KDS_READ" in permissions && !accessDenied
+    // POS → Kitchen Status reads the kitchen with ORDER_READ (waiters hold no Kitchen display permission; user, 2026-10-30).
+    val canRead get() = scope != null && ("KDS_READ" in permissions || "ORDER_READ" in permissions) && !accessDenied
     val canUpdate get() = canRead && "KDS_UPDATE" in permissions
     // Waiters (order staff) can say the ready food was taken out, as well as kitchen staff.
     val canPickUp get() = canRead && ("KDS_UPDATE" in permissions || "ORDER_UPDATE" in permissions)
-    val canReadMenu get() = scope != null && "MENUS_READ" in permissions
+    // The kitchen sees the menu with KDS_READ (Kitchen holds no POS permission).
+    val canReadMenu get() = scope != null && ("MENUS_READ" in permissions || "KDS_READ" in permissions)
     val canUpdateMenu get() = canReadMenu && "MENUS_UPDATE" in permissions
     val canConfigure get() = scope != null && "SETTINGS_UPDATE" in permissions
     val needsStationSetup get() = loaded && boards.isEmpty() && stationId == null && deviceId == null
@@ -62,12 +66,17 @@ data class KdsState(
         compareBy<KdsTicket> { it.dueAt.asInstant() ?: Instant.DISTANT_FUTURE }.thenBy { it.createdAt.asInstant() }.thenBy { it.id })
     val allDay get(): List<KdsAllDayItem> {
         data class Key(val id: String?, val name: String, val variant: String?, val modifiers: List<KdsModifier>, val notes: String?, val perUnit: Boolean)
-        return visibleTickets.flatMap { it.items }.filter { it.status in setOf("PENDING", "FIRED", "IN_PROGRESS", "READY", "EXPO_READY") }
-            .groupBy { Key(it.menuItemId, it.itemNameSnapshot, it.variantNameSnapshot, it.modifiers, it.notes, it.optionsPerUnit) }
-            .map { (key, items) -> KdsAllDayItem(key.id, key.name, key.variant, key.modifiers, key.notes, key.perUnit,
-                items.filter { it.status in setOf("PENDING", "FIRED") }.sumOf { it.quantity },
-                items.filter { it.status == "IN_PROGRESS" }.sumOf { it.quantity },
-                items.filter { it.status in setOf("READY", "EXPO_READY") }.sumOf { it.quantity }) }
+        return visibleTickets.flatMap { ticket -> ticket.items.map { ticket.orderId to it } }
+            .filter { (_, item) -> item.status in setOf("PENDING", "FIRED", "IN_PROGRESS", "READY", "EXPO_READY") }
+            .groupBy { (_, item) -> Key(item.menuItemId, item.itemNameSnapshot, item.variantNameSnapshot, item.modifiers, item.notes, item.optionsPerUnit) }
+            .map { (key, rows) ->
+                val items = rows.map { it.second }
+                KdsAllDayItem(key.id, key.name, key.variant, key.modifiers, key.notes, key.perUnit,
+                    items.filter { it.status in setOf("PENDING", "FIRED") }.sumOf { it.quantity },
+                    items.filter { it.status == "IN_PROGRESS" }.sumOf { it.quantity },
+                    items.filter { it.status in setOf("READY", "EXPO_READY") }.sumOf { it.quantity },
+                    rows.filter { (_, item) -> item.status in setOf("PENDING", "FIRED", "IN_PROGRESS") }.map { it.first }.distinct().size)
+            }
             .sortedWith(compareBy<KdsAllDayItem> { it.name.lowercase() }.thenBy { it.variant })
     }
 }

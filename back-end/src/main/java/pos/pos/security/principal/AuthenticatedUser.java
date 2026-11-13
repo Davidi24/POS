@@ -46,6 +46,26 @@ public final class AuthenticatedUser implements AuthenticatedPrincipal, Serializ
                 .build();
     }
 
+    /**
+     * The Super Admin or a Co-Super-Admin working inside one restaurant (the app sends the restaurant and branch they
+     * entered). They belong to no restaurant themselves, so outside one both are null.
+     */
+    public static AuthenticatedUser actingFor(User user, UUID restaurantId, UUID branchId) {
+        return AuthenticatedUser.builder()
+                .id(user.getId())
+                .restaurantId(restaurantId)
+                .defaultBranchId(restaurantId == null ? null : branchId)
+                .email(user.getEmail())
+                .username(user.getUsername())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .phone(user.getPhone())
+                .active(user.isActive())
+                .emailVerified(user.isEmailVerified())
+                .phoneVerified(user.isPhoneVerified())
+                .build();
+    }
+
     @Override
     public String getName() {
         return username != null ? username : email;

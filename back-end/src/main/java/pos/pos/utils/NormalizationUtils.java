@@ -52,9 +52,15 @@ public final class NormalizationUtils {
         return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
     }
 
+    // A "contains" pattern for LIKE. The LIKE wildcards someone types (% and _) are escaped with PostgreSQL's default
+    // LIKE escape character (a backslash), so they match themselves instead of everything.
     public static String normalizeLowerLike(String value) {
         String normalized = normalizeLower(value);
-        return normalized == null ? null : "%" + normalized + "%";
+        if (normalized == null) {
+            return null;
+        }
+        String escaped = normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        return "%" + escaped + "%";
     }
 
     public static String normalizeUpper(String value) {

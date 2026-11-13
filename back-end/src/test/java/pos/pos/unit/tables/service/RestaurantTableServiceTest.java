@@ -110,7 +110,13 @@ class RestaurantTableServiceTest {
                 restaurantTableLayoutService,
                 restaurantTableAvailabilityService,
                 orderRepository,
-                orderSupport
+                orderSupport,
+                new pos.pos.tables.service.TableSeatingRules(
+                        org.mockito.Mockito.mock(pos.pos.settings.repository.SettingsRepository.class),
+                        org.mockito.Mockito.mock(pos.pos.user.repository.UserRepository.class),
+                        org.mockito.Mockito.mock(pos.pos.notification.service.NotificationOperationalPublisher.class),
+                        org.mockito.Mockito.mock(pos.pos.tables.specialcase.SpecialCaseActionRepository.class)),
+                new pos.pos.order.service.TableOrderCombiner(org.mockito.Mockito.mock(jakarta.persistence.EntityManager.class), orderSupport)
         );
     }
 

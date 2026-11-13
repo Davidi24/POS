@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 import pos.pos.reservation.entity.RestaurantEvent;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,4 +29,11 @@ public interface RestaurantEventRepository extends JpaRepository<RestaurantEvent
     List<RestaurantEvent> findAllByRestaurantIdAndEndDateGreaterThanEqualOrderByStartDateAsc(UUID restaurantId, LocalDate from);
 
     Optional<RestaurantEvent> findByIdAndRestaurantId(UUID id, UUID restaurantId);
+
+    // The event night a special menu belongs to (at most one, see V66).
+    Optional<RestaurantEvent> findFirstByMenuId(UUID menuId);
+
+    List<RestaurantEvent> findAllByMenuIdIn(Collection<UUID> menuIds);
+
+    boolean existsByMenuId(UUID menuId);
 }

@@ -236,7 +236,7 @@ internal fun WaitlistSection(modifier: Modifier = Modifier, onSeated: () -> Unit
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { seating = null }) { Text("Back", color = FormMuted, fontFamily = Inter()) } }
+            dismissButton = { TextButton(onClick = { seating = null }) { Text("Back", letterSpacing = 0.sp, color = FormMuted, fontFamily = Inter()) } }
         )
     }
     removing?.let { entry ->
@@ -284,9 +284,9 @@ private fun AddToWaitlistDialog(onDismiss: () -> Unit, onAdd: (WaitlistEntryRequ
                 enabled = ready,
                 shape = RoundedCornerShape(percent = 50),
                 colors = ButtonDefaults.buttonColors(containerColor = FormGreen)
-            ) { Text("Add", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White) }
+            ) { Text("Add", letterSpacing = 0.sp, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, color = Color.White) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Back", color = FormMuted, fontFamily = Inter()) } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Back", letterSpacing = 0.sp, color = FormMuted, fontFamily = Inter()) } }
     )
 }
 

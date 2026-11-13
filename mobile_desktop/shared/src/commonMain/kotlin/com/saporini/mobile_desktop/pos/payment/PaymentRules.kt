@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.pos.payment
 
+import com.saporini.mobile_desktop.pos.payment.data.BillLineDto
 import com.saporini.mobile_desktop.pos.payment.data.OrderPaymentSummaryDto
 import com.saporini.mobile_desktop.pos.payment.data.PaymentDto
 import com.saporini.mobile_desktop.pos.reservations.domain.model.moneyCents
@@ -31,7 +32,9 @@ data class PaymentDraft(
     val tenderedText: String = "",
     val cardLast4: String = "",
     val notes: String = "",
-    val closeWhenPaid: Boolean = true
+    val closeWhenPaid: Boolean = true,
+    // Paying by dishes: portions ticked per dish. Null when the guest isn't paying by dishes.
+    val picks: Map<String, Int>? = null
 )
 
 /** The draft worked out against the bill: every amount in cents, or null when it isn't a valid number. */
@@ -60,11 +63,36 @@ fun suggestedAmountCents(summary: OrderPaymentSummaryDto, method: PayMethod): Lo
 
 fun tipFromPercent(amountCents: Long, percent: Int): Long = (amountCents * percent + 50) / 100
 
+/** What [portions] of a dish cost of the bill, rounded the way the server rounds them. */
+fun partCents(line: BillLineDto, portions: Int): Long {
+    if (portions <= 0 || line.quantity <= 0) return 0
+    return ((line.amount.toCents() ?: 0) * portions * 2 + line.quantity) / (2L * line.quantity)
+}
+
+/** What the ticked dishes cost. The last dishes left settle whatever is left of the bill, so no cents stay behind. */
+fun pickedAmountCents(summary: OrderPaymentSummaryDto, picks: Map<String, Int>, method: PayMethod): Long {
+    val left = summary.lines.filter { it.left > 0 }
+    if (left.isNotEmpty() && left.all { picks[it.lineId] == it.left }) return suggestedAmountCents(summary, method)
+    return minOf(summary.lines.sumOf { partCents(it, picks[it.lineId] ?: 0) }, summary.balanceDue.toCents() ?: 0)
+}
+
+/** Ticks that still make sense on a fresher bill: another till may have taken the same dishes. */
+fun PaymentDraft.fitTo(summary: OrderPaymentSummaryDto): PaymentDraft {
+    val ticked = picks ?: return this
+    return copy(picks = summary.lines.mapNotNull { line ->
+        ticked[line.lineId]?.coerceAtMost(line.left)?.takeIf { it > 0 }?.let { line.lineId to it }
+    }.toMap())
+}
+
 fun quote(summary: OrderPaymentSummaryDto, draft: PaymentDraft): PaymentQuote {
     val balance = summary.balanceDue.toCents() ?: 0
     val cashBalance = summary.cashBalanceDue.toCents() ?: balance
     val due = if (draft.method == PayMethod.CASH) cashBalance else balance
-    val amount = if (draft.amountText.isBlank()) due else moneyCents(draft.amountText)
+    val amount = when {
+        draft.picks != null -> pickedAmountCents(summary, draft.picks, draft.method)
+        draft.amountText.isBlank() -> due
+        else -> moneyCents(draft.amountText)
+    }
     val tip = when {
         draft.tipText.isNotBlank() -> moneyCents(draft.tipText)
         draft.tipPercent != null && amount != null -> tipFromPercent(amount, draft.tipPercent)
@@ -90,6 +118,7 @@ private fun problem(
     val cash = draft.method == PayMethod.CASH
     if (summary.orderStatus == "CANCELLED" || summary.orderStatus == "VOIDED") return "This order was ${summary.orderStatus.lowercase()}"
     if (balance <= 0) return "Nothing is left to pay"
+    if (draft.picks != null && draft.picks.isEmpty()) return "Tick the dishes this guest pays for"
     if (amount == null) return "Enter an amount like 10 or 12.50"
     if (amount <= 0) return "Enter an amount to pay"
     val allowed = if (cash) maxOf(balance, cashBalance) else balance

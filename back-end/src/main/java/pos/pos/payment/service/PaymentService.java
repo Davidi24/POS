@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.order.entity.Order;
+import pos.pos.order.entity.OrderLineItem;
 import pos.pos.order.enums.OrderEventType;
 import pos.pos.order.enums.OrderStatus;
 import pos.pos.order.service.OrderSupport;
@@ -17,6 +18,7 @@ import pos.pos.payment.dto.TakePaymentRequest;
 import pos.pos.payment.dto.TakePaymentResponse;
 import pos.pos.payment.dto.VoidPaymentRequest;
 import pos.pos.payment.entity.Payment;
+import pos.pos.payment.entity.PaymentLine;
 import pos.pos.payment.entity.PaymentTransaction;
 import pos.pos.payment.enums.PaymentMethod;
 import pos.pos.payment.enums.PaymentStatus;
@@ -34,7 +36,10 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -110,6 +115,8 @@ public class PaymentService {
             throw bad("This restaurant takes the whole bill in one payment (" + balanceDue.toPlainString() + " " + order.getCurrency() + ")");
         }
 
+        List<PaymentLine> paidLines = paidLines(order, request.lines(), amount, balanceDue, settlesBill);
+
         if (tip.signum() > 0) {
             if (!settings.isTipsEnabled()) {
                 throw bad("Tips are switched off for this restaurant");
@@ -167,6 +174,7 @@ public class PaymentService {
         payment.setCreatedBy(actorId);
         payment.setUpdatedBy(actorId);
         payment.addTransaction(transaction(PaymentTransactionType.SALE, amount.add(tip), order.getCurrency(), null, actorId, now));
+        payment.getLines().addAll(paidLines);
 
         Payment saved = paymentRepository.saveAndFlush(payment);
         order.getPayments().add(saved);
@@ -196,7 +204,7 @@ public class PaymentService {
             UUID paymentId,
             RefundPaymentRequest request
     ) {
-        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        restaurantScopeService.requireHistoricalRestaurant(authentication, restaurantId);
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         Order order = orderSupport.requireOrder(restaurantId, orderId);
         Payment payment = requirePaymentOfOrder(order, paymentId);
@@ -305,8 +313,64 @@ public class PaymentService {
                 pos.pos.settings.mapper.SettingsCodes.parsePercents(settings.getTipSuggestions()),
                 settings.getMaxTipPercent(),
                 settings.isAllowSplitBills(),
-                payments
+                payments,
+                billLines(order)
         );
+    }
+
+    private List<OrderPaymentSummaryResponse.BillLine> billLines(Order order) {
+        List<OrderLineItem> active = orderSupport.activeLineItems(order);
+        Map<UUID, BigDecimal> shares = calculator.lineShares(order, active);
+        Map<UUID, Integer> paid = calculator.paidQuantities(order);
+        return active.stream().map(line -> new OrderPaymentSummaryResponse.BillLine(
+                line.getId(),
+                line.getItemNameSnapshot(),
+                line.getVariantNameSnapshot(),
+                line.getOptions().stream().map(option -> option.getQuantity() > 1 ? option.getQuantity() + " × " + option.getOptionNameSnapshot() : option.getOptionNameSnapshot()).toList(),
+                line.getQuantity(),
+                Math.min(paid.getOrDefault(line.getId(), 0), line.getQuantity()),
+                shares.getOrDefault(line.getId(), BigDecimal.ZERO.setScale(2)),
+                line.getMenuItem() == null ? null : line.getMenuItem().getImageUrl()
+        )).toList();
+    }
+
+    // Paying by dishes (user, 2026-11-01): the dishes must still be unpaid and the amount what they cost of the bill. The
+    // last dishes left settle whatever is left, so rounding, or an amount typed earlier, never leaves a few cents behind.
+    private List<PaymentLine> paidLines(Order order, List<TakePaymentRequest.PaidLine> picked, BigDecimal amount, BigDecimal balanceDue, boolean settlesBill) {
+        if (picked == null || picked.isEmpty()) {
+            return List.of();
+        }
+        if (new HashSet<>(picked.stream().map(TakePaymentRequest.PaidLine::lineId).toList()).size() != picked.size()) {
+            throw bad("A dish is listed twice");
+        }
+        List<OrderLineItem> active = orderSupport.activeLineItems(order);
+        Map<UUID, BigDecimal> shares = calculator.lineShares(order, active);
+        Map<UUID, Integer> paid = calculator.paidQuantities(order);
+        BigDecimal expected = BigDecimal.ZERO;
+        int portionsLeft = active.stream().mapToInt(line -> Math.max(0, line.getQuantity() - paid.getOrDefault(line.getId(), 0))).sum();
+        int portionsPicked = 0;
+        for (TakePaymentRequest.PaidLine pick : picked) {
+            OrderLineItem line = active.stream().filter(item -> item.getId().equals(pick.lineId())).findFirst()
+                    .orElseThrow(PaymentService::billChanged);
+            if (pick.quantity() > line.getQuantity() - paid.getOrDefault(line.getId(), 0)) {
+                throw new AuthException(line.getItemNameSnapshot() + " is already paid. Check the bill and try again.", HttpStatus.CONFLICT);
+            }
+            portionsPicked += pick.quantity();
+            expected = expected.add(shares.get(line.getId()).multiply(BigDecimal.valueOf(pick.quantity()))
+                    .divide(BigDecimal.valueOf(line.getQuantity()), 2, RoundingMode.HALF_UP));
+        }
+        if (portionsPicked == portionsLeft) {
+            if (!settlesBill) {
+                throw billChanged();
+            }
+        } else if (amount.subtract(expected.min(balanceDue)).abs().compareTo(new BigDecimal("0.01")) > 0) {
+            throw billChanged();
+        }
+        return picked.stream().map(pick -> new PaymentLine(pick.lineId(), pick.quantity())).toList();
+    }
+
+    private static AuthException billChanged() {
+        return new AuthException("The bill changed. Check the dishes and try again.", HttpStatus.CONFLICT);
     }
 
     private Payment requirePaymentOfOrder(Order order, UUID paymentId) {

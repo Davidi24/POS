@@ -20,4 +20,7 @@ public class UpdateSettingsShiftsRequest {
     @Min(value = 0, message = "clockInEarlyMinutes must not be negative")
     @Max(value = 720, message = "clockInEarlyMinutes must be at most 720")
     private Integer clockInEarlyMinutes;
+
+    @NotNull(message = "staffSeeWholeTeam is required")
+    private Boolean staffSeeWholeTeam;
 }

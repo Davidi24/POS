@@ -106,6 +106,7 @@ class AppScreenshotTest {
         }
         val menus = menuRepository(missing)
         val catalog = catalogRepository()
+        val apiClient = notificationClient()
         startKoin {
             modules(module {
                 single { session }
@@ -118,12 +119,13 @@ class AppScreenshotTest {
                 factory { OrdersScreenModel(repository = get(), sessionManager = get(), catalogRepository = get(), tableRepository = get()) }
                 factory { ReservationsScreenModel(repository = get(), sessionManager = get(), tableLayoutRepository = get()) }
                 factory { MenuScreenModel(repository = get(), sessionManager = get()) }
-                single { com.saporini.mobile_desktop.notifications.NotificationApi(notificationClient()) }
+                single { com.saporini.mobile_desktop.notifications.NotificationApi(apiClient) }
+                single { com.saporini.mobile_desktop.pos.reservations.data.api.ReservationApi(apiClient) }
                 single { com.saporini.mobile_desktop.notifications.NotificationCenter(get(), get()) }
             })
         }
         val scene = ImageComposeScene(width, height, density = Density(1f), coroutineContext = dispatcher) {
-            SaporiniTheme { PosScreen.Content() }
+            SaporiniTheme { cafe.adriel.voyager.navigator.Navigator(PosScreen) }
         }
         val output = File("build/reports/app-ui/${width}x$height").apply { deleteRecursively(); mkdirs() }
 
@@ -194,6 +196,7 @@ class AppScreenshotTest {
         } finally {
             scene.close()
             stopKoin()
+            apiClient.close()
             Dispatchers.resetMain()
         }
     }
@@ -237,6 +240,7 @@ class AppScreenshotTest {
             "getLayoutChanges" -> emptyFlow<com.saporini.mobile_desktop.pos.tables.domain.repository.TableLayoutChange>()
             "getFloorLayouts" -> listOf(FloorLayout("floor-1", restaurantId, branchId, "1st Floor", "plan-1", "plan://1st-floor", 0f, 72f, 1.02f))
             "downloadPlanImage" -> planImage
+            "specialCaseActions" -> emptyList<com.saporini.mobile_desktop.pos.tables.domain.model.SpecialCaseAction>()
             "getTableLayout" -> BranchTableLayout(restaurantId, branchId, listOf(FloorSummary("1st Floor", layoutTables.size, layoutTables.size)), layoutTables)
             "getTableSections" -> listOf(
                 TableSection("s1", "WINDOW", "Window", 0, setOf("t01", "t03")),
@@ -388,6 +392,7 @@ class AppScreenshotTest {
             val url = request.url.toString()
             val headers = io.ktor.http.headersOf(io.ktor.http.HttpHeaders.ContentType, "application/json")
             when {
+                "/waitlist" in url -> respond("[]", io.ktor.http.HttpStatusCode.OK, headers)
                 "/stream" in url -> respond("", io.ktor.http.HttpStatusCode.NotFound)
                 "unreadOnly=true" in url -> respond("""{"items":[],"totalElements":2}""", io.ktor.http.HttpStatusCode.OK, headers)
                 else -> respond(list, io.ktor.http.HttpStatusCode.OK, headers)

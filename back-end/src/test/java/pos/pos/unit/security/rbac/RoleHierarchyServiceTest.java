@@ -153,10 +153,24 @@ class RoleHierarchyServiceTest {
         }
 
         @Test
-        @DisplayName("Should deny non-super-admin when target role rank is not lower")
-        void shouldDenyNonSuperAdminWhenTargetRoleRankIsNotLower() {
+        @DisplayName("Should allow non-super-admin to hand out their own level")
+        void shouldAllowNonSuperAdminToAssignOwnLevel() {
             UUID actorUserId = UUID.randomUUID();
             Role targetRole = role("MANAGER", 20_000L);
+
+            when(roleRepository.findHighestActiveRankByUserId(actorUserId)).thenReturn(20_000L);
+
+            assertThatCode(() -> roleHierarchyService.assertCanAssignRole(
+                    authentication(actorUserId, false),
+                    targetRole
+            )).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("Should deny non-super-admin when target role ranks above them")
+        void shouldDenyNonSuperAdminWhenTargetRoleRanksAbove() {
+            UUID actorUserId = UUID.randomUUID();
+            Role targetRole = role("ADMIN", 30_000L);
 
             when(roleRepository.findHighestActiveRankByUserId(actorUserId)).thenReturn(20_000L);
 

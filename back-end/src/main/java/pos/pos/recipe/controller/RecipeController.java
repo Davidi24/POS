@@ -42,7 +42,7 @@ public class RecipeController {
     private final RecipeService recipeService;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Create a new recipe")
     @ApiResponse(responseCode = "201", description = "Recipe created")
     public ResponseEntity<RecipeResponse> createRecipe(
@@ -55,7 +55,7 @@ public class RecipeController {
     }
 
     @PutMapping("/{recipeId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Replace a recipe's own fields (not its components)")
     @ApiResponse(responseCode = "200", description = "Recipe updated")
     @ApiResponse(responseCode = "404", description = "Recipe not found")
@@ -69,7 +69,7 @@ public class RecipeController {
     }
 
     @GetMapping("/{recipeId}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "Get one recipe, with its components")
     @ApiResponse(responseCode = "200", description = "Recipe found")
     @ApiResponse(responseCode = "404", description = "Recipe not found")
@@ -82,7 +82,7 @@ public class RecipeController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "List recipes, optionally filtered by type and/or status")
     public ResponseEntity<List<RecipeResponse>> listRecipes(
             @PathVariable UUID restaurantId,
@@ -97,7 +97,7 @@ public class RecipeController {
     // childRecipeId it references), not a path variable, since a component isn't addressable
     // by a single simple id the way most other resources here are.
     @PutMapping("/{recipeId}/components")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Add or update one recipe component (identity comes from the request body)")
     @ApiResponse(responseCode = "200", description = "Component saved")
     public ResponseEntity<RecipeResponse> upsertComponent(
@@ -110,7 +110,7 @@ public class RecipeController {
     }
 
     @DeleteMapping("/{recipeId}/components/{componentId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Remove a component from this recipe")
     @ApiResponse(responseCode = "200", description = "Component removed")
     public ResponseEntity<RecipeResponse> removeComponent(
@@ -123,7 +123,7 @@ public class RecipeController {
     }
 
     @PostMapping("/{recipeId}/archive")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Archive a recipe (soft retirement, not a delete)")
     @ApiResponse(responseCode = "200", description = "Recipe archived")
     public ResponseEntity<RecipeResponse> archiveRecipe(
@@ -135,7 +135,7 @@ public class RecipeController {
     }
 
     @PostMapping("/{recipeId}/recalculate-cost")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Recalculate and save the recipe's theoretical cost, walking the full component tree")
     @ApiResponse(responseCode = "200", description = "Cost recalculated")
     public ResponseEntity<RecipeResponse> recalculateCost(

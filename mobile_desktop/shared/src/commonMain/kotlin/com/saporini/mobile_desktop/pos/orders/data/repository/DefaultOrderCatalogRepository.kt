@@ -6,16 +6,15 @@ import com.saporini.mobile_desktop.pos.orders.domain.model.*
 import com.saporini.mobile_desktop.pos.orders.domain.repository.OrderCatalogRepository
 
 class DefaultOrderCatalogRepository(
-    private val api: OrderCatalogApi,
-    // On an event night set to "only the special menu" (Admin Hub), that menu's id; otherwise null.
-    private val onlyMenuToday: suspend (restaurantId: String) -> String? = { null }
+    private val api: OrderCatalogApi
 ) : OrderCatalogRepository {
+    // The till's menus: what the server says is on right now (this day and time; only the event menu on an event
+    // night set to "only the special menu"). They all come on the first page.
     override suspend fun getMenus(restaurantId: String, page: Int, size: Int): OrderCatalogPage {
         require(restaurantId.isNotBlank() && page >= 0 && size in 1..100)
-        val menus = api.getMenus(restaurantId, page, size).toDomain()
-        val only = runCatching { onlyMenuToday(restaurantId) }.getOrNull() ?: return menus
-        val kept = menus.items.filter { it.id == only }
-        return if (kept.isEmpty()) menus else menus.copy(items = kept, totalElements = kept.size.toLong(), totalPages = 1, hasNext = false)
+        val menus = api.getMenusAvailableNow(restaurantId).toDomain()
+        return if (page == 0) menus
+        else menus.copy(items = emptyList(), page = page, hasNext = false, hasPrevious = true)
     }
 
     override suspend fun getMenu(restaurantId: String, menuId: String): OrderCatalogMenu {

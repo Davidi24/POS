@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import pos.pos.settings.dto.SettingsResponse;
 import pos.pos.settings.dto.UpdateRestaurantSettingsRequest;
 import pos.pos.settings.dto.UpdateSettingsBillingRequest;
+import pos.pos.settings.dto.UpdateSettingsInventoryRequest;
 import pos.pos.settings.dto.UpdateSettingsDefaultBranchRequest;
 import pos.pos.settings.dto.UpdateSettingsLocalizationRequest;
 import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
@@ -159,6 +160,28 @@ public class SettingsController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(settingsService.updateKitchenStatus(authentication, restaurantId, request));
+    }
+
+    @PatchMapping("/tables")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Set how many guests a table takes, and who is told when it has too many")
+    public ResponseEntity<SettingsResponse> updateTables(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody pos.pos.settings.dto.UpdateSettingsTablesRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updateTables(authentication, restaurantId, request));
+    }
+
+    @PatchMapping("/inventory")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "Set from what value stock counts as valuable on the Inventory overview")
+    public ResponseEntity<SettingsResponse> updateInventory(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody UpdateSettingsInventoryRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updateInventory(authentication, restaurantId, request));
     }
 
     @PatchMapping("/shifts")

@@ -65,6 +65,17 @@ internal fun periodLabel(from: LocalDate, to: LocalDate): String = when {
     else -> "${shortDate(from)} – ${shortDate(to)}"
 }
 
+/** A month from its 1st to its last day, or to today for this month: shown by its name (user, 2026-11-03). */
+internal fun isWholeMonth(from: LocalDate, to: LocalDate, today: LocalDate): Boolean {
+    if (from.day != 1 || from.year != to.year || from.month != to.month) return false
+    val last = from.plus(kotlinx.datetime.DatePeriod(months = 1)).minus(kotlinx.datetime.DatePeriod(days = 1))
+    return to == last || to == today
+}
+
+/** "November 2026" for a whole month (even on its 1st), otherwise the dates. */
+internal fun periodOrMonthLabel(from: LocalDate, to: LocalDate, today: LocalDate): String =
+    if (isWholeMonth(from, to, today)) "${from.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${from.year}" else periodLabel(from, to)
+
 /** "7 days", "1 day". */
 internal fun dayCountText(from: LocalDate, to: LocalDate): String = (from.daysUntil(to) + 1).let { "$it ${if (it == 1) "day" else "days"}" }
 
@@ -79,7 +90,8 @@ internal fun DateRangeButton(
     maxDate: LocalDate,
     onChange: (LocalDate, LocalDate) -> Unit,
     modifier: Modifier = Modifier,
-    maxDays: Int = 366
+    maxDays: Int = 366,
+    label: String = periodLabel(from, to)
 ) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
@@ -87,7 +99,7 @@ internal fun DateRangeButton(
             border = BorderStroke(1.dp, Kit.Border)) {
             Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(18.dp), tint = Kit.Ink)
-                Text(periodLabel(from, to), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Ink, maxLines = 1)
+                Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Ink, maxLines = 1)
                 Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp), tint = Kit.Ink)
             }
         }

@@ -64,6 +64,8 @@ class OrderControllerTest {
     private OrderItemService orderItemService;
     @Mock
     private OrderPublicService orderPublicService;
+    @Mock
+    private pos.pos.tables.realtime.TableLayoutChangeNotifier tableLayoutChangeNotifier;
 
     private MockMvc mockMvc;
     private Authentication authentication;
@@ -76,7 +78,7 @@ class OrderControllerTest {
         validator.afterPropertiesSet();
 
         mockMvc = MockMvcBuilders.standaloneSetup(
-                        new RestaurantOrderController(orderQueryService, orderCommandService, orderWorkflowService, orderItemService),
+                        new RestaurantOrderController(orderQueryService, orderCommandService, orderWorkflowService, orderItemService, tableLayoutChangeNotifier),
                         new BranchOrderController(orderQueryService, orderHistoryService, orderCommandService, orderChangeNotifier),
                         new PublicOrderController(orderPublicService)
                 )

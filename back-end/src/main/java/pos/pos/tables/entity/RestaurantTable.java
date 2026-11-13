@@ -11,6 +11,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Transient;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.EqualsAndHashCode;
@@ -133,6 +135,23 @@ public class RestaurantTable extends AbstractAuditedEntity {
     @Column(name = "seated_at")
     private OffsetDateTime seatedAt;
 
+    // Seated with more guests still to come (on the table holding a merged group): the half ring, until staff untick it.
+    @Column(name = "more_coming", nullable = false)
+    private boolean moreComing;
+
+    // "Give more time": the next booking's warning waits until then.
+    @Column(name = "more_time_until", columnDefinition = "timestamptz")
+    private OffsetDateTime moreTimeUntil;
+
+    // "Still here": restarts the clock of Settings → Tables → Special cases.
+    @Column(name = "still_here_at", columnDefinition = "timestamptz")
+    private OffsetDateTime stillHereAt;
+
+    // Set when only the floor plan changes. Moving tables around isn't anyone acting on them, so updated_at stays
+    // and their special-case clocks keep running (user, 2026-11-01).
+    @Transient
+    private boolean layoutOnly;
+
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
@@ -146,6 +165,16 @@ public class RestaurantTable extends AbstractAuditedEntity {
     @OneToMany(mappedBy = "mergedInto")
     @OrderBy("tableNumber ASC")
     private List<RestaurantTable> mergedChildren = new ArrayList<>();
+
+    @Override
+    @PreUpdate
+    protected void preUpdate() {
+        OffsetDateTime before = getUpdatedAt();
+        super.preUpdate();
+        if (layoutOnly) {
+            setUpdatedAt(before);
+        }
+    }
 
     @Override
     protected void normalizeFields() {

@@ -41,6 +41,7 @@ import com.saporini.mobile_desktop.core.components.OverviewCompactEmpty
 import com.saporini.mobile_desktop.core.components.OverviewEmpty
 import com.saporini.mobile_desktop.core.components.OverviewPanel
 import com.saporini.mobile_desktop.core.components.OverviewStatCard
+import com.saporini.mobile_desktop.core.components.OverviewTabs
 import com.saporini.mobile_desktop.core.components.StatusChip
 import com.saporini.mobile_desktop.core.components.ValueLine
 import com.saporini.mobile_desktop.core.theme.Inter
@@ -52,18 +53,22 @@ import com.saporini.mobile_desktop.pos.reservations.ToolbarHeight
 import kotlinx.coroutines.delay
 import kotlinx.datetime.*
 import mobile_desktop.shared.generated.resources.Res
-import mobile_desktop.shared.generated.resources.overview_next_hours
-import mobile_desktop.shared.generated.resources.overview_reservations
 import mobile_desktop.shared.generated.resources.settings_payments
+import mobile_desktop.shared.generated.resources.shifts_on_duty
+import mobile_desktop.shared.generated.resources.shifts_planned
+import mobile_desktop.shared.generated.resources.shifts_worked
 import kotlin.time.Clock
 import kotlin.time.Instant
 
 // POS → Shift: the staff member's own shift. The clock and the buttons for right now, this week's hours and pay, the
 // days of the week, and what's coming up. Managers plan everyone's shifts in Admin Hub → Shifts.
 @Composable
-internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier: Modifier = Modifier) {
+internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier: Modifier = Modifier, startOnTeam: Boolean = false, openDay: LocalDate? = null) {
     var details by remember { mutableStateOf<ShiftItem?>(null) }
     var pending by remember { mutableStateOf<Pair<String, ShiftItem?>?>(null) }
+    // My shifts, or the team's week (everyone at my level or below).
+    var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(if (startOnTeam) TEAM else MY_SHIFTS) }
+    LaunchedEffect(tab) { model.showTeam(tab == TEAM) }
     val board = state.board
     val zone = state.zone
     // The clock moves on between refreshes: minutes counted from when the board arrived.
@@ -102,7 +107,7 @@ internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier
                 .padding(horizontal = if (size.isPhone) 14.dp else 22.dp, vertical = if (size.isPhone) 12.dp else 18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            MyShiftHeader(state, size, today, onDate = { model.date(it) }, onRefresh = { model.clearError(); model.refresh() })
+            MyShiftHeader(state, size, today, tab, { tab = it }, onDate = { model.date(it) }, onRefresh = { model.clearError(); model.refresh() })
             if (state.error != null && pending == null) ShiftMessage(state.error, error = true, onDismiss = model::clearError)
             if (state.notice != null) ShiftMessage(state.notice, error = false, onDismiss = model::clearError)
             LaunchedEffect(state.notice) { if (state.notice != null) { delay(3_000); model.clearError() } }
@@ -119,29 +124,33 @@ internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier
                         SmallAction("Try again", Icons.Outlined.Refresh, primary = true) { model.clearError(); model.refresh() }
                     }
                 }
+                tab == TEAM -> TeamMonth(state, model, size, now, if (size.isDesktop) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth(), openDay) { details = it }
                 else -> {
                     val cards = listOf<@Composable (Modifier) -> Unit>(
                         { m ->
                             OverviewStatCard(
                                 "Worked this week", hoursText(weekWorked),
                                 "${if (worked == 1) "1 shift" else "$worked shifts"} · ${hoursText(weekBreaks)} breaks",
-                                Kit.Green, m, image = Res.drawable.overview_next_hours, imageScale = 1.3f,
+                                Kit.Amber, m, image = Res.drawable.shifts_worked,
                                 progress = if (weekPlanned > 0) weekWorked.toFloat() / weekPlanned else null
                             )
                         },
                         { m ->
                             val wages = pay?.wages.toCents()
                             val tips = pay?.tips.toCents() ?: 0
+                            // Paid by the month: the salary stays the same whatever the hours; tips still come on top.
+                            val salary = pay?.monthlySalary.toCents()
                             OverviewStatCard(
-                                "My pay this week",
-                                if (pay == null) "–" else centsText((wages ?: 0) + tips, currency),
+                                if (salary != null) "My salary" else "My pay this week",
+                                when { pay == null -> "–"; salary != null -> centsText(salary, currency); else -> centsText((wages ?: 0) + tips, currency) },
                                 when {
                                     pay == null -> "Pay couldn't be loaded"
+                                    salary != null -> "A month · ${centsText(tips, currency)} tips this week"
                                     pay.hourlyRate == null && pay.missingRate -> "Your hourly wage isn't set yet"
                                     pay.hourlyRate == null -> "Ask your manager to set your wage"
                                     else -> "${centsText(wages ?: 0, currency)} wages · ${centsText(tips, currency)} tips"
                                 },
-                                Kit.Amber, m, image = Res.drawable.settings_payments
+                                Kit.Purple, m, image = Res.drawable.settings_payments
                             )
                         },
                         { m ->
@@ -149,7 +158,7 @@ internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier
                             OverviewStatCard(
                                 "Planned this week", hoursText(weekPlanned),
                                 if (left == 0) "No more shifts this week" else "$left ${if (left == 1) "shift" else "shifts"} still to come",
-                                Kit.Blue, m, image = Res.drawable.overview_reservations
+                                Kit.Blue, m, image = Res.drawable.shifts_planned
                             )
                         },
                         { m ->
@@ -169,7 +178,7 @@ internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier
                                     next == null -> "Nothing planned for 2 weeks"
                                     else -> "Until ${next.scheduledEnd.clock(zone)} · ${hoursText(next.plannedMinutes())}"
                                 },
-                                Kit.Purple, m, icon = Icons.Outlined.EventAvailable
+                                Kit.Green, m, image = Res.drawable.shifts_on_duty
                             )
                         }
                     )
@@ -190,8 +199,9 @@ internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier
                             onDetails = { details = current })
                     }
                     val week: @Composable (Modifier) -> Unit = { m -> WeekPanel(m, days, mine, today, state.date, zone, weekWorked, weekPlanned, size, current, liveExtra) { details = it } }
-                    val comingUp: @Composable (Modifier) -> Unit = { m -> ComingUpPanel(m, upcoming.filter { it.id != current?.id }.take(6), eligible, now, today, zone) { details = it } }
-                    val paid: @Composable (Modifier) -> Unit = { m -> WorkedPanel(m, pay, currency, weekItems, zone) { id -> details = mine.firstOrNull { it.id == id } } }
+                    // Only the desktop's fixed-height panels scroll inside; on phones and tablets the page scrolls.
+                    val comingUp: @Composable (Modifier) -> Unit = { m -> ComingUpPanel(m, upcoming.filter { it.id != current?.id }.take(6), eligible, now, today, zone, size.isDesktop) { details = it } }
+                    val paid: @Composable (Modifier) -> Unit = { m -> WorkedPanel(m, pay, currency, weekItems, zone, size.isDesktop) { id -> details = mine.firstOrNull { it.id == id } } }
 
                     if (size.isDesktop) {
                         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -233,18 +243,26 @@ internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier
     }
 }
 
+private const val MY_SHIFTS = "My shifts"
+private const val TEAM = "Team"
+
 @Composable
-private fun MyShiftHeader(state: ShiftState, size: ScreenSize, today: LocalDate, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit) {
+private fun MyShiftHeader(state: ShiftState, size: ScreenSize, today: LocalDate, tab: String, onTab: (String) -> Unit, onDate: (LocalDate) -> Unit, onRefresh: () -> Unit) {
     var dateMenu by remember { mutableStateOf(false) }
     val weekEnd = state.weekStart.plus(DatePeriod(days = 6))
     val title: @Composable () -> Unit = {
         Column {
             Text("My shift", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, letterSpacing = 0.sp, color = Kit.Ink)
-            Text("${today.longDay()} · your hours, breaks and pay", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
+            Text(if (tab == TEAM) "${today.longDay()} · who works, from last month to next month" else "${today.longDay()} · your hours, breaks and pay",
+                fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
+    val tabs: @Composable (Modifier) -> Unit = { m -> OverviewTabs(listOf(MY_SHIFTS, TEAM), tab, onTab, m, height = ToolbarHeight) }
     val controls: @Composable () -> Unit = {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (!size.isPhone) tabs(Modifier.width(210.dp))
+            // Team has its month, filters and refresh on the calendar's own bar.
+            if (tab == TEAM) return@Row
             SquareButton(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Previous week") { onDate(state.date.minus(DatePeriod(days = 7))) }
             Box {
                 HeaderButton("${state.weekStart.shortDay()} – ${weekEnd.shortDay()}", Icons.Outlined.CalendarToday, { dateMenu = true }, Modifier.width(if (size.isPhone) 170.dp else 200.dp))
@@ -263,7 +281,7 @@ private fun MyShiftHeader(state: ShiftState, size: ScreenSize, today: LocalDate,
         }
     }
     if (size.isPhone) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { title(); Box(Modifier.horizontalScroll(rememberScrollState())) { controls() } }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) { title(); tabs(Modifier.fillMaxWidth()); if (tab != TEAM) Box(Modifier.horizontalScroll(rememberScrollState())) { controls() } }
     } else {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.weight(1f)) { title() }; controls() }
     }
@@ -469,12 +487,12 @@ private fun DayTile(modifier: Modifier, day: LocalDate, shifts: List<ShiftItem>,
 }
 
 @Composable
-private fun ComingUpPanel(modifier: Modifier, upcoming: List<ShiftItem>, eligible: ShiftItem?, now: Instant, today: LocalDate, zone: TimeZone, onOpen: (ShiftItem) -> Unit) {
+private fun ComingUpPanel(modifier: Modifier, upcoming: List<ShiftItem>, eligible: ShiftItem?, now: Instant, today: LocalDate, zone: TimeZone, scrolls: Boolean, onOpen: (ShiftItem) -> Unit) {
     OverviewPanel(Icons.Outlined.EventNote, "Coming up", modifier, count = upcoming.size) {
         if (upcoming.isEmpty()) {
             OverviewCompactEmpty("Nothing planned", "New shifts show up here when your manager plans them.", Icons.Outlined.EventAvailable)
         } else {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(if (scrolls) Modifier.verticalScroll(rememberScrollState()) else Modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 upcoming.forEach { item ->
                     val day = item.start.localDate(zone) ?: today
                     val daysAway = today.daysUntil(day)
@@ -498,20 +516,22 @@ private fun ComingUpPanel(modifier: Modifier, upcoming: List<ShiftItem>, eligibl
 
 // This week's worked shifts with what each one paid, then the totals.
 @Composable
-private fun WorkedPanel(modifier: Modifier, pay: StaffPay?, currency: String, weekItems: List<ShiftItem>, zone: TimeZone, onOpen: (String) -> Unit) {
+private fun WorkedPanel(modifier: Modifier, pay: StaffPay?, currency: String, weekItems: List<ShiftItem>, zone: TimeZone, scrolls: Boolean, onOpen: (String) -> Unit) {
     val lines = pay?.shifts.orEmpty()
+    val salary = pay?.monthlySalary.toCents()
     OverviewPanel(Icons.Outlined.Payments, "Worked and paid", modifier, titleExtra = "this week") {
         if (lines.isEmpty() && weekItems.none { it.startedAt != null }) {
-            OverviewCompactEmpty("No shifts worked yet", "Your hours and pay add up here as you work.", Icons.Outlined.Schedule)
+            OverviewCompactEmpty("No shifts worked yet", if (salary != null) "Your hours and tips add up here as you work." else "Your hours and pay add up here as you work.", Icons.Outlined.Schedule)
             return@OverviewPanel
         }
-        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(if (scrolls) Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()) else Modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (pay == null) {
                 weekItems.filter { it.startedAt != null }.sortedByDescending { it.startedAt }.forEach { item ->
                     ShiftLine(item.start.localDate(zone) ?: return@forEach, "${item.startedAt.clock(zone)} – ${item.endedAt?.clock(zone) ?: "now"}",
                         "${hoursText(item.workedMinutes)} · ${hoursText(item.breakMinutes)} breaks", onClick = { onOpen(item.id) }) {}
                 }
             } else {
+                val daysWithTips = mutableSetOf<String>()
                 lines.sortedByDescending { it.startedAt }.forEach { line ->
                     val date = runCatching { LocalDate.parse(line.date) }.getOrNull() ?: return@forEach
                     ShiftLine(date, "${line.startedAt.clock(zone)} – ${line.endedAt?.clock(zone) ?: "now"}",
@@ -519,7 +539,15 @@ private fun WorkedPanel(modifier: Modifier, pay: StaffPay?, currency: String, we
                         onClick = { onOpen(line.shiftId) }) {
                         Column(horizontalAlignment = Alignment.End) {
                             val wages = line.wages.toCents()
-                            if (wages == null) StatusChip("No wage", Kit.Amber)
+                            // A salary isn't paid per shift, so a shift shows only that day's tips.
+                            if (salary != null) {
+                                val tips = pay.tipsByDay.firstOrNull { it.date == line.date }?.tips.toCents() ?: 0
+                                if (tips > 0 && daysWithTips.add(line.date)) {
+                                    Text(centsText(tips, currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Kit.Ink)
+                                    Text("tips", fontFamily = Inter(), fontSize = 10.sp, color = Kit.Muted)
+                                }
+                            }
+                            else if (wages == null) StatusChip("No wage", Kit.Amber)
                             else {
                                 Text(centsText(wages, currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Kit.Ink)
                                 line.hourlyRate.toCents()?.let { Text("${centsText(it, currency)}/h", fontFamily = Inter(), fontSize = 10.sp, color = Kit.Muted) }
@@ -531,9 +559,15 @@ private fun WorkedPanel(modifier: Modifier, pay: StaffPay?, currency: String, we
         }
         if (pay != null) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.Border))
-            ValueLine("Wages · ${hoursText(pay.workedMinutes)}", centsText(pay.wages.toCents() ?: 0, currency))
-            ValueLine("Tips on your orders", centsText(pay.tips.toCents() ?: 0, currency))
-            ValueLine("Total", centsText(pay.total.toCents() ?: 0, currency), strong = true, valueColor = Kit.Green)
+            if (salary != null) {
+                ValueLine("Hours worked", hoursText(pay.workedMinutes))
+                ValueLine("Tips on your orders", centsText(pay.tips.toCents() ?: 0, currency))
+                ValueLine("Salary a month", centsText(salary, currency), strong = true, valueColor = Kit.Green)
+            } else {
+                ValueLine("Wages · ${hoursText(pay.workedMinutes)}", centsText(pay.wages.toCents() ?: 0, currency))
+                ValueLine("Tips on your orders", centsText(pay.tips.toCents() ?: 0, currency))
+                ValueLine("Total", centsText(pay.total.toCents() ?: 0, currency), strong = true, valueColor = Kit.Green)
+            }
             if (pay.missingRate) Text("Some hours have no wage yet: ask your manager to set it in Admin Hub.", Modifier.padding(horizontal = 4.dp),
                 fontFamily = Inter(), fontSize = 11.sp, color = Kit.Amber)
         }

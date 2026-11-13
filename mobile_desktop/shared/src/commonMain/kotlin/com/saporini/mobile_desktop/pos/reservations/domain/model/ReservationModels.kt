@@ -13,7 +13,9 @@ enum class ReservationStatus {
     CANCELLED,
     NO_SHOW,
     // A request nobody answered before the booking time; never counted as a no-show.
-    EXPIRED
+    EXPIRED,
+    // Nobody acted and nobody seated the guests (Settings → Tables → Special cases); never a no-show.
+    NO_ACTION
 }
 
 @Serializable
@@ -67,6 +69,7 @@ data class Reservation(
     val completedAt: String? = null,
     val noShowAt: String? = null,
     val expiredAt: String? = null,
+    val noActionAt: String? = null,
     // When the table stops waiting for late guests (booking time + hold, or later if staff held it longer).
     val holdUntil: String? = null,
     // "3 of 6 arrived"; null until check-in.
@@ -78,6 +81,8 @@ data class Reservation(
     // CONFIRMED, WAITING, CONFIRM_NOW (booked less than 2 h ahead) or NOT_CONFIRMED (deadline passed).
     val attendanceConfirmedAt: String? = null,
     val attendanceConfirmedVia: String? = null,
+    // Staff called and couldn't reach the guest.
+    val attendanceUnreachableAt: String? = null,
     val attendance: String? = null,
     // The guest's no-shows since a manager last cleared the warning.
     val guestNoShows: Int? = null,
@@ -326,6 +331,10 @@ data class ReservationSeatingCheck(
     val minutesLeft: Int = 0,
     val nextBookingStart: String? = null,
     val nextBookingName: String? = null,
+    val nextBookingId: String? = null,
+    val nextBookingGuests: Int? = null,
+    // The whole booking's length: moved elsewhere, late guests get all of it from now.
+    val bookingMinutes: Int = 0,
     val fitsAtTables: Boolean = false,
     val alternatives: List<ReservationAvailabilityOption> = emptyList()
 )

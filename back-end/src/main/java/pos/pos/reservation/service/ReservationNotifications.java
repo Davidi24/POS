@@ -36,12 +36,14 @@ public class ReservationNotifications {
     public static final String DAY_BEFORE = "RESERVATION_DAY_BEFORE";
     public static final String TABLE_FREED = "RESERVATION_TABLE_FREED";
     public static final String RUNNING_LATE = "RESERVATION_RUNNING_LATE";
+    public static final String NEEDS_REVIEW = "RESERVATION_NEEDS_REVIEW";
 
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.ENGLISH);
 
     private final NotificationOperationalPublisher notificationOperationalPublisher;
     private final UserRepository userRepository;
     private final ReservationSupport reservationSupport;
+    private final ReservationPolicy reservationPolicy;
 
     public void created(Reservation reservation, UUID actorId, boolean online) {
         send(reservation, CREATED, online ? "New online reservation" : "New reservation", summary(reservation), reservation.getId(), actorId);
@@ -78,7 +80,12 @@ public class ReservationNotifications {
         if (parts.isEmpty()) {
             return;
         }
-        sendToPermission(anyTomorrow, DAY_BEFORE, "Tomorrow's bookings", String.join(" · ", parts), "RESERVATION_APPROVE");
+        sendToRoles(anyTomorrow, DAY_BEFORE, "Tomorrow's bookings", String.join(" · ", parts), null);
+    }
+
+    // A visit staff must look at (checked in and never seated after its time, or open from an earlier day).
+    public void needsReview(Reservation reservation, String reason) {
+        sendToRoles(reservation, NEEDS_REVIEW, "A booking needs a look", summary(reservation) + " · " + reason, reservation.getId());
     }
 
     // A booking ended early (cancelled or no-show) while requests wait around that time: staff decide who gets it.
@@ -115,14 +122,19 @@ public class ReservationNotifications {
         });
     }
 
-    private void sendToPermission(Reservation reservation, String eventCode, String subject, String body, String permission) {
+    // Settings → Reservations → "Who is told about bookings" (owners and managers by default; owners whatever their branch).
+    private void sendToRoles(Reservation reservation, String eventCode, String subject, String body, UUID referenceId) {
         if (reservation.getRestaurant() == null || reservation.getBranch() == null) {
             return;
         }
         UUID restaurantId = reservation.getRestaurant().getId();
         UUID branchId = reservation.getBranch().getId();
-        deliver(userRepository.findActiveStaffIdsWithPermission(restaurantId, branchId, permission),
-                restaurantId, branchId, eventCode, subject, body, null, null);
+        var roles = reservationPolicy.bookingAlertRoles(reservation.getRestaurant());
+        if (roles.isEmpty()) {
+            return;
+        }
+        deliver(userRepository.findActiveStaffIdsWithRoles(restaurantId, branchId, roles),
+                restaurantId, branchId, eventCode, subject, body, referenceId, null);
     }
 
     private void send(Reservation reservation, String eventCode, String subject, String body, UUID referenceId, UUID actorId) {

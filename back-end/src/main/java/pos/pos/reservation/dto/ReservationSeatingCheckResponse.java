@@ -23,8 +23,12 @@ public class ReservationSeatingCheckResponse {
     // The next booking at one of its tables, e.g. "Next booking at this table at 21:15".
     private OffsetDateTime nextBookingStart;
     private String nextBookingName;
+    private java.util.UUID nextBookingId;
+    private Integer nextBookingGuests;
+    // The whole booking's length, so late guests moved elsewhere get all of it from now (user, 2026-11-02).
+    private Integer bookingMinutes;
     // Its tables stay free until the booking ends, cleaning time included.
     private Boolean fitsAtTables;
-    // Other tables free from now until the booking ends, best first.
+    // Other tables free from now for the whole booking length, best first.
     private List<ReservationAvailabilityOptionResponse> alternatives;
 }

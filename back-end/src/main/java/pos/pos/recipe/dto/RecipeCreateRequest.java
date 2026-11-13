@@ -60,7 +60,7 @@ public class RecipeCreateRequest {
     @Max(value = 10080, message = "cookTimeMinutes must be at most 10080")
     private Integer cookTimeMinutes;
 
-    @Size(max = 10000, message = "instructions must be at most 10000 characters")
+    @Size(max = 20000, message = "instructions must be at most 20000 characters")
     private String instructions;
 
     private OffsetDateTime effectiveFrom;

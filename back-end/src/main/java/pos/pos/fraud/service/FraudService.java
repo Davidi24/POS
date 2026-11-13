@@ -254,6 +254,7 @@ public class FraudService {
                 case MANY_VOIDS -> queries.manyVoids(scope, settings.getFraudVoidsPerDay());
                 case ORDER_VOIDED_AFTER_KITCHEN -> queries.ordersEndedAfterKitchen(scope, "VOIDED", rule);
                 case CANCELLED_AFTER_KITCHEN -> queries.ordersEndedAfterKitchen(scope, "CANCELLED", rule);
+                case CLOSED_UNPAID -> queries.closedUnpaid(scope);
                 case LARGE_REFUND -> queries.largeRefunds(scope, settings.getFraudRefundAmount());
                 case CASH_REFUNDS -> queries.manyCashRefunds(scope, settings.getFraudCashRefundsPerDay());
                 case PAYMENT_VOIDED -> queries.voidedPayments(scope);
@@ -327,6 +328,10 @@ public class FraudService {
             case MANY_VOIDS -> who + " removed " + finding.count() + " items or orders on " + extra + " (" + money + ")";
             case ORDER_VOIDED_AFTER_KITCHEN -> who + " voided" + order + " (" + money + ") after food went to the kitchen";
             case CANCELLED_AFTER_KITCHEN -> who + " cancelled" + order + " (" + money + ") after food went to the kitchen";
+            // No action taken: the system closed it, and it stays against the person who opened the order.
+            case CLOSED_UNPAID -> extra != null && extra.startsWith("no action")
+                    ? who + " left" + order + " open until it closed by itself (" + money + " owed)"
+                    : who + " closed" + order + " as unpaid (" + money + " owed)" + suffix(extra);
             case LARGE_REFUND -> who + " refunded " + money + order + suffix(extra);
             case CASH_REFUNDS -> who + " gave " + finding.count() + " cash refunds on " + extra + " (" + money + ")";
             case PAYMENT_VOIDED -> who + " cancelled a payment of " + money + order + suffix(extra);

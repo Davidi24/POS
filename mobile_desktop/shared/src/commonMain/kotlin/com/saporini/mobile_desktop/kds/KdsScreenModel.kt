@@ -135,6 +135,8 @@ class KdsScreenModel(
             KdsSection.MENU -> loadMenu(s, token)
             else -> Unit
         }
+        // The board, Upcoming and History show each dish's photo from the menu, read once.
+        if (state.value.section != KdsSection.MENU && !state.value.menu.loaded && !state.value.menu.loading && state.value.canReadMenu) loadMenu(s, token)
         if (state.value.reconciliationKey?.startsWith("menu:") == true && state.value.section != KdsSection.MENU) loadMenu(s, token)
         if (state.value.reconciliationKey?.startsWith("station:") == true) loadStationSettings(s, token)
         state.value.selectedTicketId?.let { loadDetail(s, token, it, detailRevision) }

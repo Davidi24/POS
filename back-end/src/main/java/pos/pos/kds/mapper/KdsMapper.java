@@ -116,6 +116,7 @@ public class KdsMapper {
                         ? null
                         : ticket.getOrder().getCustomer().displayName())
                 .guestCount(ticket.getOrder() == null ? null : ticket.getOrder().getGuestCount())
+                .orderType(ticket.getOrder() == null || ticket.getOrder().getOrderType() == null ? null : ticket.getOrder().getOrderType().name())
                 .status(ticket.getStatus())
                 .priority(ticket.getPriority())
                 .courseName(ticket.getCourseName())

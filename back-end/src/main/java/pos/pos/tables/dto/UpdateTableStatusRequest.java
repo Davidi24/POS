@@ -23,4 +23,7 @@ public class UpdateTableStatusRequest {
     @Positive(message = "guestCount must be greater than zero")
     @Max(value = 1000, message = "guestCount must be at most 1000")
     private Integer guestCount;
+
+    // "More will come"; left out keeps what was set.
+    private Boolean moreComing;
 }

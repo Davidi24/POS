@@ -484,13 +484,18 @@ public class ReservationQueryService {
                 .orElse(null);
         java.time.Duration buffer = reservationRuleResolver.buffer(reservation.getBranch(), from);
         boolean fits = !tableIds.isEmpty() && (next == null || !next.getReservationStart().minus(buffer).isBefore(end));
+        // Moved elsewhere, late guests get their whole booking length from now, not just what's left.
+        java.time.Duration length = java.time.Duration.between(reservation.getReservationStart(), end);
         List<ReservationAvailabilityOptionResponse> alternatives = fits || !end.isAfter(from)
                 ? List.of()
-                : reservationAvailabilitySupport.availabilityOptionsForBranch(reservation.getBranch(), from, end, reservation.getPartySize(), 3);
+                : reservationAvailabilitySupport.availabilityOptionsForBranch(reservation.getBranch(), from, from.plus(length), reservation.getPartySize(), 12);
         return pos.pos.reservation.dto.ReservationSeatingCheckResponse.builder()
                 .minutesLeft((int) minutesLeft)
                 .nextBookingStart(next == null ? null : next.getReservationStart())
                 .nextBookingName(next == null ? null : next.getContactName())
+                .nextBookingId(next == null ? null : next.getId())
+                .nextBookingGuests(next == null ? null : next.getPartySize())
+                .bookingMinutes((int) length.toMinutes())
                 .fitsAtTables(fits)
                 .alternatives(alternatives)
                 .build();

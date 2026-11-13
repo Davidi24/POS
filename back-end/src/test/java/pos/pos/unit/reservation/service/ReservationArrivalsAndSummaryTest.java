@@ -67,7 +67,7 @@ class ReservationArrivalsAndSummaryTest {
     void defaults() {
         org.mockito.Mockito.lenient().when(reservationPolicy.values(any())).thenReturn(new pos.pos.reservation.service.ReservationPolicy.Values(
                 5, 15, 7, 30, 20, 15, 120, java.time.LocalTime.of(15, 0), 120, 120, 24, 60, 15, 30, 1, 7,
-                new java.math.BigDecimal("1.50"), new java.math.BigDecimal("0.25")));
+                new java.math.BigDecimal("1.50"), new java.math.BigDecimal("0.25"), true, 6, 15, "OWNER,MANAGER"));
     }
 
     @SuppressWarnings("unchecked")

@@ -21,6 +21,7 @@ public class RestaurantMapper {
 
         return RestaurantResponse.builder()
                 .id(restaurant.getId())
+                .version(restaurant.getVersion())
                 .name(restaurant.getName())
                 .legalName(restaurant.getLegalName())
                 .code(restaurant.getCode())

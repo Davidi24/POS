@@ -84,6 +84,10 @@ internal fun BillPanel(state: PaymentUiState, model: PaymentScreenModel, modifie
                                 textDecoration = if (line.removed) TextDecoration.LineThrough else null)
                             val extra = listOfNotNull(line.variant, line.options.takeIf { it.isNotEmpty() }?.joinToString(", "), line.notes?.let { "“$it”" })
                             if (extra.isNotEmpty()) Text(extra.joinToString(" · "), fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted)
+                            summary.lines.firstOrNull { it.lineId == line.lineId }?.paidQuantity?.takeIf { it > 0 }?.let { paid ->
+                                Text(if (paid >= line.quantity) "Paid" else "$paid of ${line.quantity} paid", fontFamily = Inter(),
+                                    fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Kit.Green)
+                            }
                         }
                         Text(line.lineTotal.money(currency), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Kit.Ink)
                     }

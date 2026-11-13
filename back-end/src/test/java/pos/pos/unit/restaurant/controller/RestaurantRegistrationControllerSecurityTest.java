@@ -28,11 +28,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pos.pos.restaurant.controller.RestaurantRegistrationController;
 import pos.pos.restaurant.dto.CreateRestaurantOwnerRequest;
-import pos.pos.restaurant.dto.RestaurantResponse;
 import pos.pos.restaurant.dto.RestaurantRegistrationRequest;
 import pos.pos.restaurant.dto.ReviewRestaurantRegistrationRequest;
 import pos.pos.restaurant.enums.RestaurantRegistrationDecision;
-import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.service.RestaurantRegistrationService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;
@@ -70,17 +68,23 @@ class RestaurantRegistrationControllerSecurityTest {
     @MockBean
     private RestaurantRegistrationService restaurantRegistrationService;
 
+    @MockBean
+    private pos.pos.security.util.ClientInfoExtractor clientInfoExtractor;
+
     @Test
     @DisplayName("POST /restaurants/registrations should be public")
     void shouldAllowPublicRegistration() throws Exception {
-        given(restaurantRegistrationService.registerRestaurant(any()))
-                .willReturn(RestaurantResponse.builder().id(RESTAURANT_ID).status(RestaurantStatus.PENDING).isActive(false).build());
+        given(restaurantRegistrationService.registerRestaurant(any(), any()))
+                .willReturn(new pos.pos.restaurant.dto.RestaurantApplicationReceiptResponse(RESTAURANT_ID, "Burger House",
+                        pos.pos.restaurant.dto.RestaurantApplicationStatus.PENDING, "7KQ2M-X9D4T-PW3HB-R8N6C", "owner@burger.house", null));
 
         mockMvc.perform(post("/restaurants/registrations")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(RestaurantRegistrationRequest.builder()
                                 .name("Burger House")
                                 .legalName("Burger House LLC")
+                                .email("hello@burger.house")
+                                .phone("+1234567890")
                                 .currency("USD")
                                 .timezone("America/New_York")
                                 .owner(CreateRestaurantOwnerRequest.builder()
@@ -91,6 +95,20 @@ class RestaurantRegistrationControllerSecurityTest {
                                         .build())
                                 .build())))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("POST /restaurants/registrations/status should be public")
+    void shouldAllowPublicStatusCheck() throws Exception {
+        given(restaurantRegistrationService.getRegistrationStatus(any(), any()))
+                .willReturn(new pos.pos.restaurant.dto.RestaurantApplicationStatusResponse(RESTAURANT_ID, "Burger House",
+                        pos.pos.restaurant.dto.RestaurantApplicationStatus.PENDING, null, null, null, "Waiting"));
+
+        mockMvc.perform(post("/restaurants/registrations/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"7KQ2M-X9D4T-PW3HB-R8N6C\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     @Test
@@ -109,14 +127,14 @@ class RestaurantRegistrationControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("PATCH /restaurants/registrations/{restaurantId}/review should return 403 when missing RESTAURANTS_UPDATE")
+    @DisplayName("PATCH /restaurants/registrations/{restaurantId}/review should return 403 when missing RESTAURANTS_CREATE")
     void shouldRejectReviewWhenMissingRestaurantsUpdate() throws Exception {
         ReviewRestaurantRegistrationRequest request = new ReviewRestaurantRegistrationRequest();
         request.setDecision(RestaurantRegistrationDecision.APPROVE);
 
         mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", RESTAURANT_ID)
                         .header("X-Test-User", "admin@pos.local")
-                        .header("X-Test-Authorities", "RESTAURANTS_READ")
+                        .header("X-Test-Authorities", "RESTAURANTS_READ,RESTAURANTS_UPDATE")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden())
@@ -132,11 +150,11 @@ class RestaurantRegistrationControllerSecurityTest {
         request.setDecision(RestaurantRegistrationDecision.APPROVE);
 
         given(restaurantRegistrationService.reviewRegistration(any(), any(), any()))
-                .willReturn(RestaurantResponse.builder().id(RESTAURANT_ID).status(RestaurantStatus.ACTIVE).isActive(true).build());
+                .willReturn(RestaurantRegistrationControllerTest.application(pos.pos.restaurant.dto.RestaurantApplicationStatus.APPROVED));
 
         mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", RESTAURANT_ID)
                         .header("X-Test-User", "admin@pos.local")
-                        .header("X-Test-Authorities", "RESTAURANTS_UPDATE")
+                        .header("X-Test-Authorities", "RESTAURANTS_CREATE")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
@@ -152,7 +170,7 @@ class RestaurantRegistrationControllerSecurityTest {
                     .csrf(AbstractHttpConfigurer::disable)
                     .exceptionHandling(ex -> ex.authenticationEntryPoint(new JwtAuthenticationEntryPoint()))
                     .authorizeHttpRequests(auth -> auth
-                            .requestMatchers(HttpMethod.POST, "/restaurants/registrations").permitAll()
+                            .requestMatchers(HttpMethod.POST, "/restaurants/registrations", "/restaurants/registrations/status").permitAll()
                             .anyRequest().authenticated()
                     )
                     .addFilterBefore(new HeaderAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class)

@@ -6,6 +6,6 @@ import pos.pos.exception.auth.AuthException;
 public class RestaurantRegistrationNotPendingException extends AuthException {
 
     public RestaurantRegistrationNotPendingException() {
-        super("Only pending restaurant registrations can be reviewed", HttpStatus.BAD_REQUEST);
+        super("This application was already reviewed", HttpStatus.CONFLICT);
     }
 }

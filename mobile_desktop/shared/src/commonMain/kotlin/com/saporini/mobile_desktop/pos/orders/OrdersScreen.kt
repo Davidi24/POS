@@ -1,7 +1,19 @@
 package com.saporini.mobile_desktop.pos.orders
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.alpha
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
@@ -16,7 +28,7 @@ import com.saporini.mobile_desktop.pos.menu.ui.item.DraftVariant
 import com.saporini.mobile_desktop.pos.menu.ui.item.DraftOptionGroup
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Reply
 import com.saporini.mobile_desktop.pos.menu.ui.menu.MenuValidationToast
 import com.saporini.mobile_desktop.pos.menu.ui.menu.ToastPlacement
 import com.saporini.mobile_desktop.core.components.AnimatedStatusIcon
@@ -24,7 +36,6 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.foundation.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.text.TextStyle
-import com.saporini.mobile_desktop.pos.menu.ui.item.AddItemCard
 import com.saporini.mobile_desktop.core.ui.PlatformVerticalScrollbar
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -36,6 +47,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.material3.*
@@ -62,6 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.MoneyOff
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.RoomService
 import androidx.compose.material.icons.outlined.Close
@@ -96,10 +109,10 @@ import com.saporini.mobile_desktop.pos.menu.ui.MenuCategoryIcon
 import com.saporini.mobile_desktop.pos.menu.ui.MenuCategory
 import com.saporini.mobile_desktop.pos.menu.ui.item.MenuItemCard
 import org.koin.compose.koinInject
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import mobile_desktop.shared.generated.resources.Res
-import mobile_desktop.shared.generated.resources.auth_login_img
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.InternalResourceApi
 import org.jetbrains.compose.resources.ResourceItem
@@ -110,7 +123,14 @@ import kotlin.time.Instant
 import kotlin.math.roundToInt
 
 @Composable
-fun OrdersScreen(modifier: Modifier = Modifier, onPaymentRequested: (orderId: String) -> Unit = {}, historyOnly: Boolean = false) {
+fun OrdersScreen(
+    modifier: Modifier = Modifier, onPaymentRequested: (orderId: String) -> Unit = {}, historyOnly: Boolean = false,
+    focusOrderId: String? = null, onFocusHandled: () -> Unit = {}, openItems: Boolean = false,
+    startOrder: Pair<String, Int>? = null, onStartOrderHandled: () -> Unit = {},
+    onTableFreed: (tableNumber: String) -> Unit = {}, onOrderReopened: (orderId: String) -> Unit = {},
+    onOpenHistory: () -> Unit = {},
+    historySearch: String? = null, onHistorySearchHandled: () -> Unit = {}
+) {
     val model = koinInject<OrdersScreenModel>(qualifier = if(historyOnly) org.koin.core.qualifier.named("pos-history") else null)
     val owner = LocalLifecycleOwner.current
     DisposableEffect(model, owner) {
@@ -122,12 +142,23 @@ fun OrdersScreen(modifier: Modifier = Modifier, onPaymentRequested: (orderId: St
         model.setActive(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
         onDispose { owner.lifecycle.removeObserver(observer); model.setActive(false); model.onDispose() }
     }
-    OrdersContent(model, modifier, onPaymentRequested)
+    OrdersContent(model, modifier, onPaymentRequested, focusOrderId, onFocusHandled, openItems, startOrder, onStartOrderHandled, onTableFreed, onOrderReopened, onOpenHistory, historySearch, onHistorySearchHandled)
 }
 
 /** Separate from lifecycle ownership to support deterministic screenshots and previews. */
 @Composable
-fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier, onPaymentRequested: (orderId: String) -> Unit = {}) {
+fun OrdersContent(
+    model: OrdersScreenModel, modifier: Modifier = Modifier, onPaymentRequested: (orderId: String) -> Unit = {},
+    focusOrderId: String? = null, onFocusHandled: () -> Unit = {}, openItems: Boolean = false,
+    startOrder: Pair<String, Int>? = null, onStartOrderHandled: () -> Unit = {},
+    // Closed as unpaid: on to the table it freed (user, 2026-11-01).
+    onTableFreed: (tableNumber: String) -> Unit = {},
+    onOrderReopened: (orderId: String) -> Unit = {},
+    onOpenHistory: () -> Unit = {},
+    // History opened from a table: that table's orders.
+    historySearch: String? = null,
+    onHistorySearchHandled: () -> Unit = {}
+) {
     val state by model.state.collectAsState()
     val scope = rememberCoroutineScope()
     var creating by remember { mutableStateOf(false) }
@@ -138,19 +169,107 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier, onPay
     var action by remember { mutableStateOf<String?>(null) }
     var mineOnly by remember { mutableStateOf(false) }
     var kitchen by remember { mutableStateOf<OrderFulfillmentStatus?>(null) }
+    var orderStatus by remember { mutableStateOf<OrderStatus?>(null) }
     var fullDetails by remember { mutableStateOf(false) }
     var orderButtonPosition by rememberSaveable { mutableFloatStateOf(.84f) }
-    LaunchedEffect(state.scope) { creating = false; editing = false; addingItems = false; editChooser = false; progressChooser = false; action = null; fullDetails = false; mineOnly = false; kitchen = null }
-    val visible = state.visibleOrders.filter { (!mineOnly || it.createdBy == state.scope?.userId) && (kitchen == null || (it.status.showsFulfillmentProgress && it.fulfillmentStatus == kitchen)) }
+    LaunchedEffect(state.scope) { creating = false; editing = false; addingItems = false; editChooser = false; progressChooser = false; action = null; fullDetails = false; mineOnly = false; kitchen = null; orderStatus = null }
+    var openingItems by remember { mutableStateOf(false) }
+    // Opened from Kitchen Status ("Go to order"): that order shows, so its ready food can be served.
+    // An order opened from elsewhere (a booking, Kitchen Status) stands out in the list for a few seconds (user, 2026-11-02).
+    var flashOrderId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(flashOrderId) {
+        if (flashOrderId != null) { kotlinx.coroutines.delay(4_000); flashOrderId = null }
+    }
+    LaunchedEffect(focusOrderId, state.scope) {
+        val id = focusOrderId ?: return@LaunchedEffect
+        if (state.scope == null) return@LaunchedEffect
+        flashOrderId = id
+        // History opens on an order only from No action taken: it's among the unpaid ones.
+        if (model.historyOnly) model.setFilter(OrderListFilter(mode = OrderListMode.HISTORY, unpaidOnly = true))
+        model.selectOrder(id)
+        if (openItems) { editing = true; openingItems = true }
+        onFocusHandled()
+    }
+    // The items window is open while the order loads; if it can't be loaded there's nothing to edit.
+    LaunchedEffect(openingItems) {
+        if (!openingItems) return@LaunchedEffect
+        // From the model itself: the screen's copy of its state is a moment behind, so it can look as if nothing is loading yet.
+        val opened = model.state.first { it.selectedOrder != null || !it.isLoadingDetails }
+        if (opened.selectedOrder == null) editing = false
+        openingItems = false
+    }
+    LaunchedEffect(historySearch, state.scope) {
+        val table = historySearch ?: return@LaunchedEffect
+        if (state.scope == null) return@LaunchedEffect
+        model.setFilter(OrderListFilter(mode = OrderListMode.HISTORY))
+        model.setSearchQuery(table)
+        onHistorySearchHandled()
+    }
+    // Tables → Start order: the order exists at once, and its dishes are the next thing to add.
+    var startOrderProblem by remember { mutableStateOf<String?>(null) }
+    var unpaidDone by remember { mutableStateOf<String?>(null) }
+    // Only History reopens orders (user, 2026-11-01). For payment: straight to its payment.
+    val inHistory = model.historyOnly || state.filter.mode == OrderListMode.HISTORY
+    val canReopenForPayment = inHistory && model.hasPermission("ORDER_CLOSE")
+    val canReopenOrder = inHistory && model.hasPermission("ORDER_REOPEN")
+    var reopenAsking by remember { mutableStateOf<Order?>(null) }
+    val reopenForPayment: (Order) -> Unit = { reopened ->
+        scope.launch {
+            model.reopenForPaymentFromHistory(reopened.id).fold(
+                { onPaymentRequested(reopened.id) },
+                { startOrderProblem = it.message ?: "Could not reopen the order" }
+            )
+        }
+    }
+    reopenAsking?.let { reopened ->
+        com.saporini.mobile_desktop.core.components.AppDialog(
+            title = "Reopen ${reopened.orderNumber}?",
+            onDismiss = { reopenAsking = null },
+            maxWidth = 460.dp,
+            buttons = {
+                com.saporini.mobile_desktop.core.components.KitButton("Cancel", { reopenAsking = null }, style = com.saporini.mobile_desktop.core.components.ButtonStyle.SECONDARY)
+                com.saporini.mobile_desktop.core.components.KitButton("Reopen", {
+                    reopenAsking = null
+                    scope.launch {
+                        model.reopenFromHistory(reopened.id).fold(
+                            { onOrderReopened(reopened.id) },
+                            { startOrderProblem = it.message ?: "Could not reopen the order" }
+                        )
+                    }
+                })
+            }
+        ) {
+            Text("It goes back to Active orders.", fontFamily = Inter(), fontSize = 14.sp, color = OrderMuted)
+        }
+    }
+    // The order window opens at once and fills in when the order is made.
+    var starting by remember { mutableStateOf(false) }
+    // New order opens on the menu; Start order and Edit order open on the order's items (user, 2026-11-01).
+    var newOrder by remember { mutableStateOf(false) }
+    LaunchedEffect(startOrder, state.scope) {
+        val (tableId, guests) = startOrder ?: return@LaunchedEffect
+        if (state.scope == null) return@LaunchedEffect
+        starting = true
+        try {
+            model.operations.createOrder(CreateOrderInput(tableId = tableId, orderType = OrderType.DINE_IN, guestCount = guests))
+                .fold({ editing = true }, { startOrderProblem = it.message ?: "Could not start the order" })
+        } finally {
+            starting = false
+            onStartOrderHandled()
+        }
+    }
+    com.saporini.mobile_desktop.core.components.BottomToast(startOrderProblem, isError = true, onDismiss = { startOrderProblem = null })
+    com.saporini.mobile_desktop.core.components.BottomToast(unpaidDone, onDismiss = { unpaidDone = null })
+    val visible = state.visibleOrders.filter { (!mineOnly || it.createdBy == state.scope?.userId) && (orderStatus == null || it.status == orderStatus) && (kitchen == null || (it.status.showsFulfillmentProgress && it.fulfillmentStatus == kitchen)) }
     val showEmptyCreate = visible.isEmpty() && !state.isLoading && state.can("ORDER_CREATE") &&
-        state.searchQuery.isBlank() && !mineOnly && kitchen == null && state.filter.mode == OrderListMode.OPEN
+        state.searchQuery.isBlank() && !mineOnly && kitchen == null && orderStatus == null && state.filter.mode == OrderListMode.OPEN
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val isPhone = isPhoneWindow()
         val compact = maxWidth < 1000.dp
         val order = state.selectedOrder
         var detailsClosedByUser by remember { mutableStateOf(false) }
         LaunchedEffect(compact, visible.firstOrNull()?.id, state.selectedOrderId, state.isLoading, detailsClosedByUser) {
-            if(!compact && !state.isLoading && state.selectedOrderId == null && !detailsClosedByUser) visible.firstOrNull()?.id?.let(model::selectOrder)
+            if(!compact && !state.isLoading && state.selectedOrderId == null && !detailsClosedByUser && startOrder == null && !starting) visible.firstOrNull()?.id?.let(model::selectOrder)
         }
         Column(Modifier.fillMaxSize().padding(start = if(compact) 16.dp else 28.dp, top = if(compact) 16.dp else 28.dp, end = if(compact) 16.dp else 28.dp, bottom = if(compact) 10.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if(compact && editing && order != null) {
@@ -162,21 +281,27 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier, onPay
                     TextButton({ model.refresh() }) { Text("Refresh") }
                 }
                 if(order == null) { if(state.isLoadingDetails) CircularProgressIndicator() else OrderText("Could not load order. Please refresh.") }
-                else OrderDetails(order, state, { editChooser = true }, { action = it }, Modifier.weight(1f))
+                else OrderDetails(order, state, { editChooser = true }, { action = it }, Modifier.weight(1f), reopenForPayment = canReopenForPayment, reopenOrder = canReopenOrder)
                 state.error?.let { OrderError(it.message, model::clearError) }
             } else {
                 OrdersToolbar(
                     query = state.searchQuery,
                     onQueryChange = model::setSearchQuery,
-                    progress = kitchen,
-                    onProgressChange = { kitchen = it },
+                    orderStatus = orderStatus,
+                    onOrderStatusChange = { orderStatus = it },
+                    foodStatus = kitchen,
+                    onFoodStatusChange = { kitchen = it },
                     mineOnly = mineOnly,
                     onMineChange = { mineOnly = it; model.historyMine(it) },
-                    history = state.filter.mode == OrderListMode.HISTORY,
-                    onHistoryChange = { model.setFilter(OrderListFilter(mode = if (it) OrderListMode.HISTORY else OrderListMode.OPEN)) },
+                    onOpenHistory = onOpenHistory,
                     historyOnly = model.historyOnly,
                     historyStatus = state.filter.status,
-                    onHistoryStatusChange = { model.setFilter(state.filter.copy(status = it)) }
+                    onHistoryStatusChange = { model.setFilter(state.filter.copy(status = it, unpaidOnly = false)) },
+                    historyUnpaid = state.filter.unpaidOnly,
+                    onHistoryUnpaid = { model.setFilter(OrderListFilter(mode = OrderListMode.HISTORY, unpaidOnly = true)) },
+                    // The server's total; All | Mine and the Status button narrow only what's loaded.
+                    count = if (state.isLoading && state.orders.isEmpty()) null
+                        else if (mineOnly || kitchen != null || orderStatus != null) visible.size.toLong() else state.historyTotal
                 )
                 state.error?.let { OrderError(it.message, model::clearError) }
                 state.refreshWarning?.let { OrderError(it, model::clearError) }
@@ -187,7 +312,7 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier, onPay
                 Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     if(visible.isEmpty() && !state.isLoading) {
                         OrdersEmptyListPanel(
-                            title = if(state.searchQuery.isNotBlank() || mineOnly || kitchen != null) "No matching orders" else if(state.filter.mode == OrderListMode.OPEN) "No open orders" else "No order history",
+                            title = if(state.searchQuery.isNotBlank() || mineOnly || kitchen != null || orderStatus != null) "No matching orders" else if(state.filter.mode == OrderListMode.OPEN) "No active orders" else if(state.filter.unpaidOnly) "No unpaid orders" else "No order history",
                             showCreate = showEmptyCreate,
                             modifier = Modifier.weight(if(compact) 1f else 1.65f).fillMaxHeight(),
                             onCreate = { creating = true }
@@ -203,6 +328,7 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier, onPay
                             pageError = state.error != null,
                             onLoadMore = model::loadMoreHistory,
                             selectedId = state.selectedOrderId,
+                            flashId = flashOrderId,
                             compact = compact,
                             modifier = Modifier.weight(if(compact) 1f else 1.65f).fillMaxHeight(),
                             onSelect = {
@@ -219,11 +345,14 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier, onPay
                                     order,
                                     state,
                                     onEditItems = { editing = true },
-                                    onAddItem = { addingItems = true },
                                     onEditInfo = { action = "Edit information" },
                                     onEditProgress = { progressChooser = true },
                                     onAction = { action = it },
                                     onPayment = { onPaymentRequested(order.id) },
+                                    onRequestBill = { scope.launch { model.operations.requestBill(order.id) } },
+                                    canReopenForPayment = canReopenForPayment,
+                                    canReopenOrder = canReopenOrder,
+                                    onReopenForPayment = { reopenForPayment(order) },
                                     onClose = {
                                     detailsClosedByUser = true
                                     model.closeOrderDetails()
@@ -255,12 +384,13 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier, onPay
                     )
             )
         }
-        if(creating) OrderStartForm(model, { creating = false }, { creating = false; editing = true })
-        if(editing && !compact && order != null) OrderItemsEditModal(
-            order = order,
+        if(creating) OrderStartForm(model, { creating = false }, { creating = false; newOrder = true; editing = true })
+        if((editing || starting) && !compact && (order != null || starting || openingItems)) OrderItemsEditModal(
+            order = order.takeIf { !starting },
             state = state,
             model = model,
-            onDismiss = { editing = false },
+            startOnMenu = newOrder,
+            onDismiss = { editing = false; newOrder = false },
             onSendAll = { action = "Send to kitchen" },
             onVoidItem = { id -> action = "Void item:$id" }
         )
@@ -279,6 +409,18 @@ fun OrdersContent(model: OrdersScreenModel, modifier: Modifier = Modifier, onPay
             OrderKitchenSendDialog(order, model, onDismiss = { action = null })
         } else if (action == "Edit information" && order != null) {
             OrderInfoEditDialog(order, model, onDismiss = { action = null })
+        } else if (action == "Close as unpaid" && order != null) {
+            CloseUnpaidDialog(order, model, onDismiss = { action = null }, onDone = { closed ->
+                action = null
+                // On to the table it freed; an order on no table just says where it went.
+                closed.tableNumber?.let(onTableFreed) ?: run { unpaidDone = "${closed.orderNumber} closed as unpaid. It's in History." }
+            })
+        } else if (action == "Reopen order" && order != null) {
+            LaunchedEffect(order.id) { action = null; reopenAsking = order }
+        } else if (action == "Reopen for payment" && order != null) {
+            LaunchedEffect(order.id) { action = null; reopenForPayment(order) }
+        } else if (action == "Pay" && order != null) {
+            LaunchedEffect(order.id) { action = null; onPaymentRequested(order.id) }
         } else if (action != null) OrderActionForm(action!!, model, order, { action = null })
     }
 }
@@ -322,32 +464,18 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
 }
 
 @Composable private fun OrderItemsEditModal(
-    order: Order,
+    order: Order?,
     state: OrdersUiState,
     model: OrdersScreenModel,
+    startOnMenu: Boolean,
     onDismiss: () -> Unit,
     onSendAll: () -> Unit,
     onVoidItem: (String) -> Unit
 ) {
-    val activeItems = order.lineItems.orEmpty().filter { it.active }
-    var showAddItem by remember(order.id) { mutableStateOf(false) }
-    var selectedId by remember(order.id) { mutableStateOf(activeItems.firstOrNull()?.id) }
-    val selected = activeItems.firstOrNull { it.id == selectedId }
-    val scope = rememberCoroutineScope()
-    var sendingId by remember(order.id) { mutableStateOf<String?>(null) }
-    var sentIds by remember(order.id) { mutableStateOf(emptySet<String>()) }
-    var sendError by remember(order.id) { mutableStateOf<String?>(null) }
-    var editorDirty by remember(order.id, selectedId) { mutableStateOf(false) }
-    val canWrite = order.editable && state.can("ORDER_UPDATE") && !state.isSaving && !state.needsReconciliation && sendingId == null
-    LaunchedEffect(activeItems.map { it.id }) {
-        if (selectedId != null && activeItems.none { it.id == selectedId }) selectedId = activeItems.firstOrNull()?.id
-    }
-    val pages = rememberPagerState(pageCount = { 2 })
-    LaunchedEffect(showAddItem) {
-        pages.animateScrollToPage(if (showAddItem) 1 else 0, animationSpec = tween(300))
-    }
+    // New order opens on the menu, so the first dish is one click away.
+    var showAddItem by remember(order?.id) { mutableStateOf(startOnMenu && order != null && order.lineItems.orEmpty().none { it.active }) }
     Dialog(
-        onDismissRequest = { if (!state.isSaving) { if (showAddItem) showAddItem = false else onDismiss() } },
+        onDismissRequest = { if (!state.isSaving && order != null) { if (showAddItem) showAddItem = false else onDismiss() } },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
@@ -355,6 +483,49 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
             shape = RoundedCornerShape(16.dp), color = Color.White,
             border = BorderStroke(1.dp, OrderBorder), shadowElevation = 12.dp
         ) {
+            // While Start order makes the order (user, 2026-11-01: "go smoother to the order"), the window is already open
+            // with the menu's shapes, and the order fades in when it's there.
+            androidx.compose.animation.AnimatedContent(order == null, transitionSpec = { com.saporini.mobile_desktop.core.components.loadingSwap(targetState) }) { starting ->
+                if (starting || order == null) OrderComposerShapes()
+                else OrderItemsEditPages(order, state, model, showAddItem, { showAddItem = it }, onDismiss, onSendAll, onVoidItem)
+            }
+        }
+    }
+}
+
+@Composable private fun OrderItemsEditPages(
+    order: Order,
+    state: OrdersUiState,
+    model: OrdersScreenModel,
+    showAddItem: Boolean,
+    onShowAddItem: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    onSendAll: () -> Unit,
+    onVoidItem: (String) -> Unit
+) {
+    val activeItems = order.lineItems.orEmpty().filter { it.active }
+    var selectedId by remember(order.id) { mutableStateOf(activeItems.firstOrNull()?.id) }
+    val selected = activeItems.firstOrNull { it.id == selectedId }
+    val scope = rememberCoroutineScope()
+    var sendingId by remember(order.id) { mutableStateOf<String?>(null) }
+    var sentIds by remember(order.id) { mutableStateOf(emptySet<String>()) }
+    var sendError by remember(order.id) { mutableStateOf<String?>(null) }
+    var editorDirty by remember(order.id, selectedId) { mutableStateOf(false) }
+    // Ticked dishes go to the kitchen together; the top tick takes them all (user, 2026-11-01).
+    var picked by remember(order.id) { mutableStateOf(emptySet<String>()) }
+    val awaiting = activeItems.filter { it.awaitingKitchen && it.id !in sentIds }.map { it.id }
+    val pickedNow = awaiting.filter { it in picked }
+    val allPicked = awaiting.isNotEmpty() && pickedNow.size == awaiting.size
+    val canWrite = order.editable && state.can("ORDER_UPDATE") && !state.isSaving && !state.needsReconciliation && sendingId == null
+    LaunchedEffect(activeItems.map { it.id }) {
+        if (selectedId != null && activeItems.none { it.id == selectedId }) selectedId = activeItems.firstOrNull()?.id
+    }
+    val pages = rememberPagerState(initialPage = if (showAddItem) 1 else 0, pageCount = { 2 })
+    LaunchedEffect(showAddItem) {
+        if (pages.currentPage != (if (showAddItem) 1 else 0)) pages.animateScrollToPage(if (showAddItem) 1 else 0, animationSpec = tween(300))
+    }
+    run {
+        run {
             // Keep both pages composed so the editor's selection, scroll and draft survive navigation.
             HorizontalPager(
                 state = pages, modifier = Modifier.fillMaxSize(),
@@ -370,8 +541,23 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                                 OrderListPill(Icons.Outlined.TableRestaurant, order.tableName ?: order.tableNumber?.let { "Table $it" } ?: "Table -", modifier = Modifier.widthIn(min = 70.dp, max = 96.dp))
                                 Spacer(Modifier.weight(1f))
                                 Button(
-                                    onClick = { if(activeItems.any { it.awaitingKitchen } && !state.isSaving) onSendAll() },
-                                    enabled = canWrite && !editorDirty && activeItems.any { it.awaitingKitchen },
+                                    onClick = {
+                                        if (allPicked) { if (!state.isSaving) { picked = emptySet(); onSendAll() } }
+                                        else if (pickedNow.isNotEmpty()) scope.launch {
+                                            sendError = null
+                                            try {
+                                                for (id in pickedNow) {
+                                                    sendingId = id
+                                                    val sent = model.operations.fireItem(order.id, id).fold(
+                                                        { sentIds = sentIds + id; true },
+                                                        { sendError = it.message ?: "Could not send this item to the kitchen"; false }
+                                                    )
+                                                    if (!sent) break
+                                                }
+                                            } finally { sendingId = null }
+                                        }
+                                    },
+                                    enabled = canWrite && !editorDirty && pickedNow.isNotEmpty(),
                                     modifier = Modifier.height(42.dp),
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = OrderGreen),
@@ -379,7 +565,8 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                                 ) {
                                     Icon(Icons.Outlined.Send, null, Modifier.size(18.dp).rotate(-45f), tint = Color.White)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Send all to kitchen", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White)
+                                    Text(when { allPicked -> "Send all to kitchen"; pickedNow.isNotEmpty() -> "Send selected to kitchen"; else -> "Send to kitchen" },
+                                        fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White)
                                 }
                                 Spacer(Modifier.width(10.dp))
                                 Surface(onClick = onDismiss, enabled = !state.isSaving && sendingId == null, modifier = Modifier.size(36.dp), shape = RoundedCornerShape(18.dp), color = Color.White, border = BorderStroke(1.dp, OrderBorder), shadowElevation = 2.dp) {
@@ -389,11 +576,21 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                             HorizontalDivider(color = OrderBorder)
                             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                                 Surface(Modifier.weight(1.65f).fillMaxHeight(), shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, OrderBorder)) {
-                                    Column(Modifier.fillMaxSize().padding(start = 14.dp, top = 14.dp, end = 14.dp, bottom = 5.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                    Column(Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                            // Over the dishes' ticks: all, or none.
+                                            if (awaiting.isNotEmpty()) {
+                                                TriStateCheckbox(
+                                                    state = when { allPicked -> ToggleableState.On; pickedNow.isNotEmpty() -> ToggleableState.Indeterminate; else -> ToggleableState.Off },
+                                                    onClick = { picked = if (allPicked) emptySet() else awaiting.toSet() },
+                                                    enabled = canWrite,
+                                                    modifier = Modifier.padding(start = 13.dp, end = 12.dp).size(24.dp),
+                                                    colors = CheckboxDefaults.colors(checkedColor = OrderGreen)
+                                                )
+                                            }
                                             Text("Order items", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = OrderInk, modifier = Modifier.weight(1f))
                                             OutlinedButton(
-                                                onClick = { showAddItem = true },
+                                                onClick = { onShowAddItem(true) },
                                                 enabled = canWrite,
                                                 modifier = Modifier.height(38.dp),
                                                 shape = RoundedCornerShape(10.dp),
@@ -406,8 +603,22 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                                             }
                                         }
                                         val listState = rememberLazyListState()
-                                        Box(Modifier.weight(1f)) {
-                                            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize().padding(end = 8.dp)) {
+                                        if (activeItems.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                Box(Modifier.size(64.dp).clip(CircleShape).background(OrderGreen.copy(alpha = .1f)), contentAlignment = Alignment.Center) {
+                                                    Icon(Icons.Outlined.Restaurant, null, Modifier.size(30.dp), tint = OrderGreen)
+                                                }
+                                                Text("No dishes yet", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = OrderInk)
+                                                Text("Pick them from the menu.", fontFamily = Inter(), fontSize = 13.sp, color = OrderMuted)
+                                                Button(onClick = { onShowAddItem(true) }, enabled = canWrite, shape = RoundedCornerShape(10.dp),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = OrderGreen)) {
+                                                    Icon(Icons.Outlined.Add, null, Modifier.size(18.dp), tint = Color.White)
+                                                    Spacer(Modifier.width(6.dp))
+                                                    Text("Open the menu", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White)
+                                                }
+                                            }
+                                        } else Box(Modifier.weight(1f)) {
+                                            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxSize()) {
                                                 items(activeItems, key = { it.id }) { line ->
                                                     OrderEditLineRow(
                                                         line = line,
@@ -415,6 +626,10 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                                                         selected = line.id == selected?.id,
                                                         onClick = { if (!state.isSaving && sendingId == null) selectedId = line.id },
                                                         sending = sendingId == line.id,
+                                                        pickable = line.id in awaiting,
+                                                        picked = line.id in pickedNow,
+                                                        canPick = canWrite,
+                                                        onPick = { picked = if (line.id in picked) picked - line.id else picked + line.id },
                                                         sent = line.id in sentIds || line.status != OrderLineItemStatus.PENDING,
                                                         canSend = canWrite && !editorDirty,
                                                         onSend = {
@@ -434,7 +649,8 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                                                     )
                                                 }
                                             }
-                                            PlatformVerticalScrollbar(listState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp))
+                                            // In the panel's side room, so the rows line up with Add item above them.
+                                            PlatformVerticalScrollbar(listState, Modifier.align(Alignment.CenterEnd).offset(x = 10.dp).fillMaxHeight().width(3.dp))
                                         }
                                         sendError?.let { OrderError(it) { sendError = null; model.clearError() } }
                                         if (editorDirty) Text("Save your changes before sending items to the kitchen", fontFamily = Inter(), fontSize = 11.sp, color = OrderMuted)
@@ -442,13 +658,15 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                                     }
                                 }
                                 Surface(Modifier.weight(.82f).fillMaxHeight(), shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, OrderBorder)) {
-                                    key(selected?.id) {
+                                    if (activeItems.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        OrderText("Dishes you add can be changed here", 15, true, color = OrderMuted)
+                                    } else key(selected?.id) {
                                         OrderSelectedLineEditor(
                                             line = selected, order = order, model = model,
                                             onClose = { selectedId = null },
                                             onDirtyChange = { editorDirty = it },
                                             onVoid = { selected?.let { onVoidItem(it.id) } },
-                                            modifier = Modifier.fillMaxSize().padding(14.dp)
+                                            modifier = Modifier.fillMaxSize().padding(16.dp)
                                         )
                                     }
                                 }
@@ -457,9 +675,29 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
                 } else {
                     OrderAddItemMenuContent(
                         order = order, model = model, backToEditor = true, active = showAddItem,
-                        onDismiss = { showAddItem = false }
+                        onDismiss = { onShowAddItem(false) }
                     )
                 }
+            }
+        }
+    }
+}
+
+/** The order window while Start order makes the order: its header and the menu's dishes as pulsing shapes. */
+@Composable private fun OrderComposerShapes() {
+    val alpha = com.saporini.mobile_desktop.core.components.rememberSkeletonAlpha("order-start")
+    Column(Modifier.fillMaxSize().padding(16.dp).graphicsLayer { this.alpha = alpha }, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Starting the order…", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = OrderInk)
+            com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.width(110.dp).height(26.dp), shape = RoundedCornerShape(8.dp))
+        }
+        HorizontalDivider(color = OrderBorder)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(5) { com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.width(96.dp).height(34.dp), shape = RoundedCornerShape(10.dp)) }
+        }
+        repeat(3) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                repeat(4) { com.saporini.mobile_desktop.core.components.SkeletonBox(Modifier.weight(1f).height(150.dp), com.saporini.mobile_desktop.core.components.SkeletonLight, RoundedCornerShape(14.dp)) }
             }
         }
     }
@@ -673,6 +911,14 @@ private fun OrderAddItemMenuContent(
     var addedMessage by remember { mutableStateOf<String?>(null) }
     var addedNoticeId by remember { mutableIntStateOf(0) }
     var addError by remember { mutableStateOf<String?>(null) }
+    // Option groups framed in red for 3 seconds after Add to Order finds them unchosen (user, 2026-11-01).
+    var missingGroups by remember { mutableStateOf(emptySet<String>()) }
+    var missingTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(missingTick) {
+        if (missingTick == 0) return@LaunchedEffect
+        delay(3_000L)
+        missingGroups = emptySet()
+    }
     LaunchedEffect(addedNoticeId) {
         if (addedMessage != null) {
             delay(2_000L)
@@ -760,14 +1006,14 @@ private fun OrderAddItemMenuContent(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (backToEditor) {
                     IconButton(onClick = onDismiss, enabled = !submitting, modifier = Modifier.size(34.dp)) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to order items", Modifier.size(20.dp), tint = OrderInk)
+                        Icon(Icons.AutoMirrored.Filled.Reply, "Back to order items", Modifier.size(20.dp), tint = OrderInk)
                     }
                     Spacer(Modifier.width(8.dp))
                 }
                 Text("Add item", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = OrderInk, modifier = Modifier.weight(1f))
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     OrderAddMenuSelect(
-                        label = menus.firstOrNull { it.id == menuId }?.name ?: "Change menu",
+                        label = menus.firstOrNull { it.id == menuId }?.label ?: "Change menu",
                         menus = menus,
                         onMenuSelected = { if (!submitting) menuId = it }
                     )
@@ -843,11 +1089,13 @@ private fun OrderAddItemMenuContent(
                                 canClose = !submitting,
                                 isAdding = submitting,
                                 errorMessage = (addError ?: state.error?.message).takeIf { active },
+                                onCloseError = { addError = null; model.clearError() },
+                                missingGroups = missingGroups,
                                 choices = choices,
                                 variantId = variantId,
                                 optionIds = optionIds,
                                 onVariantChange = { if (!submitting) variantId = it },
-                                onOptionChange = { id -> if (!submitting) optionIds = if (id in optionIds) optionIds - id else optionIds + id },
+                                onOptionChange = { id -> if (!submitting) { optionIds = if (id in optionIds) optionIds - id else optionIds + id; addError = null } },
                                 enabled = !submitting && !state.isSaving && !state.needsReconciliation && order.editable && state.can("ORDER_UPDATE"),
                                 currency = order.currency,
                                 quantity = quantity,
@@ -857,6 +1105,8 @@ private fun OrderAddItemMenuContent(
                                 onAdd = {
                                     val current = choices
                                     if (current != null && current.item.id == selectedItem?.id && !submitting && !state.isSaving && !state.needsReconciliation) {
+                                        val unchosen = current.groups.filter { group -> group.availableChoices.count { it.id in optionIds } < group.minimum }
+                                        if (unchosen.isNotEmpty()) { missingGroups = unchosen.mapTo(HashSet()) { it.group.id }; missingTick++ }
                                         val input = runCatching {
                                             current.toLineItemInput(quantity, variantId,
                                                 optionIds.map { CreateOrderItemOptionInput(it, 1) }, note)
@@ -908,7 +1158,7 @@ private fun OrderAddItemMenuContent(
 
 private fun OrderCatalogItem.toMenuPreview(category: String, currency: String) = MenuItem(
     id = id, name = name, description = description.orEmpty(), price = basePrice.money(currency),
-    category = category, available = available, sku = sku,
+    category = category, available = available, sku = sku, imageUrl = imageUrl,
     ingredients = ingredients.orEmpty().map { DraftIngredient(it, "", "") },
     variants = variants.orEmpty().map {
         DraftVariant(it.name, (if (it.priceDelta.isNegative) "" else "+") + it.priceDelta.money(currency), it.id)
@@ -937,7 +1187,7 @@ private fun OrderAddMenuSelect(label: String, menus: List<OrderCatalogMenu>, onM
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(Color.White), shape = RoundedCornerShape(10.dp), containerColor = Color.White, tonalElevation = 0.dp, shadowElevation = 6.dp) {
             menus.forEach { menu ->
                 DropdownMenuItem(
-                    text = { Text(menu.name, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = OrderInk) },
+                    text = { Text(menu.label, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 14.sp, color = OrderInk) },
                     onClick = { expanded = false; onMenuSelected(menu.id) }
                 )
             }
@@ -1044,12 +1294,15 @@ private fun OrderAddMenuItemCard(item: OrderCatalogItem, category: String, curre
         canEdit = false,
         modifier = Modifier.fillMaxWidth().clickable(onClick = onSelect),
         ingredients = item.ingredients.orEmpty().ifEmpty { listOfNotNull(item.description?.takeIf { it.isNotBlank() }) },
+        imageUrl = item.imageUrl,
         onExpand = onExpand
     )
 }
 
 @Composable
-private fun OrderAddItemDetails(item: OrderCatalogItem?, onClose: () -> Unit, canClose: Boolean, isAdding: Boolean, errorMessage: String?, choices: OrderItemChoices?, variantId: String?,
+private fun OrderAddItemDetails(item: OrderCatalogItem?, onClose: () -> Unit, canClose: Boolean, isAdding: Boolean, errorMessage: String?, onCloseError: () -> Unit,
+    // The option groups still missing a choice, framed in red for a moment after Add to Order.
+    missingGroups: Set<String>, choices: OrderItemChoices?, variantId: String?,
     optionIds: Set<String>, onVariantChange: (String) -> Unit, onOptionChange: (String) -> Unit,
     enabled: Boolean, currency: String, quantity: Int, note: String,
     onQuantityChange: (Int) -> Unit, onNoteChange: (String) -> Unit, onAdd: () -> Unit) {
@@ -1067,14 +1320,14 @@ private fun OrderAddItemDetails(item: OrderCatalogItem?, onClose: () -> Unit, ca
     val lineTotal = ((item.basePrice.value.toDoubleOrNull() ?: 0.0) +
         (selectedVariant?.priceDelta?.value?.toDoubleOrNull() ?: 0.0) + optionsTotal) * quantity
     val detailsScrollState = rememberScrollState()
-    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.weight(1f)) {
             Column(
-                Modifier.fillMaxSize().verticalScroll(detailsScrollState).padding(end = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                Modifier.fillMaxSize().verticalScroll(detailsScrollState),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                    Image(painter = painterResource(Res.drawable.auth_login_img), contentDescription = item.name, modifier = Modifier.size(68.dp).clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Crop)
+                    com.saporini.mobile_desktop.pos.menu.ui.item.MenuPhoto(item.imageUrl, item.name, Modifier.size(68.dp).clip(RoundedCornerShape(10.dp)))
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(item.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 19.sp, color = OrderInk, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -1103,13 +1356,28 @@ private fun OrderAddItemDetails(item: OrderCatalogItem?, onClose: () -> Unit, ca
                     HorizontalDivider(color = OrderBorder)
                     Text("Options", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OrderInk)
                     choices?.groups.orEmpty().forEach { group ->
-                        Text(group.group.name + if (group.minimum > 0) " · Choose at least ${group.minimum}" else " · Optional",
-                            fontFamily = Inter(), fontSize = 11.sp, color = OrderMuted)
-                        group.availableChoices.forEach { option ->
-                            val selectedCount = group.availableChoices.count { it.id in optionIds }
-                            val canSelect = option.id in optionIds || group.maximum == null || selectedCount < group.maximum!!
-                            OrderAddOptionRow(option.name, option.priceDelta.money(currency), selected = option.id in optionIds,
-                                radio = false, enabled = enabled && canSelect) { onOptionChange(option.id) }
+                        val selectedCount = group.availableChoices.count { it.id in optionIds }
+                        val flagged = group.group.id in missingGroups && selectedCount < group.minimum
+                        val frame by androidx.compose.animation.animateColorAsState(if (flagged) OrderDanger else Color.Transparent, tween(180), label = "missing-option")
+                        // Brought into view when it's flagged: the list may be scrolled past it.
+                        val into = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+                        LaunchedEffect(flagged) { if (flagged) into.bringIntoView() }
+                        Column(
+                            Modifier.fillMaxWidth().bringIntoViewRequester(into).drawBehind {
+                                // Around the group, without moving its rows.
+                                val outX = 6.dp.toPx(); val outY = 5.dp.toPx()
+                                drawRoundRect(frame, topLeft = Offset(-outX, -outY), size = Size(size.width + outX * 2, size.height + outY * 2),
+                                    cornerRadius = CornerRadius(10.dp.toPx()), style = Stroke(1.5.dp.toPx()))
+                            },
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(group.group.name + if (group.minimum > 0) " · Choose at least ${group.minimum}" else " · Optional",
+                                fontFamily = Inter(), fontSize = 11.sp, fontWeight = if (flagged) FontWeight.SemiBold else FontWeight.Normal, color = if (flagged) OrderDanger else OrderMuted)
+                            group.availableChoices.forEach { option ->
+                                val canSelect = option.id in optionIds || group.maximum == null || selectedCount < group.maximum!!
+                                OrderAddOptionRow(option.name, option.priceDelta.money(currency), selected = option.id in optionIds,
+                                    radio = false, enabled = enabled && canSelect) { onOptionChange(option.id) }
+                            }
                         }
                     }
                 }
@@ -1130,7 +1398,7 @@ private fun OrderAddItemDetails(item: OrderCatalogItem?, onClose: () -> Unit, ca
                     }
                 }
             }
-            PlatformVerticalScrollbar(detailsScrollState, Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp))
+            PlatformVerticalScrollbar(detailsScrollState, Modifier.align(Alignment.CenterEnd).offset(x = 11.dp).fillMaxHeight().width(3.dp))
         }
         HorizontalDivider(color = OrderBorder)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
@@ -1150,6 +1418,17 @@ private fun OrderAddItemDetails(item: OrderCatalogItem?, onClose: () -> Unit, ca
                 Text(lineTotal.toOrderMoney(currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = OrderInk)
             }
         }
+        // Sits above the button, covering nothing, and closes with its X (user, 2026-11-01).
+        errorMessage?.let { problem ->
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(OrderDanger.copy(alpha = .08f)).padding(start = 10.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.ErrorOutline, null, Modifier.size(16.dp), tint = OrderDanger)
+                Text(problem, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp, color = OrderDanger)
+                Box(Modifier.size(26.dp).clip(RoundedCornerShape(13.dp)).clickable(onClick = onCloseError), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Close, "Close", Modifier.size(16.dp), tint = OrderDanger)
+                }
+            }
+        }
         Box(Modifier.fillMaxWidth()) {
             Button(onClick = onAdd, enabled = enabled && choices != null, modifier = Modifier.fillMaxWidth().height(54.dp), shape = RoundedCornerShape(10.dp), colors = ButtonDefaults.buttonColors(containerColor = OrderGreen,
                 disabledContainerColor = if (isAdding) OrderGreen else OrderGreen.copy(alpha = .45f)), contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp)) {
@@ -1160,17 +1439,11 @@ private fun OrderAddItemDetails(item: OrderCatalogItem?, onClose: () -> Unit, ca
                     Text("Add to Order", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color.White)
                 }
             }
-            MenuValidationToast(
-                visible = errorMessage != null,
-                message = errorMessage.orEmpty(),
-                placement = ToastPlacement.Above,
-                arrowAlignment = Alignment.End,
-                anchorAlignment = Alignment.TopEnd,
-                offsetY = (-46).dp
-            )
         }
     }
 }
+
+private val OrderDanger = Color(0xFFB13A2F)
 
 @Composable
 private fun OrderAddOptionRow(label: String, price: String, selected: Boolean, radio: Boolean, enabled: Boolean, onClick: () -> Unit) {
@@ -1205,6 +1478,10 @@ private fun Double.toOrderMoney(currency: String): String {
     selected: Boolean,
     onClick: () -> Unit,
     sending: Boolean,
+    pickable: Boolean,
+    picked: Boolean,
+    canPick: Boolean,
+    onPick: () -> Unit,
     sent: Boolean,
     canSend: Boolean,
     onSend: () -> Unit
@@ -1217,8 +1494,13 @@ private fun Double.toOrderMoney(currency: String): String {
         border = BorderStroke(if(selected) 1.4.dp else 1.dp, if(selected) OrderGreen else OrderBorder)
     ) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Only what hasn't gone to the kitchen can be ticked; the others keep the room, so the rows line up.
+            Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                if (pickable) Checkbox(checked = picked, onCheckedChange = { onPick() }, enabled = canPick, modifier = Modifier.size(24.dp),
+                    colors = CheckboxDefaults.colors(checkedColor = OrderGreen))
+            }
             Text("${line.quantity}×", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = OrderInk, modifier = Modifier.width(34.dp), textAlign = TextAlign.Center)
-            Image(painter = painterResource(Res.drawable.auth_login_img), contentDescription = null, modifier = Modifier.size(54.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+            com.saporini.mobile_desktop.pos.menu.ui.item.MenuPhoto(line.imageUrl, null, Modifier.size(54.dp).clip(RoundedCornerShape(8.dp)))
             Column(Modifier.weight(1.2f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(line.itemNameSnapshot, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = OrderInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(line.orderItemSubtitle(), fontFamily = Inter(), fontSize = 13.sp, color = OrderMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1335,9 +1617,9 @@ private fun Double.toOrderMoney(currency: String): String {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         val scroll = rememberScrollState()
         Box(Modifier.weight(1f)) {
-            Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(end = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxSize().verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                    Image(painterResource(Res.drawable.auth_login_img), null, Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                    com.saporini.mobile_desktop.pos.menu.ui.item.MenuPhoto(line.imageUrl, null, Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)))
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(line.itemNameSnapshot, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = OrderInk, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -1406,7 +1688,7 @@ private fun Double.toOrderMoney(currency: String): String {
                     }
                 }
             }
-            PlatformVerticalScrollbar(scroll, Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(3.dp))
+            PlatformVerticalScrollbar(scroll, Modifier.align(Alignment.CenterEnd).offset(x = 10.dp).fillMaxHeight().width(3.dp))
         }
         HorizontalDivider(color = OrderBorder)
         if (state.needsReconciliation) Text("Check the last change in the order before trying again.", fontFamily = Inter(), fontSize = 11.sp, color = Color(0xFFB13A2F))
@@ -1609,11 +1891,11 @@ private fun OrderLineItem.orderItemSubtitle(): String {
     val busy = submitting || state.isSaving
     val hasPendingItems = order.lineItems.orEmpty().any { it.awaitingKitchen }
     val hasItems = order.lineItems.orEmpty().any { it.active }
-    val steps = listOf("Send to kitchen", "Mark ready", "Mark fulfilled", "Close order")
+    val steps = listOf("Send to kitchen", "Mark ready", "Mark as served", "Close order")
     fun available(action: String): Boolean = order.editable && !busy && !state.needsReconciliation && when (action) {
         "Send to kitchen" -> state.can("ORDER_UPDATE") && hasPendingItems
         "Mark ready" -> state.can("ORDER_UPDATE") && hasItems && order.fulfillmentStatus !in setOf(OrderFulfillmentStatus.READY, OrderFulfillmentStatus.FULFILLED)
-        "Mark fulfilled" -> state.can("ORDER_UPDATE") && hasItems && order.fulfillmentStatus != OrderFulfillmentStatus.FULFILLED
+        "Mark as served" -> state.can("ORDER_UPDATE") && hasItems && order.fulfillmentStatus != OrderFulfillmentStatus.FULFILLED
         "Close order" -> state.can("ORDER_CLOSE")
         else -> false
     }
@@ -1639,7 +1921,7 @@ private fun OrderLineItem.orderItemSubtitle(): String {
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Current", fontFamily = Inter(), fontSize = 12.sp, color = OrderMuted)
-                        OrderListBadge(order.status.label(), orderStatusColor(order.status), dot = true)
+                        OrderListBadge(statusLabel(order.status, order.unpaidAt), statusColor(order.status, order.unpaidAt), dot = true)
                         if (order.status.showsFulfillmentProgress) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
                     }
                     Text("Choose the next step, then save your changes.", fontFamily = Inter(), fontSize = 13.sp, color = OrderMuted)
@@ -1650,13 +1932,13 @@ private fun OrderLineItem.orderItemSubtitle(): String {
                             val icon = when (action) {
                                 "Send to kitchen" -> Icons.Outlined.Send
                                 "Mark ready" -> Icons.Outlined.Restaurant
-                                "Mark fulfilled" -> Icons.Outlined.CheckCircleOutline
+                                "Mark as served" -> Icons.Outlined.CheckCircleOutline
                                 else -> Icons.Outlined.ReceiptLong
                             }
                             val description = when (action) {
                                 "Send to kitchen" -> if (hasPendingItems) "Send all pending items to the kitchen" else "No pending items to send"
                                 "Mark ready" -> "Ready for service"
-                                "Mark fulfilled" -> "All items have been served"
+                                "Mark as served" -> "All items have been served"
                                 else -> "Finish and close this order"
                             }
                             Surface(onClick = { selected = action; error = null }, enabled = enabled,
@@ -1695,7 +1977,7 @@ private fun OrderLineItem.orderItemSubtitle(): String {
                                 val result: Result<*> = when (action) {
                                     "Send to kitchen" -> model.operations.sendToKitchen(order.id)
                                     "Mark ready" -> model.operations.markOrderReady(order.id)
-                                    "Mark fulfilled" -> model.operations.fulfillOrder(order.id)
+                                    "Mark as served" -> model.operations.fulfillOrder(order.id)
                                     "Close order" -> model.operations.closeOrder(order.id)
                                     else -> Result.failure<Unit>(IllegalArgumentException("Choose a progress step"))
                                 }
@@ -1759,7 +2041,7 @@ private fun OrderLineItem.orderItemSubtitle(): String {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                if(title == "No open orders") "Create a new order to start taking items." else "Try a different search or filter.",
+                if(title == "No active orders") "Create a new order to start taking items." else "Try a different search or filter.",
                 fontFamily = Inter(),
                 fontWeight = FontWeight.Normal,
                 fontSize = 14.sp,
@@ -1830,10 +2112,20 @@ private fun OrdersListPanel(
     selectedId: String?,
     compact: Boolean,
     modifier: Modifier = Modifier,
+    flashId: String? = null,
     onSelect: (String) -> Unit
 ) {
     Surface(modifier, shape = RoundedCornerShape(12.dp), color = Color.White, border = BorderStroke(1.dp, OrderBorder)) {
         val listState = rememberLazyListState()
+        LaunchedEffect(flashId, orders.size) {
+            val index = orders.indexOfFirst { it.id == flashId }
+            if (flashId != null && index >= 0) listState.animateScrollToItem(index)
+        }
+        val flash by rememberInfiniteTransition(label = "order-flash").animateFloat(
+            initialValue = 0.25f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(550), RepeatMode.Reverse),
+            label = "order-flash-alpha"
+        )
         val nearEnd by remember(listState, orders.size) { derivedStateOf { (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= orders.size - 5 } }
         LaunchedEffect(nearEnd, hasNext, loadingMore, pageError, orders.size) {
             if (nearEnd && hasNext && !loadingMore && !pageError) onLoadMore()
@@ -1845,7 +2137,10 @@ private fun OrdersListPanel(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(orders, key = { it.id }) { row ->
-                    OrderListCard(row, selectedId == row.id, compact) { onSelect(row.id) }
+                    Box {
+                        OrderListCard(row, selectedId == row.id, compact) { onSelect(row.id) }
+                        if (row.id == flashId) Box(Modifier.matchParentSize().border(3.dp, OrderGreen.copy(alpha = flash), RoundedCornerShape(12.dp)))
+                    }
                 }
                 if (hasNext) item(key = "history-load-more") {
                     TextButton(onClick = onLoadMore, enabled = !loadingMore) {
@@ -1924,28 +2219,33 @@ private fun OrdersListPanel(
                             order.tableName ?: order.tableNumber?.let { "Table $it" } ?: "Table -",
                             modifier = Modifier.fillMaxWidth()
                         )
+                        // Some dishes still wait to be sent: the reminder takes this line, in amber.
+                        val notSent = notSentNote(order.fulfillmentStatus, order.notSentItems)
                         OrderListIconText(
                             Icons.Outlined.FormatListBulleted,
-                            "${order.itemCount ?: 0} ${if((order.itemCount ?: 0) == 1) "item" else "items"}",
-                            color = OrderMuted
+                            if (notSent != null) "${order.notSentItems} of ${order.itemCount ?: 0} not sent"
+                            else "${order.itemCount ?: 0} ${if((order.itemCount ?: 0) == 1) "item" else "items"}",
+                            color = if (notSent != null) OrderNotSentColor else OrderMuted,
+                            bold = notSent != null
                         )
                     }
                     OrderColumnDivider()
                     Column(Modifier.widthIn(min = 150.dp, max = 176.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OrderListBadge(order.status.label(), orderStatusColor(order.status), dot = true)
+                        OrderListBadge(statusLabel(order.status, order.unpaidAt), statusColor(order.status, order.unpaidAt), dot = true)
                         if (order.status.showsFulfillmentProgress) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.width(102.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            OrderListIconText(Icons.Outlined.Schedule, order.openedAt.elapsedLabel(), color = OrderGreen, bold = true)
+                            if (order.closedUnpaid) OrderListIconText(Icons.Outlined.Schedule, order.unpaidAt.orEmpty().unpaidDay(), color = UnpaidRed, bold = true)
+                            else OrderListIconText(Icons.Outlined.Schedule, order.openedAt.elapsedLabel(), color = OrderGreen, bold = true)
                             Text("Opened at ${order.openedAt.orderTime()}", fontFamily = Inter(), fontSize = 12.sp, color = OrderMuted, maxLines = 1)
                         }
                         Text(
-                            order.total.money(order.currency),
+                            (order.unpaidAmount.takeIf { order.closedUnpaid } ?: order.total).money(order.currency),
                             fontFamily = Inter(),
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
-                            color = OrderInk,
+                            color = if (order.closedUnpaid) UnpaidRed else OrderInk,
                             modifier = Modifier.width(58.dp),
                             textAlign = TextAlign.End,
                             maxLines = 1
@@ -1964,7 +2264,7 @@ private fun OrdersListPanel(
             OrderListPill(Icons.Outlined.TableRestaurant, order.tableName ?: order.tableNumber?.let { "Table $it" } ?: "Table -")
             if(order.customerName != null || order.guestCount != null) OrderText(listOfNotNull(order.guestCount?.let { "$it guests" }, order.customerName).joinToString(" · "), 13, color = OrderMuted)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                OrderBadge(order.status.label()); if (order.status.showsFulfillmentProgress) OrderBadge(order.progressLabel()); Spacer(Modifier.weight(1f)); OrderText(order.total.money(order.currency), 14, true)
+                OrderBadge(statusLabel(order.status, order.unpaidAt)); if (order.status.showsFulfillmentProgress) OrderBadge(order.progressLabel()); notSentNote(order.fulfillmentStatus, order.notSentItems)?.let { OrderText(it, 12, true, OrderNotSentColor) }; Spacer(Modifier.weight(1f)); OrderText((order.unpaidAmount.takeIf { order.closedUnpaid } ?: order.total).money(order.currency), 14, true)
             }
         }
     }
@@ -1979,14 +2279,19 @@ private fun OrdersListPanel(
     order: Order,
     state: OrdersUiState,
     onEditItems: () -> Unit,
-    onAddItem: () -> Unit,
     onEditInfo: () -> Unit,
     onEditProgress: () -> Unit,
     onAction: (String) -> Unit,
     onPayment: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onRequestBill: () -> Unit = {},
+    canReopenForPayment: Boolean = false,
+    canReopenOrder: Boolean = false,
+    onReopenForPayment: () -> Unit = {}
 ) {
     var tab by remember(order.id) { mutableStateOf("Items") }
+    val canCloseUnpaid = order.canCloseUnpaid && state.can("ORDER_VOID")
+    val canEdit = order.editable && state.can("ORDER_UPDATE")
     var editMenu by remember { mutableStateOf(false) }
     var headerMenu by remember(order.id) { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
@@ -1996,7 +2301,7 @@ private fun OrdersListPanel(
             Spacer(Modifier.width(8.dp))
             Box {
                 Surface(onClick = { headerMenu = true },
-                    enabled = order.editable && state.can("ORDER_UPDATE") && !state.isSaving && !state.needsReconciliation,
+                    enabled = (canEdit || canCloseUnpaid || (canReopenOrder && order.status == OrderStatus.CLOSED)) && !state.isSaving && !state.needsReconciliation,
                     modifier = Modifier.size(34.dp), shape = RoundedCornerShape(8.dp), color = Color.White,
                     border = BorderStroke(1.dp, OrderBorder)) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -2006,9 +2311,19 @@ private fun OrdersListPanel(
                 DropdownMenu(expanded = headerMenu, onDismissRequest = { headerMenu = false },
                     shape = RoundedCornerShape(10.dp), containerColor = Color.White,
                     tonalElevation = 0.dp, shadowElevation = 6.dp) {
-                    OrderEditDropdownItem("Order items", Icons.Outlined.FormatListBulleted) { headerMenu = false; onEditItems() }
-                    OrderEditDropdownItem("Order info", Icons.Outlined.ReceiptLong) { headerMenu = false; onEditInfo() }
-                    OrderEditDropdownItem("Order progress", Icons.Outlined.Restaurant) { headerMenu = false; onEditProgress() }
+                    if (canEdit) {
+                        OrderEditDropdownItem("Order items", Icons.Outlined.FormatListBulleted) { headerMenu = false; onEditItems() }
+                        OrderEditDropdownItem("Order info", Icons.Outlined.ReceiptLong) { headerMenu = false; onEditInfo() }
+                        OrderEditDropdownItem("Order progress", Icons.Outlined.Restaurant) { headerMenu = false; onEditProgress() }
+                    }
+                    // Guests left without paying (user, 2026-11-01): voided as unpaid, reopened later for payment.
+                    if (canCloseUnpaid) {
+                        if (canEdit) HorizontalDivider(Modifier.padding(vertical = 4.dp), color = OrderBorder)
+                        OrderEditDropdownItem("Close as unpaid", Icons.Outlined.MoneyOff, UnpaidRed) { headerMenu = false; onAction("Close as unpaid") }
+                    }
+                    if (canReopenOrder && order.status == OrderStatus.CLOSED) {
+                        OrderEditDropdownItem("Reopen order", Icons.Outlined.ReceiptLong) { headerMenu = false; onAction("Reopen order") }
+                    }
                 }
             }
             Spacer(Modifier.width(8.dp))
@@ -2021,21 +2336,25 @@ private fun OrdersListPanel(
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.widthIn(min = 124.dp, max = 158.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                OrderListBadge(order.status.label(), orderStatusColor(order.status), dot = true)
+                OrderListBadge(statusLabel(order.status, order.unpaidAt), statusColor(order.status, order.unpaidAt), dot = true)
                 if (order.status.showsFulfillmentProgress) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
+                notSentNote(order.fulfillmentStatus, order.notSentItems)?.let {
+                    Text(it, Modifier.padding(start = 10.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = OrderNotSentColor, maxLines = 1)
+                }
             }
             OrderDetailMiniInfo(Icons.Outlined.PersonOutline, order.customerName ?: "No name provided", "${order.guestCount ?: 1} ${if((order.guestCount ?: 1) == 1) "guest" else "guests"}", Modifier.weight(.72f))
-            OutlinedButton(
-                onClick = onAddItem,
+            // Opens the order's dishes, where they're added and changed (user, 2026-11-01).
+            if (order.unpaidAt == null) OutlinedButton(
+                onClick = onEditItems,
                 enabled = order.editable && state.can("ORDER_UPDATE") && !state.isSaving && !state.needsReconciliation,
                 modifier = Modifier.height(38.dp).width(118.dp),
                 shape = RoundedCornerShape(10.dp),
                 border = BorderStroke(1.dp, OrderGreen),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
             ) {
-                Icon(Icons.Outlined.Add, null, Modifier.size(17.dp), tint = OrderGreen)
+                Icon(Icons.Outlined.Edit, null, Modifier.size(17.dp), tint = OrderGreen)
                 Spacer(Modifier.width(6.dp))
-                Text("Add item", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = OrderGreen, maxLines = 1)
+                Text("Edit order", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = OrderGreen, maxLines = 1)
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -2059,9 +2378,7 @@ private fun OrdersListPanel(
         }
         HorizontalDivider(color = OrderBorder)
         when(tab) {
-            "Items" -> DesktopOrderItemsList(order, Modifier.weight(1f).fillMaxWidth(),
-                canAdd = order.editable && state.can("ORDER_UPDATE"),
-                addEnabled = !state.isSaving && !state.needsReconciliation, onAddItem = onAddItem)
+            "Items" -> DesktopOrderItemsList(order, Modifier.weight(1f).fillMaxWidth())
             "Order info" -> DesktopOrderFixedText(listOf(
                 "Order type" to order.orderType.label(),
                 "Source" to order.source.label(),
@@ -2073,6 +2390,10 @@ private fun OrdersListPanel(
         }
         HorizontalDivider(color = OrderBorder)
         Spacer(Modifier.height(12.dp))
+        if (order.unpaidAt != null) {
+            UnpaidStrip(order)
+            Spacer(Modifier.height(12.dp))
+        }
         OrderAmountRowCompact("Subtotal", order.subtotal.money(order.currency))
         if(order.discountTotal.value.toDoubleOrNull() != 0.0) OrderAmountRowCompact("Discount", "− ${order.discountTotal.money(order.currency)}")
         OrderAmountRowCompact("Service charge (0%)", order.serviceChargeTotal.money(order.currency))
@@ -2084,7 +2405,7 @@ private fun OrdersListPanel(
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DesktopOrderActionButton("Print", Icons.Outlined.Print, Modifier.weight(1f), container = OrderBackground, content = OrderInk) { }
-            Box(Modifier.weight(1.25f)) {
+            if (order.unpaidAt == null) Box(Modifier.weight(1.25f)) {
                 DesktopOrderActionButton("Edit order", Icons.Outlined.Edit, Modifier.fillMaxWidth(), outlined = true) {
                     if(order.editable && state.can("ORDER_UPDATE")) editMenu = true
                 }
@@ -2103,7 +2424,15 @@ private fun OrdersListPanel(
                     OrderEditDropdownItem("Order progress", Icons.Outlined.Restaurant) { editMenu = false; onEditProgress() }
                 }
             }
-            DesktopOrderActionButton("Payment", Icons.Outlined.CreditCard, Modifier.weight(1.25f), container = OrderGreen, content = Color.White) { onPayment() }
+            // One button for the bill (user, 2026-11-01): "Request bill" while the guests eat, then "Pay" once they asked for it.
+            val canRequest = order.billRequestedAt == null && order.editable && order.paymentStatus != OrderPaymentStatus.PAID && state.can("ORDER_UPDATE")
+            if (order.closedUnpaid) {
+                if (canReopenForPayment) DesktopOrderActionButton("Reopen for payment", Icons.Outlined.CreditCard, Modifier.weight(1.6f),
+                    container = OrderGreen, content = Color.White) { if (!state.isSaving && !state.needsReconciliation) onReopenForPayment() }
+            } else if (canRequest) DesktopOrderActionButton("Request bill", Icons.Outlined.ReceiptLong, Modifier.weight(1.25f), container = OrderGreen, content = Color.White) {
+                if (!state.isSaving && !state.needsReconciliation) onRequestBill()
+            } else DesktopOrderActionButton(if (order.paymentStatus == OrderPaymentStatus.PAID) "Payment" else "Pay", Icons.Outlined.CreditCard, Modifier.weight(1.25f),
+                container = OrderGreen, content = Color.White) { onPayment() }
         }
     }
 }
@@ -2112,11 +2441,12 @@ private fun OrdersListPanel(
 @Composable private fun OrderEditDropdownItem(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color = OrderInk,
     onClick: () -> Unit
 ) {
     DropdownMenuItem(
         leadingIcon = {
-            Icon(icon, contentDescription = null, tint = OrderInk, modifier = Modifier.size(19.dp))
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(19.dp))
         },
         text = {
             Text(
@@ -2124,7 +2454,8 @@ private fun OrdersListPanel(
                 fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 14.sp,
-                color = OrderInk
+                color = tint,
+                letterSpacing = 0.sp
             )
         },
         onClick = onClick
@@ -2141,13 +2472,15 @@ private fun OrdersListPanel(
     }
 }
 
-@Composable private fun DesktopOrderItemsList(order: Order, modifier: Modifier = Modifier,
-    canAdd: Boolean = false, addEnabled: Boolean = true, onAddItem: () -> Unit = {}) {
+@Composable private fun DesktopOrderItemsList(order: Order, modifier: Modifier = Modifier) {
     val activeItems = order.lineItems.orEmpty().filter { it.active }
     if(activeItems.isEmpty()) {
         Box(modifier, contentAlignment = Alignment.Center) {
-            if (canAdd) AddItemCard(onClick = onAddItem, compact = true, enabled = addEnabled)
-            else Text("No items yet", fontFamily = Inter(), fontSize = 13.sp, color = OrderMuted)
+            // It only says so (user, 2026-11-01); dishes are added through Edit order.
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.Restaurant, null, Modifier.size(28.dp), tint = OrderMuted.copy(alpha = .6f))
+                Text("No items yet", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = OrderMuted)
+            }
         }
         return
     }
@@ -2168,12 +2501,7 @@ private fun OrdersListPanel(
 @Composable private fun DesktopOrderItemRow(line: OrderLineItem, currency: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Box(Modifier.size(42.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFEFF3EF)), contentAlignment = Alignment.Center) {
-            Image(
-                painter = painterResource(Res.drawable.auth_login_img),
-                contentDescription = line.itemNameSnapshot,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
+            com.saporini.mobile_desktop.pos.menu.ui.item.MenuPhoto(line.imageUrl, line.itemNameSnapshot, Modifier.fillMaxSize(), iconSize = 18.dp)
         }
         Text("${line.quantity}×", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = OrderInk, modifier = Modifier.width(28.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -2248,8 +2576,7 @@ private fun Order.displayOrderNumber(): String {
     }
 }
 
-private fun Order.progressLabel(): String =
-    if(status == OrderStatus.DRAFT && fulfillmentStatus == OrderFulfillmentStatus.PENDING) "Not sent" else fulfillmentStatus.label()
+private fun Order.progressLabel(): String = fulfillmentStatus.label()
 
 @Composable private fun OrderListPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, modifier: Modifier = Modifier) {
     Surface(modifier, shape = RoundedCornerShape(8.dp), color = Color(0xFFF2F6F2)) {
@@ -2304,6 +2631,13 @@ private fun orderAccentColor(order: OrderSummary): Color = when(order.status) {
     }
 }
 
+// An order closed as unpaid reads "Unpaid" in red, not "Voided".
+private fun statusLabel(status: OrderStatus, unpaidAt: String?): String =
+    if (status == OrderStatus.VOIDED && unpaidAt != null) "Unpaid" else status.label()
+
+private fun statusColor(status: OrderStatus, unpaidAt: String?): Color =
+    if (status == OrderStatus.VOIDED && unpaidAt != null) UnpaidRed else orderStatusColor(status)
+
 private fun orderStatusColor(status: OrderStatus): Color = when(status) {
     OrderStatus.OPEN -> Color(0xFF147A25)
     OrderStatus.CLOSED -> Color(0xFF24748A)
@@ -2318,8 +2652,7 @@ private fun orderProgressColor(status: OrderFulfillmentStatus): Color = when(sta
     OrderFulfillmentStatus.PENDING -> Color(0xFF4F5350)
 }
 
-private fun OrderSummary.progressLabel(): String =
-    if(status == OrderStatus.DRAFT && fulfillmentStatus == OrderFulfillmentStatus.PENDING) "Not sent" else fulfillmentStatus.label()
+private fun OrderSummary.progressLabel(): String = fulfillmentStatus.label()
 
 @OptIn(ExperimentalTime::class)
 private fun String.elapsedLabel(): String = runCatching {

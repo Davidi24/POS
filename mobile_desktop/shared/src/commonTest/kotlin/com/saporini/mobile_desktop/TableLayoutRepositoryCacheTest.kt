@@ -324,7 +324,7 @@ class TableLayoutRepositoryCacheTest {
             branchId = "branch-1",
             primaryTableId = "parent",
             childTableIds = listOf("child"),
-            previousPrimaryTableIds = listOf("old-parent")
+            tablesToUnmerge = listOf("old-parent")
         )
         val cached = repository.getTableLayout(
             "restaurant-1",

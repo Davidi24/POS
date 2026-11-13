@@ -48,6 +48,9 @@ private val TODAY = LocalDate(2026, 10, 6)
 
 private class FakeStats : StatisticsRepository {
     val queries = mutableListOf<Pair<String, StatsQuery>>()
+
+    /** The query of the period shown (staff figures are only read for it, never for the comparison). */
+    fun mainQuery(): StatsQuery = queries.last { it.first == "staff" }.second
     var failure: Exception? = null
     var gate: CompletableDeferred<Unit>? = null
     val reportGates = mutableMapOf<String, CompletableDeferred<Unit>>()
@@ -140,21 +143,23 @@ class StatisticsScreenModelTest {
     }
 
     @Test
-    fun theOpenTabLoadsForTheLastSevenDaysByDefault() = runTest(dispatcher) {
+    // Opens on this month from its 1st (user, 2026-11-03); one load fetches what every tab needs, so tabs switch at once.
+    fun opensOnThisMonthAndOneLoadServesEveryTab() = runTest(dispatcher) {
         val repo = FakeStats()
         check(repo) { m, _ ->
             m.setActive(true); runCurrent()
-            val (kind, query) = repo.queries.single()
-            assertEquals("overview", kind)
-            assertEquals(LocalDate(2026, 9, 30), query.from)
-            assertEquals(TODAY, query.to)
-            assertNull(query.branchId)
+            val shown = repo.queries.filter { it.second.from == LocalDate(2026, 10, 1) }
+            assertEquals(setOf("overview", "sales", "staff"), shown.map { it.first }.toSet())
+            shown.forEach { (_, query) ->
+                assertEquals(TODAY, query.to)
+                assertNull(query.branchId)
+            }
             assertEquals("+25%", m.state.value.overview!!.kpis.sales.let { changeText(it.value, it.previous) })
-            m.tab(StatsTab.STAFF); runCurrent()
-            assertEquals("staff", repo.queries.last().first)
+            val before = repo.queries.size
+            m.tab(StatsTab.TEAM); runCurrent()
+            assertEquals(before, repo.queries.size, "switching tabs loads nothing new")
             m.branch("branch-1"); runCurrent()
-            assertEquals("branch-1", repo.queries.last().second.branchId)
-            assertNull(m.state.value.overview)
+            assertEquals("branch-1", repo.mainQuery().branchId)
         }
     }
 
@@ -171,12 +176,13 @@ class StatisticsScreenModelTest {
             assertTrue(m.custom(LocalDate(2025, 1, 1), LocalDate(2026, 1, 1)))
             runCurrent()
             assertEquals(StatsPeriod.CUSTOM, m.state.value.period)
-            assertEquals(LocalDate(2025, 1, 1), repo.queries.last().second.from)
+            assertEquals(LocalDate(2025, 1, 1), repo.mainQuery().from)
             m.period(StatsPeriod.THIS_MONTH); runCurrent()
-            assertEquals(LocalDate(2026, 10, 1), repo.queries.last().second.from)
+            assertEquals(LocalDate(2026, 10, 1), repo.mainQuery().from)
+            // A whole month steps a whole month.
             m.shift(-1); runCurrent()
-            assertEquals(LocalDate(2026, 9, 25), repo.queries.last().second.from)
-            assertEquals(LocalDate(2026, 9, 30), repo.queries.last().second.to)
+            assertEquals(LocalDate(2026, 9, 1), repo.mainQuery().from)
+            assertEquals(LocalDate(2026, 9, 30), repo.mainQuery().to)
             val before = repo.queries.size
             m.shift(2); runCurrent()
             assertEquals(before, repo.queries.size, "a range starting in the future is not loaded")
@@ -207,7 +213,7 @@ class StatisticsScreenModelTest {
 
             repo.failure = null
             m.tab(StatsTab.SALES); runCurrent()
-            m.tab(StatsTab.STAFF); runCurrent()
+            m.tab(StatsTab.TEAM); runCurrent()
             m.tab(StatsTab.REPORTS); runCurrent()
             m.download("items"); runCurrent()
             assertNotNull(m.state.value.download)
@@ -235,7 +241,7 @@ class StatisticsScreenModelTest {
             assertEquals("items", m.state.value.reports.single().code)
             m.download("items"); runCurrent()
             val download = m.state.value.download!!
-            assertEquals("items-2026-09-30-to-2026-10-06.csv", download.fileName)
+            assertEquals("items-2026-10-01-to-2026-10-06.csv", download.fileName)
             assertTrue(download.csv.contains("Pasta,3"))
             m.downloadHandled()
             assertNull(m.state.value.download)

@@ -14,6 +14,12 @@ const val MAX_ROLE_NAME = 100
 const val MAX_ROLE_DESCRIPTION = 1000
 const val SUPER_ADMIN = "SUPER_ADMIN"
 
+/**
+ * The platform's own roles. Nothing about them ever shows inside a restaurant: no card, no choice when adding someone
+ * (user rule, 2026-10-30: "nobody there knows anything about the super admin, not even that it exists").
+ */
+val PlatformRoleCodes = setOf(SUPER_ADMIN, "CO_SUPER_ADMIN")
+
 enum class StaffField { EMAIL, USERNAME, PASSWORD, FIRST_NAME, LAST_NAME, PHONE, ROLES }
 
 /** A person being added ([id] null) or edited. Text is kept as typed; it is trimmed when saved. */

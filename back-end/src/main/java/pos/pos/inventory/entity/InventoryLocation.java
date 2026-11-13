@@ -53,7 +53,9 @@ import java.util.Objects;
             'FREEZER',
             'DRY_STORAGE',
             'CENTRAL_WAREHOUSE',
-            'TRANSIT'
+            'TRANSIT',
+            'UNCATEGORIZED',
+            'CUSTOM'
         )
         """)
 @Getter
@@ -88,6 +90,23 @@ public class InventoryLocation extends AbstractAuditedEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "location_type", nullable = false, length = 30)
     private InventoryLocationType locationType = InventoryLocationType.BRANCH_STORAGE;
+
+    // Optional app icon selection. Null keeps older places on their kind-based default icon.
+    @Column(name = "icon_code", length = 40)
+    private String iconCode;
+
+    // The restaurant's own picture for the place (PUT …/locations/{id}/image); shown instead of the icon when set.
+    @Column(name = "image_url", columnDefinition = "text")
+    private String imageUrl;
+
+    // The restaurant's own kind, when locationType is CUSTOM.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kind_id", columnDefinition = "uuid", foreignKey = @ForeignKey(name = "fk_inventory_locations_kind"))
+    private InventoryKind kind;
+
+    // Set when the place is deleted (Stock → Places → Delete). It stays for the movements and counts that name it.
+    @Column(name = "deleted_at", columnDefinition = "timestamptz")
+    private java.time.OffsetDateTime deletedAt;
 
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
@@ -140,6 +159,9 @@ public class InventoryLocation extends AbstractAuditedEntity {
         code = NormalizationUtils.normalizeCode(code == null ? name : code, 80);
         name = NormalizationUtils.normalize(name);
         notes = NormalizationUtils.normalize(notes);
+        if (locationType != InventoryLocationType.CUSTOM) {
+            kind = null;
+        }
     }
 
     @Override

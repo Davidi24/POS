@@ -33,7 +33,7 @@ public class InventoryLevelController {
     private final InventoryLevelService inventoryLevelService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "List stock levels, optionally filtered by location and/or item")
     public ResponseEntity<List<InventoryLevelResponse>> listLevels(
             @PathVariable UUID restaurantId,
@@ -45,7 +45,7 @@ public class InventoryLevelController {
     }
 
     @GetMapping("/low-stock")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "List items below their reorder threshold")
     public ResponseEntity<List<InventoryLevelResponse>> listLowStock(
             @PathVariable UUID restaurantId,
@@ -55,7 +55,7 @@ public class InventoryLevelController {
     }
 
     @GetMapping("/total/{itemId}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "Get the total on-hand quantity for one item, summed across all locations")
     @ApiResponse(responseCode = "200", description = "Total computed")
     @ApiResponse(responseCode = "404", description = "Item not found")
@@ -68,7 +68,7 @@ public class InventoryLevelController {
     }
 
     @GetMapping("/{locationId}/{itemId}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "Get the stock level for one item at one location")
     @ApiResponse(responseCode = "200", description = "Level found")
     @ApiResponse(responseCode = "404", description = "No stock level recorded yet for this item at this location")

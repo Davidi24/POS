@@ -253,6 +253,61 @@ class TableLayoutApi(
         }.body()
     }
 
+    private fun specialCases(restaurantId: String, branchId: String) =
+        "${baseUrlProvider()}/restaurants/$restaurantId/branches/$branchId/special-cases"
+
+    suspend fun giveMoreTime(restaurantId: String, branchId: String, tableId: String, minutes: Int) {
+        client.post("${specialCases(restaurantId, branchId)}/tables/$tableId/more-time") {
+            contentType(ContentType.Application.Json)
+            setBody(com.saporini.mobile_desktop.pos.tables.data.dto.MoreTimeRequestDto(minutes))
+        }
+    }
+
+    suspend fun stillHere(restaurantId: String, branchId: String, tableId: String) {
+        client.post("${specialCases(restaurantId, branchId)}/tables/$tableId/still-here")
+    }
+
+    // Their guests have come and wait for the table: the booking's own check-in.
+    suspend fun checkInBooking(restaurantId: String, reservationId: String) {
+        client.post("${baseUrlProvider()}/restaurants/$restaurantId/reservations/$reservationId/check-in") {
+            contentType(ContentType.Application.Json)
+            setBody(kotlinx.serialization.json.JsonObject(emptyMap()))
+        }
+    }
+
+    suspend fun bookingOptions(restaurantId: String, branchId: String, tableId: String): List<com.saporini.mobile_desktop.pos.tables.data.dto.BookingTableOptionDto> =
+        client.get("${specialCases(restaurantId, branchId)}/tables/$tableId/booking-options").body()
+
+    suspend fun moveBooking(restaurantId: String, branchId: String, tableId: String, tableIds: List<String>, primaryTableId: String?) {
+        client.post("${specialCases(restaurantId, branchId)}/tables/$tableId/move-booking") {
+            contentType(ContentType.Application.Json)
+            setBody(com.saporini.mobile_desktop.pos.tables.data.dto.MoveBookingRequestDto(tableIds, primaryTableId))
+        }
+    }
+
+    suspend fun specialCaseActions(restaurantId: String, branchId: String): List<com.saporini.mobile_desktop.pos.tables.data.dto.SpecialCaseActionDto> =
+        client.get("${specialCases(restaurantId, branchId)}/actions").body()
+
+    suspend fun returnSpecialCaseAction(restaurantId: String, branchId: String, actionId: String, tableId: String?) {
+        client.post("${specialCases(restaurantId, branchId)}/actions/$actionId/return") {
+            contentType(ContentType.Application.Json)
+            setBody(com.saporini.mobile_desktop.pos.tables.data.dto.ReturnActionRequestDto(tableId))
+        }
+    }
+
+    suspend fun setBillRequested(restaurantId: String, orderId: String, requested: Boolean) {
+        val url = "${baseUrlProvider()}/restaurants/$restaurantId/orders/$orderId/bill-request"
+        if (requested) client.post(url) else client.delete(url)
+    }
+
+    // Some tables leave the group and become free; [keepTableId] keeps the guests and the order (null: the server picks).
+    suspend fun unmergeSome(restaurantId: String, branchId: String, tableId: String, freeTableIds: List<String>, keepTableId: String?) {
+        client.post("${baseUrlProvider()}/restaurants/$restaurantId/branches/$branchId/tables/$tableId/unmerge-tables") {
+            contentType(ContentType.Application.Json)
+            setBody(com.saporini.mobile_desktop.pos.tables.data.dto.UnmergeTablesRequestDto(freeTableIds, keepTableId))
+        }
+    }
+
     suspend fun unmergeTables(
         restaurantId: String,
         branchId: String,

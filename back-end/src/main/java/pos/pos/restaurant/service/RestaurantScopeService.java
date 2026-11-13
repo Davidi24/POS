@@ -1,8 +1,10 @@
 package pos.pos.restaurant.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.restaurant.BranchNotFoundException;
 import pos.pos.exception.restaurant.RestaurantNotFoundException;
 import pos.pos.restaurant.policy.BranchPolicy;
@@ -25,6 +27,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RestaurantScopeService {
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entities;
+
     private final RestaurantRepository restaurantRepository;
     private final BranchRepository branchRepository;
     private final ActorScopeService actorScopeService;
@@ -32,8 +37,17 @@ public class RestaurantScopeService {
     private final BranchPolicy branchPolicy;
 
     public Restaurant requireExistingRestaurant(UUID restaurantId) {
-        return restaurantRepository.findByIdAndDeletedAtIsNull(restaurantId)
-                .orElseThrow(RestaurantNotFoundException::new);
+        Restaurant restaurant=restaurantRepository.findByIdAndDeletedAtIsNull(restaurantId).orElseThrow(RestaurantNotFoundException::new);
+        lockForMutation(restaurant);
+        if(restaurant.getDeletedAt()!=null)throw new RestaurantNotFoundException();
+        return restaurant;
+    }
+
+    /** Historical receipts remain readable by authorized actors after archival. */
+    public Restaurant requireHistoricalRestaurant(Authentication authentication,UUID restaurantId){
+        Restaurant restaurant=restaurantRepository.findById(restaurantId).orElseThrow(RestaurantNotFoundException::new);
+        restaurantPolicy.assertCanAccess(actorScopeService.resolve(authentication),restaurant);
+        lockForMutation(restaurant);return restaurant;
     }
 
     public Restaurant requireAccessibleRestaurant(Authentication authentication, UUID restaurantId) {
@@ -57,9 +71,27 @@ public class RestaurantScopeService {
         return restaurant;
     }
 
+    /**
+     * For what only the Super Admin and Co-Super-Admins decide (opening and closing restaurants and branches, legal
+     * and tax details, currency, time zone). The restaurant's own staff, owner included, get [message] as a 403.
+     */
+    public Restaurant requirePlatformManagedRestaurant(Authentication authentication, UUID restaurantId, String message) {
+        ActorScope scope = actorScopeService.resolve(authentication);
+        Restaurant restaurant = requireExistingRestaurant(restaurantId);
+        if (!scope.superAdmin()) {
+            restaurantPolicy.assertCanAccess(scope, restaurant);
+            throw new AuthException(message, HttpStatus.FORBIDDEN);
+        }
+        return restaurant;
+    }
+
     public Branch requireExistingBranch(UUID restaurantId, UUID branchId) {
-        return branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId, restaurantId)
-                .orElseThrow(BranchNotFoundException::new);
+        Branch branch=branchRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId,restaurantId).orElseThrow(BranchNotFoundException::new);
+        lockForMutation(branch.getRestaurant());
+        if(writing() && entities.getLockMode(branch)!=jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+            entities.refresh(branch,jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        if(branch.getDeletedAt()!=null || branch.getRestaurant().getDeletedAt()!=null)throw new BranchNotFoundException();
+        return branch;
     }
 
     public Branch requireAccessibleBranch(Authentication authentication, UUID restaurantId, UUID branchId) {
@@ -80,6 +112,16 @@ public class RestaurantScopeService {
         Branch branch = requireExistingBranch(restaurantId, branchId);
         branchPolicy.assertCanManage(scope, branch);
         return branch;
+    }
+
+    /** All scoped mutations use the same parent lock as currency, time-zone and closure changes. */
+    public void lockForMutation(Restaurant restaurant) {
+        if(writing() && entities.getLockMode(restaurant)!=jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+            entities.refresh(restaurant,jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+    }
+    private boolean writing(){
+        return org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+            && !org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly();
     }
 
     public void assertCanCreateRestaurant(Authentication authentication) {

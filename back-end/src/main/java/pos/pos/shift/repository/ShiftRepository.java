@@ -9,6 +9,18 @@ import java.time.OffsetDateTime;
 import java.util.*;
 
 public interface ShiftRepository extends JpaRepository<Shift, UUID> {
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from Shift s where s.planId = :planId and s.status = pos.pos.shift.enums.ShiftStatus.SCHEDULED and s.scheduledStart > :now")
+    int deletePlannedOfPlan(UUID planId, OffsetDateTime now);
+
+    /** Like overlaps, but someone clocked in right now doesn't count as busy for all time. */
+    @Query("""
+        select count(s) from Shift s where s.user.id = :userId
+        and s.status not in (pos.pos.shift.enums.ShiftStatus.CANCELLED, pos.pos.shift.enums.ShiftStatus.MISSED)
+        and ((s.scheduledStart < :end and s.scheduledEnd > :start) or (s.startedAt < :end and s.endedAt > :start))
+        """)
+    long plannedOverlaps(UUID userId, OffsetDateTime start, OffsetDateTime end);
+
     @Query("select s from Shift s where s.user.id = :userId and s.status in (pos.pos.shift.enums.ShiftStatus.OPEN, pos.pos.shift.enums.ShiftStatus.ON_BREAK)")
     Optional<Shift> findActive(UUID userId);
 
@@ -42,6 +54,9 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
 
     @Query("select ur.userId, r.name from UserRole ur, Role r where ur.roleId = r.id and ur.userId in :userIds and r.isActive = true and r.deletedAt is null order by r.rank, r.name")
     List<Object[]> roleNames(Collection<UUID> userIds);
+
+    @Query("select ur.userId, max(r.rank) from UserRole ur, Role r where ur.roleId = r.id and ur.userId in :userIds and r.isActive = true and r.deletedAt is null group by ur.userId")
+    List<Object[]> topRanks(Collection<UUID> userIds);
 
     @Query("select u from User u where u.restaurantId = :restaurantId and u.deletedAt is null and u.isActive = true and (u.defaultBranchId is null or u.defaultBranchId = :branchId) order by u.firstName, u.lastName")
     List<pos.pos.user.entity.User> staff(UUID restaurantId, UUID branchId);

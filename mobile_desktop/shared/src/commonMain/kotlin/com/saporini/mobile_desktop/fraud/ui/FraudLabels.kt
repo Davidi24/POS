@@ -1,6 +1,7 @@
 package com.saporini.mobile_desktop.fraud.ui
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Block
@@ -69,6 +70,7 @@ internal fun ruleIcon(rule: String?): ImageVector = when (rule) {
     "PAYMENT_VOIDED" -> Icons.Outlined.CreditCardOff
     "REOPENED_PAID_ORDER" -> Icons.Outlined.LockOpen
     "CLOSED_WITHOUT_PAYMENT" -> Icons.Outlined.MoneyOff
+    "CLOSED_UNPAID" -> Icons.AutoMirrored.Outlined.DirectionsRun
     "MARKED_PAID_MANUALLY" -> Icons.Outlined.Payments
     "HIGH_TIP" -> Icons.Outlined.VolunteerActivism
     "OFF_SHIFT_ACTION" -> Icons.Outlined.AccessTime

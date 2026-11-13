@@ -23,7 +23,8 @@ import kotlin.time.Instant
 
 /** The three columns of the board: new food, food on the stove, food on the pass. */
 internal enum class Lane(val title: String, val color: Color, val icon: ImageVector) {
-    NEW("New", Kit.Blue, Icons.Outlined.HourglassEmpty),
+    // New food is red, like the kitchen picture the user chose (fired, waiting to start).
+    NEW("New", Kit.Danger, Icons.Outlined.HourglassEmpty),
     COOKING("Cooking", Kit.Amber, Icons.Outlined.LocalFireDepartment),
     READY("Ready", Kit.Green, Icons.Outlined.RoomService)
 }

@@ -28,12 +28,15 @@ public class KdsTicketQueryService {
     private final pos.pos.settings.repository.SettingsRepository settingsRepository;
 
     @Transactional(readOnly = true)
-    public Map<String, Integer> posTiming(Authentication authentication, UUID restaurantId, UUID branchId) {
+    public Map<String, Object> posTiming(Authentication authentication, UUID restaurantId, UUID branchId) {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         var settings = settingsRepository.findByRestaurant_Id(restaurantId);
+        // The order types the restaurant takes (Admin Hub → Settings → Order types), so the board only offers those tabs.
         return Map.of(
                 "slowAfterMinutes", settings.map(pos.pos.settings.entity.Settings::getKitchenSlowAfterMinutes).orElse(20),
-                "readyWaitingMinutes", settings.map(pos.pos.settings.entity.Settings::getKitchenReadyWaitingMinutes).orElse(5)
+                "readyWaitingMinutes", settings.map(pos.pos.settings.entity.Settings::getKitchenReadyWaitingMinutes).orElse(5),
+                "takeawayEnabled", settings.map(pos.pos.settings.entity.Settings::isEnableTakeaway).orElse(false),
+                "deliveryEnabled", settings.map(pos.pos.settings.entity.Settings::isEnableDelivery).orElse(false)
         );
     }
 

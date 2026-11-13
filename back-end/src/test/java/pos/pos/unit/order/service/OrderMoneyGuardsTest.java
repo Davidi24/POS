@@ -89,7 +89,8 @@ class OrderMoneyGuardsTest {
         support = new OrderSupport(scope, branches, customers, reservations, tables, items, variants, options, settingsRepository,
                 orders, mapper, notifier, new PaymentCalculator(), inventoryMovements);
         workflow = new OrderWorkflowService(scope, support, new OrderDomainSupport(orders, support),
-                mock(KdsOrderSyncService.class), mock(InventorySaleConsumptionService.class));
+                mock(KdsOrderSyncService.class), mock(InventorySaleConsumptionService.class),
+                mock(org.springframework.context.ApplicationEventPublisher.class), mock(pos.pos.tables.repository.RestaurantTableRepository.class));
         Restaurant restaurant = new Restaurant();
         restaurant.setId(UUID.randomUUID());
         Branch branch = new Branch();

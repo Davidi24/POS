@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.admin.settings
 
+import kotlinx.serialization.json.jsonObject
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,6 +12,8 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,13 +25,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Info
@@ -37,7 +39,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -71,8 +72,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.saporini.mobile_desktop.core.components.ScrollColumn
+import com.saporini.mobile_desktop.core.components.ScrollbarGap
+import com.saporini.mobile_desktop.core.components.SettingsCard
+import com.saporini.mobile_desktop.core.components.SettingsRow
+import com.saporini.mobile_desktop.core.components.SettingsSwitch
+import com.saporini.mobile_desktop.core.components.UnsavedChangesBar
+import com.saporini.mobile_desktop.core.components.SettingsInfoBanner
 import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.core.ui.HoverTooltip
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonNull
@@ -88,13 +97,15 @@ private val Muted = Color(0xFF747572)
 private val Border = Color(0xFFE3E6E1)
 private val Danger = Color(0xFFB13A2F)
 private val PageBg = Color(0xFFF7F8F6)
+// The thin line between two settings rows (as in SettingsKit).
+private val RowLine = Color(0xFFF0F1EE)
 
 private const val UPDATE_PERMISSION = "SETTINGS_UPDATE"
 
-// Admin Hub → Settings: a grid of categories; each opens its own page.
+// Admin Hub → Settings: a grid of categories (a list on a phone); each opens its own page.
 @Composable
-internal fun AdminSettings(modifier: Modifier = Modifier) {
-    var open by remember { mutableStateOf<SettingsCategory?>(null) }
+internal fun AdminSettings(modifier: Modifier = Modifier, startCategory: SettingsCategory? = null) {
+    var open by remember { mutableStateOf(startCategory) }
     Box(modifier.background(PageBg)) {
         val category = open
         if (category == null) SettingsGrid(onOpen = { open = it }, modifier = Modifier.fillMaxSize())
@@ -105,27 +116,54 @@ internal fun AdminSettings(modifier: Modifier = Modifier) {
 @Composable
 private fun SettingsGrid(onOpen: (SettingsCategory) -> Unit, modifier: Modifier) {
     BoxWithConstraints(modifier) {
+        val phone = maxWidth < 600.dp
         val columns = when {
             maxWidth >= 1100.dp -> 4
             maxWidth >= 760.dp -> 3
-            maxWidth >= 480.dp -> 2
-            else -> 1
+            else -> 2
         }
-        val side = if (maxWidth < 600.dp) 16.dp else 28.dp
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = side, end = side, top = 22.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Settings", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Ink)
-                Text("Choose what you want to set up.", fontFamily = Inter(), fontSize = 13.sp, color = Muted)
-            }
-            SettingsCategory.entries.chunked(columns).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    row.forEach { category -> CategoryCard(category, onClick = { onOpen(category) }, modifier = Modifier.weight(1f)) }
-                    repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+        val side = if (phone) 12.dp else 28.dp
+        ScrollColumn(Modifier.fillMaxSize()) {
+            Column(
+                Modifier.fillMaxWidth().padding(start = side, end = (side - ScrollbarGap).coerceAtLeast(0.dp), top = if (phone) 18.dp else 22.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(if (phone) 10.dp else 16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(if (phone) 2.dp else 4.dp)) {
+                    Text("Settings", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (phone) 19.sp else 22.sp, color = Ink)
+                    Text("Choose what you want to set up.", fontFamily = Inter(), fontSize = if (phone) 12.sp else 13.sp, color = Muted)
+                }
+                // A phone: a line per category with its picture on the left, like the Users and Salary lists.
+                if (phone) SettingsCategory.entries.forEach { category -> CategoryLine(category, onClick = { onOpen(category) }) }
+                else SettingsCategory.entries.chunked(columns).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        row.forEach { category -> CategoryCard(category, onClick = { onOpen(category) }, modifier = Modifier.weight(1f)) }
+                        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
                 }
             }
+        }
+    }
+}
+
+/** A category on a phone: its picture in a soft tile, its name and what's in it, and an arrow ("Later" when it isn't ready). */
+@Composable
+private fun CategoryLine(category: SettingsCategory, onClick: () -> Unit) {
+    Surface(onClick = onClick, enabled = category.available, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White,
+        border = BorderStroke(1.dp, Border), shadowElevation = 1.dp) {
+        Row(Modifier.padding(start = 10.dp, end = 8.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFF3F5F1)), Alignment.Center) {
+                Image(painterResource(category.image), null, Modifier.padding(6.dp).fillMaxSize().alpha(if (category.available) 1f else 0.45f),
+                    contentScale = ContentScale.Fit)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(category.title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = if (category.available) Ink else Muted,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(category.description, fontFamily = Inter(), fontSize = 12.sp, lineHeight = 16.sp, color = Muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            if (category.available) Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, Modifier.size(20.dp), tint = Muted)
+            else Text("Later", Modifier.clip(RoundedCornerShape(50)).background(Color(0xFFF1F2F0)).padding(horizontal = 10.dp, vertical = 4.dp),
+                fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Muted)
         }
     }
 }
@@ -245,18 +283,26 @@ private fun SettingsPage(category: SettingsCategory, onBack: () -> Unit, modifie
     }
 
     BoxWithConstraints(modifier) {
-        val side = if (maxWidth < 600.dp) 16.dp else 28.dp
+        val phone = maxWidth < 600.dp
+        val side = if (phone) 12.dp else 28.dp
         Column(Modifier.fillMaxSize()) {
             Row(
-                Modifier.fillMaxWidth().padding(start = side - 8.dp, end = side, top = 16.dp, bottom = 8.dp),
+                Modifier.fillMaxWidth().padding(start = side - 4.dp, end = side, top = if (phone) 14.dp else 16.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                IconButton(onClick = ::leave) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to settings", tint = Ink) }
-                Image(painterResource(category.image), null, Modifier.size(44.dp), contentScale = ContentScale.Fit)
+                // One step back inside the page: a plain arrow (the curved one in the top bar leaves the workspace; user rule).
+                HoverTooltip("Back to settings") {
+                    Box(Modifier.size(34.dp).clip(CircleShape).clickable(onClick = ::leave), contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to settings", Modifier.size(22.dp), tint = Ink)
+                    }
+                }
+                Image(painterResource(category.image), null, Modifier.size(if (phone) 40.dp else 44.dp), contentScale = ContentScale.Fit)
                 Column(Modifier.weight(1f)) {
-                    Text(category.title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Ink)
-                    Text(category.description, fontFamily = Inter(), fontSize = 12.sp, color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(category.title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (phone) 18.sp else 20.sp, color = Ink,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(category.description, fontFamily = Inter(), fontSize = 12.sp, lineHeight = 16.sp, color = Muted, maxLines = if (phone) 2 else 1,
+                        overflow = TextOverflow.Ellipsis)
                 }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -269,16 +315,16 @@ private fun SettingsPage(category: SettingsCategory, onBack: () -> Unit, modifie
                         TextButton(onClick = { reload++ }) { Text("Try again", fontFamily = Inter(), color = Green) }
                     }
                     loadedValues == null -> CircularProgressIndicator(Modifier.align(Alignment.Center).size(26.dp), color = Green, strokeWidth = 2.dp)
-                    else -> Column(
-                        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                            .padding(start = side, end = side, top = 4.dp, bottom = if (loadedValues.changed) 96.dp else 28.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Column(Modifier.widthIn(max = 820.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    else -> ScrollColumn(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            Modifier.padding(start = side, end = (side - ScrollbarGap).coerceAtLeast(0.dp), top = 4.dp, bottom = if (loadedValues.changed) 96.dp else 28.dp)
+                                .widthIn(max = 820.dp).fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(if (phone) 12.dp else 14.dp)
+                        ) {
                             if (!canEdit) InfoBanner("You can see these settings, but only people with permission to change settings can edit them.")
                             key(generation) {
                                 sections.forEach { section ->
-                                    SectionCard(section, loadedValues, canEdit) { source, key, element ->
+                                    SectionCard(section, loadedValues, canEdit, stacked = phone) { source, key, element ->
                                         values = loadedValues.set(source, key, element)
                                         savedNote = false
                                         saveError = null
@@ -323,39 +369,63 @@ private fun SectionCard(
     section: SettingsSection,
     values: SettingsValues,
     canEdit: Boolean,
+    stacked: Boolean,
     onChange: (SettingsSource, String, kotlinx.serialization.json.JsonElement) -> Unit
 ) {
     val shown = section.fields.filter { field -> field.shownWhen?.invoke(values) ?: true }
-    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, Border)) {
-        Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-            Text(section.title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Ink)
-            section.note?.let { Text(it, Modifier.padding(top = 2.dp), fontFamily = Inter(), fontSize = 12.sp, color = Muted) }
-            shown.forEachIndexed { index, field ->
-                if (index > 0) HorizontalDivider(color = Color(0xFFF0F1EE))
-                FieldRow(field, values, canEdit) { element -> onChange(field.source, field.key, element) }
-            }
+    SettingsCard(section.title, note = section.note) {
+        shown.forEachIndexed { index, field ->
+            FieldRow(field, values, canEdit, divider = index > 0, stacked = stacked) { element -> onChange(field.source, field.key, element) }
         }
     }
 }
 
+// Pick any number of roles. Without permission to read the roles, the usual ones still show.
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FieldRow(field: SettingField, values: SettingsValues, canEdit: Boolean, onChange: (kotlinx.serialization.json.JsonElement) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(field.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
-            field.hint?.let { Text(it, fontFamily = Inter(), fontSize = 11.sp, lineHeight = 15.sp, color = Muted) }
+private fun RoleChoices(value: String, canEdit: Boolean, onChange: (String) -> Unit) {
+    val api = koinInject<SettingsApi>()
+    var roles by remember {
+        mutableStateOf(listOf("OWNER" to "Owner", "CO_OWNER" to "Co-Owner", "ADMIN" to "Admin", "MANAGER" to "Manager"))
+    }
+    LaunchedEffect(Unit) {
+        runCatching { api.roles() }.onSuccess { loaded ->
+            val all = loaded.map { it.jsonObject }
+                .filter { it.bool("isActive") != false && it.text("code") !in com.saporini.mobile_desktop.admin.people.PlatformRoleCodes }
+                .mapNotNull { role -> role.text("code")?.let { code -> code to (role.text("name") ?: code) } }
+            if (all.isNotEmpty()) roles = all
         }
-        when (field) {
-            is ToggleField -> Switch(
-                checked = values.bool(field.source, field.key),
-                onCheckedChange = { onChange(JsonPrimitive(it)) },
-                enabled = canEdit,
-                colors = SwitchDefaults.colors(checkedTrackColor = Green, checkedThumbColor = Color.White, uncheckedTrackColor = Color(0xFFE6E8E4), uncheckedBorderColor = Color(0xFFD5D8D2))
+    }
+    val picked = value.split(',').map(String::trim).filter(String::isNotEmpty).toSet()
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        roles.forEach { (code, name) ->
+            val on = code in picked
+            Text(
+                name,
+                Modifier.clip(RoundedCornerShape(8.dp))
+                    .background(if (on) GreenSoft else Color.White)
+                    .border(if (on) 1.5.dp else 1.dp, if (on) Green else Border, RoundedCornerShape(8.dp))
+                    .then(if (canEdit) Modifier.clickable { onChange((if (on) picked - code else picked + code).joinToString(",")) } else Modifier)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                fontFamily = Inter(), fontWeight = if (on) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp,
+                color = if (on) Green else Ink
             )
+        }
+    }
+}
+
+/**
+ * One setting: its name and short line, and its control on the right. On a phone ([stacked]) only a switch fits there;
+ * every other control (steppers, amounts, texts, choices) goes under the name, as wide as the card when it's text.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FieldRow(field: SettingField, values: SettingsValues, canEdit: Boolean, divider: Boolean, stacked: Boolean,
+                     onChange: (kotlinx.serialization.json.JsonElement) -> Unit) {
+    val under = (stacked && field !is ToggleField) || field is RolesField
+    val control: @Composable () -> Unit = {
+        when (field) {
+            is ToggleField -> SettingsSwitch(values.bool(field.source, field.key), { onChange(JsonPrimitive(it)) }, enabled = canEdit)
             is NumberField -> Stepper(
                 value = values.text(field.source, field.key)?.toIntOrNull() ?: field.min,
                 unit = field.unit, min = field.min, max = field.max, step = field.step, enabled = canEdit,
@@ -363,7 +433,7 @@ private fun FieldRow(field: SettingField, values: SettingsValues, canEdit: Boole
             )
             is DecimalField -> SmallInput(
                 text = values.text(field.source, field.key).orEmpty(),
-                width = 120.dp, suffix = field.suffix, enabled = canEdit, keyboard = KeyboardType.Decimal,
+                modifier = Modifier.width(140.dp), suffix = field.suffix, enabled = canEdit, keyboard = KeyboardType.Decimal,
                 accept = { it.isEmpty() || it.matches(Regex("\\d{0,8}([.,]\\d{0,2})?")) },
                 sameValue = { typed, stored -> typed.replace(',', '.').toDoubleOrNull() == stored.toDoubleOrNull() },
                 onChange = { raw ->
@@ -373,11 +443,12 @@ private fun FieldRow(field: SettingField, values: SettingsValues, canEdit: Boole
             )
             is TextSettingField -> SmallInput(
                 text = values.text(field.source, field.key).orEmpty(),
-                width = if (field.multiline) 320.dp else 160.dp, placeholder = field.placeholder, enabled = canEdit,
+                modifier = if (under) Modifier.fillMaxWidth() else Modifier.width(if (field.multiline) 320.dp else 160.dp),
+                placeholder = field.placeholder, enabled = canEdit,
                 singleLine = !field.multiline, accept = { it.length <= field.maxLength },
                 onChange = { onChange(JsonPrimitive(it)) }
             )
-            is ChoiceField -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            is ChoiceField -> FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val current = values.text(field.source, field.key)
                 field.options.forEach { (value, label) ->
                     val picked = current == value
@@ -393,11 +464,12 @@ private fun FieldRow(field: SettingField, values: SettingsValues, canEdit: Boole
                     )
                 }
             }
+            is RolesField -> RoleChoices(values.text(field.source, field.key).orEmpty(), canEdit) { onChange(JsonPrimitive(it)) }
             is TimeField -> {
                 // The server sends "15:00:00"; staff type "15:00".
                 val shown = values.text(field.source, field.key)?.take(5).orEmpty()
                 SmallInput(
-                    text = shown, width = 90.dp, placeholder = "15:00", enabled = canEdit,
+                    text = shown, modifier = Modifier.width(90.dp), placeholder = "15:00", enabled = canEdit,
                     accept = { it.length <= 5 && it.all { c -> c.isDigit() || c == ':' } },
                     onChange = { raw ->
                         // Stored with seconds, like the server sends it, so typing the old time back counts as unchanged.
@@ -407,6 +479,16 @@ private fun FieldRow(field: SettingField, values: SettingsValues, canEdit: Boole
             }
         }
     }
+    if (under) {
+        if (divider) HorizontalDivider(color = RowLine)
+        Column(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(field.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = if (canEdit) Ink else Muted)
+                field.hint?.let { Text(it, fontFamily = Inter(), fontSize = 11.sp, lineHeight = 15.sp, color = Muted) }
+            }
+            control()
+        }
+    } else SettingsRow(field.label, field.hint, divider = divider) { control() }
 }
 
 // Minus / number / plus, with the number typeable. Keeps the value within min..max.
@@ -451,7 +533,7 @@ private fun StepButton(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 @Composable
 private fun SmallInput(
     text: String,
-    width: androidx.compose.ui.unit.Dp,
+    modifier: Modifier,
     enabled: Boolean,
     onChange: (String) -> Unit,
     accept: (String) -> Boolean = { true },
@@ -465,7 +547,7 @@ private fun SmallInput(
     // Follow the stored value when it changes from outside, but never rewrite what's being typed.
     LaunchedEffect(text) { if (!sameValue(draft, text)) draft = text }
     Row(
-        Modifier.width(width).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF6F7F5)).border(1.dp, Border, RoundedCornerShape(8.dp))
+        modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFFF6F7F5)).border(1.dp, Border, RoundedCornerShape(8.dp))
             .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -490,41 +572,11 @@ private fun SmallInput(
 }
 
 @Composable
-private fun SaveBar(saving: Boolean, problem: String?, error: String?, onDiscard: () -> Unit, onSave: () -> Unit, modifier: Modifier) {
-    val message = problem ?: error
-    Surface(
-        modifier.widthIn(max = 820.dp).fillMaxWidth().shadow(14.dp, RoundedCornerShape(14.dp)),
-        shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, Border)
-    ) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                message ?: "You have unsaved changes",
-                Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
-                color = if (message != null) Danger else Ink, maxLines = 2, overflow = TextOverflow.Ellipsis
-            )
-            TextButton(onClick = onDiscard, enabled = !saving) { Text("Discard", fontFamily = Inter(), color = Muted) }
-            Spacer(Modifier.width(6.dp))
-            Surface(onClick = onSave, enabled = !saving && problem == null, shape = RoundedCornerShape(10.dp), color = if (problem == null) Green else Green.copy(alpha = 0.4f)) {
-                Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (saving) CircularProgressIndicator(Modifier.padding(end = 8.dp).size(14.dp), color = Color.White, strokeWidth = 2.dp)
-                    Text(if (saving) "Saving…" else "Save changes", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
-                }
-            }
-        }
-    }
-}
+private fun SaveBar(saving: Boolean, problem: String?, error: String?, onDiscard: () -> Unit, onSave: () -> Unit, modifier: Modifier) =
+    UnsavedChangesBar(saving, problem, error, onDiscard, onSave, modifier)
 
 @Composable
-private fun InfoBanner(text: String) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(GreenSoft).padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Icon(Icons.Outlined.Info, null, Modifier.size(16.dp), tint = Green)
-        Text(text, fontFamily = Inter(), fontSize = 12.sp, color = Ink)
-    }
-}
+private fun InfoBanner(text: String) = SettingsInfoBanner(text)
 
 @Composable
 private fun CenterMessage(text: String, modifier: Modifier) {

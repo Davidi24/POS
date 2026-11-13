@@ -1,5 +1,14 @@
 package com.saporini.mobile_desktop.pos.reservations
 
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Tune
+import com.saporini.mobile_desktop.admin.inventory.ui.OptionLine
+import com.saporini.mobile_desktop.admin.inventory.ui.OptionGroup
+import com.saporini.mobile_desktop.admin.inventory.ui.PhoneOptionsButton
+import com.saporini.mobile_desktop.core.components.ScrollbarGap
+import com.saporini.mobile_desktop.core.components.fadingEdges
 import com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationSource
 import com.saporini.mobile_desktop.pos.reservations.ui.RestaurantTime
 
@@ -7,6 +16,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import com.saporini.mobile_desktop.core.components.SearchField
 import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.Workspaces
 import androidx.compose.material.icons.outlined.PhoneInTalk
 import androidx.compose.material.icons.outlined.ReportProblem
 import com.saporini.mobile_desktop.core.ui.PlatformVerticalScrollbar
@@ -143,6 +153,10 @@ import mobile_desktop.shared.generated.resources.overview_next_hours
 import mobile_desktop.shared.generated.resources.overview_no_more_reservations
 import mobile_desktop.shared.generated.resources.overview_no_table
 import mobile_desktop.shared.generated.resources.overview_reservations
+import mobile_desktop.shared.generated.resources.reservation_desk
+import mobile_desktop.shared.generated.resources.settings_tables
+import mobile_desktop.shared.generated.resources.shifts_planned
+import mobile_desktop.shared.generated.resources.shifts_worked
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlinx.datetime.LocalDate
@@ -173,10 +187,13 @@ private val FinishedStatuses = setOf(ReservationStatus.COMPLETED, ReservationSta
 // Done with arriving, whatever the time: these move up to the earlier rows.
 private val PassedStatuses = setOf(ReservationStatus.CHECKED_IN, ReservationStatus.SEATED, ReservationStatus.COMPLETED, ReservationStatus.NO_SHOW)
 // Reservation cards under a section header sit this far in from each side, so the header bars read a bit wider.
-private val SectionRowInset = 10.dp
+private val SectionRowInset = 4.dp
+// Phones: the list's rows nearly fill the box (user, 2026-11-02: "the reservation has too much padding").
+private val PhoneSectionRowInset = 4.dp
+// A summary card on a phone's sliding row: wide enough for its picture and figures.
+private val PhoneSummaryCardWidth = 252.dp
 
 // Pause between folding the open section and opening the clicked one.
-private const val FOLD_STEP_MILLIS = 240L
 
 // The overview list's sections that open one at a time.
 private enum class ListSection { ARRIVING, LATER, TOMORROW }
@@ -186,6 +203,16 @@ private const val TOMORROW_FROM_HOUR = 22
 
 // Start loading the next page this many rows before the end of the list.
 private const val LOAD_AHEAD_ITEMS = 6
+
+// The overview's "Show only" filters, kept above the page so the Filters button and the lists share them.
+internal class OverviewToggles {
+    var online by mutableStateOf(false)
+    var big by mutableStateOf(false)
+    var requests by mutableStateOf(false)
+    var notConfirmed by mutableStateOf(false)
+    var review by mutableStateOf(false)
+    val count: Int get() = listOf(online, big, requests, notConfirmed, review).count { it }
+}
 
 // One list on the overview that loads page by page.
 internal data class ListPaging(
@@ -201,6 +228,8 @@ internal data class ListPaging(
 // Reservations landing page: today's numbers, who arrives next, status split and walk-in space.
 @Composable
 internal fun ReservationOverviewScreen(
+    // Opens Booking areas; null for people who may not change them.
+    onOpenAreas: (() -> Unit)? = null,
     arrivals: List<Reservation>,
     arrivalsPaging: ListPaging,
     date: LocalDate,
@@ -232,13 +261,24 @@ internal fun ReservationOverviewScreen(
     val isToday = serviceDateOf(now, zone) == date
     val isPast = date < serviceDateOf(now, zone)
     var datePickerOpen by remember { mutableStateOf(false) }
-    val filters: @Composable () -> Unit = {
-            Box {
-                HeaderButton(
+    val toggles = remember(date) { OverviewToggles() }
+    var walkInsOpen by remember { mutableStateOf(false) }
+    val datePicker: @Composable (Modifier, Boolean) -> Unit = { buttonModifier, short ->
+            Box(buttonModifier) {
+                // A phone shows only the calendar icon (user, 2026-11-02); it's green when another day than today is picked.
+                if (short) Surface(
+                    onClick = { datePickerOpen = true }, modifier = Modifier.size(ToolbarHeight), shape = RoundedCornerShape(8.dp),
+                    color = if (isToday) Color.White else FormGreenSoft,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isToday) Color(0xFFE3DED8) else FormGreen)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.CalendarToday, "Pick a day: ${date.formLabel()}", Modifier.size(19.dp), tint = if (isToday) FormInk else FormGreen)
+                    }
+                } else HeaderButton(
                     text = date.formLabel(),
                     icon = Icons.Outlined.CalendarToday,
                     onClick = { datePickerOpen = true },
-                    modifier = Modifier.width(190.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
                 DropdownMenu(
                     expanded = datePickerOpen,
@@ -254,20 +294,76 @@ internal fun ReservationOverviewScreen(
                     })
                 }
             }
+    }
+    // One Filters button right of the search, every filter inside (user, 2026-11-02; like Statistics and Inventory):
+    // floor, area, status (with counts) and "Show only".
+    val filtersButton: @Composable () -> Unit = {
+        val active = (if (selectedArea != "All areas") 1 else 0) + (if (selectedStatus != "All statuses") 1 else 0) + toggles.count
+        PhoneOptionsButton(Icons.Outlined.Tune, "Filters", active, ToolbarHeight) { close ->
             if (floors.size > 1) {
+                OptionGroup("Floor")
                 val floorChoices = if (isPast) listOf("All floors") + floors else floors
                 val floorLabel = if (isPast && floor == null) "All floors" else floor ?: floors.first()
-                HeaderDropdown(
-                    label = floorLabel,
-                    icon = Icons.Outlined.Layers,
-                    modifier = Modifier.width(140.dp),
-                    choices = floorChoices,
-                    onSelect = onFloorChange
+                floorChoices.forEach { choice ->
+                    OptionLine(choice, choice == floorLabel, { onFloorChange(choice); close() }, icon = Icons.Outlined.Layers)
+                }
+            }
+            OptionGroup("Area")
+            areaChoices.forEach { choice ->
+                OptionLine(if (choice == "Unassigned") "No table" else choice, choice == selectedArea, { onAreaChange(choice); close() },
+                    icon = Icons.Outlined.TableRestaurant, color = if (choice == "Unassigned") FormDanger else FormGreen)
+            }
+            OptionGroup("Status")
+            val counts = mapOf(
+                "Pending" to (summary?.pendingCount ?: reservations.count { it.status == ReservationStatus.PENDING }),
+                "Confirmed" to (summary?.confirmedCount ?: reservations.count { it.status == ReservationStatus.CONFIRMED }),
+                "Checked in" to (summary?.checkedInCount ?: reservations.count { it.status == ReservationStatus.CHECKED_IN }),
+                "Seated" to (summary?.seatedCount ?: reservations.count { it.status == ReservationStatus.SEATED }),
+                "Completed" to (summary?.completedCount ?: reservations.count { it.status == ReservationStatus.COMPLETED }),
+                "Cancelled" to (summary?.cancelledCount ?: reservations.count { it.status == ReservationStatus.CANCELLED }),
+                "No show" to (summary?.noShowCount ?: reservations.count { it.status == ReservationStatus.NO_SHOW })
+            )
+            OptionLine("All statuses", selectedStatus == "All statuses", { onStatusChange("All statuses"); close() }, icon = Icons.Outlined.EventAvailable)
+            counts.forEach { (label, count) ->
+                OptionLine(label, selectedStatus == label, { onStatusChange(if (selectedStatus == label) "All statuses" else label); close() },
+                    icon = Icons.Outlined.Circle, color = StatusDotColors[label] ?: FormMuted, count = count)
+            }
+            OptionGroup("Show only")
+            OptionLine("Ordered online", toggles.online, { toggles.online = !toggles.online }, icon = Icons.Outlined.Public, color = OnlineColor,
+                count = reservations.count { it.source in OnlineSources })
+            if (!isPast) OptionLine(
+                "Guest hasn't confirmed", toggles.notConfirmed, { toggles.notConfirmed = !toggles.notConfirmed }, icon = Icons.Outlined.PhoneInTalk, color = LateColor,
+                count = reservations.count { it.status == ReservationStatus.CONFIRMED && it.attendance != "CONFIRMED" }
+            )
+            if (isToday) OptionLine("Needs review", toggles.review, { toggles.review = !toggles.review }, icon = Icons.Outlined.ReportProblem, color = ReviewColor,
+                count = summary?.needsReviewCount ?: reservations.count { it.needsReview })
+            if (!isToday && !isPast) {
+                OptionLine("Big groups", toggles.big, { toggles.big = !toggles.big }, icon = Icons.Outlined.Groups, color = WaitingColor)
+                OptionLine("Special requests", toggles.requests, { toggles.requests = !toggles.requests }, icon = Icons.Outlined.EventNote, color = LateColor)
+            }
+            if (active > 0) {
+                Text(
+                    "Clear all filters",
+                    Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp).clip(RoundedCornerShape(8.dp)).clickable {
+                        onAreaChange("All areas"); onStatusChange("All statuses")
+                        toggles.online = false; toggles.notConfirmed = false; toggles.review = false; toggles.big = false; toggles.requests = false
+                        close()
+                    }.padding(horizontal = 10.dp, vertical = 9.dp),
+                    fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = FormDanger
                 )
             }
-            HeaderDropdown(label = selectedArea, icon = Icons.Outlined.TableRestaurant, modifier = Modifier.width(146.dp), choices = areaChoices, onSelect = onAreaChange)
-            // No status dropdown here: the By status box filters by status (and "No table").
+        }
     }
+    // Phones and tablets: free tables and the waitlist behind one button instead of at the end of the page (user, 2026-11-02).
+    val walkInsButton: @Composable () -> Unit = {
+        if (isToday) Surface(
+            onClick = { walkInsOpen = true }, modifier = Modifier.size(ToolbarHeight), shape = RoundedCornerShape(8.dp),
+            color = Color.White, border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE3DED8))
+        ) {
+            Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Info, "Free for walk-ins and waitlist", Modifier.size(19.dp), tint = FormInk) }
+        }
+    }
+    if (walkInsOpen) WalkInsDialog(capacity, onDismiss = { walkInsOpen = false })
     val search: @Composable (Dp) -> Unit = { width ->
         SearchField(
             query = searchQuery,
@@ -282,6 +378,25 @@ internal fun ReservationOverviewScreen(
             Row(Modifier.padding(horizontal = 14.dp).fillMaxHeight(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(18.dp), tint = Color.White)
                 Text("Calendar", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color.White)
+            }
+        }
+    }
+    // Booking areas: which tables bookings get first (user, 2026-11-02). Phones show only its icon.
+    val areasButton: @Composable (Boolean) -> Unit = { withLabel ->
+        if (onOpenAreas != null) Surface(
+            onClick = onOpenAreas,
+            modifier = Modifier.height(ToolbarHeight).then(if (withLabel) Modifier else Modifier.width(ToolbarHeight)),
+            shape = RoundedCornerShape(8.dp),
+            color = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, FormGreen)
+        ) {
+            Row(
+                Modifier.padding(horizontal = if (withLabel) 14.dp else 0.dp).fillMaxHeight(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally)
+            ) {
+                Icon(Icons.Outlined.Workspaces, "Booking areas", Modifier.size(18.dp), tint = FormGreen)
+                if (withLabel) Text("Booking areas", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp, color = FormGreen)
             }
         }
     }
@@ -305,12 +420,14 @@ internal fun ReservationOverviewScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     title()
                     Spacer(Modifier.weight(1f))
-                    filters()
-                    search(240.dp)
+                    datePicker(Modifier.width(190.dp), false)
+                    search(260.dp)
+                    filtersButton()
+                    areasButton(true)
                     calendarButton()
                 }
                 if (firstLoad) OverviewSkeleton(size, Modifier.weight(1f))
-                else OverviewContent(date, now, isToday, reservations, listed, listFilter, onStatusChange, onAreaChange, arrivals, arrivalsPaging, dayPaging, summary, capacity, onOpenReservation, size, isPast && floor == null, Modifier.weight(1f), event)
+                else OverviewContent(date, now, isToday, reservations, listed, listFilter, onStatusChange, onAreaChange, arrivals, arrivalsPaging, dayPaging, summary, capacity, onOpenReservation, size, isPast && floor == null, Modifier.weight(1f), event, toggles)
             }
         } else {
             // Tablet and phone: one scrolling page; the filters scroll sideways under the title.
@@ -322,14 +439,21 @@ internal fun ReservationOverviewScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     title()
                     Spacer(Modifier.weight(1f))
+                    walkInsButton()
+                    areasButton(!size.isPhone)
                     calendarButton()
                 }
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    search(if (size.isPhone) 200.dp else 240.dp)
-                    filters()
+                // Date, search and the one Filters button on one line, nothing sliding sideways.
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    datePicker(if (size.isPhone) Modifier else Modifier.width(190.dp), size.isPhone)
+                    Box(Modifier.weight(1f)) {
+                        SearchField(query = searchQuery, onQueryChange = onSearchChange, modifier = Modifier.fillMaxWidth(),
+                            placeholder = if (size.isPhone) "Search" else "Search guest, code, table", height = ToolbarHeight)
+                    }
+                    filtersButton()
                 }
                 if (firstLoad) OverviewSkeleton(size, Modifier.fillMaxWidth())
-                else OverviewContent(date, now, isToday, reservations, listed, listFilter, onStatusChange, onAreaChange, arrivals, arrivalsPaging, dayPaging, summary, capacity, onOpenReservation, size, isPast && floor == null, Modifier.fillMaxWidth(), event)
+                else OverviewContent(date, now, isToday, reservations, listed, listFilter, onStatusChange, onAreaChange, arrivals, arrivalsPaging, dayPaging, summary, capacity, onOpenReservation, size, isPast && floor == null, Modifier.fillMaxWidth(), event, toggles)
             }
         }
     }
@@ -354,7 +478,8 @@ private fun OverviewContent(
     size: ScreenSize,
     showFloorOnPastRows: Boolean,
     modifier: Modifier,
-    event: com.saporini.mobile_desktop.pos.reservations.domain.model.RestaurantEvent? = null
+    event: com.saporini.mobile_desktop.pos.reservations.domain.model.RestaurantEvent? = null,
+    toggles: OverviewToggles = remember(date) { OverviewToggles() }
 ) {
     val active = reservations.filter { it.status in PresentStatuses }
     val isPast = date < serviceDateOf(now, RestaurantTime.zone)
@@ -391,13 +516,13 @@ private fun OverviewContent(
     }
     var selectedHour by remember(date) { mutableStateOf<Int?>(null) }
     // "Ordered online" in By status: only bookings made online (website, app or a partner); combines with the rest.
-    var onlineOnly by remember(date) { mutableStateOf(false) }
+    var onlineOnly by toggles::online
     // Future day's "To do" box: big parties and bookings with special requests or notes.
-    var bigOnly by remember(date) { mutableStateOf(false) }
-    var requestsOnly by remember(date) { mutableStateOf(false) }
+    var bigOnly by toggles::big
+    var requestsOnly by toggles::requests
     // Confirmed bookings whose guests haven't confirmed attendance yet, and visits staff must look at.
-    var notConfirmedOnly by remember(date) { mutableStateOf(false) }
-    var reviewOnly by remember(date) { mutableStateOf(false) }
+    var notConfirmedOnly by toggles::notConfirmed
+    var reviewOnly by toggles::review
     val policy = LocalReservationPolicy.current
     val bigFrom = policy.approvalGroupSize
     val isNotConfirmed = { reservation: Reservation -> reservation.status == ReservationStatus.CONFIRMED && reservation.attendance != "CONFIRMED" }
@@ -430,7 +555,7 @@ private fun OverviewContent(
     }
     val futureCard0: @Composable (Modifier) -> Unit = { cardModifier ->
         SummaryCard(
-            Res.drawable.overview_reservations, "Bookings", if (dayDataComplete) "${bookedAhead.size}" else "–",
+            Res.drawable.shifts_planned, "Bookings", if (dayDataComplete) "${bookedAhead.size}" else "–",
             if (!dayDataComplete) "Loading day bookings"
             else listOf("${bookedAhead.size - pendingAhead} confirmed", "$pendingAhead pending", "$cancelled cancelled").joinToString(" · "),
             FormGreen, cardModifier,
@@ -445,7 +570,8 @@ private fun OverviewContent(
                 bookedAhead.isEmpty() -> "No bookings yet"
                 else -> "Biggest booking: ${bookedAhead.maxOf { it.partySize }} guests"
             },
-            Color(0xFF24748A), cardModifier
+            Color(0xFF24748A), cardModifier,
+            imageScale = 1.15f
         )
     }
     val futureCard2: @Composable (Modifier) -> Unit = { cardModifier ->
@@ -464,7 +590,7 @@ private fun OverviewContent(
     }
     val card0: @Composable (Modifier) -> Unit = { cardModifier ->
         SummaryCard(
-            Res.drawable.overview_reservations, "Reservations", if (isPast) "$totalBookings" else "$leftCount",
+            Res.drawable.shifts_planned, "Reservations", if (isPast) "$totalBookings" else "$leftCount",
             if (isPast) listOf("$cancelled cancelled", "$noShows no-show", "$openBookings open").joinToString(" · ")
             else listOf("$done/$presentCount done", "$cancelled cancelled", "$noShows no show").joinToString(" · "),
             FormGreen, cardModifier,
@@ -478,13 +604,14 @@ private fun OverviewContent(
             Res.drawable.overview_guests, "Guests", if (isPast) "$arrivedGuests" else "$guestsToArrive",
             if (isPast) "$arrivedGuests of $bookedGuests guests arrived" else "${totalGuests - guestsToArrive}/$totalGuests arrived",
             Color(0xFF24748A), cardModifier,
+            imageScale = 1.15f,
             progress = if (isPast) if (bookedGuests == 0) null else arrivedGuests.toFloat() / bookedGuests
             else if (totalGuests == 0) null else (totalGuests - guestsToArrive).toFloat() / totalGuests
         )
     }
     val card2: @Composable (Modifier) -> Unit = { cardModifier ->
         SummaryCard(
-            if (isPast) Res.drawable.overview_reservations else Res.drawable.overview_next_hours,
+            if (isPast) Res.drawable.overview_reservations else Res.drawable.shifts_worked,
             if (isPast) "Online bookings" else "Next 2 hours",
             if (isPast) if (dayDataComplete) "$onlineBookings" else "–" else if (isToday) "$soonCount" else "–",
             if (isPast) {
@@ -493,12 +620,13 @@ private fun OverviewContent(
             } else if (isToday) "$soonGuests guests arriving" else "Shown for today only",
             Color(0xFFC8790B), cardModifier,
             suffix = if (isPast) null else if (isToday) (if (soonCount == 1) "reservation coming" else "reservations coming") else null,
-            imageScale = if (isPast) 1f else 1.3f
+            // The stopwatch a little smaller than before (user, 2026-11-02).
+            imageScale = if (isPast) 1f else 1.15f
         )
     }
     val card3: @Composable (Modifier) -> Unit = { cardModifier ->
         SummaryCard(
-            if (isPast) Res.drawable.overview_next_hours else Res.drawable.overview_no_table,
+            if (isPast) Res.drawable.overview_next_hours else Res.drawable.settings_tables,
             if (isPast) "Peak time" else "Without a table",
             if (isPast) {
                 if (!dayDataComplete) "–" else peakHour?.key?.let { "${it.toString().padStart(2, '0')}:00" } ?: "–"
@@ -617,7 +745,8 @@ private fun OverviewContent(
         else -> null
     }
     val showRows = arrivingOpen || restHeader == null
-    val rowInset = if (restHeader != null) SectionRowInset else 0.dp
+    val sectionInset = if (size.isPhone) PhoneSectionRowInset else SectionRowInset
+    val rowInset = if (restHeader != null) sectionInset else 0.dp
 
     // The earlier rows and the filters need the whole day, so its remaining pages load straight away (one after
     // another; a day is a few hundred bookings at most, and only the rows on screen are drawn).
@@ -693,11 +822,12 @@ private fun OverviewContent(
         if (open) {
             fold(headerIndex) { setOpen(false) }
         } else {
-            startMotion()
+            // Opens at once, without an animation (user, 2026-11-01).
+            userMoved.value = true
+            animateRows = false
             setOpen(true)
             listScope.launch {
                 // Wait until its rows are in the list.
-                withFrameNanos { }
                 withFrameNanos { }
                 val info = listState.layoutInfo
                 val viewport = info.viewportEndOffset - info.viewportStartOffset
@@ -711,63 +841,29 @@ private fun OverviewContent(
             }
         }
     }
-    // Opens one of Arriving / Later / Tomorrow and closes the others, in two steps you can follow:
-    // 1. the open section folds up (its rows fade out) while the header at the top stays put;
-    // 2. the target's header settles in place, just under the header above it, and its rows fade in below it.
+    // Opens one of Arriving / Later / Tomorrow and closes the others, all at once (user, 2026-11-01: "it should happen
+    // immediately"): its header goes right under the header above it and its rows are there, with no animation.
     fun focusSection(target: ListSection) {
-        // Header positions at a given set of open sections (Previous doesn't change here).
-        fun headerIndexOf(section: ListSection, arrivingIsOpen: Boolean, laterIsOpen: Boolean) = when (section) {
-            ListSection.ARRIVING -> restHeaderIndex
-            ListSection.LATER -> laterIndexFor(arrivingIsOpen)
-            ListSection.TOMORROW -> tomorrowIndexFor(arrivingIsOpen, laterIsOpen)
-        }
         val pinnedAbove = when (target) {
             ListSection.ARRIVING -> earlier.isNotEmpty()
             ListSection.LATER -> restHeader != null
             ListSection.TOMORROW -> restHeader != null || laterBookings.isNotEmpty()
         }
-        // The section header at the top of the box right now, and whether it's pinned over its own rows.
-        val first = listState.firstVisibleItemIndex
-        val topHeader = listOfNotNull(
-            0.takeIf { earlier.isNotEmpty() },
-            restHeaderIndex.takeIf { restHeader != null },
-            laterHeaderIndex.takeIf { laterBookings.isNotEmpty() },
-            tomorrowHeaderIndex.takeIf { tomorrowBookings.isNotEmpty() }
-        ).lastOrNull { it <= first }
-        // Only when that header's own section is the one folding does it need holding in place (its rows vanish).
-        val topFolds = topHeader != null && topHeader < first && (
-            (topHeader == restHeaderIndex && restHeader != null && arrivingOpen && target != ListSection.ARRIVING) ||
-                (topHeader == laterHeaderIndex && laterBookings.isNotEmpty() && laterOpen && target != ListSection.LATER) ||
-                (topHeader == tomorrowHeaderIndex && tomorrowBookings.isNotEmpty() && tomorrowOpen && target != ListSection.TOMORROW)
-            )
-        // Step 1: fold everything else. The header at the top keeps its place while the rows go.
-        startMotion()
-        val arrivingStays = arrivingOpen && target == ListSection.ARRIVING
-        val laterStays = laterOpen && target == ListSection.LATER
-        arrivingOpen = arrivingStays
-        laterOpen = laterStays
-        tomorrowOpen = tomorrowOpen && target == ListSection.TOMORROW
+        val index = when (target) {
+            ListSection.ARRIVING -> restHeaderIndex
+            ListSection.LATER -> laterIndexFor(false)
+            ListSection.TOMORROW -> tomorrowIndexFor(false, false)
+        }
+        userMoved.value = true
+        animateRows = false
+        arrivingOpen = target == ListSection.ARRIVING
+        laterOpen = target == ListSection.LATER
+        tomorrowOpen = target == ListSection.TOMORROW
         listScope.launch {
-            if (topFolds && topHeader != null) {
-                // Same position after the fold: headers above it don't move when the sections below it close.
-                val topIndex = when (topHeader) {
-                    laterHeaderIndex -> laterIndexFor(arrivingStays)
-                    tomorrowHeaderIndex -> tomorrowIndexFor(arrivingStays, laterStays)
-                    else -> topHeader
-                }
-                listState.scrollToItem(topIndex)
-            }
-            delay(FOLD_STEP_MILLIS)
-            // Step 2: bring the target's header to its spot, then open it so its rows fade in underneath.
-            val index = headerIndexOf(target, arrivingStays, laterStays)
+            // Once its rows are in the list.
+            withFrameNanos { }
             val above = if (pinnedAbove) headerPx + listState.layoutInfo.mainAxisItemSpacing else 0
-            listState.animateScrollToItem(index, -above)
-            startMotion()
-            when (target) {
-                ListSection.ARRIVING -> arrivingOpen = true
-                ListSection.LATER -> laterOpen = true
-                ListSection.TOMORROW -> tomorrowOpen = true
-            }
+            listState.scrollToItem(index, -above)
         }
     }
     // Clicking a closed section opens it (closing the others) and brings it up; clicking an open one just closes
@@ -885,6 +981,7 @@ private fun OverviewContent(
             modifier = listModifier,
             listState = listState,
             fill = fill,
+            compact = size.isPhone,
             scrollConnection = scrollConnection,
             onListHeight = { listHeightPx = it },
             bottomOverlay = sectionBelow?.let { section ->
@@ -924,15 +1021,15 @@ private fun OverviewContent(
                 }
                 if (previousOpen) {
                     items(finishedEarlier, key = { it.id }) { reservation ->
-                        Box(smoothItem(animateRows).padding(horizontal = SectionRowInset)) {
+                        Box(smoothItem(animateRows).padding(horizontal = sectionInset)) {
                             ReservationCard(reservation, now = now.takeIf { isToday }, passed = true, fadedAlpha = FinishedAlpha) { onOpenReservation(reservation.id) }
                         }
                     }
                     if (previousSplit) item(key = "still-active-line") {
-                        Box(smoothItem(animateRows).padding(horizontal = SectionRowInset)) { StillActiveLine() }
+                        Box(smoothItem(animateRows).padding(horizontal = sectionInset)) { StillActiveLine() }
                     }
                     items(activeEarlier, key = { it.id }) { reservation ->
-                        Box(smoothItem(animateRows).padding(horizontal = SectionRowInset)) {
+                        Box(smoothItem(animateRows).padding(horizontal = sectionInset)) {
                             ReservationCard(reservation, now = now.takeIf { isToday }, passed = true, fadedAlpha = StillActiveAlpha) { onOpenReservation(reservation.id) }
                         }
                     }
@@ -977,7 +1074,7 @@ private fun OverviewContent(
                     }
                 }
                 if (laterOpen) items(laterBookings, key = { it.id }) { reservation ->
-                    Box(smoothItem(animateRows).padding(horizontal = SectionRowInset)) {
+                    Box(smoothItem(animateRows).padding(horizontal = sectionInset)) {
                         ReservationCard(reservation, now = null) { onOpenReservation(reservation.id) }
                     }
                 }
@@ -994,7 +1091,7 @@ private fun OverviewContent(
                     }
                 }
                 if (tomorrowOpen) items(tomorrowBookings, key = { it.id }) { reservation ->
-                    Box(smoothItem(animateRows).padding(horizontal = SectionRowInset)) {
+                    Box(smoothItem(animateRows).padding(horizontal = sectionInset)) {
                         ReservationCard(reservation, now = null) { onOpenReservation(reservation.id) }
                     }
                 }
@@ -1113,10 +1210,7 @@ private fun OverviewContent(
                     capacity.maxAvailableTableCapacity?.let { InfoPill(Icons.Outlined.EventSeat, "Largest free table: $it seats") }
                 }
             }
-            if (isToday) {
-                HorizontalDivider(Modifier.padding(vertical = 4.dp), color = OrderLikeBorder)
-                WaitlistSection(Modifier.fillMaxWidth())
-            }
+            // No waitlist here: it lives on Tables (user, 2026-11-03).
         }
     }
     val reservationsByTime: @Composable (Modifier, Boolean) -> Unit = { boxModifier, fill ->
@@ -1196,11 +1290,25 @@ private fun OverviewContent(
         }
         return
     }
-    // Tablet and phone: cards two by two, then the lists one under the other (the page scrolls).
+    // Tablet: cards two by two; phone: one row that slides sideways, pictures kept (user, 2026-11-02). Then the lists
+    // one under the other (the page scrolls).
     val gap = if (size.isPhone) 10.dp else 12.dp
     Column(modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
         eventBanner()
-        if (isFuture) {
+        if (size.isPhone) {
+            val cardsScroll = rememberScrollState()
+            Row(
+                Modifier.fillMaxWidth().fadingEdges(cardsScroll).horizontalScroll(cardsScroll),
+                horizontalArrangement = Arrangement.spacedBy(gap)
+            ) {
+                val cardWidth = Modifier.width(PhoneSummaryCardWidth)
+                if (isFuture) {
+                    futureCard0(cardWidth); futureCard1(cardWidth); futureCard2(cardWidth); card3(cardWidth)
+                } else {
+                    card0(cardWidth); card1(cardWidth); card2(cardWidth); card3(cardWidth)
+                }
+            }
+        } else if (isFuture) {
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) { futureCard0(Modifier.weight(1f)); futureCard1(Modifier.weight(1f)) }
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) { futureCard2(Modifier.weight(1f)); card3(Modifier.weight(1f)) }
         } else {
@@ -1213,13 +1321,51 @@ private fun OverviewContent(
             reservationsByTime(Modifier.fillMaxWidth().heightIn(max = if (size.isPhone) 560.dp else 640.dp), false)
         } else if (isPast) {
             reservationsByTime(Modifier.fillMaxWidth().heightIn(max = if (size.isPhone) 560.dp else 640.dp), false)
-        } else if (size.isPhone) {
-            statusList(Modifier.fillMaxWidth(), false)
-            walkIns(Modifier.fillMaxWidth())
-        } else {
-            Row(Modifier.height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                statusList(Modifier.weight(1f).fillMaxHeight(), false)
-                walkIns(Modifier.weight(1f).fillMaxHeight())
+        }
+        // Today: the status filters are in the Filters button, free tables and the waitlist behind the info button.
+    }
+}
+
+// A reservation card's Table / Order button: green icon and › when it opens something, greyed out when there's nothing yet
+// (red for a booking without a table).
+@Composable
+private fun CardLinkButton(icon: ImageVector, text: String, enabled: Boolean, modifier: Modifier = Modifier, warning: Boolean = false,
+                           height: Dp = 34.dp, tint: Color? = null, onClick: () -> Unit) {
+    // A tint (the table's colour on Tables) colours the whole button.
+    val tone = tint?.takeIf { enabled }
+    val ink = when {
+        tone != null -> tone
+        warning -> PlainRed
+        enabled -> FormInk
+        else -> Color(0xFF9A9C97)
+    }
+    Row(
+        modifier.widthIn(min = 104.dp).height(height).clip(RoundedCornerShape(9.dp))
+            .background(when { tone != null -> tone.copy(alpha = 0.10f); warning -> PlainRed.copy(alpha = 0.08f); enabled -> Color.White; else -> Color(0xFFF5F6F4) })
+            .border(1.dp, when { tone != null -> tone.copy(alpha = 0.45f); warning -> PlainRed.copy(alpha = 0.35f); enabled -> Color(0xFFD6E0D2); else -> Color(0xFFE8EAE6) }, RoundedCornerShape(9.dp))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+    ) {
+        Icon(icon, null, Modifier.size(16.dp), tint = tone ?: if (enabled) PlainGreen else ink)
+        Text(text, Modifier.weight(1f, fill = false), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp,
+            color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (enabled) Icon(Icons.Outlined.ChevronRight, null, Modifier.size(15.dp), tint = tone ?: PlainGreen)
+    }
+}
+
+// Free tables for walk-ins in the next 2 hours, opened from the info button on phones and tablets (the waitlist is on Tables).
+@Composable
+private fun WalkInsDialog(capacity: ReservationCapacity?, onDismiss: () -> Unit) {
+    com.saporini.mobile_desktop.core.components.AppDialog(title = "Free for walk-ins", onDismiss = onDismiss, maxWidth = 460.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (capacity == null) EmptyText("Loading…")
+            else {
+                Text("Next 2 hours", fontFamily = Inter(), fontSize = 12.sp, color = FormMuted)
+                InfoPill(Icons.Outlined.TableRestaurant, "${capacity.availableRootTables} of ${capacity.totalRootTables} tables free")
+                InfoPill(Icons.Outlined.Groups, "${capacity.availableSeats} of ${capacity.totalSeats} seats free")
+                capacity.maxAvailableTableCapacity?.let { InfoPill(Icons.Outlined.EventSeat, "Largest free table: $it seats") }
             }
         }
     }
@@ -1568,10 +1714,13 @@ private fun LazyListContainer(
     // Sees the user's scrolling on the list (e.g. to open a section when scrolled into).
     scrollConnection: NestedScrollConnection? = null,
     onListHeight: ((Int) -> Unit)? = null,
+    // Phones: less room around the rows, and no gutter for a scrollbar a finger doesn't use.
+    compact: Boolean = false,
     content: LazyListScope.() -> Unit
 ) {
+    val scrollbarRoom = if (compact) ScrollbarGap else 8.dp
     Surface(modifier, shape = RoundedCornerShape(12.dp), color = Color.White, border = BorderStroke(1.dp, OrderLikeBorder)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.padding(if (compact) 8.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ListHeader(icon, title, titleExtra, count, open, onToggle, action)
             if (emptyState != null) {
                 Box(if (fill) Modifier.weight(1f).fillMaxWidth() else Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { emptyState() }
@@ -1580,9 +1729,9 @@ private fun LazyListContainer(
             Box(Modifier.weight(1f, fill = false).then(if (scrollConnection != null) Modifier.nestedScroll(scrollConnection) else Modifier)) {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.padding(end = 10.dp).then(if (onListHeight != null) Modifier.onSizeChanged { onListHeight(it.height) } else Modifier),
+                    modifier = Modifier.padding(end = scrollbarRoom).then(if (onListHeight != null) Modifier.onSizeChanged { onListHeight(it.height) } else Modifier),
                     verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
-                if (bottomOverlay != null) Box(Modifier.align(Alignment.BottomStart).padding(end = 10.dp)) { bottomOverlay() }
+                if (bottomOverlay != null) Box(Modifier.align(Alignment.BottomStart).padding(end = scrollbarRoom)) { bottomOverlay() }
                 Box(Modifier.matchParentSize(), contentAlignment = Alignment.CenterEnd) {
                     PlatformVerticalScrollbar(state = listState, modifier = Modifier.fillMaxHeight().width(3.dp))
                 }
@@ -1868,17 +2017,9 @@ private fun LegendDot(color: Color, label: String) {
 // Narrow version of the reservation card for side lists: guest on top, table and status below.
 @Composable
 private fun CompactReservationCard(reservation: Reservation, relativeTo: Instant? = null, onClick: () -> Unit) {
-    val label = when (reservation.status) {
-        ReservationStatus.PENDING -> "Pending"
-        ReservationStatus.CONFIRMED -> "Confirmed"
-        ReservationStatus.CHECKED_IN -> "Checked in"
-        ReservationStatus.SEATED -> "Seated"
-        ReservationStatus.COMPLETED -> "Completed"
-        ReservationStatus.CANCELLED -> "Cancelled"
-        ReservationStatus.NO_SHOW -> "No show"
-        ReservationStatus.EXPIRED -> "Request expired"
-    }
-    val statusColor = StatusDotColors[label] ?: FormMuted
+    val state = bookingState(reservation)
+    val label = state.text
+    val statusColor = state.color
     val tables = reservation.tableAssignments.mapNotNull { it.tableNumber }
     Surface(onClick, Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = BorderStroke(1.dp, Color(0xFFE8ECE6)), shadowElevation = 1.dp) {
         Row(Modifier.fillMaxWidth().height(72.dp)) {
@@ -1901,6 +2042,7 @@ private fun CompactReservationCard(reservation: Reservation, relativeTo: Instant
                     )
                 }
                 Box(Modifier.width(1.dp).height(40.dp).background(OrderLikeBorder))
+                ReservationFigure(40.dp)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         "${reservation.displayGuestName} · ${reservation.partySize}",
@@ -1937,7 +2079,7 @@ private fun CompactReservationCard(reservation: Reservation, relativeTo: Instant
     }
 }
 
-// Order-card look for one reservation: status strip, time, guest, table pill, status badge, chevron.
+// Order-card look for one reservation: time, guest, table and order buttons, the booking's state.
 @Composable
 private fun ReservationCard(
     reservation: Reservation,
@@ -1948,17 +2090,10 @@ private fun ReservationCard(
     fadedAlpha: Float = FinishedAlpha,
     onClick: () -> Unit
 ) {
-    val label = when (reservation.status) {
-        ReservationStatus.PENDING -> "Pending"
-        ReservationStatus.CONFIRMED -> "Confirmed"
-        ReservationStatus.CHECKED_IN -> "Checked in"
-        ReservationStatus.SEATED -> "Seated"
-        ReservationStatus.COMPLETED -> "Completed"
-        ReservationStatus.CANCELLED -> "Cancelled"
-        ReservationStatus.NO_SHOW -> "No show"
-        ReservationStatus.EXPIRED -> "Request expired"
-    }
-    val statusColor = StatusDotColors[label] ?: FormMuted
+    // One state per booking: "Confirmed by app" until the guest confirms (user, 2026-11-02).
+    val state = bookingState(reservation)
+    val label = state.text
+    val statusColor = state.color
     val tables = reservation.tableAssignments.mapNotNull { assignment ->
         assignment.tableNumber?.let { table ->
             if (showFloor) assignment.floor?.takeIf(String::isNotBlank)?.let { "$table · $it" } ?: table else table
@@ -1985,82 +2120,96 @@ private fun ReservationCard(
     }
     // Earlier bookings look faded: still readable and clickable, clearly behind us.
     BoxWithConstraints(Modifier.fillMaxWidth().alpha(if (passed) fadedAlpha else 1f)) {
-    if (maxWidth < 560.dp) {
-        NarrowReservationCard(reservation, label, statusColor, tables, whenText, onClick)
+    // Below 820 dp (phones and tablets) the buttons go on their own line under the guest, so the name keeps its room.
+    if (maxWidth < 820.dp) {
+        NarrowReservationCard(
+            reservation, if (reservation.needsReview) BookingFlag("Needs review", ReviewColor) else state, tables, whenText,
+            when {
+                holdFlag != null -> Color(0xFF8A6A00)
+                passed -> FormMuted
+                else -> PlainGreen
+            },
+            onClick
+        )
         return@BoxWithConstraints
     }
-    Surface(onClick, Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = BorderStroke(1.dp, Color(0xFFE8ECE6)), shadowElevation = 1.dp) {
-        Row(Modifier.fillMaxWidth().height(72.dp)) {
-            Box(Modifier.width(5.dp).fillMaxHeight().background(statusColor))
-            Row(
-                Modifier.weight(1f).fillMaxHeight().padding(start = 14.dp, end = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Column(Modifier.width(84.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Schedule, null, Modifier.size(15.dp), tint = FormInk)
-                        Spacer(Modifier.width(6.dp))
-                        Text(reservation.reservationStart.clock(), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FormInk)
-                    }
+    // Redone (user, 2026-11-02: "terrible, make it much better, more modern; remove the padding at the end"): the time sits in
+    // a tile tinted in the booking's state colour, then the guest with what matters about them, then the table and order
+    // buttons and the state. No arrow: the whole card opens the booking.
+    val whenColor = when {
+        holdFlag != null -> Color(0xFF8A6A00)
+        passed -> FormMuted
+        else -> PlainGreen
+    }
+    Surface(onClick, Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, Color(0xFFE6EAE4)), shadowElevation = 1.dp) {
+        Row(
+            Modifier.fillMaxWidth().height(86.dp).padding(start = 8.dp, end = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // The time as it was (user, 2026-11-02: "return the time as it was"): clock, time, how soon under it, a line after.
+            Column(Modifier.padding(start = 6.dp).width(112.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Schedule, null, Modifier.size(15.dp), tint = FormInk)
+                    Spacer(Modifier.width(6.dp))
+                    Text(reservation.reservationStart.clock(), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FormInk)
+                }
+                Text(whenText, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp, color = whenColor,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Box(Modifier.width(1.dp).height(40.dp).background(OrderLikeBorder))
+            ReservationFigure(52.dp)
+            // The guest, what matters about them, and the booking's state right under them (user, 2026-11-02: "the height
+            // I like, but it still looks bad": the state no longer floats in the middle of the card).
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    listOfNotNull(reservation.occasionIcon, reservation.displayGuestName).joinToString(" "),
+                    fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 0.sp, color = FormInk, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Groups, null, Modifier.size(15.dp), tint = if (arrivedFlag != null) WaitingColor else FormMuted)
+                    Spacer(Modifier.width(5.dp))
                     Text(
-                        whenText,
-                        fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 1,
-                        color = when {
-                            holdFlag != null -> Color(0xFF8A6A00)
-                            passed -> FormMuted
-                            else -> FormGreen
-                        }
+                        listOfNotNull(
+                            arrivedFlag?.text ?: "${reservation.partySize} guests",
+                            reservation.occasionName,
+                            reservation.specialRequests?.takeIf(String::isNotBlank)
+                        ).joinToString("  ·  "),
+                        fontFamily = Inter(), fontSize = 12.sp, letterSpacing = 0.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = if (arrivedFlag != null) WaitingColor else FormMuted
                     )
                 }
-                Box(Modifier.width(1.dp).height(40.dp).background(OrderLikeBorder))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        listOfNotNull(reservation.occasionIcon, reservation.displayGuestName).joinToString(" "),
-                        fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FormInk, maxLines = 1, overflow = TextOverflow.Ellipsis
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Groups, null, Modifier.size(15.dp), tint = FormMuted)
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            arrivedFlag?.text ?: "${reservation.partySize} guests", fontFamily = Inter(), fontSize = 12.sp,
-                            color = if (arrivedFlag != null) WaitingColor else FormMuted
-                        )
-                    }
-                }
-                val tableTone = when {
-                    waitingForTable -> WaitingColor
-                    tables.isEmpty() -> FormDanger
-                    else -> FormInk
-                }
+            }
+            // At the card's end the state, with Table and Order side by side under it (user, 2026-11-02). Table takes its table's
+            // colour on Tables once the guests are there (orange when seated, blue with dishes ordered...); before that it's
+            // the usual green. Each is greyed out while there's nothing to open (user rule: "it should be just disabled").
+            val links = LocalBookingLinks.current
+            val order = links?.orderOf?.invoke(reservation)
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
-                    Modifier.widthIn(min = 92.dp).clip(RoundedCornerShape(8.dp))
-                        .background(if (tables.isEmpty()) tableTone.copy(alpha = 0.10f) else Color(0xFFF2F6F2))
-                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    Modifier.height(24.dp).clip(RoundedCornerShape(50)).background(statusTone.copy(alpha = 0.12f)).padding(horizontal = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(Icons.Outlined.TableRestaurant, null, Modifier.size(17.dp), tint = tableTone)
-                    Text(
+                    Box(Modifier.size(6.dp).background(statusTone, CircleShape))
+                    Text(statusText, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, letterSpacing = 0.sp, color = statusTone, maxLines = 1)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CardLinkButton(
+                        Icons.Outlined.TableRestaurant,
                         when {
-                            waitingForTable -> "Waiting for table"
+                            waitingForTable -> "Waiting"
                             tables.isEmpty() -> "No table"
-                            else -> tables.joinToString(" + ")
+                            else -> "Table " + tables.joinToString(" + ")
                         },
-                        fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
-                        color = tableTone, maxLines = 1
-                    )
-                }
-                Row(
-                    Modifier.clip(RoundedCornerShape(22.dp)).background(statusTone.copy(alpha = 0.14f)).padding(horizontal = 10.dp, vertical = 5.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(Modifier.size(8.dp).background(statusTone, RoundedCornerShape(4.dp)))
-                    Text(statusText, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = statusTone)
-                }
-                Box(Modifier.size(32.dp).background(Color(0xFFF0F4F0), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.ChevronRight, null, Modifier.size(19.dp), tint = FormInk)
+                        enabled = links != null && tables.isNotEmpty() && !waitingForTable,
+                        warning = tables.isEmpty(), modifier = Modifier.width(146.dp), height = 32.dp,
+                        tint = links?.tableColor?.invoke(reservation)
+                    ) { links?.goToTable(reservation) }
+                    CardLinkButton(Icons.AutoMirrored.Outlined.ReceiptLong, order?.let { "Order ${it.second}" } ?: "No order", enabled = order != null,
+                        modifier = Modifier.width(146.dp), height = 32.dp) {
+                        order?.let { links?.goToOrder(it.first) }
+                    }
                 }
             }
         }
@@ -2068,62 +2217,79 @@ private fun ReservationCard(
     }
 }
 
-// Same card for narrow lists: time and status on top, guest below, then guests and table.
+// The user's reservation figure, on every reservation in the lists (user, 2026-11-02: "all reservations have this logo").
+@Composable
+private fun ReservationFigure(size: Dp) {
+    Box(
+        Modifier.size(size).clip(RoundedCornerShape(10.dp)).background(Color(0xFFF2F6F2)),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(painterResource(Res.drawable.reservation_desk), null, Modifier.fillMaxSize().padding(3.dp), contentScale = ContentScale.Fit)
+    }
+}
+
+// The card on a phone (user, 2026-11-02: "make it better"): time and how soon on the left, the figure, the guest with
+// their table, then the guests and the booking's one state. The whole card opens it, no arrow.
 @Composable
 private fun NarrowReservationCard(
     reservation: Reservation,
-    label: String,
-    statusColor: Color,
+    state: BookingFlag,
     tables: List<String>,
     whenText: String,
+    whenColor: Color,
     onClick: () -> Unit
 ) {
-    Surface(onClick, Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp), color = Color.White, border = BorderStroke(1.dp, Color(0xFFE8ECE6)), shadowElevation = 1.dp) {
+    val links = LocalBookingLinks.current
+    Surface(onClick, Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = Color.White, border = BorderStroke(1.dp, Color(0xFFE8ECE6)), shadowElevation = 1.dp) {
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Box(Modifier.width(5.dp).fillMaxHeight().background(statusColor))
-            Column(Modifier.weight(1f).padding(start = 12.dp, end = 10.dp, top = 10.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Schedule, null, Modifier.size(15.dp), tint = FormInk)
-                    Spacer(Modifier.width(5.dp))
-                    Text(reservation.reservationStart.clock(), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FormInk)
-                    Spacer(Modifier.width(8.dp))
-                    Text(whenText, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = FormGreen, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(
-                        Modifier.clip(RoundedCornerShape(22.dp)).background(statusColor.copy(alpha = 0.14f)).padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Box(Modifier.size(7.dp).background(statusColor, RoundedCornerShape(4.dp)))
-                        Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = statusColor, maxLines = 1)
-                    }
+            Box(Modifier.width(4.dp).fillMaxHeight().background(state.color))
+            Column(Modifier.weight(1f)) {
+            // Taller than the first try (user, 2026-11-02: "you made it too small, bigger").
+            Row(Modifier.fillMaxWidth().heightIn(min = 78.dp).padding(start = 10.dp, end = 10.dp, top = 14.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.width(52.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(reservation.reservationStart.clock(), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = FormInk, maxLines = 1)
+                    // "in 1h 14m": hours and minutes short, so it never runs to a third line.
+                    Text(if (" h " in whenText) whenText.replace(" h ", "h ").replace(" min", "m") else whenText,
+                        fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, lineHeight = 13.sp, color = whenColor, maxLines = 2,
+                        overflow = TextOverflow.Ellipsis)
                 }
-                Text(reservation.displayGuestName, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FormInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Groups, null, Modifier.size(15.dp), tint = FormMuted)
-                        Spacer(Modifier.width(5.dp))
-                        Text("${reservation.partySize} guests", fontFamily = Inter(), fontSize = 12.sp, color = FormMuted, maxLines = 1)
-                    }
-                    Row(
-                        Modifier.clip(RoundedCornerShape(6.dp))
-                            .background(if (tables.isEmpty()) FormDanger.copy(alpha = 0.10f) else Color(0xFFF2F6F2))
-                            .padding(horizontal = 7.dp, vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Icon(Icons.Outlined.TableRestaurant, null, Modifier.size(14.dp), tint = if (tables.isEmpty()) FormDanger else FormInk)
-                        Text(
-                            if (tables.isEmpty()) "No table" else tables.joinToString(" + "),
-                            fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
-                            color = if (tables.isEmpty()) FormDanger else FormInk, maxLines = 1
-                        )
+                Box(Modifier.padding(horizontal = 6.dp).width(1.dp).height(44.dp).background(OrderLikeBorder))
+                ReservationFigure(38.dp)
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        listOfNotNull(reservation.occasionIcon, reservation.displayGuestName).joinToString(" "),
+                        fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = FormInk, maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.Groups, null, Modifier.size(14.dp), tint = FormMuted)
+                            Spacer(Modifier.width(4.dp))
+                            Text("${reservation.partySize}", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = FormMuted, maxLines = 1)
+                        }
+                        Row(
+                            Modifier.weight(1f, fill = false).clip(RoundedCornerShape(22.dp)).background(state.color.copy(alpha = 0.13f))
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Box(Modifier.size(6.dp).background(state.color, RoundedCornerShape(3.dp)))
+                            Text(state.text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = state.color, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
-            Box(Modifier.fillMaxHeight().padding(end = 10.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(28.dp).background(Color(0xFFF0F4F0), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.ChevronRight, null, Modifier.size(17.dp), tint = FormInk)
-                }
+            // Table and Order across the card's width, always both; greyed out while there's nothing to open (user, 2026-11-02).
+            val order = links?.orderOf?.invoke(reservation)
+            Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 12.dp).widthIn(max = 520.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CardLinkButton(
+                    Icons.Outlined.TableRestaurant, if (tables.isEmpty()) "No table" else "Table " + tables.joinToString(" + "),
+                    enabled = links != null && tables.isNotEmpty(), warning = tables.isEmpty(), modifier = Modifier.weight(1f)
+                ) { links?.goToTable(reservation) }
+                CardLinkButton(Icons.AutoMirrored.Outlined.ReceiptLong, order?.let { "Order ${it.second}" } ?: "No order yet", enabled = order != null,
+                    modifier = Modifier.weight(1f)) { order?.let { links?.goToOrder(it.first) } }
+            }
             }
         }
     }

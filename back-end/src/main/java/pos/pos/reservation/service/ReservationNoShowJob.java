@@ -34,6 +34,7 @@ public class ReservationNoShowJob {
     private final ReservationPolicy reservationPolicy;
     private final ReservationSupport reservationSupport;
     private final ReservationNotifications reservationNotifications;
+    private final pos.pos.tables.specialcase.SpecialCaseService specialCases;
 
     @Scheduled(fixedDelay = 60_000, initialDelay = 20_000)
     @Transactional
@@ -48,6 +49,10 @@ public class ReservationNoShowJob {
         for (Reservation reservation : reservationRepository.findConfirmedPastStart(ReservationStatus.CONFIRMED, now, ReservationStatus.NO_SHOW)) {
             OffsetDateTime holdUntil = reservationPolicy.holdUntil(reservation);
             if (holdUntil == null || holdUntil.isAfter(now)) {
+                continue;
+            }
+            // Its table was taken, or the system moved it: nobody can say the guests didn't come.
+            if (specialCases.leftToSpecialCases(reservation, now)) {
                 continue;
             }
             String heldUntil = CLOCK_TIME.format(holdUntil.atZoneSameInstant(reservationSupport.restaurantZone(reservation.getRestaurant())));

@@ -39,6 +39,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -48,6 +49,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class UserAdminService {
+
+    // How many people a forgiving search looks through (everyone a person can see in one restaurant).
+    private static final int SEARCH_LIMIT = 2000;
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final String STATUS_ACTIVE = "ACTIVE";
@@ -76,20 +80,31 @@ public class UserAdminService {
             String direction
     ) {
         Pageable pageable = PageableUtils.create(page, size, direction, resolveSortProperty(sortBy), DEFAULT_PAGE_SIZE);
-        String searchLike = NormalizationUtils.normalizeLowerLike(search);
-        String normalizedPhoneLike = NormalizationUtils.normalizePhoneLike(search);
         String normalizedRoleCode = NormalizationUtils.normalizeUpper(roleCode);
+        boolean platformAdmin = roleHierarchyService.isSuperAdmin(authentication) || roleHierarchyService.isCoSuperAdmin(authentication);
 
-        Page<User> usersPage = userRepository.searchVisibleUsers(
-                active,
-                searchLike,
-                normalizedPhoneLike,
-                normalizedRoleCode,
-                roleHierarchyService.isSuperAdmin(authentication),
-                roleHierarchyService.actorRank(authentication),
-                roleHierarchyService.actorRestaurantId(authentication),
-                pageable
-        );
+        Page<User> usersPage;
+        if (search == null || search.isBlank()) {
+            usersPage = userRepository.searchVisibleUsers(active, null, null, normalizedRoleCode, platformAdmin,
+                    roleHierarchyService.actorRank(authentication), roleHierarchyService.currentUserId(authentication),
+                    roleHierarchyService.actorRestaurantId(authentication), pageable);
+        } else {
+            // A search is forgiving (accents, whole names, small typos; StaffSearch), so it looks through everyone this
+            // person can see (a restaurant's staff, a few hundred at most) and pages the closest first.
+            List<User> visible = userRepository.searchVisibleUsers(active, null, null, normalizedRoleCode, platformAdmin,
+                    roleHierarchyService.actorRank(authentication), roleHierarchyService.currentUserId(authentication),
+                    roleHierarchyService.actorRestaurantId(authentication),
+                    org.springframework.data.domain.PageRequest.of(0, SEARCH_LIMIT, pageable.getSort())).getContent();
+            List<User> found = visible.stream()
+                    .map(user -> Map.entry(user, StaffSearch.score(user, search)))
+                    .filter(entry -> entry.getValue() > 0)
+                    .sorted(Map.Entry.<User, Integer>comparingByValue().reversed())
+                    .map(Map.Entry::getKey)
+                    .toList();
+            int from = (int) Math.min(pageable.getOffset(), found.size());
+            int to = Math.min(from + pageable.getPageSize(), found.size());
+            usersPage = new PageImpl<>(found.subList(from, to), pageable, found.size());
+        }
 
         Map<UUID, List<String>> roleCodesByUserId = loadActiveRoleCodes(usersPage.getContent());
         List<UserResponse> items = usersPage.getContent().stream()
@@ -130,11 +145,10 @@ public class UserAdminService {
         boolean wasActive = user.isActive();
 
         if (request.getDefaultBranchId() != null) {
-            if (user.getRestaurantId() == null || branchRepository
-                    .findByIdAndRestaurantIdAndDeletedAtIsNull(request.getDefaultBranchId(), user.getRestaurantId()).isEmpty()) {
-                throw new pos.pos.exception.auth.AuthException("defaultBranchId must be a branch of the person's restaurant",
-                        org.springframework.http.HttpStatus.BAD_REQUEST);
-            }
+            if (user.getRestaurantId() == null) throw new AuthException("A restaurant is required for a branch", org.springframework.http.HttpStatus.BAD_REQUEST);
+            var branch = branchRepository.findForAssignment(request.getDefaultBranchId(), user.getRestaurantId()).orElseThrow(() ->
+                    new AuthException("defaultBranchId must be a branch of the person's restaurant", org.springframework.http.HttpStatus.BAD_REQUEST));
+            pos.pos.restaurant.service.RestaurantOperations.requireOpen(branch);
             user.setDefaultBranchId(request.getDefaultBranchId());
         }
         user.setFirstName(request.getFirstName());
@@ -224,6 +238,11 @@ public class UserAdminService {
     public void deleteUser(Authentication authentication, UUID userId) {
         User user = findExistingUser(userId);
         roleHierarchyService.assertCanManageUser(authentication, userId);
+        // A Co-Super-Admin only removes people they added themselves.
+        if (roleHierarchyService.isCoSuperAdmin(authentication) && !roleHierarchyService.isSuperAdmin(authentication)
+                && !Objects.equals(user.getCreatedBy(), roleHierarchyService.currentUserId(authentication))) {
+            throw new AuthException("You can only remove people you added", HttpStatus.FORBIDDEN);
+        }
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         user.setActive(false);

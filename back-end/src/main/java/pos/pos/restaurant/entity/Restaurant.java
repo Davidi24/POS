@@ -72,7 +72,6 @@ import java.util.UUID;
         AND char_length(btrim(slug)) > 0
         AND char_length(currency) = 3
         AND status IN ('PENDING', 'REJECTED', 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED')
-        AND (owner_id IS NOT NULL OR status IN ('PENDING', 'REJECTED'))
         AND (
             pending_owner_client_target IS NULL
             OR pending_owner_client_target IN ('WEB', 'MOBILE', 'UNIVERSAL')
@@ -84,6 +83,10 @@ import java.util.UUID;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Restaurant extends AbstractAuditedSoftDeleteEntity {
+
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private long version;
 
     @Column(name = "name", nullable = false, length = 150)
     private String name;
@@ -108,6 +111,14 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
 
     @Column(name = "website", length = 255)
     private String website;
+
+    // The picture on the restaurant's card in the super admins' restaurant list.
+    @Column(name = "cover_url", length = 2048)
+    private String coverUrl;
+
+    // Its place on the super admins' restaurant list.
+    @Column(name = "display_order", nullable = false)
+    private int displayOrder;
 
     @Column(name = "currency", nullable = false, length = 3, columnDefinition = "char(3)")
     private String currency;
@@ -146,6 +157,20 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
 
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
+
+    // A public application: the hash of the applicant's private status code and when they sent it.
+    @Column(name = "application_code_hash", length = 64)
+    private String applicationCodeHash;
+
+    @Column(name = "application_submitted_at", columnDefinition = "timestamptz")
+    private java.time.OffsetDateTime applicationSubmittedAt;
+
+    // When and by whom an application was approved or rejected.
+    @Column(name = "reviewed_at", columnDefinition = "timestamptz")
+    private java.time.OffsetDateTime reviewedAt;
+
+    @Column(name = "reviewed_by", columnDefinition = "uuid")
+    private UUID reviewedBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
@@ -247,8 +272,6 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
             throw new IllegalStateException("timezone must be a valid IANA identifier");
         }
 
-        if (ownerId == null && status != RestaurantStatus.PENDING && status != RestaurantStatus.REJECTED) {
-            throw new IllegalStateException("ownerId is required unless restaurant status is PENDING or REJECTED");
-        }
+        // A restaurant can be set up before its owner is added (the owner is invited in a second step).
     }
 }

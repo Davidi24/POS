@@ -6,6 +6,7 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import com.saporini.mobile_desktop.core.network.ApiException
 import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.pos.payment.data.OrderPaymentSummaryDto
+import com.saporini.mobile_desktop.pos.payment.data.PaidLineDto
 import com.saporini.mobile_desktop.pos.payment.data.PaymentDto
 import com.saporini.mobile_desktop.pos.payment.data.PaymentRepository
 import com.saporini.mobile_desktop.pos.payment.data.ReceiptDto
@@ -130,7 +131,7 @@ class PaymentScreenModel(
                 // Keep explicit server refusals visible (for example, card payments are disabled until a provider
                 // is configured). Refreshing the bill must not erase the reason the payment was rejected.
                 mutable.update {
-                    it.copy(summary = summary,
+                    it.copy(summary = summary, draft = it.draft.fitTo(summary),
                         error = it.error?.takeIf { e -> e.mayHaveWorked || e.kind == PaymentFailure.Kind.CONFLICT },
                         completed = isSettled(summary))
                 }
@@ -152,7 +153,15 @@ class PaymentScreenModel(
             cardLast4 = if (method.card) it.cardLast4 else "")
     }
 
-    fun amount(text: String) = edit { it.copy(amountText = text.take(16)) }
+    fun amount(text: String) = edit { it.copy(amountText = text.take(16), picks = null) }
+
+    /** Paying by dishes: the guest pays for the dishes ticked. */
+    fun payByDishes() = edit { it.copy(amountText = "", picks = emptyMap()) }
+
+    fun pickDish(lineId: String, portions: Int) = edit { draft ->
+        val picks = draft.picks.orEmpty()
+        draft.copy(picks = if (portions > 0) picks + (lineId to portions) else picks - lineId)
+    }
 
     fun tipPercent(percent: Int?) = edit { it.copy(tipPercent = percent, tipText = "") }
 
@@ -174,7 +183,7 @@ class PaymentScreenModel(
         if (people < 1) return
         val due = suggestedAmountCents(summary, state.value.draft.method)
         val share = (due + people - 1) / people
-        edit { it.copy(amountText = centsToDecimal(share).value) }
+        edit { it.copy(amountText = centsToDecimal(share).value, picks = null) }
     }
 
     private fun edit(change: (PaymentDraft) -> PaymentDraft) {
@@ -207,7 +216,8 @@ class PaymentScreenModel(
             tenderedAmount = quote.tenderedCents?.let(::centsToDecimal),
             cardLast4 = draft.cardLast4.trim().takeIf { it.isNotEmpty() },
             notes = draft.notes.trim().takeIf { it.isNotEmpty() },
-            closeOrderWhenPaid = draft.closeWhenPaid
+            closeOrderWhenPaid = draft.closeWhenPaid,
+            lines = draft.picks?.map { (lineId, portions) -> PaidLineDto(lineId, portions) }
         )
         if (current.submitting) return
         val key = current.pendingKey ?: newKey()
@@ -221,7 +231,8 @@ class PaymentScreenModel(
                     if (token != revision) return@withLock
                     mutable.update {
                         it.copy(summary = response.summary, lastPayment = response.payment, pendingKey = null,
-                            draft = PaymentDraft(method = it.draft.method, closeWhenPaid = it.draft.closeWhenPaid),
+                            // The next guest at the table usually pays by dishes too.
+                            draft = PaymentDraft(method = it.draft.method, closeWhenPaid = it.draft.closeWhenPaid, picks = it.draft.picks?.let { emptyMap() }),
                             completed = response.orderClosed || isSettled(response.summary))
                     }
                 } catch (e: CancellationException) {

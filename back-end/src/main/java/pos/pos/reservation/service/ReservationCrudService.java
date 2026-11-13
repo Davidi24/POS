@@ -56,6 +56,7 @@ public class ReservationCrudService {
         Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         Branch branch = reservationSupport.resolveManagedBranch(authentication, restaurantId, request.getBranchId());
+        pos.pos.restaurant.service.RestaurantOperations.requireOpen(branch);
         Customer customer = reservationSupport.resolveCustomer(restaurantId, request.getCustomerId());
 
         Reservation reservation = new Reservation();
@@ -124,7 +125,15 @@ public class ReservationCrudService {
                 reservation.getPartySize(),
                 1
         ).isEmpty();
-        if (!needsApproval && tableFree) {
+        // Settings → Reservations → "Confirm bookings by themselves": off, every booking waits for someone who can approve.
+        boolean autoConfirm = reservationPolicy.values(reservation.getRestaurant()).autoConfirmBookings();
+        if (!autoConfirm && actor.canApprove() && tableFree) {
+            reservation.setStatus(ReservationStatus.CONFIRMED);
+            reservation.setConfirmedAt(OffsetDateTime.now(ZoneOffset.UTC));
+            reservationSupport.addStatusHistory(reservation, null, ReservationStatus.CONFIRMED, "Booked and approved by staff", actor.id());
+            return;
+        }
+        if (autoConfirm && !needsApproval && tableFree) {
             reservation.setStatus(ReservationStatus.CONFIRMED);
             reservation.setConfirmedAt(OffsetDateTime.now(ZoneOffset.UTC));
             reservationSupport.addStatusHistory(reservation, null, ReservationStatus.CONFIRMED, "Booked by staff", actor.id());
@@ -132,7 +141,8 @@ public class ReservationCrudService {
         }
         String reason = needsApproval
                 ? "Request: bookings of " + approvalFrom + " or more guests need approval"
-                : "Request: no table is free for the whole booking";
+                : !tableFree ? "Request: no table is free for the whole booking"
+                : "Request: bookings wait for approval";
         reservationSupport.addStatusHistory(reservation, null, ReservationStatus.PENDING, reason, actor.id());
     }
 

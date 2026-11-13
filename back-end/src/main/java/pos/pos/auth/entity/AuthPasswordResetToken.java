@@ -4,6 +4,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Check;
+import pos.pos.auth.enums.PasswordLinkPurpose;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -47,6 +48,15 @@ public class AuthPasswordResetToken {
     @Column(name = "used_at", columnDefinition = "timestamptz")
     private OffsetDateTime usedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "purpose", nullable = false, length = 20)
+    @Builder.Default
+    private PasswordLinkPurpose purpose = PasswordLinkPurpose.RESET;
+
+    // A newer link replaced this one; kept so the old link can say so.
+    @Column(name = "superseded_at", columnDefinition = "timestamptz")
+    private OffsetDateTime supersededAt;
+
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamptz")
     private OffsetDateTime createdAt;
 
@@ -58,6 +68,10 @@ public class AuthPasswordResetToken {
 
         if (createdAt == null) {
             createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+        }
+
+        if (purpose == null) {
+            purpose = PasswordLinkPurpose.RESET;
         }
     }
 }

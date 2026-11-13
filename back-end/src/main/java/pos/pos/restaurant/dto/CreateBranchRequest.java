@@ -26,6 +26,7 @@ public class CreateBranchRequest {
     @Size(max = 100, message = "code must be at most 100 characters")
     private String code;
 
+    @Size(max = 2000, message = "description must be at most 2000 characters")
     private String description;
 
     @Email(message = "email must be a valid email")

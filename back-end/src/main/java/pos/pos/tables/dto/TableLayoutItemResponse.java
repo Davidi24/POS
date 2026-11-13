@@ -39,6 +39,8 @@ public class TableLayoutItemResponse {
     private TableShape shape;
     private TableStatus status;
     private Integer guestCount;
+    // Seated with more guests still to come: the half ring.
+    private boolean moreComing;
     private OffsetDateTime seatedAt;
     private OffsetDateTime nextReservationStart;
     private OffsetDateTime nextReservationEnd;
@@ -55,9 +57,43 @@ public class TableLayoutItemResponse {
     // e.g. 🎂 for a birthday booking at this table.
     private String nextReservationOccasionIcon;
     private String nextReservationOccasionName;
+    // The booking whose guests sit here now: what they celebrate shows while they're here (user, 2026-11-02).
+    private UUID seatedReservationId;
+    private String seatedReservationName;
+    private OffsetDateTime seatedReservationStart;
+    private Integer seatedReservationPartySize;
+    private String seatedReservationOccasionIcon;
+    private String seatedReservationOccasionName;
     private UUID currentOrderId;
     private String currentOrderNumber;
     private OrderStatus currentOrderStatus;
     private OrderFulfillmentStatus currentOrderFulfillmentStatus;
+    private boolean currentOrderBillRequested;
+    // The guests have paid and are still at the table (user, 2026-11-01): its open order is paid, or an order closed and paid
+    // since they sat down.
+    private boolean paid;
+    private int currentOrderServedItems;
+    private int currentOrderTotalItems;
+    // How many guests can be seated here (with its merged tables), see TableSeatingRules.
+    private Integer guestsMin;
+    private Integer guestsUsual;
+    private Integer guestsMax;
+    // From then the guests here are in the way of the next booking (see TableSeatingRules); null when they aren't.
+    private OffsetDateTime nextBookingClashAt;
+    // Joining this table asks what to do with its booking.
+    private boolean nextBookingSoon;
+    // A free table whose booking is coming: the yellow ring.
+    private boolean bookingComing;
+    private OffsetDateTime moreTimeUntil;
+    // When the booking's guests came, and the table it was moved from automatically.
+    private OffsetDateTime nextReservationCheckedInAt;
+    private String nextReservationMovedFrom;
+    // The "Give more time" choices (Settings → Tables → Special cases), minutes separated by commas.
+    private String moreTimeOptions;
+    // Nothing done on this table or its order since then.
+    private OffsetDateTime lastActionAt;
+    // When the system steps in if nobody acts, and when it starts saying so; null when it won't.
+    private OffsetDateTime autoFreeAt;
+    private OffsetDateTime autoFreeWarningAt;
     private Boolean active;
 }

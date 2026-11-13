@@ -4,6 +4,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,34 +24,42 @@ import com.saporini.mobile_desktop.pos.orders.domain.model.OrderStatus
 @Composable
 internal fun OrdersToolbar(
     query: String, onQueryChange: (String) -> Unit,
-    progress: OrderFulfillmentStatus?, onProgressChange: (OrderFulfillmentStatus?) -> Unit,
+    orderStatus: OrderStatus?, onOrderStatusChange: (OrderStatus?) -> Unit,
+    foodStatus: OrderFulfillmentStatus?, onFoodStatusChange: (OrderFulfillmentStatus?) -> Unit,
     mineOnly: Boolean, onMineChange: (Boolean) -> Unit,
-    history: Boolean, onHistoryChange: (Boolean) -> Unit,
+    // A plain button: it opens POS → History (user, 2026-11-01).
+    onOpenHistory: () -> Unit = {},
     historyOnly: Boolean = false, historyStatus: OrderStatus? = null,
-    onHistoryStatusChange: (OrderStatus?) -> Unit = {}
+    onHistoryStatusChange: (OrderStatus?) -> Unit = {},
+    // History's choice of the orders closed as unpaid (user, 2026-11-01).
+    historyUnpaid: Boolean = false, onHistoryUnpaid: () -> Unit = {},
+    // How many orders the list holds, beside the title (user, 2026-11-01).
+    count: Long? = null
 ) {
     val phone = isPhoneWindow()
     val title: @Composable () -> Unit = {
-        Text(if (historyOnly) "History" else "Orders", fontFamily = Inter(), fontWeight = FontWeight.Bold,
-            fontSize = if (phone) 18.sp else 20.sp, color = Color(0xFF232422))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(if (historyOnly) "History" else "Orders", fontFamily = Inter(), fontWeight = FontWeight.Bold,
+                fontSize = if (phone) 18.sp else 20.sp, color = Color(0xFF232422))
+            count?.let {
+                Text("$it", Modifier.background(Color(0xFFEFF3EF), RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 2.dp),
+                    fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = Color(0xFF4F7942))
+            }
+        }
     }
     val controls: @Composable () -> Unit = {
         if (historyOnly) {
-            HeaderDropdown(historyStatus?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "All statuses",
-                Icons.Outlined.ReceiptLong, Modifier.width(146.dp)) { close ->
+            HeaderDropdown(if (historyUnpaid) "Unpaid" else historyStatus?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "All statuses",
+                Icons.Outlined.ReceiptLong, Modifier.width(146.dp), if (historyUnpaid) Color(0xFFDC2626) else null) { close ->
                 DropdownMenuItem(text = { HeaderText("All statuses") }, onClick = { onHistoryStatusChange(null); close() })
                 listOf(OrderStatus.CLOSED, OrderStatus.CANCELLED, OrderStatus.VOIDED).forEach { status ->
                     DropdownMenuItem(text = { HeaderText(status.name.lowercase().replaceFirstChar { it.uppercase() }) },
                         onClick = { onHistoryStatusChange(status); close() })
                 }
+                DropdownMenuItem(text = { HeaderText("Unpaid", color = Color(0xFFDC2626)) }, onClick = { onHistoryUnpaid(); close() })
             }
         } else {
-        HeaderDropdown(if (history) "History" else "Open orders", Icons.Outlined.ReceiptLong, Modifier.width(146.dp)) { close ->
-            DropdownMenuItem(
-                text = { HeaderText(if (history) "Open orders" else "History") },
-                onClick = { onHistoryChange(!history); close() }
-            )
-        }
+            HeaderPlainButton("History", Icons.AutoMirrored.Outlined.EventNote, onOpenHistory)
         }
         Surface(
             modifier = Modifier.width(132.dp).height(44.dp),
@@ -74,18 +83,17 @@ internal fun OrdersToolbar(
                 }
             }
         }
-        if (!historyOnly) HeaderDropdown(progress?.label() ?: "Order progress", Icons.Outlined.Restaurant, Modifier.width(170.dp), progress?.let(::progressColor)) { close ->
-            DropdownMenuItem(text = { HeaderText("All progress") }, onClick = { onProgressChange(null); close() })
-            OrderFulfillmentStatus.entries.forEach { status ->
-                DropdownMenuItem(text = { HeaderText(status.label()) }, leadingIcon = { ProgressDot(progressColor(status)) }, onClick = { onProgressChange(status); close() })
-            }
-        }
+        if (!historyOnly) StatusDropdown(orderStatus, onOrderStatusChange, foodStatus, onFoodStatusChange)
+    }
+    // On the left, beside the title (user, 2026-11-01).
+    val search: @Composable () -> Unit = {
         SearchField(query, onQueryChange, Modifier.width(240.dp), placeholder = "Search orders", height = 44.dp)
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         if (maxWidth >= 950.dp) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 title()
+                search()
                 Spacer(Modifier.weight(1f))
                 controls()
             }
@@ -94,9 +102,58 @@ internal fun OrdersToolbar(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 title()
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    search()
                     controls()
                 }
             }
+        }
+    }
+}
+
+// One button for both kinds of status (user, 2026-11-01). One of each can be picked; picking it again takes it off.
+@Composable
+private fun StatusDropdown(
+    orderStatus: OrderStatus?, onOrderStatusChange: (OrderStatus?) -> Unit,
+    foodStatus: OrderFulfillmentStatus?, onFoodStatusChange: (OrderFulfillmentStatus?) -> Unit
+) {
+    val label = listOfNotNull(orderStatus?.label(), foodStatus?.label()).joinToString(" · ").ifEmpty { "Status" }
+    val width = if (orderStatus != null && foodStatus != null) 206.dp else 170.dp
+    HeaderDropdown(label, Icons.Outlined.Tune, Modifier.width(width), foodStatus?.let(::progressColor) ?: orderStatus?.let(::orderStatusColor)) { close ->
+        DropdownMenuItem(text = { HeaderText("All statuses") }, onClick = { onOrderStatusChange(null); onFoodStatusChange(null); close() })
+        StatusHeading("Order status")
+        listOf(OrderStatus.DRAFT, OrderStatus.OPEN).forEach { status ->
+            StatusChoice(status.label(), orderStatusColor(status), status == orderStatus) { onOrderStatusChange(status.takeUnless { it == orderStatus }); close() }
+        }
+        StatusHeading("Food status")
+        OrderFulfillmentStatus.entries.forEach { status ->
+            StatusChoice(status.label(), progressColor(status), status == foodStatus) { onFoodStatusChange(status.takeUnless { it == foodStatus }); close() }
+        }
+    }
+}
+
+@Composable
+private fun StatusHeading(text: String) {
+    Text(text, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp), fontFamily = Inter(), fontWeight = FontWeight.Bold,
+        fontSize = 11.sp, letterSpacing = 0.sp, color = Color(0xFF747572))
+}
+
+@Composable
+private fun StatusChoice(label: String, color: Color, chosen: Boolean, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { HeaderText(label) },
+        leadingIcon = { ProgressDot(color) },
+        trailingIcon = if (chosen) { { Icon(Icons.Outlined.Check, null, Modifier.size(16.dp), tint = Color(0xFF4F7942)) } } else null,
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun HeaderPlainButton(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.height(44.dp),
+        shape = RoundedCornerShape(8.dp), color = Color.White, border = BorderStroke(1.dp, Color(0xFFE8E5E1))) {
+        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(icon, null, Modifier.size(18.dp), tint = Color(0xFF222426))
+            HeaderText(label)
         }
     }
 }
@@ -118,10 +175,11 @@ private fun HeaderDropdown(label: String, icon: ImageVector, modifier: Modifier,
 }
 
 @Composable private fun HeaderText(text: String, modifier: Modifier = Modifier, color: Color = Color(0xFF222426)) {
-    Text(text, modifier, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = color, maxLines = 1)
+    Text(text, modifier, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp, color = color, maxLines = 1)
 }
 @Composable private fun ProgressDot(color: Color) { Box(Modifier.size(9.dp).background(color, RoundedCornerShape(50))) }
-private fun progressColor(status: OrderFulfillmentStatus): Color = when (status) {
+internal fun orderStatusColor(status: OrderStatus): Color = if (status == OrderStatus.OPEN) Color(0xFF4F7942) else Color(0xFF747572)
+internal fun progressColor(status: OrderFulfillmentStatus): Color = when (status) {
     OrderFulfillmentStatus.PENDING -> Color(0xFF747572)
     OrderFulfillmentStatus.IN_PREPARATION, OrderFulfillmentStatus.PARTIALLY_FULFILLED -> Color(0xFFAA5E10)
     OrderFulfillmentStatus.READY -> Color(0xFF24748A)

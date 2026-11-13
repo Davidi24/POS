@@ -23,6 +23,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RestaurantTaxProfileService {
 
+    // VAT and tax numbers are the restaurant's legal identity; the owner sees them but only super admins change them.
+    private static final String TAX_ONLY_SUPER_ADMIN = "Only the Super Admin can change tax and VAT details";
+
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantTaxProfileRepository restaurantTaxProfileRepository;
     private final RestaurantTaxProfileMapper restaurantTaxProfileMapper;
@@ -43,7 +46,7 @@ public class RestaurantTaxProfileService {
             UpsertRestaurantTaxProfileRequest request
     ) {
         validateEffectiveRange(request);
-        Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        Restaurant restaurant = restaurantScopeService.requirePlatformManagedRestaurant(authentication, restaurantId, TAX_ONLY_SUPER_ADMIN);
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         if (Boolean.TRUE.equals(request.getIsDefault())) {
             clearExistingDefault(restaurantId, null, actorId);
@@ -62,7 +65,7 @@ public class RestaurantTaxProfileService {
             UpsertRestaurantTaxProfileRequest request
     ) {
         validateEffectiveRange(request);
-        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        restaurantScopeService.requirePlatformManagedRestaurant(authentication, restaurantId, TAX_ONLY_SUPER_ADMIN);
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         RestaurantTaxProfile taxProfile = findExistingTaxProfile(restaurantId, taxProfileId);
         if (Boolean.TRUE.equals(request.getIsDefault())) {
@@ -80,7 +83,7 @@ public class RestaurantTaxProfileService {
             UUID restaurantId,
             UUID taxProfileId
     ) {
-        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        restaurantScopeService.requirePlatformManagedRestaurant(authentication, restaurantId, TAX_ONLY_SUPER_ADMIN);
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         RestaurantTaxProfile taxProfile = findExistingTaxProfile(restaurantId, taxProfileId);
         clearExistingDefault(restaurantId, taxProfileId, actorId);
@@ -91,7 +94,7 @@ public class RestaurantTaxProfileService {
 
     @Transactional
     public void deleteTaxProfile(Authentication authentication, UUID restaurantId, UUID taxProfileId) {
-        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        restaurantScopeService.requirePlatformManagedRestaurant(authentication, restaurantId, TAX_ONLY_SUPER_ADMIN);
         RestaurantTaxProfile taxProfile = findExistingTaxProfile(restaurantId, taxProfileId);
         restaurantTaxProfileMapper.markDeleted(
                 taxProfile,
@@ -107,7 +110,7 @@ public class RestaurantTaxProfileService {
     }
 
     private void clearExistingDefault(UUID restaurantId, UUID keepTaxProfileId, UUID actorId) {
-        restaurantTaxProfileRepository.clearAllDefault(restaurantId, actorId);
+        restaurantTaxProfileRepository.clearAllDefault(restaurantId, actorId, keepTaxProfileId);
     }
 
     private void validateEffectiveRange(UpsertRestaurantTaxProfileRequest request) {

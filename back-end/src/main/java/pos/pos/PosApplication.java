@@ -14,6 +14,4 @@ public class PosApplication {
 		SpringApplication.run(PosApplication.class, args);
 		System.out.println("System started successfully");
 	}
-
 }
-

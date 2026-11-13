@@ -23,10 +23,24 @@ internal val OrderMuted = Color(0xFF757B76)
 internal val OrderBorder = Color(0xFFE3E8E1)
 internal val OrderBackground = Color(0xFFF7F9F6)
 internal fun Enum<*>.label() = name.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
+// The words the user chose (2026-11-01). The status names themselves stay as they are.
+internal fun OrderStatus.label() = if (this == OrderStatus.OPEN) "Active" else name.lowercase().replaceFirstChar { it.uppercase() }
+internal fun OrderFulfillmentStatus.label() = when (this) {
+    OrderFulfillmentStatus.PENDING -> "Not sent"
+    OrderFulfillmentStatus.IN_PREPARATION -> "In preparation"
+    OrderFulfillmentStatus.READY -> "Ready"
+    OrderFulfillmentStatus.PARTIALLY_FULFILLED -> "Partly served"
+    OrderFulfillmentStatus.FULFILLED -> "Served"
+}
+/** The reminder beside the food status when some dishes still wait to be sent: "2 not sent". */
+internal fun notSentNote(status: OrderFulfillmentStatus, notSent: Int): String? =
+    "$notSent not sent".takeIf { notSent > 0 && (status == OrderFulfillmentStatus.IN_PREPARATION || status == OrderFulfillmentStatus.PARTIALLY_FULFILLED) }
+internal val OrderNotSentColor = androidx.compose.ui.graphics.Color(0xFFB45309)
 internal fun OrderDecimal.money(currency: String) = when(currency) { "EUR" -> "€"; "USD" -> "$"; "GBP" -> "£"; else -> "$currency " } + value
 internal fun String.orderTime(): String = runCatching { Instant.parse(this).toLocalDateTime(TimeZone.currentSystemDefault()).let { "${it.hour.toString().padStart(2,'0')}:${it.minute.toString().padStart(2,'0')}" } }.getOrDefault(take(16).replace('T',' '))
 internal val OrderStatus.showsFulfillmentProgress get() = this != OrderStatus.CANCELLED && this != OrderStatus.VOIDED
-internal val Order.editable get() = status == OrderStatus.OPEN || status == OrderStatus.DRAFT
+// An order reopened after being closed as unpaid is open only to take its payment.
+internal val Order.editable get() = (status == OrderStatus.OPEN || status == OrderStatus.DRAFT) && unpaidAt == null
 internal val OrderLineItem.active get() = status != OrderLineItemStatus.CANCELLED && status != OrderLineItemStatus.VOIDED
 // Not sent yet and meant for the kitchen; counter items (e.g. a cola) never count as waiting for the kitchen.
 internal val OrderLineItem.awaitingKitchen get() = status == OrderLineItemStatus.PENDING && sendToKitchen
@@ -42,7 +56,7 @@ internal val OrderLineItem.awaitingKitchen get() = status == OrderLineItemStatus
         text.contains("Ready", true) -> Color(0xFF24748A)
         text.contains("prepar", true) || text.contains("Fired", true) -> Color(0xFFAA5E10)
         text.contains("cancel",true) || text.contains("void",true) -> Color(0xFFAA3F38)
-        text == "Open" || text == "Fulfilled" -> OrderGreen
+        text == "Active" || text == "Served" -> OrderGreen
         else -> OrderMuted
     }
     Surface(color = color.copy(alpha = .09f), shape = RoundedCornerShape(20.dp)) { OrderText(text, 12, true, color, Modifier.padding(horizontal = 10.dp, vertical = 5.dp)) }

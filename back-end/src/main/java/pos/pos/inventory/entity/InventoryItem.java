@@ -54,7 +54,9 @@ import java.util.List;
             'BEVERAGE',
             'ALCOHOL',
             'PACKAGING',
-            'SUPPLY'
+            'SUPPLY',
+            'UNCATEGORIZED',
+            'CUSTOM'
         )
         AND base_unit IN (
             'EACH',
@@ -105,6 +107,11 @@ public class InventoryItem extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "item_type", nullable = false, length = 30)
     private InventoryItemType itemType = InventoryItemType.INGREDIENT;
 
+    // The restaurant's own kind, when itemType is CUSTOM.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kind_id", columnDefinition = "uuid", foreignKey = @ForeignKey(name = "fk_inventory_items_kind"))
+    private InventoryKind kind;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "base_unit", nullable = false, length = 30)
     private InventoryUnit baseUnit = InventoryUnit.EACH;
@@ -116,6 +123,10 @@ public class InventoryItem extends AbstractAuditedSoftDeleteEntity {
 
     @Column(name = "supplier_name", length = 150)
     private String supplierName;
+
+    /** The supplier picked for this item (one of the restaurant's suppliers); supplierName is their name. */
+    @Column(name = "supplier_id", columnDefinition = "uuid")
+    private java.util.UUID supplierId;
 
 
     /**
@@ -162,6 +173,12 @@ public class InventoryItem extends AbstractAuditedSoftDeleteEntity {
 
     @Column(name = "storage_notes", columnDefinition = "text")
     private String storageNotes;
+
+    /**
+     * The item's photo (same picture storage as dish photos). Changed only through the photo endpoints.
+     */
+    @Column(name = "image_url", columnDefinition = "text")
+    private String imageUrl;
 
 
     /**
@@ -236,6 +253,9 @@ public class InventoryItem extends AbstractAuditedSoftDeleteEntity {
         supplierName = NormalizationUtils.normalize(supplierName);
         supplierSku = NormalizationUtils.normalizeUpper(supplierSku);
         storageNotes = NormalizationUtils.normalize(storageNotes);
+        if (itemType != InventoryItemType.CUSTOM) {
+            kind = null;
+        }
         costPerUnit = defaultMoney(costPerUnit);
         reorderPoint = defaultQuantity(reorderPoint);
         parLevel = defaultQuantity(parLevel);

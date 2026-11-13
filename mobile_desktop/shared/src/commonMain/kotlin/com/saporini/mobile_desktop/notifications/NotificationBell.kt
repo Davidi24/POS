@@ -69,6 +69,12 @@ fun NotificationBell(
     val center = getKoin().getOrNull<NotificationCenter>()
     val state by (center?.state ?: remember { kotlinx.coroutines.flow.MutableStateFlow(NotificationsState()) }).collectAsState()
     var open by remember { mutableStateOf(false) }
+    // Too many guests at a table, or an order closed as unpaid, can't wait for someone to look at the bell (user, 2026-10-31, 2026-11-01).
+    var urgent by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(center) {
+        center?.arrivals?.collect { if (it.eventCode == "TABLE_SEATING_OVER_LIMIT" || it.eventCode == "ORDER_CLOSED_UNPAID" || it.eventCode == "SPECIAL_CASE_ACTION") urgent = it.message }
+    }
+    com.saporini.mobile_desktop.core.components.BottomToast(urgent, isWarning = true, onDismiss = { urgent = null })
     Box {
         Box(contentAlignment = Alignment.TopEnd) {
             IconButton(onClick = { open = true }, modifier = Modifier.size(buttonSize)) {

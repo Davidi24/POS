@@ -21,11 +21,13 @@ public class BranchMapper {
 
         return BranchResponse.builder()
                 .id(branch.getId())
+                .version(branch.getVersion())
                 .name(branch.getName())
                 .code(branch.getCode())
                 .description(branch.getDescription())
                 .email(branch.getEmail())
                 .phone(branch.getPhone())
+                .coverUrl(branch.getCoverUrl())
                 .isActive(branch.isActive())
                 .status(branch.getStatus())
                 .managerUserId(branch.getManagerUserId())

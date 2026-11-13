@@ -68,6 +68,7 @@ public class RestaurantOrderController {
     private final OrderCommandService orderCommandService;
     private final OrderWorkflowService orderWorkflowService;
     private final OrderItemService orderItemService;
+    private final pos.pos.tables.realtime.TableLayoutChangeNotifier tableLayoutChangeNotifier;
 
     @GetMapping("/orders")
     @PreAuthorize("hasAuthority('ORDER_READ')")
@@ -229,6 +230,58 @@ public class RestaurantOrderController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(orderWorkflowService.fulfillOrder(authentication, restaurantId, orderId, request));
+    }
+
+    @PostMapping("/orders/{orderId}/close-unpaid")
+    @PreAuthorize("hasAuthority('ORDER_VOID')")
+    @Operation(summary = "Close an order the guests didn't pay (walked out, will pay later)")
+    public ResponseEntity<OrderResponse> closeUnpaid(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID orderId,
+            @Valid @RequestBody pos.pos.order.dto.OrderCloseUnpaidRequest request,
+            Authentication authentication
+    ) {
+        // Its table is free again on every device.
+        return billRequestAnswer(restaurantId, orderWorkflowService.closeUnpaid(authentication, restaurantId, orderId, request));
+    }
+
+    @PostMapping("/orders/{orderId}/reopen-for-payment")
+    @PreAuthorize("hasAuthority('ORDER_CLOSE')")
+    @Operation(summary = "Reopen an order closed as unpaid, to take its payment")
+    public ResponseEntity<OrderResponse> reopenForPayment(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID orderId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(orderWorkflowService.reopenForPayment(authentication, restaurantId, orderId));
+    }
+
+    @PostMapping("/orders/{orderId}/bill-request")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @Operation(summary = "The guests asked for the bill")
+    public ResponseEntity<OrderResponse> requestBill(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID orderId,
+            Authentication authentication
+    ) {
+        return billRequestAnswer(restaurantId, orderWorkflowService.setBillRequested(authentication, restaurantId, orderId, true));
+    }
+
+    @DeleteMapping("/orders/{orderId}/bill-request")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @Operation(summary = "Take back a bill request made by mistake")
+    public ResponseEntity<OrderResponse> cancelBillRequest(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID orderId,
+            Authentication authentication
+    ) {
+        return billRequestAnswer(restaurantId, orderWorkflowService.setBillRequested(authentication, restaurantId, orderId, false));
+    }
+
+    // The table changes colour on every device.
+    private ResponseEntity<OrderResponse> billRequestAnswer(UUID restaurantId, OrderResponse order) {
+        tableLayoutChangeNotifier.notifyBranchChanged(restaurantId, order.getBranchId());
+        return ResponseEntity.ok(order);
     }
 
     @PostMapping("/orders/{orderId}/close")

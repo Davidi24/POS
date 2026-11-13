@@ -23,6 +23,7 @@ import pos.pos.common.dto.PageResponse;
 import pos.pos.inventory.dto.InventoryCountCreateRequest;
 import pos.pos.inventory.dto.InventoryCountLineUpsertRequest;
 import pos.pos.inventory.dto.InventoryCountResponse;
+import pos.pos.inventory.dto.InventoryCountScheduleResponse;
 import pos.pos.inventory.enums.InventoryCountStatus;
 import pos.pos.inventory.service.InventoryCountService;
 
@@ -42,7 +43,7 @@ public class InventoryCountController {
     private final InventoryCountService inventoryCountService;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Start a new physical stock count (created as DRAFT)")
     @ApiResponse(responseCode = "201", description = "Count created")
     public ResponseEntity<InventoryCountResponse> createCount(
@@ -55,7 +56,7 @@ public class InventoryCountController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "List counts, optionally filtered by status")
     public ResponseEntity<PageResponse<InventoryCountResponse>> listCounts(
             @PathVariable UUID restaurantId,
@@ -67,8 +68,18 @@ public class InventoryCountController {
         return ResponseEntity.ok(inventoryCountService.listCounts(authentication, restaurantId, status, page, size));
     }
 
+    @GetMapping("/schedule")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @Operation(summary = "Get the restaurant's physical count schedule")
+    public ResponseEntity<InventoryCountScheduleResponse> countSchedule(
+            @PathVariable UUID restaurantId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(inventoryCountService.countSchedule(authentication, restaurantId));
+    }
+
     @GetMapping("/{countId}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "Get one count, with its lines")
     @ApiResponse(responseCode = "200", description = "Count found")
     @ApiResponse(responseCode = "404", description = "Count not found")
@@ -81,7 +92,7 @@ public class InventoryCountController {
     }
 
     @PostMapping("/{countId}/start")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Start counting (DRAFT -> IN_PROGRESS)")
     @ApiResponse(responseCode = "200", description = "Count started")
     @ApiResponse(responseCode = "409", description = "Count is not currently DRAFT")
@@ -94,7 +105,7 @@ public class InventoryCountController {
     }
 
     @PutMapping("/{countId}/lines/{itemId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Add or update one item's counted quantity on this count")
     @ApiResponse(responseCode = "200", description = "Line saved")
     @ApiResponse(responseCode = "409", description = "Count is not DRAFT or IN_PROGRESS")
@@ -109,7 +120,7 @@ public class InventoryCountController {
     }
 
     @DeleteMapping("/{countId}/lines/{lineId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Remove a line from this count")
     @ApiResponse(responseCode = "200", description = "Line removed")
     @ApiResponse(responseCode = "409", description = "Count is not DRAFT or IN_PROGRESS")
@@ -123,7 +134,7 @@ public class InventoryCountController {
     }
 
     @PostMapping("/{countId}/complete")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Finish counting (IN_PROGRESS -> COMPLETED)")
     @ApiResponse(responseCode = "200", description = "Count completed")
     @ApiResponse(responseCode = "409", description = "Count is not currently IN_PROGRESS")
@@ -135,12 +146,12 @@ public class InventoryCountController {
         return ResponseEntity.ok(inventoryCountService.completeCount(authentication, restaurantId, countId));
     }
 
-    // NOTE: uses SETTINGS_UPDATE for now, same as every other write in this controller. This
+    // NOTE: uses INVENTORY_UPDATE, same as every other write in this controller. This
     // project doesn't have a manager-level "approve" permission yet (checked the full permission
     // set -- nothing like INVENTORY_APPROVE exists), so there's currently no way to require a
     // stricter permission just for this one action. Worth revisiting once one exists.
     @PostMapping("/{countId}/approve")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Approve the count and correct live stock levels (COMPLETED -> APPROVED)")
     @ApiResponse(responseCode = "200", description = "Count approved, stock corrected")
     @ApiResponse(responseCode = "409", description = "Count is not currently COMPLETED")
@@ -153,7 +164,7 @@ public class InventoryCountController {
     }
 
     @PostMapping("/{countId}/cancel")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Cancel the count")
     @ApiResponse(responseCode = "200", description = "Count cancelled")
     @ApiResponse(responseCode = "409", description = "An approved count cannot be cancelled")

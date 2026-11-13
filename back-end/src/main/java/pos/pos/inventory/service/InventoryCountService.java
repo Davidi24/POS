@@ -17,6 +17,7 @@ import pos.pos.exception.inventory.InventoryLocationNotFoundException;
 import pos.pos.inventory.dto.InventoryCountCreateRequest;
 import pos.pos.inventory.dto.InventoryCountLineUpsertRequest;
 import pos.pos.inventory.dto.InventoryCountResponse;
+import pos.pos.inventory.dto.InventoryCountScheduleResponse;
 import pos.pos.inventory.entity.InventoryCount;
 import pos.pos.inventory.entity.InventoryCountLine;
 import pos.pos.inventory.entity.InventoryItem;
@@ -30,6 +31,8 @@ import pos.pos.inventory.repository.InventoryLocationRepository;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.service.RestaurantScopeService;
+import pos.pos.settings.entity.Settings;
+import pos.pos.settings.repository.SettingsRepository;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -65,6 +68,17 @@ public class InventoryCountService {
     private final InventoryLevelService inventoryLevelService;
     private final InventoryMovementService inventoryMovementService;
     private final InventoryCountMapper inventoryCountMapper;
+    private final InventoryChangeNotifier inventoryChangeNotifier;
+    private final SettingsRepository settingsRepository;
+
+    @Transactional(readOnly = true)
+    public InventoryCountScheduleResponse countSchedule(Authentication authentication, UUID restaurantId) {
+        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        Settings settings = settingsRepository.findByRestaurant_Id(restaurantId)
+                .orElseThrow(() -> new AuthException("Restaurant settings were not found", HttpStatus.NOT_FOUND));
+        return new InventoryCountScheduleResponse(settings.getInventoryCountFrequency(), settings.getInventoryCountPeriod(),
+                settings.getInventoryCountScheduleStartedAt());
+    }
 
     //This method is only used to create a count and take the startinformation about the person, time and location it is created for
     //There is no other management action included
@@ -93,6 +107,7 @@ public class InventoryCountService {
         count.setCreatedBy(actorId);
         count.setUpdatedBy(actorId);
 
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
         return inventoryCountMapper.toResponse(saveCount(count));
     }
 
@@ -140,6 +155,7 @@ public class InventoryCountService {
         count.setStatus(InventoryCountStatus.IN_PROGRESS);
         count.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
 
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
         return inventoryCountMapper.toResponse(saveCount(count));
     }
 
@@ -196,6 +212,7 @@ public class InventoryCountService {
         line.setCountedQuantity(request.getCountedQuantity());
         line.setNotes(request.getNotes());
 
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
         return inventoryCountMapper.toResponse(saveCount(count));
     }
 
@@ -215,6 +232,7 @@ public class InventoryCountService {
 
         count.removeLine(line);
 
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
         return inventoryCountMapper.toResponse(saveCount(count));
     }
 
@@ -240,6 +258,7 @@ public class InventoryCountService {
         count.setVarianceValue(totalVariance);
         count.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
 
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
         return inventoryCountMapper.toResponse(saveCount(count));
     }
 
@@ -296,6 +315,7 @@ public class InventoryCountService {
         count.setApprovedAt(now);
         count.setUpdatedBy(actorId);
 
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
         return inventoryCountMapper.toResponse(saveCount(count));
     }
 
@@ -313,6 +333,7 @@ public class InventoryCountService {
         count.setStatus(InventoryCountStatus.CANCELLED);
         count.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
 
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
         return inventoryCountMapper.toResponse(saveCount(count));
     }
 

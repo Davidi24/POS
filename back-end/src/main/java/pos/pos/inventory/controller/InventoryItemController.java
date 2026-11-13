@@ -44,7 +44,7 @@ public class InventoryItemController {
     private final InventoryItemService inventoryItemService;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Register a new inventory item")
     @ApiResponse(responseCode = "201", description = "Item created")
     public ResponseEntity<InventoryItemResponse> createItem(
@@ -57,7 +57,7 @@ public class InventoryItemController {
     }
 
     @PutMapping("/{itemId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Replace an inventory item")
     @ApiResponse(responseCode = "200", description = "Item updated")
     @ApiResponse(responseCode = "404", description = "Item not found")
@@ -71,7 +71,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/{itemId}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "Get one inventory item by id")
     @ApiResponse(responseCode = "200", description = "Item found")
     @ApiResponse(responseCode = "404", description = "Item not found")
@@ -84,7 +84,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/by-barcode/{barcode}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "Find an inventory item by barcode")
     @ApiResponse(responseCode = "200", description = "Item found")
     @ApiResponse(responseCode = "404", description = "No item registered with this barcode")
@@ -97,7 +97,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "Search inventory items by name")
     public ResponseEntity<List<InventoryItemResponse>> searchItems(
             @PathVariable UUID restaurantId,
@@ -108,7 +108,7 @@ public class InventoryItemController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "List active inventory items")
     public ResponseEntity<List<InventoryItemResponse>> listActiveItems(
             @PathVariable UUID restaurantId,
@@ -118,7 +118,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "List all inventory items, including inactive")
     public ResponseEntity<List<InventoryItemResponse>> listAllItems(
             @PathVariable UUID restaurantId,
@@ -128,7 +128,7 @@ public class InventoryItemController {
     }
 
     @GetMapping("/inactive")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAuthority('INVENTORY_READ')")
     @Operation(summary = "List only inactive (deactivated) inventory items")
     public ResponseEntity<List<InventoryItemResponse>> listInactiveItems(
             @PathVariable UUID restaurantId,
@@ -137,8 +137,23 @@ public class InventoryItemController {
         return ResponseEntity.ok(inventoryItemService.listInactiveItems(authentication, restaurantId));
     }
 
+    @PostMapping("/{itemId}/delete")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @Operation(summary = "Delete an inventory item for good: its remaining stock is taken out as a correction, its history stays")
+    @ApiResponse(responseCode = "204", description = "Item deleted")
+    @ApiResponse(responseCode = "404", description = "Item not found")
+    @ApiResponse(responseCode = "409", description = "A recipe or an unapproved count still uses it")
+    public ResponseEntity<Void> deleteItem(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID itemId,
+            Authentication authentication
+    ) {
+        inventoryItemService.deleteItem(authentication, restaurantId, itemId);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{itemId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
     @Operation(summary = "Deactivate an inventory item (soft, not a real delete)")
     @ApiResponse(responseCode = "204", description = "Item deactivated")
     @ApiResponse(responseCode = "404", description = "Item not found")

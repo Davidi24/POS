@@ -19,4 +19,10 @@ public interface InventorySalesSourceRepository extends JpaRepository<InventoryS
     boolean existsByLocation_Id(UUID locationId);
 
     boolean existsByInventoryItem_Id(UUID inventoryItemId);
+
+    void deleteAllByInventoryItem_Id(UUID inventoryItemId);
+
+    List<InventorySalesSource> findAllByLocation_Id(UUID locationId);
+
+    void deleteAllByLocation_Id(UUID locationId);
 }

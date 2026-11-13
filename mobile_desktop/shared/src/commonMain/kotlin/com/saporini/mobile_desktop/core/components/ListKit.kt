@@ -114,7 +114,8 @@ internal fun RowActionsMenu(actions: List<RowAction>, busy: Boolean = false) {
                     enabled = action.enabled,
                     leadingIcon = { Icon(action.icon, null, Modifier.size(18.dp), tint = if (!action.enabled) Kit.Faint else if (action.danger) Kit.Danger else Kit.Ink) },
                     text = {
-                        Text(action.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                        // letterSpacing 0: the menu item's own text style spaces letters out (the theme's labelLarge).
+                        Text(action.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp,
                             color = if (!action.enabled) Kit.Faint else if (action.danger) Kit.Danger else Kit.Ink)
                     },
                     onClick = { open = false; action.onClick() }

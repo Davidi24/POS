@@ -104,13 +104,22 @@ public interface MenuItemRepository extends JpaRepository<MenuItem, UUID> {
     @Query("delete from KdsStationRouting r where r.menuItem.id in :itemIds")
     void deleteKdsRoutingsOf(@org.springframework.data.repository.query.Param("itemIds") java.util.Collection<UUID> itemIds);
 
-    // Extras guests can order with a booking: available dishes in the restaurant's active special menus.
+    // Extras guests can order with a booking: available dishes in the restaurant's active booking-extras menus
+    // (special menus that don't belong to an event night; an event menu's dishes are that night's food, not extras).
     @Query("""
             select i from MenuItem i
             where i.section.menu.restaurant.id = :restaurantId
               and i.section.menu.special = true and i.section.menu.active = true
               and i.section.active = true and i.available = true
+              and not exists (select e.id from RestaurantEvent e where e.menuId = i.section.menu.id)
             order by i.section.menu.displayOrder asc, i.section.displayOrder asc, i.displayOrder asc
             """)
     List<MenuItem> findSpecialMenuExtras(@org.springframework.data.repository.query.Param("restaurantId") UUID restaurantId);
+
+    // How many dishes still show this photo (copies imported from other menus share it).
+    long countByImageUrl(String imageUrl);
+
+    // True when the menu is an event night's menu (its dishes aren't booking extras).
+    @Query("select count(e) > 0 from RestaurantEvent e where e.menuId = :menuId")
+    boolean isEventMenu(@org.springframework.data.repository.query.Param("menuId") UUID menuId);
 }

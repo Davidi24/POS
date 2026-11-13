@@ -30,8 +30,78 @@ data class Menu(
     val updatedAt: String?,
     val sections: List<MenuSection>,
     val allFilterPosition: Int? = null,
-    // A special menu: occasion extras or an event night's menu.
-    val special: Boolean = false
+    // A special menu: booking extras or an event night's menu.
+    val special: Boolean = false,
+    // Set for an event menu: the event night it belongs to (its days are the menu's days).
+    val event: MenuEvent? = null,
+    // Shown to waiters in Menu and at the till (Menu → "Menus shown").
+    val shownToWaiters: Boolean = true
+) {
+    // Special menus without an event are the booking extras (cakes, flowers…) guests add to a booking.
+    val isBookingExtras: Boolean get() = special && event == null
+    val specialKind: SpecialMenuKind? get() = when {
+        !special -> null
+        event != null -> SpecialMenuKind.EVENT
+        else -> SpecialMenuKind.BOOKING_EXTRAS
+    }
+}
+
+// Which menus waiters see (Menu → "Menus shown"): the menus marked shown. With "special menus only", just the special
+// menus on the day one is on; on other days the marked menus (so waiters never see nothing).
+data class MenuWaiterView(
+    val specialMenusOnly: Boolean = false,
+    val shownMenuIds: Set<String> = emptySet()
+) {
+    fun visibleMenus(menus: List<Menu>, today: kotlinx.datetime.LocalDate): List<Menu> {
+        val active = menus.filter { it.active }
+        if (specialMenusOnly) {
+            val specialToday = active.filter { it.special && it.isOnDay(today) }
+            if (specialToday.isNotEmpty()) return specialToday
+        }
+        return active.filter { it.shownToWaiters }
+    }
+}
+
+// Whether the menu's dates include this day (no dates: every day).
+fun Menu.isOnDay(day: kotlinx.datetime.LocalDate): Boolean {
+    val from = availableFromDate?.let { runCatching { kotlinx.datetime.LocalDate.parse(it) }.getOrNull() }
+    val until = availableUntilDate?.let { runCatching { kotlinx.datetime.LocalDate.parse(it) }.getOrNull() }
+    return (from == null || day >= from) && (until == null || day <= until)
+}
+
+// What a special menu is for: booking extras (any day, no event) or one event night's menu.
+enum class SpecialMenuKind { BOOKING_EXTRAS, EVENT }
+
+data class MenuEvent(
+    val id: String,
+    val name: String,
+    val icon: String,
+    val startDate: String,
+    val endDate: String,
+    val active: Boolean = true,
+    val specialMenuOnly: Boolean = false
+)
+
+// A new event night added from the menu editor.
+data class MenuEventNightInput(
+    val name: String,
+    val icon: String,
+    val startDate: String,
+    val endDate: String,
+    val specialMenuOnly: Boolean = false
+)
+
+// An event night as the menu editor lists it, with the menu it already has (if any).
+data class MenuEventNight(
+    val id: String,
+    val name: String,
+    val icon: String,
+    val startDate: String,
+    val endDate: String,
+    val menuId: String? = null,
+    val menuName: String? = null,
+    val active: Boolean = true,
+    val specialMenuOnly: Boolean = false
 )
 
 data class MenuRestaurant(

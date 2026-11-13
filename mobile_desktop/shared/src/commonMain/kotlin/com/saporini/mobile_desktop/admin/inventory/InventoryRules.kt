@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.admin.inventory
 
+import com.saporini.mobile_desktop.pos.menu.ui.item.PhotoChange
 import com.saporini.mobile_desktop.pos.orders.domain.model.OrderDecimal
 import kotlinx.serialization.Serializable
 
@@ -74,6 +75,9 @@ fun compareDecimals(a: OrderDecimal, b: OrderDecimal): Int {
     return if (an) -magnitude else magnitude
 }
 
+/** How long a kind's name can be (as on the server). */
+const val MAX_KIND_NAME = 60
+
 enum class ItemField { NAME, CODE, BARCODE, SUPPLIER, SUPPLIER_SKU, COST, REORDER, PAR, TEXT }
 
 data class StockItemDraft(
@@ -82,24 +86,33 @@ data class StockItemDraft(
     val code: String = "",
     val description: String = "",
     val itemType: String = "INGREDIENT",
+    // One of the restaurant's own kinds, when itemType is CUSTOM.
+    val kindId: String? = null,
     val baseUnit: String = "EACH",
     val barcode: String = "",
     val supplierName: String = "",
+    // The supplier picked from Inventory → Suppliers (supplierName is their name, kept for showing).
+    val supplierId: String? = null,
     val supplierSku: String = "",
     val costText: String = "",
     val reorderText: String = "",
     val parText: String = "",
     val trackInventory: Boolean = true,
     val active: Boolean = true,
-    val storageNotes: String = ""
+    val storageNotes: String = "",
+    // The photo the item has now, and what saving does with it (uploaded after the item itself is saved).
+    val imageUrl: String? = null,
+    val photo: PhotoChange = PhotoChange.Keep,
+    // Where the form was filled in from (a supplier's price list); only shown in the form, never sent.
+    val filledFrom: String? = null
 )
 
 fun itemDraftOf(item: StockItemDto) = StockItemDraft(
-    id = item.id, name = item.name, code = item.code.orEmpty(), description = item.description.orEmpty(), itemType = item.itemType,
-    baseUnit = item.baseUnit, barcode = item.barcode.orEmpty(), supplierName = item.supplierName.orEmpty(),
+    id = item.id, name = item.name, code = item.code.orEmpty(), description = item.description.orEmpty(), itemType = item.itemType, kindId = item.kindId,
+    baseUnit = item.baseUnit, barcode = item.barcode.orEmpty(), supplierName = item.supplierName.orEmpty(), supplierId = item.supplierId,
     supplierSku = item.supplierSku.orEmpty(), costText = item.costPerUnit.value, reorderText = item.reorderPoint?.value.orEmpty(),
     parText = item.parLevel?.value.orEmpty(), trackInventory = item.trackInventory, active = item.active,
-    storageNotes = item.storageNotes.orEmpty()
+    storageNotes = item.storageNotes.orEmpty(), imageUrl = item.imageUrl
 )
 
 fun itemProblems(draft: StockItemDraft): Map<ItemField, String> = buildMap {
@@ -120,7 +133,8 @@ fun itemProblems(draft: StockItemDraft): Map<ItemField, String> = buildMap {
     if (reorder.value != null && par.value != null && compareDecimals(par.value, reorder.value) < 0) {
         put(ItemField.PAR, "The full level can't be below the reorder point")
     }
-    if (draft.itemType !in INVENTORY_ITEM_TYPES || draft.baseUnit !in INVENTORY_UNITS) put(ItemField.TEXT, "Choose a type and unit")
+    val kindChosen = draft.itemType in INVENTORY_ITEM_TYPES || draft.itemType == UNCATEGORIZED_KIND || (draft.itemType == CUSTOM_KIND && draft.kindId != null)
+    if (!kindChosen || draft.baseUnit !in INVENTORY_UNITS) put(ItemField.TEXT, "Choose a kind and unit")
     if (draft.description.trim().length > MAX_STOCK_TEXT || draft.storageNotes.trim().length > MAX_STOCK_TEXT) {
         put(ItemField.TEXT, "Notes can be at most $MAX_STOCK_TEXT characters")
     }
@@ -131,9 +145,11 @@ fun itemRequest(draft: StockItemDraft) = StockItemRequestDto(
     name = draft.name.trim(),
     description = draft.description.trim().ifEmpty { null },
     itemType = draft.itemType,
+    kindId = draft.kindId.takeIf { draft.itemType == CUSTOM_KIND },
     baseUnit = draft.baseUnit,
     barcode = draft.barcode.trim().ifEmpty { null },
     supplierName = draft.supplierName.trim().ifEmpty { null },
+    supplierId = draft.supplierId,
     supplierSku = draft.supplierSku.trim().ifEmpty { null },
     costPerUnit = typedNumber(draft.costText, COST_DIGITS, COST_DECIMALS, allowZero = true).value ?: OrderDecimal("0"),
     reorderPoint = typedNumber(draft.reorderText, required = false, allowZero = true).value,
@@ -150,8 +166,20 @@ data class StockLocationDraft(
     val locationType: String = "KITCHEN",
     val notes: String = "",
     val branchId: String? = null,
-    val active: Boolean = true
-)
+    val active: Boolean = true,
+    // One of the restaurant's own kinds, when locationType is CUSTOM.
+    val kindId: String? = null,
+    val iconCode: String? = null,
+    // The place's own picture as saved, and what saving does with it (a new one is uploaded after the place is saved).
+    val imageUrl: String? = null,
+    val photo: PhotoChange = PhotoChange.Keep
+) {
+    /** The place shows its own picture (a new one picked, or the saved one kept) instead of an icon. */
+    val usesOwnPicture: Boolean get() = photo is PhotoChange.Replace || (imageUrl != null && photo == PhotoChange.Keep)
+}
+
+fun locationDraftOf(location: StockLocationDto) = StockLocationDraft(location.id, location.name, location.code.orEmpty(), location.locationType,
+    location.notes.orEmpty(), location.branchId, location.active, kindId = location.kindId, iconCode = location.iconCode, imageUrl = location.imageUrl)
 
 fun locationProblem(draft: StockLocationDraft): String? {
     val name = draft.name.trim()
@@ -159,7 +187,8 @@ fun locationProblem(draft: StockLocationDraft): String? {
         name.isEmpty() -> "Enter a name for the place"
         name.length > MAX_STOCK_NAME -> "The name can be at most $MAX_STOCK_NAME characters"
         draft.code.trim().length > MAX_STOCK_CODE -> "The code can be at most $MAX_STOCK_CODE characters"
-        draft.locationType !in INVENTORY_LOCATION_TYPES -> "Choose what kind of place this is"
+        draft.locationType !in INVENTORY_LOCATION_TYPES && draft.locationType != UNCATEGORIZED_KIND &&
+            !(draft.locationType == CUSTOM_KIND && draft.kindId != null) -> "Choose what kind of place this is"
         draft.notes.trim().length > MAX_STOCK_TEXT -> "Notes can be at most $MAX_STOCK_TEXT characters"
         else -> null
     }
@@ -174,8 +203,34 @@ data class StockMoveDraft(
     val toLocationId: String? = null,
     val quantityText: String = "",
     val unitCostText: String = "",
-    val reason: String = ""
+    val reason: String = "",
+    // Started from a stock line's ⋮, so the item is already known: no Scan button (user, 2026-10-30).
+    val itemFixed: Boolean = false
 )
+
+/** One stock line in a change made to several lines at once (from the Stock tab's selection). */
+data class BulkMoveLine(
+    val itemId: String,
+    val locationId: String,
+    val quantityText: String = "",
+    // Kept after a failed send, so sending it again can't count it twice.
+    val requestKey: String? = null,
+    val problem: String? = null,
+    // A delivery from a supplier order brings its own price per unit; otherwise the item's cost is used.
+    val unitCostText: String = ""
+)
+
+/** The same kind of change for several stock lines; "Move" sends them all to one place, the reason is shared. */
+data class BulkMoveDraft(
+    val kind: StockMoveKind = StockMoveKind.RECEIVE,
+    val lines: List<BulkMoveLine> = emptyList(),
+    val toLocationId: String? = null,
+    val reason: String = "",
+    /** Saved without showing the dialog (a supplier delivery); it only shows when a line needs fixing. */
+    val quiet: Boolean = false
+) {
+    fun draftFor(line: BulkMoveLine) = StockMoveDraft(kind, line.itemId, line.locationId, toLocationId, line.quantityText, line.unitCostText, reason)
+}
 
 /** The exact account-scoped operation needed to safely replay a request after process death. */
 @Serializable

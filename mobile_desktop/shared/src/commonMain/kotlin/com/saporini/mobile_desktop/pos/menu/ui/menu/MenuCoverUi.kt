@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.DragIndicator
@@ -84,9 +85,11 @@ import com.saporini.mobile_desktop.core.theme.CormorantGaramond
 import com.saporini.mobile_desktop.core.ui.HoverTooltip
 import com.saporini.mobile_desktop.core.ui.isWidePhoneWindow
 import com.saporini.mobile_desktop.core.theme.Inter
+import com.saporini.mobile_desktop.pos.menu.ui.justCreated
 import com.saporini.mobile_desktop.pos.menu.domain.model.Menu
 import com.saporini.mobile_desktop.pos.menu.ui.MenuUiState
 import com.saporini.mobile_desktop.pos.ui.shell.PosPhoneTopBar
+import com.saporini.mobile_desktop.pos.reservations.ToolbarHeight
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -102,6 +105,16 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.datetime.toLocalDateTime
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.saporini.mobile_desktop.core.components.RightEdgeActionButton
+import com.saporini.mobile_desktop.core.components.RightEdgeActionButtonHeight
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuEvent
+import com.saporini.mobile_desktop.pos.menu.domain.model.MenuWaiterView
 
 private val CoverOlive = Color(0xFF4F7942)
 private val CoverGold = Color(0xFFC79435)
@@ -118,34 +131,33 @@ fun MenuCoverUi(
     onEditMenu: (Menu) -> Unit,
     onRetry: () -> Unit,
     onOpenOnlineMenu: () -> Unit = {},
+    // Menu → "Menus shown": which menus waiters see.
+    onOpenWaiterView: () -> Unit = {},
+    // A menu just created: scrolled to and marked for a moment.
+    highlightedMenuId: String? = null,
     modifier: Modifier = Modifier,
     deletingMenuId: String? = null,
     profileInitials: String = "?"
 ) {
-    var isReordering by remember { mutableStateOf(false) }
-    var orderedMenus by remember(state.menus) {
-        mutableStateOf(state.menus)
+    // Menu order is changed in "Menus shown" now; the grid itself no longer rearranges.
+    val isReordering = false
+    val waiterView = state.waiterView ?: MenuWaiterView()
+    // The restaurant's day starts at 06:00, so 01:00 still counts as last night.
+    val serviceDay = remember {
+        (kotlin.time.Clock.System.now() - kotlin.time.Duration.parse("6h"))
+            .toLocalDateTime(kotlinx.datetime.TimeZone.currentSystemDefault()).date
     }
-    // Bumped each time "Edit Order" is clicked with fewer than 2 menus, so the toast's
-    // auto-dismiss timer restarts on every click instead of stacking timers.
-    var reorderBlockedToken by remember { mutableStateOf(0) }
-    var showReorderToast by remember { mutableStateOf(false) }
-
-    LaunchedEffect(reorderBlockedToken) {
-        if (reorderBlockedToken > 0) {
-            showReorderToast = true
-            delay(3000)
-            showReorderToast = false
-        }
+    val waiterMenus = remember(state.menus, state.waiterView) { waiterView.visibleMenus(state.menus, serviceDay).map { it.id }.toSet() }
+    // Managers see every menu: the ones shown in POS first, the others (hidden from waiters, or switched off) after
+    // the Online menu card; each group keeps its own order. Waiters get exactly the server's "on now" list.
+    var orderedMenus by remember(state.menus, state.waiterView, canManageMenus) {
+        mutableStateOf(
+            if (canManageMenus) state.menus.sortedBy { !it.active || it.id !in waiterMenus }
+            else state.menus
+        )
     }
-
-    fun tryToggleReorder() {
-        if (!isReordering && orderedMenus.size < 2) {
-            reorderBlockedToken++
-        } else {
-            isReordering = !isReordering
-        }
-    }
+    // Where the "+ Menu" edge button sits on the right edge (it can be dragged up and down).
+    var newMenuButtonPosition by rememberSaveable { mutableStateOf(.84f) }
 
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val isPhone = isPhoneMenuWindow()
@@ -181,12 +193,8 @@ fun MenuCoverUi(
                         )
                         if (canManageMenus) {
                             MenuCoverActions(
-                                isReordering = isReordering,
                                 isPhone = true,
-                                showReorderToast = showReorderToast,
-                                enoughMenusToReorder = orderedMenus.size >= 2,
-                                onToggleReorder = { tryToggleReorder() },
-                                onAddMenu = onAddMenu,
+                                onOpenWaiterView = onOpenWaiterView,
                                 modifier = Modifier.width(widePhoneActionsWidth)
                             )
                         }
@@ -206,12 +214,8 @@ fun MenuCoverUi(
                         )
                         if (canManageMenus) {
                             MenuCoverActions(
-                                isReordering = isReordering,
                                 isPhone = true,
-                                showReorderToast = showReorderToast,
-                                enoughMenusToReorder = orderedMenus.size >= 2,
-                                onToggleReorder = { tryToggleReorder() },
-                                onAddMenu = onAddMenu,
+                                onOpenWaiterView = onOpenWaiterView,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -231,17 +235,38 @@ fun MenuCoverUi(
                         )
                         if (canManageMenus) {
                             MenuCoverActions(
-                                isReordering = isReordering,
                                 isPhone = false,
-                                showReorderToast = showReorderToast,
-                                enoughMenusToReorder = orderedMenus.size >= 2,
-                                onToggleReorder = { tryToggleReorder() },
-                                onAddMenu = onAddMenu
+                                onOpenWaiterView = onOpenWaiterView
                             )
                         }
                     }
                 }
                 Spacer(Modifier.height(if (isWidePhone) 8.dp else if (isPhone) 14.dp else 16.dp))
+
+                // Managers: which menus waiters see couldn't be loaded, so the "Hidden from waiters" labels may be off.
+                if (canManageMenus && state.errorMessage == null) state.waiterViewError?.let { message ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = if (isPhone) 16.dp else 0.dp)
+                            .background(Color(0xFFFFF7E8), RoundedCornerShape(9.dp))
+                            .border(1.dp, Color(0xFFF0D9A8), RoundedCornerShape(9.dp))
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Couldn't load which menus waiters see, so the labels may be wrong. $message",
+                            modifier = Modifier.weight(1f),
+                            fontFamily = Inter(),
+                            fontSize = 13.sp,
+                            color = Color(0xFF8A5A00)
+                        )
+                        TextButton(onClick = onRetry) {
+                            Text("Try again", fontFamily = Inter(), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                }
 
                 state.errorMessage?.let { message ->
                     Row(
@@ -294,119 +319,68 @@ fun MenuCoverUi(
                             onEditMenu = onEditMenu,
                             onAddMenu = onAddMenu,
                             onOpenOnlineMenu = onOpenOnlineMenu,
-                            onlineItemCount = onlineItemCount
+                            onlineItemCount = onlineItemCount,
+                            hiddenFromWaiters = { menu -> canManageMenus && menu.active && menu.id !in waiterMenus },
+                            highlightedMenuId = highlightedMenuId
                         )
                     }
                 }
             }
+        }
+
+        // "+ Create Menu" on the right edge, like "+ Reservation": creating a menu lives here now.
+        if (canManageMenus && !isReordering) {
+            val maxButtonOffset = with(LocalDensity.current) {
+                (maxHeight - RightEdgeActionButtonHeight).coerceAtLeast(0.dp).toPx()
+            }
+            RightEdgeActionButton(
+                text = "Create Menu",
+                onClick = onAddMenu,
+                enabled = true,
+                width = 124.dp,
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .offset { IntOffset(0, (newMenuButtonPosition * maxButtonOffset).roundToInt()) }
+                    .draggable(
+                        orientation = Orientation.Vertical,
+                        state = rememberDraggableState { delta ->
+                            if (maxButtonOffset > 0f) {
+                                newMenuButtonPosition = (newMenuButtonPosition + delta / maxButtonOffset).coerceIn(0f, 1f)
+                            }
+                        }
+                    )
+            )
         }
     }
 }
 
 @Composable
 private fun MenuCoverActions(
-    isReordering: Boolean,
     isPhone: Boolean,
-    showReorderToast: Boolean,
-    enoughMenusToReorder: Boolean,
-    onToggleReorder: () -> Unit,
-    onAddMenu: () -> Unit,
+    onOpenWaiterView: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Looks disabled until there are enough menus to reorder, but stays clickable
-    // (enough for onToggleReorder to fire and show the "need two menus" toast) —
-    // same look-disabled-but-clickable pattern as the Create Menu button.
-    val reorderLooksDisabled = !isReordering && !enoughMenusToReorder
-    val reorderPulse = rememberInfiniteTransition(label = "reorder-save-pulse")
-    val reorderPulseScale by reorderPulse.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.045f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 750),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "reorder-save-pulse-scale"
-    )
-    // Box (rather than sizing the Row directly) so the toast can float above the
-    // reorder button without pushing the row or its siblings around.
-    Box(modifier = modifier) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(if (isPhone) 12.dp else 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val sharedButtonHeight = if (isPhone) 40.dp else 48.dp
-        val reorderButtonModifier = if (isPhone) Modifier.weight(0.82f).height(sharedButtonHeight) else Modifier.height(sharedButtonHeight)
-        val createButtonModifier = if (isPhone) Modifier.weight(1.18f).height(sharedButtonHeight) else Modifier.height(sharedButtonHeight)
+    // "Menus shown": which menus waiters see and the order menus are shown in. Desktop matches the Reservations
+    // header (Calendar button): same height, padding and text size.
+    val shape = RoundedCornerShape(if (isPhone) 5.dp else 8.dp)
+    Row(modifier = modifier, horizontalArrangement = Arrangement.End) {
         TextButton(
-            onClick = onToggleReorder,
-            shape = RoundedCornerShape(if (isPhone) 5.dp else 8.dp),
-            colors = ButtonDefaults.textButtonColors(
-                containerColor = if (isReordering) CoverInk else Color.White,
-                contentColor = if (isReordering) Color.White else CoverInk
-            ),
-            modifier = reorderButtonModifier
-                .alpha(if (reorderLooksDisabled) 0.45f else 1f)
-                .graphicsLayer {
-                    if (isReordering && !isPhone) {
-                        scaleX = reorderPulseScale
-                        scaleY = reorderPulseScale
-                    }
-                }
-                .then(
-                    if (isReordering && !isPhone) {
-                        Modifier.shadow(8.dp, RoundedCornerShape(8.dp), clip = false)
-                    } else if (isReordering) Modifier else Modifier.border(
-                        1.dp,
-                        Color(0xFFDDD9D2),
-                        RoundedCornerShape(if (isPhone) 5.dp else 8.dp)
-                    )
-                ),
-            contentPadding = PaddingValues(horizontal = if (isPhone) 8.dp else 16.dp, vertical = if (isPhone) 8.dp else 10.dp)
+            onClick = onOpenWaiterView,
+            shape = shape,
+            colors = ButtonDefaults.textButtonColors(containerColor = Color.White, contentColor = CoverInk),
+            modifier = Modifier.height(if (isPhone) 40.dp else ToolbarHeight).border(1.dp, Color(0xFFDDD9D2), shape),
+            contentPadding = PaddingValues(horizontal = if (isPhone) 10.dp else 14.dp, vertical = 0.dp)
         ) {
-            Icon(
-                imageVector = if (isReordering) Icons.Filled.Check else Icons.Outlined.DragIndicator,
-                contentDescription = null,
-                modifier = Modifier.size(if (isPhone) 16.dp else 18.dp)
-            )
-            Spacer(Modifier.width(6.dp))
+            Icon(Icons.Outlined.Visibility, contentDescription = null, modifier = Modifier.size(if (isPhone) 16.dp else 18.dp))
+            Spacer(Modifier.width(if (isPhone) 6.dp else 7.dp))
             Text(
-                text = if (isReordering) "Save Positions" else "Change Positions",
+                text = "Menus shown",
                 fontFamily = Inter(),
                 fontWeight = FontWeight.SemiBold,
-                fontSize = if (isPhone) 12.sp else 14.sp,
+                fontSize = 12.sp,
+                letterSpacing = if (isPhone) TextUnit.Unspecified else 0.sp,
                 maxLines = 1
             )
         }
-        TextButton(
-            onClick = onAddMenu,
-            modifier = createButtonModifier,
-            shape = RoundedCornerShape(if (isPhone) 5.dp else 8.dp),
-            colors = ButtonDefaults.textButtonColors(
-                containerColor = CoverOlive,
-                contentColor = Color.White
-            ),
-            contentPadding = PaddingValues(horizontal = if (isPhone) 8.dp else 16.dp, vertical = if (isPhone) 8.dp else 10.dp)
-        ) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = "Create Menu",
-                fontFamily = Inter(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = if (isPhone) 13.sp else 14.sp,
-                maxLines = 1
-            )
-        }
-    }
-
-        MenuValidationToast(
-            visible = showReorderToast,
-            message = "You need at least two menus to change positions",
-            placement = ToastPlacement.Below,
-            arrowAlignment = Alignment.Start,
-            anchorAlignment = Alignment.BottomStart,
-            offsetY = 46.dp
-        )
     }
 }
 
@@ -564,10 +538,18 @@ private fun MenuCoverCollection(
     onEditMenu: (Menu) -> Unit,
     onAddMenu: () -> Unit,
     onOpenOnlineMenu: () -> Unit,
-    onlineItemCount: Int
+    onlineItemCount: Int,
+    // Active menus a manager sees but waiters don't get a "Hidden from waiters" label.
+    hiddenFromWaiters: (Menu) -> Boolean = { false },
+    highlightedMenuId: String? = null
 ) {
-    // Menus, then the Online menu preview (hidden while reordering), then "Add menu" for managers.
+    // Menus in use, then the Online menu preview (hidden while reordering), then switched-off menus, then "Add menu"
+    // for managers. The menus arrive with the active ones first.
     val showOnlineCover = !isReordering
+    // Menus shown in POS come before the Online card; hidden or switched-off ones after it (they arrive in that order).
+    val activeCount = menus.count { it.active && !hiddenFromWaiters(it) }
+    // A menu's place in the grid: switched-off menus sit after the Online menu card.
+    fun menuSlotIndex(index: Int): Int = if (showOnlineCover && index >= activeCount) index + 1 else index
     val itemCount = menus.size + (if (showOnlineCover) 1 else 0) + if (isReordering || !canManageMenus) 0 else 1
     val rowCount = if (itemCount == 0) 0 else (itemCount + columns - 1) / columns
     val horizontalGap = if (isPhone) 26.dp else 32.dp
@@ -715,7 +697,7 @@ private fun MenuCoverCollection(
 
             menus.forEachIndexed { itemIndex, menu ->
                 key(menu.id) {
-                    val targetSlot = slotPosition(itemIndex)
+                    val targetSlot = slotPosition(menuSlotIndex(itemIndex))
                     val targetOffset = IntOffset(targetSlot.x.roundToInt(), targetSlot.y.roundToInt())
                     val animatedSlot by animateIntOffsetAsState(
                         targetValue = targetOffset,
@@ -786,6 +768,8 @@ private fun MenuCoverCollection(
                         isReordering = isReordering,
                         isDragging = isDragging,
                         canManageMenus = canManageMenus,
+                        hiddenFromWaiters = hiddenFromWaiters(menu),
+                        highlighted = menu.id == highlightedMenuId,
                         onClick = { if (!isReordering) onOpenMenu(menu.id) },
                         onEdit = { onEditMenu(menu) },
                         modifier = Modifier
@@ -873,7 +857,7 @@ private fun MenuCoverCollection(
             }
 
             if (showOnlineCover) {
-                val onlineSlot = slotPosition(menus.size)
+                val onlineSlot = slotPosition(activeCount)
                 OnlineMenuCover(
                     compact = compact,
                     itemCount = onlineItemCount,
@@ -913,6 +897,8 @@ private fun MenuChooserCover(
     isReordering: Boolean,
     isDragging: Boolean,
     canManageMenus: Boolean,
+    hiddenFromWaiters: Boolean,
+    highlighted: Boolean = false,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier
@@ -924,6 +910,8 @@ private fun MenuChooserCover(
             isReordering = isReordering,
             isDragging = isDragging,
             canManageMenus = canManageMenus,
+            hiddenFromWaiters = hiddenFromWaiters,
+            highlighted = highlighted,
             onClick = onClick,
             onEdit = onEdit,
             modifier = modifier
@@ -936,6 +924,8 @@ private fun MenuChooserCover(
             isReordering = isReordering,
             isDragging = isDragging,
             canManageMenus = canManageMenus,
+            hiddenFromWaiters = hiddenFromWaiters,
+            highlighted = highlighted,
             onClick = onClick,
             onEdit = onEdit,
             modifier = modifier
@@ -947,11 +937,14 @@ private fun MenuChooserCover(
 fun MenuCoverPreview(
     name: String,
     description: String,
-    active: Boolean,
+    // Off: the preview wears the "Hidden from waiters" veil, like the real card.
+    shownInPos: Boolean,
     availableFrom: String?,
     availableUntil: String?,
     color: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // An event menu's event: the preview shows its icon and days like the real card.
+    event: MenuEvent? = null
 ) {
     val previewMenu = Menu(
         id = "menu-preview",
@@ -959,7 +952,7 @@ fun MenuCoverPreview(
         code = "PREVIEW",
         name = name.trim().ifEmpty { "New Menu" },
         description = description.trim().takeIf { it.isNotEmpty() },
-        active = active,
+        active = true,
         displayOrder = 0,
         availableFrom = availableFrom,
         availableUntil = availableUntil,
@@ -971,7 +964,9 @@ fun MenuCoverPreview(
         updatedBy = null,
         createdAt = null,
         updatedAt = null,
-        sections = emptyList()
+        sections = emptyList(),
+        special = event != null,
+        event = event
     )
 
     MenuBookCover(
@@ -980,6 +975,7 @@ fun MenuCoverPreview(
         compact = true,
         isReordering = false,
         showActions = false,
+        hiddenFromWaiters = !shownInPos,
         onClick = {},
         onEdit = {},
         modifier = modifier
@@ -995,6 +991,8 @@ private fun MenuBookCover(
     isDragging: Boolean = false,
     showActions: Boolean = true,
     canManageMenus: Boolean = true,
+    hiddenFromWaiters: Boolean = false,
+    highlighted: Boolean = false,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     modifier: Modifier = Modifier
@@ -1029,6 +1027,7 @@ private fun MenuBookCover(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = CoverFaceTop)
+                .justCreated(highlighted, cardShape)
                 .graphicsLayer {
                     scaleX = dragScale
                     scaleY = dragScale
@@ -1210,12 +1209,39 @@ private fun MenuBookCover(
                     }
                 }
             }
+
+            if (!menu.active) {
+                InactiveCoverVeil(
+                    compact = compact,
+                    spineWidth = if (compact) 38.dp else 44.dp,
+                    modifier = Modifier.matchParentSize()
+                )
+            } else if (hiddenFromWaiters) {
+                // Waiters don't see it: washed out like an inactive menu, with the reason in the middle.
+                InactiveCoverVeil(
+                    compact = compact,
+                    spineWidth = if (compact) 38.dp else 44.dp,
+                    label = "Hidden from waiters",
+                    modifier = Modifier.matchParentSize()
+                )
+            }
         }
 
         // The edit button sits on the book face's top-right corner, sticking out CoverActionOverhang past the top
         // and right edges; the info button (when there's a description) sits right below it, lined up.
         val actionSize = if (compact) 34.dp else 40.dp
         val actionTop = CoverFaceTop - CoverActionOverhang
+        // A special menu wears its event's icon on the top-left corner, like a sticker (mirrors the edit button).
+        menu.event?.let { event ->
+            EventIconBadge(
+                event = event,
+                size = actionSize,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = (if (compact) 38.dp else 44.dp) + 8.dp, y = actionTop)
+                    .zIndex(3f)
+            )
+        }
         if (showActions && !isReordering) {
             if (canManageMenus) {
                 HoverTooltip(
@@ -1674,6 +1700,9 @@ internal fun coverTitle(name: String): String {
 }
 
 internal fun coverSchedule(menu: Menu): String {
+    // An event menu shows its event night; booking extras say what they are.
+    menu.event?.let { return "${it.icon} ${it.name} · ${eventDaysText(it.startDate, it.endDate)}".trim() }
+    if (menu.isBookingExtras) return "Booking extras"
     val from = formatTimeOfDay(menu.availableFrom)
     val until = formatTimeOfDay(menu.availableUntil)
     if (from == null || until == null) {
@@ -1694,4 +1723,62 @@ private fun formatTimeOfDay(time: String?): String? {
         else -> hour24
     }
     return "$hour12:$minute $period"
+}
+
+/**
+ * A menu that's out of use: the cover is washed out with a dark label in the middle ("Inactive", or "Hidden from
+ * waiters"), so it reads as unavailable at a glance.
+ */
+@Composable
+internal fun InactiveCoverVeil(
+    compact: Boolean,
+    spineWidth: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    label: String = "Inactive"
+) {
+    Box(modifier.background(Color(0xFFF3F3F1).copy(alpha = 0.66f))) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(start = spineWidth)
+                .clip(RoundedCornerShape(50))
+                .background(CoverInk.copy(alpha = 0.88f))
+                .padding(horizontal = if (compact) 10.dp else 14.dp, vertical = if (compact) 5.dp else 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.VisibilityOff,
+                contentDescription = null,
+                modifier = Modifier.size(if (compact) 13.dp else 16.dp),
+                tint = Color.White
+            )
+            Text(
+                text = label,
+                fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = if (compact) 11.sp else 13.sp,
+                letterSpacing = 0.sp,
+                color = Color.White
+            )
+        }
+    }
+}
+
+/** The event's icon on a special menu's cover: a white round badge with a soft shadow, the event's name on hover. */
+@Composable
+internal fun EventIconBadge(event: MenuEvent, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
+    HoverTooltip(text = "${event.name} · ${eventDaysText(event.startDate, event.endDate)}", modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .shadow(4.dp, CircleShape)
+                .clip(CircleShape)
+                .background(Color.White)
+                .border(1.5.dp, CoverGold.copy(alpha = 0.55f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(event.icon.ifBlank { "🎉" }, fontSize = (size.value * 0.46f).sp)
+        }
+    }
 }
