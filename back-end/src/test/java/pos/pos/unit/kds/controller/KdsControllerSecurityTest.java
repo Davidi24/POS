@@ -146,10 +146,11 @@ class KdsControllerSecurityTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items").isArray()).andExpect(jsonPath("$.size").value(30));
     }
 
-    @Test void historyAndStreamRejectAccountsWithoutKitchenRead() throws Exception {
+    // KDS reads accept KDS_READ or ORDER_READ (POS → Kitchen Status reads the kitchen with ORDER_READ).
+    @Test void historyAndStreamRejectAccountsWithoutKitchenOrOrderRead() throws Exception {
         for (String endpoint : List.of("history", "events")) {
             mockMvc.perform(get("/restaurants/{r}/branches/{b}/kds/" + endpoint, RESTAURANT_ID, BRANCH_ID)
-                    .header("X-Test-User", "other@pos.local").header("X-Test-Authorities", "ORDER_READ"))
+                    .header("X-Test-User", "other@pos.local").header("X-Test-Authorities", "MENUS_READ"))
                     .andExpect(status().isForbidden());
         }
         verifyNoInteractions(historyService, changes);

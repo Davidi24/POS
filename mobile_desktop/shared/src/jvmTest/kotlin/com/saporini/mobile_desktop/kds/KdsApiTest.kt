@@ -47,7 +47,7 @@ class KdsApiTest {
         }) { install(ContentNegotiation) { json(json) } }
         try { val api = KdsApi(client) { "http://localhost" }
             KdsAction.entries.forEach { action -> api.action(scope, "t", null, action, KdsActionInput("Chef note", "Checked")); api.action(scope, "t", "i", action, KdsActionInput("Chef note", "Checked")) }
-            assertEquals(8, requests)
+            assertEquals(KdsAction.entries.size * 2, requests)
         } finally { client.close() }
     }
     @Test fun historySendsUtcRangeAndPaginationAndDecodesTotals() = runTest {

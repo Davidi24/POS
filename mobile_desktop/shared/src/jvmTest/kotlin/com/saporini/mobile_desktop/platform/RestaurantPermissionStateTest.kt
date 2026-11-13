@@ -163,9 +163,9 @@ class RestaurantPermissionStateTest {
             SaporiniTheme {RestaurantDetailsContent(state,model,state.tab,model::tab,true)}
         }
         try {
-            render(scene);assertTrue(labels(scene).contains("Edit details"));click(scene,"Edit details");render(scene)
+            // The Details tab is the form itself and opens by itself for someone who may edit (no Edit details dialog).
+            render(scene);render(scene)
             assertNotNull(model.state.value.details)
-            assertTrue(clickLabels(scene).contains("Save"))
             s.signIn(user(read));render(scene)
             assertNull(model.state.value.details)
             for(text in listOf("Edit details","Add the owner","Suspend","Remove restaurant")) assertFalse(clickLabels(scene).contains(text),text)

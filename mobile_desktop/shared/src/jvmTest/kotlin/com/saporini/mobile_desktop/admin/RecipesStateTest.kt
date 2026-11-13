@@ -158,7 +158,7 @@ class RecipesScreenModelTest {
 
     private suspend fun TestScope.check(
         repo: FakeRecipes = FakeRecipes(),
-        permissions: List<String> = listOf("SETTINGS_READ", "SETTINGS_UPDATE"),
+        permissions: List<String> = listOf("INVENTORY_READ", "INVENTORY_UPDATE"),
         block: suspend TestScope.(RecipesScreenModel, FakeRecipes) -> Unit
     ) {
         val session = SessionManager().apply { signIn(user(permissions = permissions)) }
@@ -266,7 +266,7 @@ class RecipesScreenModelTest {
 
     @Test
     fun readOnlyPeopleCantChangeRecipes() = runTest(dispatcher) {
-        check(permissions = listOf("SETTINGS_READ")) { model, repo ->
+        check(permissions = listOf("INVENTORY_READ")) { model, repo ->
             model.open("pizza"); runCurrent()
             model.newRecipe()
             assertNull(model.state.value.draft)

@@ -200,7 +200,7 @@ class UserAdminServiceTest {
         }
 
         @Test
-        @DisplayName("Should normalize search and role filters and apply default paging")
+        @DisplayName("Should normalize the role filter, search everyone visible and page the matches by default")
         void shouldNormalizeFiltersAndApplyDefaults() {
             Authentication authentication = authentication();
 
@@ -208,8 +208,8 @@ class UserAdminServiceTest {
             given(roleHierarchyService.actorRank(authentication)).willReturn(20_000L);
             given(userRepository.searchVisibleUsers(
                     eq(null),
-                    eq("%+1 (555) 0200%"),
-                    eq("%+15550200%"),
+                    eq(null),
+                    eq(null),
                     eq("WAITER"),
                     eq(false),
                     eq(20_000L),
@@ -229,11 +229,12 @@ class UserAdminServiceTest {
                     null
             );
 
+            // A search is forgiving (StaffSearch), so it loads everyone this person can see and ranks them itself.
             ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
             then(userRepository).should().searchVisibleUsers(
                     eq(null),
-                    eq("%+1 (555) 0200%"),
-                    eq("%+15550200%"),
+                    eq(null),
+                    eq(null),
                     eq("WAITER"),
                     eq(false),
                     eq(20_000L),
@@ -244,10 +245,12 @@ class UserAdminServiceTest {
 
             Pageable pageable = pageableCaptor.getValue();
             assertThat(pageable.getPageNumber()).isEqualTo(0);
-            assertThat(pageable.getPageSize()).isEqualTo(20);
+            assertThat(pageable.getPageSize()).isEqualTo(2000);
             assertThat(pageable.getSort().getOrderFor("createdAt")).isNotNull();
             assertThat(pageable.getSort().getOrderFor("createdAt").getDirection().name()).isEqualTo("DESC");
             assertThat(response.getItems()).isEmpty();
+            assertThat(response.getPage()).isEqualTo(0);
+            assertThat(response.getSize()).isEqualTo(20);
         }
     }
 

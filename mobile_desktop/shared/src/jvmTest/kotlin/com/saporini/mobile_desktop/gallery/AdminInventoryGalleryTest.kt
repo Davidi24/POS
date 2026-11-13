@@ -108,6 +108,11 @@ private class GalleryInventory : InventoryRepository {
         approvedAt = ago(60 * 26), varianceValue = d("-1.65"), updatedAt = ago(60 * 26)))
 
     override suspend fun items(restaurantId: String, includeInactive: Boolean) = items
+    // Suppliers are kept by the server: one per supplier written on the items, linked to them.
+    override suspend fun suppliers(restaurantId: String) = items.mapNotNull { it.supplierName }.distinct().mapIndexed { index, name ->
+        com.saporini.mobile_desktop.admin.inventory.SupplierDto("s${index + 1}", name, items = items.filter { it.supplierName == name }
+            .map { com.saporini.mobile_desktop.admin.inventory.SupplierItemDto(it.id, it.supplierSku) })
+    }
     override suspend fun searchItems(restaurantId: String, keyword: String) = items
     override suspend fun saveItem(restaurantId: String, itemId: String?, request: StockItemRequestDto) = items.first()
     override suspend fun deactivateItem(restaurantId: String, itemId: String) {}

@@ -3,6 +3,7 @@ package com.saporini.mobile_desktop.reservations
 import com.saporini.mobile_desktop.pos.reservations.BookingAction
 import com.saporini.mobile_desktop.pos.reservations.bookingActions
 import com.saporini.mobile_desktop.pos.reservations.bookingFlags
+import com.saporini.mobile_desktop.pos.reservations.bookingState
 import com.saporini.mobile_desktop.pos.reservations.domain.model.Reservation
 import com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationPolicy
 import com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationStatus
@@ -86,12 +87,13 @@ class BookingRulesTest {
     }
 
     @Test
-    fun undoSeatWithinFifteenMinutes() {
+    // No time limit while there's no order on it (user, 2026-11-02); the server refuses once there is one.
+    fun undoSeatHasNoTimeLimit() {
         val justSeated = booking(ReservationStatus.SEATED, (-30).minutes) { copy(seatedAt = (now - 10.minutes).toString()) }
         assertTrue(bookingActions(justSeated, policy, staff, now).menu.first { it.action == BookingAction.UNDO_SEAT }.enabled)
 
         val longAgo = booking(ReservationStatus.SEATED, (-40).minutes) { copy(seatedAt = (now - 20.minutes).toString()) }
-        assertFalse(bookingActions(longAgo, policy, staff, now).menu.first { it.action == BookingAction.UNDO_SEAT }.enabled)
+        assertTrue(bookingActions(longAgo, policy, staff, now).menu.first { it.action == BookingAction.UNDO_SEAT }.enabled)
     }
 
     @Test
@@ -135,12 +137,20 @@ class BookingRulesTest {
         assertTrue(bookingActions(waiting, policy, staff, now).secondary?.action == BookingAction.CONFIRM_ATTENDANCE)
         assertTrue(bookingFlags(waiting, policy, now).isEmpty())
 
+        // One state per booking (user, 2026-11-02): who confirmed it, never a second "hasn't confirmed" label.
+        assertEquals("Confirmed by app", bookingState(waiting).text)
+
         val confirmed = booking(ReservationStatus.CONFIRMED, 5.hours) { copy(attendance = "CONFIRMED") }
         assertNull(bookingActions(confirmed, policy, staff, now).secondary)
-        assertEquals("✓ Attendance confirmed", bookingFlags(confirmed, policy, now).single().text)
+        assertTrue(bookingFlags(confirmed, policy, now).isEmpty())
+        assertEquals("Guest confirmed", bookingState(confirmed).text)
 
-        assertEquals("Not confirmed", bookingFlags(booking(ReservationStatus.CONFIRMED, 1.hours) { copy(attendance = "NOT_CONFIRMED") }, policy, now).single().text)
-        assertEquals("Confirm now", bookingFlags(booking(ReservationStatus.CONFIRMED, 1.hours) { copy(attendance = "CONFIRM_NOW") }, policy, now).single().text)
+        assertEquals("Confirmed by app", bookingState(booking(ReservationStatus.CONFIRMED, 1.hours) { copy(attendance = "NOT_CONFIRMED") }).text)
+        assertEquals("Confirmed by app", bookingState(booking(ReservationStatus.CONFIRMED, 1.hours) { copy(attendance = "CONFIRM_NOW") }).text)
+
+        val unreachable = booking(ReservationStatus.CONFIRMED, 1.hours) { copy(attendance = "CONFIRM_NOW", attendanceUnreachableAt = now.toString()) }
+        assertEquals("Couldn't reach", bookingState(unreachable).text)
+        assertTrue(bookingActions(unreachable, policy, staff, now).menu.none { it.action == BookingAction.COULD_NOT_REACH })
     }
 
     @Test
