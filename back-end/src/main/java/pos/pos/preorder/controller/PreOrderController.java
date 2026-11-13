@@ -36,7 +36,7 @@ public class PreOrderController {
     private final PreOrderService preOrderService;
 
     @GetMapping("/reservations/{reservationId}/pre-order")
-    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @PreAuthorize("hasAnyAuthority('ORDER_READ', 'KDS_READ')")
     @Operation(summary = "Get a reservation's pre-order (the live one, otherwise the latest)")
     public ResponseEntity<PreOrderResponse> getPreOrder(
             @PathVariable UUID restaurantId,
@@ -82,7 +82,7 @@ public class PreOrderController {
     }
 
     @GetMapping("/branches/{branchId}/pre-orders")
-    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @PreAuthorize("hasAnyAuthority('ORDER_READ', 'KDS_READ')")
     @Operation(summary = "List pre-orders for bookings in a time window, earliest booking first")
     public ResponseEntity<List<PreOrderResponse>> getBranchPreOrders(
             @PathVariable UUID restaurantId,

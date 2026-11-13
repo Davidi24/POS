@@ -100,7 +100,11 @@ class MenuItemServiceTest {
                 actorScopeService,
                 menuPolicy,
                 restaurantValidationService,
-                onlineMenuService
+                onlineMenuService,
+                // Photos aren't part of these tests.
+                org.mockito.Mockito.mock(pos.pos.menu.image.MenuImageStorage.class),
+                org.mockito.Mockito.mock(pos.pos.menu.image.MenuImageReleaser.class),
+                org.mockito.Mockito.mock(pos.pos.menu.recipe.DishRecipeCleanup.class)
         );
         // Placement itself is covered in OnlineMenuServiceTest; here it just records where the dish went.
         org.mockito.Mockito.lenient().doAnswer(call -> {

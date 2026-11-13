@@ -61,6 +61,14 @@ public class StatisticsRepository {
         }
     }
 
+    /** Every currency the restaurant has closed orders or payments in (after a currency change there are two). */
+    public List<String> currencies(UUID restaurantId) {
+        return jdbc.queryForList("select currency from (select distinct o.currency from " + schema + "orders o where o.restaurant_id = :restaurant"
+                        + " and o.status = 'CLOSED' union select distinct p.currency from " + schema + "payments p where p.restaurant_id = :restaurant) c"
+                        + " where currency is not null order by currency",
+                Map.of("restaurant", restaurantId), String.class);
+    }
+
     public record SalesTotals(long orders, BigDecimal sales, long guests, BigDecimal discounts) {
     }
 
@@ -115,9 +123,26 @@ public class StatisticsRepository {
         params.put("status", status);
         Long count = jdbc.queryForObject(
                 "select count(*) from " + schema + "orders o where o.restaurant_id = :restaurant" + scope.branch("o")
-                        + " and o.status = :status and o.updated_at >= :from and o.updated_at < :to",
+                        + " and o.status = :status and o.unpaid_at is null and o.updated_at >= :from and o.updated_at < :to",
                 params, Long.class);
         return count == null ? 0 : count;
+    }
+
+    // Orders closed as unpaid in the window and still unpaid: how many, and what was owed.
+    public long unpaidOrders(Scope scope) {
+        Long count = jdbc.queryForObject(
+                "select count(*) from " + schema + "orders o where o.restaurant_id = :restaurant" + scope.branch("o")
+                        + " and o.status = 'VOIDED' and o.unpaid_at >= :from and o.unpaid_at < :to and o.currency = :currency",
+                scope.params(), Long.class);
+        return count == null ? 0 : count;
+    }
+
+    public BigDecimal unpaidValue(Scope scope) {
+        BigDecimal value = jdbc.queryForObject(
+                "select coalesce(sum(o.unpaid_amount), 0) from " + schema + "orders o where o.restaurant_id = :restaurant" + scope.branch("o")
+                        + " and o.status = 'VOIDED' and o.unpaid_at >= :from and o.unpaid_at < :to and o.currency = :currency",
+                scope.params(), BigDecimal.class);
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     public long openOrders(Scope scope) {
@@ -287,7 +312,7 @@ public class StatisticsRepository {
     public Map<UUID, Long> staffVoidedOrders(Scope scope) {
         Map<UUID, Long> result = new HashMap<>();
         jdbc.query("select o.updated_by as staff, count(*) value from " + schema + "orders o where o.restaurant_id = :restaurant" + scope.branch("o")
-                        + " and o.status = 'VOIDED' and o.updated_by is not null and o.updated_at >= :from and o.updated_at < :to group by o.updated_by",
+                        + " and o.status = 'VOIDED' and o.unpaid_at is null and o.updated_by is not null and o.updated_at >= :from and o.updated_at < :to group by o.updated_by",
                 scope.params(), rs -> {
                     result.put(rs.getObject("staff", UUID.class), rs.getLong("value"));
                 });

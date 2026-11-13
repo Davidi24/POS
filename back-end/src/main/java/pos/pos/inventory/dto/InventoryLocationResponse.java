@@ -23,6 +23,12 @@ public class InventoryLocationResponse {
     private String code;
     private String name;
     private InventoryLocationType locationType;
+    private String iconCode;
+    // The restaurant's own picture, shown instead of the icon when set.
+    private String imageUrl;
+    // The restaurant's own kind (locationType CUSTOM).
+    private UUID kindId;
+    private String kindName;
     private String notes;
     private boolean active;
     private String createdByUserName;

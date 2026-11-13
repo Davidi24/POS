@@ -29,6 +29,10 @@ public final class TestPostgresContainerSupport {
         registry.add("DB_USERNAME", POSTGRES::getUsername);
         registry.add("DB_PASSWORD", POSTGRES::getPassword);
         registry.add("DEVICE_PAIRING_TOKEN_PEPPER", () -> "test-prod-device-pairing-token-pepper-0123456789");
+        // Production needs the public address its emailed links point to.
+        registry.add("PUBLIC_BASE_URL", () -> "https://api.pos.example");
+        // Production stores dish photos in R2; tests don't need live Cloudflare credentials (a test can still override it).
+        registry.add("app.storage.menu-images.provider", () -> "disabled");
         registerSharedPoolProperties(registry);
         registry.add("spring.flyway.default-schema", () -> schema);
         registry.add("spring.flyway.schemas[0]", () -> schema);

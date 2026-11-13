@@ -52,4 +52,15 @@ public interface InventoryCountRepository extends JpaRepository<InventoryCount, 
 
     @EntityGraph(attributePaths = {"location", "approvedByUser", "createdByUser", "updatedByUser", "lines", "lines.inventoryItem"})
     List<InventoryCount> findAllByIdIn(Iterable<UUID> ids);
+
+    // A count not approved or cancelled yet still holds a line for the item (approving it would change its stock).
+    @Query("""
+            select case when count(line) > 0 then true else false end from InventoryCountLine line
+            where line.inventoryItem.id = :itemId
+              and line.inventoryCount.status in (pos.pos.inventory.enums.InventoryCountStatus.DRAFT,
+                  pos.pos.inventory.enums.InventoryCountStatus.IN_PROGRESS, pos.pos.inventory.enums.InventoryCountStatus.COMPLETED)
+            """)
+    boolean itemInOpenCount(@Param("itemId") UUID itemId);
+
+    boolean existsByLocation_IdAndStatusIn(UUID locationId, java.util.Collection<pos.pos.inventory.enums.InventoryCountStatus> statuses);
 }

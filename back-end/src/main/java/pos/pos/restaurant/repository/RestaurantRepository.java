@@ -16,13 +16,59 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
 
     Optional<Restaurant> findBySlugAndDeletedAtIsNull(String slug);
 
-    boolean existsByCodeAndDeletedAtIsNull(String code);
+    // Codes and web addresses stay reserved after a restaurant is archived (the database keeps them unique too).
+    boolean existsByCode(String code);
 
-    boolean existsByCodeAndIdNotAndDeletedAtIsNull(String code, UUID id);
+    boolean existsByCodeAndIdNot(String code, UUID id);
 
-    boolean existsBySlugAndDeletedAtIsNull(String slug);
+    boolean existsByCodeAndDeletedAtIsNotNull(String code);
 
-    boolean existsBySlugAndIdNotAndDeletedAtIsNull(String slug, UUID id);
+    boolean existsBySlug(String slug);
+
+    boolean existsBySlugAndIdNot(String slug, UUID id);
+
+    boolean existsBySlugAndDeletedAtIsNotNull(String slug);
+
+    Optional<Restaurant> findByApplicationCodeHash(String applicationCodeHash);
+
+    boolean existsByStatusAndPendingOwnerEmailAndDeletedAtIsNull(RestaurantStatus status, String pendingOwnerEmail);
+
+    boolean existsByStatusAndPendingOwnerUsernameAndDeletedAtIsNull(RestaurantStatus status, String pendingOwnerUsername);
+
+    boolean existsByOwnerIdAndIdNotAndDeletedAtIsNull(UUID ownerId, UUID id);
+
+    /** Public applications waiting for review ([statuses] PENDING) or already rejected, newest or oldest first. */
+    @Query(
+            value = """
+            SELECT r
+            FROM Restaurant r
+            WHERE r.deletedAt IS NULL
+              AND r.status IN :statuses
+              AND (
+                    :searchLike IS NULL
+                    OR lower(r.name) LIKE :searchLike
+                    OR lower(r.legalName) LIKE :searchLike
+                    OR lower(r.email) LIKE :searchLike
+                    OR lower(r.pendingOwnerEmail) LIKE :searchLike
+                    OR lower(concat(coalesce(r.pendingOwnerFirstName, ''), ' ', coalesce(r.pendingOwnerLastName, ''))) LIKE :searchLike
+              )
+            """,
+            countQuery = """
+            SELECT COUNT(r)
+            FROM Restaurant r
+            WHERE r.deletedAt IS NULL
+              AND r.status IN :statuses
+              AND (
+                    :searchLike IS NULL
+                    OR lower(r.name) LIKE :searchLike
+                    OR lower(r.legalName) LIKE :searchLike
+                    OR lower(r.email) LIKE :searchLike
+                    OR lower(r.pendingOwnerEmail) LIKE :searchLike
+                    OR lower(concat(coalesce(r.pendingOwnerFirstName, ''), ' ', coalesce(r.pendingOwnerLastName, ''))) LIKE :searchLike
+              )
+            """
+    )
+    Page<Restaurant> searchApplications(java.util.Collection<RestaurantStatus> statuses, String searchLike, Pageable pageable);
 
     @Query(
             value = """

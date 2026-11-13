@@ -11,6 +11,9 @@ import pos.pos.exception.inventory.InventoryItemNotFoundException;
 import pos.pos.exception.inventory.InventoryLocationNotFoundException;
 import pos.pos.exception.inventory.InventoryMovementNotFoundException;
 import pos.pos.inventory.dto.InventoryAdjustmentRequest;
+import pos.pos.restaurant.entity.Restaurant;
+import pos.pos.inventory.dto.InventoryItemEventResponse;
+import pos.pos.inventory.dto.InventoryMovementPersonResponse;
 import pos.pos.inventory.dto.InventoryMovementResponse;
 import pos.pos.inventory.dto.InventoryReceiveRequest;
 import pos.pos.inventory.dto.InventoryReturnRequest;
@@ -48,6 +51,8 @@ public class InventoryMovementService {
     private final InventoryLocationRepository inventoryLocationRepository;
     private final InventoryMovementRepository inventoryMovementRepository;
     private final InventoryMovementMapper inventoryMovementMapper;
+    private final InventoryChangeNotifier inventoryChangeNotifier;
+    private final pos.pos.audit.repository.AuditLogRepository auditLogRepository;
 
     //For Inventory Movement there were created different Request and Response DTO based on the movement type
     //The recieve method takes the request and applies the changes to the given item and location using the applyMovement method
@@ -208,6 +213,61 @@ public class InventoryMovementService {
         );
     }
 
+    /**
+     * Who changed stock or items (for one item when [itemId] is set), with how many changes each, most first, for
+     * History's person filter.
+     */
+    @Transactional(readOnly = true)
+    public List<InventoryMovementPersonResponse> listPeople(Authentication authentication, UUID restaurantId, UUID itemId) {
+        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        java.util.Map<UUID, InventoryMovementPersonResponse> people = new java.util.LinkedHashMap<>();
+        java.util.List<Object[]> rows = new java.util.ArrayList<>(inventoryMovementRepository.people(restaurantId, itemId));
+        rows.addAll(auditLogRepository.people(restaurantId, InventoryItemEvents.ENTITY, itemId));
+        for (Object[] row : rows) {
+            String first = row[1] == null ? "" : row[1].toString().trim();
+            String last = row[2] == null ? "" : row[2].toString().trim();
+            String name = (first + " " + last).trim();
+            UUID id = (UUID) row[0];
+            long count = ((Number) row[4]).longValue();
+            people.merge(id, new InventoryMovementPersonResponse(id, name.isEmpty() ? String.valueOf(row[3]) : name, count),
+                    (a, b) -> new InventoryMovementPersonResponse(a.id(), a.name(), a.count() + b.count()));
+        }
+        return people.values().stream().sorted(java.util.Comparator.comparingLong(InventoryMovementPersonResponse::count).reversed()).toList();
+    }
+
+    /** What happened to items themselves (added, changed, deleted), newest first, at most 500, with History's filters. */
+    @Transactional(readOnly = true)
+    public List<InventoryItemEventResponse> listItemEvents(Authentication authentication, UUID restaurantId, UUID itemId, UUID createdBy,
+                                                           java.time.LocalDate day) {
+        Restaurant restaurant = restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        java.time.OffsetDateTime from = java.time.OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        java.time.OffsetDateTime to = java.time.OffsetDateTime.of(9999, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        if (day != null) {
+            java.time.ZoneId zone = zoneOf(restaurant);
+            from = day.atStartOfDay(zone).toOffsetDateTime();
+            to = day.plusDays(1).atStartOfDay(zone).toOffsetDateTime();
+        }
+        return auditLogRepository.search(restaurantId, InventoryItemEvents.ENTITY, itemId, createdBy, from, to,
+                        org.springframework.data.domain.PageRequest.of(0, 500)).stream()
+                .map(log -> new InventoryItemEventResponse(log.getId(), log.getEntityId(), log.getMetadataPayload(), log.getAction(), log.getSummary(),
+                        log.getCreatedAt(), log.getActorUser() == null ? null : log.getActorUser().getId(), personName(log.getActorUser())))
+                .toList();
+    }
+
+    private static String personName(pos.pos.user.entity.User user) {
+        if (user == null) return null;
+        String name = ((user.getFirstName() == null ? "" : user.getFirstName()) + " " + (user.getLastName() == null ? "" : user.getLastName())).trim();
+        return name.isEmpty() ? user.getUsername() : name;
+    }
+
+    private static java.time.ZoneId zoneOf(Restaurant restaurant) {
+        try {
+            return java.time.ZoneId.of(restaurant.getTimezone());
+        } catch (Exception invalid) {
+            return ZoneOffset.UTC;
+        }
+    }
+
     //Returns the given Movement
     @Transactional(readOnly = true)
     public InventoryMovementResponse getMovement(Authentication authentication, UUID restaurantId, UUID movementId) {
@@ -231,17 +291,27 @@ public class InventoryMovementService {
             UUID orderLineItemId,
             InventoryMovementType movementType,
             UUID itemId,
+            UUID createdBy,
+            java.time.LocalDate day,
             int page,
             int size
     ) {
-        restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
+        Restaurant restaurant = restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
 
         if (itemId != null) {
             requireItem(restaurantId, itemId);
         }
+        // One day in the restaurant's time zone (History → day filter, user 2026-10-30), else everything.
+        java.time.OffsetDateTime from = java.time.OffsetDateTime.of(1970, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        java.time.OffsetDateTime to = java.time.OffsetDateTime.of(9999, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        if (day != null) {
+            java.time.ZoneId zone = zoneOf(restaurant);
+            from = day.atStartOfDay(zone).toOffsetDateTime();
+            to = day.plusDays(1).atStartOfDay(zone).toOffsetDateTime();
+        }
 
         // Newest first, one page at a time: the history only grows.
-        return inventoryMovementRepository.search(restaurantId, orderLineItemId, movementType, itemId,
+        return inventoryMovementRepository.search(restaurantId, orderLineItemId, movementType, itemId, createdBy, from, to,
                         org.springframework.data.domain.PageRequest.of(page, size)).stream()
                 .map(inventoryMovementMapper::toResponse)
                 .toList();
@@ -271,7 +341,45 @@ public class InventoryMovementService {
         }
         assertItemTrackable(item);
         assertItemActive(item);
+        return recordMovement(restaurantId, location, item, quantityDelta, movementType, unitCostOverride, reason, referenceType, referenceId,
+                occurredAt, orderLineItem, actorId);
+    }
 
+    // Takes what's left of an item that is being deleted out of one place, as a correction ("Item deleted"), so History
+    // and the stock value still add up. Skips the active/tracked checks on purpose: a switched-off item, an untracked
+    // one or a switched-off place can still hold stock that has to go. Only InventoryItemService.deleteItem calls this.
+    void writeOffForDeletion(UUID restaurantId, InventoryLocation location, InventoryItem item, BigDecimal onHand, UUID actorId) {
+        recordMovement(restaurantId, location, item, onHand.negate(), InventoryMovementType.MANUAL_ADJUSTMENT, null, "Item deleted",
+                null, null, null, null, actorId);
+    }
+
+    // Deleting a place: what it holds goes out of it, to [moveTo] (out of it and into that place) or out of stock when
+    // [moveTo] is null. Skips the active/tracked checks like writeOffForDeletion. Only InventoryLocationService.deleteLocation calls this.
+    void clearForPlaceDeletion(UUID restaurantId, InventoryLocation from, InventoryLocation moveTo, InventoryItem item, BigDecimal onHand, UUID actorId) {
+        String reason = "Place deleted: " + from.getName();
+        if (moveTo == null) {
+            recordMovement(restaurantId, from, item, onHand.negate(), InventoryMovementType.MANUAL_ADJUSTMENT, null, reason,
+                    null, null, null, null, actorId);
+            return;
+        }
+        recordMovement(restaurantId, from, item, onHand.negate(), InventoryMovementType.TRANSFER_OUT, null, reason, null, null, null, null, actorId);
+        recordMovement(restaurantId, moveTo, item, onHand, InventoryMovementType.TRANSFER_IN, null, reason, null, null, null, null, actorId);
+    }
+
+    private InventoryMovementResponse recordMovement(
+            UUID restaurantId,
+            InventoryLocation location,
+            InventoryItem item,
+            BigDecimal quantityDelta,
+            InventoryMovementType movementType,
+            BigDecimal unitCostOverride,
+            String reason,
+            String referenceType,
+            UUID referenceId,
+            OffsetDateTime occurredAt,
+            OrderLineItem orderLineItem,
+            UUID actorId
+    ) {
         BigDecimal unitCost = unitCostOverride != null ? unitCostOverride : item.getCostPerUnit();
         OffsetDateTime effectiveOccurredAt = occurredAt != null ? occurredAt : OffsetDateTime.now(ZoneOffset.UTC);
 
@@ -296,6 +404,7 @@ public class InventoryMovementService {
         InventoryMovement saved = saveMovement(movement);
 
         inventoryLevelService.upsertLevel(location, item, quantityDelta);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
 
         return inventoryMovementMapper.toResponse(saved);
     }

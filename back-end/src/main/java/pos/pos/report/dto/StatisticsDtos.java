@@ -6,8 +6,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Statistics for one restaurant (optionally one branch) over restaurant-local calendar days. Money is in the
- * restaurant's currency; orders in other currencies are left out and counted in {@code otherCurrencyOrders}.
+ * Statistics for one restaurant (optionally one branch) over restaurant-local calendar days. Money is in one currency
+ * (the restaurant's own unless another is asked for); orders in other currencies are left out and counted in
+ * {@code otherCurrencyOrders}. {@code currencies} lists every currency the restaurant has sold in, its own first, so
+ * the period before a currency change can be looked at in its own money.
  * "Sales" are the totals of closed orders on the day they closed.
  */
 public final class StatisticsDtos {
@@ -16,7 +18,7 @@ public final class StatisticsDtos {
     }
 
     public record Period(LocalDate from, LocalDate to, LocalDate previousFrom, LocalDate previousTo,
-                         String timezone, String currency, UUID branchId) {
+                         String timezone, String currency, UUID branchId, List<String> currencies) {
     }
 
     /** One figure with the same figure for the period just before, for "up 12%" comparisons. */
@@ -25,7 +27,7 @@ public final class StatisticsDtos {
 
     public record Kpis(Kpi sales, Kpi orders, Kpi guests, Kpi averageTicket, Kpi averagePerGuest, Kpi tips,
                        Kpi collected, Kpi refunds, Kpi discounts, Kpi removedItemsValue, Kpi cancelledOrders,
-                       Kpi voidedOrders, long openOrders, long otherCurrencyOrders) {
+                       Kpi voidedOrders, Kpi unpaidOrders, Kpi unpaidValue, long openOrders, long otherCurrencyOrders) {
     }
 
     public record DaySales(LocalDate date, BigDecimal sales, long orders, long guests) {

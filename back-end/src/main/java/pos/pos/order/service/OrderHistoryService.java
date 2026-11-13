@@ -34,23 +34,47 @@ public class OrderHistoryService {
     public OrderHistoryPage history(Authentication authentication, UUID restaurantId, UUID branchId,
             OffsetDateTime from, OffsetDateTime to, OrderStatus status, UUID customerId, UUID staffId,
             String search, int page, int size) {
+        return history(authentication, restaurantId, branchId, from, to, status, customerId, staffId, search, page, size, false);
+    }
+
+    // unpaidOnly: the orders closed as unpaid, the ones History can reopen for payment.
+    @Transactional(readOnly = true)
+    public OrderHistoryPage history(Authentication authentication, UUID restaurantId, UUID branchId,
+            OffsetDateTime from, OffsetDateTime to, OrderStatus status, UUID customerId, UUID staffId,
+            String search, int page, int size, boolean unpaidOnly) {
         if (status != null && !TERMINAL.contains(status)) throw bad("History status must be CLOSED, CANCELLED or VOIDED");
-        return page(authentication, restaurantId, branchId, from, to, status, customerId, staffId, search, page, size, true, false);
+        return page(authentication, restaurantId, branchId, from, to, unpaidOnly ? OrderStatus.VOIDED : status, customerId, staffId, search, page, size, true, false, unpaidOnly);
     }
 
     @Transactional(readOnly = true)
     public OrderHistoryPage orders(Authentication authentication, UUID restaurantId, UUID branchId,
             OffsetDateTime from, OffsetDateTime to, OrderStatus status, UUID customerId,
             String search, int page, int size, boolean historyOnly, boolean openOnly) {
+        return orders(authentication, restaurantId, branchId, from, to, status, customerId, search, page, size, historyOnly, openOnly, false);
+    }
+
+    // unpaidOnly: the orders closed as unpaid that are still unpaid, to find one and reopen it for payment.
+    @Transactional(readOnly = true)
+    public OrderHistoryPage orders(Authentication authentication, UUID restaurantId, UUID branchId,
+            OffsetDateTime from, OffsetDateTime to, OrderStatus status, UUID customerId,
+            String search, int page, int size, boolean historyOnly, boolean openOnly, boolean unpaidOnly) {
         if (historyOnly && openOnly) throw bad("historyOnly and openOnly cannot both be true");
+        if (unpaidOnly && openOnly) throw bad("unpaidOnly and openOnly cannot both be true");
         if (openOnly && status != null && status != OrderStatus.DRAFT && status != OrderStatus.OPEN)
             throw bad("Open orders status must be DRAFT or OPEN");
-        return page(authentication, restaurantId, branchId, from, to, status, customerId, null, search, page, size, historyOnly, openOnly);
+        return page(authentication, restaurantId, branchId, from, to, unpaidOnly ? OrderStatus.VOIDED : status, customerId, null, search,
+                page, size, historyOnly || unpaidOnly, openOnly, unpaidOnly);
     }
 
     private OrderHistoryPage page(Authentication authentication, UUID restaurantId, UUID branchId,
             OffsetDateTime from, OffsetDateTime to, OrderStatus status, UUID customerId, UUID staffId,
             String search, int page, int size, boolean historyOnly, boolean openOnly) {
+        return page(authentication, restaurantId, branchId, from, to, status, customerId, staffId, search, page, size, historyOnly, openOnly, false);
+    }
+
+    private OrderHistoryPage page(Authentication authentication, UUID restaurantId, UUID branchId,
+            OffsetDateTime from, OffsetDateTime to, OrderStatus status, UUID customerId, UUID staffId,
+            String search, int page, int size, boolean historyOnly, boolean openOnly, boolean unpaidOnly) {
         scope.requireAccessibleBranch(authentication, restaurantId, branchId);
         if (page < 0 || size < 1 || size > 100) throw bad("Page must be non-negative and size between 1 and 100");
         if (from != null && to != null && !from.isBefore(to)) throw bad("from must be before to");
@@ -69,6 +93,7 @@ public class OrderHistoryService {
             if (from != null) clauses.add(cb.greaterThanOrEqualTo(r.get("openedAt"), from));
             if (to != null) clauses.add(cb.lessThan(r.get("openedAt"), to));
             if (customerId != null) clauses.add(cb.equal(r.get("customer").get("id"), customerId));
+            if (unpaidOnly) clauses.add(cb.isNotNull(r.get("unpaidAt")));
             if (staffId != null) clauses.add(cb.equal(r.get("createdBy"), staffId));
             if (!term.isBlank()) {
                 String escaped = "%" + term.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";

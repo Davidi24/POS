@@ -123,6 +123,11 @@ public class ReservationLifecycleService {
     }
 
     @Transactional
+    public ReservationResponse couldNotReach(Authentication authentication, UUID restaurantId, UUID reservationId, ReservationActionRequest request) {
+        return act(authentication, restaurantId, reservationId, (reservation, actor) -> couldNotReach(reservation, reason(request), actor));
+    }
+
+    @Transactional
     public ReservationResponse extendHold(Authentication authentication, UUID restaurantId, UUID reservationId, ExtendReservationHoldRequest request) {
         return act(authentication, restaurantId, reservationId,
                 (reservation, actor) -> extendHold(reservation, request.getMinutes(), request.getReason(), actor));
@@ -253,7 +258,7 @@ public class ReservationLifecycleService {
                     HttpStatus.CONFLICT
             );
         }
-        requireWithinWindow(reservation.getSeatedAt(), values(reservation).undoSeatMinutes(), "seated", reason, actor);
+        // No order on it: no time limit (user, 2026-11-02); the table frees itself when nobody orders.
         requireSameDayOrCorrection(reservation, reason, actor);
         freeTables(reservation);
         reservation.setSeatedAt(null);
@@ -296,6 +301,21 @@ public class ReservationLifecycleService {
         change(reservation, ReservationStatus.EXPIRED, reason, actor);
     }
 
+    // Nobody acted and nobody seated the guests (Settings → Tables → Special cases).
+    public void noAction(Reservation reservation, String reason, ReservationActor actor) {
+        if (reservation.getStatus() != ReservationStatus.CONFIRMED && reservation.getStatus() != ReservationStatus.CHECKED_IN) {
+            throw bad("Only a booking still waiting to be seated can be closed as no action taken");
+        }
+        reservation.setCheckedInAt(null);
+        reservation.setNoActionAt(now());
+        change(reservation, ReservationStatus.NO_ACTION, reason, actor);
+    }
+
+    // A line in the booking's history, from Settings → Tables → Special cases.
+    public void note(Reservation reservation, String detail, java.util.UUID actorId) {
+        record(reservation, ReservationEventType.SPECIAL_CASE, detail, null, ReservationActor.system(actorId));
+    }
+
     // Back to Confirmed (or Pending if it was never accepted). The table waits again if its hold has passed, and a
     // table given to someone else meanwhile is not taken back.
     public void reopen(Reservation reservation, String reason, ReservationActor actor) {
@@ -303,20 +323,24 @@ public class ReservationLifecycleService {
             case CANCELLED -> reservation.getCancelledAt();
             case NO_SHOW -> reservation.getNoShowAt();
             case EXPIRED -> reservation.getExpiredAt();
+            case NO_ACTION -> reservation.getNoActionAt();
             default -> throw bad("Only a cancelled, no-show or expired booking can be reopened");
         };
         String what = switch (reservation.getStatus()) {
             case CANCELLED -> "cancelled";
             case NO_SHOW -> "marked no-show";
+            case NO_ACTION -> "closed as no action taken";
             default -> "expired";
         };
         requireWithinWindow(since, values(reservation).reopenWindowMinutes(), what, reason, actor);
         requireSameDayOrCorrection(reservation, reason, actor);
-        boolean wasAccepted = reservation.getConfirmedAt() != null && reservation.getStatus() != ReservationStatus.EXPIRED;
+        boolean wasAccepted = reservation.getStatus() == ReservationStatus.NO_ACTION
+                || (reservation.getConfirmedAt() != null && reservation.getStatus() != ReservationStatus.EXPIRED);
         reservation.setCancelledAt(null);
         reservation.setCancellationReason(null);
         reservation.setNoShowAt(null);
         reservation.setExpiredAt(null);
+        reservation.setNoActionAt(null);
         reservation.setCheckedInAt(null);
         reservation.setSeatedAt(null);
         reservation.setCompletedAt(null);
@@ -342,10 +366,24 @@ public class ReservationLifecycleService {
             return;
         }
         reservation.setAttendanceConfirmedAt(now());
+        reservation.setAttendanceUnreachableAt(null);
         reservation.setAttendanceConfirmedBy(actor.id());
         reservation.setAttendanceConfirmedVia(via);
         record(reservation, ReservationEventType.ATTENDANCE_CONFIRMED,
                 via == AttendanceConfirmedVia.GUEST ? "Attendance confirmed by the guest" : "Attendance confirmed after a call", reason, actor);
+    }
+
+    // Staff called and nobody answered: a grey "Couldn't reach" mark. Never cancels (user, 2026-11-02); the table
+    // waits the shorter hold for unconfirmed guests, and a manager can still cancel by hand.
+    public void couldNotReach(Reservation reservation, String reason, ReservationActor actor) {
+        if (reservation.getStatus() != ReservationStatus.CONFIRMED) {
+            throw bad("Only a confirmed booking can be marked as not reached");
+        }
+        if (reservation.getAttendanceConfirmedAt() != null || reservation.getAttendanceUnreachableAt() != null) {
+            return;
+        }
+        reservation.setAttendanceUnreachableAt(now());
+        record(reservation, ReservationEventType.ATTENDANCE_UNREACHABLE, "Called, couldn't reach the guest", reason, actor);
     }
 
     // The guest called: "we'll be 20 minutes late". Only the hold moves; the booking still ends on time.
@@ -476,8 +514,14 @@ public class ReservationLifecycleService {
                 .sorted((left, right) -> Boolean.compare(right.isPrimaryAssignment(), left.isPrimaryAssignment()))
                 .toList();
         int left = guests;
+        int previousGuests = 0;
+        int seats = 0;
+        List<String> numbers = new java.util.ArrayList<>();
         for (int index = 0; index < assignments.size(); index++) {
             RestaurantTable table = lockTable(reservation, assignments.get(index));
+            previousGuests += table.getStatus() == TableStatus.OCCUPIED && table.getGuestCount() != null ? table.getGuestCount() : 0;
+            seats += table.getCapacity();
+            numbers.add(table.getTableNumber());
             int tablesAfter = assignments.size() - index - 1;
             int here = index == assignments.size() - 1
                     ? left
@@ -490,6 +534,11 @@ public class ReservationLifecycleService {
             table.setStatus(TableStatus.OCCUPIED);
             restaurantTableRepository.save(table);
         }
+        if (!assignments.isEmpty()) {
+            events.publishEvent(new pos.pos.tables.event.GuestsSeatedEvent(
+                    reservation.getRestaurant().getId(), reservation.getBranch().getId(), reservation.getBranch().getName(),
+                    assignments.get(0).getRestaurantTable().getId(), String.join("-", numbers), seats, guests, previousGuests, reservation.getUpdatedBy()));
+        }
     }
 
     // Tables the undone seating had taken become free again, unless something is open on them.
@@ -500,6 +549,7 @@ public class ReservationLifecycleService {
                 table.setStatus(TableStatus.AVAILABLE);
                 table.setGuestCount(null);
                 table.setSeatedAt(null);
+                table.setMoreComing(false);
                 restaurantTableRepository.save(table);
             }
         }
@@ -587,6 +637,7 @@ public class ReservationLifecycleService {
             case CANCELLED -> "cancelled";
             case NO_SHOW -> "a no-show";
             case EXPIRED -> "expired";
+            case NO_ACTION -> "closed as no action taken";
         };
     }
 

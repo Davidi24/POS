@@ -46,6 +46,12 @@ import java.util.UUID;
 @lombok.RequiredArgsConstructor
 public class RestaurantTableService {
 
+    // A table takes in tables of its own kind or lower; a free one doesn't take in a reserved one (user, 2026-11-01).
+    private static final int JOIN_FREE = 0;
+    private static final int JOIN_RESERVED = 1;
+    private static final int JOIN_SEATED = 2;
+    private static final int JOIN_ORDER = 3;
+
     private final RestaurantScopeService restaurantScopeService;
     private final ApplicationEventPublisher events;
     private final RestaurantTableRepository restaurantTableRepository;
@@ -55,6 +61,8 @@ public class RestaurantTableService {
     private final RestaurantTableAvailabilityService restaurantTableAvailabilityService;
     private final OrderRepository orderRepository;
     private final OrderSupport orderSupport;
+    private final TableSeatingRules tableSeatingRules;
+    private final pos.pos.order.service.TableOrderCombiner tableOrderCombiner;
 
     /**
      * First, we check if the logged-in user is allowed to access this restaurant branch.
@@ -148,7 +156,8 @@ public class RestaurantTableService {
                 branchId,
                 tableId,
                 request.getStatus(),
-                request.getGuestCount()
+                request.getGuestCount(),
+                request.getMoreComing()
         );
     }
 
@@ -180,6 +189,7 @@ public class RestaurantTableService {
         if (request.getLayoutScale() != null) {
             table.setLayoutScale(request.getLayoutScale());
         }
+        table.setLayoutOnly(true);
         table.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
 
         return restaurantTableSupport.toResponse(
@@ -370,11 +380,21 @@ public class RestaurantTableService {
         }
 
         validateMergeParticipant(primaryTable);
+        int startRank = joinRank(primaryTable);
         for (RestaurantTable mergeTarget : mergeTargets) {
             validateMergeTarget(mergeTarget);
             validateMergeParticipant(mergeTarget);
             if (!Objects.equals(primaryTable.getFloor(), mergeTarget.getFloor())) {
                 throw new AuthException("Tables on different floors cannot be merged.", HttpStatus.BAD_REQUEST);
+            }
+            int targetRank = joinRank(mergeTarget);
+            if (targetRank > startRank) {
+                String number = mergeTarget.getTableNumber();
+                throw new AuthException(
+                        number + (targetRank == JOIN_ORDER ? " has an order" : targetRank == JOIN_SEATED ? " has guests seated" : " is reserved")
+                                + ". Start from " + number + " to join these tables.",
+                        HttpStatus.CONFLICT
+                );
             }
         }
 
@@ -411,6 +431,95 @@ public class RestaurantTableService {
         return restaurantTableSupport.toResponse(table, Map.of());
     }
 
+    /**
+     * Some tables leave a merged group (user, 2026-11-01): any of them, the main one too. Those that leave become free;
+     * the guests and the open orders go to the table that keeps them, which leads what's left of the group. Each order's
+     * history says which tables were freed and where it went.
+     */
+    @Transactional
+    public TableResponse unmergeTables(Authentication authentication, UUID restaurantId, UUID branchId, UUID tableId,
+                                       List<UUID> freeTableIds, UUID keepTableId) {
+        restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
+        RestaurantTable picked = requireTableForUpdate(branchId, tableId);
+        RestaurantTable head = picked.getMergedInto() == null ? picked : requireTableForUpdate(branchId, picked.getMergedInto().getId());
+        List<RestaurantTable> group = new java.util.ArrayList<>(List.of(head));
+        group.addAll(restaurantTableRepository.findAllByMergedInto_IdOrderByTableNumberAsc(head.getId()));
+        if (group.size() < 2) {
+            throw new AuthException("These tables aren't merged", HttpStatus.BAD_REQUEST);
+        }
+        java.util.Set<UUID> leaving = new java.util.HashSet<>(freeTableIds);
+        if (!group.stream().map(RestaurantTable::getId).collect(java.util.stream.Collectors.toSet()).containsAll(leaving)) {
+            throw new AuthException("Only tables of this group can be unmerged", HttpStatus.BAD_REQUEST);
+        }
+        List<RestaurantTable> freed = group.stream().filter(table -> leaving.contains(table.getId())).toList();
+        List<RestaurantTable> remaining = new java.util.ArrayList<>(group.stream().filter(table -> !leaving.contains(table.getId())).toList());
+        if (remaining.isEmpty()) {
+            throw new AuthException("Keep at least one table for the guests", HttpStatus.BAD_REQUEST);
+        }
+        RestaurantTable keep = keepTableId == null
+                ? (remaining.contains(head) ? head : remaining.stream()
+                        .max(java.util.Comparator.comparingInt(RestaurantTable::getCapacity).thenComparing(RestaurantTable::getTableNumber, java.util.Comparator.reverseOrder()))
+                        .orElseThrow())
+                : remaining.stream().filter(table -> table.getId().equals(keepTableId)).findFirst()
+                        .orElseThrow(() -> new AuthException("The table that keeps the order must stay", HttpStatus.BAD_REQUEST));
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        boolean seated = group.stream().anyMatch(table -> table.getStatus() == TableStatus.OCCUPIED);
+        int guests = group.stream().mapToInt(this::guestsAt).sum();
+        OffsetDateTime seatedAt = group.stream().map(RestaurantTable::getSeatedAt).filter(Objects::nonNull).min(OffsetDateTime::compareTo).orElse(null);
+        boolean moreComing = head.isMoreComing();
+        List<Order> orders = orderRepository.findAllByRestaurantTable_IdInAndStatusInOrderByOpenedAtAsc(
+                group.stream().map(RestaurantTable::getId).toList(), List.of(OrderStatus.DRAFT, OrderStatus.OPEN));
+
+        // What's left of the group, led by the table that keeps everything.
+        remaining.remove(keep);
+        remaining.add(0, keep);
+        keep.setMergedInto(null);
+        remaining.stream().skip(1).forEach(table -> table.setMergedInto(keep));
+        List<TableStatus> before = freed.stream().map(RestaurantTable::getStatus).toList();
+        for (RestaurantTable table : freed) {
+            table.setMergedInto(null);
+            if (table.getStatus() == TableStatus.OCCUPIED) {
+                table.setStatus(TableStatus.AVAILABLE);
+            }
+            table.setGuestCount(null);
+            table.setSeatedAt(null);
+            table.setMoreComing(false);
+            table.setUpdatedBy(actorId);
+        }
+        if (seated) {
+            spreadGuests(remaining, Math.max(guests, remaining.size()), actorId);
+            if (seatedAt != null) {
+                remaining.forEach(table -> table.setSeatedAt(seatedAt));
+            }
+            keep.setMoreComing(moreComing);
+        }
+        remaining.forEach(table -> table.setUpdatedBy(actorId));
+        restaurantTableSupport.saveTables(group);
+
+        String freedNumbers = freed.stream().map(RestaurantTable::getTableNumber).sorted().collect(java.util.stream.Collectors.joining(", "));
+        // One open order per table: anything that ended up apart on the group becomes the one order that stays.
+        if (orders.size() > 1) {
+            Order kept = tableOrderCombiner.combineOnto(orders.get(0).getRestaurantTable(), orders, freedNumbers + " unmerged", actorId);
+            orders = kept == null ? List.of() : List.of(kept);
+        }
+        for (Order order : orders) {
+            String from = order.getRestaurantTable() == null ? null : order.getRestaurantTable().getTableNumber();
+            boolean moves = order.getRestaurantTable() == null || !order.getRestaurantTable().getId().equals(keep.getId());
+            order.setRestaurantTable(keep);
+            order.setUpdatedBy(actorId);
+            orderSupport.addEvent(order, OrderEventType.TABLE_CHANGED,
+                    freedNumbers + " unmerged and free" + (moves && from != null ? "; moved from " + from + " to " + keep.getTableNumber()
+                            : "; the order stays on " + keep.getTableNumber()), actorId);
+            orderSupport.saveOrder(order);
+        }
+        for (int index = 0; index < freed.size(); index++) {
+            if (before.get(index) != freed.get(index).getStatus()) {
+                events.publishEvent(new TableStatusChangedEvent(restaurantId, branchId, freed.get(index).getId(), before.get(index), freed.get(index).getStatus(), actorId));
+            }
+        }
+        return restaurantTableSupport.toResponse(keep, restaurantTableSupport.loadChildMap(keep.getId()));
+    }
+
     private TableResponse updateOperationalStatus(
             Authentication authentication,
             UUID restaurantId,
@@ -419,9 +528,24 @@ public class RestaurantTableService {
             TableStatus status,
             Integer guestCount
     ) {
+        return updateOperationalStatus(authentication, restaurantId, branchId, tableId, status, guestCount, null);
+    }
+
+    private TableResponse updateOperationalStatus(
+            Authentication authentication,
+            UUID restaurantId,
+            UUID branchId,
+            UUID tableId,
+            TableStatus status,
+            Integer guestCount,
+            Boolean moreComing
+    ) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
         RestaurantTable table = requireTableForUpdate(branchId, tableId);
         TableStatus previousStatus = table.getStatus();
+        List<RestaurantTable> merged = restaurantTableRepository.findAllByMergedInto_IdOrderByTableNumberAsc(tableId);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        int previousGuests = guestsAt(table) + merged.stream().mapToInt(this::guestsAt).sum();
         if (status == TableStatus.OCCUPIED) {
             if (guestCount == null || guestCount <= 0) {
                 throw new AuthException(
@@ -429,22 +553,87 @@ public class RestaurantTableService {
                         HttpStatus.BAD_REQUEST
                 );
             }
-            table.setGuestCount(guestCount);
-            if (table.getStatus() != TableStatus.OCCUPIED || table.getSeatedAt() == null) {
-                table.setSeatedAt(OffsetDateTime.now());
+            List<RestaurantTable> group = new java.util.ArrayList<>(List.of(table));
+            group.addAll(merged);
+            // "More will come": a mark until staff untick it (how many is unknown).
+            if (moreComing != null) {
+                table.setMoreComing(moreComing);
             }
+            tableSeatingRules.check(restaurantId, group, guestCount);
+            spreadGuests(group, guestCount, actorId);
+            String tables = group.stream().map(RestaurantTable::getTableNumber).collect(java.util.stream.Collectors.joining("-"));
+            int seats = group.stream().mapToInt(RestaurantTable::getCapacity).sum();
+            events.publishEvent(new pos.pos.tables.event.GuestsSeatedEvent(
+                    restaurantId, branchId, table.getBranch().getName(), tableId, tables, seats, guestCount, previousGuests, actorId));
         } else {
             table.setGuestCount(null);
             table.setSeatedAt(null);
+            table.setMoreComing(false);
+            // The guests have gone, so the tables merged into this one are free too.
+            merged.stream().filter(child -> child.getStatus() == TableStatus.OCCUPIED).forEach(child -> {
+                child.setStatus(TableStatus.AVAILABLE);
+                child.setGuestCount(null);
+                child.setSeatedAt(null);
+                child.setUpdatedBy(actorId);
+            });
         }
         table.setStatus(status);
-        UUID actorId = restaurantScopeService.currentUserId(authentication);
         table.setUpdatedBy(actorId);
         RestaurantTable saved = restaurantTableSupport.saveTable(table);
+        restaurantTableSupport.saveTables(merged);
+        // After the table is saved: saving an order flushes it, and a half-freed table fails its own checks.
+        if (status == TableStatus.AVAILABLE) {
+            cancelEmptyOrders(saved, merged, actorId);
+        }
         if (previousStatus != status) {
             events.publishEvent(new TableStatusChangedEvent(restaurantId, branchId, tableId, previousStatus, status, actorId));
         }
         return restaurantTableSupport.toResponse(saved, restaurantTableSupport.loadChildMap(tableId));
+    }
+
+    // The guests left before ordering anything: an order with no dishes has nothing to pay, so it ends with them (user, 2026-11-01).
+    private void cancelEmptyOrders(RestaurantTable table, List<RestaurantTable> merged, UUID actorId) {
+        List<UUID> tableIds = new java.util.ArrayList<>(List.of(table.getId()));
+        merged.forEach(child -> tableIds.add(child.getId()));
+        List<Order> orders = orderRepository.findAllByRestaurantTable_IdInAndStatusInOrderByOpenedAtAsc(
+                tableIds, List.of(OrderStatus.DRAFT, OrderStatus.OPEN));
+        if (orders.isEmpty()) {
+            return;
+        }
+        Set<UUID> withDishes = orderRepository.countServed(orders.stream().map(Order::getId).toList()).stream()
+                .map(OrderRepository.OrderServedCount::getOrderId)
+                .collect(java.util.stream.Collectors.toSet());
+        orders.stream()
+                .filter(order -> !withDishes.contains(order.getId()) && !orderSupport.hasMoneyTaken(order))
+                .forEach(order -> {
+                    order.setStatus(OrderStatus.CANCELLED);
+                    order.setUpdatedBy(actorId);
+                    orderSupport.addEvent(order, OrderEventType.CANCELLED, "Cancelled: the table was set free with no dishes ordered", actorId);
+                    orderSupport.saveOrder(order);
+                });
+    }
+
+    private int guestsAt(RestaurantTable table) {
+        return table.getStatus() == TableStatus.OCCUPIED && table.getGuestCount() != null ? table.getGuestCount() : 0;
+    }
+
+    // Seats the guests across merged tables, main table first, filling each up to its seats, at least one per table.
+    private void spreadGuests(List<RestaurantTable> group, int guests, UUID actorId) {
+        int left = guests;
+        for (int index = 0; index < group.size(); index++) {
+            RestaurantTable table = group.get(index);
+            int tablesAfter = group.size() - index - 1;
+            int here = tablesAfter == 0
+                    ? Math.max(1, left)
+                    : Math.max(1, Math.min(Math.max(1, table.getCapacity()), left - tablesAfter));
+            left -= here;
+            table.setGuestCount(here);
+            if (table.getStatus() != TableStatus.OCCUPIED || table.getSeatedAt() == null) {
+                table.setSeatedAt(OffsetDateTime.now());
+            }
+            table.setStatus(TableStatus.OCCUPIED);
+            table.setUpdatedBy(actorId);
+        }
     }
 
     private RestaurantTable requireTableForUpdate(UUID branchId, UUID tableId) {
@@ -468,20 +657,38 @@ public class RestaurantTableService {
                 childTableIds,
                 List.of(OrderStatus.DRAFT, OrderStatus.OPEN)
         );
-        for (Order order : childTableOrders) {
-            if (order.getRestaurantTable() != null && Objects.equals(order.getRestaurantTable().getId(), primaryTable.getId())) {
-                continue;
-            }
-            order.setRestaurantTable(primaryTable);
-            order.setUpdatedBy(actorId);
-            orderSupport.addEvent(
-                    order,
-                    OrderEventType.TABLE_CHANGED,
-                    "Table merged into " + primaryTable.getTableNumber(),
-                    actorId
-            );
-            orderSupport.saveOrder(order);
+        if (childTableOrders.isEmpty()) {
+            return;
         }
+        // One open order per table (user, 2026-11-01): the start table's order stays and the others' dishes join it.
+        List<Order> orders = new java.util.ArrayList<>(orderRepository.findAllByRestaurantTable_IdInAndStatusInOrderByOpenedAtAsc(
+                List.of(primaryTable.getId()), List.of(OrderStatus.DRAFT, OrderStatus.OPEN)));
+        String joined = mergeTargets.stream().map(RestaurantTable::getTableNumber).sorted().collect(java.util.stream.Collectors.joining(", "));
+        // A joined table's order with no dishes ends there: its guests sat down without ordering (user, 2026-11-01).
+        childTableOrders.stream()
+                .filter(order -> !tableOrderCombiner.cancelIfEmpty(order, "Table " + order.getRestaurantTable().getTableNumber() + " joined " + primaryTable.getTableNumber(), actorId))
+                .forEach(orders::add);
+        Order kept = tableOrderCombiner.combineOnto(primaryTable, orders, joined + " joined " + primaryTable.getTableNumber(), actorId);
+        if (kept != null) {
+            orderSupport.addEvent(kept, OrderEventType.TABLE_CHANGED, joined + " joined " + primaryTable.getTableNumber(), actorId);
+            orderSupport.saveOrder(kept);
+        }
+    }
+
+    // Who can take in whom (user rules, 2026-10-31): a table takes in tables of its own kind or lower. Free and reserved
+    // are the lowest, then guests seated without an order, then a table with an order.
+    // An order with no dishes yet counts as guests seated (user, 2026-11-01).
+    private int joinRank(RestaurantTable table) {
+        boolean hasOrder = orderRepository.findAllByRestaurantTable_IdInAndStatusInOrderByOpenedAtAsc(
+                List.of(table.getId()), List.of(OrderStatus.DRAFT, OrderStatus.OPEN)
+        ).stream().anyMatch(tableOrderCombiner::hasDishes);
+        if (hasOrder) {
+            return JOIN_ORDER;
+        }
+        if (table.getStatus() == TableStatus.OCCUPIED) {
+            return JOIN_SEATED;
+        }
+        return table.getStatus() == TableStatus.RESERVED ? JOIN_RESERVED : JOIN_FREE;
     }
 
     private void validateMergeTarget(RestaurantTable mergeTarget) {
@@ -508,7 +715,8 @@ public class RestaurantTableService {
     /**
      * Rules that apply uniformly to every table in a merge attempt (the primary
      * and every target): blocked/under-maintenance tables, tables waiting to be
-     * cleared, and tables with a payment already underway can't be merged.
+     * cleared, tables whose bill was requested and tables with a payment already
+     * underway can't be merged.
      */
     private void validateMergeParticipant(RestaurantTable table) {
         if (table.getStatus() == TableStatus.MAINTENANCE || table.getStatus() == TableStatus.OUT_OF_SERVICE) {
@@ -520,8 +728,16 @@ public class RestaurantTableService {
         }
 
         Optional<Order> openOrder = orderRepository.findTopByRestaurantTable_IdAndStatusInOrderByOpenedAtDesc(
-                table.getId(), List.of(OrderStatus.OPEN)
+                table.getId(), List.of(OrderStatus.DRAFT, OrderStatus.OPEN)
         );
+        // Guests who have paid are about to leave (user, 2026-11-01).
+        if ((openOrder.isPresent() && openOrder.get().getPaymentStatus() == pos.pos.order.enums.OrderPaymentStatus.PAID)
+                || (openOrder.isEmpty() && !restaurantTableSupport.paidSinceSeated(List.of(table)).isEmpty())) {
+            throw new AuthException(table.getTableNumber() + " has paid and is waiting for its guests to leave, so it can't be joined.", HttpStatus.CONFLICT);
+        }
+        if (openOrder.isPresent() && openOrder.get().getBillRequestedAt() != null) {
+            throw new AuthException(table.getTableNumber() + "'s bill has been requested, so it can't be joined.", HttpStatus.CONFLICT);
+        }
         if (openOrder.isPresent() && openOrder.get().getPaymentStatus() == OrderPaymentStatus.PARTIALLY_PAID) {
             throw new AuthException(
                     "Payment has started for " + table.getTableNumber() + ". Finish or cancel payment before merging.",

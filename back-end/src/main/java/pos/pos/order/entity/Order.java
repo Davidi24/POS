@@ -185,6 +185,32 @@ public class Order extends AbstractAuditedEntity {
     @Column(name = "closed_at", columnDefinition = "timestamptz")
     private OffsetDateTime closedAt;
 
+    // When the guests asked for the bill; the table shows Bill Pending until it's paid or they order more.
+    @Column(name = "bill_requested_at", columnDefinition = "timestamptz")
+    private OffsetDateTime billRequestedAt;
+
+    // Closed without being paid (guests walked out, will pay later): status VOIDED with these filled in. Reopening it
+    // for payment keeps them, as its history.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "unpaid_reason", length = 20)
+    private pos.pos.order.enums.OrderUnpaidReason unpaidReason;
+
+    @Column(name = "unpaid_note", length = 2000)
+    private String unpaidNote;
+
+    @Column(name = "unpaid_amount", precision = 19, scale = 2)
+    private BigDecimal unpaidAmount;
+
+    @Column(name = "unpaid_at", columnDefinition = "timestamptz")
+    private OffsetDateTime unpaidAt;
+
+    @Column(name = "unpaid_by")
+    private java.util.UUID unpaidBy;
+
+    // The table it was on: the order lets go of the table, so the table is free for the next guests.
+    @Column(name = "unpaid_table_number", length = 30)
+    private String unpaidTableNumber;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "created_by",

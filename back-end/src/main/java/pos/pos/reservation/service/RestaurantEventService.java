@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.repository.MenuRepository;
+import pos.pos.menu.service.SpecialMenuEventLinks;
 import pos.pos.reservation.dto.RestaurantEventDto;
 import pos.pos.reservation.entity.RestaurantEvent;
 import pos.pos.reservation.repository.RestaurantEventRepository;
@@ -21,7 +22,7 @@ import java.util.UUID;
 
 // The restaurant's own nights (Admin Hub → Settings → Reservations → Event nights): a name, days, an icon and the
 // special menu that shows only then. Bookings those days stay normal and show the event icon. Choosing a menu makes
-// it a special menu available only on the event's days.
+// it a special menu available only on the event's days; the link rules live in SpecialMenuEventLinks.
 @Service
 @RequiredArgsConstructor
 public class RestaurantEventService {
@@ -30,6 +31,7 @@ public class RestaurantEventService {
     private final RestaurantEventRepository restaurantEventRepository;
     private final MenuRepository menuRepository;
     private final ReservationSupport reservationSupport;
+    private final SpecialMenuEventLinks specialMenuEventLinks;
 
     // Events still to come or on now (and the last month's, to look back).
     @Transactional(readOnly = true)
@@ -69,6 +71,7 @@ public class RestaurantEventService {
         restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         RestaurantEvent event = restaurantEventRepository.findByIdAndRestaurantId(eventId, restaurantId)
                 .orElseThrow(() -> new AuthException("Event not found", HttpStatus.NOT_FOUND));
+        specialMenuEventLinks.eventRemoved(event);
         restaurantEventRepository.delete(event);
     }
 
@@ -88,18 +91,14 @@ public class RestaurantEventService {
         event.setSpecialMenuOnly(Boolean.TRUE.equals(request.getSpecialMenuOnly()));
         event.setActive(request.getActive() == null || request.getActive());
         event.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
-        event.setMenuId(null);
+        Menu menu = null;
         if (request.getMenuId() != null) {
-            Menu menu = menuRepository.findByIdAndRestaurantDeletedAtIsNull(request.getMenuId())
+            menu = menuRepository.findByIdAndRestaurantDeletedAtIsNull(request.getMenuId())
                     .filter(candidate -> Objects.equals(candidate.getRestaurant().getId(), restaurantId))
                     .orElseThrow(() -> new AuthException("Choose one of this restaurant's menus", HttpStatus.BAD_REQUEST));
-            // The event's menu is a special menu shown only on its days.
-            menu.setSpecial(true);
-            menu.setAvailableFromDate(request.getStartDate());
-            menu.setAvailableUntilDate(request.getEndDate());
-            menuRepository.save(menu);
-            event.setMenuId(menu.getId());
         }
+        // The event's menu is a special menu shown only on its days; a menu it lets go of is switched off.
+        specialMenuEventLinks.eventUsesMenu(event, menu);
         return toDto(restaurantEventRepository.saveAndFlush(event));
     }
 

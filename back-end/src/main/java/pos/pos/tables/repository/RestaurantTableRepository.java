@@ -97,4 +97,19 @@ public interface RestaurantTableRepository extends JpaRepository<RestaurantTable
             ORDER BY t.floor ASC
             """)
     List<String> findDistinctFloorsByBranchId(UUID branchId);
+
+    // Tables with guests or an open order, not those merged into another; for the special cases.
+    @Query("""
+            select t.id from RestaurantTable t
+            where t.mergedInto is null and t.restaurant.status = pos.pos.restaurant.enums.RestaurantStatus.ACTIVE
+              and t.status in (pos.pos.tables.enums.TableStatus.OCCUPIED, pos.pos.tables.enums.TableStatus.AVAILABLE, pos.pos.tables.enums.TableStatus.RESERVED)
+              and (t.status = pos.pos.tables.enums.TableStatus.OCCUPIED or exists (
+                  select o.id from pos.pos.order.entity.Order o where (o.restaurantTable = t or o.restaurantTable.mergedInto = t)
+                  and o.status in (pos.pos.order.enums.OrderStatus.DRAFT, pos.pos.order.enums.OrderStatus.OPEN)))
+            """)
+    List<UUID> findRootIdsWithGuests();
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("update RestaurantTable t set t.stillHereAt = :now where t.restaurant.id = :restaurantId")
+    void restartClocks(UUID restaurantId, java.time.OffsetDateTime now);
 }

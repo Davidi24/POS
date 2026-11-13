@@ -43,6 +43,19 @@ security:
     refresh-expiration: 1d
 
 app:
+  restaurants:
+    # Public restaurant applications (POST /restaurants/registrations), each reviewed by a super admin before the
+    # restaurant exists. Off: only super admins create restaurants (applicants can still check earlier applications).
+    public-registration-enabled: ${APP_PUBLIC_REGISTRATION_ENABLED:true}
+    applications:
+      # Applications per IP address and per owner email, and status checks per IP address, within each window.
+      max-per-ip: ${APP_APPLICATIONS_MAX_PER_IP:5}
+      ip-window-minutes: ${APP_APPLICATIONS_IP_WINDOW_MINUTES:60}
+      max-per-email: ${APP_APPLICATIONS_MAX_PER_EMAIL:3}
+      email-window-hours: ${APP_APPLICATIONS_EMAIL_WINDOW_HOURS:24}
+      status-checks-per-ip: ${APP_APPLICATIONS_STATUS_CHECKS_PER_IP:30}
+      status-window-minutes: ${APP_APPLICATIONS_STATUS_WINDOW_MINUTES:10}
+
   payments:
     # A live provider must be configured before booking money can be collected.
     provider: ${APP_PAYMENTS_PROVIDER:disabled}
@@ -50,6 +63,17 @@ app:
   storage:
     floor-plans:
       provider: ${FLOOR_PLAN_STORAGE_PROVIDER:disabled}
+    menu-images:
+      # Dish photos: "r2" (Cloudflare R2, production), "local" (a folder, development) or "disabled".
+      provider: ${MENU_IMAGE_STORAGE_PROVIDER:disabled}
+      local-directory: ${MENU_IMAGE_LOCAL_DIRECTORY:uploads}
+    r2:
+      endpoint: ${R2_ENDPOINT:}
+      access-key-id: ${R2_ACCESS_KEY_ID:}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+      bucket: ${R2_BUCKET:saporini-assets}
+      # Optional public bucket domain (r2.dev or your own). Empty: the backend serves photos at /public/menu-images/**.
+      public-base-url: ${R2_PUBLIC_BASE_URL:}
 
   security:
     max-user-agent-length: 512
@@ -96,7 +120,11 @@ app:
       token-ttl: ${PASSWORD_RESET_TOKEN_TTL:30m}
       request-cooldown: ${PASSWORD_RESET_REQUEST_COOLDOWN:2m}
       token-pepper: ${PASSWORD_RESET_TOKEN_PEPPER}
-      reset-path: ${PASSWORD_RESET_FRONTEND_PATH:/reset-password}
+      # Owners' invitations stay usable longer than reset links.
+      invite-token-ttl: ${OWNER_INVITE_TOKEN_TTL:72h}
+      # Emailed links open this backend's own page (/public/account/password) until a website takes over.
+      link-base-url: ${PASSWORD_LINK_BASE_URL:${PUBLIC_BASE_URL:http://localhost:8080}}
+      reset-path: ${PASSWORD_RESET_FRONTEND_PATH:/public/account/password}
       subject: ${PASSWORD_RESET_EMAIL_SUBJECT:Reset your POS password}
 
     email-verification:
@@ -118,6 +146,13 @@ app:
 
   mail:
     from: ${MAIL_FROM:no-reply@pos.local}
+    # Account emails wait here and are retried while the mail server is down.
+    outbox:
+      poll-ms: ${MAIL_OUTBOX_POLL_MS:5000}
+      batch-size: ${MAIL_OUTBOX_BATCH_SIZE:20}
+      max-attempts: ${MAIL_OUTBOX_MAX_ATTEMPTS:8}
+      sending-lease: ${MAIL_OUTBOX_SENDING_LEASE:2m}
+      retention: ${MAIL_OUTBOX_RETENTION:90d}
 
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:3000}

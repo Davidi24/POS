@@ -18,6 +18,7 @@ import java.util.UUID;
 public class RestaurantResponse {
 
     private UUID id;
+    private long version;
     private String name;
     private String legalName;
     private String code;

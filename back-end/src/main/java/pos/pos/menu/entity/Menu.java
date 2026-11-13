@@ -104,6 +104,10 @@ public class Menu extends AbstractAuditedEntity {
     @Column(name = "is_special", nullable = false)
     private boolean special = false;
 
+    // Shown to waiters in Menu and at the till (Menu → "Menus shown").
+    @Column(name = "shown_to_waiters", nullable = false)
+    private boolean shownToWaiters = true;
+
     @OneToMany(mappedBy = "menu")
     private List<MenuSection> sections = new ArrayList<>();
 
@@ -145,6 +149,14 @@ public class Menu extends AbstractAuditedEntity {
                 ? dateTime.toLocalDate().minusDays(1)
                 : dateTime.toLocalDate();
         if (!isAvailableOn(availabilityDate)) {
+            return false;
+        }
+        return isOpenAt(time);
+    }
+
+    /** Whether the menu's daily hours include this time (dates aside). The window may cross midnight. */
+    public boolean isOpenAt(LocalTime time) {
+        if (time == null) {
             return false;
         }
         if (availableFrom == null && availableUntil == null) {

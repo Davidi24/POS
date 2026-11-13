@@ -10,7 +10,14 @@ import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.inventory.InventoryLocationNotFoundException;
 import pos.pos.inventory.dto.InventoryLocationRequest;
 import pos.pos.inventory.dto.InventoryLocationResponse;
+import pos.pos.inventory.entity.InventoryLevel;
 import pos.pos.inventory.entity.InventoryLocation;
+import pos.pos.inventory.entity.InventorySalesSource;
+import pos.pos.inventory.enums.InventoryCountStatus;
+import pos.pos.inventory.enums.InventoryKindScope;
+import pos.pos.inventory.enums.InventoryLocationType;
+import pos.pos.inventory.repository.InventoryCountRepository;
+import pos.pos.inventory.repository.InventoryLevelRepository;
 import pos.pos.inventory.mapper.InventoryLocationMapper;
 import pos.pos.inventory.repository.InventoryLocationRepository;
 import pos.pos.inventory.repository.InventorySalesSourceRepository;
@@ -34,6 +41,11 @@ public class InventoryLocationService {
     private final InventoryLocationRepository inventoryLocationRepository;
     private final InventorySalesSourceRepository inventorySalesSourceRepository;
     private final InventoryLocationMapper inventoryLocationMapper;
+    private final InventoryChangeNotifier inventoryChangeNotifier;
+    private final InventoryKindService inventoryKindService;
+    private final InventoryLevelRepository inventoryLevelRepository;
+    private final InventoryCountRepository inventoryCountRepository;
+    private final InventoryMovementService inventoryMovementService;
 
     @Transactional
     public InventoryLocationResponse createLocation(
@@ -52,8 +64,11 @@ public class InventoryLocationService {
         location.setCreatedBy(actorId);
         location.setUpdatedBy(actorId);
         inventoryLocationMapper.applyRequest(location, request);
+        location.setKind(ownKind(restaurantId, location, request));
 
-        return inventoryLocationMapper.toResponse(saveLocation(location));
+        InventoryLocation saved = saveLocation(location);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return inventoryLocationMapper.toResponse(saved);
     }
 
     @Transactional
@@ -81,8 +96,11 @@ public class InventoryLocationService {
         location.setBranch(nextBranch);
         location.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         inventoryLocationMapper.applyRequest(location, request);
+        location.setKind(ownKind(restaurantId, location, request));
 
-        return inventoryLocationMapper.toResponse(saveLocation(location));
+        InventoryLocation saved = saveLocation(location);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+        return inventoryLocationMapper.toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -94,7 +112,7 @@ public class InventoryLocationService {
     @Transactional(readOnly = true)
     public List<InventoryLocationResponse> listActiveLocations(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
-        return inventoryLocationRepository.findAllByRestaurant_IdAndActiveTrueOrderByNameAsc(restaurantId).stream()
+        return inventoryLocationRepository.findAllByRestaurant_IdAndActiveTrueAndDeletedAtIsNullOrderByNameAsc(restaurantId).stream()
                 .map(inventoryLocationMapper::toResponse)
                 .toList();
     }
@@ -102,7 +120,7 @@ public class InventoryLocationService {
     @Transactional(readOnly = true)
     public List<InventoryLocationResponse> listAllLocations(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.requireAccessibleRestaurant(authentication, restaurantId);
-        return inventoryLocationRepository.findAllByRestaurant_IdOrderByNameAsc(restaurantId).stream()
+        return inventoryLocationRepository.findAllByRestaurant_IdAndDeletedAtIsNullOrderByNameAsc(restaurantId).stream()
                 .map(inventoryLocationMapper::toResponse)
                 .toList();
     }
@@ -119,11 +137,106 @@ public class InventoryLocationService {
         location.setActive(false);
         location.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
         saveLocation(location);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
     }
 
     private InventoryLocation requireLocation(UUID restaurantId, UUID locationId) {
-        return inventoryLocationRepository.findByIdAndRestaurant_Id(locationId, restaurantId)
+        return inventoryLocationRepository.findByIdAndRestaurant_IdAndDeletedAtIsNull(locationId, restaurantId)
                 .orElseThrow(InventoryLocationNotFoundException::new);
+    }
+
+    /**
+     * Deletes a place (Stock → Places → Delete; user, 2026-10-30). Asked first in the app what happens to its stock:
+     * [keepStock] moves every line to the branch's Uncategorized place (made when missing) and points its sale places
+     * there too; otherwise the stock is taken out of stock as a correction and its sale places go. Either way History keeps
+     * a "Place deleted: …" line per item. Refused while a count of it isn't approved or cancelled.
+     */
+    @Transactional
+    public void deleteLocation(Authentication authentication, UUID restaurantId, UUID locationId, boolean keepStock) {
+        restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        InventoryLocation location = requireLocation(restaurantId, locationId);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+
+        if (inventoryCountRepository.existsByLocation_IdAndStatusIn(locationId, java.util.List.of(InventoryCountStatus.DRAFT,
+                InventoryCountStatus.IN_PROGRESS, InventoryCountStatus.COMPLETED))) {
+            throw new AuthException(location.getName() + " has a count that isn't approved yet. Approve or cancel it first.", HttpStatus.CONFLICT);
+        }
+        List<InventoryLevel> levels = inventoryLevelRepository.findAllByLocation_IdOrderByInventoryItem_NameAsc(locationId).stream()
+                .filter(level -> level.getOnHandQuantity() != null && level.getOnHandQuantity().signum() > 0)
+                .toList();
+        if (keepStock && location.getLocationType() == InventoryLocationType.UNCATEGORIZED && !levels.isEmpty()) {
+            throw new AuthException("Uncategorized can't keep its own stock. Move it to another place first, or delete it with the place.",
+                    HttpStatus.CONFLICT);
+        }
+
+        // Uncategorized is only made when there is stock to keep.
+        InventoryLocation target = keepStock && !levels.isEmpty() ? uncategorizedFor(location, actorId) : null;
+        for (InventoryLevel level : levels) {
+            inventoryMovementService.clearForPlaceDeletion(restaurantId, location, target, level.getInventoryItem(), level.getOnHandQuantity(), actorId);
+        }
+        inventoryLevelRepository.deleteAllForLocation(locationId);
+        if (target != null) {
+            for (InventorySalesSource source : inventorySalesSourceRepository.findAllByLocation_Id(locationId)) {
+                source.setLocation(target);
+                inventorySalesSourceRepository.save(source);
+            }
+        } else {
+            inventorySalesSourceRepository.deleteAllByLocation_Id(locationId);
+        }
+
+        location.setActive(false);
+        location.setDeletedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC));
+        // Codes stay unique per restaurant even for deleted places, so this one's code is freed for a new place.
+        String tail = "-DEL-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);
+        String code = location.getCode();
+        location.setCode((code.length() + tail.length() > 80 ? code.substring(0, 80 - tail.length()) : code) + tail);
+        location.setUpdatedBy(actorId);
+        saveLocation(location);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
+    }
+
+    // The Uncategorized place of the deleted place's branch (or of the whole restaurant), made the first time it's needed.
+    private InventoryLocation uncategorizedFor(InventoryLocation from, UUID actorId) {
+        UUID restaurantId = from.getRestaurant().getId();
+        Branch branch = from.getBranch();
+        InventoryLocation found = (branch == null
+                ? inventoryLocationRepository.findFirstByRestaurant_IdAndLocationTypeAndBranchIsNullAndDeletedAtIsNullOrderByCreatedAtAsc(
+                        restaurantId, InventoryLocationType.UNCATEGORIZED)
+                : inventoryLocationRepository.findFirstByRestaurant_IdAndLocationTypeAndBranch_IdAndDeletedAtIsNullOrderByCreatedAtAsc(
+                        restaurantId, InventoryLocationType.UNCATEGORIZED, branch.getId()))
+                .filter(place -> !place.getId().equals(from.getId()))
+                .orElse(null);
+        if (found != null) {
+            if (!found.isActive()) {
+                found.setActive(true);
+                found.setUpdatedBy(actorId);
+                saveLocation(found);
+            }
+            return found;
+        }
+        String base = NormalizationUtils.normalizeCode("UNCATEGORIZED" + (branch == null ? "" : "-" + branch.getCode()), 70);
+        String code = base;
+        for (int n = 2; inventoryLocationRepository.findByRestaurant_IdAndCode(restaurantId, code).isPresent(); n++) {
+            code = base + "-" + n;
+        }
+        InventoryLocation place = new InventoryLocation();
+        place.setRestaurant(from.getRestaurant());
+        place.setBranch(branch);
+        place.setCode(code);
+        place.setName("Uncategorized");
+        place.setLocationType(InventoryLocationType.UNCATEGORIZED);
+        place.setNotes("Stock from deleted places. Move it where it belongs.");
+        place.setActive(true);
+        place.setCreatedBy(actorId);
+        place.setUpdatedBy(actorId);
+        return saveLocation(place);
+    }
+
+    // One of the restaurant's own kinds for a CUSTOM place, none for the built-in kinds.
+    private pos.pos.inventory.entity.InventoryKind ownKind(UUID restaurantId, InventoryLocation location, InventoryLocationRequest request) {
+        return location.getLocationType() == InventoryLocationType.CUSTOM
+                ? inventoryKindService.requireOwnKind(restaurantId, InventoryKindScope.PLACE, request.getKindId())
+                : null;
     }
 
     private Branch resolveBranch(UUID restaurantId, UUID branchId) {

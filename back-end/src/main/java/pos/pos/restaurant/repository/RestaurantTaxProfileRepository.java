@@ -28,9 +28,11 @@ public interface RestaurantTaxProfileRepository extends JpaRepository<Restaurant
             WHERE t.restaurant.id = :restaurantId
               AND t.isDefault = true
               AND t.deletedAt IS NULL
+              AND (:keepId IS NULL OR t.id <> :keepId)
             """)
     void clearAllDefault(
             @Param("restaurantId") UUID restaurantId,
-            @Param("actorId") UUID actorId
+            @Param("actorId") UUID actorId,
+            @Param("keepId") UUID keepId
     );
 }

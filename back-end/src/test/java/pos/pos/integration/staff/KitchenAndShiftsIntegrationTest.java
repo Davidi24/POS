@@ -136,7 +136,7 @@ class KitchenAndShiftsIntegrationTest extends AbstractPosApiIntegrationTest {
 
         put(SHIFTS + "/pay-rates/{u}", r, b, waiter.getId()).as(managerToken).body(Map.of("hourlyRate", new BigDecimal("12.50"))).expect(200);
         put(SHIFTS + "/pay-rates/{u}", r, b, waiter.getId()).as(waiterToken).body(Map.of("hourlyRate", new BigDecimal("99"))).expect(403);
-        put(SHIFTS + "/pay-rates/{u}", r, b, waiter.getId()).as(managerToken).body(Map.of("hourlyRate", new BigDecimal("10000.01"))).expect(400);
+        put(SHIFTS + "/pay-rates/{u}", r, b, waiter.getId()).as(managerToken).body(Map.of("hourlyRate", new BigDecimal("10000000.01"))).expect(400);
 
         JsonNode shift = post(SHIFTS + "/clock-in", r, b).as(waiterToken).body(Map.of()).expect(200);
         UUID shiftId = id(shift);

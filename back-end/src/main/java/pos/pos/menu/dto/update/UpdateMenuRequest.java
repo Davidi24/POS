@@ -9,9 +9,11 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import pos.pos.menu.dto.request.SpecialMenuKind;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -53,6 +55,15 @@ public class UpdateMenuRequest {
     @Size(max = 20, message = "Color must be at most 20 characters")
     private String color;
 
-    // Occasion extras or an event night's menu.
+    // A special menu: booking extras or an event night's menu.
     private Boolean special;
+
+    // With special = true: what it's for (null keeps what it is now). EVENT needs eventId.
+    private SpecialMenuKind specialKind;
+
+    // The event night an EVENT menu belongs to; the menu takes its days.
+    private UUID eventId;
+
+    // Shown in POS (to waiters and at the till); null keeps it (a new menu shows).
+    private Boolean shownToWaiters;
 }

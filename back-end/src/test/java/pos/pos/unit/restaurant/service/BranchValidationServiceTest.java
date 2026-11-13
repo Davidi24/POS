@@ -45,7 +45,7 @@ class BranchValidationServiceTest {
     @Test
     @DisplayName("normalizeAndValidateFields should return normalized code when unique on create")
     void shouldNormalizeAndAcceptUniqueCodeOnCreate() {
-        given(branchRepository.existsByRestaurantIdAndCodeAndDeletedAtIsNull(RESTAURANT_ID, "DOWN_TOWN"))
+        given(branchRepository.existsByRestaurantIdAndCode(RESTAURANT_ID, "DOWN_TOWN"))
                 .willReturn(false);
 
         BranchValidationService.NormalizedBranchFields result =
@@ -57,7 +57,7 @@ class BranchValidationServiceTest {
     @Test
     @DisplayName("normalizeAndValidateFields should fall back to name when code is blank")
     void shouldFallbackToNameWhenCodeBlank() {
-        given(branchRepository.existsByRestaurantIdAndCodeAndDeletedAtIsNull(RESTAURANT_ID, "DOWNTOWN"))
+        given(branchRepository.existsByRestaurantIdAndCode(RESTAURANT_ID, "DOWNTOWN"))
                 .willReturn(false);
 
         BranchValidationService.NormalizedBranchFields result =
@@ -69,18 +69,46 @@ class BranchValidationServiceTest {
     @Test
     @DisplayName("normalizeAndValidateFields should reject duplicate code on create")
     void shouldRejectDuplicateCodeOnCreate() {
-        given(branchRepository.existsByRestaurantIdAndCodeAndDeletedAtIsNull(RESTAURANT_ID, "DOWNTOWN"))
+        given(branchRepository.existsByRestaurantIdAndCode(RESTAURANT_ID, "DOWNTOWN"))
                 .willReturn(true);
 
         assertThatThrownBy(() ->
                 branchValidationService.normalizeAndValidateFields("downtown", "Downtown", RESTAURANT_ID, null))
-                .isInstanceOf(BranchCodeAlreadyExistsException.class);
+                .isInstanceOf(BranchCodeAlreadyExistsException.class)
+                .hasMessage("Branch code already in use for this restaurant")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("normalizeAndValidateFields keeps a removed branch's code reserved with a clear conflict")
+    void shouldReserveRemovedBranchCode() {
+        given(branchRepository.existsByRestaurantIdAndCode(RESTAURANT_ID, "OLD_TOWN")).willReturn(true);
+        given(branchRepository.existsByRestaurantIdAndCodeAndDeletedAtIsNotNull(RESTAURANT_ID, "OLD_TOWN")).willReturn(true);
+
+        assertThatThrownBy(() ->
+                branchValidationService.normalizeAndValidateFields("old town", "Old Town", RESTAURANT_ID, null))
+                .isInstanceOf(BranchCodeAlreadyExistsException.class)
+                .hasMessageContaining("removed branch and stays reserved")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("normalizeAndValidateFields refuses renaming a branch to a removed branch's code")
+    void shouldRefuseRenameToRemovedBranchCode() {
+        given(branchRepository.existsByRestaurantIdAndCodeAndIdNot(RESTAURANT_ID, "OLD_TOWN", BRANCH_ID)).willReturn(true);
+        given(branchRepository.existsByRestaurantIdAndCodeAndDeletedAtIsNotNull(RESTAURANT_ID, "OLD_TOWN")).willReturn(true);
+
+        assertThatThrownBy(() ->
+                branchValidationService.normalizeAndValidateFields("OLD_TOWN", "Renamed", RESTAURANT_ID, BRANCH_ID))
+                .hasMessageContaining("stays reserved");
     }
 
     @Test
     @DisplayName("normalizeAndValidateFields should skip self-conflict on update")
     void shouldSkipSelfConflictOnUpdate() {
-        given(branchRepository.existsByRestaurantIdAndCodeAndIdNotAndDeletedAtIsNull(RESTAURANT_ID, "DOWNTOWN", BRANCH_ID))
+        given(branchRepository.existsByRestaurantIdAndCodeAndIdNot(RESTAURANT_ID, "DOWNTOWN", BRANCH_ID))
                 .willReturn(false);
 
         BranchValidationService.NormalizedBranchFields result =
@@ -92,7 +120,7 @@ class BranchValidationServiceTest {
     @Test
     @DisplayName("normalizeAndValidateFields should reject a code used by another branch on update")
     void shouldRejectConflictingCodeOnUpdate() {
-        given(branchRepository.existsByRestaurantIdAndCodeAndIdNotAndDeletedAtIsNull(RESTAURANT_ID, "DOWNTOWN", BRANCH_ID))
+        given(branchRepository.existsByRestaurantIdAndCodeAndIdNot(RESTAURANT_ID, "DOWNTOWN", BRANCH_ID))
                 .willReturn(true);
 
         assertThatThrownBy(() ->

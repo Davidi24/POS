@@ -70,6 +70,11 @@ public enum AppPermission {
     KDS_ACCESS("Open Kitchen Display", "Open the kitchen display workspace"),
     ADMIN_ACCESS("Open Admin Hub", "Open the admin hub workspace"),
     STATISTICS_ACCESS("Open Statistics", "Open the statistics workspace"),
+    // Inventory (stock, items, places, counts, history, suppliers) has its own permissions since 2026-10-30; it used the
+    // settings ones before.
+    INVENTORY_ACCESS("Open Inventory", "Open the inventory workspace"),
+    INVENTORY_READ("View Stock", "See stock, items, places, counts, history and suppliers"),
+    INVENTORY_UPDATE("Change Stock", "Receive, move, waste and count stock; change items, places and suppliers"),
     FRAUD_ACCESS("Open Fraud Detection", "Open the fraud detection workspace");
 
 

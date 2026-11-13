@@ -53,6 +53,10 @@ class LocalRestaurantSeedRunnerTest {
     @Mock
     private PasswordService passwordService;
 
+    @Mock private pos.pos.restaurant.repository.BranchRepository branchRepository;
+    @Mock private pos.pos.restaurant.repository.RestaurantAddressRepository restaurantAddressRepository;
+    @Mock private pos.pos.restaurant.repository.RestaurantTaxProfileRepository restaurantTaxProfileRepository;
+
     @InjectMocks
     private LocalRestaurantSeedRunner localRestaurantSeedRunner;
 
@@ -187,8 +191,8 @@ class LocalRestaurantSeedRunnerTest {
     }
 
     @Test
-    @DisplayName("run should repair ownerless sample restaurants")
-    void shouldRepairOwnerlessRestaurant() throws Exception {
+    @DisplayName("run must preserve an archived ownerless demo restaurant")
+    void shouldPreserveArchivedRestaurant() throws Exception {
         User bistroOwner = existingOwner(
                 LocalRestaurantSeedRunner.DEMO_BISTRO_OWNER_ID,
                 "bistro.owner@pos.local",
@@ -247,15 +251,13 @@ class LocalRestaurantSeedRunnerTest {
                         "local-demo-cafe",
                         LocalRestaurantSeedRunner.DEMO_CAFE_OWNER_ID
                 )));
-        given(restaurantRepository.save(any(Restaurant.class))).willAnswer(invocation -> invocation.getArgument(0));
-
         localRestaurantSeedRunner.run();
 
-        assertThat(ownerlessRestaurant.getDeletedAt()).isNull();
-        assertThat(ownerlessRestaurant.isActive()).isTrue();
-        assertThat(ownerlessRestaurant.getStatus()).isEqualTo(RestaurantStatus.ACTIVE);
-        assertThat(ownerlessRestaurant.getOwnerId()).isEqualTo(LocalRestaurantSeedRunner.DEMO_BISTRO_OWNER_ID);
-        verify(restaurantRepository, times(1)).save(ownerlessRestaurant);
+        assertThat(ownerlessRestaurant.getDeletedAt()).isNotNull();
+        assertThat(ownerlessRestaurant.isActive()).isFalse();
+        assertThat(ownerlessRestaurant.getStatus()).isEqualTo(RestaurantStatus.ARCHIVED);
+        assertThat(ownerlessRestaurant.getOwnerId()).isNull();
+        verify(restaurantRepository, never()).save(any(Restaurant.class));
     }
 
     private Role role(String code) {

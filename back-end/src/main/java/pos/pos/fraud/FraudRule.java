@@ -9,6 +9,7 @@ public enum FraudRule {
     ITEM_VOID_AFTER_KITCHEN(FraudSeverity.MEDIUM, "Item removed after cooking", "An item removed after it was sent to the kitchen"),
     MANY_VOIDS(FraudSeverity.HIGH, "Many removals", "One person removed more items or orders in a day than the set limit"),
     ORDER_VOIDED_AFTER_KITCHEN(FraudSeverity.HIGH, "Order voided after cooking", "A whole order voided after food went to the kitchen"),
+    CLOSED_UNPAID(FraudSeverity.MEDIUM, "Closed as unpaid", "An order closed without being paid (guests walked out or will pay later)"),
     CANCELLED_AFTER_KITCHEN(FraudSeverity.MEDIUM, "Order cancelled after cooking", "An order cancelled after food went to the kitchen"),
     LARGE_REFUND(FraudSeverity.HIGH, "Big refund", "A refund at or above the set amount"),
     CASH_REFUNDS(FraudSeverity.HIGH, "Many cash refunds", "One person gave more cash refunds in a day than the set limit"),

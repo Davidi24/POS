@@ -21,13 +21,23 @@ public class ReservationReminderDeliveryService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordGuestReminderSent(UUID reservationId) {
-        if (reservationEventRepository.existsByReservation_IdAndType(reservationId, ReservationEventType.GUEST_REMINDED)) {
+        recordGuestReminderSent(reservationId, ReservationEventType.GUEST_REMINDED);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordGuestReminderSent(UUID reservationId, ReservationEventType type) {
+        var booking=reservationRepository.findById(reservationId).orElse(null);
+        if(booking==null)return;
+        boolean sent=booking.getScheduleChangedAt()==null
+            ? reservationEventRepository.existsByReservation_IdAndType(reservationId,type)
+            : reservationEventRepository.existsByReservation_IdAndTypeAndCreatedAtGreaterThanEqual(reservationId,type,booking.getScheduleChangedAt());
+        if (sent) {
             return;
         }
         ReservationEvent event = new ReservationEvent();
-        event.setReservation(reservationRepository.getReferenceById(reservationId));
-        event.setType(ReservationEventType.GUEST_REMINDED);
-        event.setDetail("Guest asked to confirm by email");
+        event.setReservation(booking);
+        event.setType(type);
+        event.setDetail(type == ReservationEventType.GUEST_REMINDED_AGAIN ? "Guest asked again to confirm by email" : "Guest asked to confirm by email");
         reservationEventRepository.save(event);
     }
 }

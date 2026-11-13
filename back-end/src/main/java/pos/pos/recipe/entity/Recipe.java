@@ -20,6 +20,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractAuditedEntity;
+import pos.pos.inventory.entity.InventoryItem;
 import pos.pos.inventory.enums.InventoryUnit;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.recipe.enums.RecipeStatus;
@@ -152,6 +153,21 @@ public class Recipe extends AbstractAuditedEntity {
 
     @Column(name = "instructions", columnDefinition = "text")
     private String instructions;
+
+    @Column(name = "image_url", columnDefinition = "text")
+    private String imageUrl;
+
+    /**
+     * The item in Inventory → Items that this sub-recipe makes (a sauce, a dough): its name, kind, unit and cost per
+     * unit follow the recipe. Null for a dish's own recipe. One recipe per item (unique index uk_recipes_output_item).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "output_item_id",
+            columnDefinition = "uuid",
+            foreignKey = @ForeignKey(name = "fk_recipes_output_item")
+    )
+    private InventoryItem outputItem;
 
     @Column(name = "theoretical_cost", nullable = false, precision = 19, scale = 2)
     private BigDecimal theoreticalCost = BigDecimal.ZERO;

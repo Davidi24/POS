@@ -19,8 +19,11 @@ import java.util.concurrent.CopyOnWriteArraySet;
 @RequiredArgsConstructor
 public class OrderChangeNotifier {
     private final RestaurantScopeService restaurantScopeService;
+    private final pos.pos.tables.realtime.TableLayoutChangeNotifier tableLayoutChangeNotifier;
     private final ConcurrentHashMap<BranchKey, CopyOnWriteArraySet<SseEmitter>> subscribers = new ConcurrentHashMap<>();
 
+    // The branch check reads the restaurant lazily, and open-in-view is off: it needs its own read transaction.
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public SseEmitter subscribe(Authentication authentication, UUID restaurantId, UUID branchId) {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         BranchKey key = new BranchKey(restaurantId, branchId);
@@ -42,11 +45,17 @@ public class OrderChangeNotifier {
         BranchKey key = new BranchKey(restaurantId, branchId);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override public void afterCommit() { broadcast(key, "orders-changed"); }
+                @Override public void afterCommit() { announce(key); }
             });
         } else {
-            broadcast(key, "orders-changed");
+            announce(key);
         }
+    }
+
+    // A table's colour and ring follow its order's dishes, so the floor plan refreshes too.
+    private void announce(BranchKey key) {
+        broadcast(key, "orders-changed");
+        tableLayoutChangeNotifier.notifyBranchChanged(key.restaurantId(), key.branchId());
     }
 
     @Scheduled(fixedDelay = 25000)

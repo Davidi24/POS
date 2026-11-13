@@ -51,7 +51,7 @@ public class GuestBookingPageController {
 
     @GetMapping(value = "/book/{restaurantSlug}/{branchCode}", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> bookingForm(@PathVariable String restaurantSlug, @PathVariable String branchCode) {
-        return page(HttpStatus.OK, bookingFormHtml(restaurantSlug, branchCode, null, FormValues.EMPTY));
+        return bookingFormPage(HttpStatus.OK, restaurantSlug, branchCode, null, FormValues.EMPTY);
     }
 
     @PostMapping(value = "/book/{restaurantSlug}/{branchCode}", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
@@ -89,10 +89,10 @@ public class GuestBookingPageController {
             if (error.getStatus() == HttpStatus.NOT_FOUND) {
                 return page(HttpStatus.NOT_FOUND, message("Not found", "This restaurant doesn't take bookings online."));
             }
-            return page(HttpStatus.BAD_REQUEST, bookingFormHtml(restaurantSlug, branchCode, error.getMessage(), values));
+            return bookingFormPage(HttpStatus.BAD_REQUEST, restaurantSlug, branchCode, error.getMessage(), values);
         } catch (RuntimeException error) {
             String problem = error instanceof IllegalArgumentException ? error.getMessage() : "Check the day and time";
-            return page(HttpStatus.BAD_REQUEST, bookingFormHtml(restaurantSlug, branchCode, problem, values));
+            return bookingFormPage(HttpStatus.BAD_REQUEST, restaurantSlug, branchCode, problem, values);
         }
     }
 
@@ -170,13 +170,18 @@ public class GuestBookingPageController {
 
     // ---- HTML ----
 
-    private String bookingFormHtml(String restaurantSlug, String branchCode, String problem, FormValues values) {
-        Branch branch;
+    private ResponseEntity<String> bookingFormPage(HttpStatus status, String restaurantSlug, String branchCode,
+                                                    String problem, FormValues values) {
         try {
-            branch = reservationSupport.requirePublicBranch(restaurantSlug, branchCode);
+            return page(status, bookingFormHtml(restaurantSlug, branchCode, problem, values));
         } catch (AuthException error) {
-            return message("Not found", "This restaurant doesn't take bookings online.");
+            if (error.getStatus() != HttpStatus.NOT_FOUND) throw error;
+            return page(HttpStatus.NOT_FOUND, message("Not found", "This restaurant doesn't take bookings online."));
         }
+    }
+
+    private String bookingFormHtml(String restaurantSlug, String branchCode, String problem, FormValues values) {
+        Branch branch = reservationSupport.requirePublicBranch(restaurantSlug, branchCode);
         List<ReservationOccasionDto> occasions = reservationOccasionService.activeOccasions(branch.getRestaurant().getId());
         ZoneId zone = reservationSupport.restaurantZone(branch.getRestaurant());
         String today = LocalDate.now(zone).toString();
@@ -201,7 +206,9 @@ public class GuestBookingPageController {
                 + (occasions.isEmpty() ? "" : "<label>Occasion (optional)<select name='occasion'>" + occasionOptions + "</select></label>")
                 + "<label>Note (optional)<textarea name='note' maxlength='2000'>" + esc(or(values.note(), "")) + "</textarea></label>"
                 + "<button>Book</button></form>"
-                + "<p class='muted'>If no table is free we send your request to the restaurant and email you their answer. Cancelling is always free.</p>";
+                + "<p class='muted'>If no table is free we send your request to the restaurant and email you their answer. Cancelling is always free.</p>"
+                + contact(branch.getPhone() != null ? branch.getPhone() : branch.getRestaurant().getPhone(),
+                        branch.getEmail() != null ? branch.getEmail() : branch.getRestaurant().getEmail());
         return shell("Book a table", body);
     }
 
@@ -248,7 +255,22 @@ public class GuestBookingPageController {
         if (Boolean.TRUE.equals(booking.getCanCancel())) {
             body.append("<p><a class='danger-link' href='/public/bookings/").append(token).append("/cancel'>Cancel booking</a></p>");
         }
+        body.append(contact(booking.getRestaurantPhone(), booking.getRestaurantEmail()));
         return shell(booking.getRestaurantName(), body.toString());
+    }
+
+    // "Questions? Call … · Write to …" at the bottom of the guest pages (phone and email links work on phones).
+    private static String contact(String phone, String email) {
+        if (phone == null && email == null) return "";
+        StringBuilder html = new StringBuilder("<p class='muted contact'>Questions? ");
+        if (phone != null) {
+            html.append("Call <a href='tel:").append(esc(phone.replaceAll("[^+0-9]", ""))).append("'>").append(esc(phone)).append("</a>");
+        }
+        if (phone != null && email != null) html.append(" · ");
+        if (email != null) {
+            html.append("Write to <a href='mailto:").append(esc(email)).append("'>").append(esc(email)).append("</a>");
+        }
+        return html.append("</p>").toString();
     }
 
     private static String message(String title, String text) {
@@ -268,6 +290,7 @@ public class GuestBookingPageController {
                 + ".row{display:flex;gap:8px;flex-wrap:wrap}.row form{margin:0}"
                 + ".muted{color:#747572;font-size:13px}.error{color:#b13a2f;font-weight:600}.notice{color:#4f7942;font-weight:600}"
                 + ".status{font-weight:700;font-size:16px}.danger-link{color:#b13a2f}ul{padding-left:18px}li{margin-bottom:8px}"
+                + ".contact{border-top:1px solid #e3e6e1;padding-top:12px;margin-top:16px}.contact a{color:#4f7942;font-weight:600;text-decoration:none}"
                 + "</style></head><body><main>" + body + "</main></body></html>";
     }
 

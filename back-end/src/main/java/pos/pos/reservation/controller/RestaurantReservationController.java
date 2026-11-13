@@ -250,6 +250,18 @@ public class RestaurantReservationController {
         return ResponseEntity.ok(reservationLifecycleService.confirmAttendance(authentication, restaurantId, reservationId, request));
     }
 
+    @PostMapping("/{reservationId}/could-not-reach")
+    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @Operation(summary = "Mark that staff called and couldn't reach the guest (never cancels)")
+    public ResponseEntity<ReservationResponse> couldNotReach(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID reservationId,
+            @Valid @RequestBody(required = false) ReservationActionRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(reservationLifecycleService.couldNotReach(authentication, restaurantId, reservationId, request));
+    }
+
     @GetMapping("/{reservationId}/guest-history")
     @PreAuthorize("hasAuthority('RESERVATION_READ')")
     @Operation(summary = "The guest's no-shows and cleared warnings")

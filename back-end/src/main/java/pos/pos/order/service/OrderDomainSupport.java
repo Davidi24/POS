@@ -64,6 +64,10 @@ public class OrderDomainSupport {
         if (EnumSet.of(OrderStatus.CANCELLED, OrderStatus.VOIDED, OrderStatus.CLOSED).contains(order.getStatus())) {
             throw new AuthException("This order can no longer be modified in its current state", HttpStatus.BAD_REQUEST);
         }
+        // Reopened after being closed as unpaid: it's only there to take the payment, so nothing goes back to the kitchen.
+        if (order.getUnpaidAt() != null) {
+            throw new AuthException("This order is open only to take its payment", HttpStatus.BAD_REQUEST);
+        }
     }
 
     public String firstNote(OrderActionRequest request, String fallback) {

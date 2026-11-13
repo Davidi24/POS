@@ -36,6 +36,9 @@ public class RecipeResponse {
     private Integer prepTimeMinutes;
     private Integer cookTimeMinutes;
     private String instructions;
+    private String imageUrl;
+    /** The item this sub-recipe makes (Inventory → Items); null for a dish's recipe. */
+    private UUID outputItemId;
     private BigDecimal theoreticalCost;
     private OffsetDateTime effectiveFrom;
     private OffsetDateTime retiredAt;

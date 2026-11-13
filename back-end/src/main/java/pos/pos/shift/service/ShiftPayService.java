@@ -38,6 +38,7 @@ public class ShiftPayService {
     private final RestaurantScopeService scope;
     private final EntityManager em;
     private final AuditLogRepository audits;
+    private final pos.pos.role.service.RolePayService rolePay;
 
     @Transactional(readOnly = true)
     public PayReport pay(Authentication auth, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to, boolean mine) {
@@ -67,21 +68,28 @@ public class ShiftPayService {
             worked.forEach(s -> byId.putIfAbsent(s.getUser().getId(), s.getUser()));
             people = new ArrayList<>(byId.values());
         }
+        // Only people with a paid role are in Salary (user, 2026-10-31: viewers, admins and owners aren't paid); someone
+        // looking at their own pay always sees it.
+        Map<UUID, pos.pos.role.service.RolePayService.Pay> pay = rolePay.peoplePay(restaurantId, people.stream().map(User::getId).toList());
+        if (!mine) people = people.stream().filter(p -> pay.containsKey(p.getId()) && pay.get(p.getId()).paid()).toList();
         Map<UUID, List<String>> roleNames = new HashMap<>();
         if (!people.isEmpty()) shifts.roleNames(people.stream().map(User::getId).toList()).forEach(row ->
                 roleNames.computeIfAbsent((UUID) row[0], ignored -> new ArrayList<>()).add((String) row[1]));
         Map<UUID, BigDecimal> current = rates.rates(restaurantId);
+        Map<UUID, BigDecimal> salaries = rates.salaries(restaurantId);
         Map<UUID, Map<LocalDate, BigDecimal>> tips = new HashMap<>();
         rates.tips(restaurantId, branchId, mine ? actor : null, start, end, zone.getId(), currency).forEach(row ->
                 tips.computeIfAbsent(row.staffId(), ignored -> new TreeMap<>()).merge(LocalDate.parse(row.day()), row.tips(), BigDecimal::add));
 
         List<StaffPay> staff = people.stream().map(person -> {
             BigDecimal rate = current.get(person.getId());
+            // Someone on a monthly salary isn't paid per shift, whatever wage older shifts recorded.
+            BigDecimal salary = salaries.get(person.getId());
             List<ShiftPay> shiftPays = worked.stream().filter(s -> s.getUser().getId().equals(person.getId()))
                     .sorted(Comparator.comparing(Shift::getStartedAt))
                     .map(s -> {
                         long minutes = ShiftService.workedMinutes(s, now);
-                        BigDecimal shiftRate = s.getHourlyRate() != null ? s.getHourlyRate() : rate;
+                        BigDecimal shiftRate = salary != null ? null : s.getHourlyRate() != null ? s.getHourlyRate() : rate;
                         return new ShiftPay(s.getId(), s.getStartedAt().atZoneSameInstant(zone).toLocalDate(), s.getStatus(),
                                 s.getStartedAt(), s.getEndedAt(), minutes, ShiftService.breakMinutes(s, now, false), shiftRate, wages(minutes, shiftRate));
                     }).toList();
@@ -90,30 +98,42 @@ public class ShiftPayService {
             BigDecimal wages = shiftPays.stream().map(ShiftPay::wages).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
             Map<LocalDate, BigDecimal> personTips = tips.getOrDefault(person.getId(), Map.of());
             BigDecimal tipTotal = personTips.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
-            boolean missing = shiftPays.stream().anyMatch(p -> p.hourlyRate() == null && p.workedMinutes() > 0);
+            boolean missing = salary == null && shiftPays.stream().anyMatch(p -> p.hourlyRate() == null && p.workedMinutes() > 0);
             return new StaffPay(person.getId(), name(person), roleNames.getOrDefault(person.getId(), List.of()), rate, shiftPays.size(),
                     minutes, breaks, wages.setScale(2, RoundingMode.HALF_UP), tipTotal, wages.add(tipTotal).setScale(2, RoundingMode.HALF_UP), missing, shiftPays,
-                    personTips.entrySet().stream().map(e -> new DayTips(e.getKey(), e.getValue().setScale(2, RoundingMode.HALF_UP))).toList());
+                    personTips.entrySet().stream().map(e -> new DayTips(e.getKey(), e.getValue().setScale(2, RoundingMode.HALF_UP))).toList(),
+                    Optional.ofNullable(pay.get(person.getId())).map(pos.pos.role.service.RolePayService.Pay::team).orElse("EXTRA"),
+                    Optional.ofNullable(pay.get(person.getId())).map(pos.pos.role.service.RolePayService.Pay::teamName).orElse(null),
+                    Optional.ofNullable(pay.get(person.getId())).map(pos.pos.role.service.RolePayService.Pay::teamPicture).orElse(null), salary);
         }).toList();
-        return new PayReport(zone.getId(), currency, from, to, now, staff);
+        // The restaurant's own paid roles are teams of their own, shown even before anyone has them.
+        List<PayTeamInfo> teams = mine ? List.of() : rolePay.ownTeams(restaurantId).stream()
+                .map(p -> new PayTeamInfo(p.team(), p.teamName(), p.teamPicture())).toList();
+        return new PayReport(zone.getId(), currency, from, to, now, staff, teams);
     }
 
-    public BigDecimal setRate(Authentication auth, UUID restaurantId, UUID branchId, UUID userId, PayRate request) {
+    public PayRate setRate(Authentication auth, UUID restaurantId, UUID branchId, UUID userId, PayRate request) {
         require(auth, "SHIFT_MANAGE");
         Branch branch = scope.requireAccessibleBranch(auth, restaurantId, branchId);
         User user = em.find(User.class, userId);
         if (user == null || user.getDeletedAt() != null || !Objects.equals(user.getRestaurantId(), restaurantId)) bad("Choose a staff member of this restaurant.");
-        BigDecimal rate = request.hourlyRate().setScale(2, RoundingMode.HALF_UP);
+        if ((request.hourlyRate() == null) == (request.monthlySalary() == null)) bad("Give an hourly wage or a monthly salary.");
         BigDecimal before = rates.rate(userId).orElse(null);
+        BigDecimal salaryBefore = rates.salary(userId).orElse(null);
         UUID actor = scope.currentUserId(auth);
-        rates.save(restaurantId, userId, rate, actor);
-        int filled = rates.fillMissingShiftRates(userId, rate);
+        boolean monthly = request.monthlySalary() != null;
+        BigDecimal rate = (monthly ? request.monthlySalary() : request.hourlyRate()).setScale(2, RoundingMode.HALF_UP);
+        if (monthly) rates.saveSalary(restaurantId, userId, rate, actor);
+        else rates.save(restaurantId, userId, rate, actor);
+        // Shifts worked on a salary were paid by it, so they don't take the new wage.
+        int filled = monthly || salaryBefore != null ? 0 : rates.fillMissingShiftRates(userId, rate);
         AuditLog log = new AuditLog(); log.setRestaurant(branch.getRestaurant()); log.setBranch(branch); log.setActorUser(em.getReference(User.class, actor));
         log.setSource(AuditSource.API); log.setEntityType("STAFF_PAY_RATE"); log.setEntityId(userId); log.setAction("STAFF_PAY_RATE_SET");
-        log.setSummary("Hourly wage set for " + name(user)); log.setBeforeState(before == null ? "none" : before.toPlainString());
-        log.setAfterState(rate.toPlainString()); log.setMetadataPayload(filled > 0 ? "applied to " + filled + " earlier shifts without a wage" : null);
+        log.setSummary((monthly ? "Monthly salary set for " : "Hourly wage set for ") + name(user));
+        log.setBeforeState(salaryBefore != null ? salaryBefore.toPlainString() + " a month" : before == null ? "none" : before.toPlainString());
+        log.setAfterState(rate.toPlainString() + (monthly ? " a month" : "")); log.setMetadataPayload(filled > 0 ? "applied to " + filled + " earlier shifts without a wage" : null);
         audits.save(log);
-        return rate;
+        return monthly ? new PayRate(null, rate) : new PayRate(rate, null);
     }
 
     private static BigDecimal wages(long minutes, BigDecimal rate) {

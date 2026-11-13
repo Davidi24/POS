@@ -18,11 +18,13 @@ import java.util.UUID;
 public class BranchResponse {
 
     private UUID id;
+    private long version;
     private String name;
     private String code;
     private String description;
     private String email;
     private String phone;
+    private String coverUrl;
     private Boolean isActive;
     private BranchStatus status;
     private UUID managerUserId;

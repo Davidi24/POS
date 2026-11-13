@@ -1,14 +1,19 @@
 package pos.pos.payment.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import pos.pos.payment.enums.PaymentMethod;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * One payment towards an order's bill. {@code amount} pays the bill; the tip comes on top. For cash,
@@ -50,6 +55,20 @@ public record TakePaymentRequest(
         String notes,
 
         // Close the order once nothing is left to pay; null follows the restaurant setting.
-        Boolean closeOrderWhenPaid
+        Boolean closeOrderWhenPaid,
+
+        // Paying by dishes: what this guest pays for. The amount must be what those dishes cost of the bill.
+        @Valid
+        @Size(max = 500, message = "lines must be at most 500")
+        List<PaidLine> lines
 ) {
+    public record PaidLine(
+            @NotNull(message = "lineId is required")
+            UUID lineId,
+
+            @Min(value = 1, message = "quantity must be at least 1")
+            @Max(value = 100000, message = "quantity is too large")
+            int quantity
+    ) {
+    }
 }

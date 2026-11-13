@@ -42,7 +42,7 @@ public class OrderMapper {
                 .restaurantId(order.getRestaurant() == null ? null : order.getRestaurant().getId())
                 .branchId(order.getBranch() == null ? null : order.getBranch().getId())
                 .tableId(order.getRestaurantTable() == null ? null : order.getRestaurantTable().getId())
-                .tableNumber(order.getRestaurantTable() == null ? null : order.getRestaurantTable().getTableNumber())
+                .tableNumber(order.getRestaurantTable() == null ? order.getUnpaidTableNumber() : order.getRestaurantTable().getTableNumber())
                 .tableName(order.getRestaurantTable() == null ? null : order.getRestaurantTable().getName())
                 .reservationId(order.getReservation() == null ? null : order.getReservation().getId())
                 .reservationCode(order.getReservation() == null ? null : order.getReservation().getReservationCode())
@@ -66,8 +66,14 @@ public class OrderMapper {
                 .total(order.getTotal())
                 .prepaidTotal(order.getPrepaidTotal())
                 .itemCount(resolvedItemCount == null ? quantityTotal(order) : resolvedItemCount)
+                .notSentItems(resolvedItemCount == null ? notSentTotal(order) : 0)
                 .openedAt(order.getOpenedAt())
                 .closedAt(order.getClosedAt())
+                .billRequestedAt(order.getBillRequestedAt())
+                .unpaidReason(order.getUnpaidReason())
+                .unpaidNote(order.getUnpaidNote())
+                .unpaidAmount(order.getUnpaidAmount())
+                .unpaidAt(order.getUnpaidAt())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .createdBy(order.getCreatedBy())
@@ -155,6 +161,7 @@ public class OrderMapper {
                 .menuItemId(lineItem.getMenuItem() == null ? null : lineItem.getMenuItem().getId())
                 .variantId(lineItem.getVariant() == null ? null : lineItem.getVariant().getId())
                 .itemNameSnapshot(lineItem.getItemNameSnapshot())
+                .imageUrl(lineItem.getMenuItem() == null ? null : lineItem.getMenuItem().getImageUrl())
                 .variantNameSnapshot(lineItem.getVariantNameSnapshot())
                 .skuSnapshot(lineItem.getSkuSnapshot())
                 .quantity(lineItem.getQuantity())
@@ -226,6 +233,16 @@ public class OrderMapper {
                 .sorted(Comparator.comparing(OrderLineItem::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .map(this::toLineItemResponse)
                 .toList();
+    }
+
+    private int notSentTotal(Order order) {
+        if (order == null || order.getLineItems() == null) {
+            return 0;
+        }
+        return order.getLineItems().stream()
+                .filter(lineItem -> lineItem.getStatus() == OrderLineItemStatus.PENDING && lineItem.goesToKitchen())
+                .mapToInt(OrderLineItem::getQuantity)
+                .sum();
     }
 
     private Integer quantityTotal(Order order) {

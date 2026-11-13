@@ -34,6 +34,7 @@ public class InventorySalesSourceService {
     private final BranchRepository branchRepository;
     private final InventoryItemRepository itemRepository;
     private final InventoryLocationRepository locationRepository;
+    private final InventoryChangeNotifier inventoryChangeNotifier;
 
     @Transactional(readOnly = true)
     public List<InventorySalesSourceResponse> list(Authentication authentication, UUID restaurantId) {
@@ -78,7 +79,9 @@ public class InventorySalesSourceService {
         source.setInventoryItem(item);
         source.setLocation(location);
         try {
-            return toResponse(sourceRepository.saveAndFlush(source));
+            InventorySalesSource saved = sourceRepository.saveAndFlush(source);
+            inventoryChangeNotifier.changedAfterCommit(restaurantId);
+            return toResponse(saved);
         } catch (DataIntegrityViolationException exception) {
             throw new AuthException("A sale stock source for this branch and item already exists", HttpStatus.CONFLICT);
         }
@@ -91,6 +94,7 @@ public class InventorySalesSourceService {
             throw new AuthException("Branch not found", HttpStatus.NOT_FOUND);
         }
         sourceRepository.deleteByBranch_IdAndInventoryItem_Id(branchId, itemId);
+        inventoryChangeNotifier.changedAfterCommit(restaurantId);
     }
 
     private InventorySalesSourceResponse toResponse(InventorySalesSource source) {
