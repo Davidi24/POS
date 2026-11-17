@@ -50,6 +50,9 @@ class ChangePasswordServiceTest {
     @Mock
     private AuthMailService authMailService;
 
+    @Mock
+    private pos.pos.auth.service.PasswordDailyLimits passwordDailyLimits;
+
     @InjectMocks
     private ChangePasswordService changePasswordService;
 

@@ -60,6 +60,9 @@ class PasswordControllerTest {
     @Mock
     private JwtService jwtService;
 
+    @Mock
+    private pos.pos.security.util.ClientInfoExtractor clientInfoExtractor;
+
     @InjectMocks
     private PasswordController controller;
 
@@ -70,6 +73,8 @@ class PasswordControllerTest {
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(clientInfoExtractor.extract(any()))
+                .thenReturn(new pos.pos.security.util.ClientInfo("203.0.113.9", "test-agent"));
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
@@ -102,7 +107,7 @@ class PasswordControllerTest {
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNoContent());
 
-            verify(passwordResetService).requestReset(any(ForgotPasswordRequest.class));
+            verify(passwordResetService).requestReset(any(ForgotPasswordRequest.class), org.mockito.ArgumentMatchers.eq("203.0.113.9"));
         }
 
         @Test
@@ -132,7 +137,7 @@ class PasswordControllerTest {
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNoContent());
 
-            verify(passwordResetService).requestReset(any(ForgotPasswordRequest.class));
+            verify(passwordResetService).requestReset(any(ForgotPasswordRequest.class), org.mockito.ArgumentMatchers.eq("203.0.113.9"));
         }
     }
 

@@ -54,9 +54,12 @@ class WebAuthIntegrationTest {
     private static final String REFRESH_COOKIE_NAME = "refreshToken";
     private static final String DEFAULT_PASSWORD = "StrongPass123!";
     private static final String WRONG_PASSWORD = "WrongPass123!";
-    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid username/email or password";
+    private static final String INVALID_CREDENTIALS_MESSAGE = "Wrong username or password.";
+    private static final String LOCKED_MESSAGE = "Too many wrong passwords.";
+    private static final String NETWORK_PAUSED_MESSAGE = "Many wrong tries on this network.";
+    private static final String ACCOUNT_OFF_MESSAGE = "Your account is switched off. Ask your manager.";
+    private static final String EMAIL_NOT_CONFIRMED_MESSAGE = "Your email isn't confirmed yet. Use the link in the email we sent you, or ask your manager.";
     private static final String INVALID_REFRESH_TOKEN_MESSAGE = "Invalid refresh token";
-    private static final String TOO_MANY_LOGIN_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
@@ -158,24 +161,26 @@ class WebAuthIntegrationTest {
         MvcResult result = webLogin(user.getUsername(), WRONG_PASSWORD, ip, "AUTH-003", status().isUnauthorized());
 
         assertThat(bodyOf(result).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
+        assertThat(bodyOf(result).get("code").asText()).isEqualTo("WRONG_CREDENTIALS");
         User reloaded = userRepository.findById(user.getId()).orElseThrow();
         assertThat(reloaded.getFailedLoginAttempts()).isEqualTo(1);
         assertThat(activeSessionsFor(user)).isEmpty();
     }
 
     @Test
-    @DisplayName("AUTH-004 POST /auth/web/login rejects inactive or deleted user")
+    @DisplayName("AUTH-004 POST /auth/web/login tells a switched-off account only after the right password; a deleted one is unknown")
     void auth004RejectsInactiveOrDeletedUser() throws Exception {
         User inactiveUser = createUser("auth004-inactive", false, true, null, "INACTIVE");
         User deletedUser = createUser("auth004-deleted", true, true, OffsetDateTime.now(ZoneOffset.UTC), "ACTIVE");
         String ip = nextIp();
 
+        MvcResult inactiveWrong = webLogin(inactiveUser.getUsername(), WRONG_PASSWORD, ip, "AUTH-004-inactive-wrong", status().isUnauthorized());
         MvcResult inactiveResult = webLogin(
                 inactiveUser.getUsername(),
                 DEFAULT_PASSWORD,
                 ip,
                 "AUTH-004-inactive",
-                status().isUnauthorized()
+                status().isForbidden()
         );
         MvcResult deletedResult = webLogin(
                 deletedUser.getEmail(),
@@ -185,91 +190,90 @@ class WebAuthIntegrationTest {
                 status().isUnauthorized()
         );
 
-        assertThat(bodyOf(inactiveResult).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
+        assertThat(bodyOf(inactiveWrong).get("code").asText()).isEqualTo("WRONG_CREDENTIALS");
+        assertThat(bodyOf(inactiveResult).get("message").asText()).isEqualTo(ACCOUNT_OFF_MESSAGE);
+        assertThat(bodyOf(inactiveResult).get("code").asText()).isEqualTo("ACCOUNT_OFF");
         assertThat(bodyOf(deletedResult).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
         assertThat(activeSessionsFor(inactiveUser)).isEmpty();
         assertThat(activeSessionsFor(deletedUser)).isEmpty();
     }
 
     @Test
-    @DisplayName("AUTH-005 POST /auth/web/login rejects user with unverified email")
+    @DisplayName("AUTH-005 POST /auth/web/login tells an unconfirmed email only after the right password")
     void auth005RejectsUserWithUnverifiedEmail() throws Exception {
         User user = createUser("auth005", true, false, null, "ACTIVE");
         String ip = nextIp();
 
-        MvcResult result = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-005", status().isUnauthorized());
+        MvcResult result = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-005", status().isForbidden());
 
-        assertThat(bodyOf(result).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
+        assertThat(bodyOf(result).get("message").asText()).isEqualTo(EMAIL_NOT_CONFIRMED_MESSAGE);
+        assertThat(bodyOf(result).get("code").asText()).isEqualTo("EMAIL_NOT_CONFIRMED");
         assertThat(activeSessionsFor(user)).isEmpty();
     }
 
     @Test
-    @DisplayName("AUTH-006 POST /auth/web/login locks account after max failed attempts")
+    @DisplayName("AUTH-006 POST /auth/web/login locks the account on the 8th wrong password and keeps it locked for the right one")
     void auth006LocksAccountAfterMaxFailedAttempts() throws Exception {
         User user = createVerifiedUser("auth006");
         String ip = nextIp();
 
-        for (int attempt = 0; attempt < 5; attempt++) {
+        for (int attempt = 0; attempt < 7; attempt++) {
             webLogin(user.getUsername(), WRONG_PASSWORD, ip, "AUTH-006", status().isUnauthorized());
         }
+        MvcResult lockingResult = webLogin(user.getUsername(), WRONG_PASSWORD, ip, "AUTH-006", status().isLocked());
+        assertThat(bodyOf(lockingResult).get("code").asText()).isEqualTo("ACCOUNT_LOCKED");
+        assertThat(bodyOf(lockingResult).hasNonNull("lockedUntil")).isTrue();
 
         User lockedUser = userRepository.findById(user.getId()).orElseThrow();
-        assertThat(lockedUser.getFailedLoginAttempts()).isEqualTo(5);
+        assertThat(lockedUser.getFailedLoginAttempts()).isEqualTo(8);
         assertThat(lockedUser.getLockedUntil()).isNotNull();
         assertThat(lockedUser.getLockedUntil()).isAfter(OffsetDateTime.now(ZoneOffset.UTC));
-
-        authLoginAttemptRepository.deleteAllInBatch();
 
         MvcResult lockedResult = webLogin(
                 user.getUsername(),
                 DEFAULT_PASSWORD,
                 ip,
                 "AUTH-006-locked",
-                status().isUnauthorized()
+                status().isLocked()
         );
 
-        assertThat(bodyOf(lockedResult).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
+        assertThat(bodyOf(lockedResult).get("message").asText()).isEqualTo(LOCKED_MESSAGE);
         assertThat(activeSessionsFor(user)).isEmpty();
     }
 
     @Test
-    @DisplayName("AUTH-007 POST /auth/web/login rate-limits by identifier")
+    @DisplayName("AUTH-007 POST /auth/web/login locks a username nobody has exactly like a real one")
     void auth007RateLimitsByIdentifier() throws Exception {
-        User user = createVerifiedUser("auth007");
         String ip = nextIp();
+        String nobody = "nobody-" + UUID.randomUUID().toString().substring(0, 8);
 
-        for (int attempt = 0; attempt < 5; attempt++) {
-            webLogin(user.getEmail(), WRONG_PASSWORD, ip, "AUTH-007", status().isUnauthorized());
+        for (int attempt = 0; attempt < 7; attempt++) {
+            webLogin(nobody, WRONG_PASSWORD, ip, "AUTH-007", status().isUnauthorized());
         }
+        MvcResult lockedResult = webLogin(nobody, WRONG_PASSWORD, ip, "AUTH-007-lock", status().isLocked());
 
-        MvcResult rateLimitedResult = webLogin(
-                user.getEmail(),
-                DEFAULT_PASSWORD,
-                ip,
-                "AUTH-007-rate-limit",
-                status().isTooManyRequests()
-        );
-
-        assertThat(bodyOf(rateLimitedResult).get("message").asText()).isEqualTo(TOO_MANY_LOGIN_ATTEMPTS_MESSAGE);
-        assertThat(activeSessionsFor(user)).isEmpty();
+        assertThat(bodyOf(lockedResult).get("message").asText()).isEqualTo(LOCKED_MESSAGE);
+        assertThat(bodyOf(lockedResult).get("code").asText()).isEqualTo("ACCOUNT_LOCKED");
     }
 
     @Test
-    @DisplayName("AUTH-008 POST /auth/web/login rate-limits by IP")
+    @DisplayName("AUTH-008 POST /auth/web/login pauses a network address after 200 wrong passwords within 15 minutes")
     void auth008RateLimitsByIp() throws Exception {
         String ip = nextIp();
-
-        for (int attempt = 0; attempt < 20; attempt++) {
-            webLogin(
-                    "missing-" + attempt + "@pos.example",
-                    WRONG_PASSWORD,
-                    ip,
-                    "AUTH-008",
-                    status().isUnauthorized()
-            );
+        OffsetDateTime minuteAgo = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1);
+        List<pos.pos.auth.entity.AuthLoginAttempt> wrongTries = new java.util.ArrayList<>();
+        for (int attempt = 0; attempt < 200; attempt++) {
+            wrongTries.add(pos.pos.auth.entity.AuthLoginAttempt.builder()
+                    .identifier("missing-" + attempt + "@pos.example")
+                    .ipAddress(ip)
+                    .success(false)
+                    .failureReason(pos.pos.auth.enums.LoginFailureReason.INVALID_CREDENTIALS)
+                    .attemptedAt(minuteAgo)
+                    .build());
         }
+        authLoginAttemptRepository.saveAll(wrongTries);
 
-        MvcResult rateLimitedResult = webLogin(
+        MvcResult pausedResult = webLogin(
                 "missing-final@pos.example",
                 WRONG_PASSWORD,
                 ip,
@@ -277,7 +281,11 @@ class WebAuthIntegrationTest {
                 status().isTooManyRequests()
         );
 
-        assertThat(bodyOf(rateLimitedResult).get("message").asText()).isEqualTo(TOO_MANY_LOGIN_ATTEMPTS_MESSAGE);
+        assertThat(bodyOf(pausedResult).get("message").asText()).isEqualTo(NETWORK_PAUSED_MESSAGE);
+        assertThat(bodyOf(pausedResult).get("code").asText()).isEqualTo("NETWORK_PAUSED");
+
+        // Another address is not affected.
+        webLogin("missing-other@pos.example", WRONG_PASSWORD, nextIp(), "AUTH-008-other", status().isUnauthorized());
     }
 
     @Test

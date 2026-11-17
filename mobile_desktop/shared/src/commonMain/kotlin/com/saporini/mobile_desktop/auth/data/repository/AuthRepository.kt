@@ -28,6 +28,8 @@ class AuthRepository(
         val response = executeWithFallback { baseUrl ->
             client.post("$baseUrl/auth/device/login") {
                 contentType(ContentType.Application.Json)
+                // This device's id, for the per-device sign-in limit (user, 2026-11-17).
+                header("X-Device-Id", com.saporini.mobile_desktop.core.session.DeviceIdentity.id)
                 setBody(LoginRequest(identifier, password))
             }.body<AuthenticationResponse>()
         }

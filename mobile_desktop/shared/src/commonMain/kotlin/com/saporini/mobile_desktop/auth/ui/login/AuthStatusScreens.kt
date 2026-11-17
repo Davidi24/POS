@@ -7,6 +7,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.material.icons.outlined.CheckCircle
+import mobile_desktop.shared.generated.resources.auth_account_locked
+import com.saporini.mobile_desktop.core.theme.Inter
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Backspace
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Check
@@ -77,8 +82,6 @@ object PasswordUpdatedScreen : Screen {
         AuthScreenFrame { isCompact ->
             val successGreen = Color(0xFF2F8F4E)
 
-            AuthLogo(isCompact)
-            Spacer(modifier = Modifier.height(64.dp))
             AnimatedSuccessCheck(successGreen = successGreen)
             Spacer(modifier = Modifier.height(24.dp))
             AuthTitle("Password updated!")
@@ -174,11 +177,11 @@ object CreatePinScreen : Screen {
             Spacer(modifier = Modifier.height(10.dp))
             Box(modifier = Modifier.fillMaxWidth()) {
                 IconButton(
-                    onClick = { navigator.popOrPreview() },
+                    onClick = { navigator.popOrLogin() },
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Reply,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         tint = Color.Black
                     )
@@ -222,42 +225,76 @@ object CreatePinScreen : Screen {
     }
 }
 
-object AccountLockedScreen : Screen {
+/**
+ * Too many wrong passwords: the account waits until [until] (the server's time, ISO) before it can try again (user,
+ * 2026-11-16). The picture pops in and floats, a ring empties as the minutes pass, and a new password unlocks it at once.
+ * Without [until] (the screens list) it shows a 15-minute sample.
+ */
+data class AccountLockedScreen(val until: String? = null) : Screen {
     @Composable
     override fun Content() {
+        val navigator = LocalNavigator.currentOrThrow
+        val end = remember(until) {
+            com.saporini.mobile_desktop.core.format.instantOrNull(until) ?: (kotlin.time.Clock.System.now() + kotlin.time.Duration.parse("15m"))
+        }
+        fun secondsLeft() = ((end - kotlin.time.Clock.System.now()).inWholeSeconds).coerceAtLeast(0)
+        var left by remember { mutableStateOf(secondsLeft()) }
+        val total = remember { secondsLeft().coerceAtLeast(1) }
+        LaunchedEffect(end) {
+            while (left > 0) {
+                delay(1000)
+                left = secondsLeft()
+            }
+        }
+        val pop = remember { androidx.compose.animation.core.Animatable(0.4f) }
+        LaunchedEffect(Unit) {
+            pop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 220f))
+        }
+        val float = androidx.compose.animation.core.rememberInfiniteTransition()
+        val lift by float.animateFloat(0f, -6f, androidx.compose.animation.core.infiniteRepeatable(tween(1600), androidx.compose.animation.core.RepeatMode.Reverse))
+        val ring by animateFloatAsState(left.toFloat() / total, tween(900))
+        val ink = Color(0xFF111111)
+        val muted = Color(0xFF666666)
+        val red = Color(0xFFB24443)
+        val green = Color(0xFF2F8F4E)
         AuthScreenFrame { isCompact ->
-            val dangerRed = Color(0xFFB24443)
-
-            AuthLogo(isCompact)
-            Spacer(modifier = Modifier.height(34.dp))
-            AnimatedLockIcon(dangerRed = dangerRed)
+            Image(painterResource(Res.drawable.auth_account_locked), null,
+                Modifier.size(if (isCompact) 120.dp else 150.dp).offset(y = lift.dp).scale(pop.value), contentScale = ContentScale.Fit)
+            Spacer(modifier = Modifier.height(18.dp))
+            // The same text styles as the sign-in screen (user, 2026-11-16: "use the same fonts as login").
+            Text("Account locked", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (isCompact) 23.sp else 27.sp, letterSpacing = (-0.3).sp, color = ink,
+                textAlign = TextAlign.Center)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Too many wrong passwords.", fontFamily = Inter(), fontSize = 14.sp,
+                lineHeight = 20.sp, color = muted, textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(24.dp))
-            AuthTitle("Account locked")
-            Spacer(modifier = Modifier.height(10.dp))
-            AuthBody("Too many failed login attempts.")
-            Spacer(modifier = Modifier.height(18.dp))
-            AuthBody("For your security, your account has\nbeen locked.")
-            Spacer(modifier = Modifier.height(18.dp))
-            AuthBody("Please try again later or contact your\nadministrator.")
-            Spacer(modifier = Modifier.height(28.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Outlined.AccessTime,
-                    contentDescription = null,
-                    tint = Color(0xFF5F5F5F),
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Try again in 14:59",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color(0xFF222222),
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = Belleza()
-                )
+            Row(
+                Modifier.clip(RoundedCornerShape(50)).background((if (left > 0) red else green).copy(alpha = 0.07f))
+                    .border(1.dp, (if (left > 0) red else green).copy(alpha = 0.22f), RoundedCornerShape(50)).padding(start = 8.dp, end = 18.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.foundation.Canvas(Modifier.size(30.dp)) {
+                        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawArc((if (left > 0) red else green).copy(alpha = 0.15f), 0f, 360f, false, style = stroke)
+                        drawArc(if (left > 0) red else green, -90f, 360f * (if (left > 0) ring else 1f), false, style = stroke)
+                    }
+                    Icon(if (left > 0) Icons.Outlined.AccessTime else Icons.Outlined.CheckCircle, null, Modifier.size(15.dp), tint = if (left > 0) red else green)
+                }
+                Text(if (left > 0) "Try again in ${left / 60}:${(left % 60).toString().padStart(2, '0')}" else "You can try again now",
+                    fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, letterSpacing = 0.sp, color = ink)
             }
             Spacer(modifier = Modifier.height(28.dp))
-            BackToLoginText()
+            // Back to sign in is the main button; "Forgot password?" sits under it while the lock runs, since a new
+            // password unlocks the account at once (user, 2026-11-17).
+            BlackButton("Back to sign in") { if (navigator.canPop) navigator.pop() else navigator.replaceAll(LoginScreen) }
+            if (left > 0) {
+                Spacer(modifier = Modifier.height(10.dp))
+                TextButton(onClick = { navigator.push(ForgotPasswordScreen) }) {
+                    Text("Forgot password?", style = MaterialTheme.typography.bodyMedium, fontFamily = Inter(), fontWeight = FontWeight.Normal,
+                        color = muted, textDecoration = TextDecoration.Underline)
+                }
+            }
         }
     }
 }
@@ -268,8 +305,6 @@ object SessionExpiredScreen : Screen {
         AuthScreenFrame { isCompact ->
             val mutedGray = Color(0xFF666666)
 
-            AuthLogo(isCompact)
-            Spacer(modifier = Modifier.height(38.dp))
             CircleIcon(
                 tint = mutedGray,
                 borderColor = Color(0xFFD5D5D5)
@@ -299,7 +334,6 @@ private fun AuthScreenFrame(content: @Composable ColumnScope.(Boolean) -> Unit) 
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
         ) {
             val isCompact = maxWidth < 380.dp || maxHeight < 700.dp
             val isDesktop = remember { !getPlatform().name.startsWith("Android") }
@@ -308,7 +342,7 @@ private fun AuthScreenFrame(content: @Composable ColumnScope.(Boolean) -> Unit) 
 
             Column(
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
+                    .widthIn(max = 420.dp)
                     .fillMaxWidth()
                     .align(if (shouldCenterVertically) Alignment.Center else Alignment.TopCenter)
                     .verticalScroll(rememberScrollState())
@@ -317,7 +351,6 @@ private fun AuthScreenFrame(content: @Composable ColumnScope.(Boolean) -> Unit) 
                 content = { content(isCompact) }
             )
 
-            PreviewHomeButton()
         }
     }
 }
@@ -328,7 +361,6 @@ private fun CompactAuthFrame(content: @Composable ColumnScope.(Boolean) -> Unit)
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
         ) {
             val isCompact = maxWidth < 380.dp || maxHeight < 700.dp
             val isDesktop = remember { !getPlatform().name.startsWith("Android") }
@@ -336,7 +368,7 @@ private fun CompactAuthFrame(content: @Composable ColumnScope.(Boolean) -> Unit)
 
             Column(
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
+                    .widthIn(max = 420.dp)
                     .fillMaxWidth()
                     .align(if (shouldCenterVertically) Alignment.Center else Alignment.TopCenter)
                     .padding(
@@ -349,19 +381,8 @@ private fun CompactAuthFrame(content: @Composable ColumnScope.(Boolean) -> Unit)
                 content = { content(isCompact) }
             )
 
-            PreviewHomeButton()
         }
     }
-}
-
-@Composable
-private fun AuthLogo(isCompact: Boolean) {
-    Image(
-        painter = painterResource(Res.drawable.brand_logo),
-        contentDescription = "Saporini Italiano",
-        modifier = Modifier.height(if (isCompact) 72.dp else 100.dp),
-        contentScale = ContentScale.Fit
-    )
 }
 
 @Composable
@@ -497,7 +518,9 @@ private fun AuthTitle(
         style = MaterialTheme.typography.headlineLarge.copy(lineHeight = 32.sp),
         color = Color(0xFF111111),
         fontWeight = FontWeight.Bold,
-        fontFamily = CormorantGaramond(),
+        fontSize = 27.sp,
+        fontFamily = Inter(),
+        letterSpacing = (-0.3).sp,
         textAlign = TextAlign.Center
     )
 }
@@ -508,7 +531,7 @@ private fun AuthBody(text: String) {
         text = text,
         style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 19.sp),
         color = Color(0xFF666666),
-        fontFamily = Belleza(),
+        fontFamily = Inter(),
         textAlign = TextAlign.Center
     )
 }
@@ -522,8 +545,9 @@ private fun PinLabel(text: String) {
             .padding(start = 44.dp),
         style = MaterialTheme.typography.bodyLarge,
         color = Color(0xFF111111),
-        fontWeight = FontWeight.Bold,
-        fontFamily = Belleza()
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        fontFamily = Inter()
     )
 }
 
@@ -660,7 +684,8 @@ private fun BlackButton(
         Text(
             text = text,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = Inter(),
             letterSpacing = 0.sp
         )
     }
@@ -688,6 +713,7 @@ private fun BackToLoginText() {
     }
 }
 
-private fun cafe.adriel.voyager.navigator.Navigator.popOrPreview() {
-    replaceAll(UiPreviewScreen)
+// Back one screen, or to sign in when there's nothing behind (the screens list is gone with the house, 2026-11-17).
+private fun cafe.adriel.voyager.navigator.Navigator.popOrLogin() {
+    if (canPop) pop() else replaceAll(LoginScreen)
 }

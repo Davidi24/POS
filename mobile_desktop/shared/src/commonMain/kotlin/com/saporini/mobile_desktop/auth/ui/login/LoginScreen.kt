@@ -1,6 +1,38 @@
 package com.saporini.mobile_desktop.auth.ui.login
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material.icons.outlined.PhonelinkLock
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.HourglassTop
+import androidx.compose.material.icons.outlined.MarkEmailUnread
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import mobile_desktop.shared.generated.resources.auth_account_off
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -54,8 +86,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
-import com.saporini.mobile_desktop.core.theme.Belleza
-import com.saporini.mobile_desktop.core.theme.CormorantGaramond
+import com.saporini.mobile_desktop.core.theme.Inter
+import androidx.compose.ui.text.TextStyle
 import com.saporini.mobile_desktop.core.theme.SaporiniColors
 import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.brand_logo
@@ -73,18 +105,17 @@ object LoginScreen : Screen {
     @Composable
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
+        val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
         AuthImageScaffold {
             LoginForm(
                 centerContent = true,
                 onPinClick = { navigator.push(PinLoginScreen) },
                 onForgetPassClick = { navigator.push(ForgotPasswordScreen) },
-                onSetPasswordClick = { navigator.push(ResetPasswordScreen()) },
-                onApplyClick = { navigator.push(com.saporini.mobile_desktop.auth.ui.apply.ApplyRestaurantScreen) },
-                onCheckApplicationClick = { navigator.push(com.saporini.mobile_desktop.auth.ui.apply.ApplicationStatusScreen()) },
-                onLoginSuccess = { user -> navigator.replaceAll(resolveStartScreen(user)) }
+                // A new restaurant fills in its application on the web, not in the app (user, 2026-11-17).
+                onNoAccountClick = { runCatching { uriHandler.openUri(SignUpPage.url()) } },
+                onLoginSuccess = { user -> navigator.replaceAll(resolveStartScreen(user)) },
+                onLocked = { until -> navigator.push(AccountLockedScreen(until)) }
             )
-
-            PreviewHomeButton()
         }
     }
 }
@@ -95,20 +126,29 @@ private fun LoginForm(
     centerContent: Boolean = false,
     onPinClick: () -> Unit = {},
     onForgetPassClick: () -> Unit = {},
-    onSetPasswordClick: () -> Unit = {},
-    onApplyClick: () -> Unit = {},
-    onCheckApplicationClick: () -> Unit = {},
+    onNoAccountClick: () -> Unit = {},
     onLoginSuccess: (CurrentUserResponse) -> Unit = {},
+    onLocked: (String?) -> Unit = {},
 ) {
     val screenModel = koinInject<LoginScreenModel>()
     val state by screenModel.state.collectAsState()
     LaunchedEffect(state.user) {
         state.user?.let { onLoginSuccess(it) }
     }
+    // A locked account opens Account locked with until when (user, 2026-11-16).
+    LaunchedEffect(state.problem) {
+        state.problem?.takeIf { it.kind == LoginProblemKind.LOCKED }?.let { onLocked(it.lockedUntil); screenModel.clearProblem() }
+    }
+    // A wrong username or password shakes the two fields once.
+    val shake = remember { Animatable(0f) }
+    LaunchedEffect(state.tries) {
+        if (state.problem?.kind == LoginProblemKind.WRONG) {
+            for (x in listOf(14f, -12f, 9f, -6f, 3f, 0f)) shake.animateTo(x, tween(45))
+        }
+    }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .background(SaporiniColors.White)
     ) {
         val formWidth = maxWidth
         val formHeight = maxHeight
@@ -122,7 +162,7 @@ private fun LoginForm(
         val horizontalPadding = if (isCompact) 16.dp else 20.dp
         val topPadding = if (isCompact) 18.dp else 35.dp
         val logoHeight = if (isCompact) 72.dp else 100.dp
-        val titleFontSize = if (isCompact) 24.sp else 30.sp
+        val titleFontSize = if (isCompact) 23.sp else 27.sp
         val sectionSpacing = if (isCompact) 12.dp else 20.dp
         val smallSpacing = if (isCompact) 6.dp else 8.dp
         val logoToTitleSpacing = sectionSpacing * 2
@@ -139,7 +179,7 @@ private fun LoginForm(
 
         Column(
             modifier = Modifier
-                .widthIn(max = 480.dp)
+                .widthIn(max = 420.dp)
                 .fillMaxWidth()
                 .align(formAlignment)
                 .then(
@@ -154,16 +194,7 @@ private fun LoginForm(
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.Start
         ) {
-            Image(
-                painter = painterResource(Res.drawable.brand_logo),
-                contentDescription = "Saporini Italiano",
-                modifier = Modifier
-                    .height(logoHeight)
-                    .align(Alignment.CenterHorizontally),
-                contentScale = ContentScale.Fit
-            )
-
-            Spacer(modifier = Modifier.height(logoToTitleSpacing))
+            // No logo for now (user, 2026-11-17: "remove the logo for the moment, leave only the login in the centre").
 
             Text(
                 text = "Welcome back",
@@ -172,8 +203,9 @@ private fun LoginForm(
                 ),
                 color = primaryText,
                 fontWeight = FontWeight.Bold,
-                fontFamily = CormorantGaramond(),
-                fontSize = titleFontSize
+                fontFamily = Inter(),
+                fontSize = titleFontSize,
+                letterSpacing = (-0.3).sp
             )
 
             Text(
@@ -183,7 +215,8 @@ private fun LoginForm(
                     lineHeight = 16.sp
                 ),
                 color = mutedText,
-                fontFamily = Belleza()
+                fontFamily = Inter(),
+                fontSize = 14.sp
             )
 
             Spacer(modifier = Modifier.height(sectionSpacing))
@@ -192,21 +225,32 @@ private fun LoginForm(
                 text = "Identifier",
                 style = MaterialTheme.typography.bodyLarge,
                 color = primaryText,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
                 modifier = Modifier.padding(start = 3.dp),
-                fontFamily = Belleza()
+                fontFamily = Inter()
             )
 
             Spacer(modifier = Modifier.height(smallSpacing))
 
             var email by remember { mutableStateOf("") }
+            // Tab goes from the username to the password, Shift+Tab back; Enter signs in once both are filled, from
+            // either field (user, 2026-11-17).
+            val emailFocus = remember { FocusRequester() }
+            val passwordFocus = remember { FocusRequester() }
+            var password by remember { mutableStateOf("") }
+            val signIn = {
+                if (email.isNotBlank() && password.isNotEmpty() && !state.isLoading) screenModel.login(email.trim(), password)
+            }
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { email = it; screenModel.clearProblem() },
                 placeholder = {
                     Text(
                         "Enter your username or email",
-                        color = mutedText
+                        color = mutedText,
+                        fontFamily = Inter(),
+                        fontSize = 14.5.sp
                     )
                 },
                 leadingIcon = {
@@ -216,8 +260,23 @@ private fun LoginForm(
                         tint = iconGray
                     )
                 },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(onNext = { passwordFocus.requestFocus() }),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .focusRequester(emailFocus)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.Tab -> if (event.isShiftPressed) false else { passwordFocus.requestFocus(); true }
+                            Key.Enter, Key.NumPadEnter -> {
+                                if (password.isEmpty()) passwordFocus.requestFocus() else signIn()
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+                    .graphicsLayer { translationX = shake.value * density }
                     .shadow(
                         elevation = 10.dp,
                         shape = fieldShape,
@@ -225,6 +284,7 @@ private fun LoginForm(
                         spotColor = Color.Black.copy(alpha = 0.12f)
                     ),
                 singleLine = true,
+                textStyle = TextStyle(fontFamily = Inter(), fontSize = 14.5.sp, color = primaryText),
                 shape = fieldShape,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = fieldBorder,
@@ -243,22 +303,24 @@ private fun LoginForm(
                 text = "Password",
                 style = MaterialTheme.typography.bodyLarge,
                 color = primaryText,
-                fontWeight = FontWeight.Bold,
-                fontFamily = Belleza()
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                fontFamily = Inter()
             )
 
             Spacer(modifier = Modifier.height(smallSpacing))
 
-            var password by remember { mutableStateOf("") }
             var passwordVisible by remember { mutableStateOf(false) }
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { password = it; screenModel.clearProblem() },
                 placeholder = {
                     Text(
                         "Enter your password",
-                        color = mutedText
+                        color = mutedText,
+                        fontFamily = Inter(),
+                        fontSize = 14.5.sp
                     )
                 },
                 leadingIcon = {
@@ -278,8 +340,20 @@ private fun LoginForm(
                     }
                 },
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { signIn() }),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .focusRequester(passwordFocus)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when {
+                            event.key == Key.Tab && event.isShiftPressed -> { emailFocus.requestFocus(); true }
+                            event.key == Key.Enter || event.key == Key.NumPadEnter -> { signIn(); true }
+                            else -> false
+                        }
+                    }
+                    .graphicsLayer { translationX = shake.value * density }
                     .shadow(
                         elevation = 10.dp,
                         shape = fieldShape,
@@ -287,6 +361,7 @@ private fun LoginForm(
                         spotColor = Color.Black.copy(alpha = 0.12f)
                     ),
                 singleLine = true,
+                textStyle = TextStyle(fontFamily = Inter(), fontSize = 14.5.sp, color = primaryText),
                 shape = fieldShape,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = fieldBorder,
@@ -305,20 +380,8 @@ private fun LoginForm(
                     .height(30.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                // An owner's invitation email has a link to set the first password; it can be pasted here too.
-                TextButton(
-                    onClick = onSetPasswordClick,
-                    contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier.height(30.dp).align(Alignment.CenterStart)
-                ) {
-                    Text(
-                        text = "Got an invitation?",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = mutedText,
-                        fontWeight = FontWeight.Normal,
-                        textDecoration = TextDecoration.Underline
-                    )
-                }
+                // No "Got an invitation?" here (user, 2026-11-17): the link in the email works in the browser, and
+                // Forgot password → "I have the link" still opens Set your password for pasting it.
                 TextButton(
                     onClick = onForgetPassClick ,
                     contentPadding = PaddingValues(0.dp),
@@ -327,25 +390,32 @@ private fun LoginForm(
                     Text(
                         text = "Forgot password?",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = mutedText,
-                        fontWeight = FontWeight.Normal,
+                        // Darker and bolder after a few wrong passwords, so it's the way out.
+                        color = if (state.warnAboutPause) primaryText else mutedText,
+                        fontWeight = if (state.warnAboutPause) FontWeight.SemiBold else FontWeight.Normal,
+                        fontFamily = Inter(),
                         textDecoration = TextDecoration.Underline
                     )
                 }
             }
 
+            // What went wrong, sliding in above the button (user, 2026-11-16: "add animation to look good").
+            LoginProblemCard(state.problem, warn = state.warnAboutPause, onRetry = { screenModel.login(email.trim(), password) })
+
             Spacer(modifier = Modifier.height(sectionSpacing))
 
+            val filled = email.isNotBlank() && password.isNotEmpty()
             Button(
-                onClick = { screenModel.login(email, password) },
-                enabled = !state.isLoading,
+                onClick = { screenModel.login(email.trim(), password) },
+                enabled = !state.isLoading && filled,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(buttonHeight),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.Black,
                     contentColor = Color.White,
-                    disabledContainerColor = Color.Black,
+                    // Grey while a field is empty; black with the spinner while signing in.
+                    disabledContainerColor = if (state.isLoading) Color.Black else Color(0xFFC4C4C4),
                     disabledContentColor = Color.White
                 ),
                 shape = RoundedCornerShape(10.dp)
@@ -360,19 +430,11 @@ private fun LoginForm(
                     Text(
                         text = "Sign in",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = Inter(),
                         letterSpacing = 0.sp
                     )
                 }
-            }
-
-            state.error?.let { error ->
-                Spacer(modifier = Modifier.height(smallSpacing))
-                Text(
-                    text = error,
-                    color = Color(0xFFB24443),
-                    style = MaterialTheme.typography.bodyMedium
-                )
             }
 
             Spacer(modifier = Modifier.height(sectionSpacing))
@@ -391,7 +453,8 @@ private fun LoginForm(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = mutedText,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = Inter()
                 )
                 HorizontalDivider(
                     modifier = Modifier.weight(1f),
@@ -406,9 +469,10 @@ private fun LoginForm(
                 text = "Sign in with PIN",
                 style = MaterialTheme.typography.bodyLarge,
                 color = primaryText,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
-                fontFamily = Belleza()
+                fontFamily = Inter()
             )
 
             Spacer(modifier = Modifier.height(smallSpacing))
@@ -441,28 +505,20 @@ private fun LoginForm(
 
             Spacer(modifier = Modifier.height(sectionSpacing))
 
-            // New restaurants apply here; a super admin reviews each application before it can sign in.
+            // No account: the web page where a new restaurant applies (user, 2026-11-17: "the form is filled in on the web, not here").
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onApplyClick, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                Text(text = "Don't have an account?", color = mutedText, style = MaterialTheme.typography.bodyMedium, fontFamily = Inter())
+                TextButton(onClick = onNoAccountClick, contentPadding = PaddingValues(horizontal = 6.dp)) {
                     Text(
-                        text = "Open a restaurant",
+                        text = "Click here",
                         style = MaterialTheme.typography.bodyMedium,
                         color = primaryText,
                         fontWeight = FontWeight.SemiBold,
-                        textDecoration = TextDecoration.Underline
-                    )
-                }
-                Text(text = "·", color = mutedText, style = MaterialTheme.typography.bodyMedium)
-                TextButton(onClick = onCheckApplicationClick, contentPadding = PaddingValues(horizontal = 6.dp)) {
-                    Text(
-                        text = "Check an application",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = mutedText,
-                        fontWeight = FontWeight.Normal,
+                        fontFamily = Inter(),
                         textDecoration = TextDecoration.Underline
                     )
                 }
@@ -474,3 +530,96 @@ private fun LoginForm(
         }
     }
 }
+
+/**
+ * What went wrong with the sign-in, in a small tinted card that slides in (and out when typing again): a bold title and one
+ * short line (user, 2026-11-17: "not long messages, make it small, make it look good"); a paused device or network counts down
+ * to when it can try again. Red for a wrong password, a switched-off account (with its picture) or a closed restaurant; amber
+ * for pauses and an email not confirmed; grey for no connection, with Try again.
+ */
+@Composable
+private fun LoginProblemCard(problem: LoginProblem?, warn: Boolean, onRetry: () -> Unit) {
+    // Keeps the last problem while the card slides out.
+    var shown by remember { mutableStateOf(problem) }
+    if (problem != null && problem.kind != LoginProblemKind.LOCKED) shown = problem
+    AnimatedVisibility(
+        visible = problem != null && problem.kind != LoginProblemKind.LOCKED,
+        enter = expandVertically(tween(260)) + fadeIn(tween(260)) + slideInVertically(tween(260)) { -it / 3 },
+        exit = shrinkVertically(tween(200)) + fadeOut(tween(160))
+    ) {
+        val p = shown ?: return@AnimatedVisibility
+        val amber = Color(0xFFC8790B)
+        val red = Color(0xFFB24443)
+        val grey = Color(0xFF5F6B73)
+        val tint = when (p.kind) {
+            LoginProblemKind.DEVICE_PAUSED, LoginProblemKind.NETWORK_PAUSED, LoginProblemKind.TOO_MANY_TRIES, LoginProblemKind.EMAIL_NOT_CONFIRMED -> amber
+            LoginProblemKind.NO_CONNECTION, LoginProblemKind.OTHER -> grey
+            else -> red
+        }
+        val icon = when (p.kind) {
+            LoginProblemKind.DEVICE_PAUSED -> Icons.Outlined.PhonelinkLock
+            LoginProblemKind.NETWORK_PAUSED -> Icons.Outlined.WifiOff
+            LoginProblemKind.TOO_MANY_TRIES -> Icons.Outlined.HourglassTop
+            LoginProblemKind.EMAIL_NOT_CONFIRMED -> Icons.Outlined.MarkEmailUnread
+            LoginProblemKind.RESTAURANT_CLOSED -> Icons.Outlined.Storefront
+            LoginProblemKind.NO_CONNECTION -> Icons.Outlined.CloudOff
+            else -> Icons.Outlined.ErrorOutline
+        }
+        val left = rememberSecondsLeft(p.lockedUntil.takeIf { p.kind == LoginProblemKind.DEVICE_PAUSED || p.kind == LoginProblemKind.NETWORK_PAUSED })
+        val wait = left?.let { if (it > 0) "Try again in ${it / 60}:${(it % 60).toString().padStart(2, '0')}." else "You can try again now." }
+        val (title, line) = when (p.kind) {
+            // After the 3rd wrong password in a row, the same card warns (no number, so it tells nothing about the account).
+            LoginProblemKind.WRONG -> "Wrong username or password" to (if (warn) "Careful: more wrong tries pause sign-in." else null)
+            LoginProblemKind.ACCOUNT_OFF -> "Account switched off" to "Ask your manager."
+            LoginProblemKind.EMAIL_NOT_CONFIRMED -> "Email not confirmed" to "Use the link we emailed you."
+            LoginProblemKind.RESTAURANT_CLOSED -> "Restaurant closed" to "Ask the owner."
+            LoginProblemKind.DEVICE_PAUSED -> "Paused on this device" to "Too many wrong tries. ${wait.orEmpty()}"
+            LoginProblemKind.NETWORK_PAUSED -> "Paused on this network" to "Many wrong tries on this Wi-Fi. ${wait.orEmpty()}"
+            LoginProblemKind.TOO_MANY_TRIES -> "Too many tries" to "Wait a moment and try again."
+            LoginProblemKind.NO_CONNECTION -> "Can't reach Saporini" to "Check the internet connection."
+            else -> "Something went wrong" to "Try again."
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(top = 14.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = 0.07f))
+                .border(1.dp, tint.copy(alpha = 0.25f), RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)
+        ) {
+            if (p.kind == LoginProblemKind.ACCOUNT_OFF) {
+                Image(painterResource(Res.drawable.auth_account_off), null, Modifier.size(40.dp), contentScale = ContentScale.Fit)
+            } else {
+                Box(Modifier.size(32.dp).clip(CircleShape).background(tint.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, Modifier.size(18.dp), tint = tint)
+                }
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = Color(0xFF222426))
+                line?.let { Text(it, fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 17.sp, color = Color(0xFF5E605D)) }
+                if (p.kind == LoginProblemKind.NETWORK_PAUSED) {
+                    Text("Signed in? Keep working. Or use mobile data.", fontFamily = Inter(), fontSize = 11.5.sp, lineHeight = 16.sp, color = Color(0xFF8A8C88))
+                }
+            }
+            if (p.kind == LoginProblemKind.NO_CONNECTION) {
+                TextButton(onClick = onRetry, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text("Try again", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF111111))
+                }
+            }
+        }
+    }
+}
+
+/** Seconds until [until] (the server's ISO time), ticking every second; null without one. */
+@Composable
+private fun rememberSecondsLeft(until: String?): Long? {
+    if (until == null) return null
+    val end = remember(until) { com.saporini.mobile_desktop.core.format.instantOrNull(until) } ?: return null
+    fun left() = (end - kotlin.time.Clock.System.now()).inWholeSeconds.coerceAtLeast(0)
+    var seconds by remember(until) { mutableStateOf(left()) }
+    LaunchedEffect(until) {
+        while (seconds > 0) {
+            kotlinx.coroutines.delay(1000)
+            seconds = left()
+        }
+    }
+    return seconds
+}
+

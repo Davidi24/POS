@@ -58,10 +58,37 @@ public class PasswordResetService {
     private final SmsMessageService smsMessageService;
     private final RoleRepository roleRepository;
     private final pos.pos.restaurant.repository.RestaurantRepository restaurantRepository;
+    private final PasswordDailyLimits passwordDailyLimits;
+    private final pos.pos.security.service.PublicRequestRateLimiter publicRequestRateLimiter;
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.password.max-forgot-requests-per-address:30}")
+    private int maxForgotRequestsPerAddress = 30;
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.password.forgot-address-window-minutes:60}")
+    private long forgotAddressWindowMinutes = 60;
+
+    private static final String SAME_PASSWORD_MESSAGE = "Choose a password different from your current one.";
 
     // Routes the reset request to email or SMS based on the channel in the request
     @Transactional
     public void requestReset(ForgotPasswordRequest request) {
+        requestReset(request, null);
+    }
+
+    /**
+     * The same, counting [clientIp]'s requests first: at most 30 an hour from one network address, for any email known
+     * or not (user, 2026-11-17). Past that nothing is sent and the answer stays the same.
+     */
+    @Transactional
+    public void requestReset(ForgotPasswordRequest request, String clientIp) {
+        if (clientIp != null && !clientIp.isBlank()) {
+            try {
+                publicRequestRateLimiter.check("FORGOT_PASSWORD_IP", clientIp, maxForgotRequestsPerAddress,
+                        Duration.ofMinutes(forgotAddressWindowMinutes), TOO_MANY_PASSWORD_RESET_REQUESTS_MESSAGE);
+            } catch (TooManyRequestsException limited) {
+                return;
+            }
+        }
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         if (request.getChannel() == RecoveryChannel.SMS) {
             requestSmsReset(request, now);
@@ -165,6 +192,10 @@ public class PasswordResetService {
 
         // Someone choosing their first password doesn't need a "your password was changed" email.
         boolean firstPassword = resetToken.getPurpose() == PasswordLinkPurpose.INVITE;
+        // A new password must be new (user, 2026-11-17); the link stays usable for another try.
+        if (!firstPassword && passwordService.matches(request.getNewPassword(), user.getPasswordHash())) {
+            throw new AuthException(SAME_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
+        }
         applyNewPassword(user, request.getNewPassword(), now, SessionRevocationReason.PASSWORD_RESET.name(), !firstPassword);
 
         resetToken.setUsedAt(now);
@@ -207,6 +238,10 @@ public class PasswordResetService {
         if (!code.getCodeHash().equals(oneTimeCodeService.hash(request.getCode(), smsAuthProperties.getCodePepper()))) {
             registerFailedAttempt(code, now);
             throw new InvalidTokenException();
+        }
+
+        if (passwordService.matches(request.getNewPassword(), user.getPasswordHash())) {
+            throw new AuthException(SAME_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
         }
 
         applyNewPassword(user, request.getNewPassword(), now, SessionRevocationReason.PASSWORD_RESET.name(), true);
@@ -253,18 +288,26 @@ public class PasswordResetService {
         }
 
         // 3. An owner who never finished their invitation gets a fresh invitation; others need a confirmed email
-        if (!user.isEmailVerified()) {
-            if (authPasswordResetTokenRepository.existsByUserIdAndPurpose(user.getId(), PasswordLinkPurpose.INVITE)) {
-                String restaurantName = user.getRestaurantId() == null ? null : restaurantRepository
-                        .findByIdAndDeletedAtIsNull(user.getRestaurantId()).map(restaurant -> restaurant.getName()).orElse(null);
-                sendInvite(user, request.getClientTarget(), restaurantName, now);
-            }
+        boolean invite = !user.isEmailVerified();
+        if (invite && !authPasswordResetTokenRepository.existsByUserIdAndPurpose(user.getId(), PasswordLinkPurpose.INVITE)) {
             return;
         }
 
-        // 4. Replace older links and send the new one
-        OpaqueTokenService.IssuedToken issuedToken = replacePasswordResetToken(user, now);
-        sendResetEmail(user, request.getClientTarget(), issuedToken, now);
+        // 4. At most 10 links a day (user, 2026-11-17); past that nothing is sent and the person is told once by email
+        if (!passwordDailyLimits.maySendResetLink(user, now)) {
+            return;
+        }
+
+        // 5. Replace older links and send the new one
+        if (invite) {
+            String restaurantName = user.getRestaurantId() == null ? null : restaurantRepository
+                    .findByIdAndDeletedAtIsNull(user.getRestaurantId()).map(restaurant -> restaurant.getName()).orElse(null);
+            sendInvite(user, request.getClientTarget(), restaurantName, now);
+        } else {
+            OpaqueTokenService.IssuedToken issuedToken = replacePasswordResetToken(user, now);
+            sendResetEmail(user, request.getClientTarget(), issuedToken, now);
+        }
+        passwordDailyLimits.resetLinkSent(user, now);
     }
 
     private void issueAdminEmailReset(User user, ClientLinkTarget clientTarget, OffsetDateTime now) {

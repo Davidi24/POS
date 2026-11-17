@@ -87,12 +87,27 @@ app:
       - ::1
 
     login:
-      max-failed-attempts: 5
+      # Sign-in limits (user, 2026-11-17): 8 wrong passwords within 15 minutes lock a username (real or not) for 15
+      # minutes (5 until 2026-11-17: "make 8 wrong before locking"); 50 on one device pause that device, 200 from one
+      # network address pause it, each for 15 minutes.
+      max-failed-attempts: 8
       lock-duration-minutes: 15
+      max-wrong-per-device: 50
+      max-wrong-per-address: 200
       max-attempts-per-ip: 20
       max-attempts-per-account: 5
       window-minutes: 5
       attempt-retention-days: 90
+
+    password:
+      # Daily password limits (user, 2026-11-17), over the last 24 hours: changes while signed in, and links sent
+      # from "Forgot password?" (7, was 10). Past either one the person gets one email that day saying so.
+      max-changes-per-day: 30
+      max-reset-links-per-day: 7
+      # "Forgot password?" requests from one network address (any email, known or not) within the window; past it
+      # nothing is sent and the answer stays the same, so nobody can flood people's inboxes from one place.
+      max-forgot-requests-per-address: 30
+      forgot-address-window-minutes: 60
 
     session:
       max-active-sessions: 3

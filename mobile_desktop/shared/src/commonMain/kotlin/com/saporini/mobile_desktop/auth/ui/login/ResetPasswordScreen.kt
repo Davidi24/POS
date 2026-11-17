@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.auth.ui.login
 
+import com.saporini.mobile_desktop.core.theme.Inter
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,7 +23,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Link
@@ -98,7 +99,6 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White)
             ) {
                 val isCompact = maxWidth < 380.dp || maxHeight < 700.dp
                 val isDesktop = remember { !getPlatform().name.startsWith("Android") }
@@ -111,7 +111,7 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
                 val dangerRed = Color(0xFFB24443)
                 val horizontalPadding = if (isCompact) 16.dp else 20.dp
                 val logoHeight = if (isCompact) 64.dp else 88.dp
-                val titleFontSize = if (isCompact) 24.sp else 30.sp
+                val titleFontSize = if (isCompact) 23.sp else 27.sp
                 val sectionSpacing = if (isCompact) 12.dp else 18.dp
                 val smallSpacing = if (isCompact) 6.dp else 8.dp
                 val buttonHeight = if (isCompact) 48.dp else 56.dp
@@ -127,7 +127,7 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
                             .padding(12.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Reply,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = primaryText
                         )
@@ -136,7 +136,7 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
 
                 Column(
                     modifier = Modifier
-                        .widthIn(max = 480.dp)
+                        .widthIn(max = 420.dp)
                         .fillMaxWidth()
                         .align(if (shouldCenterVertically) Alignment.Center else Alignment.TopCenter)
                         .verticalScroll(rememberScrollState())
@@ -148,21 +148,10 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
                         ),
                     horizontalAlignment = Alignment.Start
                 ) {
-                    Image(
-                        painter = painterResource(Res.drawable.brand_logo),
-                        contentDescription = "Saporini Italiano",
-                        modifier = Modifier
-                            .height(logoHeight)
-                            .align(Alignment.CenterHorizontally),
-                        contentScale = ContentScale.Fit
-                    )
-
                     if (state.done) {
                         DoneContent(state.view, primaryText, mutedText, successGreen, buttonHeight, toLogin)
                         return@Column
                     }
-
-                    Spacer(modifier = Modifier.height(sectionSpacing * 1.5f))
 
                     val view = state.view?.takeIf { it.valid }
                     Text(
@@ -170,7 +159,8 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
                         style = MaterialTheme.typography.headlineLarge.copy(lineHeight = (titleFontSize.value + 2).sp),
                         color = primaryText,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = CormorantGaramond(),
+                        fontFamily = Inter(),
+                        letterSpacing = (-0.3).sp,
                         fontSize = titleFontSize
                     )
 
@@ -180,7 +170,7 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
                         text = welcome(view),
                         style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 19.sp),
                         color = mutedText,
-                        fontFamily = Belleza()
+                        fontFamily = Inter()
                     )
 
                     Spacer(modifier = Modifier.height(sectionSpacing * 1.2f))
@@ -255,7 +245,7 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
                                 text = label,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = if (satisfied) primaryText else mutedText,
-                                fontFamily = Belleza()
+                                fontFamily = Inter()
                             )
                         }
                     }
@@ -287,7 +277,7 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
                             Text(
                                 text = if (view != null && !view.invite) "Update password" else "Set password",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 letterSpacing = 0.sp
                             )
                         }
@@ -310,7 +300,6 @@ data class ResetPasswordScreen(val link: String = "") : Screen {
                     }
                 }
 
-                PreviewHomeButton()
             }
         }
     }
@@ -339,7 +328,7 @@ private fun LinkStatus(
     when {
         state.link.isBlank() -> Text(
             "Copy the link from the email and paste it here.",
-            style = MaterialTheme.typography.bodySmall, color = mutedText, fontFamily = Belleza()
+            style = MaterialTheme.typography.bodySmall, color = mutedText, fontFamily = Inter()
         )
         state.checking -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CircularProgressIndicator(modifier = Modifier.size(14.dp), color = mutedText, strokeWidth = 1.5.dp)
@@ -395,8 +384,9 @@ private fun DoneContent(
             style = MaterialTheme.typography.headlineLarge,
             color = primaryText,
             fontWeight = FontWeight.Bold,
-            fontFamily = CormorantGaramond(),
-            fontSize = 30.sp
+            fontFamily = Inter(),
+            letterSpacing = (-0.3).sp,
+            fontSize = 27.sp
         )
         Spacer(modifier = Modifier.height(10.dp))
         Text(
@@ -414,7 +404,7 @@ private fun DoneContent(
             },
             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
             color = mutedText,
-            fontFamily = Belleza(),
+            fontFamily = Inter(),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         Spacer(modifier = Modifier.height(40.dp))
@@ -424,7 +414,7 @@ private fun DoneContent(
             colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White),
             shape = RoundedCornerShape(10.dp)
         ) {
-            Text("Go to sign in", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, letterSpacing = 0.sp)
+            Text("Go to sign in", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, fontFamily = Inter(), letterSpacing = 0.sp)
         }
     }
 }
@@ -435,9 +425,10 @@ private fun FieldLabel(text: String, color: Color) {
         text = text,
         style = MaterialTheme.typography.bodyLarge,
         color = color,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
         modifier = Modifier.padding(start = 3.dp),
-        fontFamily = Belleza()
+        fontFamily = Inter()
     )
 }
 
@@ -459,7 +450,7 @@ private fun AuthField(
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, color = mutedText) },
+        placeholder = { Text(placeholder, color = mutedText, fontFamily = Inter(), fontSize = 14.5.sp) },
         leadingIcon = { Icon(imageVector = icon, contentDescription = null, tint = mutedText) },
         trailingIcon = if (!password) null else {
             {
