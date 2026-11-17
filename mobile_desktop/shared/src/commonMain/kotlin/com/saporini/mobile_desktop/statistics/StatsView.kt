@@ -8,6 +8,7 @@ import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.DayOfWeek
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.daysUntil
+import kotlinx.datetime.minus
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.plus
 import kotlin.math.roundToLong
@@ -51,8 +52,9 @@ internal data class MethodFigures(val key: String, val collected: Long, val coun
 internal data class BranchFigures(
     val id: String, val name: String, val sales: Long, val orders: Long, val guests: Long, val collected: Long, val tips: Long,
     val methods: List<MethodFigures>, val dishes: List<ItemSalesDto>,
-    // The sales of each day of the period, in the order of [StatsView.days].
-    val days: List<Long>
+    // The sales of each day of the period, in the order of [StatsView.days], and the same days with their orders.
+    val days: List<Long>,
+    val dayPoints: List<DayPoint> = emptyList()
 ) {
     val averageBill: Long get() = if (orders > 0) sales / orders else 0
 }
@@ -132,8 +134,21 @@ internal class StatsView(val state: StatisticsState) {
         (rawStaff.firstOrNull { it.staffId == id }?.sales.centsOf()).toDouble() / total
     } ?: 1.0
 
+    /** Whether a source is in the filter's choice: WALK_IN and ONLINE are groups of sources ("How it was ordered"). */
+    private fun sourceIn(choice: String?, key: String): Boolean = when (choice) {
+        null -> true
+        FILTER_ONLINE -> key in OnlineSources
+        FILTER_WALK_IN -> key !in OnlineSources
+        else -> key == choice
+    }
+
+    private val sourceShare: Double = filters.source?.let { choice ->
+        val total = sourceSlices.sumOf { it.sales }.takeIf { it > 0 } ?: return@let 0.0
+        sourceSlices.filter { sourceIn(choice, it.key) }.sumOf { it.sales }.toDouble() / total
+    } ?: 1.0
+
     /** How much of everything the narrower filters keep (1 without filters). */
-    val factor: Double = share(typeSlices, filters.orderType) * share(sourceSlices, filters.source) * share(sectionSlices, filters.section) *
+    val factor: Double = share(typeSlices, filters.orderType) * sourceShare * share(sectionSlices, filters.section) *
         methodShare * staffShare
 
     private fun Long.scaled(by: Double = factor): Long = (this * by).roundToLong()
@@ -192,15 +207,72 @@ internal class StatsView(val state: StatisticsState) {
         daysOf(range.first, dayCount, list)
     }
 
-    val hours: List<HourPoint> = run {
-        val byHour = sales?.salesByHour.orEmpty().associateBy { it.hour }
-        (0..23).map { h -> byHour[h].let { HourPoint(h, it?.sales.centsOf().scaled(), (it?.orders ?: 0L).scaled()) } }
+    // ---- The day-by-day graph of a month: the whole month on the axis (user, 2026-11-14) ----
+
+    /** A period inside one month from its 1st: the graph spans the whole month, this month's line stopping at today. */
+    val monthAxis: Boolean = monthLike(from, to)
+
+    /** Every day of that month, for the graph's axis (just [days] for other periods). */
+    val axisDays: List<LocalDate> = if (!monthAxis) days.map { it.date } else {
+        val end = from.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1))
+        (0..from.daysUntil(end)).map { from.plus(DatePeriod(days = it)) }
     }
 
-    val compareHours: List<HourPoint>? = state.compareSales?.let { c ->
-        val byHour = c.salesByHour.associateBy { it.hour }
-        (0..23).map { h -> byHour[h].let { HourPoint(h, it?.sales.centsOf().scaled(), (it?.orders ?: 0L).scaled()) } }
+    /** The comparison line of that graph: last month as a whole (day 1 with day 1), or the comparison's days. */
+    val axisCompareDays: List<DayPoint>? = run {
+        if (!monthAxis || compareMode != CompareMode.LAST_MONTH) return@run compareDays
+        val start = from.minus(DatePeriod(months = 1))
+        val lastMonthDays = start.daysUntil(from)
+        val list = state.compareWholeSales?.salesByDay ?: state.compareSales?.salesByDay?.ifEmpty { null } ?: state.compareOverview?.salesByDay
+            ?: return@run null
+        daysOf(start, minOf(lastMonthDays, axisDays.size), list)
     }
+
+    /** A year from 1 January: its graph shows the twelve months, not days (user, 2026-11-14). */
+    val yearAxis: Boolean = yearLike(from, to)
+
+    /** Last year's days for that graph: the whole year while this one runs, else the comparison's days. */
+    val yearCompareDays: List<DayPoint>? = run {
+        if (!yearAxis || compareMode != CompareMode.LAST_YEAR) return@run null
+        val start = LocalDate(from.year - 1, 1, 1)
+        val list = state.compareWholeSales?.salesByDay ?: state.compareSales?.salesByDay?.ifEmpty { null } ?: state.compareOverview?.salesByDay
+            ?: return@run null
+        daysOf(start, start.daysUntil(LocalDate(from.year, 1, 1)), list)
+    }
+
+    private fun hourPoints(dto: com.saporini.mobile_desktop.statistics.data.StatsSalesDto?): List<HourPoint> {
+        val byHour = dto?.salesByHour.orEmpty().associateBy { it.hour }
+        return (0..23).map { h -> byHour[h].let { HourPoint(h, it?.sales.centsOf().scaled(), (it?.orders ?: 0L).scaled()) } }
+    }
+
+    val hours: List<HourPoint> = hourPoints(sales)
+
+    val compareHours: List<HourPoint>? = state.compareSales?.let(::hourPoints)
+
+    // ---- Sales by hour on one day of its own calendar (null = the period's hours above) ----
+
+    val hoursDay: LocalDate? = state.hoursDay
+    val hoursLoading: Boolean = state.hoursLoading
+
+    /** The picked day's hours; null until they first load. */
+    val dayHours: List<HourPoint>? = if (hoursDay == null) null else state.hoursSales?.let(::hourPoints)
+
+    /** The same weekday a week earlier, the day's comparison (none when the page compares with nothing). */
+    val dayCompareDate: LocalDate? = hoursDay?.takeIf { compareMode != CompareMode.NONE }?.minus(DatePeriod(days = 7))
+    val dayCompareHours: List<HourPoint>? = if (dayCompareDate == null) null else state.hoursCompareSales?.let(::hourPoints)
+
+    // ---- Sales by weekday for one week of its own calendar (null = the period's averages) ----
+
+    /** The Monday of the week picked, or null. */
+    val week: LocalDate? = state.week
+    val weekLoading: Boolean = state.weekLoading
+
+    /** Monday to Sunday of that week; null until it first loads. */
+    val weekDays: List<DayPoint>? = week?.let { monday -> state.weekSales?.let { daysOf(monday, 7, it.salesByDay) } }
+
+    /** The week before, the week's comparison (none when the page compares with nothing). */
+    val weekCompareStart: LocalDate? = week?.takeIf { compareMode != CompareMode.NONE }?.minus(DatePeriod(days = 7))
+    val weekCompareDays: List<DayPoint>? = weekCompareStart?.let { monday -> state.weekCompareSales?.let { daysOf(monday, 7, it.salesByDay) } }
 
     val weekdays: List<WeekdayPoint> = run {
         val byDay = sales?.salesByWeekday.orEmpty().associateBy { it.isoDayOfWeek }
@@ -239,7 +311,11 @@ internal class StatsView(val state: StatisticsState) {
     }
 
     val orderTypes: List<Slice> = only(typeSlices, filters.orderType, share(typeSlices, filters.orderType))
-    val sources: List<Slice> = only(sourceSlices, filters.source, share(sourceSlices, filters.source))
+    val sources: List<Slice> = run {
+        val others = if (sourceShare > 0) factor / sourceShare else 0.0
+        sourceSlices.filter { sourceIn(filters.source, it.key) }.map { it.copy(sales = it.sales.scaled(others), count = it.count.scaled(others)) }
+            .sortedByDescending { it.sales }
+    }
     val floors: List<Slice> = sales?.floors.orEmpty().map { Slice(it.key, it.sales.centsOf().scaled(), it.orders.scaled()) }
     val sections: List<Slice> = only(sectionSlices, filters.section, share(sectionSlices, filters.section))
     val compareSections: List<Slice> = state.compareSales?.sections.orEmpty().map { Slice(it.section, it.sales.centsOf(), it.quantity) }
@@ -301,6 +377,9 @@ internal class StatsView(val state: StatisticsState) {
 
     // ---- Branches ----
 
+    /** Several branches, all of them shown (the picker at the top on All branches): the pages add what's by branch. */
+    val allBranches: Boolean get() = state.branchId == null && branches.size > 1
+
     val branches: List<BranchFigures> = state.branches.mapNotNull { branch ->
         val o = state.branchOverviews[branch.id] ?: return@mapNotNull null
         val k = o.kpis
@@ -309,7 +388,8 @@ internal class StatsView(val state: StatisticsState) {
             k.collected.value.centsOf().scaled(), k.tips.value.centsOf().scaled(),
             o.paymentMethods.map { MethodFigures(it.method, it.collected.centsOf().scaled(), it.count.scaled(), it.tips.centsOf().scaled(), 0) },
             o.topItems,
-            daysOf(from, dayCount, o.salesByDay).map { it.sales }
+            daysOf(from, dayCount, o.salesByDay).map { it.sales },
+            daysOf(from, dayCount, o.salesByDay)
         )
     }.sortedByDescending { it.sales }
 
@@ -327,6 +407,82 @@ internal class StatsView(val state: StatisticsState) {
     }.sortedByDescending { it.sales }
 
     val staffOptions: List<Pair<String, String>> = rawStaff.sortedBy { it.name.lowercase() }.map { it.staffId to it.name }
+
+    // ---- Where the money came from (MOCK for the booked part) ----
+
+    /**
+     * The sales split by where they came from (user, 2026-11-14: "only walk-ins and online orders, the others when they're
+     * switched on"): walk-ins (eat-in orders taken by staff), online orders (guests ordering themselves: QR at the table,
+     * website, app; shown when QR ordering is on), and takeaway and delivery only when switched on in Admin Hub → Settings →
+     * Order types. With the settings unknown, whatever had sales shows. Booked tables can be split out of walk-ins
+     * ([SplitBookedTables]; MOCK share, the server doesn't split eat-in orders by booking yet). Biggest first.
+     */
+    val moneySources: List<MoneySource> = run {
+        val on = state.orderTypesOn
+        fun allowed(key: String, setting: String) = on?.contains(setting) ?: true
+        val dine = orderTypes.firstOrNull { it.key == "DINE_IN" }
+        val dineSales = dine?.sales ?: 0L
+        val dineOrders = dine?.count ?: 0L
+        val online = sources.filter { it.key in OnlineSources }
+        val onlineShown = on?.contains(com.saporini.mobile_desktop.statistics.data.QR_ORDERING) ?: online.any { it.sales > 0 }
+        val onlineSales = if (onlineShown) minOf(online.sumOf { it.sales }, dineSales) else 0L
+        val onlineOrders = if (onlineShown) minOf(online.sumOf { it.count }, dineOrders) else 0L
+        val restSales = dineSales - onlineSales
+        val restOrders = dineOrders - onlineOrders
+        val bookedOrders = if (SplitBookedTables) (restOrders * 0.38 * noise("money-book", 0.08)).roundToLong().coerceIn(0L, restOrders) else 0L
+        val bookedSales = if (restOrders > 0) (restSales * bookedOrders * 1.18 / restOrders).roundToLong().coerceAtMost(restSales) else 0L
+        fun type(key: String) = orderTypes.firstOrNull { it.key == key }
+        listOfNotNull(
+            MoneySource("WALK_IN", restSales - bookedSales, restOrders - bookedOrders),
+            MoneySource("BOOKING", bookedSales, bookedOrders).takeIf { SplitBookedTables },
+            MoneySource("ONLINE", onlineSales, onlineOrders).takeIf { onlineShown },
+            type("TAKEAWAY")?.takeIf { allowed(it.key, "TAKEAWAY") }?.let { MoneySource("TAKEAWAY", it.sales, it.count) },
+            type("DELIVERY")?.takeIf { allowed(it.key, "DELIVERY") }?.let { MoneySource("DELIVERY", it.sales, it.count) }
+        ).filter { it.sales > 0 || it.key == "ONLINE" }.sortedByDescending { it.sales }
+    }
+
+    // ---- Sales by floor and its places (MOCK for the places) ----
+
+    /**
+     * Each floor that had table sales (orders without a table left out), biggest first, with its places when it has any:
+     * the places of Tables → Edit → Create places, and "Not in a place" for its other tables. MOCK: the server sums sales per
+     * floor only, so a floor's sales are spread over its places by their number of tables until it sums them per place.
+     */
+    val floorFigures: List<FloorFigures> = floors.filter { it.key != "No table" && it.sales > 0 }.sortedByDescending { it.sales }.map { floor ->
+        // The branch picked at the top has its own floors; without one, every branch's places on a floor of that name.
+        val places = (state.branchId?.let { listOfNotNull(state.floorPlaces[it]) } ?: state.floorPlaces.values)
+            .flatMap { it[floor.key].orEmpty() }.groupBy { it.name }.map { (name, list) -> StatsPlace(name, list.sumOf { it.tables }) }
+        if (places.none { it.name != null }) return@map FloorFigures(floor.key, floor.sales, floor.count, emptyList())
+        val weights = places.map { it.tables * noise("place-${floor.key}-${it.name}", 0.25) }
+        val total = weights.sum().coerceAtLeast(0.0001)
+        val split = places.mapIndexed { i, p ->
+            FloorPlace(p.name, (floor.sales * weights[i] / total).roundToLong(), (floor.count * weights[i] / total).roundToLong())
+        }.filter { it.sales > 0 }.sortedWith(compareBy<FloorPlace> { it.name == null }.thenByDescending { it.sales })
+        FloorFigures(floor.key, floor.sales, floor.count, split)
+    }
+
+    // ---- Bill sizes (MOCK) ----
+
+    /**
+     * The bills in four price bands, cut at round amounts around the average bill (for €35: under €20, €20–50, €50–100,
+     * €100 and more), with how many bills and how much of the sales each holds. MOCK: spread around the real average
+     * bill and total until the server counts the bills per band.
+     */
+    val billBands: List<BillBand> = run {
+        val orders = totals.orders
+        val average = totals.averageBill
+        if (orders <= 0 || average <= 0) return@run emptyList()
+        val cuts = listOf(roundAmount(average / 2), roundAmount(average * 5 / 4), roundAmount(average * 5 / 2)).distinct()
+        if (cuts.size < 3) return@run emptyList()
+        val parts = listOf(0.17, 0.43, 0.29, 0.11).mapIndexed { i, p -> p * noise("bill-$i", 0.12) }
+        val partTotal = parts.sum()
+        val bills = parts.map { (orders * it / partTotal).roundToLong() }
+        val inside = listOf(cuts[0] * 0.62, (cuts[0] + cuts[1]) / 2.0, (cuts[1] + cuts[2]) / 2.0, cuts[2] * 1.45)
+        val rough = bills.mapIndexed { i, n -> n * inside[i] }
+        val scale = totals.sales / rough.sum().coerceAtLeast(1.0)
+        val bounds = listOf(null to cuts[0], cuts[0] to cuts[1], cuts[1] to cuts[2], cuts[2] to null)
+        bounds.mapIndexed { i, (from, until) -> BillBand(from, until, bills[i], (rough[i] * scale).roundToLong()) }
+    }
 
     // ---- Bookings (MOCK) ----
 
@@ -410,7 +566,38 @@ internal class StatsView(val state: StatisticsState) {
     val foodCost: Float get() = if (totals.sales > 0) stock.used.toFloat() / totals.sales else 0f
 }
 
+/** The Filters' "How it was ordered" choices: every source but the online ones, or the online ones. */
+const val FILTER_WALK_IN = "WALK_IN"
+const val FILTER_ONLINE = "ONLINE"
+
+/** Order sources that count as online orders: the guests ordered themselves. */
+internal val OnlineSources = setOf("QR_TABLE", "WEB", "MOBILE", "KIOSK")
+
+/** Booked tables apart from walk-ins in Where the money came from (off: the user wants walk-ins and online orders only for now). */
+internal const val SplitBookedTables = false
+
+/** Where some of the sales came from: a key (WALK_IN, BOOKING, ONLINE, TAKEAWAY, DELIVERY), the money and the orders. */
+internal data class MoneySource(val key: String, val sales: Long, val orders: Long)
+
+/** A floor's table sales and its places (empty when it has none). */
+internal data class FloorFigures(val name: String, val sales: Long, val orders: Long, val places: List<FloorPlace>)
+
+/** A place on a floor and its sales; null name = the floor's tables in no place. */
+internal data class FloorPlace(val name: String?, val sales: Long, val orders: Long)
+
+/** A price band of bills: from (inclusive, null = from nothing) until (exclusive, null = and more), in cents. */
+internal data class BillBand(val from: Long?, val until: Long?, val bills: Long, val sales: Long)
+
 // ---- Small helpers ----
+
+/** [cents] rounded to a round amount (1, 2 or 5 times a power of ten of whole units): 1,750 → 2,000; 4,375 → 5,000. */
+internal fun roundAmount(cents: Long): Long {
+    val units = (cents / 100.0).coerceAtLeast(1.0)
+    var step = 1.0
+    while (step * 10 <= units) step *= 10
+    val nice = listOf(1.0, 2.0, 5.0, 10.0).minBy { kotlin.math.abs(it * step - units) } * step
+    return (nice * 100).roundToLong()
+}
 
 /** 0..1 from a text, the same every time (the MOCK figures don't jump between renders). */
 internal fun hash01(key: String): Double {

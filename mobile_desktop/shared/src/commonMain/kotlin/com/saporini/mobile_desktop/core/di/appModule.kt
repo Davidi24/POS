@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.core.di
 
+import com.saporini.mobile_desktop.pos.shifts.toCentsOrNull
 import com.saporini.mobile_desktop.auth.data.repository.AuthRepository
 import com.saporini.mobile_desktop.auth.ui.login.LoginScreenModel
 import com.saporini.mobile_desktop.core.network.createHttpClient
@@ -92,7 +93,30 @@ private val appModule = module {
     factory {
         val platform = get<com.saporini.mobile_desktop.platform.PlatformRepository>()
         val menus = get<MenuRepository>()
-        com.saporini.mobile_desktop.statistics.StatisticsScreenModel(repository = get(), session = get(), branchesOf = { restaurantId ->
+        val history = get<com.saporini.mobile_desktop.pos.history.OrderHistoryRepository>()
+        val payments = get<com.saporini.mobile_desktop.pos.payment.data.PaymentRepository>()
+        val session = get<com.saporini.mobile_desktop.core.session.SessionManager>()
+        com.saporini.mobile_desktop.statistics.StatisticsScreenModel(repository = get(), session = session, dayOrdersOf = { restaurantId, branchId, from, to ->
+            // The orders of a day (the Day window) or of a month at most (Sales details' Download all): the branch picked, or every
+            // branch; at most 6,000 a branch (60 pages).
+            val userId = session.currentUser.value?.id.orEmpty()
+            val branchIds = branchId?.let { listOf(it) } ?: platform.branches(restaurantId).filter { it.isActive }.map { it.id }
+            branchIds.flatMap { b ->
+                val scope = com.saporini.mobile_desktop.pos.orders.ui.OrdersScope(userId, restaurantId, b)
+                buildList {
+                    var page = 0
+                    while (page < 60) {
+                        val answer = history.page(scope, com.saporini.mobile_desktop.pos.history.HistoryFilter(from = from, to = to), page, 100)
+                        addAll(answer.items)
+                        if (!answer.hasNext) break
+                        page++
+                    }
+                }
+            }.map { o ->
+                com.saporini.mobile_desktop.statistics.StatsOrder(o.id, o.branchId, o.orderNumber, o.openedAt, o.closedAt, o.tableNumber ?: o.tableName,
+                    o.orderType.name, o.createdBy, o.guestCount, o.itemCount, o.total.value.toCentsOrNull() ?: 0L, o.status.name, unpaid = o.unpaidAt != null)
+            }
+        }, receiptOf = { restaurantId, orderId -> payments.receipt(restaurantId, orderId) }, branchesOf = { restaurantId ->
             platform.branches(restaurantId).filter { it.isActive }.map { com.saporini.mobile_desktop.statistics.StatsBranch(it.id, it.name) }
         }, photosOf = { restaurantId ->
             // Every menu's dishes that have a photo, by id and by name. The menu list carries no dishes, so each menu is read
@@ -102,6 +126,16 @@ private val appModule = module {
                 .flatMap { it.items }
                 .mapNotNull { dish -> dish.imageUrl?.takeIf { it.isNotBlank() }?.let { url -> dish to url } }
                 .flatMap { (dish, url) -> listOf(dish.id to url, dish.name to url) }.toMap()
+        }, restaurantNameOf = { restaurantId -> platform.restaurant(restaurantId).name },
+            addedOn = { restaurantId -> platform.restaurant(restaurantId).createdAt?.take(10)?.let { kotlinx.datetime.LocalDate.parse(it) } }, placesOf = { restaurantId ->
+            // Every branch's tables by floor, grouped by the place they're in (Tables → Edit → Create places).
+            val tablesApi = get<TableLayoutApi>()
+            platform.branches(restaurantId).filter { it.isActive }.associate { branch ->
+                val names = runCatching { tablesApi.getTableCategories(restaurantId, branch.id) }.getOrDefault(emptyList()).associate { it.id to it.name }
+                branch.id to runCatching { tablesApi.getTables(restaurantId, branch.id) }.getOrDefault(emptyList()).filter { it.active && it.floor != null }
+                    .groupBy({ it.floor!! }, { table -> table.categoryId?.let(names::get) })
+                    .mapValues { (_, places) -> places.groupingBy { it }.eachCount().map { (name, count) -> com.saporini.mobile_desktop.statistics.StatsPlace(name, count) } }
+            }
         })
     }
     single<com.saporini.mobile_desktop.fraud.data.FraudRepository> { com.saporini.mobile_desktop.fraud.data.FraudApi(client = get()) }

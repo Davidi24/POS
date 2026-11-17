@@ -71,7 +71,7 @@ import com.saporini.mobile_desktop.platform.MAX_LEGAL_NAME
 import com.saporini.mobile_desktop.platform.MAX_RESTAURANT_NAME
 import com.saporini.mobile_desktop.platform.TIME_ZONES
 import com.saporini.mobile_desktop.platform.timeZoneLabel
-import com.saporini.mobile_desktop.platform.ui.BackArrow
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import kotlinx.datetime.TimeZone
 import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.brand_logo
@@ -216,17 +216,20 @@ private fun StatusResult(view: RestaurantApplicationStatusView, onSignIn: () -> 
 
 /** A white page with the brand on top and the curved back arrow, for the sign-in side of the app. */
 @Composable
-private fun PublicPage(onBack: () -> Unit, content: @Composable ColumnScope.(wide: Boolean) -> Unit) {
+private fun PublicPage(onBack: () -> Unit, content: @Composable ColumnScope.(wide: Boolean) -> Unit) = com.saporini.mobile_desktop.auth.ui.login.AuthFonts {
     BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFFFCFCFB))) {
         val wide = maxWidth >= 640.dp
-        Box(Modifier.padding(12.dp)) { BackArrow("Back to sign in", onBack) }
+        // The sign-in screens' small home-screen corner, behind the page (user, 2026-11-17: "in all pages").
+        com.saporini.mobile_desktop.workspace.ui.BottomLeftDecoration(Modifier.matchParentSize(), if (wide && maxHeight >= 700.dp) 0.6f else 0.45f)
+        // A plain back arrow (user, 2026-11-17: the curved one is only for inside the app).
+        androidx.compose.material3.IconButton(onClick = onBack, modifier = Modifier.padding(12.dp)) {
+            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, "Back to sign in", tint = Kit.Ink)
+        }
         Column(
             Modifier.align(Alignment.TopCenter).widthIn(max = 760.dp).fillMaxWidth().verticalScroll(rememberScrollState())
                 .padding(start = 16.dp, end = 16.dp, top = 56.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Image(painterResource(Res.drawable.brand_logo), "Saporini Italiano", Modifier.height(if (wide) 72.dp else 56.dp).align(Alignment.CenterHorizontally),
-                contentScale = ContentScale.Fit)
             content(wide)
         }
     }

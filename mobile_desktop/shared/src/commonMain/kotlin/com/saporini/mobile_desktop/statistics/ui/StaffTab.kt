@@ -2,6 +2,11 @@ package com.saporini.mobile_desktop.statistics.ui
 
 import mobile_desktop.shared.generated.resources.salary_waiters
 import mobile_desktop.shared.generated.resources.Res
+import mobile_desktop.shared.generated.resources.settings_shifts
+import mobile_desktop.shared.generated.resources.role_finance
+import mobile_desktop.shared.generated.resources.workspace_statistics
+import mobile_desktop.shared.generated.resources.shifts_worked
+import mobile_desktop.shared.generated.resources.role_general
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -46,22 +51,22 @@ import com.saporini.mobile_desktop.statistics.StatsView
 // pay live in Admin Hub → Salary; the labour cost here is an estimate until it reads them (MOCK, StatsView).
 
 @Composable
-internal fun TeamBookingsTab(v: StatsView, size: ScreenSize) {
-    SectionHeading("Team", "Who sold what, hours on the clock, sales per hour and the labour cost", Res.drawable.salary_waiters, StatsSeries[3])
+internal fun TeamTab(v: StatsView, size: ScreenSize) {
     val people = v.staff
     val hours = people.sumOf { it.hours }
     val labor = people.sumOf { it.laborCost }
     val sales = people.sumOf { it.sales }
-    TileGrid(listOf(
-        { m -> StatTile("People who worked", countText(people.count { it.hours > 0 || it.orders > 0 }.toLong()), m, detail = "took orders or clocked in",
-            icon = Icons.Outlined.Groups, tone = StatsSeries[3]) },
-        { m -> StatTile("Hours worked", hoursText(hours), m, detail = "breaks taken off", icon = Icons.Outlined.Schedule, tone = StatsSeries[1]) },
-        { m -> StatTile("Sales per hour worked", v.money(if (hours > 0.1) (sales / hours).toLong() else 0), m, detail = "everyone together", icon = Icons.Outlined.Speed) },
-        { m -> StatTile("Labour cost", v.money(labor), m, detail = "hours × wage (estimated)", icon = Icons.Outlined.Savings, tone = StatsSeries[2]) },
-        { m -> StatTile("Labour cost of sales", if (sales > 0) percent1(labor.toFloat() / sales) else "–", m, detail = "the lower, the better", inverted = true,
-            icon = Icons.Outlined.Percent, tone = Kit.Grey) },
-        { m -> StatTile("Tips", v.money(people.sumOf { it.tips }), m, detail = "on their orders", icon = Icons.Outlined.VolunteerActivism) }
-    ), desktop = 6)
+    // The figures as one grid with the app's pictures, no colour strips (user, 2026-11-16).
+    FigureGrid(listOf(
+        FigureCell("People who worked", countText(people.count { it.hours > 0 || it.orders > 0 }.toLong()), Res.drawable.role_general,
+            detail = "took orders or clocked in"),
+        FigureCell("Hours worked", hoursText(hours), Res.drawable.shifts_worked, detail = "breaks taken off"),
+        FigureCell("Sales per hour worked", v.money(if (hours > 0.1) (sales / hours).toLong() else 0), Res.drawable.workspace_statistics, detail = "everyone together"),
+        FigureCell("Labour cost", v.money(labor), Res.drawable.role_finance, detail = "hours × wage (estimated)"),
+        FigureCell("Labour cost of sales", if (sales > 0) percent1(labor.toFloat() / sales) else "–", Res.drawable.settings_shifts, inverted = true,
+            detail = "the lower, the better"),
+        FigureCell("Tips", v.money(people.sumOf { it.tips }), Res.drawable.salary_waiters, detail = "on their orders")
+    ))
     LeaderboardPanel(v, people, size)
     PanelLine(size,
         1f to { m -> RankPanel(Icons.Outlined.Leaderboard, "Sales", people.sortedByDescending { it.sales }, m, v, StatsAccent, { it.sales }) { "${it.orders} orders" } },
@@ -72,7 +77,6 @@ internal fun TeamBookingsTab(v: StatsView, size: ScreenSize) {
     )
     StaffWatchPanel(v, people, Modifier.fillMaxWidth())
     Footnote("Wages and paying people are in Admin Hub → Salary. The labour cost here uses each person's hours and an estimated wage for now.")
-    BookingsSection(v, size)
 }
 
 @Composable

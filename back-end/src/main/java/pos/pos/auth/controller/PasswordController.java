@@ -35,11 +35,12 @@ public class PasswordController {
     private final PasswordResetService passwordResetService;
     private final ChangePasswordService changePasswordService;
     private final JwtService jwtService;
+    private final pos.pos.security.util.ClientInfoExtractor clientInfoExtractor;
 
     @PostMapping("/forgot-password")
     @Operation(summary = "Request a password reset by email link or SMS code")
-    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        passwordResetService.requestReset(request);
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest httpRequest) {
+        passwordResetService.requestReset(request, clientInfoExtractor.extract(httpRequest).ipAddress());
         return ResponseEntity.noContent().build();
     }
 

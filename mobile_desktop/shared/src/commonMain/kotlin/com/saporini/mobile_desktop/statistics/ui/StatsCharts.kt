@@ -45,6 +45,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -103,7 +106,7 @@ internal fun sourceColor(key: String): Color = when (key) {
 internal fun seriesColor(index: Int): Color = StatsSeries.getOrElse(index) { StatsOther }
 
 /** A clean axis top above [max] and its step: 0, step, 2·step, 3·step. */
-private fun niceAxis(max: Float, steps: Int = 3): Pair<Float, Float> {
+internal fun niceAxis(max: Float, steps: Int = 3): Pair<Float, Float> {
     if (max <= 0f) return 1f to 1f / steps
     val raw = max / steps
     val magnitude = 10.0.pow(floor(log10(raw.toDouble()))).toFloat()
@@ -141,7 +144,7 @@ private fun Modifier.pointerSpot(onSpot: (Offset?) -> Unit): Modifier = pointerI
 
 /** The readout: the title, then each value (strong) with a short line in its series colour and its name. */
 @Composable
-private fun Readout(title: String, rows: List<Triple<Color?, String, String>>, anchorX: Float, anchorY: Float, width: Int) {
+private fun Readout(title: String, rows: List<Triple<Color?, String, String>>, anchorX: Float, anchorY: Float, width: Int, hint: String? = null) {
     var size by remember { mutableStateOf(IntSize.Zero) }
     Column(
         Modifier
@@ -163,17 +166,23 @@ private fun Readout(title: String, rows: List<Triple<Color?, String, String>>, a
                     overflow = TextOverflow.Ellipsis)
             }
         }
+        // What a click does here ("Click to open the day ›").
+        hint?.let { Text(it, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 10.sp, color = Color(0xFFA7D99B), maxLines = 1) }
     }
 }
 
 /** A legend: a swatch (a dot, or a short line for line series) and the name, for two or more series. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ChartLegend(items: List<Pair<Color, String>>, modifier: Modifier = Modifier, lines: Boolean = false, dashedLast: Boolean = false) {
+internal fun ChartLegend(items: List<Pair<Color, String>>, modifier: Modifier = Modifier, lines: Boolean = false, dashedLast: Boolean = false,
+                         dotted: Set<Int> = emptySet()) {
     FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         items.forEachIndexed { index, (color, name) ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 when {
+                    lines && index in dotted -> Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        repeat(3) { Box(Modifier.size(3.dp).clip(RoundedCornerShape(50)).background(color)) }
+                    }
                     lines && dashedLast && index == items.lastIndex -> Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         repeat(2) { Box(Modifier.width(5.dp).height(2.dp).background(color)) }
                     }
@@ -188,7 +197,8 @@ internal fun ChartLegend(items: List<Pair<Color, String>>, modifier: Modifier = 
 
 // ---- Line ----
 
-internal class LineSeries(val name: String, val values: List<Float>, val color: Color, val dashed: Boolean = false)
+// A null value is a day without a point (closed, or still to come): the line goes straight on to the next one.
+internal class LineSeries(val name: String, val values: List<Float?>, val color: Color, val dashed: Boolean = false, val dotted: Boolean = false)
 
 /**
  * Lines over time on one axis: the first series is filled with a wash, a [LineSeries.dashed] one is the comparison.
@@ -205,14 +215,23 @@ internal fun LineChart(
     axisFormat: (Float) -> String = format,
     titleOf: (Int) -> String = { labels.getOrElse(it) { "" } },
     // The first series is filled with a wash; off for several equal lines (one per branch).
-    wash: Boolean = true
+    wash: Boolean = true,
+    // Days shown in a light grey band (closed, or no sales).
+    shaded: Set<Int> = emptySet(),
+    // About how many steps the left axis has (more = more amounts written on the left).
+    steps: Int = 3,
+    // A click (a tap) on a place opens it (Sales: the day, or a year's month); [pickHint] says so in the readout, and a
+    // place whose hint is null can't be opened (days still to come).
+    onPick: ((Int) -> Unit)? = null,
+    pickHint: (Int) -> String? = { null }
 ) {
     val measurer = rememberTextMeasurer()
     val style = axisStyle()
     var spot by remember { mutableStateOf<Offset?>(null) }
     var width by remember { mutableStateOf(0) }
-    val count = series.maxOfOrNull { it.values.size } ?: 0
-    val (top, step) = niceAxis(series.flatMap { it.values }.maxOrNull() ?: 0f)
+    // The axis has a place per label, also past where the lines stop (a month still running).
+    val count = maxOf(labels.size, series.maxOfOrNull { it.values.size } ?: 0)
+    val (top, step) = niceAxis(series.flatMap { it.values }.filterNotNull().maxOrNull() ?: 0f, steps)
     val axisWidth = remember(top) { measurer.measure(axisFormat(top), style).size.width + 8 }
     val gutter = with(androidx.compose.ui.platform.LocalDensity.current) { 6.dp.toPx() }
     // The day under the pointer, snapped to the nearest one.
@@ -221,12 +240,29 @@ internal fun LineChart(
         if (count == 0 || plot <= 0f || p.x < axisWidth - 4) null else ((p.x - axisWidth) / plot * (count - 1)).roundToInt().coerceIn(0, count - 1)
     }
     Box(modifier.fillMaxWidth().heightIn(min = height).onSizeChanged { width = it.width }) {
-        Canvas(Modifier.matchParentSize().pointerSpot { spot = it }) {
+        Canvas(Modifier.matchParentSize().pointerSpot { spot = it }.then(if (onPick == null) Modifier else Modifier
+            .pointerHoverIcon(if (at != null && pickHint(at) != null) PointerIcon.Hand else PointerIcon.Default)
+            .pointerInput(onPick, count, axisWidth, width) {
+                detectTapGestures { p ->
+                    val plot = width - axisWidth - gutter
+                    if (count > 0 && plot > 0f && p.x >= axisWidth - 4) {
+                        val i = ((p.x - axisWidth) / plot * (count - 1)).roundToInt().coerceIn(0, count - 1)
+                        if (pickHint(i) != null) onPick(i)
+                    }
+                }
+            })) {
             val left = axisWidth.toFloat()
             val bottom = size.height - 22.dp.toPx()
             val plotWidth = size.width - left - gutter
             fun x(i: Int) = left + if (count <= 1) plotWidth / 2 else plotWidth * i / (count - 1)
             fun y(v: Float) = bottom - (bottom - 8.dp.toPx()) * (v / top)
+            // Closed days: a light band the width of a day.
+            if (count > 1) shaded.forEach { i ->
+                val half = plotWidth / (count - 1) / 2
+                val start = (x(i) - half).coerceAtLeast(left)
+                val end = (x(i) + half).coerceAtMost(left + plotWidth)
+                drawRect(Color(0xFFEFF1EE), Offset(start, 6.dp.toPx()), androidx.compose.ui.geometry.Size(end - start, bottom - 6.dp.toPx()))
+            }
             var level = 0f
             while (level <= top + step / 2) {
                 drawLine(if (level == 0f) AxisLine else GridLine, Offset(left, y(level)), Offset(left + plotWidth, y(level)), strokeWidth = 1.dp.toPx())
@@ -234,24 +270,30 @@ internal fun LineChart(
                 level += step
             }
             series.forEachIndexed { index, s ->
-                if (s.values.isEmpty()) return@forEachIndexed
+                val points = s.values.withIndex().filter { it.value != null }
+                if (points.isEmpty()) return@forEachIndexed
                 val path = Path()
-                s.values.forEachIndexed { i, v -> if (i == 0) path.moveTo(x(i), y(v)) else path.lineTo(x(i), y(v)) }
-                if (index == 0 && !s.dashed && wash) {
+                points.forEachIndexed { n, (i, v) -> if (n == 0) path.moveTo(x(i), y(v!!)) else path.lineTo(x(i), y(v!!)) }
+                if (index == 0 && !s.dashed && !s.dotted && wash) {
                     val fill = Path().apply {
                         addPath(path)
-                        lineTo(x(s.values.lastIndex), bottom)
-                        lineTo(x(0), bottom)
+                        lineTo(x(points.last().index), bottom)
+                        lineTo(x(points.first().index), bottom)
                         close()
                     }
                     drawPath(fill, Brush.verticalGradient(listOf(s.color.copy(alpha = 0.14f), s.color.copy(alpha = 0.02f)), startY = 0f, endY = bottom))
                 }
-                drawPath(path, s.color, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round,
-                    pathEffect = if (s.dashed) PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())) else null))
+                drawPath(path, s.color, style = Stroke(width = if (s.dotted) 2.5.dp.toPx() else 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round,
+                    pathEffect = when {
+                        s.dotted -> PathEffect.dashPathEffect(floatArrayOf(0.1f, 6.dp.toPx()))
+                        s.dashed -> PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))
+                        else -> null
+                    }))
             }
-            // The x labels: at most seven, spread evenly.
+            // The x labels: as many as fit, about one per 60 dp, so a wide graph shows more dates (user, 2026-11-14).
             if (count > 0) {
-                val every = ((count + 6) / 7).coerceAtLeast(1)
+                val fit = (plotWidth / 60.dp.toPx()).toInt().coerceAtLeast(2)
+                val every = ((count + fit - 1) / fit).coerceAtLeast(1)
                 (0 until count).filter { it % every == 0 || it == count - 1 }.distinctBy { it / every }.forEach { i ->
                     label(measurer, labels.getOrElse(i) { "" }, style, x(i), bottom + 12.dp.toPx(), center = true)
                 }
@@ -270,7 +312,10 @@ internal fun LineChart(
         if (at != null && width > 0) {
             val plotWidth = width - axisWidth - gutter
             val anchor = axisWidth + if (count <= 1) plotWidth / 2 else plotWidth * at / (count - 1)
-            Readout(titleOf(at), series.map { Triple(it.color, it.values.getOrNull(at)?.let(format) ?: "–", it.name) }, anchor, 0f, width)
+            // Only the lines that have a point that day (the first one at least, with a dash).
+            val shown = series.filter { it.values.getOrNull(at) != null }.ifEmpty { series.take(1) }
+            Readout(titleOf(at), shown.map { Triple(it.color, it.values.getOrNull(at)?.let(format) ?: "–", it.name) }, anchor, 0f, width,
+                hint = if (onPick != null) pickHint(at) else null)
         }
     }
 }

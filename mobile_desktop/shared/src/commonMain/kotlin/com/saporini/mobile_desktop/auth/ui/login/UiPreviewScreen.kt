@@ -75,7 +75,7 @@ object UiPreviewScreen : Screen {
                 PreviewButton("Reset password") { navigator.push(ResetPasswordScreen()) }
                 PreviewButton("Password updated") { navigator.push(PasswordUpdatedScreen) }
                 PreviewButton("Create PIN") { navigator.push(CreatePinScreen) }
-                PreviewButton("Account locked") { navigator.push(AccountLockedScreen) }
+                PreviewButton("Account locked") { navigator.push(AccountLockedScreen()) }
                 PreviewButton("Session expired") { navigator.push(SessionExpiredScreen) }
 
                 Spacer(modifier = Modifier.height(12.dp))

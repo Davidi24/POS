@@ -126,6 +126,33 @@ public class AuthMailService {
         deliver(EmailKind.PASSWORD_CHANGED, recipientEmail, "Your POS password was changed", body, null, null, null);
     }
 
+    /** "Forgot password?" reached today's limit, so no more links come today (user, 2026-11-17). */
+    public void sendResetLinkLimitEmail(User user, int limit) {
+        String body = """
+                Hello %s,
+
+                We were asked %d times today to send you a link to choose a new POS password. That's the most we send in a day, so no more links will come today.
+
+                If you asked for them, use the newest link we sent. If it has expired, try again tomorrow.
+
+                If you didn't ask for them, you can ignore this email: your password hasn't changed.
+                """.formatted(normalizeName(user.getFirstName()), limit);
+        deliver(EmailKind.PASSWORD_LIMIT, user.getEmail(), "No more password links today", body, user.getId(), user.getRestaurantId(), null);
+    }
+
+    /** The password was changed as many times today as allowed, which may mean someone else is in the account (user, 2026-11-17). */
+    public void sendPasswordChangeLimitEmail(User user, int limit) {
+        String body = """
+                Hello %s,
+
+                Your POS password was changed %d times today. That's the most allowed in a day, so it can't be changed again until tomorrow.
+
+                If you didn't make these changes, someone may be using your account. Use "Forgot password?" in the POS app to choose a new password, and tell your manager.
+                """.formatted(normalizeName(user.getFirstName()), limit);
+        deliver(EmailKind.PASSWORD_LIMIT, user.getEmail(), "Your POS password was changed many times today", body, user.getId(),
+                user.getRestaurantId(), null);
+    }
+
     private String resetBody(String firstName, String resetUrl, Duration tokenTtl) {
         return """
                 Hello %s,

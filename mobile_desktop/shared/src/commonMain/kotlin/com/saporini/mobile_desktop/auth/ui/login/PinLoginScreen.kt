@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.auth.ui.login
 
+import com.saporini.mobile_desktop.core.theme.Inter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,14 +55,13 @@ object PinLoginScreen : Screen {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White)
             ) {
             val isCompact = maxWidth < 380.dp || maxHeight < 700.dp
 
             val primaryText = Color(0xFF111111)
             val mutedText = Color(0xFF666666)
             val logoHeight = if (isCompact) 72.dp else 100.dp
-            val titleFontSize = if (isCompact) 24.sp else 30.sp
+            val titleFontSize = if (isCompact) 23.sp else 27.sp
             val sectionSpacing = if (isCompact) 12.dp else 20.dp
             val keySize = if (isCompact) 56.dp else 64.dp
             val keySpacing = if (isCompact) 12.dp else 16.dp
@@ -71,26 +71,18 @@ object PinLoginScreen : Screen {
 
             Column(
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
+                    .widthIn(max = 420.dp)
                     .fillMaxWidth()
                     .align(Alignment.Center)
                     .padding(horizontal = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = painterResource(Res.drawable.brand_logo),
-                    contentDescription = "Saporini Italiano",
-                    modifier = Modifier.height(logoHeight),
-                    contentScale = ContentScale.Fit
-                )
-
-                Spacer(modifier = Modifier.height(sectionSpacing * 2))
-
                 Text(
                     text = "Enter your PIN",
                     color = primaryText,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = CormorantGaramond(),
+                    fontFamily = Inter(),
+                    letterSpacing = (-0.3).sp,
                     fontSize = titleFontSize
                 )
 
@@ -98,7 +90,7 @@ object PinLoginScreen : Screen {
                     text = "Enter your 4\u20136 digit PIN to sign in.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = mutedText,
-                    fontFamily = Belleza()
+                    fontFamily = Inter()
                 )
 
                 Spacer(modifier = Modifier.height(sectionSpacing * 1.5f))
@@ -167,7 +159,6 @@ object PinLoginScreen : Screen {
                 }
             }
 
-                PreviewHomeButton()
             }
         }
     }

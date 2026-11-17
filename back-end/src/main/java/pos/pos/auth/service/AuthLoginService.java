@@ -19,6 +19,7 @@ import pos.pos.auth.repository.UserSessionRepository;
 import org.springframework.http.HttpStatus;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.auth.InvalidCredentialsException;
+import pos.pos.exception.auth.LoginRefusedException;
 import pos.pos.exception.auth.TooManyRequestsException;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.PermissionRepository;
@@ -46,9 +47,14 @@ import java.util.UUID;
 public class AuthLoginService {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthLoginService.class);
-    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid username/email or password";
-    static final String RESTAURANT_CLOSED_MESSAGE = "Your restaurant is closed in the app right now, so you can't sign in. Contact support.";
-    private static final String TOO_MANY_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
+    private static final String INVALID_CREDENTIALS_MESSAGE = "Wrong username or password.";
+    static final String RESTAURANT_CLOSED_MESSAGE = "This restaurant can't sign in right now. Ask the owner.";
+    private static final String TOO_MANY_ATTEMPTS_MESSAGE = "Too many tries. Wait a few minutes and try again.";
+    private static final String LOCKED_MESSAGE = "Too many wrong passwords.";
+    private static final String DEVICE_PAUSED_MESSAGE = "Too many wrong tries on this device.";
+    private static final String NETWORK_PAUSED_MESSAGE = "Many wrong tries on this network.";
+    private static final String ACCOUNT_OFF_MESSAGE = "Your account is switched off. Ask your manager.";
+    private static final String EMAIL_NOT_CONFIRMED_MESSAGE = "Your email isn't confirmed yet. Use the link in the email we sent you, or ask your manager.";
     private static final String TOKEN_TYPE = "Bearer";
 
     private static final String DUMMY_PASSWORD_HASH =
@@ -74,6 +80,13 @@ public class AuthLoginService {
     @Value("${app.security.login.max-attempts-per-ip}")
     private int maxAttemptsPerIp;
 
+    // Wrong passwords on one device, and from one network address, that pause sign-in there (user, 2026-11-17).
+    @Value("${app.security.login.max-wrong-per-device:50}")
+    private int maxWrongPerDevice;
+
+    @Value("${app.security.login.max-wrong-per-address:200}")
+    private int maxWrongPerAddress;
+
     @Value("${app.security.login.max-attempts-per-account:${app.security.login.max-failed-attempts}}")
     private int maxAttemptsPerAccount;
 
@@ -85,7 +98,7 @@ public class AuthLoginService {
 
     private final RefreshTokenSecurityService refreshTokenSecurityService;
 
-    @Transactional(noRollbackFor = {InvalidCredentialsException.class, TooManyRequestsException.class})
+    @Transactional(noRollbackFor = {InvalidCredentialsException.class, TooManyRequestsException.class, LoginRefusedException.class})
     public AuthenticationResponse login(LoginRequest request, ClientInfo clientInfo) {
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
@@ -95,27 +108,49 @@ public class AuthLoginService {
         User user = findUserByIdentifier(normalizedIdentifier);
         UUID userId = user != null ? user.getId() : null;
 
-        checkIpRateLimit(userId, normalizedIdentifier, normalizedClientInfo, now);
-        checkAccountRateLimit(userId, normalizedIdentifier, normalizedClientInfo, now);
-
+        // Paused network, then paused device (user, 2026-11-17): only wrong passwords count, right sign-ins never do, and
+        // a pause lasts 15 minutes from the wrong try that started it. People already signed in aren't touched.
+        OffsetDateTime networkPausedUntil = networkPausedUntil(normalizedClientInfo, now);
+        if (networkPausedUntil != null) {
+            saveLoginAttempt(userId, normalizedIdentifier, normalizedClientInfo, false, LoginFailureReason.IP_RATE_LIMITED, now);
+            throw networkPaused(networkPausedUntil);
+        }
+        OffsetDateTime devicePausedUntil = devicePausedUntil(normalizedClientInfo, now);
+        if (devicePausedUntil != null) {
+            saveLoginAttempt(userId, normalizedIdentifier, normalizedClientInfo, false, LoginFailureReason.DEVICE_RATE_LIMITED, now);
+            throw devicePaused(devicePausedUntil);
+        }
+        // Locked: 5 wrong passwords within 15 minutes stop that username for 15 minutes. The same rule, from the same
+        // records, for a username nobody has, so "locked" never tells a stranger that a username exists (user, 2026-11-16:
+        // "so the hacker now knows the username"). It's checked before anything else about the account.
+        OffsetDateTime lockedUntil = lockedUntil(user, normalizedIdentifier, now);
+        if (lockedUntil != null) {
+            saveLoginAttempt(userId, normalizedIdentifier, normalizedClientInfo, false, LoginFailureReason.ACCOUNT_LOCKED, now);
+            throw locked(lockedUntil);
+        }
         if (user == null) {
             // Always fails on purpose to prevent timing attacks by making response time the same even if the user does not exist
             passwordService.matches(request.getPassword(), DUMMY_PASSWORD_HASH);
             saveLoginAttempt(null, normalizedIdentifier, normalizedClientInfo, false, LoginFailureReason.INVALID_CREDENTIALS, now);
-            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+            OffsetDateTime nowLocked = lockedUntil(null, normalizedIdentifier, now);
+            if (nowLocked != null) throw locked(nowLocked);
+            throwIfPausedNow(normalizedClientInfo, now);
+            throw wrongCredentials();
         }
-
-        validateUserCanLogin(user, now, normalizedIdentifier, normalizedClientInfo);
 
         if (!passwordService.matches(request.getPassword(), user.getPasswordHash())) {
             handleFailedLogin(user, normalizedIdentifier, normalizedClientInfo, now);
-            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+            // The wrong password that locks the account says so at once (the same as for a username nobody has).
+            if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) throw locked(user.getLockedUntil());
+            throwIfPausedNow(normalizedClientInfo, now);
+            throw wrongCredentials();
         }
 
-        // Staff of a suspended, closed or removed restaurant can't sign in (checked after the password, so it tells
-        // nothing to someone guessing).
+        // The right password: only now is the account's own state told (switched off, email not confirmed, restaurant
+        // closed), so it tells nothing to someone guessing.
+        validateUserCanLogin(user, now, normalizedIdentifier, normalizedClientInfo);
         if (userRepository.worksAtClosedRestaurant(user.getId())) {
-            throw new AuthException(RESTAURANT_CLOSED_MESSAGE, HttpStatus.FORBIDDEN);
+            throw new LoginRefusedException(LoginRefusedException.Reason.RESTAURANT_CLOSED, RESTAURANT_CLOSED_MESSAGE, HttpStatus.FORBIDDEN, null);
         }
 
         enforceSessionLimit(user.getId(), now);
@@ -210,15 +245,11 @@ public class AuthLoginService {
             ClientInfo clientInfo,
             OffsetDateTime now
     ) {
-        int attempts = user.getFailedLoginAttempts() + 1;
-        user.setFailedLoginAttempts(attempts);
-
-        if (attempts >= maxFailedAttempts) {
-            user.setLockedUntil(now.plusMinutes(lockDurationMinutes));
-        }
-
-        userRepository.save(user);
+        user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
         saveLoginAttempt(user.getId(), normalizedIdentifier, clientInfo, false, LoginFailureReason.INVALID_CREDENTIALS, now);
+        // Kept on the person too, so their own screens can show it; the rule itself is lockedUntil().
+        user.setLockedUntil(lockedUntil(user, normalizedIdentifier, now));
+        userRepository.save(user);
     }
 
 
@@ -239,19 +270,89 @@ public class AuthLoginService {
                 || user.getDeletedAt() != null
                 || !"ACTIVE".equalsIgnoreCase(user.getStatus())) {
             saveLoginAttempt(user.getId(), normalizedIdentifier, clientInfo, false, LoginFailureReason.ACCOUNT_INACTIVE, now);
-            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+            throw new LoginRefusedException(LoginRefusedException.Reason.ACCOUNT_OFF, ACCOUNT_OFF_MESSAGE, HttpStatus.FORBIDDEN, null);
         }
 
         if (!Boolean.TRUE.equals(user.isEmailVerified())) {
             saveLoginAttempt(user.getId(), normalizedIdentifier, clientInfo, false, LoginFailureReason.EMAIL_NOT_VERIFIED, now);
-            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
-        }
-
-        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
-            saveLoginAttempt(user.getId(), normalizedIdentifier, clientInfo, false, LoginFailureReason.ACCOUNT_LOCKED, now);
-            throw new InvalidCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+            throw new LoginRefusedException(LoginRefusedException.Reason.EMAIL_NOT_CONFIRMED, EMAIL_NOT_CONFIRMED_MESSAGE, HttpStatus.FORBIDDEN, null);
         }
     }
+
+    /**
+     * Until when sign-in for this username is stopped, or null: 8 ([maxFailedAttempts]) wrong passwords within 15 minutes
+     * ([lockDurationMinutes]) stop it for 15 minutes from the last of them. Counted from the stored sign-in attempts (wrong
+     * passwords only; tries made while locked don't count), after the person's last sign-in or new password. A username
+     * nobody has is counted by what was typed, the same way, so the two can't be told apart.
+     */
+    private OffsetDateTime lockedUntil(User user, String identifier, OffsetDateTime now) {
+        java.time.Duration lock = java.time.Duration.ofMinutes(lockDurationMinutes);
+        OffsetDateTime after = now.minus(lock.multipliedBy(2));
+        java.util.List<OffsetDateTime> times;
+        if (user != null) {
+            if (user.getLastLoginAt() != null && user.getLastLoginAt().isAfter(after)) after = user.getLastLoginAt();
+            if (user.getPasswordUpdatedAt() != null && user.getPasswordUpdatedAt().isAfter(after)) after = user.getPasswordUpdatedAt();
+            times = authLoginAttemptRepository.wrongPasswordTimesForUser(user.getId(), after);
+        } else {
+            if (identifier == null) return null;
+            times = authLoginAttemptRepository.wrongPasswordTimesForUnknown(identifier, after);
+        }
+        return pausedUntil(times, maxFailedAttempts, lock, now);
+    }
+
+    /** Until when sign-in from this device is paused: [maxWrongPerDevice] wrong passwords within 15 minutes, for 15 minutes. */
+    private OffsetDateTime devicePausedUntil(ClientInfo clientInfo, OffsetDateTime now) {
+        String deviceId = clientInfo != null ? clientInfo.deviceId() : null;
+        if (deviceId == null) return null;
+        java.time.Duration pause = java.time.Duration.ofMinutes(lockDurationMinutes);
+        return pausedUntil(authLoginAttemptRepository.wrongPasswordTimesForDevice(deviceId, now.minus(pause.multipliedBy(2))), maxWrongPerDevice, pause, now);
+    }
+
+    /** The same for the network address, the safety net: [maxWrongPerAddress] wrong passwords within 15 minutes. */
+    private OffsetDateTime networkPausedUntil(ClientInfo clientInfo, OffsetDateTime now) {
+        String ip = clientInfo != null ? clientInfo.ipAddress() : null;
+        if (ip == null) return null;
+        java.time.Duration pause = java.time.Duration.ofMinutes(lockDurationMinutes);
+        return pausedUntil(authLoginAttemptRepository.wrongPasswordTimesForAddress(ip, now.minus(pause.multipliedBy(2))), maxWrongPerAddress, pause, now);
+    }
+
+    /** After a wrong password: the one that pauses the device or the network says so at once. */
+    private void throwIfPausedNow(ClientInfo clientInfo, OffsetDateTime now) {
+        OffsetDateTime device = devicePausedUntil(clientInfo, now);
+        if (device != null) throw devicePaused(device);
+        OffsetDateTime network = networkPausedUntil(clientInfo, now);
+        if (network != null) throw networkPaused(network);
+    }
+
+    /** [limit] tries within [pause] of each other pause it for [pause] from the last of them; null when not paused now. */
+    private static OffsetDateTime pausedUntil(java.util.List<OffsetDateTime> times, int limit, java.time.Duration pause, OffsetDateTime now) {
+        int n = Math.max(1, limit);
+        OffsetDateTime until = null;
+        for (int i = n - 1; i < times.size(); i++) {
+            if (!times.get(i).isAfter(times.get(i - n + 1).plus(pause))) {
+                OffsetDateTime candidate = times.get(i).plus(pause);
+                if (until == null || candidate.isAfter(until)) until = candidate;
+            }
+        }
+        return until != null && until.isAfter(now) ? until : null;
+    }
+
+    private static LoginRefusedException devicePaused(OffsetDateTime until) {
+        return new LoginRefusedException(LoginRefusedException.Reason.DEVICE_PAUSED, DEVICE_PAUSED_MESSAGE, HttpStatus.TOO_MANY_REQUESTS, until);
+    }
+
+    private static LoginRefusedException networkPaused(OffsetDateTime until) {
+        return new LoginRefusedException(LoginRefusedException.Reason.NETWORK_PAUSED, NETWORK_PAUSED_MESSAGE, HttpStatus.TOO_MANY_REQUESTS, until);
+    }
+
+    private static LoginRefusedException wrongCredentials() {
+        return new LoginRefusedException(LoginRefusedException.Reason.WRONG_CREDENTIALS, INVALID_CREDENTIALS_MESSAGE, HttpStatus.UNAUTHORIZED, null);
+    }
+
+    private static LoginRefusedException locked(OffsetDateTime until) {
+        return new LoginRefusedException(LoginRefusedException.Reason.ACCOUNT_LOCKED, LOCKED_MESSAGE, HttpStatus.LOCKED, until);
+    }
+
 
 
     /**
@@ -274,6 +375,7 @@ public class AuthLoginService {
                 .userId(userId)
                 .identifier(identifier)
                 .ipAddress(clientInfo != null ? clientInfo.ipAddress() : null)
+                .deviceId(clientInfo != null ? clientInfo.deviceId() : null)
                 .userAgent(clientInfo != null ? clientInfo.userAgent() : null)
                 .success(success)
                 .failureReason(failureReason)
@@ -283,58 +385,7 @@ public class AuthLoginService {
         authLoginAttemptRepository.save(attempt);
     }
 
-    /**
-     * Checks rate limiting based on the account (email).
-     * - If email is missing, skip the check.
-     * - Defines a time window (last X minutes from now).
-     * - Counts failed login attempts for this email within that time window.
-     * - If the number exceeds the allowed limit, saves the attempt and blocks the login.
-     */
-    private void checkAccountRateLimit(
-            UUID userId,
-            String normalizedIdentifier,
-            ClientInfo clientInfo,
-            OffsetDateTime now
-    ) {
-        if (normalizedIdentifier == null) {
-            return;
-        }
 
-        OffsetDateTime windowStart = now.minusMinutes(windowMinutes);
-        long attempts = userId != null
-                ? authLoginAttemptRepository.countByUserIdAndAttemptedAtAfterAndSuccessFalse(userId, windowStart)
-                : authLoginAttemptRepository.countByIdentifierAndAttemptedAtAfterAndSuccessFalse(
-                        normalizedIdentifier,
-                        windowStart
-                );
-
-        if (attempts >= maxAttemptsPerAccount) {
-            saveLoginAttempt(userId, normalizedIdentifier, clientInfo, false, LoginFailureReason.ACCOUNT_RATE_LIMITED, now);
-            throw new TooManyRequestsException(TOO_MANY_ATTEMPTS_MESSAGE);
-        }
-    }
-
-    /**
-     * Checks if an IP address is making too many login attempts.
-     * - Gets the IP address; if none, skip the check.
-     * - Defines a "time window" (a recent period, e.g., last X minutes from now).
-     * - Counts how many login attempts were made from this IP within this time window.
-     * - If the number is too high, saves the attempt and blocks the login.
-     */
-    private void checkIpRateLimit(UUID userId, String normalizedIdentifier, ClientInfo clientInfo, OffsetDateTime now) {
-        String ip = clientInfo != null ? clientInfo.ipAddress() : null;
-        if (ip == null) {
-            return;
-        }
-
-        OffsetDateTime windowStart = now.minusMinutes(windowMinutes);
-        long attempts = authLoginAttemptRepository.countByIpAddressAndAttemptedAtAfter(ip, windowStart);
-
-        if (attempts >= maxAttemptsPerIp) {
-            saveLoginAttempt(userId, normalizedIdentifier, clientInfo, false, LoginFailureReason.IP_RATE_LIMITED, now);
-            throw new TooManyRequestsException(TOO_MANY_ATTEMPTS_MESSAGE);
-        }
-    }
 
     private User findUserByIdentifier(String normalizedIdentifier) {
         if (normalizedIdentifier == null) {

@@ -137,8 +137,11 @@ interface StatisticsRepository {
     suspend fun orderTypesOn(restaurantId: String): Set<String>? = null
 }
 
+/** In [StatisticsRepository.orderTypesOn]'s answer: guests may order themselves (QR at the table, website, app). */
+const val QR_ORDERING = "QR_ORDERING"
+
 @Serializable
-private data class OrderChannelsDto(val enableTakeaway: Boolean? = null, val enableDelivery: Boolean? = null)
+private data class OrderChannelsDto(val enableTakeaway: Boolean? = null, val enableDelivery: Boolean? = null, val enableQrOrdering: Boolean? = null)
 
 class StatisticsApi(
     private val client: HttpClient,
@@ -169,7 +172,9 @@ class StatisticsApi(
 
     override suspend fun orderTypesOn(restaurantId: String): Set<String>? {
         val settings: OrderChannelsDto = client.get("${baseUrlProvider().trimEnd('/')}/restaurants/${restaurantId.encodeURLPathPart()}/settings").body()
-        return setOfNotNull("DINE_IN", "TAKEAWAY".takeIf { settings.enableTakeaway == true }, "DELIVERY".takeIf { settings.enableDelivery == true })
+        // The order types switched on, plus QR_ORDERING when guests may order themselves (QR at the table).
+        return setOfNotNull("DINE_IN", "TAKEAWAY".takeIf { settings.enableTakeaway == true }, "DELIVERY".takeIf { settings.enableDelivery == true },
+            QR_ORDERING.takeIf { settings.enableQrOrdering == true })
     }
 
     override suspend fun report(query: StatsQuery, code: String): String {

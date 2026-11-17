@@ -37,6 +37,13 @@ public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(pos.pos.exception.auth.LoginRefusedException.class)
+    public ResponseEntity<LoginErrorResponse> handleLoginRefused(pos.pos.exception.auth.LoginRefusedException ex) {
+        return ResponseEntity
+                .status(ex.getStatus())
+                .body(new LoginErrorResponse(ex.getStatus().value(), ex.getMessage(), ex.getReason().name(), ex.getLockedUntil()));
+    }
+
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<ErrorResponse> handleAuth(AuthException ex) {
         return ResponseEntity

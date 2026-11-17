@@ -62,6 +62,10 @@ public class AuthLoginAttempt {
     @Column(name = "ip_address")
     private String ipAddress;
 
+    // The device the try came from (the app's own id for it), for the per-device sign-in limit; null = not sent (the web).
+    @Column(name = "device_id", length = 100)
+    private String deviceId;
+
     @Column(name = "user_agent", columnDefinition = "text")
     private String userAgent;
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material.icons.automirrored.outlined.CompareArrows
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -66,14 +67,25 @@ import com.saporini.mobile_desktop.core.components.IconTile
 
 internal fun dayLabel(date: LocalDate, days: Int): String = if (days <= 7) weekdayShort(date) else shortDate(date)
 
-internal fun compareName(v: StatsView): String = when (v.compareMode) {
-    CompareMode.PREVIOUS -> "The days before"
-    CompareMode.LAST_YEAR -> "Last year"
-    CompareMode.NONE -> ""
+/** The comparison by its dates ("1 – 14 Oct", "Sat 7 Nov", "1 – 14 Nov 2025"); empty without one (user, 2026-11-14). */
+internal fun compareName(v: StatsView): String = compareDates(v.compareMode, v.from, v.to)
+
+internal fun compareDates(mode: CompareMode, from: LocalDate, to: LocalDate): String {
+    val (a, b) = com.saporini.mobile_desktop.statistics.compareRange(mode, from, to) ?: return ""
+    val label = if (a == b) com.saporini.mobile_desktop.core.format.weekdayDate(a) else com.saporini.mobile_desktop.core.components.periodLabel(a, b)
+    return if (a.year == b.year && a.year != from.year) "$label ${a.year}" else label
+}
+
+/** A Filters choice: "1 – 14 Oct · last month", "Sat 7 Nov · last week", "No comparison". */
+internal fun compareChoice(mode: CompareMode, from: LocalDate, to: LocalDate): String = when (mode) {
+    CompareMode.NONE -> "No comparison"
+    CompareMode.LAST_WEEK -> "${compareDates(mode, from, to)} · ${if (from == to) "last week" else mode.word}"
+    else -> "${compareDates(mode, from, to)} · ${mode.word}"
 }
 
 @Composable
-internal fun OverviewTab(v: StatsView, size: ScreenSize, onTab: (StatsTab) -> Unit) {
+// [onOrders] opens Sales on its Orders view (order counts and what happened to orders live there).
+internal fun OverviewTab(v: StatsView, size: ScreenSize, onTab: (StatsTab) -> Unit, onOrders: () -> Unit = { onTab(StatsTab.SALES) }) {
     val t = v.totals
     val c = v.compareTotals
     val days = v.days
@@ -82,23 +94,23 @@ internal fun OverviewTab(v: StatsView, size: ScreenSize, onTab: (StatsTab) -> Un
         FigureCell("Total sales", v.money(t.sales), Res.drawable.workspace_statistics, v.change(t.sales, c?.sales),
             detail = "from ${countText(t.orders)} orders", onClick = { onTab(StatsTab.SALES) }),
         FigureCell("Orders", countText(t.orders), Res.drawable.settings_orders_kitchen, v.change(t.orders, c?.orders),
-            detail = "${v.money(t.averageBill)} each on average", onClick = { onTab(StatsTab.SALES) }),
+            detail = "${v.money(t.averageBill)} each on average", onClick = onOrders),
         FigureCell("Guests", countText(t.guests), Res.drawable.overview_guests, v.change(t.guests, c?.guests),
-            detail = if (t.orders > 0) "${(t.guests * 10 / t.orders) / 10.0} an order" else null, onClick = { onTab(StatsTab.TEAM) }),
+            detail = if (t.orders > 0) "${(t.guests * 10 / t.orders) / 10.0} an order" else null, onClick = { onTab(StatsTab.TABLES) }),
         FigureCell("Average bill", v.money(t.averageBill), Res.drawable.settings_payments, v.change(t.averageBill, c?.averageBill),
             detail = c?.let { "was ${v.money(it.averageBill)}" } ?: "an order"),
         FigureCell("Spend per guest", v.money(t.perGuest), Res.drawable.settings_tables, v.change(t.perGuest, c?.perGuest),
             detail = c?.let { "was ${v.money(it.perGuest)}" } ?: "a guest"),
         FigureCell("Tips", v.money(t.tips), Res.drawable.salary_waiters, v.change(t.tips, c?.tips), detail = "on top of the bills"),
         FigureCell("Total money in", v.money(t.collected), Res.drawable.role_finance, v.change(t.collected, c?.collected),
-            detail = "bills, tips and fees", onClick = { onTab(StatsTab.PAYMENTS) }),
+            detail = "bills, tips and fees", onClick = { onTab(StatsTab.FINANCE) }),
         FigureCell("Refunds", v.money(t.refunds), Res.drawable.inventory_stock_changes, v.change(t.refunds, c?.refunds), inverted = true,
             detail = "${countText(t.refundedOrders)} ${if (t.refundedOrders == 1L) "order" else "orders"}"),
         FigureCell("Discounts", v.money(t.discounts), Res.drawable.inventory_stock_value, v.change(t.discounts, c?.discounts), inverted = true,
             detail = if (t.sales > 0) "${percent1(t.discounts.toFloat() / (t.sales + t.discounts))} off the bills" else null),
         FigureCell("Cancelled & voided", countText(t.cancelled + t.voided), Res.drawable.shifts_needs_review,
             v.change(t.cancelled + t.voided, c?.let { it.cancelled + it.voided }), inverted = true,
-            detail = "${t.cancelled} cancelled · ${t.voided} voided", onClick = { onTab(StatsTab.SALES) })
+            detail = "${t.cancelled} cancelled · ${t.voided} voided", onClick = onOrders)
     )
     // The sales graph top left with the figures as a card on its right (user, 2026-11-03: "it will look perfect"); on a
     // phone the graph first, then the figures. "Worth a look" is gone: the grid already shows those figures.
@@ -106,7 +118,7 @@ internal fun OverviewTab(v: StatsView, size: ScreenSize, onTab: (StatsTab) -> Un
     // "To keep an eye on" sits down with the branches, so this panel isn't taller than the graph (user, 2026-11-03).
     // Tips with the sales; the money that came in and went out under them (user, 2026-11-03).
     val moneyOut = FigureCell("Total money out", v.money(t.refunds), Res.drawable.inventory_stock_changes, v.change(t.refunds, c?.refunds), inverted = true,
-        detail = "given back to guests · ${countText(t.refundedOrders)} ${if (t.refundedOrders == 1L) "order" else "orders"}", onClick = { onTab(StatsTab.PAYMENTS) })
+        detail = "given back to guests · ${countText(t.refundedOrders)} ${if (t.refundedOrders == 1L) "order" else "orders"}", onClick = { onTab(StatsTab.FINANCE) })
     val groups = listOf("Sales" to figures.subList(0, 6), "Money" to listOf(figures[6], moneyOut))
     val watch: @Composable (Modifier) -> Unit = { m ->
         KeyFigures(listOf("" to figures.subList(7, 10)), m, vs, title = "To keep an eye on", icon = Icons.Outlined.Visibility)
@@ -120,20 +132,26 @@ internal fun OverviewTab(v: StatsView, size: ScreenSize, onTab: (StatsTab) -> Un
     )
     // How the money came in, the best sellers and the busiest hours.
     PanelLine(size,
-        1f to { m -> MethodsPanel(v, m) { onTab(StatsTab.PAYMENTS) } },
+        1f to { m -> MethodsPanel(v, m) { onTab(StatsTab.FINANCE) } },
         1.15f to { m -> BestSellersPanel(v, m) { onTab(StatsTab.DISHES) } },
         1f to { m -> HoursMiniPanel(v, m) }
     )
     // Eat in / takeaway / delivery only when the restaurant takes more than eat in (or such orders came anyway), the
     // branches only when there are several (user, 2026-11-03).
-    val typesShown = (v.state.orderTypesOn?.let { it.size > 1 } ?: false) || v.orderTypes.any { it.key != "DINE_IN" && it.count > 0 }
+    val typesShown = (v.state.orderTypesOn?.let { on -> "TAKEAWAY" in on || "DELIVERY" in on } ?: false) || v.orderTypes.any { it.key != "DINE_IN" && it.count > 0 }
     val branchesShown = v.branches.size > 1
     // With them, refunds, discounts and cancelled orders (alone it takes half the width).
+    // Every measure against the comparison sits beside them (moved here from Sales, user, 2026-11-14: "it includes
+    // everything, it goes in the overview").
+    val against: @Composable (Modifier) -> Unit = { m -> AgainstPanel(v, m) }
     when {
-        typesShown && branchesShown -> PanelLine(size, 1f to { m -> OrderTypesPanel(v, m) }, 1f to { m -> BranchesPanel(v, m) }, 1f to watch)
-        typesShown -> PanelLine(size, 1f to { m -> OrderTypesPanel(v, m) }, 1f to watch)
-        branchesShown -> PanelLine(size, 1f to { m -> BranchesPanel(v, m) }, 1f to watch)
-        else -> PanelLine(size, 1f to watch, 1f to { m -> Spacer(m) })
+        typesShown && branchesShown -> {
+            PanelLine(size, 1f to { m -> OrderTypesPanel(v, m) }, 1f to { m -> BranchesPanel(v, m) })
+            PanelLine(size, 1f to watch, 1f to against)
+        }
+        typesShown -> PanelLine(size, 1f to { m -> OrderTypesPanel(v, m) }, 1f to watch, 1f to against)
+        branchesShown -> PanelLine(size, 1f to { m -> BranchesPanel(v, m) }, 1f to watch, 1f to against)
+        else -> PanelLine(size, 1f to watch, 1f to against)
     }
     if (t.open > 0) Footnote("${t.open} ${if (t.open == 1L) "order is" else "orders are"} still open and not counted yet.")
     v.state.overview?.kpis?.otherCurrencyOrders?.takeIf { it > 0 }?.let { Footnote("$it orders in another currency are left out of the money figures.") }
@@ -232,3 +250,19 @@ private fun HoursMiniPanel(v: StatsView, modifier: Modifier) {
     }
 }
 
+/** Each measure now (dark dot) against the comparison (hollow), with the change. */
+@Composable
+private fun AgainstPanel(v: StatsView, modifier: Modifier) {
+    val t = v.totals
+    val c = v.compareTotals
+    StatsPanel(Icons.AutoMirrored.Outlined.CompareArrows, if (c == null) "This period" else "Against ${compareName(v)}", modifier) {
+        Dumbbells(listOf(
+            Triple("Sales", t.sales.toFloat() to c?.sales?.toFloat(), v.money(t.sales) to c?.let { v.money(it.sales) }),
+            Triple("Orders", t.orders.toFloat() to c?.orders?.toFloat(), countText(t.orders) to c?.let { countText(it.orders) }),
+            Triple("Guests", t.guests.toFloat() to c?.guests?.toFloat(), countText(t.guests) to c?.let { countText(it.guests) }),
+            Triple("Average bill", t.averageBill.toFloat() to c?.averageBill?.toFloat(), v.money(t.averageBill) to c?.let { v.money(it.averageBill) }),
+            Triple("Spend per guest", t.perGuest.toFloat() to c?.perGuest?.toFloat(), v.money(t.perGuest) to c?.let { v.money(it.perGuest) })
+        ), beforeName = compareName(v).takeIf { c != null })
+        if (c == null) PanelNote("Choose something to compare with in Filters.")
+    }
+}

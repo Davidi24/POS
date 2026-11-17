@@ -278,6 +278,30 @@ internal fun PageDecorations(modifier: Modifier, narrow: Boolean) {
     }
 }
 
+/**
+ * Only the bottom-left shape of [PageDecorations], at [scale] of its size (the sign-in screen's corner, user 2026-11-16:
+ * "like on the home screen, but a small one").
+ */
+@Composable
+internal fun BottomLeftDecoration(modifier: Modifier, scale: Float) {
+    Canvas(modifier) {
+        val h = size.height
+        val k = scale
+        val bl = Path().apply {
+            moveTo(0f, h - 214.dp.toPx() * k)
+            cubicTo(50.dp.toPx() * k, h - 214.dp.toPx() * k, 86.dp.toPx() * k, h - 170.dp.toPx() * k, 116.dp.toPx() * k, h - 108.dp.toPx() * k)
+            cubicTo(146.dp.toPx() * k, h - 46.dp.toPx() * k, 196.dp.toPx() * k, h - 16.dp.toPx() * k, 286.dp.toPx() * k, h)
+            lineTo(0f, h); close()
+        }
+        drawPath(bl, DecorationFill)
+        val blLine = Path().apply {
+            moveTo(0f, h - 124.dp.toPx() * k)
+            cubicTo(56.dp.toPx() * k, h - 116.dp.toPx() * k, 110.dp.toPx() * k, h - 70.dp.toPx() * k, 134.dp.toPx() * k, h)
+        }
+        drawPath(blLine, DecorationLine, style = Stroke(width = 1.dp.toPx()))
+    }
+}
+
 @Composable
 internal fun PickerTopBar(
     user: CurrentUserResponse?, loggingOut: Boolean, onLogout: () -> Unit, compact: Boolean,

@@ -41,7 +41,8 @@ public class AppAuthController {
             HttpServletRequest httpRequest
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
-        AuthenticationResponse authResult = authLoginService.login(request, clientInfo);
+        // The app's own id for this device (the per-device sign-in limit, user 2026-11-17).
+        AuthenticationResponse authResult = authLoginService.login(request, clientInfo.withDeviceId(httpRequest.getHeader("X-Device-Id")));
         return ResponseEntity.ok(authResult);
     }
 

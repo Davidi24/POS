@@ -30,6 +30,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -121,11 +128,9 @@ internal fun StatTile(
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (narrow) 1.dp else 2.dp)) {
                 Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = if (narrow) 11.sp else 12.sp, color = Kit.Muted, maxLines = 1,
                     overflow = TextOverflow.Ellipsis)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(value, Modifier.weight(1f, fill = false), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (narrow) 16.sp else 20.sp,
-                        color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (!narrow) TrendBadge(change, inverted)
-                }
+                // The change sits beside the value, or under it when both don't fit (a big amount in a row of five), so the
+                // value is never cut.
+                StatValueLine(value, if (narrow) null else change, inverted, if (narrow) 16.sp else 20.sp)
                 // A narrow tile has no room beside its value: the change goes on a line of its own.
                 if (narrow) TrendBadge(change, inverted)
                 detail?.let {
@@ -133,6 +138,16 @@ internal fun StatTile(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatValueLine(value: String, change: String?, inverted: Boolean, size: androidx.compose.ui.unit.TextUnit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(value, Modifier.align(Alignment.CenterVertically), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = size,
+            color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (change != null) Box(Modifier.align(Alignment.CenterVertically)) { TrendBadge(change, inverted) }
     }
 }
 
@@ -320,6 +335,10 @@ private val LocalPanelRow = compositionLocalOf { false }
 @Composable
 internal fun ColumnScope.roomLeft(): Modifier = if (LocalPanelRow.current) Modifier.weight(1f) else Modifier
 
+/** True inside a panel set beside others in a row (the row's height is set by its tallest panel). */
+@Composable
+internal fun inPanelRow(): Boolean = LocalPanelRow.current
+
 /**
  * Panels side by side on a wide window, every one as tall as the tallest of the row; in pairs on a tablet, one under
  * the other on a phone. Panel content must not use lazy lists or BoxWithConstraints (the row asks it for its height).
@@ -360,7 +379,11 @@ internal fun PanelStack(modifier: Modifier, panels: List<@Composable (Modifier) 
 
 /** A branch's colour, the same on every chart: by its place in the restaurant's list of branches, never by its sales. */
 internal fun StatsView.branchColor(id: String): Color =
-    state.branches.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { seriesColor(it) } ?: StatsOther
+    state.branches.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { BranchColors[it % BranchColors.size] } ?: StatsOther
+
+/** A colour per branch, by its place in the list, never green: green is the whole restaurant's line (user, 2026-11-14). */
+private val BranchColors = listOf(StatsSeries[1], StatsSeries[2], StatsSeries[3], StatsSeries[4], StatsSeries[5],
+    Color(0xFFC2412D), Color(0xFF3B4A8C), Color(0xFF8C5A3C))
 
 /** A panel that says so when there's nothing yet, instead of an empty chart. */
 @Composable
@@ -374,10 +397,34 @@ internal fun StatsPanel(
     action: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    OverviewPanel(icon, title, modifier, titleExtra = note, action = action) {
-        if (empty) OverviewCompactEmpty("Nothing yet", emptyText, icon) else content()
+    // The card keeps a picture of itself as drawn, for its Download as a chart (user, 2026-11-15: "print the graph as it is").
+    // While the picture is taken its buttons (download, dates) and info marks are see-through, so the printout has none of
+    // them (user, 2026-11-15: "don't include the download button or any unnecessary icon"); they keep their room, so nothing moves.
+    val layer = androidx.compose.ui.graphics.rememberGraphicsLayer()
+    var printing by remember { mutableStateOf(false) }
+    val picture: suspend () -> androidx.compose.ui.graphics.ImageBitmap? = {
+        printing = true
+        androidx.compose.runtime.withFrameNanos { }
+        androidx.compose.runtime.withFrameNanos { }
+        val shot = runCatching { layer.toImageBitmap() }.getOrNull()
+        printing = false
+        shot
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalPanelPicture provides picture, LocalPrinting provides printing) {
+        OverviewPanel(icon, title, modifier.drawWithContent {
+            layer.record { this@drawWithContent.drawContent() }
+            drawLayer(layer)
+        }, titleExtra = note, action = action?.let { buttons -> { Box(Modifier.alpha(if (printing) 0f else 1f)) { buttons() } } }) {
+            if (empty) OverviewCompactEmpty("Nothing yet", emptyText, icon) else content()
+        }
     }
 }
+
+/** True while a card's picture is being taken: its info marks and buttons hide (see [StatsPanel]). */
+internal val LocalPrinting = androidx.compose.runtime.compositionLocalOf { false }
+
+/** The card's picture as it's drawn now, for the card's own Download (null outside a card). */
+internal val LocalPanelPicture = androidx.compose.runtime.staticCompositionLocalOf<(suspend () -> androidx.compose.ui.graphics.ImageBitmap?)?> { null }
 
 /** The big figure a panel leads with, and its change. */
 @Composable

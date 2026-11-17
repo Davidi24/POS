@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.auth.repository.AuthEmailVerificationTokenRepository;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
+import pos.pos.auth.repository.AuthPasswordEventRepository;
 import pos.pos.auth.repository.AuthPasswordResetTokenRepository;
 import pos.pos.auth.repository.AuthSmsOtpCodeRepository;
 import pos.pos.auth.repository.UserSessionRepository;
@@ -24,6 +25,7 @@ public class SessionCleanupService {
     private final AuthEmailVerificationTokenRepository authEmailVerificationTokenRepository;
     private final AuthSmsOtpCodeRepository authSmsOtpCodeRepository;
     private final AuthLoginAttemptRepository authLoginAttemptRepository;
+    private final AuthPasswordEventRepository authPasswordEventRepository;
 
     private static final int PASSWORD_LINK_MEMORY_DAYS = 30;
 
@@ -47,5 +49,7 @@ public class SessionCleanupService {
         authSmsOtpCodeRepository.deleteExpiredCodes(now);
         // Deletes login attempt records older than the configured retention period (e.g. 90 days)
         authLoginAttemptRepository.deleteOlderThan(now.minusDays(attemptRetentionDays));
+        // What the daily password limits counted, kept as long as the sign-in attempts.
+        authPasswordEventRepository.deleteOlderThan(now.minusDays(attemptRetentionDays));
     }
 }

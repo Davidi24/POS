@@ -55,6 +55,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -100,6 +101,9 @@ internal fun AppDialog(
     height: Dp? = null,
     // One step back inside the window: a plain arrow before the title (user, 2026-10-31: "the back arrow is at the top").
     onBack: (() -> Unit)? = null,
+    // A window whose content goes through steps (Statistics' Every day → a day): each key keeps its own scroll place, so
+    // going back finds a list where it was left and a new step starts at its top.
+    scrollKey: Any? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -125,6 +129,17 @@ internal fun AppDialog(
                             IconButton(onDismiss, enabled = !busy) { Icon(Icons.Outlined.Close, "Close", tint = Kit.Ink) }
                         }
                         val scroll = rememberScrollState()
+                        if (scrollKey != null) {
+                            val places = remember { mutableMapOf<Any?, Int>() }
+                            var placed by remember { mutableStateOf(scrollKey) }
+                            LaunchedEffect(scrollKey) {
+                                if (placed != scrollKey) {
+                                    places[placed] = scroll.value
+                                    placed = scrollKey
+                                    scroll.scrollTo(places[scrollKey] ?: 0)
+                                }
+                            }
+                        }
                         val body: @Composable BoxScope.() -> Unit = {
                             Column(
                                 Modifier.verticalScroll(scroll).padding(horizontal = side, vertical = DialogContentPadding),

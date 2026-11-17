@@ -92,6 +92,12 @@ class PasswordResetServiceTest {
     @Mock
     private RoleRepository roleRepository;
 
+    @Mock
+    private pos.pos.auth.service.PasswordDailyLimits passwordDailyLimits;
+
+    @Mock
+    private pos.pos.security.service.PublicRequestRateLimiter publicRequestRateLimiter;
+
     private PasswordResetService passwordResetService;
 
     @BeforeEach
@@ -127,8 +133,12 @@ class PasswordResetServiceTest {
                 oneTimeCodeService,
                 smsMessageService,
                 roleRepository,
-                org.mockito.Mockito.mock(pos.pos.restaurant.repository.RestaurantRepository.class)
+                org.mockito.Mockito.mock(pos.pos.restaurant.repository.RestaurantRepository.class),
+                passwordDailyLimits,
+                publicRequestRateLimiter
         );
+        // Under the daily limit unless a test says otherwise.
+        org.mockito.Mockito.lenient().when(passwordDailyLimits.maySendResetLink(any(), any())).thenReturn(true);
     }
 
     @Nested

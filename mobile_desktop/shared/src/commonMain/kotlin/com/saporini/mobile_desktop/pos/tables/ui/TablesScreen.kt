@@ -48,6 +48,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.alpha
 import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.Workspaces
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.foundation.BorderStroke
@@ -202,6 +203,8 @@ fun TablesScreen(
     val scope = rememberCoroutineScope()
     var selectedFloor by remember { mutableStateOf(FloorOption.FIRST) }
     var showEditFloors by remember { mutableStateOf(false) }
+    // Edit → Create places: tables grouped into places like Terrace or Window (user, 2026-11-14; was "Group tables").
+    var showPlaces by remember { mutableStateOf(false) }
     var selectedStatuses by remember { mutableStateOf<Set<TableVisualState>>(emptySet()) }
     var selectedTables by remember { mutableStateOf<List<FloorPlanTable>>(emptyList()) }
     var moveSourceTables by remember { mutableStateOf<List<FloorPlanTable>>(emptyList()) }
@@ -738,6 +741,24 @@ fun TablesScreen(
                                 showEditFloors = true
                             }
                         )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "Create places", letterSpacing = 0.sp,
+                                    fontFamily = Inter(),
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFF222426)
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.Workspaces, null, tint = Color(0xFF4F7942))
+                            },
+                            onClick = {
+                                showEditMenu = false
+                                showPlaces = true
+                            }
+                        )
                     }
                 }
                     }
@@ -1159,6 +1180,7 @@ fun TablesScreen(
                 }
             )
 
+            if (showPlaces) BookingAreasDialog(onDismiss = { showPlaces = false })
             if (showEditFloors) {
                 EditFloorsDialog(
                     floors = visibleFloors,

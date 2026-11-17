@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -72,9 +74,16 @@ internal fun isWholeMonth(from: LocalDate, to: LocalDate, today: LocalDate): Boo
     return to == last || to == today
 }
 
-/** "November 2026" for a whole month (even on its 1st), otherwise the dates. */
-internal fun periodOrMonthLabel(from: LocalDate, to: LocalDate, today: LocalDate): String =
-    if (isWholeMonth(from, to, today)) "${from.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${from.year}" else periodLabel(from, to)
+/** A whole year that's over: 1 January to 31 December (Statistics' By year). */
+internal fun isWholeYear(from: LocalDate, to: LocalDate): Boolean =
+    from.year == to.year && from.month == kotlinx.datetime.Month.JANUARY && from.day == 1 && to.month == kotlinx.datetime.Month.DECEMBER && to.day == 31
+
+/** "November 2026" for a whole month (even on its 1st), "2025" for a whole year, otherwise the dates. */
+internal fun periodOrMonthLabel(from: LocalDate, to: LocalDate, today: LocalDate): String = when {
+    isWholeMonth(from, to, today) -> "${from.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${from.year}"
+    isWholeYear(from, to) -> "${from.year}"
+    else -> periodLabel(from, to)
+}
 
 /** "7 days", "1 day". */
 internal fun dayCountText(from: LocalDate, to: LocalDate): String = (from.daysUntil(to) + 1).let { "$it ${if (it == 1) "day" else "days"}" }
@@ -95,14 +104,7 @@ internal fun DateRangeButton(
 ) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
-        Surface(onClick = { open = true }, modifier = Modifier.height(PageControlHeight), shape = RoundedCornerShape(8.dp), color = Color.White,
-            border = BorderStroke(1.dp, Kit.Border)) {
-            Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(18.dp), tint = Kit.Ink)
-                Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Ink, maxLines = 1)
-                Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp), tint = Kit.Ink)
-            }
-        }
+        DateButtonFace(label) { open = true }
         DropdownMenu(open, { open = false }, offset = DpOffset(0.dp, 6.dp), shape = RoundedCornerShape(12.dp), containerColor = Color.White,
             shadowElevation = 8.dp) {
             RangeCalendar(from, to, maxDate, maxDays) { a, b -> onChange(a, b); open = false }
@@ -110,14 +112,111 @@ internal fun DateRangeButton(
     }
 }
 
-/** A month calendar for choosing a range: tap the first day, then the last; the days between are tinted. */
+/** The date button's face: a white box with a calendar, the dates and a ▾ (the header's look, also used inside panels). */
 @Composable
-internal fun RangeCalendar(from: LocalDate, to: LocalDate, maxDate: LocalDate, maxDays: Int, onPick: (LocalDate, LocalDate) -> Unit) {
-    var month by remember { mutableStateOf(LocalDate(to.year, to.month, 1)) }
+internal fun DateButtonFace(label: String, height: androidx.compose.ui.unit.Dp = PageControlHeight, onClick: () -> Unit) {
+    Surface(onClick = onClick, modifier = Modifier.height(height), shape = RoundedCornerShape(8.dp), color = Color.White,
+        border = BorderStroke(1.dp, Kit.Border)) {
+        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Outlined.CalendarMonth, null, Modifier.size(18.dp), tint = Kit.Ink)
+            Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp, color = Kit.Ink, maxLines = 1)
+            Icon(Icons.Outlined.ExpandMore, null, Modifier.size(16.dp), tint = Kit.Ink)
+        }
+    }
+}
+
+/**
+ * A month calendar for choosing a range: tap the first day, then the last; the days between are tinted. It opens on the
+ * month the range ends in and moves there when the range changes. [neighbourDays] fills the first and last weeks with
+ * the months around it (faded, tinted when in the range), so a range that starts last month visibly goes on before the
+ * 1st. [footer] replaces the hint under the days; it gets the first day tapped so far (null before a tap).
+ */
+@Composable
+internal fun RangeCalendar(
+    from: LocalDate,
+    to: LocalDate,
+    maxDate: LocalDate,
+    maxDays: Int,
+    neighbourDays: Boolean = false,
+    footer: (@Composable (start: LocalDate?) -> Unit)? = null,
+    onPick: (LocalDate, LocalDate) -> Unit
+) {
+    var month by remember(from, to) { mutableStateOf(LocalDate(to.year, to.month, 1)) }
     // Null until the first day is tapped; then the second tap finishes the range.
-    var start by remember { mutableStateOf<LocalDate?>(null) }
+    var start by remember(from, to) { mutableStateOf<LocalDate?>(null) }
     val shownFrom = start ?: from
     val shownTo = start ?: to
+    val lastDay = month.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1)).day
+    val blanks = month.dayOfWeek.isoDayNumber - 1
+    val monthDays = (1..lastDay).map { LocalDate(month.year, month.month, it) }
+    val cells: List<LocalDate?> = if (neighbourDays) {
+        val before = (blanks downTo 1).map { month.minus(DatePeriod(days = it)) }
+        val after = monthDays.last().let { last -> (1..((7 - (blanks + lastDay) % 7) % 7)).map { last.plus(DatePeriod(days = it)) } }
+        before + monthDays + after
+    } else List(blanks) { null } + monthDays
+    Column(Modifier.width(292.dp).padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CalendarArrow(Icons.Outlined.ChevronLeft, "Previous month") { month = month.minus(DatePeriod(months = 1)) }
+            Text("${month.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${month.year}", Modifier.weight(1f), fontFamily = Inter(),
+                fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink, textAlign = TextAlign.Center)
+            CalendarArrow(Icons.Outlined.ChevronRight, "Next month", enabled = month.plus(DatePeriod(months = 1)) <= maxDate) {
+                month = month.plus(DatePeriod(months = 1))
+            }
+        }
+        Row {
+            listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su").forEach {
+                Text(it, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 10.sp, color = Kit.Faint, textAlign = TextAlign.Center)
+            }
+        }
+        cells.chunked(7).forEach { week ->
+            Row {
+                week.forEach { day ->
+                    if (day == null) Spacer(Modifier.weight(1f).height(34.dp)) else {
+                        val first = start
+                        val allowed = day <= maxDate && (first == null || day < first || first.daysUntil(day) + 1 <= maxDays)
+                        val inRange = day in shownFrom..shownTo
+                        val edge = day == shownFrom || day == shownTo
+                        // A day of the month before or after: lighter, so the month shown still stands out.
+                        val other = day.month != month.month
+                        Box(
+                            Modifier.weight(1f).height(34.dp)
+                                .background(if (inRange && !edge) (if (other) Kit.GreenSoft.copy(alpha = 0.55f) else Kit.GreenSoft) else Color.Transparent)
+                                .clickable(enabled = allowed) {
+                                    if (first == null || day < first) start = day
+                                    else { start = null; onPick(first, day) }
+                                },
+                            Alignment.Center
+                        ) {
+                            Box(Modifier.size(30.dp).clip(CircleShape).background(if (edge) Kit.Green.copy(alpha = if (other) 0.7f else 1f) else Color.Transparent),
+                                Alignment.Center) {
+                                Text("${day.day}", fontFamily = Inter(), fontWeight = if (edge) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp,
+                                    color = when {
+                                        edge -> Color.White
+                                        !allowed -> Kit.Faint.copy(alpha = 0.5f)
+                                        other -> if (inRange) Kit.Muted else Kit.Faint
+                                        else -> Kit.Ink
+                                    })
+                            }
+                        }
+                    }
+                }
+                repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+        if (footer != null) footer(start) else {
+            Text(if (start == null) "Tap the first day" else "Now tap the last day (or the same day again)", fontFamily = Inter(), fontSize = 11.sp,
+                color = Kit.Muted)
+        }
+    }
+}
+
+/**
+ * A month calendar for choosing one day, in the range calendar's look: a tap picks it; days after [maxDate] can't be picked.
+ * [footer] sits under the days (e.g. "All days" and "Today").
+ */
+@Composable
+internal fun DayCalendar(selected: LocalDate?, maxDate: LocalDate, onPick: (LocalDate) -> Unit, footer: @Composable () -> Unit = {}) {
+    var month by remember { mutableStateOf((selected ?: maxDate).let { LocalDate(it.year, it.month, 1) }) }
     val lastDay = month.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1)).day
     val blanks = month.dayOfWeek.isoDayNumber - 1
     Column(Modifier.width(292.dp).padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -138,21 +237,12 @@ internal fun RangeCalendar(from: LocalDate, to: LocalDate, maxDate: LocalDate, m
             Row {
                 week.forEach { day ->
                     if (day == null) Spacer(Modifier.weight(1f).height(34.dp)) else {
-                        val first = start
-                        val allowed = day <= maxDate && (first == null || day < first || first.daysUntil(day) + 1 <= maxDays)
-                        val inRange = day in shownFrom..shownTo
-                        val edge = day == shownFrom || day == shownTo
-                        Box(
-                            Modifier.weight(1f).height(34.dp).background(if (inRange && !edge) Kit.GreenSoft else Color.Transparent)
-                                .clickable(enabled = allowed) {
-                                    if (first == null || day < first) start = day
-                                    else { start = null; onPick(first, day) }
-                                },
-                            Alignment.Center
-                        ) {
-                            Box(Modifier.size(30.dp).clip(CircleShape).background(if (edge) Kit.Green else Color.Transparent), Alignment.Center) {
-                                Text("${day.day}", fontFamily = Inter(), fontWeight = if (edge) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp,
-                                    color = when { edge -> Color.White; !allowed -> Kit.Faint.copy(alpha = 0.5f); else -> Kit.Ink })
+                        val allowed = day <= maxDate
+                        val chosen = day == selected
+                        Box(Modifier.weight(1f).height(34.dp).clickable(enabled = allowed) { onPick(day) }, Alignment.Center) {
+                            Box(Modifier.size(30.dp).clip(CircleShape).background(if (chosen) Kit.Green else Color.Transparent), Alignment.Center) {
+                                Text("${day.day}", fontFamily = Inter(), fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp,
+                                    color = when { chosen -> Color.White; !allowed -> Kit.Faint.copy(alpha = 0.5f); else -> Kit.Ink })
                             }
                         }
                     }
@@ -160,8 +250,79 @@ internal fun RangeCalendar(from: LocalDate, to: LocalDate, maxDate: LocalDate, m
                 repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
             }
         }
-        Text(if (start == null) "Tap the first day" else "Now tap the last day (or the same day again)", fontFamily = Inter(), fontSize = 11.sp,
-            color = Kit.Muted)
+        footer()
+    }
+}
+
+/** The ISO week number of [date] (weeks start on Monday; week 1 holds the year's first Thursday). */
+internal fun isoWeekNumber(date: LocalDate): Int {
+    val thursday = date.plus(DatePeriod(days = 4 - date.dayOfWeek.isoDayNumber))
+    return (thursday.dayOfYear - 1) / 7 + 1
+}
+
+/**
+ * A month calendar for choosing a whole week, as in Outlook: the pointer lights up the week it's on, a tap picks that
+ * week (its Monday goes to [onPick]). Each row is a week from Monday, with its number on the left and the days of the
+ * months around it faded. Weeks starting after [maxDate] can't be picked. [footer] sits under the weeks.
+ */
+@Composable
+internal fun WeekCalendar(selected: LocalDate?, maxDate: LocalDate, onPick: (LocalDate) -> Unit, footer: @Composable () -> Unit = {}) {
+    var month by remember { mutableStateOf((selected ?: maxDate).let { LocalDate(it.year, it.month, 1) }) }
+    val first = month.minus(DatePeriod(days = month.dayOfWeek.isoDayNumber - 1))
+    val last = month.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1))
+    val weeks = generateSequence(first) { it.plus(DatePeriod(days = 7)) }.takeWhile { it <= last }.toList()
+    Column(Modifier.width(314.dp).padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CalendarArrow(Icons.Outlined.ChevronLeft, "Previous month") { month = month.minus(DatePeriod(months = 1)) }
+            Text("${month.month.name.lowercase().replaceFirstChar { it.uppercase() }} ${month.year}", Modifier.weight(1f), fontFamily = Inter(),
+                fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Kit.Ink, textAlign = TextAlign.Center)
+            CalendarArrow(Icons.Outlined.ChevronRight, "Next month", enabled = month.plus(DatePeriod(months = 1)) <= maxDate) {
+                month = month.plus(DatePeriod(months = 1))
+            }
+        }
+        Row {
+            Text("Wk", Modifier.width(30.dp).padding(start = 3.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 10.sp, color = Kit.Faint,
+                textAlign = TextAlign.Center)
+            listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su").forEach {
+                Text(it, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 10.sp, color = Kit.Faint, textAlign = TextAlign.Center)
+            }
+        }
+        weeks.forEach { monday ->
+            val source = remember(monday) { MutableInteractionSource() }
+            val hovered by source.collectIsHoveredAsState()
+            val allowed = monday <= maxDate
+            val chosen = monday == selected
+            Row(
+                Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp))
+                    .background(when { chosen -> Kit.Green; hovered && allowed -> Kit.GreenSoft; else -> Color.Transparent })
+                    .clickable(interactionSource = source, indication = null, enabled = allowed) { onPick(monday) },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // The week's number as a small tag of its own, so it reads apart from the days (user, 2026-11-14).
+                Box(Modifier.width(30.dp).padding(start = 3.dp), Alignment.CenterStart) {
+                    Box(Modifier.height(20.dp).width(24.dp).clip(RoundedCornerShape(6.dp))
+                        .background(when { chosen -> Color.White.copy(alpha = 0.22f); hovered && allowed -> Color.White; !allowed -> Kit.Canvas; else -> Kit.GreenSoft }),
+                        Alignment.Center) {
+                        Text("${isoWeekNumber(monday)}", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.sp,
+                            color = when { chosen -> Color.White; !allowed -> Kit.Faint.copy(alpha = 0.6f); else -> Kit.Green })
+                    }
+                }
+                (0..6).forEach { offset ->
+                    val day = monday.plus(DatePeriod(days = offset))
+                    val other = day.month != month.month
+                    Text("${day.day}", Modifier.weight(1f), fontFamily = Inter(), fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium, fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        color = when {
+                            chosen -> if (day > maxDate) Color.White.copy(alpha = 0.6f) else Color.White
+                            day > maxDate -> Kit.Faint.copy(alpha = 0.5f)
+                            hovered && allowed -> if (other) Kit.Muted else Kit.Green
+                            other -> Kit.Faint
+                            else -> Kit.Ink
+                        })
+                }
+            }
+        }
+        footer()
     }
 }
 

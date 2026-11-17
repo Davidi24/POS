@@ -2,6 +2,12 @@ package com.saporini.mobile_desktop.statistics.ui
 
 import mobile_desktop.shared.generated.resources.notification_reservation
 import mobile_desktop.shared.generated.resources.Res
+import mobile_desktop.shared.generated.resources.role_cashier
+import mobile_desktop.shared.generated.resources.overview_no_more_reservations
+import mobile_desktop.shared.generated.resources.overview_no_table
+import mobile_desktop.shared.generated.resources.overview_reservations
+import mobile_desktop.shared.generated.resources.overview_guests
+import mobile_desktop.shared.generated.resources.settings_reservations
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -43,21 +49,19 @@ private fun bookingSourceColor(key: String) = when (key) {
 @Composable
 internal fun BookingsSection(v: StatsView, size: ScreenSize) {
     val b = v.bookings
-    SectionHeading("Bookings", "How many booked and came, when for, where from, no-shows and how full the tables were",
-        Res.drawable.notification_reservation, StatsSeries[5])
-    TileGrid(listOf(
-        { m -> StatTile("Bookings", countText(b.booked), m, v.change(b.booked, b.compareBooked),
-            detail = "${countText(b.booked / v.dayCount.coerceAtLeast(1))} a day", icon = Icons.Outlined.EventSeat) },
-        { m -> StatTile("Guests booked", countText(b.guests), m, v.change(b.guests, b.compareGuests),
-            detail = "${(b.averageGroup * 10).toInt() / 10f} a booking", icon = Icons.Outlined.Groups, tone = StatsSeries[3]) },
-        { m -> StatTile("Came as booked", percent1(b.arrivalRate), m, detail = "${countText(b.arrived)} bookings arrived", icon = Icons.Outlined.EventAvailable,
-            tone = StatsSeries[1]) },
-        { m -> StatTile("No-shows", countText(b.noShows), m, inverted = true, detail = "${percent1(b.noShows.toFloat() / b.booked.coerceAtLeast(1))} of bookings",
-            icon = Icons.Outlined.PersonOff, tone = Kit.Grey) },
-        { m -> StatTile("Cancelled", countText(b.cancelled), m, inverted = true, detail = "${percent1(b.cancelled.toFloat() / b.booked.coerceAtLeast(1))} of bookings",
-            icon = Icons.Outlined.EventBusy, tone = Kit.Grey) },
-        { m -> StatTile("Deposits", v.money(b.depositsTaken), m, detail = "${v.money(b.depositsRefunded)} refunded", icon = Icons.Outlined.Savings, tone = StatsSeries[2]) }
-    ), desktop = 6)
+    // The figures as one grid with the app's pictures, no colour strips (user, 2026-11-16).
+    FigureGrid(listOf(
+        FigureCell("Bookings", countText(b.booked), Res.drawable.settings_reservations, v.change(b.booked, b.compareBooked),
+            detail = "${countText(b.booked / v.dayCount.coerceAtLeast(1))} a day"),
+        FigureCell("Guests booked", countText(b.guests), Res.drawable.overview_guests, v.change(b.guests, b.compareGuests),
+            detail = "${(b.averageGroup * 10).toInt() / 10f} a booking"),
+        FigureCell("Came as booked", percent1(b.arrivalRate), Res.drawable.overview_reservations, detail = "${countText(b.arrived)} bookings arrived"),
+        FigureCell("No-shows", countText(b.noShows), Res.drawable.overview_no_table, inverted = true,
+            detail = "${percent1(b.noShows.toFloat() / b.booked.coerceAtLeast(1))} of bookings"),
+        FigureCell("Cancelled", countText(b.cancelled), Res.drawable.overview_no_more_reservations, inverted = true,
+            detail = "${percent1(b.cancelled.toFloat() / b.booked.coerceAtLeast(1))} of bookings"),
+        FigureCell("Deposits", v.money(b.depositsTaken), Res.drawable.role_cashier, detail = "${v.money(b.depositsRefunded)} refunded")
+    ))
     PanelLine(size,
         1.6f to { m -> BookingsByDayPanel(v, m) },
         1f to { m -> PanelStack(m, listOf({ OutcomeFunnelPanel(v, it) }, { BookingSourcesPanel(v, it) })) }

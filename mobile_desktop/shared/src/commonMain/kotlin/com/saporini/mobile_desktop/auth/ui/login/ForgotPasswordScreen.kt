@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.auth.ui.login
 
+import com.saporini.mobile_desktop.core.theme.Inter
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.EaseOutBack
 import androidx.compose.animation.core.LinearEasing
@@ -29,7 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.MarkAsUnread
@@ -89,7 +90,6 @@ object ForgotPasswordScreen : Screen {
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White)
             ) {
             val isCompact = maxWidth < 380.dp || maxHeight < 700.dp
             val isDesktop = remember { !getPlatform().name.startsWith("Android") }
@@ -101,7 +101,7 @@ object ForgotPasswordScreen : Screen {
             val horizontalPadding = if (isCompact) 16.dp else 20.dp
             val topPadding = if (shouldCenterVertically) 0.dp else 48.dp
             val logoHeight = if (isCompact) 72.dp else 100.dp
-            val titleFontSize = if (isCompact) 24.sp else 30.sp
+            val titleFontSize = if (isCompact) 23.sp else 27.sp
             val sectionSpacing = if (isCompact) 12.dp else 20.dp
             val smallSpacing = if (isCompact) 6.dp else 8.dp
             val buttonHeight = if (isCompact) 48.dp else 56.dp
@@ -143,7 +143,7 @@ object ForgotPasswordScreen : Screen {
                         .padding(12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Reply,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         tint = primaryText
                     )
@@ -152,7 +152,7 @@ object ForgotPasswordScreen : Screen {
 
             Column(
                 modifier = Modifier
-                    .widthIn(max = 480.dp)
+                    .widthIn(max = 420.dp)
                     .fillMaxWidth()
                     .align(if (shouldCenterVertically) Alignment.Center else Alignment.TopCenter)
                     .then(
@@ -188,17 +188,6 @@ object ForgotPasswordScreen : Screen {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.Start
                         ) {
-                            Image(
-                            painter = painterResource(Res.drawable.brand_logo),
-                                contentDescription = "Saporini Italiano",
-                                modifier = Modifier
-                                    .height(logoHeight)
-                                    .align(Alignment.CenterHorizontally),
-                                contentScale = ContentScale.Fit
-                            )
-
-                            Spacer(modifier = Modifier.height(sectionSpacing * 2))
-
                             Text(
                                 text = "Forgot password?",
                                 style = MaterialTheme.typography.headlineLarge.copy(
@@ -206,7 +195,8 @@ object ForgotPasswordScreen : Screen {
                                 ),
                                 color = primaryText,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = CormorantGaramond(),
+                                fontFamily = Inter(),
+                                letterSpacing = (-0.3).sp,
                                 fontSize = titleFontSize
                             )
                             Spacer(modifier = Modifier.height(sectionSpacing / 3))
@@ -214,7 +204,7 @@ object ForgotPasswordScreen : Screen {
                                 text = "No worries! Enter your email and we'll send you a link to reset your password.",
                                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 16.sp),
                                 color = mutedText,
-                                fontFamily = Belleza()
+                                fontFamily = Inter()
                             )
 
                             Spacer(modifier = Modifier.height(sectionSpacing * 3))
@@ -223,9 +213,10 @@ object ForgotPasswordScreen : Screen {
                                 text = "Email",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = primaryText,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
                                 modifier = Modifier.padding(start = 3.dp),
-                                fontFamily = Belleza()
+                                fontFamily = Inter()
                             )
 
                             Spacer(modifier = Modifier.height(smallSpacing))
@@ -234,7 +225,7 @@ object ForgotPasswordScreen : Screen {
                                 value = email,
                                 onValueChange = { email = it; error = null },
                                 placeholder = {
-                                    Text("Enter your email", color = mutedText)
+                                    Text("Enter your email", color = mutedText, fontFamily = Inter(), fontSize = 14.5.sp)
                                 },
                                 leadingIcon = {
                                     Icon(
@@ -252,6 +243,7 @@ object ForgotPasswordScreen : Screen {
                                         spotColor = Color.Black.copy(alpha = 0.12f)
                                     ),
                                 singleLine = true,
+                                textStyle = androidx.compose.ui.text.TextStyle(fontFamily = Inter(), fontSize = 14.5.sp, color = primaryText),
                                 shape = fieldShape,
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = fieldBorder,
@@ -295,7 +287,7 @@ object ForgotPasswordScreen : Screen {
                                     Text(
                                         text = "Send reset link",
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         letterSpacing = 0.sp
                                     )
                                 }
@@ -321,7 +313,6 @@ object ForgotPasswordScreen : Screen {
                 }
             }
 
-                PreviewHomeButton()
             }
         }
     }
@@ -379,15 +370,6 @@ private fun ResetLinkSentContent(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Image(
-            painter = painterResource(Res.drawable.brand_logo),
-            contentDescription = "Saporini Italiano",
-            modifier = Modifier.height(logoHeight),
-            contentScale = ContentScale.Fit
-        )
-
-        Spacer(modifier = Modifier.height(sectionSpacing * 2.5f))
-
         Box(
             modifier = Modifier.size(circleSize),
             contentAlignment = Alignment.Center
@@ -439,7 +421,8 @@ private fun ResetLinkSentContent(
             ),
             color = primaryText,
             fontWeight = FontWeight.Bold,
-            fontFamily = CormorantGaramond(),
+            fontFamily = Inter(),
+            letterSpacing = (-0.3).sp,
             fontSize = titleFontSize
         )
 
@@ -449,7 +432,7 @@ private fun ResetLinkSentContent(
             text = "If an account uses this email, we've sent it\na link to choose a new password.",
             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 19.sp),
             color = mutedText,
-            fontFamily = Belleza(),
+            fontFamily = Inter(),
             textAlign = TextAlign.Center
         )
 
@@ -459,7 +442,7 @@ private fun ResetLinkSentContent(
             text = "If you don't see it, check your spam\nor junk folder.",
             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 19.sp),
             color = mutedText,
-            fontFamily = Belleza(),
+            fontFamily = Inter(),
             textAlign = TextAlign.Center
         )
 
@@ -479,7 +462,7 @@ private fun ResetLinkSentContent(
             Text(
                 text = "Back to login",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.sp
             )
         }

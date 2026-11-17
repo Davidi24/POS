@@ -95,7 +95,7 @@ class StatisticsRulesTest {
         assertEquals("-20%", changeText(OrderDecimal("80.00"), OrderDecimal("100.00")))
         assertEquals("+3%", changeText(OrderDecimal("103.40"), OrderDecimal("100.00")))
         assertEquals("±0%", changeText(OrderDecimal("100.00"), OrderDecimal("100.00")))
-        assertEquals("new", changeText(OrderDecimal("5.00"), OrderDecimal("0.00")))
+        assertEquals("no data before", changeText(OrderDecimal("5.00"), OrderDecimal("0.00")))
         assertNull(changeText(OrderDecimal("0.00"), OrderDecimal("0.00")))
     }
 
@@ -214,7 +214,6 @@ class StatisticsScreenModelTest {
             repo.failure = null
             m.tab(StatsTab.SALES); runCurrent()
             m.tab(StatsTab.TEAM); runCurrent()
-            m.tab(StatsTab.REPORTS); runCurrent()
             m.download("items"); runCurrent()
             assertNotNull(m.state.value.download)
 
@@ -237,7 +236,7 @@ class StatisticsScreenModelTest {
         val repo = FakeStats()
         check(repo) { m, _ ->
             m.setActive(true); runCurrent()
-            m.tab(StatsTab.REPORTS); runCurrent()
+            // The reports the server makes come with the first load (for the pages' downloads); no Reports page any more.
             assertEquals("items", m.state.value.reports.single().code)
             m.download("items"); runCurrent()
             val download = m.state.value.download!!
@@ -259,7 +258,6 @@ class StatisticsScreenModelTest {
         }
         check(repo) { m, _ ->
             m.setActive(true); runCurrent()
-            m.tab(StatsTab.REPORTS); runCurrent()
             m.download("items"); runCurrent()
             assertEquals("items", m.state.value.downloading)
 

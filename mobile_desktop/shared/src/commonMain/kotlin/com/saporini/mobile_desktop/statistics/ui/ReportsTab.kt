@@ -3,6 +3,15 @@ package com.saporini.mobile_desktop.statistics.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.DpOffset
+import com.saporini.mobile_desktop.statistics.StatsTab
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -287,4 +296,72 @@ private fun deviceReport(code: String, v: StatsView): String {
         }
     }
     return "﻿" + lines.joinToString("\n") + "\n"
+}
+
+/**
+ * The reports a page offers from its own Download button (agreed 2026-11-13: one Download button per page, with that page's
+ * reports, instead of a Reports place). Sales offers its money reports, Orders the order ones.
+ */
+internal fun pageReports(tab: StatsTab): List<String> = when (tab) {
+    StatsTab.SALES -> listOf("daily-sales", "hours", "sections")
+    StatsTab.ORDERS -> listOf("daily-sales", "orders")
+    else -> emptyList()
+}
+
+/**
+ * A page's Download button (a square in the header, like Filters and refresh): its menu lists the page's reports for the
+ * days chosen at the top; a pick saves the spreadsheet (the server makes some, this device the rest), with a spinner on the
+ * button while the server prepares one.
+ */
+@Composable
+internal fun StatsDownloadButton(state: StatisticsState, model: StatisticsScreenModel, v: StatsView, codes: List<String>, size: androidx.compose.ui.unit.Dp) {
+    var open by remember { mutableStateOf(false) }
+    val kinds = codes.mapNotNull { code -> ReportGroups.flatMap { it.reports }.firstOrNull { it.code == code } }
+    if (kinds.isEmpty()) return
+    val busy = state.downloading != null
+    Box {
+        Surface(onClick = { open = true }, modifier = Modifier.size(size), shape = RoundedCornerShape(8.dp), color = Color.White,
+            border = BorderStroke(1.dp, Kit.Border)) {
+            Box(contentAlignment = Alignment.Center) {
+                if (busy) CircularProgressIndicator(Modifier.size(16.dp), color = Kit.Green, strokeWidth = 2.dp)
+                else Icon(Icons.Outlined.Download, "Download", Modifier.size(19.dp), tint = Kit.Ink)
+            }
+        }
+        DropdownMenu(open, { open = false }, Modifier.width(330.dp), offset = DpOffset(0.dp, 6.dp), shape = RoundedCornerShape(12.dp),
+            containerColor = Color.White, shadowElevation = 8.dp) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Download", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = 0.sp, color = Kit.Ink)
+                val from = state.from
+                val to = state.to
+                Text((if (from != null && to != null) "${periodLabel(from, to)} · " else "") + "opens in Excel, Numbers or Google Sheets",
+                    fontFamily = Inter(), fontSize = 11.sp, letterSpacing = 0.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            KitDivider()
+            kinds.forEach { kind ->
+                val maker = if (kind.maker == ReportMaker.SERVER && state.reports.none { it.code == kind.code }) ReportMaker.LATER else kind.maker
+                val later = maker == ReportMaker.LATER
+                val preparing = state.downloading == kind.code
+                Row(Modifier.fillMaxWidth().clickable(enabled = !later && !busy && state.overview != null) {
+                    when (maker) {
+                        ReportMaker.SERVER -> model.download(kind.code)
+                        ReportMaker.DEVICE -> model.offer(kind.code, deviceReport(kind.code, v))
+                        ReportMaker.LATER -> {}
+                    }
+                    open = false
+                }.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)).background((if (later) Kit.Grey else Kit.Green).copy(alpha = 0.11f)), Alignment.Center) {
+                        Icon(kind.icon, null, Modifier.size(18.dp), tint = if (later) Kit.Faint else Kit.Green)
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(kind.title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp,
+                            color = if (later) Kit.Muted else Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(if (later) "Coming soon" else "CSV · " + (kind.holds(v) ?: kind.description), fontFamily = Inter(), fontSize = 11.sp,
+                            letterSpacing = 0.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (preparing) CircularProgressIndicator(Modifier.size(14.dp), color = Kit.Green, strokeWidth = 2.dp)
+                    else if (!later) Icon(Icons.Outlined.Download, null, Modifier.size(17.dp), tint = Kit.Green)
+                }
+            }
+        }
+    }
 }

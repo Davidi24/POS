@@ -71,17 +71,18 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
     HttpResponseValidator {
         validateResponse { response ->
             if (!response.status.isSuccess()) {
-                val message = try {
-                    response.body<ApiErrorResponse>().message
+                val error = try {
+                    response.body<ApiErrorResponse>()
                 } catch (e: Exception) {
                     println("Unparsed API error: ${response.status.value}")
-                    "Something went wrong. Please try again."
+                    null
                 }
+                val message = error?.message ?: "Something went wrong. Please try again."
                 if (response.headers["X-POS-Context-Invalid"] == "true") {
                     sessionManager.rejectRestaurantContext(response.call.request.headers["X-Restaurant-Id"],
                         response.call.request.headers["X-Branch-Id"], message)
                 }
-                throw ApiException(response.status.value, message)
+                throw ApiException(response.status.value, message, error?.code, error?.lockedUntil)
             }
         }
     }

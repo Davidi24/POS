@@ -1,7 +1,22 @@
 package com.saporini.mobile_desktop.statistics.ui
 
 import mobile_desktop.shared.generated.resources.settings_orders_kitchen
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import mobile_desktop.shared.generated.resources.Res
+import mobile_desktop.shared.generated.resources.inventory_stock_value
+import mobile_desktop.shared.generated.resources.workspace_statistics
+import mobile_desktop.shared.generated.resources.salary_kitchen
+import mobile_desktop.shared.generated.resources.settings_payments
+import mobile_desktop.shared.generated.resources.role_finance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,32 +59,31 @@ import com.saporini.mobile_desktop.core.components.TableHeader
 import com.saporini.mobile_desktop.core.components.TrendBadge
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.core.ui.ScreenSize
+import com.saporini.mobile_desktop.statistics.DishFigures
 import com.saporini.mobile_desktop.statistics.StatsView
 
-// Statistics → Menu & dishes: what guests buy. The dishes as a table (sold, sales, share, change, margin), the menu
+// Statistics → Dishes (user, 2026-11-16: "a grid on top, no colours on the left, good icons; every dish sold with pages; stock
+// separate"): what guests buy. The dishes as a table (sold, sales, share, change, margin), the menu
 // sections, best and slow sellers, how dishes go out (eat in, takeaway, delivery), each branch's favourites and the
 // dishes on popularity × margin. Costs and margins are estimates until recipe costs are reported (MOCK, StatsView).
 
 @Composable
-internal fun DishesStockTab(v: StatsView, size: ScreenSize) {
+internal fun DishesTab(v: StatsView, size: ScreenSize) {
     val dishes = v.dishes
-    SectionHeading("Dishes", "What guests order, what sells slowly and what each dish earns", Res.drawable.settings_orders_kitchen, StatsSeries[2])
     val sold = dishes.sumOf { it.quantity }
     val sales = dishes.sumOf { it.sales }
     val profit = dishes.sumOf { it.profit }
     val best = dishes.maxByOrNull { it.quantity }
-    TileGrid(listOf(
-        { m -> StatTile("Dishes sold", countText(sold), m, detail = "${dishes.count { it.quantity > 0 }} different dishes", icon = Icons.Outlined.RestaurantMenu) },
-        { m -> StatTile("Sales from dishes", v.money(sales), m, v.change(sales, v.compareDishSales.values.sum().takeIf { v.compareDishSales.isNotEmpty() }),
-            icon = Icons.Outlined.Sell, tone = StatsSeries[1]) },
-        { m -> StatTile("Average dish price", v.money(if (sold > 0) sales / sold else 0), m, detail = "what a dish sold for", icon = Icons.Outlined.LocalDining,
-            tone = StatsSeries[2]) },
-        { m -> StatTile("Best seller", best?.name ?: "–", m, detail = best?.let { "${it.quantity} sold · ${v.money(it.sales)}" }, icon = Icons.Outlined.EmojiEvents,
-            tone = StatsSeries[4]) },
-        { m -> StatTile("Profit on dishes", v.money(profit), m, detail = "sales less ingredients (estimated)", icon = Icons.Outlined.Savings) },
-        { m -> StatTile("Food cost", if (sales > 0) percent1((sales - profit).toFloat() / sales) else "–", m, detail = "of what dishes sold for (estimated)",
-            icon = Icons.Outlined.Percent, tone = Kit.Grey) }
-    ), desktop = 6)
+    // The six figures as one grid with the app's pictures, no colour strips (user, 2026-11-16).
+    FigureGrid(listOf(
+        FigureCell("Dishes sold", countText(sold), Res.drawable.settings_orders_kitchen, detail = "${dishes.count { it.quantity > 0 }} different dishes"),
+        FigureCell("Sales from dishes", v.money(sales), Res.drawable.role_finance,
+            v.change(sales, v.compareDishSales.values.sum().takeIf { v.compareDishSales.isNotEmpty() }), detail = "what the dishes came to"),
+        FigureCell("Average dish price", v.money(if (sold > 0) sales / sold else 0), Res.drawable.settings_payments, detail = "what a dish sold for"),
+        FigureCell("Best seller", best?.name ?: "–", Res.drawable.salary_kitchen, detail = best?.let { "${countText(it.quantity)} sold · ${v.money(it.sales)}" }),
+        FigureCell("Gross profit", v.money(profit), Res.drawable.workspace_statistics, detail = "sales less ingredients (estimated)"),
+        FigureCell("Margin", if (sales > 0) percent1(profit.toFloat() / sales) else "–", Res.drawable.inventory_stock_value, detail = "kept from what dishes sold for")
+    ))
     DishTablePanel(v, size)
     PanelLine(size,
         1.3f to { m -> EngineeringPanel(v, m, size) },
@@ -79,54 +93,65 @@ internal fun DishesStockTab(v: StatsView, size: ScreenSize) {
         1f to { m -> HowTheyGoOutPanel(v, m) },
         1f to { m -> BranchDishesPanel(v, m) }
     ) else HowTheyGoOutPanel(v, Modifier.fillMaxWidth())
-    StockSection(v, size)
 }
+
+/** How many dishes a page of Sales by dish shows. */
+private const val DishesPerPage = 10
 
 @Composable
 private fun DishTablePanel(v: StatsView, size: ScreenSize) {
-    val dishes = v.dishes
+    // Every dish sold, the best-selling first, with what it costs and earns (Cost and margin by dish joined in, user 2026-11-16).
+    val dishes = remember(v) { v.dishes.filter { it.quantity > 0 }.sortedWith(compareByDescending<DishFigures> { it.sales }.thenByDescending { it.quantity }) }
     val total = dishes.sumOf { it.sales }.coerceAtLeast(1)
-    StatsPanel(Icons.AutoMirrored.Outlined.MenuOpen, "Sales by dish", Modifier.fillMaxWidth(), empty = dishes.isEmpty(),
-        emptyText = "Every dish sold, how many and for how much.") {
+    StatsPanel(Icons.AutoMirrored.Outlined.MenuOpen, "Every dish sold", Modifier.fillMaxWidth(), empty = dishes.isEmpty(),
+        emptyText = "Every dish sold, how many and for how much.", note = "costs estimated") {
         val compact = !size.isDesktop
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Kit.Canvas)) {
-            TableHeader(if (compact) listOf(TableColumn("Dish", 2f), TableColumn("Sold", 0.7f, true), TableColumn("Sales", 1f, true))
-            else listOf(TableColumn("#", 0.3f), TableColumn("Dish", 2f), TableColumn("Section", 1.1f), TableColumn("Sold", 0.6f, true),
-                TableColumn("Sales", 0.9f, true), TableColumn("Share", 1.2f), TableColumn("Change", 0.8f), TableColumn("Margin", 0.7f, true)), trailingSpace = false)
+            TableHeader(if (compact) listOf(TableColumn("Dish", 2f), TableColumn("Sold", 0.7f, true), TableColumn("Sales", 1f, true), TableColumn("Margin", 0.8f, true))
+            else listOf(TableColumn("#", 0.3f), TableColumn("Dish", 2.1f), TableColumn("Sold", 0.55f, true), TableColumn("Sales", 0.9f, true),
+                TableColumn("Share", 1.1f), TableColumn("Change", 0.75f), TableColumn("Cost each", 0.75f, true), TableColumn("Margin", 0.65f, true),
+                TableColumn("Profit", 0.85f, true)), trailingSpace = false)
         }
-        dishes.take(15).forEachIndexed { index, dish ->
+        // Ten a page (user, 2026-11-16: "pagination with all the foods that are sold").
+        var page by remember(v.from, v.to, v.state.branchId, dishes.size) { mutableStateOf(0) }
+        val pages = ((dishes.size + DishesPerPage - 1) / DishesPerPage).coerceAtLeast(1)
+        val shown = dishes.drop(page * DishesPerPage).take(DishesPerPage)
+        shown.forEachIndexed { i, dish ->
+            val index = page * DishesPerPage + i
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (!compact) Row(Modifier.weight(0.3f)) { RankBadge(index + 1) }
-                Row(Modifier.weight(2f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.weight(if (compact) 2f else 2.1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     DishThumb(v, dish, 34.dp)
                     Column(Modifier.weight(1f)) {
                         Text(dish.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (compact) Text(dish.section ?: "", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1)
+                        Text(dish.section ?: "", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                if (!compact) Text(dish.section ?: "–", Modifier.weight(1.1f), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis)
-                Text("${dish.quantity}", Modifier.weight(if (compact) 0.7f else 0.6f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                Text(countText(dish.quantity), Modifier.weight(if (compact) 0.7f else 0.55f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
                     color = Kit.Ink, textAlign = TextAlign.End)
-                Text(v.money(dish.sales), Modifier.weight(if (compact) 1f else 0.9f), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp,
-                    color = Kit.Ink, textAlign = TextAlign.End)
+                Text(v.money(dish.sales), Modifier.weight(0.9f.takeIf { !compact } ?: 1f), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                    color = Kit.Ink, textAlign = TextAlign.End, maxLines = 1, softWrap = false)
                 if (!compact) {
                     val share = dish.sales.toFloat() / total
-                    Row(Modifier.weight(1.2f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.weight(1.1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(50)).background(StatsAccent.copy(alpha = 0.12f))) {
                             Box(Modifier.fillMaxWidth(share.coerceIn(0.02f, 1f)).fillMaxHeight().clip(RoundedCornerShape(50)).background(StatsAccent))
                         }
                         Text(com.saporini.mobile_desktop.core.components.percentText(share), Modifier.width(34.dp), fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted)
                     }
-                    Row(Modifier.weight(0.8f)) { TrendBadge(v.change(dish.sales, v.compareDishSales[dish.name])) }
-                    Text(percent1(dish.margin), Modifier.weight(0.7f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
-                        color = if (dish.margin >= 0.7f) Kit.Green else Kit.Ink, textAlign = TextAlign.End)
+                    Row(Modifier.weight(0.75f)) { TrendBadge(v.change(dish.sales, v.compareDishSales[dish.name])) }
+                    Text(v.money(if (dish.quantity > 0) dish.cost / dish.quantity else 0), Modifier.weight(0.75f), fontFamily = Inter(), fontSize = 12.sp,
+                        color = Kit.Muted, textAlign = TextAlign.End, maxLines = 1)
                 }
+                Text(percent1(dish.margin), Modifier.weight(if (compact) 0.8f else 0.65f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                    color = if (dish.margin >= 0.7f) Kit.Green else Kit.Ink, textAlign = TextAlign.End)
+                if (!compact) Text(v.money(dish.profit), Modifier.weight(0.85f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp,
+                    color = Kit.Ink, textAlign = TextAlign.End, maxLines = 1, softWrap = false)
             }
-            if (index < dishes.take(15).lastIndex) KitDivider()
+            if (i < shown.lastIndex) KitDivider()
         }
-        if (dishes.size > 15) Footnote("The full list is in Reports → Dishes sold.")
+        if (pages > 1) DishPager(page, pages, dishes.size) { page = it }
     }
 }
 
@@ -224,5 +249,27 @@ private fun BranchDishesPanel(v: StatsView, modifier: Modifier) {
         StackedColumnChart(dishes.map { it.name.take(10) }, branches.map { b -> b.name to v.branchColor(b.id) },
             dishes.map { d -> branches.map { b -> (b.dishes.firstOrNull { it.name == d.name }?.quantity ?: 0L).toFloat() } },
             roomLeft(), height = 230.dp, format = { "${it.toLong()} sold" }, axisFormat = { compactNumber(it) }, titleOf = { dishes[it].name })
+    }
+}
+
+/** Under the dishes: "11–20 of 34", then ‹ Page 2 of 4 ›. */
+@Composable
+private fun DishPager(page: Int, pages: Int, total: Int, onPage: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        val first = page * DishesPerPage + 1
+        val last = minOf(total, (page + 1) * DishesPerPage)
+        Text("$first–$last of ${countText(total.toLong())} dishes", Modifier.weight(1f), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, maxLines = 1)
+        PagerArrow(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, "Page before", page > 0) { onPage(page - 1) }
+        Text("Page ${page + 1} of $pages", Modifier.padding(horizontal = 10.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+            letterSpacing = 0.sp, color = Kit.Ink, maxLines = 1)
+        PagerArrow(Icons.AutoMirrored.Outlined.KeyboardArrowRight, "Next page", page < pages - 1) { onPage(page + 1) }
+    }
+}
+
+@Composable
+private fun PagerArrow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).border(1.dp, Kit.Border, RoundedCornerShape(8.dp))
+        .clickable(enabled = enabled, onClick = onClick), Alignment.Center) {
+        Icon(icon, label, Modifier.size(18.dp), tint = if (enabled) Kit.Ink else Kit.Faint)
     }
 }
