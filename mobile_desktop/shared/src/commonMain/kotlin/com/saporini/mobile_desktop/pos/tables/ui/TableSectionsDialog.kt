@@ -145,7 +145,7 @@ internal fun TableSectionsDialog(
         loadError = null
         onLoadSections().fold(
             onSuccess = { loaded -> sections = loaded.sortedBy { it.displayOrder } },
-            onFailure = { error -> loadError = error.message ?: "Could not load the areas." }
+            onFailure = { error -> loadError = error.message ?: "Could not load the places." }
         )
     }
 
@@ -190,7 +190,7 @@ internal fun TableSectionsDialog(
         if (section == null) {
             val owner = sections.orEmpty().firstOrNull { tableId in it.tableIds }
             notify(
-                if (owner != null) "Table ${table.label} is in ${owner.name}" else "Table ${table.label} is not in an area yet",
+                if (owner != null) "Table ${table.label} is in ${owner.name}" else "Table ${table.label} is not in a place yet",
                 TableNotificationTone.Info
             )
             return
@@ -251,15 +251,15 @@ internal fun TableSectionsDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text("Booking areas", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = SectionInk)
+                                Text("Places", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 19.sp, color = SectionInk)
                                 Text(
-                                    if (reorderMode) "Drag the six-dot handle to set the order. Bookings get tables from the top area first."
-                                    else "Make areas like Main Salon or Terrace and pick their tables on the plan. Bookings get tables from the top area first.",
+                                    if (reorderMode) "Drag the six-dot handle to set the order. Bookings get tables from the top place first."
+                                    else "Make places like Main Salon or Terrace and pick their tables on the plan. Bookings get tables from the top place first.",
                                     fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = SectionMuted
                                 )
                             }
                             if (!expanded) {
-                                CloseCircleButton("Close areas", closeDialog)
+                                CloseCircleButton("Close places", closeDialog)
                             }
                         }
                         HorizontalDivider(color = SectionBorder)
@@ -299,7 +299,7 @@ internal fun TableSectionsDialog(
                                 else -> {
                                     if (loaded.isEmpty()) {
                                         Text(
-                                            "No areas yet. Tap + to make the first one.",
+                                            "No places yet. Tap + to make the first one.",
                                             modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                                             fontFamily = Inter(), fontSize = 13.sp, color = SectionMuted
                                         )
@@ -331,12 +331,12 @@ internal fun TableSectionsDialog(
                                                 .clickable { addSectionOpen = true },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(Icons.Outlined.Add, "Add an area", Modifier.size(21.dp), tint = SectionInk)
+                                            Icon(Icons.Outlined.Add, "Add a place", Modifier.size(21.dp), tint = SectionInk)
                                         }
                                     }
                                     if (pickingSection != null) {
                                         Text(
-                                            "Unselect all to see all areas",
+                                            "Unselect all to see all places",
                                             modifier = Modifier.fillMaxWidth()
                                                 .clip(RoundedCornerShape(6.dp))
                                                 .clickable {
@@ -408,7 +408,7 @@ internal fun TableSectionsDialog(
                                         workingOrder = sections.orEmpty()
                                         reorderMode = true
                                     } else {
-                                        notify("Add at least 2 areas to change their order", TableNotificationTone.Info)
+                                        notify("Add at least 2 places to change their order", TableNotificationTone.Info)
                                     }
                                 }
                                 Spacer(Modifier.weight(1f))
@@ -586,7 +586,7 @@ private fun TablePickerPane(
                 Text(
                     buildAnnotatedString {
                         if (section == null) {
-                            append("All areas on the plan")
+                            append("All places on the plan")
                         } else {
                             append("Choose the tables you want to add to ")
                             withStyle(SpanStyle(color = SectionGreen)) { append(section.name) }
@@ -597,9 +597,9 @@ private fun TablePickerPane(
                 )
                 Text(
                     when {
-                        stacked && section == null -> "Each area has its own color."
+                        stacked && section == null -> "Each place has its own color."
                         stacked -> "Tap a table to add it. The × in the list removes it."
-                        section == null -> "Each area has its own color. Click an area on the left to edit its tables."
+                        section == null -> "Each place has its own color. Click a place on the left to edit its tables."
                         else -> "Tap a table on the plan to add it. Remove tables with the × in the list on the left."
                     },
                     fontFamily = Inter(), fontSize = 12.sp, letterSpacing = 0.sp, color = SectionMuted
@@ -747,9 +747,9 @@ private fun TableSectionNameDialog(
         sections.any { it.id != section?.id && it.name.equals(trimmed, ignoreCase = true) }
     val valid = trimmed.length in 2..40 && !isDuplicate
     val errorText = when {
-        trimmed.isEmpty() -> "The area needs a name."
+        trimmed.isEmpty() -> "The place needs a name."
         trimmed.length < 2 -> "Use at least 2 characters."
-        isDuplicate -> "An area with this name already exists."
+        isDuplicate -> "A place with this name already exists."
         else -> null
     }
     val isIdle = status is DialogActionStatus.Idle
@@ -767,7 +767,7 @@ private fun TableSectionNameDialog(
                     status = DialogActionStatus.Success(if (section == null) "$trimmed added" else "$trimmed saved")
                 },
                 onFailure = { error ->
-                    status = DialogActionStatus.Failed(message = error.message ?: "Could not save this area.")
+                    status = DialogActionStatus.Failed(message = error.message ?: "Could not save this place.")
                 }
             )
         }
@@ -777,14 +777,14 @@ private fun TableSectionNameDialog(
         onDismissRequest = { if (isIdle) onDismiss() },
         title = {
             Text(
-                if (section == null) "Add area" else "Rename area",
+                if (section == null) "Add place" else "Rename place",
                 fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp
             )
         },
         text = {
             if (isIdle) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Area name", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SectionInk)
+                    Text("Place name", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = SectionInk)
                     OutlinedTextField(
                         value = name,
                         onValueChange = { if (it.length <= 40) name = it },
@@ -855,7 +855,7 @@ private fun DeleteTableSectionDialog(
         text = {
             if (isIdle) {
                 Text(
-                    "The area will be removed. Its tables stay on the floor plan, in no area.",
+                    "The place will be removed. Its tables stay on the floor plan, in no place.",
                     fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = SectionMuted
                 )
             } else {
@@ -877,7 +877,7 @@ private fun DeleteTableSectionDialog(
                             onDeleteSection(section.id).fold(
                                 onSuccess = { status = DialogActionStatus.Removed("${section.name} deleted") },
                                 onFailure = { error ->
-                                    status = DialogActionStatus.Failed(message = error.message ?: "Could not delete this area.")
+                                    status = DialogActionStatus.Failed(message = error.message ?: "Could not delete this place.")
                                 }
                             )
                         }
