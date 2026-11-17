@@ -35,7 +35,7 @@ import com.saporini.mobile_desktop.pos.shifts.ShiftAvatar
 // the house is busiest (weekday × hour), how and where they were ordered, and the items taken off them.
 
 @Composable
-internal fun OrdersSection(v: StatsView, size: ScreenSize) {
+internal fun OrdersSection(v: StatsView, size: ScreenSize, today: kotlinx.datetime.LocalDate) {
     val t = v.totals
     val c = v.compareTotals
     SectionHeading("Orders", "How many, what happened to them, when the house is busiest and what was taken off",
@@ -54,36 +54,21 @@ internal fun OrdersSection(v: StatsView, size: ScreenSize) {
             detail = if (t.unpaid > 0) v.money(t.unpaidValue) + " not paid" else "everyone paid",
             icon = Icons.Outlined.MoneyOff, tone = Kit.Danger) }
     ))
+    // The same graph as Sales, for the orders, in blue (user, 2026-11-14).
+    DayLinePanel(v, size, today, DayMeasure.ORDERS)
     PanelLine(size,
-        1.5f to { m -> OrdersByDayPanel(v, m) },
-        1f to { m -> OutcomesPanel(v, m) }
+        1f to { m -> OutcomesPanel(v, m) },
+        1f to { m -> TypesDonutPanel(v, m) },
+        1f to { m -> SourcesOrdersPanel(v, m) }
     )
     BusyTimesPanel(v, Modifier.fillMaxWidth())
     PanelLine(size,
-        1f to { m -> TypesDonutPanel(v, m) },
-        1f to { m -> SourcesOrdersPanel(v, m) },
-        1f to { m -> AverageByTypePanel(v, m) }
-    )
-    PanelLine(size,
+        1f to { m -> AverageByTypePanel(v, m) },
         1f to { m -> RemovedByPersonPanel(v, m) },
         1f to { m -> VoidedByPersonPanel(v, m) }
     )
 }
 
-@Composable
-private fun OrdersByDayPanel(v: StatsView, modifier: Modifier) {
-    val days = v.days
-    val compare = v.compareDays
-    StatsPanel(Icons.Outlined.BarChart, "Orders by day", modifier, empty = days.all { it.orders == 0L }) {
-        HeroLine(countText(v.totals.orders), "orders", v.change(v.totals.orders, v.compareTotals?.orders))
-        ColumnChart(days.mapIndexed { i, d ->
-            ColumnDatum(dayLabel(d.date, v.dayCount), d.orders.toFloat(), "${d.orders} orders · ${v.money(d.sales)}", compare?.getOrNull(i)?.orders?.toFloat())
-        }, roomLeft(), height = 220.dp, color = StatsSeries[1], axisFormat = { compactNumber(it) }, peakLabel = { compactNumber(it) },
-            compareName = compareName(v).takeIf { compare != null })
-    }
-}
-
-/** What happened to the orders: paid and closed, refunded, cancelled, voided, still open. */
 @Composable
 private fun OutcomesPanel(v: StatsView, modifier: Modifier) {
     val t = v.totals

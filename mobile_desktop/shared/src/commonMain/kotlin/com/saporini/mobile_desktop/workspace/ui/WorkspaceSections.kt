@@ -3,6 +3,8 @@ package com.saporini.mobile_desktop.workspace.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.*
@@ -38,15 +40,20 @@ internal enum class WorkspacePage(val title: String, val workspace: Workspace) {
             WorkspaceTab("Inventory", Icons.Outlined.Inventory2, Icons.Filled.Inventory2),
             WorkspaceTab("Suppliers", Icons.Outlined.LocalShipping, Icons.Filled.LocalShipping)
         )
-        // In StatsTab order (the user's: Overview, Reports, then the rest); the place's index is the tab's.
-        STATISTICS -> listOf(
-            WorkspaceTab("Overview", Icons.Outlined.Dashboard, Icons.Filled.Dashboard),
-            WorkspaceTab("Reports", Icons.Outlined.Assessment, Icons.Filled.Assessment),
-            WorkspaceTab("Sales & orders", Icons.Outlined.BarChart, Icons.Filled.BarChart),
-            WorkspaceTab("Dishes & stock", Icons.Outlined.RestaurantMenu, Icons.Filled.RestaurantMenu),
-            WorkspaceTab("Payments & finance", Icons.Outlined.Payments, Icons.Filled.Payments),
-            WorkspaceTab("Team & bookings", Icons.Outlined.Groups, Icons.Filled.Groups)
-        )
+        // In StatsTab order (the user's: Overview, Sales, Finance, Orders (own place since 2026-11-14), Dishes, Stock (own place since 2026-11-16), Tables, Team); the
+        // place's index is the tab's.
+        STATISTICS -> com.saporini.mobile_desktop.statistics.StatsTab.entries.map { tab ->
+            when (tab) {
+                com.saporini.mobile_desktop.statistics.StatsTab.OVERVIEW -> WorkspaceTab(tab.title, Icons.Outlined.Dashboard, Icons.Filled.Dashboard)
+                com.saporini.mobile_desktop.statistics.StatsTab.SALES -> WorkspaceTab(tab.title, Icons.Outlined.BarChart, Icons.Filled.BarChart)
+                com.saporini.mobile_desktop.statistics.StatsTab.ORDERS -> WorkspaceTab(tab.title, Icons.AutoMirrored.Outlined.ReceiptLong, Icons.AutoMirrored.Filled.ReceiptLong)
+                com.saporini.mobile_desktop.statistics.StatsTab.FINANCE -> WorkspaceTab(tab.title, Icons.Outlined.AccountBalance, Icons.Filled.AccountBalance)
+                com.saporini.mobile_desktop.statistics.StatsTab.DISHES -> WorkspaceTab(tab.title, Icons.Outlined.RestaurantMenu, Icons.Filled.RestaurantMenu)
+                com.saporini.mobile_desktop.statistics.StatsTab.STOCK -> WorkspaceTab(tab.title, Icons.Outlined.Inventory2, Icons.Filled.Inventory2)
+                com.saporini.mobile_desktop.statistics.StatsTab.TABLES -> WorkspaceTab(tab.title, Icons.Outlined.TableRestaurant, Icons.Filled.TableRestaurant)
+                com.saporini.mobile_desktop.statistics.StatsTab.TEAM -> WorkspaceTab(tab.title, Icons.Outlined.Groups, Icons.Filled.Groups)
+            }
+        }
         FRAUD_DETECTION -> listOf(
             WorkspaceTab("Overview", Icons.Outlined.Security, Icons.Filled.Security),
             WorkspaceTab("Alerts", Icons.Outlined.WarningAmber, Icons.Filled.Warning),

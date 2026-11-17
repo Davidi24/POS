@@ -46,7 +46,9 @@ import java.util.UUID;
 public class StatisticsService {
 
     public static final int MAX_DAYS = 366;
-    private static final int TOP_ITEMS = 10;
+    // Every dish sold, for Statistics → Dishes' list of all of them (user, 2026-11-16: "pagination with all the foods sold");
+    // the overview keeps its five best.
+    private static final int TOP_ITEMS = 500;
     private static final int SLOW_ITEMS = 5;
 
     public static final List<ReportInfo> REPORTS = List.of(

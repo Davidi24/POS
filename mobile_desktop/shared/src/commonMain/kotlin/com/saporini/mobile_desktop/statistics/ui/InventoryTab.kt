@@ -2,6 +2,11 @@ package com.saporini.mobile_desktop.statistics.ui
 
 import mobile_desktop.shared.generated.resources.inventory_stock_value
 import mobile_desktop.shared.generated.resources.Res
+import mobile_desktop.shared.generated.resources.role_finance
+import mobile_desktop.shared.generated.resources.place_kitchen
+import mobile_desktop.shared.generated.resources.inventory_stock_changes
+import mobile_desktop.shared.generated.resources.inventory_stock_items
+import mobile_desktop.shared.generated.resources.supplier_deliveries
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,23 +50,20 @@ import kotlin.math.roundToInt
 private const val FOOD_COST_TARGET = 0.30f
 
 @Composable
-internal fun StockSection(v: StatsView, size: ScreenSize) {
+internal fun StockTab(v: StatsView, size: ScreenSize) {
     val s = v.stock
     val sales = v.totals.sales
-    SectionHeading("Stock & costs", "What the stock is worth, what came in and went out, waste and the food cost", Res.drawable.inventory_stock_value,
-        StatsSeries[1])
-    TileGrid(listOf(
-        { m -> StatTile("Stock value", v.money(s.stockValue), m, detail = "at cost, today", icon = Icons.Outlined.Warehouse, tone = StatsSeries[1]) },
-        { m -> StatTile("Received", v.money(s.received), m, detail = "deliveries in", icon = Icons.Outlined.LocalShipping) },
-        { m -> StatTile("Used", v.money(s.used), m, v.change(s.used, s.compareUsed), detail = "cost of what was sold", icon = Icons.Outlined.RestaurantMenu,
-            tone = StatsSeries[2]) },
-        { m -> StatTile("Waste", v.money(s.waste), m, inverted = true, detail = "${percent1(s.waste.toFloat() / s.used.coerceAtLeast(1))} of what was used",
-            icon = Icons.Outlined.DeleteOutline, tone = Kit.Grey) },
-        { m -> StatTile("Food cost", percent1(v.foodCost), m, inverted = true, detail = "target ${percent1(FOOD_COST_TARGET)}", icon = Icons.Outlined.Percent,
-            tone = if (v.foodCost <= FOOD_COST_TARGET) StatsAccent else Kit.Amber) },
-        { m -> StatTile("Gross margin", v.money(sales - s.used), m, detail = if (sales > 0) "${percent1((sales - s.used).toFloat() / sales)} of sales" else null,
-            icon = Icons.Outlined.Savings) }
-    ), desktop = 6)
+    // Stock is its own place now (user, 2026-11-16: "make stock separate, not with dishes"); the figures as one grid.
+    FigureGrid(listOf(
+        FigureCell("Stock value", v.money(s.stockValue), Res.drawable.inventory_stock_value, detail = "at cost, today"),
+        FigureCell("Received", v.money(s.received), Res.drawable.supplier_deliveries, detail = "deliveries in"),
+        FigureCell("Used", v.money(s.used), Res.drawable.inventory_stock_items, v.change(s.used, s.compareUsed), detail = "cost of what was sold"),
+        FigureCell("Waste", v.money(s.waste), Res.drawable.inventory_stock_changes, inverted = true,
+            detail = "${percent1(s.waste.toFloat() / s.used.coerceAtLeast(1))} of what was used"),
+        FigureCell("Food cost", percent1(v.foodCost), Res.drawable.place_kitchen, inverted = true, detail = "target ${percent1(FOOD_COST_TARGET)}"),
+        FigureCell("Gross margin", v.money(sales - s.used), Res.drawable.role_finance,
+            detail = if (sales > 0) "${percent1((sales - s.used).toFloat() / sales)} of sales" else null)
+    ))
     PanelLine(size,
         1.6f to { m -> StockByDayPanel(v, m, size) },
         1f to { m -> FoodCostPanel(v, m) }
@@ -71,7 +73,6 @@ internal fun StockSection(v: StatsView, size: ScreenSize) {
         1f to { m -> SuppliersPanel(v, m) },
         1f to { m -> MovementsPanel(v, m) }
     )
-    DishMarginsPanel(v, Modifier.fillMaxWidth(), size)
 }
 
 /** What came in, what was used and what was thrown away, day by day, on one money axis. */
@@ -157,7 +158,7 @@ private fun MovementsPanel(v: StatsView, modifier: Modifier) {
 
 /** What each dish sells for, what its ingredients cost and what's left (estimated costs, MOCK). */
 @Composable
-private fun DishMarginsPanel(v: StatsView, modifier: Modifier, size: ScreenSize) {
+internal fun DishMarginsPanel(v: StatsView, modifier: Modifier, size: ScreenSize) {
     val dishes = v.dishes.filter { it.quantity > 0 }.sortedByDescending { it.profit }.take(12)
     StatsPanel(Icons.Outlined.PriceCheck, "Cost and margin by dish", modifier, empty = dishes.isEmpty(), note = "estimated costs") {
         val compact = !size.isDesktop

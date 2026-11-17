@@ -69,6 +69,11 @@ internal fun PaymentsFinanceTab(v: StatsView, size: ScreenSize) {
     val count = methods.sumOf { it.count }
     val cardShare = methods.filter { it.key != "CASH" }.sumOf { it.collected }.toFloat() / methods.sumOf { it.collected }.coerceAtLeast(1)
     TileGrid(listOf(
+        // Gross and net sales live here, not on Sales (user, 2026-11-14): before discounts, and after discounts and refunds.
+        { m -> StatTile("Gross sales", v.money(t.sales + t.discounts), m, c?.let { v.change(t.sales + t.discounts, it.sales + it.discounts) },
+            detail = "the bills before discounts", icon = Icons.Outlined.Receipt, tone = StatsSeries[3]) },
+        { m -> StatTile("Net sales", v.money(t.sales - t.refunds), m, c?.let { v.change(t.sales - t.refunds, it.sales - it.refunds) },
+            detail = "after discounts and refunds", icon = Icons.Outlined.Sell, tone = StatsSeries[0]) },
         { m -> StatTile("Money collected", v.money(t.collected), m, v.change(t.collected, c?.collected), icon = Icons.Outlined.AccountBalance, tone = StatsSeries[1]) },
         { m -> StatTile("Payments", countText(count), m, detail = "${methods.size} ${if (methods.size == 1) "method" else "methods"}", icon = Icons.Outlined.Payments) },
         { m -> StatTile("Average payment", v.money(if (count > 0) t.collected / count else 0), m, detail = "bill, tip and fees", icon = Icons.Outlined.Sell,
@@ -78,7 +83,7 @@ internal fun PaymentsFinanceTab(v: StatsView, size: ScreenSize) {
         { m -> StatTile("Refunds", v.money(t.refunds), m, v.change(t.refunds, c?.refunds), inverted = true, detail = "${t.refundedOrders} ${if (t.refundedOrders == 1L) "order" else "orders"}",
             icon = Icons.AutoMirrored.Outlined.Undo, tone = Kit.Grey) },
         { m -> StatTile("Paid by card", percent1(cardShare), m, detail = "everything but cash", icon = Icons.Outlined.CreditCard, tone = StatsSeries[1]) }
-    ), desktop = 6)
+    ), desktop = 4)
     PanelLine(size,
         1f to { m -> MethodsPanel(v, m) },
         1.6f to { m -> PaymentsByDayPanel(v, m) }
@@ -100,15 +105,17 @@ internal fun PaymentsFinanceTab(v: StatsView, size: ScreenSize) {
 
 /** From the bills (before discounts) to the money kept: discounts and refunds take away, tips add (a waterfall). */
 @Composable
-private fun BridgePanel(v: StatsView, modifier: Modifier) {
+internal fun BridgePanel(v: StatsView, modifier: Modifier) {
     val t = v.totals
     StatsPanel(Icons.Outlined.AccountBalance, "From the bills to the money kept", modifier, empty = t.sales == 0L) {
         HeroLine(v.money(v.moneyKept), "kept after refunds", v.change(v.moneyKept, v.compareTotals?.let { it.collected - it.refunds }))
         val steps = buildList {
-            add(Step("Bills", (t.sales + t.discounts) / 100f, StepKind.TOTAL, "what the orders came to before discounts"))
+            // Gross sales → discounts → refunds → net sales → tips → the money kept (user, 2026-11-14: the bridge lives here).
+            add(Step("Gross sales", (t.sales + t.discounts) / 100f, StepKind.TOTAL, "what the orders came to before discounts"))
             add(Step("Discounts", t.discounts / 100f, StepKind.DOWN, "taken off the bills"))
-            add(Step("Tips", t.tips / 100f, StepKind.UP, "on top of the bills"))
             add(Step("Refunds", t.refunds / 100f, StepKind.DOWN, "given back"))
+            add(Step("Net sales", (t.sales - t.refunds) / 100f, StepKind.TOTAL, "after discounts and refunds"))
+            add(Step("Tips", t.tips / 100f, StepKind.UP, "on top of the bills"))
             if (kotlin.math.abs(v.otherMoney) > t.sales / 200) add(Step("Other", kotlin.math.abs(v.otherMoney) / 100f,
                 if (v.otherMoney >= 0) StepKind.UP else StepKind.DOWN, "fees, rounding and bills not paid in full"))
             add(Step("Kept", v.moneyKept / 100f, StepKind.TOTAL, "the money that stayed"))
@@ -119,7 +126,7 @@ private fun BridgePanel(v: StatsView, modifier: Modifier) {
 
 /** MOCK until the server reports tax per rate: the VAT included in the sales, worked out at 20%. */
 @Composable
-private fun TaxPanel(v: StatsView, modifier: Modifier) {
+internal fun TaxPanel(v: StatsView, modifier: Modifier) {
     val t = v.totals
     StatsPanel(Icons.Outlined.Receipt, "Tax summary", modifier, empty = t.sales == 0L, note = "for the accountant") {
         HeroLine(v.money(v.vat), "VAT ${(v.vatRate * 100).toInt()}% included in the sales", big = false)
@@ -215,7 +222,7 @@ private fun BranchMethodsPanel(v: StatsView, modifier: Modifier) {
  * only on this screen for now), and the difference: green when they match, amber when they don't.
  */
 @Composable
-private fun ReconciliationPanel(v: StatsView, modifier: Modifier, size: ScreenSize) {
+internal fun ReconciliationPanel(v: StatsView, modifier: Modifier, size: ScreenSize) {
     val typed = remember(v.from, v.to, v.state.branchId) { mutableStateMapOf<String, String>() }
     val methods = v.methods
     StatsPanel(Icons.Outlined.Balance, "Check against the terminal and the bank", modifier, empty = methods.isEmpty()) {

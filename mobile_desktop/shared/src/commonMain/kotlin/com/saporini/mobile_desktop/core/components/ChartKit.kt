@@ -275,15 +275,18 @@ internal fun RingChart(values: List<Float>, centerTitle: String, centerDetail: S
     }
 }
 
-/** "+12%" in green, "-3%" in red, "new" in blue; nothing for no change data. Lower is better when [inverted]. */
+/** The change text when there was nothing before to compare with (user, 2026-11-14: "new" was confusing). */
+internal const val NoDataBefore = "no data before"
+
+/** "+12%" in green, "-3%" in red, "no data before" in grey; nothing for no change data. Lower is better when [inverted]. */
 @Composable
 internal fun TrendBadge(change: String?, inverted: Boolean = false) {
     if (change == null) return
-    val up = change.startsWith("+") || change == "new"
-    val down = change.startsWith("-")
+    val none = change == NoDataBefore
+    val up = !none && change.startsWith("+")
+    val down = !none && change.startsWith("-")
     val good = if (inverted) down else up
     val color = when {
-        change == "new" -> Kit.Blue
         !up && !down -> Kit.Grey
         good -> Kit.Green
         else -> Kit.Danger
@@ -292,11 +295,12 @@ internal fun TrendBadge(change: String?, inverted: Boolean = false) {
         Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.1f)).padding(horizontal = 7.dp, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(
-            when { up && change != "new" -> Icons.AutoMirrored.Outlined.TrendingUp; down -> Icons.AutoMirrored.Outlined.TrendingDown; else -> Icons.AutoMirrored.Outlined.TrendingFlat },
+        // Nothing before: just the words, no arrow.
+        if (!none) Icon(
+            when { up -> Icons.AutoMirrored.Outlined.TrendingUp; down -> Icons.AutoMirrored.Outlined.TrendingDown; else -> Icons.AutoMirrored.Outlined.TrendingFlat },
             null, Modifier.size(12.dp), tint = color
         )
-        Text(change, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 10.sp, color = color, maxLines = 1)
+        Text(change, fontFamily = Inter(), fontWeight = if (none) FontWeight.SemiBold else FontWeight.Bold, fontSize = 10.sp, color = color, maxLines = 1)
     }
 }
 
