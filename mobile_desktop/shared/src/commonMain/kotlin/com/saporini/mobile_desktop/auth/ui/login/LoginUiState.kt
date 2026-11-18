@@ -33,7 +33,10 @@ data class LoginUiState(
     val problem: LoginProblem? = null,
     val tries: Int = 0,
     val wrongInARow: Int = 0,
-    val user: CurrentUserResponse? = null
+    val user: CurrentUserResponse? = null,
+    // At the device limit (user, 2026-11-18: "ask the person to sign out one"): the signed-in devices to choose from, unused longest first.
+    val devices: List<com.saporini.mobile_desktop.core.network.SignedInDevice> = emptyList(),
+    val devicesMessage: String? = null
 ) {
     /** "Careful: more wrong tries pause sign-in." after this device's 3rd wrong password in a row. */
     val warnAboutPause: Boolean get() = wrongInARow >= 3
@@ -49,28 +52,43 @@ class LoginScreenModel(
     private val _state = MutableStateFlow(LoginUiState())
     val state: StateFlow<LoginUiState> = _state.asStateFlow()
 
-    fun login(identifier: String, password: String) {
+    /** [signOutSessionId]: at the device limit, the device the person chose to sign out first. */
+    fun login(identifier: String, password: String, signOutSessionId: String? = null) {
         if (_state.value.isLoading || identifier.isBlank() || password.isEmpty()) return
         screenModelScope.launch {
             _state.update { it.copy(isLoading = true, problem = null) }
             try {
                 // 1. Login — saves tokens to TokenStore
-                repository.login(identifier, password)
+                repository.login(identifier, password, signOutSessionId)
 
                 // 2. Prove auth works — call protected /auth/me
                 val me = repository.me()
                 sessionManager.signIn(me)
-                _state.update { it.copy(isLoading = false, user = me, wrongInARow = 0) }
+                _state.update { it.copy(isLoading = false, user = me, wrongInARow = 0, devices = emptyList(), devicesMessage = null) }
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: ApiException) {
+                if (e.code == "TOO_MANY_DEVICES" && e.devices.isNotEmpty()) {
+                    // The right password: pick which device to sign out, then sign in again with it.
+                    _state.update { it.copy(isLoading = false, devices = e.devices, devicesMessage = e.message, wrongInARow = 0) }
+                } else fail(e)
             } catch (e: Exception) {
-                val problem = problemOf(e)
-                _state.update {
-                    it.copy(isLoading = false, problem = problem, tries = it.tries + 1,
-                        wrongInARow = if (problem.kind == LoginProblemKind.WRONG && problem.counted) it.wrongInARow + 1 else it.wrongInARow)
-                }
+                fail(e)
             }
         }
+    }
+
+    private fun fail(e: Exception) {
+        val problem = problemOf(e)
+        _state.update {
+            it.copy(isLoading = false, problem = problem, tries = it.tries + 1, devices = emptyList(), devicesMessage = null,
+                wrongInARow = if (problem.kind == LoginProblemKind.WRONG && problem.counted) it.wrongInARow + 1 else it.wrongInARow)
+        }
+    }
+
+    /** Closing the device choice without picking one. */
+    fun dismissDevices() {
+        _state.update { it.copy(devices = emptyList(), devicesMessage = null) }
     }
 
     /** Typing again lets go of the message. */

@@ -23,5 +23,7 @@ public class UserResponse {
     private List<String> roles;
     private UUID restaurantId;
     private UUID defaultBranchId;
+    // The username they had before changing it themselves in the last 30 days (Users shows "was …").
+    private String previousUsername;
 
 }

@@ -102,6 +102,8 @@ fun TakePaymentScreen(orderId: String, modifier: Modifier = Modifier, onBack: ()
 
 @Composable
 internal fun TakePaymentContent(state: PaymentUiState, model: PaymentScreenModel, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    // Taking a payment: 3 minutes before a till locks.
+    com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
     var showReceipt by remember { mutableStateOf(false) }
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val size = screenSizeFor(maxWidth)

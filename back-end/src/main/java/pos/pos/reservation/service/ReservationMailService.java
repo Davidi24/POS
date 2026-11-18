@@ -31,6 +31,16 @@ public class ReservationMailService {
     private final ReservationSupport reservationSupport;
     private final ReservationReminderDeliveryService reminderDeliveryService;
 
+    // Guest emails are switched off for now (user, 2026-11-18: "use real email but don't send anything, we'll come back to it");
+    // when on, they go out through the same real sender as account emails.
+    @Value("${app.mail.guest.enabled:false}")
+    private boolean guestEmailsOn;
+
+    private pos.pos.mail.AccountMailSender accountMail;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAccountMail(pos.pos.mail.AccountMailSender accountMail) { this.accountMail = accountMail; }
+
     // Where the guest's booking pages live (the server itself until the website takes over).
     @Value("${app.reservations.guest-base-url:http://localhost:8080}")
     private String guestBaseUrl;
@@ -214,15 +224,23 @@ public class ReservationMailService {
         if (to == null || to.isBlank()) {
             return;
         }
+        if (!guestEmailsOn) {
+            logger.debug("Guest emails are switched off; not sending \"{}\" for booking {}", subject, reservation.getReservationCode());
+            return;
+        }
         Runnable task = () -> {
             boolean delivered = false;
             try {
                 SimpleMailMessage message = new SimpleMailMessage();
-                message.setFrom(appMailProperties.getFrom());
                 message.setTo(to);
                 message.setSubject(subject);
                 message.setText(body);
-                mailSender.send(message);
+                if (accountMail != null) {
+                    accountMail.send(message);
+                } else {
+                    message.setFrom(appMailProperties.getFrom());
+                    mailSender.send(message);
+                }
                 delivered = true;
             } catch (RuntimeException error) {
                 logger.warn("Could not email {} about booking {} ({})", to, reservation.getReservationCode(), subject, error);

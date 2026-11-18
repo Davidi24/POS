@@ -60,6 +60,7 @@ public class PasswordResetService {
     private final pos.pos.restaurant.repository.RestaurantRepository restaurantRepository;
     private final PasswordDailyLimits passwordDailyLimits;
     private final pos.pos.security.service.PublicRequestRateLimiter publicRequestRateLimiter;
+    private final AccountAudit accountAudit;
 
     @org.springframework.beans.factory.annotation.Value("${app.security.password.max-forgot-requests-per-address:30}")
     private int maxForgotRequestsPerAddress = 30;
@@ -197,6 +198,9 @@ public class PasswordResetService {
             throw new AuthException(SAME_PASSWORD_MESSAGE, HttpStatus.BAD_REQUEST);
         }
         applyNewPassword(user, request.getNewPassword(), now, SessionRevocationReason.PASSWORD_RESET.name(), !firstPassword);
+        accountAudit.about(user, user.getId(), firstPassword ? "PASSWORD_SET" : "PASSWORD_RESET", firstPassword
+                ? AccountAudit.nameOf(user) + " chose their first password from the invitation"
+                : AccountAudit.nameOf(user) + " set a new password from an email link; they were signed out on every device");
 
         resetToken.setUsedAt(now);
         authPasswordResetTokenRepository.save(resetToken);
@@ -245,6 +249,8 @@ public class PasswordResetService {
         }
 
         applyNewPassword(user, request.getNewPassword(), now, SessionRevocationReason.PASSWORD_RESET.name(), true);
+        accountAudit.about(user, user.getId(), "PASSWORD_RESET",
+                AccountAudit.nameOf(user) + " set a new password with a code by SMS; they were signed out on every device");
 
         code.setUsedAt(now);
         authSmsOtpCodeRepository.save(code);
@@ -295,6 +301,8 @@ public class PasswordResetService {
 
         // 4. At most 10 links a day (user, 2026-11-17); past that nothing is sent and the person is told once by email
         if (!passwordDailyLimits.maySendResetLink(user, now)) {
+            accountAudit.about(user, null, "PASSWORD_LIMIT", "A password link was asked for " + AccountAudit.nameOf(user)
+                    + ", but today's limit was reached; nothing was sent");
             return;
         }
 
@@ -308,6 +316,9 @@ public class PasswordResetService {
             sendResetEmail(user, request.getClientTarget(), issuedToken, now);
         }
         passwordDailyLimits.resetLinkSent(user, now);
+        accountAudit.about(user, null, "PASSWORD_LINK_SENT", invite
+                ? "A new invitation was sent to " + AccountAudit.nameOf(user) + " from Forgot password"
+                : "A password link was sent to " + AccountAudit.nameOf(user) + " from Forgot password");
     }
 
     private void issueAdminEmailReset(User user, ClientLinkTarget clientTarget, OffsetDateTime now) {

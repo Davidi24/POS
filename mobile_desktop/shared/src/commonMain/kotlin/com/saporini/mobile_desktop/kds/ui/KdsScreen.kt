@@ -29,6 +29,8 @@ object KdsScreen : Screen {
 
     @Composable
     override fun Content() {
+        // The kitchen display never locks (user, 2026-11-18).
+        com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.NEVER)
         val model = koinInject<KdsScreenModel>()
         val state by model.state.collectAsState()
         val selected = state.section

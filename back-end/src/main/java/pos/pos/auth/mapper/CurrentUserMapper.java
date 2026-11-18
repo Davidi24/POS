@@ -13,7 +13,22 @@ import java.util.Objects;
 public class CurrentUserMapper {
     private final pos.pos.restaurant.repository.BranchRepository branches;
 
+    private pos.pos.restaurant.repository.RestaurantRepository restaurants;
+
     public CurrentUserMapper(pos.pos.restaurant.repository.BranchRepository branches) { this.branches = branches; }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRestaurants(pos.pos.restaurant.repository.RestaurantRepository restaurants) { this.restaurants = restaurants; }
+
+    private String restaurantName(java.util.UUID restaurantId) {
+        if (restaurantId == null || restaurants == null) return null;
+        return restaurants.findByIdAndDeletedAtIsNull(restaurantId).map(pos.pos.restaurant.entity.Restaurant::getName).orElse(null);
+    }
+
+    private String branchName(java.util.UUID restaurantId, java.util.UUID branchId) {
+        if (restaurantId == null || branchId == null) return null;
+        return branches.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId, restaurantId).map(pos.pos.restaurant.entity.Branch::getName).orElse(null);
+    }
 
     /** Login, refresh and session restoration never revive a closed or removed default branch. */
     private java.util.UUID availableBranch(java.util.UUID restaurantId, java.util.UUID branchId) {
@@ -42,6 +57,9 @@ public class CurrentUserMapper {
                 .phoneVerified(user.isPhoneVerified())
                 .roles(normalizeCodes(roles))
                 .permissions(normalizeCodes(permissions))
+                .restaurantName(restaurantName(user.getRestaurantId()))
+                .photoUrl(user.getAvatarUrl())
+                .branchName(branchName(user.getRestaurantId(), availableBranch(user.getRestaurantId(), user.getDefaultBranchId())))
                 .build();
     }
 
@@ -68,6 +86,9 @@ public class CurrentUserMapper {
                 .phoneVerified(user.isPhoneVerified())
                 .roles(normalizeCodes(roles))
                 .permissions(normalizeCodes(permissions))
+                .restaurantName(restaurantName(user.getRestaurantId()))
+                .photoUrl(user.getPhotoUrl())
+                .branchName(branchName(user.getRestaurantId(), availableBranch(user.getRestaurantId(), user.getDefaultBranchId())))
                 .build();
     }
 

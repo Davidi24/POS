@@ -18,7 +18,6 @@ import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.AuthRefreshService;
-import pos.pos.exception.auth.InvalidCredentialsException;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RoleRepository;
@@ -84,9 +83,14 @@ class AuthRefreshServiceConcurrencyTest extends AbstractTestProfilePostgresTest 
     @MockBean
     private RefreshRateLimiter refreshRateLimiter;
 
+    @MockBean
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     @BeforeEach
     void setUp() {
         given(jwtProperties.getAccessExpiration()).willReturn(Duration.ofMinutes(15));
+        // Every refresh moves the sign-in 30 days on (user, 2026-11-18); a mock would answer zero and end it at once.
+        given(jwtProperties.getRefreshExpiration()).willReturn(Duration.ofDays(30));
     }
 
     @Test
@@ -146,7 +150,7 @@ class AuthRefreshServiceConcurrencyTest extends AbstractTestProfilePostgresTest 
             assertThat(firstResult.response().getUser().getId()).isEqualTo(user.getId());
 
             assertThat(secondResult.response()).isNull();
-            assertThat(secondResult.error()).isInstanceOf(InvalidCredentialsException.class);
+            assertThat(secondResult.error()).isInstanceOf(pos.pos.exception.auth.LoginRefusedException.class);
             assertThat(secondResult.error()).hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
 
             RefreshTokenSecurityService.ValidatedRefreshToken rotatedToken =

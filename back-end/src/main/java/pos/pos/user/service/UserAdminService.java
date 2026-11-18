@@ -69,6 +69,11 @@ public class UserAdminService {
     private final NotificationService notificationService;
     private final pos.pos.restaurant.repository.BranchRepository branchRepository;
 
+    private pos.pos.user.repository.UsernameChangeRepository usernameChanges;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setUsernameChanges(pos.pos.user.repository.UsernameChangeRepository usernameChanges) { this.usernameChanges = usernameChanges; }
+
     public PageResponse<UserResponse> getUsers(
             Authentication authentication,
             String search,
@@ -110,6 +115,13 @@ public class UserAdminService {
         List<UserResponse> items = usersPage.getContent().stream()
                 .map(user -> userMapper.toUserResponse(user, roleCodesByUserId.getOrDefault(user.getId(), List.of())))
                 .toList();
+        // "was …" for people who changed their own username in the last 30 days (user, 2026-11-18).
+        if (usernameChanges != null && !items.isEmpty()) {
+            Map<UUID, String> previous = new java.util.HashMap<>();
+            usernameChanges.findByUserIdInAndChangedAtAfterOrderByChangedAtDesc(items.stream().map(UserResponse::getId).toList(),
+                    java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusDays(30)).forEach(c -> previous.putIfAbsent(c.getUserId(), c.getOldUsername()));
+            items.forEach(item -> item.setPreviousUsername(previous.get(item.getId())));
+        }
 
         return PageResponse.from(new PageImpl<>(items, pageable, usersPage.getTotalElements()));
     }

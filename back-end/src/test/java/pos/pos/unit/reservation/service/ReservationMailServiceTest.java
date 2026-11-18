@@ -40,6 +40,8 @@ class ReservationMailServiceTest {
         when(support.restaurantZone(any())).thenReturn(ZoneId.of("UTC"));
         service = new ReservationMailService(mailSender, properties, support, deliveryService);
         ReflectionTestUtils.setField(service, "guestBaseUrl", "https://pos.example");
+        // Guest emails are off by default (user, 2026-11-18); these tests check how they're sent once switched on.
+        ReflectionTestUtils.setField(service, "guestEmailsOn", true);
     }
 
     @AfterEach

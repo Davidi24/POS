@@ -153,7 +153,9 @@ data class DevicesState(
  */
 class DevicesScreenModel(
     private val repository: DevicesRepository,
-    session: SessionManager
+    session: SessionManager,
+    // Makes the device the app runs on a till with a pairing code (user, 2026-11-18: PIN sign-in only on connected tills).
+    private val connectHere: (suspend (pairingToken: String) -> com.saporini.mobile_desktop.core.session.TillConnection)? = null
 ) : ScreenModel {
 
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -428,6 +430,27 @@ class DevicesScreenModel(
                 }
             }
         }
+    }
+
+    /** Makes the device the app runs on the open till or tablet: a one-time code, used here at once. */
+    fun connectThisDevice() {
+        val deviceId = state.value.selectedId ?: return
+        val connect = connectHere ?: return
+        needsEdit {
+            write(null) { restaurantId ->
+                val code = repository.newPairingCode(restaurantId, deviceId, 5)
+                val connection = connect(code.pairingToken ?: error("No pairing code came back"))
+                mutable.update { it.copy(notice = "This device is ${connection.name} now. Staff sign in here with their PIN.") }
+                load()
+            }
+        }
+    }
+
+    /** This device stops being a till (the PIN pad goes; the device itself stays in the list). */
+    fun disconnectThisDevice() {
+        val name = com.saporini.mobile_desktop.core.session.TokenStore.till.value?.name ?: return
+        com.saporini.mobile_desktop.core.session.TokenStore.forgetTill()
+        mutable.update { it.copy(notice = "This device is no longer $name.") }
     }
 
     fun dismissFreshCode() = mutable.update { it.copy(freshCode = null) }

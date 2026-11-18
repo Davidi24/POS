@@ -25,6 +25,8 @@ actual class TokenPersistence {
     actual suspend fun loadRefreshToken(): String? = load(KEY_REFRESH)
     actual suspend fun savePendingInventoryMoves(payload: String?) = save(KEY_PENDING_INVENTORY_MOVES, payload)
     actual suspend fun loadPendingInventoryMoves(): String? = load(KEY_PENDING_INVENTORY_MOVES)
+    actual suspend fun saveConnectedTill(payload: String?) = save(KEY_CONNECTED_TILL, payload)
+    actual suspend fun loadConnectedTill(): String? = load(KEY_CONNECTED_TILL)
 
     actual suspend fun clear() {
         // Pending writes belong to the signed-in user and must survive logout so an uncertain
@@ -72,6 +74,7 @@ actual class TokenPersistence {
         private val KEY_ACCESS = stringPreferencesKey("access_token")
         private val KEY_REFRESH = stringPreferencesKey("refresh_token")
         private val KEY_PENDING_INVENTORY_MOVES = stringPreferencesKey("pending_inventory_moves")
+        private val KEY_CONNECTED_TILL = stringPreferencesKey("connected_till")
 
         lateinit var appContext: Context
             private set

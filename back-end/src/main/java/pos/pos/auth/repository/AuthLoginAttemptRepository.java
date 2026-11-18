@@ -11,6 +11,15 @@ import java.util.UUID;
 // checked
 // tested
 public interface AuthLoginAttemptRepository extends JpaRepository<AuthLoginAttempt, UUID> {
+
+    /** A person's own sign-in tries since [after], newest first, a page at a time (Profile → Security → Recent sign-ins). */
+    org.springframework.data.domain.Page<AuthLoginAttempt> findByUserIdAndAttemptedAtAfterOrderByAttemptedAtDesc(UUID userId, OffsetDateTime after,
+            org.springframework.data.domain.Pageable pageable);
+
+    /** How many of a person's tries since [after] worked, and how many failed for each reason. */
+    @Query("SELECT a.success, a.failureReason, COUNT(a) FROM AuthLoginAttempt a WHERE a.userId = :userId AND a.attemptedAt > :after"
+            + " GROUP BY a.success, a.failureReason")
+    java.util.List<Object[]> countResultsForUser(UUID userId, OffsetDateTime after);
     long countByIpAddressAndAttemptedAtAfter(String ipAddress, OffsetDateTime after);
 
     long countByUserIdAndAttemptedAtAfterAndSuccessFalse(UUID userId, OffsetDateTime after);
@@ -26,6 +35,11 @@ public interface AuthLoginAttemptRepository extends JpaRepository<AuthLoginAttem
     @Query("SELECT a.attemptedAt FROM AuthLoginAttempt a WHERE a.userId IS NULL AND a.identifier = :identifier AND a.success = false"
             + " AND a.failureReason = pos.pos.auth.enums.LoginFailureReason.INVALID_CREDENTIALS AND a.attemptedAt > :after ORDER BY a.attemptedAt")
     java.util.List<OffsetDateTime> wrongPasswordTimesForUnknown(String identifier, OffsetDateTime after);
+
+    /** Wrong PINs typed on one connected till after [after], oldest first (5 within 15 minutes pause it). */
+    @Query("SELECT a.attemptedAt FROM AuthLoginAttempt a WHERE a.deviceId = :deviceId AND a.success = false"
+            + " AND a.failureReason = pos.pos.auth.enums.LoginFailureReason.INVALID_PIN AND a.attemptedAt > :after ORDER BY a.attemptedAt")
+    java.util.List<OffsetDateTime> wrongPinTimesForDevice(String deviceId, OffsetDateTime after);
 
     /** Wrong passwords typed on one device after [after], oldest first (the per-device limit). */
     @Query("SELECT a.attemptedAt FROM AuthLoginAttempt a WHERE a.deviceId = :deviceId AND a.success = false"

@@ -29,6 +29,7 @@ public class ChangePasswordService {
     private final UserSessionRepository userSessionRepository;
     private final AuthMailService authMailService;
     private final PasswordDailyLimits passwordDailyLimits;
+    private final AccountAudit accountAudit;
 
     // The limit's refusal keeps its "changed many times today" email (user, 2026-11-17).
     @Transactional(noRollbackFor = TooManyRequestsException.class)
@@ -38,7 +39,12 @@ public class ChangePasswordService {
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         // At most 30 changes a day; the first refusal of the day emails the person.
-        passwordDailyLimits.checkChange(user, now);
+        try {
+            passwordDailyLimits.checkChange(user, now);
+        } catch (TooManyRequestsException limit) {
+            accountAudit.about(user, user.getId(), "PASSWORD_LIMIT", AccountAudit.nameOf(user) + " tried to change their password past today's limit");
+            throw limit;
+        }
 
         if (!passwordService.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new InvalidCredentialsException("Current password is incorrect");
@@ -72,5 +78,6 @@ public class ChangePasswordService {
 
         passwordDailyLimits.changed(user, now);
         authMailService.sendPasswordChangedNotificationEmail(user.getEmail(), user.getFirstName());
+        accountAudit.about(user, user.getId(), "PASSWORD_CHANGED", AccountAudit.nameOf(user) + " changed their password; their other devices were signed out");
     }
 }

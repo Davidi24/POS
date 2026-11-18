@@ -15,6 +15,20 @@ interface PendingInventoryMoveStorage {
     suspend fun savePendingInventoryMoves(payload: String?)
 }
 
+/**
+ * This device connected to its restaurant as a till (user, 2026-11-18: "only connected devices have Sign in with PIN"):
+ * its id and secret from pairing, so the server knows which restaurant a PIN belongs to. Kept when someone signs out.
+ */
+@kotlinx.serialization.Serializable
+data class TillConnection(
+    val deviceId: String,
+    val secret: String,
+    val restaurantId: String,
+    val branchId: String? = null,
+    val name: String,
+    val type: String? = null
+)
+
 object TokenStore : PendingInventoryMoveStorage {
     private val persistence: TokenPersistence? by lazy {
         try { TokenPersistence() } catch (_: Throwable) { null }
@@ -28,12 +42,31 @@ object TokenStore : PendingInventoryMoveStorage {
     private val _refreshToken = MutableStateFlow<String?>(null)
     val refreshToken: StateFlow<String?> = _refreshToken.asStateFlow()
 
+    private val _till = MutableStateFlow<TillConnection?>(null)
+    /** This device's connection as a till, or null when it isn't one (then there's no PIN sign-in). */
+    val till: StateFlow<TillConnection?> = _till.asStateFlow()
+
+    private val tillJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
     init {
         // Load saved tokens synchronously at startup so isLoggedIn returns the right value immediately
         runBlocking {
             _accessToken.value = persistence?.loadAccessToken()
             _refreshToken.value = persistence?.loadRefreshToken()
+            _till.value = persistence?.loadConnectedTill()?.let { runCatching { tillJson.decodeFromString(TillConnection.serializer(), it) }.getOrNull() }
         }
+    }
+
+    /** Makes this device a till of [connection]'s restaurant. */
+    fun connectTill(connection: TillConnection) {
+        _till.value = connection
+        scope.launch { persistence?.saveConnectedTill(tillJson.encodeToString(TillConnection.serializer(), connection)) }
+    }
+
+    /** This device is no longer a till (disconnected here, or the server no longer knows it). */
+    fun forgetTill() {
+        _till.value = null
+        scope.launch { persistence?.saveConnectedTill(null) }
     }
 
     fun save(accessToken: String, refreshToken: String) {

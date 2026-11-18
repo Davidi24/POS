@@ -17,6 +17,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -163,6 +168,7 @@ private fun HeroText(
 @Composable
 private fun LeftCards(device: DeviceDto, kind: DeviceKind, state: DevicesState, model: DevicesScreenModel) {
     StatusCard(device, kind, state, model)
+    if ((kind == DeviceKind.TILL || kind == DeviceKind.TABLET) && !DeviceExtras.isExtra(device.id)) ThisDeviceCard(device, state, model)
     if (kind.pairs && !DeviceExtras.isExtra(device.id)) {
         SettingsCard("Pairing codes", note = "Type a code on the device to connect it. Each code works once.", icon = Icons.Outlined.QrCode2) {
             Spacer(Modifier.height(12.dp))
@@ -281,6 +287,49 @@ private fun FactGrid(facts: List<Pair<String, String>>) {
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
             }
+        }
+    }
+}
+
+/**
+ * Use the device you're on as this till or tablet (user, 2026-11-18): only a connected device offers "Sign in with PIN",
+ * and it locks itself when nobody uses it. Disconnect lets it go again.
+ */
+@Composable
+private fun ThisDeviceCard(device: DeviceDto, state: DevicesState, model: DevicesScreenModel) {
+    val till by com.saporini.mobile_desktop.core.session.TokenStore.till.collectAsState()
+    var asking by remember { mutableStateOf(false) }
+    val here = till?.deviceId == device.id
+    SettingsCard("This device", note = "Staff sign in here with their PIN, and it locks when nobody uses it.", icon = Icons.Outlined.PointOfSale) {
+        Spacer(Modifier.height(12.dp))
+        if (here) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Kit.GreenSoft.copy(alpha = 0.6f)).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Outlined.CheckCircle, null, Modifier.size(20.dp), tint = Kit.Green)
+                Text("You're on ${device.name} now.", Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp,
+                    letterSpacing = 0.sp, color = Kit.Ink)
+                KitButton("Disconnect", { model.disconnectThisDevice() }, style = ButtonStyle.DANGER_OUTLINE)
+            }
+        } else {
+            till?.let {
+                Text("This device is ${it.name} now.", fontFamily = Inter(), fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Muted)
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.canEdit) KitButton("Use this device as ${device.name}", { asking = true }, icon = Icons.Outlined.PointOfSale, loading = state.saving)
+            else Text("Ask a manager to connect it.", fontFamily = Inter(), fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Muted)
+        }
+    }
+    if (asking) {
+        com.saporini.mobile_desktop.core.components.AppDialog(
+            title = "Use this device as ${device.name}?",
+            onDismiss = { asking = false },
+            maxWidth = 440.dp,
+            buttons = {
+                KitButton("Cancel", { asking = false }, style = ButtonStyle.SECONDARY)
+                KitButton("Connect", { asking = false; model.connectThisDevice() })
+            }
+        ) {
+            Text("Staff will sign in here with their PIN.", fontFamily = Inter(), fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink)
         }
     }
 }

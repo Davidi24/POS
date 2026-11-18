@@ -30,6 +30,7 @@ public class DevicePairingService {
     private final EntityManager entityManager;
     private final DevicePairingProperties pairingProperties;
     private final OpaqueTokenService opaqueTokenService;
+    private final pos.pos.auth.service.AccountAudit accountAudit;
 
     /** Redeem a one-time enrollment token and return a device secret exactly once. */
     @Transactional
@@ -66,6 +67,9 @@ public class DevicePairingService {
 
         deviceRepository.saveAndFlush(device);
         pairingTokenRepository.saveAndFlush(token);
+        // Connecting a till or tablet is what lets staff sign in on it with a PIN (user, 2026-11-18), so it's in the log.
+        accountAudit.inRestaurant(device.getRestaurant().getId(), device.getId(), token.getCreatedBy(), "DEVICE_CONNECTED",
+                device.getName() + " was connected with a pairing code" + (StringUtils.hasText(remoteAddress) ? " from " + remoteAddress : ""));
 
         return new DevicePairingRedeemResponse(
                 device.getId(),

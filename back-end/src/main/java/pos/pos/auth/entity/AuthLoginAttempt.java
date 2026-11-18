@@ -66,6 +66,10 @@ public class AuthLoginAttempt {
     @Column(name = "device_id", length = 100)
     private String deviceId;
 
+    // What the app calls the device ("Linux computer (kitchen-pc)"), for the person's Recent sign-ins.
+    @Column(name = "device_name", length = 100)
+    private String deviceName;
+
     @Column(name = "user_agent", columnDefinition = "text")
     private String userAgent;
 

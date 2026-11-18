@@ -29,6 +29,7 @@ public final class AuthenticatedUser implements AuthenticatedPrincipal, Serializ
     private final boolean active;
     private final boolean emailVerified;
     private final boolean phoneVerified;
+    private final String photoUrl;
 
     public static AuthenticatedUser from(User user) {
         return AuthenticatedUser.builder()
@@ -43,6 +44,7 @@ public final class AuthenticatedUser implements AuthenticatedPrincipal, Serializ
                 .active(user.isActive())
                 .emailVerified(user.isEmailVerified())
                 .phoneVerified(user.isPhoneVerified())
+                .photoUrl(user.getAvatarUrl())
                 .build();
     }
 
@@ -63,6 +65,7 @@ public final class AuthenticatedUser implements AuthenticatedPrincipal, Serializ
                 .active(user.isActive())
                 .emailVerified(user.isEmailVerified())
                 .phoneVerified(user.isPhoneVerified())
+                .photoUrl(user.getAvatarUrl())
                 .build();
     }
 

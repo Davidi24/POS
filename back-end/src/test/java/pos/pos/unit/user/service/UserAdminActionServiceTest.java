@@ -54,6 +54,9 @@ class UserAdminActionServiceTest {
     @Mock
     private PhoneVerificationService phoneVerificationService;
 
+    @Mock
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     @InjectMocks
     private UserAdminActionService userAdminActionService;
 

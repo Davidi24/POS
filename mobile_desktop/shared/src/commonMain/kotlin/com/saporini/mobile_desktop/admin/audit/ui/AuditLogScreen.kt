@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Login
 import androidx.compose.material.icons.automirrored.outlined.ManageSearch
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.Category
@@ -102,7 +103,7 @@ import kotlin.time.Clock
 // its kind as a chip. Phones and tablets have no room for the side column: there the search sits on top and the kinds,
 // the people and the areas fold into one options button (user rule).
 
-private val Kinds = listOf(null, "ADDED", "CHANGED", "REMOVED", "RESET")
+private val Kinds = listOf(null, "SIGN_IN", "ADDED", "CHANGED", "REMOVED", "RESET")
 
 /** Admin Hub → Audit Logs: who changed which setting, and when. */
 @Composable
@@ -129,13 +130,13 @@ internal fun AuditLogContent(state: AuditLogState, model: AuditLogScreenModel, m
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Audit log", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (size.isPhone) 19.sp else 20.sp, color = Kit.Ink)
-                        Text(if (size.isPhone) "Every change to the settings: what, who and when" else "Every change to the restaurant's settings: what, who and when",
+                        Text(if (size.isPhone) "Every change and sign-in: what, who and when" else "Every change and sign-in in the restaurant: what, who and when",
                             fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     RefreshButton(state.loading, model::refresh, size = if (size.isPhone) 38.dp else PageControlHeight)
                 }
             } else {
-                PageHeader("Audit log", "Every change to the restaurant's settings: what, who and when") { RefreshButton(state.loading, model::refresh) }
+                PageHeader("Audit log", "Every change and sign-in in the restaurant: what, who and when") { RefreshButton(state.loading, model::refresh) }
             }
             ScreenMessages(state.error, null, model::clearError)
             when {
@@ -225,7 +226,7 @@ private fun ChangesPanel(state: AuditLogState, model: AuditLogScreenModel, zone:
         }
         if (visible.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) {
-                if (state.entries.isEmpty()) OverviewEmpty("No changes yet", "Every change to the settings will be listed here, newest first.",
+                if (state.entries.isEmpty()) OverviewEmpty("No changes yet", "Every change and sign-in will be listed here, newest first.",
                     Icons.Outlined.History, image = Res.drawable.overview_reservations)
                 else OverviewEmpty("Nothing like that", "Try another area, kind, person or word. Older changes load as you scroll.",
                     Icons.AutoMirrored.Outlined.ManageSearch)
@@ -367,6 +368,7 @@ private fun KindChip(look: KindLook) {
 private fun areaLabel(code: String?): String = when {
     code.isNullOrBlank() -> ""
     code == "SETTINGS" -> "General settings"
+    code == "ACCOUNT" -> "Accounts and sign-ins"
     code.startsWith("SETTINGS_") -> humanize(code.removePrefix("SETTINGS_")) + " settings"
     else -> humanize(code)
 }
@@ -374,6 +376,7 @@ private fun areaLabel(code: String?): String = when {
 private data class KindLook(val label: String, val icon: ImageVector, val color: Color)
 
 private fun kindLook(kind: String): KindLook = when (kind) {
+    "SIGN_IN" -> KindLook("Sign-ins", Icons.AutoMirrored.Outlined.Login, Color(0xFF0E7C66))
     "ADDED" -> KindLook("Added", Icons.Outlined.AddCircleOutline, Kit.Green)
     "REMOVED" -> KindLook("Removed", Icons.Outlined.DeleteOutline, Kit.Danger)
     "RESET" -> KindLook("Reset", Icons.Outlined.Restore, Kit.Purple)

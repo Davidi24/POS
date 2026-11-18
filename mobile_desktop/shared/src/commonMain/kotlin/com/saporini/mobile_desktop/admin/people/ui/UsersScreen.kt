@@ -130,18 +130,21 @@ private fun ownersCard(owners: List<RoleDto>) = RoleDto(
 )
 
 /** A role's colour and picture, matched by its code or name (custom roles like "Cleaner" go by their name). */
-private class RoleLook(val color: Color, val image: DrawableResource)
+internal class RoleLook(val color: Color, val image: DrawableResource)
 
-private fun lookOf(role: RoleDto): RoleLook {
+private fun lookOf(role: RoleDto): RoleLook = roleLookOf(role.code, role.name, role.picture)
+
+/** The same look from a role's code (and name and picked picture when known); Profile uses it for the signed-in person. */
+internal fun roleLookOf(code: String, name: String = code, picture: String? = null): RoleLook {
     // A picture the restaurant picked for its own role comes first.
-    rolePicture(role.picture)?.let { return RoleLook(it.color, it.image) }
-    val words = (role.code + " " + role.name).uppercase()
+    rolePicture(picture)?.let { return RoleLook(it.color, it.image) }
+    val words = (code + " " + name).uppercase()
     fun has(vararg keys: String) = keys.any { it in words }
     return when {
         has("SUPER_ADMIN") -> RoleLook(Color(0xFF6B4E9B), Res.drawable.workspace_fraud)
-        role.code == "OWNER" || role.code == OWNERS_CARD -> RoleLook(Color(0xFFB0812C), Res.drawable.users_owner)
-        role.code == "CO_OWNER" -> RoleLook(Color(0xFF9A7434), Res.drawable.users_owner)
-        role.code == "ADMIN" || has("ADMIN") -> RoleLook(Color(0xFF2E7D7A), Res.drawable.users_admin)
+        code == "OWNER" || code == OWNERS_CARD -> RoleLook(Color(0xFFB0812C), Res.drawable.users_owner)
+        code == "CO_OWNER" -> RoleLook(Color(0xFF9A7434), Res.drawable.users_owner)
+        code == "ADMIN" || has("ADMIN") -> RoleLook(Color(0xFF2E7D7A), Res.drawable.users_admin)
         has("MANAGER", "SUPERVISOR") -> RoleLook(Kit.Blue, Res.drawable.salary_managers)
         has("KITCHEN", "CHEF", "COOK") -> RoleLook(Color(0xFF9C5B34), Res.drawable.salary_kitchen)
         has("CLEAN", "HOUSEKEEP", "JANITOR", "PORTER") -> RoleLook(Color(0xFF3B8FC4), Res.drawable.salary_cleaning)
@@ -675,6 +678,7 @@ private fun personActions(person: StaffUserDto, state: StaffState, model: StaffS
         add(if (person.isActive) RowAction("Switch off", Icons.Outlined.PersonOff) { model.setActive(person.id, false) }
             else RowAction("Switch on", Icons.Outlined.ToggleOn) { model.setActive(person.id, true) })
         add(RowAction("Send password reset email", Icons.Outlined.LockReset, enabled = person.isActive) { model.sendPasswordReset(person.id) })
+        if (person.id != state.myId) add(RowAction("Reset PIN", Icons.Outlined.Dialpad) { model.resetPin(person.id) })
     }
     if (state.canRemove(person)) add(RowAction("Remove", Icons.Outlined.Delete, danger = true) { model.askRemove(person.id) })
 }
@@ -703,8 +707,9 @@ private fun PersonLine(person: StaffUserDto, role: RoleDto, state: StaffState, m
                                 color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (me) StatusChip("You", Kit.Blue)
                         }
-                        Text("@${person.username}" + (person.phone?.let { " · $it" } ?: ""), fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis)
+                        // A username changed in the last 30 days says what it was, so the manager knows who it is (user, 2026-11-18).
+                        Text("@${person.username}" + (person.previousUsername?.let { " · was @$it" } ?: "") + (person.phone?.let { " · $it" } ?: ""),
+                            fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 if (size.isDesktop) {

@@ -20,6 +20,7 @@ public class AuthLogoutService {
 
     private final UserSessionRepository userSessionRepository;
     private final RefreshTokenSecurityService refreshTokenSecurityService;
+    private final AccountAudit accountAudit;
 
     // Logs out the current session using the refresh token.
     // 1. Validates the refresh token signature
@@ -30,6 +31,12 @@ public class AuthLogoutService {
     // 6. If active — marks it as revoked with reason LOGOUT
     @Transactional
     public void logout(String refreshToken) {
+        logout(refreshToken, null);
+    }
+
+    /** The same; [reason] LOCKED (the Lock button on a till) or IDLE (the till locked itself) only changes the audit line. */
+    @Transactional
+    public void logout(String refreshToken, String reason) {
         RefreshTokenSecurityService.ValidatedRefreshToken validatedRefreshToken =
                 refreshTokenSecurityService.validate(refreshToken);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
@@ -51,6 +58,12 @@ public class AuthLogoutService {
         }
 
         revokeSession(session, now, SessionRevocationReason.LOGOUT);
+        String device = AccountAudit.deviceOf(session.getDeviceName());
+        accountAudit.about(session.getUserId(), session.getUserId(), "SIGNED_OUT", name -> switch (reason == null ? "" : reason.trim().toUpperCase()) {
+            case "LOCKED" -> name + " locked " + device;
+            case "IDLE" -> device + " locked itself after nobody used it; " + name + " was signed out";
+            default -> name + " signed out on " + device;
+        });
     }
 
     // Logs out all active sessions for the user using the current refresh token.
@@ -80,6 +93,8 @@ public class AuthLogoutService {
                 now,
                 SessionRevocationReason.LOGOUT_ALL.name()
         );
+        accountAudit.about(validatedRefreshToken.userId(), validatedRefreshToken.userId(), "SIGNED_OUT_EVERYWHERE",
+                name -> name + " signed out on every device");
     }
 
     // Validates that the session belongs to the correct user and that the refresh token hash matches.

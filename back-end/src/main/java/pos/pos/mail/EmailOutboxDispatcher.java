@@ -41,6 +41,12 @@ public class EmailOutboxDispatcher {
     private final EmailOutboxProperties properties;
     private final TransactionTemplate transaction;
 
+    // Account emails go through their own sender (Gmail for now) when it's set up (user, 2026-11-18).
+    private AccountMailSender accountMail;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setAccountMail(AccountMailSender accountMail) { this.accountMail = accountMail; }
+
     public EmailOutboxDispatcher(
             EmailOutboxRepository repository,
             JavaMailSender mailSender,
@@ -124,11 +130,15 @@ public class EmailOutboxDispatcher {
         }
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailProperties.getFrom());
             message.setTo(email.to());
             message.setSubject(email.subject());
             message.setText(email.body());
-            mailSender.send(message);
+            if (accountMail != null) {
+                accountMail.send(message);
+            } else {
+                message.setFrom(mailProperties.getFrom());
+                mailSender.send(message);
+            }
             finish(email.id(), EmailOutboxStatus.SENT, null, null);
         } catch (RuntimeException failure) {
             String reason = describe(failure);

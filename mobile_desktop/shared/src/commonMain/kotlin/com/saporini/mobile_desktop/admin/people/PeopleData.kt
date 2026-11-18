@@ -30,7 +30,9 @@ data class StaffUserDto(
     val phoneVerified: Boolean = false,
     val roles: List<String> = emptyList(),
     val restaurantId: String? = null,
-    val defaultBranchId: String? = null
+    val defaultBranchId: String? = null,
+    // The username they had before changing it themselves in the last 30 days ("was …").
+    val previousUsername: String? = null
 ) {
     val displayName: String get() = "$firstName $lastName".trim().ifEmpty { username }
 }
@@ -116,6 +118,8 @@ interface PeopleRepository {
     suspend fun rolesOf(id: String): List<RoleDto>
     suspend fun replaceRoles(id: String, roleIds: List<String>): StaffUserDto
     suspend fun sendPasswordReset(id: String)
+    /** Takes the person's PIN away; they generate a new one in their profile. */
+    suspend fun resetPin(id: String): Unit = throw UnsupportedOperationException("PIN reset isn't available here")
     suspend fun assignableRoles(): List<RoleDto>
 
     suspend fun roles(): List<RoleDto>
@@ -183,6 +187,10 @@ class PeopleApi(
 
     override suspend fun sendPasswordReset(id: String) {
         client.post(url("/users/${id(id)}/reset-password")) { contentType(ContentType.Application.Json); setBody(mapOf("channel" to "EMAIL")) }
+    }
+
+    override suspend fun resetPin(id: String) {
+        client.post(url("/users/${id(id)}/pin/reset"))
     }
 
     override suspend fun assignableRoles(): List<RoleDto> = client.get(url("/roles/assignable")).body()

@@ -9,6 +9,7 @@ public class SecurityPaths {
             "/auth/web/logout",
             "/auth/web/logout-all",
             "/auth/device/login",
+            "/auth/device/pin-login",
             "/auth/device/refresh",
             "/auth/device/logout",
             "/auth/device/logout-all",

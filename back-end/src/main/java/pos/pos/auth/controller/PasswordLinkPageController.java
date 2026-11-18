@@ -129,6 +129,8 @@ public class PasswordLinkPageController {
                 .append("<li data-rule='special'>A special character, like ! or #</li>")
                 .append("<li data-rule='same'>Both passwords are the same</li>")
                 .append("</ul>")
+                // A reset signs out every device; say so before (user, 2026-11-18).
+                .append(invite ? "" : "<p class='muted'>For your safety, you'll be signed out on all your devices.</p>")
                 .append("<button type='submit'>").append(invite ? "Set my password" : "Change my password").append("</button>")
                 .append("</form>");
         if (link.expiresAt() != null) {
@@ -160,7 +162,7 @@ public class PasswordLinkPageController {
         return page(status, title, null, "<div class='badge warn'>!</div><h1>" + esc(title) + "</h1><p>" + esc(link.message()) + "</p>");
     }
 
-    private static ResponseEntity<String> page(HttpStatus status, String title, String nonce, String body) {
+    static ResponseEntity<String> page(HttpStatus status, String title, String nonce, String body) {
         String html = "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
                 + "<meta name='robots' content='noindex'><title>" + esc(title) + " · POS</title><style>"
                 + "body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f7f8f6;color:#222426;margin:0;padding:16px}"
@@ -206,7 +208,7 @@ public class PasswordLinkPageController {
         return Base64.getEncoder().encodeToString(bytes);
     }
 
-    private static String esc(String value) {
+    static String esc(String value) {
         return value == null ? "" : HtmlUtils.htmlEscape(value);
     }
 }

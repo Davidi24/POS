@@ -75,7 +75,7 @@ data class AuditLogState(
     // Narrows what is already loaded: the kind of setting (entityType), who made the change, and free text.
     val area: String? = null,
     val actor: String? = null,
-    // What kind of change ([actionKind]): ADDED, CHANGED, REMOVED, RESET.
+    // What kind of change ([actionKind]): SIGN_IN, ADDED, CHANGED, REMOVED, RESET.
     val kind: String? = null,
     val search: String = "",
     val loading: Boolean = false,
@@ -98,10 +98,15 @@ data class AuditLogState(
     }
 }
 
-/** The kind of a change from its action: ADDED, REMOVED, RESET or CHANGED (the default). */
+/** Signing in and out, wrong passwords and PINs, locks (user, 2026-11-18: "save everything, even the okay sign-ins"). */
+private val SignInActions = setOf("SIGNED_IN", "SIGNED_OUT", "SIGNED_OUT_EVERYWHERE", "SIGN_IN_FAILED", "SIGN_IN_REFUSED", "ACCOUNT_LOCKED",
+    "WRONG_PIN", "TILL_PAUSED")
+
+/** The kind of a change from its action: SIGN_IN, ADDED, REMOVED, RESET or CHANGED (the default). */
 fun actionKind(action: String?): String {
     val code = action.orEmpty().uppercase()
     return when {
+        code in SignInActions -> "SIGN_IN"
         "CREATE" in code || "ADD" in code -> "ADDED"
         "DELETE" in code || "REMOVE" in code -> "REMOVED"
         "RESET" in code || "RESTORE" in code || "IMPORT" in code -> "RESET"
@@ -110,7 +115,12 @@ fun actionKind(action: String?): String {
 }
 
 /** The name shown for who made a change: their name, "System" for automatic changes, "Someone" when the name is gone. */
-fun actorLabel(entry: AuditEntryDto): String = entry.actorName ?: if (entry.actorUserId == null) "System" else "Someone"
+fun actorLabel(entry: AuditEntryDto): String = entry.actorName ?: when {
+    entry.actorUserId != null -> "Someone"
+    // A wrong PIN: nobody is known until the PIN is right.
+    entry.action == "WRONG_PIN" -> "Unknown person"
+    else -> "System"
+}
 
 /**
  * Admin Hub → Audit log: who changed which setting and when, newest first. Paged; a refresh reloads every page
