@@ -22,6 +22,9 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 
     long countByUserIdAndRevokedFalseAndExpiresAtAfter(UUID userId, OffsetDateTime now);
 
+    /** Signed-in devices of one kind (the 5-device limit counts PASSWORD sessions only; PIN ones are on shared tills). */
+    long countByUserIdAndRevokedFalseAndExpiresAtAfterAndSessionType(UUID userId, OffsetDateTime now, pos.pos.auth.enums.SessionType sessionType);
+
     Optional<UserSession> findByIdAndUserIdAndRevokedFalse(UUID id, UUID userId);
 
     //Fetches a non-revoked session by tokenId and locks it so no one else can modify it concurrently, so it locks in the db so no one uses that row.

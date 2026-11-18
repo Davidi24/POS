@@ -40,7 +40,8 @@ security:
     private-key: ${JWT_PRIVATE_KEY}
     public-key: ${JWT_PUBLIC_KEY}
     access-expiration: 15m
-    refresh-expiration: 1d
+    # How long a sign-in lasts without use (user, 2026-11-18): every use renews it, so people who use the app stay signed in.
+    refresh-expiration: 30d
 
 app:
   restaurants:
@@ -110,7 +111,8 @@ app:
       forgot-address-window-minutes: 60
 
     session:
-      max-active-sessions: 3
+      # Devices one person can be signed in on (user, 2026-11-18); at the limit the app asks which one to sign out.
+      max-active-sessions: 5
 
     refresh-token:
       pepper: ${REFRESH_TOKEN_PEPPER}
@@ -161,6 +163,19 @@ app:
 
   mail:
     from: ${MAIL_FROM:no-reply@pos.local}
+    # Account emails (invitations, password links, email confirmation, username changes, limits, applications) go through
+    # their own sender when ACCOUNT_MAIL_HOST is set (user, 2026-11-18: Gmail for now); booking and guest emails keep the
+    # usual mail server (spring.mail above).
+    account:
+      host: ${ACCOUNT_MAIL_HOST:}
+      port: ${ACCOUNT_MAIL_PORT:587}
+      username: ${ACCOUNT_MAIL_USERNAME:}
+      password: ${ACCOUNT_MAIL_PASSWORD:}
+      from: ${ACCOUNT_MAIL_FROM:}
+    # Booking and guest emails (confirmed, reminders, changes, payment links): off until the user decides (2026-11-18);
+    # when on they use the same real sender as account emails.
+    guest:
+      enabled: ${GUEST_EMAILS_ENABLED:false}
     # Account emails wait here and are retried while the mail server is down.
     outbox:
       poll-ms: ${MAIL_OUTBOX_POLL_MS:5000}

@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.pos.orders
 
+import com.saporini.mobile_desktop.core.session.keepsTillAwake
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.animateFloat
@@ -472,6 +473,8 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
     onSendAll: () -> Unit,
     onVoidItem: (String) -> Unit
 ) {
+    // Taking an order: a till waits 3 minutes before locking (user, 2026-11-18).
+    com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
     // New order opens on the menu, so the first dish is one click away.
     var showAddItem by remember(order?.id) { mutableStateOf(startOnMenu && order != null && order.lineItems.orEmpty().none { it.active }) }
     Dialog(
@@ -479,7 +482,7 @@ private fun NewOrderEdgeButton(onClick: () -> Unit, enabled: Boolean, modifier: 
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(.92f).fillMaxHeight(.88f),
+            modifier = Modifier.fillMaxWidth(.92f).fillMaxHeight(.88f).keepsTillAwake(),
             shape = RoundedCornerShape(16.dp), color = Color.White,
             border = BorderStroke(1.dp, OrderBorder), shadowElevation = 12.dp
         ) {

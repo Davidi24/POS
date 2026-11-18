@@ -80,6 +80,9 @@ class AuthRefreshServiceTest {
     @Mock
     private RefreshRateLimiter refreshRateLimiter;
 
+    @Mock
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     @InjectMocks
     private AuthRefreshService authRefreshService;
 
@@ -224,7 +227,7 @@ class AuthRefreshServiceTest {
             when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(pos.pos.exception.auth.LoginRefusedException.class)
                     .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
 
             verify(userRepository, never()).findActiveById(any(UUID.class));
@@ -243,7 +246,7 @@ class AuthRefreshServiceTest {
             when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> authRefreshService.refresh("token", null))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(pos.pos.exception.auth.LoginRefusedException.class)
                     .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
 
             verify(refreshRateLimiter).check(null);
@@ -263,7 +266,7 @@ class AuthRefreshServiceTest {
             when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.of(session));
 
             assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(pos.pos.exception.auth.LoginRefusedException.class)
                     .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
 
             assertRevokedWithReason(SessionRevocationReason.EXPIRED);
@@ -285,7 +288,7 @@ class AuthRefreshServiceTest {
             when(userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(tokenId)).thenReturn(Optional.of(session));
 
             assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(pos.pos.exception.auth.LoginRefusedException.class)
                     .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
 
             assertRevokedWithReason(SessionRevocationReason.TOKEN_USER_MISMATCH);
@@ -307,7 +310,7 @@ class AuthRefreshServiceTest {
             when(refreshTokenSecurityService.matchesHash(validatedRefreshToken, "stored-hash")).thenReturn(false);
 
             assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(pos.pos.exception.auth.LoginRefusedException.class)
                     .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
 
             assertRevokedWithReason(SessionRevocationReason.REUSE_DETECTED);
@@ -329,7 +332,7 @@ class AuthRefreshServiceTest {
             when(userRepository.findActiveById(userId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(pos.pos.exception.auth.LoginRefusedException.class)
                     .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
 
             assertRevokedWithReason(SessionRevocationReason.USER_NOT_ALLOWED);
@@ -353,7 +356,7 @@ class AuthRefreshServiceTest {
             when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
 
             assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(pos.pos.exception.auth.LoginRefusedException.class)
                     .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
 
             assertRevokedWithReason(SessionRevocationReason.USER_NOT_ALLOWED);
@@ -377,7 +380,7 @@ class AuthRefreshServiceTest {
             when(userRepository.findActiveById(userId)).thenReturn(Optional.of(user));
 
             assertThatThrownBy(() -> authRefreshService.refresh("token", new ClientInfo("127.0.0.1", "JUnit")))
-                    .isInstanceOf(InvalidCredentialsException.class)
+                    .isInstanceOf(pos.pos.exception.auth.LoginRefusedException.class)
                     .hasMessage(INVALID_REFRESH_TOKEN_MESSAGE);
 
             assertRevokedWithReason(SessionRevocationReason.USER_NOT_ALLOWED);

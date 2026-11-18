@@ -1,5 +1,9 @@
 package com.saporini.mobile_desktop.auth.ui.login
 
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.outlined.Info
@@ -109,7 +113,11 @@ object LoginScreen : Screen {
         AuthImageScaffold {
             LoginForm(
                 centerContent = true,
-                onPinClick = { navigator.push(PinLoginScreen) },
+                // Back to the PIN pad it came from, or to it (only shown on a connected till).
+                onPinClick = {
+                    val previous = navigator.items.getOrNull(navigator.items.size - 2)
+                    if (previous == PinLoginScreen) navigator.pop() else navigator.push(PinLoginScreen)
+                },
                 onForgetPassClick = { navigator.push(ForgotPasswordScreen) },
                 // A new restaurant fills in its application on the web, not in the app (user, 2026-11-17).
                 onNoAccountClick = { runCatching { uriHandler.openUri(SignUpPage.url()) } },
@@ -402,6 +410,12 @@ private fun LoginForm(
             // What went wrong, sliding in above the button (user, 2026-11-16: "add animation to look good").
             LoginProblemCard(state.problem, warn = state.warnAboutPause, onRetry = { screenModel.login(email.trim(), password) })
 
+            // At the device limit: pick a device to sign out, then this one signs in (user, 2026-11-18).
+            if (state.devices.isNotEmpty()) {
+                DeviceLimitDialog(state.devices, state.devicesMessage, busy = state.isLoading,
+                    onPick = { id -> screenModel.login(email.trim(), password, id) }, onDismiss = screenModel::dismissDevices)
+            }
+
             Spacer(modifier = Modifier.height(sectionSpacing))
 
             val filled = email.isNotBlank() && password.isNotEmpty()
@@ -439,6 +453,9 @@ private fun LoginForm(
 
             Spacer(modifier = Modifier.height(sectionSpacing))
 
+            // Only a device connected to its restaurant as a till offers the PIN (user, 2026-11-18).
+            val till by com.saporini.mobile_desktop.core.session.TokenStore.till.collectAsState()
+            if (till != null) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -504,6 +521,7 @@ private fun LoginForm(
             }
 
             Spacer(modifier = Modifier.height(sectionSpacing))
+            }
 
             // No account: the web page where a new restaurant applies (user, 2026-11-17: "the form is filled in on the web, not here").
             Row(
@@ -623,3 +641,60 @@ private fun rememberSecondsLeft(until: String?): Long? {
     return seconds
 }
 
+/**
+ * "You're signed in on 5 devices. Sign out one to continue." (user, 2026-11-18): every device with its name and when it was
+ * last used; the one unused longest comes first and is already picked; one button signs it out and signs in here.
+ */
+@Composable
+private fun DeviceLimitDialog(
+    devices: List<com.saporini.mobile_desktop.core.network.SignedInDevice>,
+    message: String?,
+    busy: Boolean,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var picked by remember(devices) { mutableStateOf(devices.first().id) }
+    val now = remember { kotlin.time.Clock.System.now() }
+    val zone = remember { kotlinx.datetime.TimeZone.currentSystemDefault() }
+    val ink = Color(0xFF111111)
+    val muted = Color(0xFF666666)
+    com.saporini.mobile_desktop.core.components.AppDialog(
+        title = "Sign out one device",
+        onDismiss = onDismiss,
+        busy = busy,
+        maxWidth = 480.dp,
+        buttons = {
+            com.saporini.mobile_desktop.core.components.KitButton("Cancel", onDismiss,
+                style = com.saporini.mobile_desktop.core.components.ButtonStyle.SECONDARY, enabled = !busy)
+            com.saporini.mobile_desktop.core.components.KitButton("Sign out and continue", { onPick(picked) }, loading = busy)
+        }
+    ) {
+        Text(message ?: "You're signed in on too many devices. Sign out one to continue.", fontFamily = Inter(), fontSize = 14.sp,
+            lineHeight = 20.sp, color = muted)
+        Spacer(Modifier.height(4.dp))
+        devices.forEach { device ->
+            val chosen = device.id == picked
+            val name = device.name?.takeIf { it.isNotBlank() && it != "UNKNOWN" } ?: "Unknown device"
+            val computer = listOf("computer", "windows", "mac", "linux").any { name.contains(it, ignoreCase = true) }
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                    .border(if (chosen) 1.5.dp else 1.dp, if (chosen) ink else Color(0xFFE2E2E2), RoundedCornerShape(12.dp))
+                    .background(if (chosen) Color(0xFFF6F6F6) else Color.White)
+                    .clickable(enabled = !busy) { picked = device.id }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(if (computer) Icons.Outlined.Computer else Icons.Outlined.Smartphone, null, Modifier.size(22.dp), tint = ink)
+                Column(Modifier.weight(1f)) {
+                    Text(name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ink, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text("Last used " + com.saporini.mobile_desktop.core.format.agoText(device.lastUsedAt ?: device.signedInAt, now, zone),
+                        fontFamily = Inter(), fontSize = 12.5.sp, color = muted)
+                }
+                RadioButton(selected = chosen, onClick = if (busy) null else ({ picked = device.id }),
+                    colors = RadioButtonDefaults.colors(selectedColor = ink))
+            }
+        }
+    }
+}

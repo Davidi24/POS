@@ -47,8 +47,9 @@ public class StoredImageCleanup {
                 +"+(select count(*) from "+schema+"inventory_items where image_url"+condition+")"
                 +"+(select count(*) from "+schema+"inventory_locations where image_url"+condition+")"
                 +"+(select count(*) from "+schema+"recipes where image_url"+condition+")"
-                +"+(select count(*) from "+schema+"order_receipt_identities where identity_json->>'logoUrl'"+condition+")",
-                Long.class,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current);
+                +"+(select count(*) from "+schema+"order_receipt_identities where identity_json->>'logoUrl'"+condition+")"
+                +"+(select count(*) from "+schema+"users where avatar_url"+condition+")",
+                Long.class,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current);
         return count==null?0:count;
     }
     /** Post-commit cleanup must never turn a committed save into an HTTP failure. */

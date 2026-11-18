@@ -82,7 +82,7 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
                     sessionManager.rejectRestaurantContext(response.call.request.headers["X-Restaurant-Id"],
                         response.call.request.headers["X-Branch-Id"], message)
                 }
-                throw ApiException(response.status.value, message, error?.code, error?.lockedUntil)
+                throw ApiException(response.status.value, message, error?.code, error?.lockedUntil, error?.reason, error?.devices.orEmpty())
             }
         }
     }
@@ -128,7 +128,8 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
                 } catch (e: ApiException) {
                     // Expired/revoked credentials end the session. Rate limits and outages remain retryable.
                     if (e.status !in listOf(400, 401, 403)) throw e
-                    if (sessionManager.currentUser.value?.id == refreshingUser && TokenStore.refreshToken.value == currentRefreshToken) sessionManager.signOut()
+                    // The server says why it ended (code SIGNED_OUT + reason), so the app can show it (user, 2026-11-18).
+                    if (sessionManager.currentUser.value?.id == refreshingUser && TokenStore.refreshToken.value == currentRefreshToken) sessionManager.endedByServer(e.reason)
                     null
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
@@ -140,6 +141,8 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
             sendWithoutRequest { request ->
                 // Always send the bearer token, even on the first request (after login)
                 !request.url.encodedPath.contains("/auth/device/login") &&
+                        !request.url.encodedPath.contains("/auth/device/pin-login") &&
+                        !request.url.encodedPath.contains("/public/devices/pairing") &&
                         !request.url.encodedPath.contains("/auth/web/login")
             }
         }
@@ -155,4 +158,19 @@ fun createHttpClient(sessionManager: SessionManager): HttpClient = HttpClient {
     }
 }.also { client ->
     sessionManager.setUserLoader { client.get("${ApiConfig.BASE_URL}/auth/me").body() }
+    // Signing out tells the server. Only the refresh token is needed, so a plain client without the sign-in plugin sends it
+    // (an expired access token must not start a refresh round while signing out).
+    val signOutClient by lazy {
+        HttpClient {
+            install(HttpTimeout) { connectTimeoutMillis = 5_000; requestTimeoutMillis = 8_000; socketTimeoutMillis = 8_000 }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+            expectSuccess = true
+        }
+    }
+    sessionManager.setServerSignOut { refreshToken, everywhere, reason ->
+        signOutClient.post("${ApiConfig.BASE_URL}/auth/device/${if (everywhere) "logout-all" else "logout"}") {
+            contentType(ContentType.Application.Json)
+            setBody(RefreshRequest(refreshToken, reason))
+        }
+    }
 }

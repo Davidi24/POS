@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.core.session
 
+import kotlinx.coroutines.launch
 import com.saporini.mobile_desktop.auth.data.dto.CurrentUserResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,22 @@ class SessionManager {
 
     fun setUserLoader(loader: suspend () -> CurrentUserResponse) { userLoader = loader }
 
+    // Tells the server this device signs out (everywhere = every device of the person); set by the HTTP client.
+    // [reason] LOCKED / IDLE (a till locked) only changes the restaurant's audit line.
+    private var serverSignOut: (suspend (refreshToken: String, everywhere: Boolean, reason: String?) -> Unit)? = null
+    fun setServerSignOut(call: suspend (refreshToken: String, everywhere: Boolean, reason: String?) -> Unit) { serverSignOut = call }
+    private val background = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+
+    private val _signedOutReason = MutableStateFlow<String?>(null)
+
+    /**
+     * Why the server ended this sign-in (user, 2026-11-18: show the Signed out screen with the reason): a session revocation
+     * reason (PASSWORD_CHANGED, LOGOUT_ALL, SESSION_LIMIT, EXPIRED…), "UNKNOWN" when it didn't say, null when the person
+     * signed out themselves or is signed in.
+     */
+    val signedOutReason: StateFlow<String?> = _signedOutReason.asStateFlow()
+    fun clearSignedOutReason() { _signedOutReason.value = null }
+
     suspend fun refreshPermissions() {
         val loader = userLoader ?: return
         refreshLock.lock()
@@ -37,7 +54,7 @@ class SessionManager {
                 val fresh = loader()
                 if (revision == identityRevision && signedIn.value?.id == before.id && fresh.id == before.id) signIn(fresh)
             } catch (e: com.saporini.mobile_desktop.core.network.ApiException) {
-                if (e.status == 401 && revision == identityRevision) signOut()
+                if (e.status == 401 && revision == identityRevision) endedByServer(e.reason)
                 throw e
             }
         } finally { refreshLock.unlock() }
@@ -114,7 +131,40 @@ class SessionManager {
         publish()
     }
 
-    fun signOut() {
+    /**
+     * The person signs out: the device forgets the sign-in at once, and the server is told behind it (so the session ends
+     * there too and stops counting toward the device limit; user, 2026-11-18). No answer from the server changes nothing here.
+     */
+    fun signOut(reason: String? = null) {
+        val refreshToken = TokenStore.refreshToken.value
+        _signedOutReason.value = null
+        endLocally()
+        val call = serverSignOut
+        if (refreshToken != null && call != null) background.launch {
+            kotlinx.coroutines.withTimeoutOrNull(8_000) { runCatching { call(refreshToken, false, reason) } }
+        }
+    }
+
+    /**
+     * "Sign out everywhere": the server signs the person out on every device, this one too, then this device forgets the
+     * sign-in. Throws when the server couldn't be reached, so the person knows the other devices are still signed in.
+     */
+    suspend fun signOutEverywhere() {
+        val refreshToken = TokenStore.refreshToken.value
+        val call = serverSignOut
+        if (refreshToken != null && call != null) call(refreshToken, true, null)
+        _signedOutReason.value = null
+        endLocally()
+    }
+
+    /** The server ended this sign-in (refresh refused): the app shows Signed out with [reason]. */
+    fun endedByServer(reason: String?) {
+        if (signedIn.value == null && TokenStore.refreshToken.value == null) return
+        _signedOutReason.value = reason ?: "UNKNOWN"
+        endLocally()
+    }
+
+    private fun endLocally() {
         identityRevision++
         signedIn.value = null
         _actingRestaurant.value = null

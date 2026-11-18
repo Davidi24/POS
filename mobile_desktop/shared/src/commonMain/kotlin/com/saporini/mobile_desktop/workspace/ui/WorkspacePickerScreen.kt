@@ -1,5 +1,6 @@
 package com.saporini.mobile_desktop.workspace.ui
 
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Path
@@ -28,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Settings
@@ -343,7 +345,8 @@ internal fun PickerTopBar(
                     if (user?.let { Workspace.POS in accessibleWorkspaces(it) } == true) navigator.push(com.saporini.mobile_desktop.pos.ui.PosScreen)
                 }
             )
-            ProfileMenu(user, loggingOut, onLogout, compact, small = slim)
+            // One menu behind the person's name in every top bar: who they are, Profile, Sign out (user, 2026-11-18).
+            com.saporini.mobile_desktop.account.ui.AccountMenu(onLogout, compact, small = slim, loggingOut = loggingOut)
             // Always in sight on wider windows; on a phone Log out is only in the profile menu (user, 2026-10-30).
             if (!compact) Surface(
                 onClick = onLogout, enabled = !loggingOut, shape = RoundedCornerShape(50), color = Color.White,
@@ -361,65 +364,6 @@ internal fun PickerTopBar(
             }
         }
     }
-    }
-}
-
-@Composable
-private fun ProfileMenu(user: CurrentUserResponse?, loggingOut: Boolean, onLogout: () -> Unit, compact: Boolean, small: Boolean = false) {
-    var open by remember { mutableStateOf(false) }
-    val name = user?.let { "${it.firstName} ${it.lastName}".trim().ifBlank { it.username } } ?: "Signed in"
-    val initials = user?.let { listOf(it.firstName, it.lastName).mapNotNull { part -> part.firstOrNull()?.uppercaseChar() }.joinToString("") }
-        ?.ifBlank { null } ?: "?"
-    val role = user?.roles?.firstOrNull()?.lowercase()?.replace('_', ' ')?.replaceFirstChar { it.uppercase() }
-    Box {
-        Surface(
-            onClick = { open = true },
-            shape = RoundedCornerShape(50),
-            color = Color.White,
-            border = BorderStroke(1.dp, CardBorder)
-        ) {
-            Row(
-                Modifier.padding(start = if (small) 3.dp else 5.dp, end = if (compact) 8.dp else 12.dp, top = if (small) 3.dp else 5.dp, bottom = if (small) 3.dp else 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(if (small) 6.dp else 10.dp)
-            ) {
-                Box(Modifier.size(if (small) 28.dp else 36.dp).clip(CircleShape).background(Green), contentAlignment = Alignment.Center) {
-                    Text(initials, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = if (small) 11.sp else 13.sp, color = Color.White)
-                }
-                if (!compact) {
-                    Column {
-                        Text(name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        role?.let { Text(it, fontFamily = Inter(), fontSize = 12.sp, color = Muted, maxLines = 1) }
-                    }
-                }
-                Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp), tint = Ink)
-            }
-        }
-        DropdownMenu(
-            expanded = open, onDismissRequest = { open = false }, offset = DpOffset(0.dp, 8.dp),
-            shape = RoundedCornerShape(12.dp), containerColor = Color.White, shadowElevation = 8.dp
-        ) {
-            Column(Modifier.width(240.dp).padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(name, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                user?.email?.let { Text(it, fontFamily = Inter(), fontSize = 12.sp, color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                role?.let {
-                    Text(
-                        it, Modifier.padding(top = 6.dp).clip(RoundedCornerShape(50)).background(GreenSoft).padding(horizontal = 8.dp, vertical = 3.dp),
-                        fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Green
-                    )
-                }
-            }
-            HorizontalDivider(color = CardBorder)
-            DropdownMenuItem(
-                text = { Text(if (loggingOut) "Logging out…" else "Log out", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color(0xFFB13A2F)) },
-                leadingIcon = {
-                    if (loggingOut) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Color(0xFFB13A2F))
-                    else Icon(Icons.AutoMirrored.Outlined.Logout, null, Modifier.size(18.dp), tint = Color(0xFFB13A2F))
-                },
-                enabled = !loggingOut,
-                onClick = { open = false; onLogout() }
-            )
-        }
     }
 }
 

@@ -204,7 +204,8 @@ internal fun WorkspaceTopBar(
                 horizontalArrangement = Arrangement.spacedBy(if (tier == TopBarTier.COMPACT) 6.dp else 10.dp)
             ) {
                 LogoutButton(onClick = onLogout)
-                ProfileChip(initials = "DK", showArrow = tier != TopBarTier.COMPACT)
+                // The person's own menu (name, role, restaurant, Profile, Sign out), the same in every workspace (user, 2026-11-18).
+                com.saporini.mobile_desktop.account.ui.AccountMenu(onLogout, compact = tier != TopBarTier.FULL)
             }
         }
     }
@@ -543,32 +544,3 @@ private fun LogoutButton(onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun ProfileChip(initials: String, showArrow: Boolean = true) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(ActiveOlive),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = initials,
-                fontFamily = Inter(),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 13.sp,
-                color = Color.White
-            )
-        }
-        if (showArrow) Icon(
-            imageVector = Icons.Outlined.ExpandMore,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = Ink
-        )
-    }
-}

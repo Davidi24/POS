@@ -16,6 +16,12 @@ class MainActivity : ComponentActivity() {
             App()
         }
     }
+
+    // Every touch or key on the app's screen keeps a connected till from locking.
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        com.saporini.mobile_desktop.core.session.IdleLock.touch()
+    }
 }
 
 @Preview(name = "Pixel", device = Devices.PIXEL, showSystemUi = true)

@@ -132,11 +132,6 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
         }
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        owner.setEmail(spec.email());
-        owner.setUsername(spec.username());
-        owner.setFirstName(spec.firstName());
-        owner.setLastName(spec.lastName());
-        owner.setPhone(spec.phone());
         owner.setRestaurantId(restaurantId);
         owner.setStatus("ACTIVE");
         owner.setActive(true);
@@ -163,11 +158,7 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
         return owner.getDeletedAt() == null
                 && owner.isActive()
                 && "ACTIVE".equals(owner.getStatus())
-                && Objects.equals(owner.getEmail(), spec.email())
-                && Objects.equals(owner.getUsername(), spec.username())
-                && Objects.equals(owner.getFirstName(), spec.firstName())
-                && Objects.equals(owner.getLastName(), spec.lastName())
-                && Objects.equals(owner.getPhone(), spec.phone())
+                // Email, username, name and phone stay as changed in the app (Profile), never put back (user, 2026-11-18).
                 && Objects.equals(owner.getRestaurantId(), restaurantId)
                 && owner.isEmailVerified();
     }
@@ -229,11 +220,6 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
         }
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        user.setEmail(spec.email());
-        user.setUsername(spec.username());
-        user.setFirstName(spec.firstName());
-        user.setLastName(spec.lastName());
-        user.setPhone(null);
         user.setRestaurantId(restaurantId);
         user.setStatus("ACTIVE");
         user.setActive(true);
@@ -258,10 +244,7 @@ public class LocalRestaurantSeedRunner implements CommandLineRunner {
         return user.getDeletedAt() == null
                 && user.isActive()
                 && "ACTIVE".equals(user.getStatus())
-                && Objects.equals(user.getEmail(), spec.email())
-                && Objects.equals(user.getUsername(), spec.username())
-                && Objects.equals(user.getFirstName(), spec.firstName())
-                && Objects.equals(user.getLastName(), spec.lastName())
+                // Email, username and name stay as changed in the app (Profile), never put back (user, 2026-11-18).
                 && Objects.equals(user.getRestaurantId(), restaurantId)
                 && user.isEmailVerified();
     }

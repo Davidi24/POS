@@ -510,6 +510,18 @@ class StaffScreenModel(
         quick(personId, notice = "A password reset email was sent to ${person.email}") { repository.sendPasswordReset(personId) }
     }
 
+    /** Takes someone's PIN away (they forgot it, or someone else knows it); they generate a new one in Profile. */
+    fun resetPin(personId: String) {
+        val current = state.value
+        val person = current.people.firstOrNull { it.id == personId } ?: return
+        if (!current.canEdit(person) || person.id == current.myId) {
+            mutable.update { it.copy(error = if (person.id == current.myId) "Change your own PIN in your profile" else "You can't edit staff") }
+            return
+        }
+        val name = listOf(person.firstName, person.lastName).filter { !it.isNullOrBlank() }.joinToString(" ").ifBlank { person.username }
+        quick(personId, notice = "$name's PIN was reset. They can get a new one in their profile.") { repository.resetPin(personId) }
+    }
+
     fun askRemove(personId: String) {
         val current = state.value
         val person = current.people.firstOrNull { it.id == personId } ?: return

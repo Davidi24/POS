@@ -712,6 +712,8 @@ private fun EditReservationForm(
     onSave: (UpdateReservationInput?, notesToAdd: List<String>, noteIdsToDelete: Set<String>) -> Unit,
     occasions: List<com.saporini.mobile_desktop.pos.reservations.domain.model.ReservationOccasion> = emptyList()
 ) {
+    // Changing a booking: 3 minutes before a till locks.
+    com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
     var occasionCode by remember(reservation.id) { mutableStateOf(reservation.occasionCode) }
     var occasionOptions by remember(reservation.id) { mutableStateOf(reservation.occasionOptions) }
     var occasionNote by remember(reservation.id) { mutableStateOf(reservation.occasionNote.orEmpty()) }

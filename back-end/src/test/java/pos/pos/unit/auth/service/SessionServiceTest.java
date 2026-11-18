@@ -51,6 +51,9 @@ class SessionServiceTest {
     @Mock
     private RoleHierarchyService roleHierarchyService;
 
+    @Mock
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     @InjectMocks
     private SessionService sessionService;
 

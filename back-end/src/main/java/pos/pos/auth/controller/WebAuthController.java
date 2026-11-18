@@ -81,7 +81,8 @@ public class WebAuthController {
                     .build();
 
             return ResponseEntity.ok(response);
-        } catch (InvalidCredentialsException ex) {
+        } catch (InvalidCredentialsException | pos.pos.exception.auth.LoginRefusedException ex) {
+            // An ended sign-in (SIGNED_OUT with its reason) clears the cookies too.
             cookieService.clearRefreshTokenCookie(httpResponse);
             cookieService.clearAccessTokenCookie(httpResponse);
             throw ex;

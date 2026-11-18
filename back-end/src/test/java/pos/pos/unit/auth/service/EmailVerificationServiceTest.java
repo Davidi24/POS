@@ -76,6 +76,7 @@ class EmailVerificationServiceTest {
                 authEmailVerificationTokenRepository,
                 opaqueTokenService,
                 authMailService,
+                org.mockito.Mockito.mock(pos.pos.auth.service.AccountAudit.class),
                 emailVerificationProperties,
                 frontendProperties
         );

@@ -41,7 +41,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<LoginErrorResponse> handleLoginRefused(pos.pos.exception.auth.LoginRefusedException ex) {
         return ResponseEntity
                 .status(ex.getStatus())
-                .body(new LoginErrorResponse(ex.getStatus().value(), ex.getMessage(), ex.getReason().name(), ex.getLockedUntil()));
+                .body(new LoginErrorResponse(ex.getStatus().value(), ex.getMessage(), ex.getReason().name(), ex.getLockedUntil(),
+                        ex.getSignedOutReason(), ex.getDevices()));
     }
 
     @ExceptionHandler(AuthException.class)

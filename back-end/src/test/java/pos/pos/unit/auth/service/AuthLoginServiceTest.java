@@ -96,6 +96,9 @@ class AuthLoginServiceTest {
     @Mock
     private RefreshTokenSecurityService refreshTokenSecurityService;
 
+    @Mock
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     @InjectMocks
     private AuthLoginService authLoginService;
 
@@ -148,7 +151,7 @@ class AuthLoginServiceTest {
 
             when(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(Optional.of(user));
             when(passwordService.matches("Password123!", "stored-hash")).thenReturn(true);
-            when(userSessionRepository.countByUserIdAndRevokedFalseAndExpiresAtAfter(eq(userId), any(OffsetDateTime.class)))
+            when(userSessionRepository.countByUserIdAndRevokedFalseAndExpiresAtAfterAndSessionType(eq(userId), any(OffsetDateTime.class), eq(SessionType.PASSWORD)))
                     .thenReturn(1L);
             when(roleRepository.findActiveRolesByUserId(userId)).thenReturn(activeRoles);
             when(permissionRepository.findCodesByRoleIds(activeRoles.stream().map(Role::getId).toList()))
@@ -476,13 +479,16 @@ class AuthLoginServiceTest {
         }
 
         @Test
-        @DisplayName("Should revoke oldest session when session limit is reached")
-        void shouldRevokeOldestSession_whenSessionLimitReached() {
+        @DisplayName("At the device limit: refuse with the devices to choose from, then sign out the chosen one and sign in")
+        void shouldAskWhichDeviceToSignOut_whenSessionLimitReached() {
             UUID userId = UUID.randomUUID();
             User user = activeUser(userId, "cashier@pos.local", "cashier.one");
             List<Role> activeRoles = List.of(role(UUID.randomUUID(), "ADMIN", 100));
             List<String> roleCodes = List.of("ADMIN");
-            List<String> permissionCodes = List.of("USERS_READ");
+            UserSession oldest = UserSession.builder().id(UUID.randomUUID()).userId(userId).deviceName("Old phone")
+                    .sessionType(SessionType.PASSWORD).lastUsedAt(OffsetDateTime.now().minusDays(9)).createdAt(OffsetDateTime.now().minusDays(20)).build();
+            UserSession recent = UserSession.builder().id(UUID.randomUUID()).userId(userId).deviceName("Till")
+                    .sessionType(SessionType.PASSWORD).lastUsedAt(OffsetDateTime.now().minusHours(1)).createdAt(OffsetDateTime.now().minusDays(2)).build();
             UserSession mappedSession = UserSession.builder()
                     .userId(userId)
                     .refreshTokenHash("hashed-refresh")
@@ -491,32 +497,37 @@ class AuthLoginServiceTest {
 
             when(userRepository.findByEmailAndDeletedAtIsNull("cashier@pos.local")).thenReturn(Optional.of(user));
             when(passwordService.matches("Password123!", "stored-hash")).thenReturn(true);
-            when(userSessionRepository.countByUserIdAndRevokedFalseAndExpiresAtAfter(eq(userId), any(OffsetDateTime.class)))
-                    .thenReturn(3L);
-            when(userSessionRepository.revokeOldestSession(eq(userId), any(OffsetDateTime.class), eq(SessionRevocationReason.SESSION_LIMIT.name())))
-                    .thenReturn(1);
+            when(userSessionRepository.countByUserIdAndRevokedFalseAndExpiresAtAfterAndSessionType(eq(userId), any(OffsetDateTime.class), eq(SessionType.PASSWORD)))
+                    .thenReturn(3L, 2L);
+            when(userSessionRepository.findActiveSessionsByUserId(eq(userId), any(OffsetDateTime.class))).thenReturn(List.of(recent, oldest));
+
+            // 1. At the limit with no device chosen: refused, the device unused longest first.
+            assertThatThrownBy(() -> authLoginService.login(loginRequest("cashier@pos.local", "Password123!"), new ClientInfo("127.0.0.1", "JUnit")))
+                    .isInstanceOfSatisfying(LoginRefusedException.class, refused -> {
+                        assertThat(refused.getReason()).isEqualTo(LoginRefusedException.Reason.TOO_MANY_DEVICES);
+                        assertThat(refused.getDevices()).extracting(LoginRefusedException.SignedInDevice::id).containsExactly(oldest.getId(), recent.getId());
+                    });
+            verify(userSessionRepository, never()).save(any(UserSession.class));
+
+            // 2. Again with the oldest chosen: it's signed out (SESSION_LIMIT) and the sign-in goes through.
+            when(userSessionRepository.findByIdAndUserIdAndRevokedFalse(oldest.getId(), userId)).thenReturn(Optional.of(oldest));
             when(roleRepository.findActiveRolesByUserId(userId)).thenReturn(activeRoles);
-            when(permissionRepository.findCodesByRoleIds(activeRoles.stream().map(Role::getId).toList()))
-                    .thenReturn(permissionCodes);
             when(jwtProperties.getAccessExpiration()).thenReturn(Duration.ofMinutes(15));
             when(jwtService.generateAccessToken(eq(userId), eq(roleCodes), any(UUID.class))).thenReturn("access-token");
             when(jwtService.generateRefreshToken(eq(userId), any(UUID.class))).thenReturn("refresh-token");
             when(refreshTokenSecurityService.hash("refresh-token")).thenReturn("hashed-refresh");
             when(userSessionMapper.toSession(eq(userId), any(UUID.class), eq(SessionType.PASSWORD), eq("hashed-refresh"), any(ClientInfo.class)))
                     .thenReturn(mappedSession);
-            when(currentUserMapper.toCurrentUserResponse(eq(user), eq(roleCodes), eq(permissionCodes)))
-                    .thenReturn(CurrentUserResponse.builder().id(userId).roles(roleCodes).permissions(permissionCodes).build());
+            when(currentUserMapper.toCurrentUserResponse(eq(user), eq(roleCodes), any()))
+                    .thenReturn(CurrentUserResponse.builder().id(userId).roles(roleCodes).build());
 
-            authLoginService.login(
-                    loginRequest("cashier@pos.local", "Password123!"),
-                    new ClientInfo("127.0.0.1", "JUnit")
-            );
+            LoginRequest chosen = loginRequest("cashier@pos.local", "Password123!");
+            chosen.setSignOutSessionId(oldest.getId());
+            authLoginService.login(chosen, new ClientInfo("127.0.0.1", "JUnit"));
 
-            verify(userSessionRepository).revokeOldestSession(
-                    eq(userId),
-                    any(OffsetDateTime.class),
-                    eq(SessionRevocationReason.SESSION_LIMIT.name())
-            );
+            assertThat(oldest.isRevoked()).isTrue();
+            assertThat(oldest.getRevokedReason()).isEqualTo(SessionRevocationReason.SESSION_LIMIT.name());
+            verify(userSessionRepository).save(oldest);
             verify(userSessionRepository).save(mappedSession);
         }
     }

@@ -13,6 +13,7 @@ import pos.pos.auth.enums.SessionType;
 import pos.pos.auth.entity.AuthLoginAttempt;
 import pos.pos.auth.enums.LoginFailureReason;
 import pos.pos.auth.mapper.CurrentUserMapper;
+import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.mapper.UserSessionMapper;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
@@ -68,6 +69,9 @@ public class AuthLoginService {
     private final JwtProperties jwtProperties;
     private final UserSessionRepository userSessionRepository;
     private final AuthLoginAttemptRepository authLoginAttemptRepository;
+    private final PinService pinService;
+    private final pos.pos.device.service.ConnectedDeviceService connectedDevices;
+    private final AccountAudit accountAudit;
     private final UserSessionMapper userSessionMapper;
     private final CurrentUserMapper currentUserMapper;
 
@@ -153,9 +157,58 @@ public class AuthLoginService {
             throw new LoginRefusedException(LoginRefusedException.Reason.RESTAURANT_CLOSED, RESTAURANT_CLOSED_MESSAGE, HttpStatus.FORBIDDEN, null);
         }
 
-        enforceSessionLimit(user.getId(), now);
+        enforceSessionLimit(user, request.getSignOutSessionId(), normalizedClientInfo, now);
 
-        //here it means all the check have passed so it creates a successful login.
+        return issue(user, normalizedIdentifier, normalizedClientInfo, SessionType.PASSWORD, now);
+    }
+
+    /**
+     * Sign in with a PIN on one of the restaurant's connected tills (user, 2026-11-18): the device's id and secret say which
+     * restaurant; the PIN finds the person there. 5 wrong PINs on a till within 15 minutes pause PIN sign-in on it for 15
+     * minutes (people can still use their password). A PIN session lasts at most 12 hours and doesn't count toward the 5 devices.
+     */
+    @Transactional(noRollbackFor = {LoginRefusedException.class})
+    public AuthenticationResponse pinLogin(UUID deviceId, String deviceSecret, String pin, ClientInfo clientInfo) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        pos.pos.device.service.ConnectedDeviceService.Connected device = connectedDevices.check(deviceId, deviceSecret).orElseThrow(() ->
+                new LoginRefusedException(LoginRefusedException.Reason.DEVICE_NOT_CONNECTED,
+                        "This device isn't connected to a restaurant. Sign in with your password.", HttpStatus.UNAUTHORIZED, null));
+        String tillKey = "till:" + device.deviceId();
+        ClientInfo base = ClientInfoNormalizer.normalize(clientInfo);
+        ClientInfo info = new ClientInfo(base == null ? null : base.ipAddress(), base == null ? null : base.userAgent(), tillKey, device.name());
+        java.time.Duration pause = java.time.Duration.ofMinutes(lockDurationMinutes);
+        OffsetDateTime pausedUntil = pausedUntil(authLoginAttemptRepository.wrongPinTimesForDevice(tillKey, now.minus(pause.multipliedBy(2))), 5, pause, now);
+        if (pausedUntil != null) {
+            saveLoginAttempt(null, "pin", info, false, LoginFailureReason.PIN_PAUSED, now);
+            accountAudit.inRestaurant(device.restaurantId(), device.deviceId(), null, "WRONG_PIN",
+                    "A PIN was tried on " + AccountAudit.deviceOf(device.name()) + " while it was paused");
+            throw new LoginRefusedException(LoginRefusedException.Reason.PIN_PAUSED, "Too many wrong PINs on this till.", HttpStatus.TOO_MANY_REQUESTS, pausedUntil);
+        }
+        if (pin == null || !pin.matches("\\d{" + PinService.LENGTH + "}")) {
+            throw new LoginRefusedException(LoginRefusedException.Reason.WRONG_PIN, "Wrong PIN.", HttpStatus.UNAUTHORIZED, null);
+        }
+        User user = userRepository.findByRestaurantIdAndPinHashAndDeletedAtIsNull(device.restaurantId(), pinService.hash(device.restaurantId(), pin))
+                .filter(User::isPinEnabled).orElse(null);
+        if (user == null) {
+            saveLoginAttempt(null, "pin", info, false, LoginFailureReason.INVALID_PIN, now);
+            accountAudit.inRestaurant(device.restaurantId(), device.deviceId(), null, "WRONG_PIN", "Wrong PIN on " + AccountAudit.deviceOf(device.name()));
+            OffsetDateTime nowPaused = pausedUntil(authLoginAttemptRepository.wrongPinTimesForDevice(tillKey, now.minus(pause.multipliedBy(2))), 5, pause, now);
+            if (nowPaused != null) {
+                accountAudit.inRestaurant(device.restaurantId(), device.deviceId(), null, "TILL_PAUSED",
+                        AccountAudit.deviceOf(device.name()) + " stopped PIN sign-in for " + lockDurationMinutes + " minutes after 5 wrong PINs");
+                throw new LoginRefusedException(LoginRefusedException.Reason.PIN_PAUSED, "Too many wrong PINs on this till.", HttpStatus.TOO_MANY_REQUESTS, nowPaused);
+            }
+            throw new LoginRefusedException(LoginRefusedException.Reason.WRONG_PIN, "Wrong PIN.", HttpStatus.UNAUTHORIZED, null);
+        }
+        validateUserCanLogin(user, now, user.getUsername(), info);
+        if (userRepository.worksAtClosedRestaurant(user.getId())) {
+            throw new LoginRefusedException(LoginRefusedException.Reason.RESTAURANT_CLOSED, RESTAURANT_CLOSED_MESSAGE, HttpStatus.FORBIDDEN, null);
+        }
+        return issue(user, user.getUsername(), info, SessionType.PIN, now);
+    }
+
+    /** The checks have passed: a new session (and its tokens) for [user] on this device. */
+    private AuthenticationResponse issue(User user, String normalizedIdentifier, ClientInfo normalizedClientInfo, SessionType sessionType, OffsetDateTime now) {
         List<Role> activeRoles = loadActiveRoles(user.getId());
         List<String> roleCodes = activeRoles.stream().map(Role::getCode).toList();
         List<String> permissionCodes = loadPermissionCodes(user, activeRoles);
@@ -170,17 +223,17 @@ public class AuthLoginService {
         String accessToken = jwtService.generateAccessToken(user.getId(), roleCodes, tokenId);
         String refreshToken = jwtService.generateRefreshToken(user.getId(), tokenId);
 
-        userSessionRepository.save(
-                userSessionMapper.toSession(
-                        user.getId(),
-                        tokenId,
-                        SessionType.PASSWORD,
-                        refreshTokenSecurityService.hash(refreshToken),
-                        normalizedClientInfo
-                )
-        );
+        UserSession session = userSessionMapper.toSession(user.getId(), tokenId, sessionType,
+                refreshTokenSecurityService.hash(refreshToken), normalizedClientInfo);
+        // A PIN session on a shared till lasts one working day at most, whatever the refresh lifetime.
+        if (sessionType == SessionType.PIN) session.setExpiresAt(now.plusHours(12));
+        userSessionRepository.save(session);
 
         saveLoginAttempt(user.getId(), normalizedIdentifier, normalizedClientInfo, true, null, now);
+        String device = AccountAudit.deviceOf(normalizedClientInfo == null ? null : normalizedClientInfo.deviceName());
+        accountAudit.about(user, user.getId(), "SIGNED_IN", sessionType == SessionType.PIN
+                ? AccountAudit.nameOf(user) + " signed in with their PIN on " + device
+                : AccountAudit.nameOf(user) + " signed in on " + device);
 
         return AuthenticationResponse.builder()
                 .accessToken(accessToken)
@@ -207,29 +260,34 @@ public class AuthLoginService {
 
 
     /**
-     * Ensures the user does not exceed the maximum number of active sessions.
-     * - Counts current active (not revoked and not expired) sessions for the user.
-     * - If the limit is reached, revokes the oldest active session.
-     * - Logs the action if a session was successfully revoked.
+     * At most [maxActiveSessions] (5) signed-in devices per person (user, 2026-11-18: "ask the person to sign out one").
+     * At the limit the sign-in is refused with the list of devices, the one unused longest first; the app asks which to sign
+     * out and signs in again with [signOutSessionId], which is signed out here (reason SESSION_LIMIT, so that device is told
+     * "signed out from another device"). Only reached after the right password, so the list is never shown to a stranger.
      */
-    private void enforceSessionLimit(UUID userId, OffsetDateTime now) {
-        long activeSessions = userSessionRepository
-                .countByUserIdAndRevokedFalseAndExpiresAtAfter(userId, now);
-
-        if (activeSessions >= maxActiveSessions) {
-            int revokedSessions = userSessionRepository.revokeOldestSession(
-                    userId,
-                    now,
-                    SessionRevocationReason.SESSION_LIMIT.name()
-            );
-            if (revokedSessions > 0) {
-                logger.info(
-                        "Revoked oldest active session for user {} because the session limit of {} was reached",
-                        userId,
-                        maxActiveSessions
-                );
-            }
+    private void enforceSessionLimit(User user, UUID signOutSessionId, ClientInfo clientInfo, OffsetDateTime now) {
+        UUID userId = user.getId();
+        if (signOutSessionId != null) {
+            userSessionRepository.findByIdAndUserIdAndRevokedFalse(signOutSessionId, userId).ifPresent(chosen -> {
+                chosen.setRevoked(true);
+                chosen.setRevokedAt(now);
+                chosen.setRevokedReason(SessionRevocationReason.SESSION_LIMIT.name());
+                userSessionRepository.save(chosen);
+                userSessionRepository.flush();
+                accountAudit.about(user, userId, "SIGNED_OUT", AccountAudit.nameOf(user) + " signed out " + AccountAudit.deviceOf(chosen.getDeviceName())
+                        + " to sign in on " + AccountAudit.deviceOf(clientInfo == null ? null : clientInfo.deviceName()) + " (5 devices at most)");
+            });
         }
+        if (userSessionRepository.countByUserIdAndRevokedFalseAndExpiresAtAfterAndSessionType(userId, now, SessionType.PASSWORD) < maxActiveSessions) {
+            return;
+        }
+        List<LoginRefusedException.SignedInDevice> devices = userSessionRepository.findActiveSessionsByUserId(userId, now).stream()
+                .filter(s -> s.getSessionType() != SessionType.PIN)
+                .sorted(java.util.Comparator.comparing(UserSession::getLastUsedAt, java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())))
+                .map(s -> new LoginRefusedException.SignedInDevice(s.getId(), s.getDeviceName(), s.getLastUsedAt(), s.getCreatedAt()))
+                .toList();
+        throw new LoginRefusedException(LoginRefusedException.Reason.TOO_MANY_DEVICES,
+                "You're signed in on " + maxActiveSessions + " devices. Sign out one to continue.", HttpStatus.CONFLICT, null, null, devices);
     }
 
 
@@ -250,6 +308,10 @@ public class AuthLoginService {
         // Kept on the person too, so their own screens can show it; the rule itself is lockedUntil().
         user.setLockedUntil(lockedUntil(user, normalizedIdentifier, now));
         userRepository.save(user);
+        if (user.getLockedUntil() != null) {
+            accountAudit.about(user, null, "ACCOUNT_LOCKED", AccountAudit.nameOf(user) + "'s account was locked for " + lockDurationMinutes
+                    + " minutes after " + maxFailedAttempts + " wrong passwords");
+        }
     }
 
 
@@ -376,6 +438,7 @@ public class AuthLoginService {
                 .identifier(identifier)
                 .ipAddress(clientInfo != null ? clientInfo.ipAddress() : null)
                 .deviceId(clientInfo != null ? clientInfo.deviceId() : null)
+                .deviceName(clientInfo != null ? clientInfo.deviceName() : null)
                 .userAgent(clientInfo != null ? clientInfo.userAgent() : null)
                 .success(success)
                 .failureReason(failureReason)
@@ -383,6 +446,18 @@ public class AuthLoginService {
                 .build();
 
         authLoginAttemptRepository.save(attempt);
+        if (!success && userId != null && failureReason != null) {
+            String device = AccountAudit.deviceOf(clientInfo == null ? null : clientInfo.deviceName());
+            switch (failureReason) {
+                case INVALID_CREDENTIALS -> accountAudit.about(userId, userId, "SIGN_IN_FAILED", name -> "Wrong password for " + name + " on " + device);
+                case ACCOUNT_LOCKED -> accountAudit.about(userId, userId, "SIGN_IN_FAILED", name -> name + " tried to sign in on " + device + " while the account was locked");
+                case DEVICE_RATE_LIMITED -> accountAudit.about(userId, userId, "SIGN_IN_FAILED", name -> name + " tried to sign in on " + device + " while it was paused after many wrong passwords");
+                case IP_RATE_LIMITED -> accountAudit.about(userId, userId, "SIGN_IN_FAILED", name -> name + " tried to sign in on " + device + " while its network was paused after many wrong passwords");
+                case ACCOUNT_INACTIVE -> accountAudit.about(userId, userId, "SIGN_IN_REFUSED", name -> name + " couldn't sign in on " + device + ": the account is switched off");
+                case EMAIL_NOT_VERIFIED -> accountAudit.about(userId, userId, "SIGN_IN_REFUSED", name -> name + " couldn't sign in on " + device + ": the email isn't confirmed");
+                default -> { }
+            }
+        }
     }
 
 

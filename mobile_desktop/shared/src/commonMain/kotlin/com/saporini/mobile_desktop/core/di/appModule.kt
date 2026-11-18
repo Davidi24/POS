@@ -147,7 +147,10 @@ private val appModule = module {
     single<com.saporini.mobile_desktop.admin.inventory.InventoryRepository> { com.saporini.mobile_desktop.admin.inventory.InventoryApi(client = get()) }
     factory { com.saporini.mobile_desktop.admin.inventory.InventoryScreenModel(repository = get(), session = get(), pendingMoveStorage = TokenStore) }
     single<com.saporini.mobile_desktop.admin.devices.DevicesRepository> { com.saporini.mobile_desktop.admin.devices.DevicesApi(client = get()) }
-    factory { com.saporini.mobile_desktop.admin.devices.DevicesScreenModel(repository = get(), session = get()) }
+    factory {
+        val auth = get<com.saporini.mobile_desktop.auth.data.repository.AuthRepository>()
+        com.saporini.mobile_desktop.admin.devices.DevicesScreenModel(repository = get(), session = get(), connectHere = { auth.connectTill(it) })
+    }
     single<com.saporini.mobile_desktop.admin.audit.AuditLogRepository> { com.saporini.mobile_desktop.admin.audit.AuditLogApi(client = get()) }
     factory { com.saporini.mobile_desktop.admin.audit.AuditLogScreenModel(repository = get(), session = get()) }
     single<com.saporini.mobile_desktop.admin.inventory.RecipesRepository> { com.saporini.mobile_desktop.admin.inventory.RecipesApi(client = get()) }

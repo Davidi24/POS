@@ -90,6 +90,7 @@ private fun PreOrderLine.key() = lineKey(menuItemId, variantId, options)
 /** Taking the guests' food with the booking: the menu on the left, their order on the right. */
 @Composable
 internal fun PreOrderEditorDialog(state: PreOrderState, model: PreOrderScreenModel, dishes: PreOrderDishes, guests: Int) {
+    com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
     val restaurantId = state.restaurantId ?: return
     var menus by remember { mutableStateOf<List<OrderCatalogMenu>?>(null) }
     var loadProblem by remember { mutableStateOf<String?>(null) }

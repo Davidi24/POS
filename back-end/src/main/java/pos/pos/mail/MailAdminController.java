@@ -36,6 +36,7 @@ import java.util.UUID;
 public class MailAdminController {
 
     private final JavaMailSender mailSender;
+    private final AccountMailSender accountMail;
     private final AppMailProperties mailProperties;
     private final EmailOutboxRepository repository;
 
@@ -58,7 +59,6 @@ public class MailAdminController {
     @Operation(summary = "Super Admin: send a test email straight to the mail server and report its answer")
     public TestEmailResponse sendTest(@Valid @RequestBody TestEmailRequest request) {
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailProperties.getFrom());
         message.setTo(request.to().trim());
         message.setSubject("POS test email");
         message.setText("""
@@ -67,7 +67,8 @@ public class MailAdminController {
                 This is a test email from POS. If you can read it, emails from the POS server reach this inbox.
                 """);
         try {
-            mailSender.send(message);
+            // The account emails' sender (Gmail for now), the one the test is about.
+            accountMail.send(message);
         } catch (MailException failure) {
             throw new AuthException("The mail server didn't accept the email: " + failure.getMessage(), HttpStatus.BAD_GATEWAY);
         }

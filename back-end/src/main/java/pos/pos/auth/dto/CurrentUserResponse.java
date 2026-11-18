@@ -27,4 +27,9 @@ public class CurrentUserResponse {
     private boolean phoneVerified;
     private List<String> roles;
     private List<String> permissions;
+    // For the person's own profile and menu (user, 2026-11-18): their restaurant's and default branch's names.
+    private String restaurantName;
+    private String branchName;
+    // The person's own photo (Profile), or null for their initials.
+    private String photoUrl;
 }

@@ -10,6 +10,7 @@ actual class TokenPersistence {
     private val accessFile = File(storageDir, "access.bin")
     private val refreshFile = File(storageDir, "refresh.bin")
     private val pendingInventoryMovesFile = File(storageDir, "pending-inventory-moves.bin")
+    private val connectedTillFile = File(storageDir, "connected-till.bin")
 
     actual suspend fun saveAccessToken(token: String?) = save(accessFile, token)
     actual suspend fun saveRefreshToken(token: String?) = save(refreshFile, token)
@@ -17,6 +18,8 @@ actual class TokenPersistence {
     actual suspend fun loadRefreshToken(): String? = load(refreshFile)
     actual suspend fun savePendingInventoryMoves(payload: String?) = save(pendingInventoryMovesFile, payload)
     actual suspend fun loadPendingInventoryMoves(): String? = load(pendingInventoryMovesFile)
+    actual suspend fun saveConnectedTill(payload: String?) = save(connectedTillFile, payload)
+    actual suspend fun loadConnectedTill(): String? = load(connectedTillFile)
 
     actual suspend fun clear() {
         accessFile.delete()

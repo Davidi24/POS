@@ -289,26 +289,45 @@ class WebAuthIntegrationTest {
     }
 
     @Test
-    @DisplayName("AUTH-009 POST /auth/web/login revokes oldest session when session limit is reached")
-    void auth009RevokesOldestSessionWhenSessionLimitIsReached() throws Exception {
+    @DisplayName("AUTH-009 at 5 devices sign-in asks which one to sign out, then signs it out and signs in")
+    void auth009AsksWhichDeviceToSignOutAtTheSessionLimit() throws Exception {
         User user = createVerifiedUser("auth009");
         String ip = nextIp();
 
         String firstRefreshToken = loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-1");
-        Thread.sleep(20);
-        loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-2");
-        Thread.sleep(20);
-        loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-3");
-        Thread.sleep(20);
-        String fourthRefreshToken = loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-4");
+        String latestRefreshToken = null;
+        for (int i = 2; i <= 5; i++) {
+            Thread.sleep(20);
+            latestRefreshToken = loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-" + i);
+        }
+        assertThat(activeSessionsFor(user)).hasSize(5);
 
-        List<UserSession> allSessions = sessionsFor(user);
-        assertThat(allSessions).hasSize(4);
-        assertThat(activeSessionsFor(user)).hasSize(3);
-        assertThat(allSessions)
+        // The 6th: refused with the devices, the one unused longest first; nothing is signed out yet.
+        MvcResult refused = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-6", status().isConflict());
+        com.fasterxml.jackson.databind.JsonNode answer = objectMapper.readTree(refused.getResponse().getContentAsString());
+        assertThat(answer.path("code").asText()).isEqualTo("TOO_MANY_DEVICES");
+        assertThat(answer.path("devices")).hasSize(5);
+        assertThat(activeSessionsFor(user)).hasSize(5);
+        String oldestId = answer.path("devices").get(0).path("id").asText();
+
+        // Again with the oldest chosen: it's signed out (SESSION_LIMIT) and the sign-in goes through.
+        mockMvc.perform(post("/auth/web/login")
+                        .with(client(ip, "AUTH-009-6b"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "identifier", user.getUsername(),
+                                "password", DEFAULT_PASSWORD,
+                                "signOutSessionId", oldestId
+                        ))))
+                .andExpect(status().isOk());
+        assertThat(activeSessionsFor(user)).hasSize(5);
+        assertThat(sessionsFor(user))
                 .filteredOn(UserSession::isRevoked)
                 .singleElement()
-                .satisfies(session -> assertThat(session.getRevokedReason()).isEqualTo("SESSION_LIMIT"));
+                .satisfies(session -> {
+                    assertThat(session.getId().toString()).isEqualTo(oldestId);
+                    assertThat(session.getRevokedReason()).isEqualTo("SESSION_LIMIT");
+                });
 
         MvcResult revokedRefreshResult = webRefresh(
                 firstRefreshToken,
@@ -320,7 +339,7 @@ class WebAuthIntegrationTest {
         assertRefreshCookieCleared(revokedRefreshResult);
 
         MvcResult latestRefreshResult = webRefresh(
-                fourthRefreshToken,
+                latestRefreshToken,
                 ip,
                 "AUTH-009-refresh-current",
                 status().isOk()

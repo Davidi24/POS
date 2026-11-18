@@ -415,6 +415,8 @@ fun BoxScope.TableDetailsModal(
                 DialogActionButton(text = "Back", icon = null, modifier = Modifier.fillMaxWidth().height(50.dp), onClick = { mode = DetailMode.MENU })
             }
             DetailMode.GUEST_COUNT -> {
+                // Seating guests: 3 minutes before a till locks.
+                com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
                 GuestCountStep(
                     label = "Number of guests",
                     guestCount = guestCount,
@@ -431,6 +433,7 @@ fun BoxScope.TableDetailsModal(
                 )
             }
             DetailMode.CHANGE_GUEST_COUNT -> {
+                com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
                 GuestCountStep(
                     label = "Update guest count",
                     guestCount = guestCount,

@@ -30,7 +30,9 @@ public class UserSessionMapper {
         ClientInfo normalizedClientInfo = ClientInfoNormalizer.normalize(clientInfo);
 
         String userAgent = normalizedClientInfo != null ? normalizedClientInfo.userAgent() : null;
-        String finalDeviceName = extractDeviceName(userAgent);
+        // The name the app sent ("Samsung SM-G998U"), else a guess from the user agent.
+        String sentName = normalizedClientInfo != null ? normalizedClientInfo.deviceName() : null;
+        String finalDeviceName = sentName != null ? sentName : extractDeviceName(userAgent);
 
         return UserSession.builder()
                 .userId(userId)

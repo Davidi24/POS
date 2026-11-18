@@ -28,6 +28,7 @@ public class UserAdminActionService {
     private final PasswordResetService passwordResetService;
     private final EmailVerificationService emailVerificationService;
     private final PhoneVerificationService phoneVerificationService;
+    private final pos.pos.auth.service.AccountAudit accountAudit;
 
     public void requestPasswordReset(Authentication authentication, UUID userId, AdminPasswordResetRequest request) {
         User user = findManageableUser(authentication, userId);
@@ -37,6 +38,8 @@ public class UserAdminActionService {
                 request == null || request.getChannel() == null ? RecoveryChannel.EMAIL : request.getChannel(),
                 request == null || request.getClientTarget() == null ? ClientLinkTarget.UNIVERSAL : request.getClientTarget()
         );
+        accountAudit.about(user, authentication != null && authentication.getPrincipal() instanceof pos.pos.security.principal.AuthenticatedUser actor
+                ? actor.getId() : null, "PASSWORD_LINK_SENT", "Sent " + pos.pos.auth.service.AccountAudit.nameOf(user) + " a password reset");
     }
 
     public void sendVerificationEmail(Authentication authentication, UUID userId, ClientTargetRequest request) {

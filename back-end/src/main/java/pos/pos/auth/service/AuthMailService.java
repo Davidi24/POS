@@ -126,6 +126,45 @@ public class AuthMailService {
         deliver(EmailKind.PASSWORD_CHANGED, recipientEmail, "Your POS password was changed", body, null, null, null);
     }
 
+    /** Profile → change email: the link that makes [newEmail] the account's email (user, 2026-11-18). */
+    public void sendEmailChangeConfirmation(User user, String newEmail, String url, Duration ttl) {
+        String body = """
+                Hello %s,
+
+                You asked to use this email for your POS account. Confirm it here:
+                %s
+
+                This link works once and expires in %s. Until then your old email stays.
+
+                If you didn't ask for this, ignore this email: nothing changes.
+                """.formatted(normalizeName(user.getFirstName()), url, inWords(ttl));
+        deliver(EmailKind.EMAIL_VERIFICATION, newEmail, "Confirm your new email", body, user.getId(), user.getRestaurantId(), null);
+    }
+
+    /** After a person changed their own username, so they notice if it wasn't them. */
+    public void sendUsernameChangedNotice(User user, String oldUsername) {
+        String body = """
+                Hello %s,
+
+                Your POS username was changed from "%s" to "%s". Sign in with the new one from now on.
+
+                If this wasn't you, change your password and tell your manager.
+                """.formatted(normalizeName(user.getFirstName()), oldUsername, user.getUsername());
+        deliver(EmailKind.USERNAME_CHANGED, user.getEmail(), "Your POS username was changed", body, user.getId(), user.getRestaurantId(), null);
+    }
+
+    /** To the account's current email when someone asks to change it, so the owner of the address knows. */
+    public void sendEmailChangeNotice(User user, String maskedNewEmail) {
+        String body = """
+                Hello %s,
+
+                Someone asked to change the email of your POS account to %s. It changes only when the link sent there is used.
+
+                If this wasn't you, change your password and tell your manager.
+                """.formatted(normalizeName(user.getFirstName()), maskedNewEmail);
+        deliver(EmailKind.EMAIL_CHANGE, user.getEmail(), "Your POS email is being changed", body, user.getId(), user.getRestaurantId(), null);
+    }
+
     /** "Forgot password?" reached today's limit, so no more links come today (user, 2026-11-17). */
     public void sendResetLinkLimitEmail(User user, int limit) {
         String body = """

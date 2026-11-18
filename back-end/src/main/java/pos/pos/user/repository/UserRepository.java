@@ -28,6 +28,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByUsernameAndDeletedAtIsNull(String username);
 
+    /** The person in [restaurantId] with this PIN (its peppered hash); PINs are unique in a restaurant. */
+    Optional<User> findByRestaurantIdAndPinHashAndDeletedAtIsNull(UUID restaurantId, String pinHash);
+
+    boolean existsByRestaurantIdAndPinHashAndDeletedAtIsNull(UUID restaurantId, String pinHash);
+
+    /** Any account with this username, removed ones too (the unique index counts them). */
+    boolean existsByUsername(String username);
+
     boolean existsByNormalizedPhoneAndDeletedAtIsNull(String normalizedPhone);
 
     boolean existsByNormalizedPhoneAndIdNotAndDeletedAtIsNull(String normalizedPhone, UUID id);

@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.material.icons.outlined.CheckCircle
 import mobile_desktop.shared.generated.resources.auth_account_locked
+import mobile_desktop.shared.generated.resources.auth_signed_out
 import com.saporini.mobile_desktop.core.theme.Inter
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.border
@@ -297,6 +298,53 @@ data class AccountLockedScreen(val until: String? = null) : Screen {
             }
         }
     }
+}
+
+/**
+ * The server ended this sign-in (user, 2026-11-18: "show the Signed out screen with the reason"): what happened in one short
+ * line, then Sign in again. [reason] is the server's session revocation reason (see `SessionManager.signedOutReason`).
+ */
+data class SignedOutScreen(val reason: String? = null) : Screen {
+    @Composable
+    override fun Content() {
+        val navigator = LocalNavigator.currentOrThrow
+        val session = org.koin.compose.koinInject<com.saporini.mobile_desktop.core.session.SessionManager>()
+        val (title, line) = signedOutWords(reason)
+        val pop = remember { androidx.compose.animation.core.Animatable(0.4f) }
+        LaunchedEffect(Unit) {
+            pop.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 220f))
+        }
+        val float = androidx.compose.animation.core.rememberInfiniteTransition()
+        val lift by float.animateFloat(0f, -6f, androidx.compose.animation.core.infiniteRepeatable(tween(1600), androidx.compose.animation.core.RepeatMode.Reverse))
+        AuthScreenFrame { isCompact ->
+            Image(painterResource(Res.drawable.auth_signed_out), null,
+                Modifier.size(if (isCompact) 120.dp else 150.dp).offset(y = lift.dp).scale(pop.value), contentScale = ContentScale.Fit)
+            Spacer(modifier = Modifier.height(18.dp))
+            Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (isCompact) 23.sp else 27.sp, letterSpacing = (-0.3).sp,
+                color = Color(0xFF111111), textAlign = TextAlign.Center)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(line, fontFamily = Inter(), fontSize = 14.sp, lineHeight = 20.sp, color = Color(0xFF666666), textAlign = TextAlign.Center)
+            Spacer(modifier = Modifier.height(28.dp))
+            BlackButton("Sign in again") {
+                session.clearSignedOutReason()
+                navigator.replaceAll(signInScreen())
+            }
+        }
+    }
+}
+
+/** The title and one short line for why the server ended a sign-in. */
+internal fun signedOutWords(reason: String?): Pair<String, String> = when (reason) {
+    "EXPIRED" -> "Signed out" to "You hadn't used the app for a while."
+    "LOGOUT_ALL" -> "Signed out everywhere" to "Someone chose Sign out everywhere for your account."
+    "SESSION_LIMIT" -> "Signed out on this device" to "You signed in on another device and chose to sign out this one."
+    "SESSION_REVOKED" -> "Signed out on this device" to "Your sign-in here was ended from another device or by your manager."
+    "PASSWORD_CHANGED", "PASSWORD_RESET" -> "Password changed" to "Sign in with your new password."
+    "USER_NOT_ALLOWED" -> "Account switched off" to "Your account can't sign in right now. Ask your manager."
+    "RESTAURANT_CLOSED" -> "Restaurant closed" to "This restaurant can't sign in right now. Ask the owner."
+    "OWNERSHIP_TRANSFERRED" -> "Signed out" to "This restaurant has a new owner."
+    "REUSE_DETECTED", "TOKEN_USER_MISMATCH" -> "Signed out for your safety" to "Sign in again. If this keeps happening, change your password."
+    else -> "Signed out" to "Sign in again to continue."
 }
 
 object SessionExpiredScreen : Screen {
@@ -666,7 +714,7 @@ private fun PinNumberKey(
 }
 
 @Composable
-private fun BlackButton(
+internal fun BlackButton(
     text: String,
     onClick: () -> Unit
 ) {

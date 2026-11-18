@@ -40,6 +40,7 @@ internal fun ChangeTableDialog(
     // Moving late guests: their current tables stay out (they don't fit there) and "no table" isn't a choice.
     keepCurrent: Boolean = true
 ) {
+    com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
     val state by model.state.collectAsState()
     val planTableIds = remember(state.tableGroups) { state.tableGroups.flatMap { group -> group.tables.map { it.id } }.toSet() }
     val ownTables = remember(reservation.id) {

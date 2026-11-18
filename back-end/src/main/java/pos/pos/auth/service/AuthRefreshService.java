@@ -47,8 +47,10 @@ public class AuthRefreshService {
     private final CurrentUserMapper currentUserMapper;
     private final RefreshTokenSecurityService refreshTokenSecurityService;
     private final RefreshRateLimiter refreshRateLimiter;
+    private final AccountAudit accountAudit;
 
-    @Transactional(noRollbackFor = InvalidCredentialsException.class)
+    // An ended sign-in answers why (SIGNED_OUT + reason), so the app can say it (user, 2026-11-18); the revoke is kept.
+    @Transactional(noRollbackFor = {InvalidCredentialsException.class, pos.pos.exception.auth.LoginRefusedException.class})
     public AuthenticationResponse refresh(String refreshToken, ClientInfo clientInfo) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         ClientInfo normalizedClientInfo = ClientInfoNormalizer.normalize(clientInfo);
@@ -60,25 +62,28 @@ public class AuthRefreshService {
         // Fetches the active session by tokenId and locks the database row, orUpdate => (SELECT FOR UPDATE)
         // to prevent concurrent access or reuse of the same refresh token
         UserSession session = userSessionRepository.findByTokenIdAndRevokedFalseForUpdate(validatedRefreshToken.tokenId())
-                .orElseThrow(() -> new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE));
+                .orElseThrow(() -> signedOut(userSessionRepository.findByTokenId(validatedRefreshToken.tokenId())
+                        .map(UserSession::getRevokedReason).orElse(null)));
 
-        // if session is expired it revokes it
+        // Not used for 30 days (the refresh lifetime, renewed by every refresh): signed out
         if (session.getExpiresAt() == null || !session.getExpiresAt().isAfter(now)) {
             revokeSession(session, now, SessionRevocationReason.EXPIRED);
-            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
+            throw signedOut(SessionRevocationReason.EXPIRED.name());
         }
 
         // Ensures that the session userID is same as the user who send the request, so userID that came from refresh token
         // So the session belongs to this user not another user
         if (!session.getUserId().equals(validatedRefreshToken.userId())) {
             revokeSession(session, now, SessionRevocationReason.TOKEN_USER_MISMATCH);
-            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
+            throw signedOut(SessionRevocationReason.TOKEN_USER_MISMATCH.name());
         }
 
         // Verifies the provided refresh token matches the stored hash to detect reuse or tampering (unauthorized modification or falsification of a token)
         if (!refreshTokenSecurityService.matchesHash(validatedRefreshToken, session.getRefreshTokenHash())) {
             revokeSession(session, now, SessionRevocationReason.REUSE_DETECTED);
-            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
+            accountAudit.about(session.getUserId(), null, "SIGNED_OUT", name -> name + " was signed out on "
+                    + AccountAudit.deviceOf(session.getDeviceName()) + " for safety: an old sign-in was used again");
+            throw signedOut(SessionRevocationReason.REUSE_DETECTED.name());
         }
 
         // after all checks now it checks if user exist
@@ -88,12 +93,13 @@ public class AuthRefreshService {
                 || !"ACTIVE".equalsIgnoreCase(user.getStatus())
                 || !user.isEmailVerified()) {
             revokeSession(session, now, SessionRevocationReason.USER_NOT_ALLOWED);
-            throw new InvalidCredentialsException(INVALID_REFRESH_TOKEN_MESSAGE);
+            throw signedOut(SessionRevocationReason.USER_NOT_ALLOWED.name());
         }
 
         if (userRepository.worksAtClosedRestaurant(user.getId())) {
             revokeSession(session, now, SessionRevocationReason.RESTAURANT_CLOSED);
-            throw new AuthException(AuthLoginService.RESTAURANT_CLOSED_MESSAGE, HttpStatus.FORBIDDEN);
+            throw new pos.pos.exception.auth.LoginRefusedException(pos.pos.exception.auth.LoginRefusedException.Reason.SIGNED_OUT,
+                    AuthLoginService.RESTAURANT_CLOSED_MESSAGE, HttpStatus.FORBIDDEN, null, SessionRevocationReason.RESTAURANT_CLOSED.name(), null);
         }
 
         List<Role> activeRoles = roleRepository.findActiveRolesByUserId(user.getId());
@@ -107,6 +113,10 @@ public class AuthRefreshService {
         session.setTokenId(newTokenId);
         session.setRefreshTokenHash(refreshTokenSecurityService.hash(newRefreshToken));
         session.setLastUsedAt(now);
+        // Used now: signed in for another 30 days (user, 2026-11-18: "30 days without use").
+        if (session.getSessionType() != pos.pos.auth.enums.SessionType.PIN) {
+            session.setExpiresAt(now.plusSeconds(jwtProperties.getRefreshExpiration().getSeconds()));
+        }
         session.setIpAddress(normalizedClientInfo != null ? normalizedClientInfo.ipAddress() : null);
         session.setUserAgent(normalizedClientInfo != null ? normalizedClientInfo.userAgent() : null);
 
@@ -128,6 +138,12 @@ public class AuthRefreshService {
 
         // Their roles as their restaurant has them, less what's switched off for them, plus what's given to them alone.
         return pos.pos.role.service.EffectivePermissions.forUser(permissionRepository, user.getId(), user.getRestaurantId(), roleIds);
+    }
+
+    /** The sign-in has ended: 401 with code SIGNED_OUT and why (a session revocation reason, or null when unknown). */
+    private static pos.pos.exception.auth.LoginRefusedException signedOut(String reason) {
+        return new pos.pos.exception.auth.LoginRefusedException(pos.pos.exception.auth.LoginRefusedException.Reason.SIGNED_OUT,
+                INVALID_REFRESH_TOKEN_MESSAGE, HttpStatus.UNAUTHORIZED, null, reason, null);
     }
 
     //revoke the session so it can be used anymore

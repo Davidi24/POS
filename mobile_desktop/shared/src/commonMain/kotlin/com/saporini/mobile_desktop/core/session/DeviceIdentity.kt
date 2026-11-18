@@ -6,4 +6,7 @@ package com.saporini.mobile_desktop.core.session
  */
 expect object DeviceIdentity {
     val id: String
+
+    /** What this device is called in the person's list of signed-in devices ("Samsung SM-G998U", "Linux computer (kitchen-pc)"). */
+    val name: String
 }

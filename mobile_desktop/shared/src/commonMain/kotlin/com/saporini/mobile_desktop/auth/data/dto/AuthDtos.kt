@@ -5,12 +5,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class LoginRequest(
     val identifier: String,
-    val password: String
+    val password: String,
+    // At the device limit: the device the person chose to sign out (left out otherwise).
+    val signOutSessionId: String? = null
 )
 
 @Serializable
 data class RefreshRequest(
-    val refreshToken: String
+    val refreshToken: String,
+    // Signing out only: LOCKED (the Lock button on a till) or IDLE (the till locked itself), for the audit log.
+    val reason: String? = null
 )
 
 @Serializable
@@ -36,7 +40,76 @@ data class CurrentUserResponse(
     val emailVerified: Boolean,
     val phoneVerified: Boolean,
     val roles: List<String>,
-    val permissions: List<String>
+    val permissions: List<String>,
+    // The person's restaurant and default branch by name, for their menu and Profile.
+    val restaurantName: String? = null,
+    val branchName: String? = null,
+    // The person's own photo, or null for their initials.
+    val photoUrl: String? = null
+)
+
+/** Profile → My details as the server keeps them; [pendingEmail] = a new address waiting for its link. */
+@Serializable
+data class MyProfile(
+    val firstName: String = "",
+    val lastName: String = "",
+    val username: String? = null,
+    val email: String = "",
+    val emailVerified: Boolean = false,
+    val pendingEmail: String? = null,
+    val phone: String? = null,
+    val phoneVerified: Boolean = false,
+    val photoUrl: String? = null,
+    val usernameChangesLeft: Int = 3,
+    val nextUsernameChangeAt: String? = null
+)
+
+@Serializable
+data class ChangeMyUsernameRequest(val username: String, val currentPassword: String)
+
+/** A page of the person's own sign-ins, how many there are, and the 30 days' counts by result. */
+@Serializable
+data class SignInPage(
+    val items: List<SignInRecord> = emptyList(),
+    val total: Long = 0,
+    val page: Int = 0,
+    val size: Int = 8,
+    val counts: Map<String, Long> = emptyMap()
+)
+
+@Serializable
+data class UpdateMyDetailsRequest(val firstName: String, val lastName: String, val phone: String?)
+
+@Serializable
+data class ChangeMyEmailRequest(val newEmail: String, val currentPassword: String)
+
+/** Profile → Change password. */
+@Serializable
+data class ChangePasswordRequest(
+    val currentPassword: String,
+    val newPassword: String
+)
+
+/** One of the person's own sign-in tries (Profile → Security): [result] SIGNED_IN or why it failed. */
+@Serializable
+data class SignInRecord(
+    val id: String,
+    val at: String? = null,
+    val result: String = "",
+    val deviceId: String? = null,
+    val deviceName: String? = null,
+    val ipAddress: String? = null
+)
+
+/** One device the person is signed in on (Profile → Your devices); [current] = this device. */
+@Serializable
+data class MySession(
+    val id: String,
+    val deviceName: String? = null,
+    val ipAddress: String? = null,
+    val lastUsedAt: String? = null,
+    val createdAt: String? = null,
+    val current: Boolean = false
 )
 
 @Serializable
@@ -119,3 +192,38 @@ data class RestaurantApplicationStatusView(
     val reviewedAt: String? = null,
     val message: String? = null
 )
+
+/** A till's pairing code, used once to connect it to its restaurant. */
+@Serializable
+data class PairingRedeemRequest(val pairingToken: String)
+
+/** What pairing gives back: the device and its secret (only this once). */
+@Serializable
+data class PairingRedeemResponse(
+    val deviceId: String,
+    val restaurantId: String,
+    val branchId: String? = null,
+    val deviceName: String,
+    val deviceType: String? = null,
+    val deviceSecret: String
+)
+
+/** Signing in on a connected till with a PIN. */
+@Serializable
+data class PinLoginRequest(val deviceId: String, val deviceSecret: String, val pin: String)
+
+/** Profile → PIN: whether the person has one, since when, and what's left today. */
+@Serializable
+data class PinStatus(
+    val hasPin: Boolean = false,
+    val setAt: String? = null,
+    val suggestionsLeft: Int = 0,
+    val changesLeft: Int = 0
+)
+
+/** A random PIN offered to the person; it becomes theirs only with "Use this PIN". */
+@Serializable
+data class PinSuggestion(val pin: String, val suggestionsLeft: Int = 0)
+
+@Serializable
+data class SavePinRequest(val pin: String)

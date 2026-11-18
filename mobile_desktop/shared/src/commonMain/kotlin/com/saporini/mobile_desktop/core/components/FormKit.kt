@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.window.DialogProperties
 import com.saporini.mobile_desktop.core.theme.Inter
 
@@ -107,7 +108,15 @@ internal fun AppDialog(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Dialog(onDismissRequest = { if (!busy) onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        BoxWithConstraints {
+        // A touch inside a dialog keeps a connected till from locking (on Android a dialog is a window of its own).
+        BoxWithConstraints(Modifier.pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    com.saporini.mobile_desktop.core.session.IdleLock.touch()
+                }
+            }
+        }) {
             // On a phone the dialog takes nearly the whole width and its sides are slimmer, so fields keep their room.
             // this.maxWidth is the window's width (the parameter of the same name is the dialog's own limit).
             val narrow = this.maxWidth < NarrowDialogWidth

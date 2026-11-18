@@ -217,6 +217,8 @@ internal fun CreateReservationDialog(
     onDismiss: () -> Unit,
     onCreated: (LocalDate) -> Unit
 ) {
+    // Making a booking: 3 minutes before a till locks.
+    com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
     val zone = RestaurantTime.zone
     val modelState by model.state.collectAsState()
     // Only tables on the floor plan can be offered; the server also knows tables on floors the app doesn't show.

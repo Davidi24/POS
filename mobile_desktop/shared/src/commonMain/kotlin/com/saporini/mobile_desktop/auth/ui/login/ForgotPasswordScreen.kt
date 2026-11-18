@@ -180,8 +180,7 @@ object ForgotPasswordScreen : Screen {
                             smallSpacing = smallSpacing,
                             logoHeight = logoHeight,
                             buttonHeight = buttonHeight,
-                            onBackToLogin = goBack,
-                            onHaveLink = { navigator.push(ResetPasswordScreen()) }
+                            onBackToLogin = goBack
                         )
                     } else {
                         Column(
@@ -328,8 +327,7 @@ private fun ResetLinkSentContent(
     smallSpacing: androidx.compose.ui.unit.Dp,
     logoHeight: androidx.compose.ui.unit.Dp,
     buttonHeight: androidx.compose.ui.unit.Dp,
-    onBackToLogin: () -> Unit,
-    onHaveLink: () -> Unit
+    onBackToLogin: () -> Unit
 ) {
     val successGreen = Color(0xFF2F8F4E)
 
@@ -464,18 +462,6 @@ private fun ResetLinkSentContent(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 0.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(smallSpacing))
-
-        TextButton(onClick = onHaveLink, contentPadding = PaddingValues(0.dp)) {
-            Text(
-                text = "I have the link",
-                style = MaterialTheme.typography.bodyMedium,
-                color = primaryText,
-                fontWeight = FontWeight.Medium,
-                textDecoration = TextDecoration.Underline
             )
         }
     }
