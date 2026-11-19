@@ -13,31 +13,47 @@ Each step has its own branch, named like its file without the number plus `-prod
 Read the step's file before working on it, keep its sections and "Done" up to date, and change its Status only as the user agrees
 (Not started → Screens → Development → Hard testing list ready → Done).
 
-| # | Step | Status |
-|---|------|--------|
-| 1 | [Sign-in & accounts](01-sign-in-and-accounts.md) | Development |
-| 2 | [Languages](02-languages.md) | Not started |
-| 3 | [Users & roles](03-users-and-roles.md) | Not started |
-| 4 | [Restaurant & branches (plus opening hours)](04-restaurant-and-branches.md) | Not started |
-| 5 | [Settings](05-settings.md) | Not started |
-| 6 | [Devices & printing](06-devices-and-printing.md) | Not started |
-| 7 | [Notifications](07-notifications.md) | Not started |
-| 8 | [Shifts](08-shifts.md) | Not started |
-| 9 | [Inventory](09-inventory.md) | Not started |
-| 10 | [Suppliers](10-suppliers.md) | Not started |
-| 11 | [Menu & recipes](11-menu-and-recipes.md) | Not started |
-| 12 | [Kitchen](12-kitchen.md) | Not started |
-| 13 | [Tables](13-tables.md) | Not started |
-| 14 | [Reservations](14-reservations.md) | Not started |
-| 15 | [Orders](15-orders.md) | Not started |
-| 16 | [Payments & receipts](16-payments-and-receipts.md) | Not started |
-| 17 | [Offline](17-offline.md) | Not started |
-| 18 | [Salary](18-salary.md) | Not started |
-| 19 | [My Sales](19-my-sales.md) | Not started |
-| 20 | [Statistics](20-statistics.md) | Not started |
-| 21 | [Fraud detection & Audit log](21-fraud-and-audit-log.md) | Not started |
-| 22 | [Onboarding](22-onboarding.md) | Not started |
-| 23 | [Web](23-web.md) | Not started |
+## Where we are
+
+**Now: step 2, [Languages](02-languages.md), built; PR open to `develop`, waiting for your merge.** Keep this list up to date as each part is finished (user, 2026-11-18:
+"check boxes so I know what I have left and where I am").
+
+- [x] 1. [Sign-in & accounts](01-sign-in-and-accounts.md): built and merged (#100, #101); its hard testing list is written.
+  - [x] Screens
+  - [x] Development
+  - [x] Hard testing list written
+  - [ ] Waiting on outside things: the phone app's server address (no domain yet), real email on the deployed server, phone confirmation by SMS
+  - [ ] Your decisions in [decide-later.md](decide-later.md)
+  - [ ] Hard testing (later, when you say)
+- [ ] 2. [Languages](02-languages.md) ← **now**
+  - [x] Decisions
+  - [x] Screens (waiting for your look)
+  - [x] Development (numbers and money in each language's style left for [decide-later.md](decide-later.md))
+  - [x] Hard testing list written
+  - [ ] Merged
+  - [ ] Native speakers check the translations (later)
+  - [ ] Hard testing (later, when you say)
+- [ ] 3. [Users & roles](03-users-and-roles.md)
+- [ ] 4. [Restaurant & branches (plus opening hours)](04-restaurant-and-branches.md)
+- [ ] 5. [Settings](05-settings.md)
+- [ ] 6. [Devices & printing](06-devices-and-printing.md)
+- [ ] 7. [Notifications](07-notifications.md)
+- [ ] 8. [Shifts](08-shifts.md)
+- [ ] 9. [Inventory](09-inventory.md)
+- [ ] 10. [Suppliers](10-suppliers.md)
+- [ ] 11. [Menu & recipes](11-menu-and-recipes.md)
+- [ ] 12. [Kitchen](12-kitchen.md)
+- [ ] 13. [Tables](13-tables.md)
+- [ ] 14. [Reservations](14-reservations.md)
+- [ ] 15. [Orders](15-orders.md)
+- [ ] 16. [Payments & receipts](16-payments-and-receipts.md)
+- [ ] 17. [Offline](17-offline.md)
+- [ ] 18. [Salary](18-salary.md)
+- [ ] 19. [My Sales](19-my-sales.md)
+- [ ] 20. [Statistics](20-statistics.md)
+- [ ] 21. [Fraud detection & Audit log](21-fraud-and-audit-log.md)
+- [ ] 22. [Onboarding](22-onboarding.md)
+- [ ] 23. [Web](23-web.md)
 
 Added 2026-11-17 (user: "offline, multi-language and onboarding"): Languages right after sign-in, so every later screen is
 translated as it's finished; Offline after Payments, once the service flows work online (steps 12–16 already give new orders,

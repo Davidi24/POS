@@ -1,6 +1,6 @@
 # 1. Sign-in & accounts
 
-Status: Development (Not started → Screens → Development → Hard testing list ready → Done)
+Status: Hard testing list ready (merged in #100 and #101, 2026-11-18; a few items wait, see To do) (Not started → Screens → Development → Hard testing list ready → Done)
 
 ## Where it is
 - App: Login, Forgot password, Set a password from a link (only from Forgot password → "I have the link" since 2026-11-17; the emailed link works in the browser), Open a restaurant / Check an application, the workspace picker, the profile menu (sign out).
