@@ -115,6 +115,7 @@ class EmailVerificationServiceTest {
             assertThat(savedToken.getExpiresAt()).isNotNull();
 
             verify(authMailService).sendEmailVerificationEmail(
+                    null,
                     "cashier@pos.local",
                     "Casey",
                     "Verify your POS email",
@@ -289,6 +290,7 @@ class EmailVerificationServiceTest {
             verify(authEmailVerificationTokenRepository).deleteByUserId(USER_ID);
             verify(authEmailVerificationTokenRepository).save(any(AuthEmailVerificationToken.class));
             verify(authMailService).sendEmailVerificationEmail(
+                    null,
                     "cashier@pos.local",
                     "Casey",
                     "Verify your POS email",

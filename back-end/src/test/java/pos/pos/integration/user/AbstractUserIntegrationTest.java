@@ -180,9 +180,9 @@ abstract class AbstractUserIntegrationTest {
         Mockito.reset(authMailService, smsMessageService);
 
         doAnswer(invocation -> {
-            latestVerificationUrl.set(invocation.getArgument(3, String.class));
+            latestVerificationUrl.set(invocation.getArgument(4, String.class));
             return invocation.callRealMethod();
-        }).when(authMailService).sendEmailVerificationEmail(anyString(), anyString(), anyString(), anyString(), any(Duration.class));
+        }).when(authMailService).sendEmailVerificationEmail(any(), anyString(), anyString(), anyString(), anyString(), any(Duration.class));
 
         doAnswer(invocation -> {
             latestPasswordResetUrl.set(invocation.getArgument(2, String.class));

@@ -1,5 +1,7 @@
 package pos.pos.auth.service;
 
+import pos.pos.i18n.Words;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -137,12 +139,13 @@ public class PasswordResetService {
         PasswordLinkStatus status = statusOf(token, user, now);
         PasswordLinkPurpose purpose = token == null ? null : token.getPurpose();
         if (status != PasswordLinkStatus.VALID) {
-            return new PasswordLinkView(status, purpose, linkProblem(status, purpose), null, null, null, null, null);
+            return new PasswordLinkView(status, purpose, linkProblem(status, purpose), null, null, null, null, null,
+                    user == null ? null : user.getLanguage());
         }
         String restaurantName = user.getRestaurantId() == null ? null : restaurantRepository
                 .findByIdAndDeletedAtIsNull(user.getRestaurantId()).map(restaurant -> restaurant.getName()).orElse(null);
         return new PasswordLinkView(status, purpose, null, user.getFirstName(), user.getUsername(), user.getEmail(),
-                restaurantName, token.getExpiresAt());
+                restaurantName, token.getExpiresAt(), user.getLanguage());
     }
 
     /** The newest invitation link sent to this person, and what it can still do. */
@@ -162,14 +165,14 @@ public class PasswordResetService {
         return switch (status) {
             case VALID -> null;
             case EXPIRED -> invite
-                    ? "This invitation link has expired. Ask for a new invitation, or use \"Forgot password?\" in the POS app with your email to get a new link."
-                    : "This link has expired. Use \"Forgot password?\" in the POS app to get a new one.";
-            case USED -> "This link was already used, so your password is set. Sign in with it, or use \"Forgot password?\" if you don't remember it.";
+                    ? Words.en("This invitation link has expired. Ask for a new invitation, or use \"Forgot password?\" in the POS app with your email to get a new link.")
+                    : Words.en("This link has expired. Use \"Forgot password?\" in the POS app to get a new one.");
+            case USED -> Words.en("This link was already used, so your password is set. Sign in with it, or use \"Forgot password?\" if you don't remember it.");
             case REPLACED -> invite
-                    ? "A newer invitation replaced this link. Use the link in the most recent email."
-                    : "A newer email replaced this link. Use the link in the most recent email.";
-            case UNAVAILABLE -> "This account has been switched off. Contact whoever set it up for you.";
-            case INVALID -> "This link isn't valid. Check that you copied the whole link from the email.";
+                    ? Words.en("A newer invitation replaced this link. Use the link in the most recent email.")
+                    : Words.en("A newer email replaced this link. Use the link in the most recent email.");
+            case UNAVAILABLE -> Words.en("This account has been switched off. Contact whoever set it up for you.");
+            case INVALID -> Words.en("This link isn't valid. Check that you copied the whole link from the email.");
         };
     }
 
@@ -275,7 +278,7 @@ public class PasswordResetService {
         );
 
         if (notify) {
-            authMailService.sendPasswordChangedNotificationEmail(user.getEmail(), user.getFirstName());
+            authMailService.sendPasswordChangedNotificationEmail(user.getLanguage(), user.getEmail(), user.getFirstName());
         }
     }
 

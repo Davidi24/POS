@@ -44,6 +44,9 @@ security:
     refresh-expiration: 30d
 
 app:
+  exchange-rates:
+    # Today's rates, only for seeing amounts in another currency on one's own device (never for payments).
+    url: ${EXCHANGE_RATES_URL:https://api.frankfurter.dev/v2}
   restaurants:
     # Public restaurant applications (POST /restaurants/registrations), each reviewed by a super admin before the
     # restaurant exists. Off: only super admins create restaurants (applicants can still check earlier applications).

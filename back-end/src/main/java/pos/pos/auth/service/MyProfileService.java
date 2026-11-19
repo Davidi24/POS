@@ -151,6 +151,21 @@ public class MyProfileService {
         return view(user);
     }
 
+    /** The app's language this person uses (en, it, es, sq), picked in Profile; the app switches to it at sign-in. */
+    @Transactional
+    public void changeLanguage(UUID userId, String language) {
+        String code = language == null ? "" : language.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!java.util.Set.of("en", "it", "es", "sq").contains(code)) {
+            throw new AuthException("Choose English, Italiano, Español or Shqip.", HttpStatus.BAD_REQUEST);
+        }
+        User user = requireUser(userId);
+        if (code.equals(user.getLanguage())) return;
+        user.setLanguage(code);
+        userRepository.save(user);
+        String name = switch (code) { case "it" -> "Italiano"; case "es" -> "Español"; case "sq" -> "Shqip"; default -> "English"; };
+        accountAudit.about(user, userId, "PROFILE_CHANGED", AccountAudit.nameOf(user) + " changed their language to " + name);
+    }
+
     @Transactional
     public MyProfileResponse cancelEmailChange(UUID userId) {
         User user = requireUser(userId);

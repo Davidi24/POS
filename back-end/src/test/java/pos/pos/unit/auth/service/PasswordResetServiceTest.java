@@ -391,7 +391,7 @@ class PasswordResetServiceTest {
                     any(OffsetDateTime.class),
                     eq(SessionRevocationReason.PASSWORD_RESET.name())
             );
-            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
+            verify(authMailService).sendPasswordChangedNotificationEmail(null, "cashier@pos.local", "Casey");
             assertThat(token.getUsedAt()).isNotNull();
             verify(authPasswordResetTokenRepository).save(token);
         }
@@ -425,7 +425,7 @@ class PasswordResetServiceTest {
             assertThat(user.getEmailVerifiedAt()).isNotNull();
             verify(userRepository).save(user);
             // A first password is not a change, so no "your password was changed" email.
-            verify(authMailService, never()).sendPasswordChangedNotificationEmail(any(), any());
+            verify(authMailService, never()).sendPasswordChangedNotificationEmail(any(), any(), any());
         }
     }
 
@@ -477,7 +477,7 @@ class PasswordResetServiceTest {
                     any(OffsetDateTime.class),
                     eq(SessionRevocationReason.PASSWORD_RESET.name())
             );
-            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
+            verify(authMailService).sendPasswordChangedNotificationEmail(null, "cashier@pos.local", "Casey");
 
             ArgumentCaptor<AuthSmsOtpCode> codeCaptor = ArgumentCaptor.forClass(AuthSmsOtpCode.class);
             verify(authSmsOtpCodeRepository).save(codeCaptor.capture());

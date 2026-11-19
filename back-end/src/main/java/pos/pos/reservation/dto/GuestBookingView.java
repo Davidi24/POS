@@ -29,6 +29,8 @@ public class GuestBookingView {
     private ReservationStatus status;
     // e.g. "Confirmed ✓", "Request sent: we'll let you know", "Cancelled".
     private String statusText;
+    // The language the guest booked in (null = English), for their pages.
+    private String language;
     private Integer partySize;
     private OffsetDateTime reservationStart;
     private OffsetDateTime reservationEnd;

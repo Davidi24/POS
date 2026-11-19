@@ -97,6 +97,10 @@ public class User implements AuditedEntityLifecycle {
     @Column(name = "avatar_url", columnDefinition = "text")
     private String avatarUrl;
 
+    // The app's language this person picked in Profile (en, it, es, sq); null = English.
+    @Column(name = "language", length = 5)
+    private String language;
+
     @Builder.Default
     @Column(name = "status", nullable = false, length = 30)
     private String status = "ACTIVE";
