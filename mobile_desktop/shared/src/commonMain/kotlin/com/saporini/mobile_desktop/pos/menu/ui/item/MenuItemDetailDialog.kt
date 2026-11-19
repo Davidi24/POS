@@ -30,7 +30,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -174,7 +174,7 @@ private fun DesktopItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                                 color = ActiveOlive
                             )
                             Text(
-                                text = item.category + (item.sku?.let { "  •  SKU $it" } ?: ""),
+                                text = item.sku?.let { "${item.category}  •  SKU $it" } ?: item.category,
                                 fontFamily = Inter(),
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 12.sp,
@@ -514,7 +514,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                     fontSize = 24.sp, lineHeight = 29.sp, color = TextInk
                 )
                 Text(
-                    item.category + (item.sku?.let { "  •  SKU $it" } ?: ""),
+                    item.sku?.let { "${item.category}  •  SKU $it" } ?: item.category,
                     fontFamily = Inter(), fontSize = 12.sp, color = MutedInk
                 )
                 Text(item.price, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 21.sp, color = TextInk)
@@ -550,7 +550,7 @@ private fun PhoneItemDetails(item: MenuItem, onDismiss: () -> Unit) {
                     item.optionGroups.forEach { group ->
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                group.name + if (group.required) " • Required" else " • Optional",
+                                if (group.required) "${group.name} • Required" else "${group.name} • Optional",
                                 fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = TextInk
                             )
                             group.choices.forEach { choice ->
@@ -604,9 +604,4 @@ private fun parseSignedPriceDelta(label: String): Double {
     return if (negative) -magnitude else magnitude
 }
 
-private fun formatDetailPrice(price: Double): String {
-    val cents = kotlin.math.round(price * 100).toLong()
-    val dollars = cents / 100
-    val remainder = (cents % 100).let { if (it < 0) -it else it }
-    return "$$dollars.${remainder.toString().padStart(2, '0')}"
-}
+private fun formatDetailPrice(price: Double): String = com.saporini.mobile_desktop.core.format.menuPrice(price)

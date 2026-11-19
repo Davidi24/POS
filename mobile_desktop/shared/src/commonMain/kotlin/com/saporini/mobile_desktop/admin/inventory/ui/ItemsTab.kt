@@ -51,7 +51,7 @@ import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -500,7 +500,11 @@ private fun priceOrNull(text: String): Double? = text.trim().replace(',', '.').t
 
 /** Cost per unit from / up to: typed in, or one of the quick ranges. Green while a range is set, with a cross to clear it. */
 @Composable
-private fun PriceFilterButton(min: Double?, max: Double?, onChange: (Double?, Double?) -> Unit, compact: Boolean) {
+private fun PriceFilterButton(min: Double?, max: Double?, onChange: (Double?, Double?) -> Unit, compact: Boolean) =
+    com.saporini.mobile_desktop.core.money.RealMoney { PriceFilterButtonRealMoney(min = min, max = max, onChange = onChange, compact = compact) }
+
+@Composable
+private fun PriceFilterButtonRealMoney(min: Double?, max: Double?, onChange: (Double?, Double?) -> Unit, compact: Boolean) {
     var open by remember { mutableStateOf(false) }
     var fromText by remember(open) { mutableStateOf(min?.let(::plainPrice).orEmpty()) }
     var toText by remember(open) { mutableStateOf(max?.let(::plainPrice).orEmpty()) }

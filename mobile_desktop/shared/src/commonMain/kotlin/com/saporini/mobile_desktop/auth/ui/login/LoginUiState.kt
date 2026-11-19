@@ -63,6 +63,8 @@ class LoginScreenModel(
 
                 // 2. Prove auth works — call protected /auth/me
                 val me = repository.me()
+                // The person's own language from Profile, from now on on this device (user, 2026-11-18).
+                com.saporini.mobile_desktop.core.i18n.AppLanguage.of(me.language)?.let { com.saporini.mobile_desktop.core.i18n.I18n.use(it) }
                 sessionManager.signIn(me)
                 _state.update { it.copy(isLoading = false, user = me, wrongInARow = 0, devices = emptyList(), devicesMessage = null) }
             } catch (e: CancellationException) {

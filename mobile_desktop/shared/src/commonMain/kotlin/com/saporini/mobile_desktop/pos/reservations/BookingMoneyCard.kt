@@ -27,7 +27,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -285,9 +285,13 @@ private fun MoneyChipButton(
 }
 
 // Part of kept money back, with a reason. Never all of it: the server refuses that too.
+@Composable
+private fun GoodwillDialog(line: MoneyLine, onConfirm: (cents: Long, reason: String) -> Unit, onDismiss: () -> Unit) =
+    com.saporini.mobile_desktop.core.money.RealMoney { GoodwillDialogRealMoney(line = line, onConfirm = onConfirm, onDismiss = onDismiss) }
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun GoodwillDialog(line: MoneyLine, onConfirm: (cents: Long, reason: String) -> Unit, onDismiss: () -> Unit) {
+private fun GoodwillDialogRealMoney(line: MoneyLine, onConfirm: (cents: Long, reason: String) -> Unit, onDismiss: () -> Unit) {
     var amount by remember(line.id) { mutableStateOf("") }
     var reason by remember(line.id) { mutableStateOf("") }
     val problem = goodwillProblem(amount, line)

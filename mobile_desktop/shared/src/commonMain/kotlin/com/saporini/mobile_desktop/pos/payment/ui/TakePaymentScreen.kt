@@ -37,7 +37,7 @@ import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -101,7 +101,11 @@ fun TakePaymentScreen(orderId: String, modifier: Modifier = Modifier, onBack: ()
 }
 
 @Composable
-internal fun TakePaymentContent(state: PaymentUiState, model: PaymentScreenModel, onBack: () -> Unit, modifier: Modifier = Modifier) {
+internal fun TakePaymentContent(state: PaymentUiState, model: PaymentScreenModel, onBack: () -> Unit, modifier: Modifier = Modifier) =
+    com.saporini.mobile_desktop.core.money.RealMoney { TakePaymentContentRealMoney(state = state, model = model, onBack = onBack, modifier = modifier) }
+
+@Composable
+private fun TakePaymentContentRealMoney(state: PaymentUiState, model: PaymentScreenModel, onBack: () -> Unit, modifier: Modifier = Modifier) {
     // Taking a payment: 3 minutes before a till locks.
     com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
     var showReceipt by remember { mutableStateOf(false) }
@@ -168,6 +172,8 @@ private fun PayColumn(state: PaymentUiState, model: PaymentScreenModel, size: Sc
                     Text(if (balance > 0) "Left to pay" else "Nothing left to pay", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Kit.Muted)
                     Text(moneyText(balance.coerceAtLeast(0), currency), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 36.sp,
                         color = if (balance > 0) Color(0xFFAD3F08) else Kit.Green)
+                    // With another currency chosen on this device: about how much that is, only to give an idea (user, 2026-11-19).
+                    if (balance > 0) com.saporini.mobile_desktop.core.money.ApproxMoneyNote(balance, currency)
                 }
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text("Bill ${moneyText(total, currency)}", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Ink)
@@ -385,7 +391,8 @@ private fun DonePanel(state: PaymentUiState, onBack: () -> Unit, onReceipt: () -
             }
             Text("Paid in full", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 24.sp, color = Kit.Ink)
             payment?.let {
-                Text("${methodName(it.method)} · ${it.amount.money(currency)}" + (it.tipAmount.cents().takeIf { t -> t > 0 }?.let { t -> " + ${moneyText(t, currency)} tip" } ?: ""),
+                Text(it.tipAmount.cents().takeIf { t -> t > 0 }?.let { t -> "${methodName(it.method)} · ${it.amount.money(currency)} + ${moneyText(t, currency)} tip" }
+                    ?: "${methodName(it.method)} · ${it.amount.money(currency)}",
                     fontFamily = Inter(), fontSize = 14.sp, color = Kit.Muted)
                 it.changeAmount?.cents()?.takeIf { c -> c > 0 }?.let { change ->
                     Text("Give back ${moneyText(change, currency)}", Modifier.clip(RoundedCornerShape(50)).background(Kit.Amber.copy(alpha = 0.12f))

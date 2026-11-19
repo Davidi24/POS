@@ -50,6 +50,7 @@ data class ProfileState(
     val pinSuggestion: com.saporini.mobile_desktop.auth.data.dto.PinSuggestion? = null,
     val pinBusy: Boolean = false,
     val pinProblem: String? = null,
+    val savingLanguage: Boolean = false,
     val notice: String? = null,
     val error: String? = null
 )
@@ -305,6 +306,24 @@ class ProfileScreenModel(
 
     /** Lets go of the PIN shown without using it. */
     fun dropPinSuggestion() = _state.update { it.copy(pinSuggestion = null, pinProblem = null) }
+
+    /** The person's own language: saved on the server (used at every sign-in) and used here at once. */
+    fun saveLanguage(language: com.saporini.mobile_desktop.core.i18n.AppLanguage) {
+        if (_state.value.savingLanguage) return
+        com.saporini.mobile_desktop.core.i18n.I18n.use(language)
+        screenModelScope.launch {
+            _state.update { it.copy(savingLanguage = true) }
+            try {
+                repository.setMyLanguage(language.code)
+                runCatching { sessionManager.refreshPermissions() }
+                _state.update { it.copy(savingLanguage = false, notice = "Your language was saved.") }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(savingLanguage = false, error = (e as? ApiException)?.message ?: "Couldn't reach the server. Try again.") }
+            }
+        }
+    }
 
     /** Every device, this one too; throws when the server can't be reached (the window says so). */
     suspend fun signOutEverywhere() = sessionManager.signOutEverywhere()

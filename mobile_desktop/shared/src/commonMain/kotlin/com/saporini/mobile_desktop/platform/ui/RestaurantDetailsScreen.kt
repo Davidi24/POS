@@ -55,7 +55,7 @@ import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -1153,7 +1153,11 @@ private fun TaxDialog(draft: TaxDraft, state: RestaurantDetailsState, model: Res
 }
 
 @Composable
-private fun CurrencyDialog(flow: CurrencyFlow, state: RestaurantDetailsState, model: RestaurantDetailsScreenModel) {
+private fun CurrencyDialog(flow: CurrencyFlow, state: RestaurantDetailsState, model: RestaurantDetailsScreenModel) =
+    com.saporini.mobile_desktop.core.money.RealMoney { CurrencyDialogRealMoney(flow = flow, state = state, model = model) }
+
+@Composable
+private fun CurrencyDialogRealMoney(flow: CurrencyFlow, state: RestaurantDetailsState, model: RestaurantDetailsScreenModel) {
     val restaurant = state.restaurant ?: return
     val preview = flow.preview
     val choices = CURRENCIES.filter { it.code != restaurant.currency }

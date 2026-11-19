@@ -79,6 +79,17 @@ public class MyProfileController {
         return pinService.save(me(authentication), request.pin());
     }
 
+    /** The app's language (en, it, es, sq). */
+    public record LanguageRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 5) String language) {
+    }
+
+    @PutMapping("/language")
+    @Operation(summary = "My language in the app")
+    public org.springframework.http.ResponseEntity<Void> changeLanguage(@Valid @RequestBody LanguageRequest request, Authentication authentication) {
+        myProfileService.changeLanguage(me(authentication), request.language());
+        return org.springframework.http.ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/email")
     @Operation(summary = "Cancel my waiting email change")
     public MyProfileResponse cancelEmailChange(Authentication authentication) {

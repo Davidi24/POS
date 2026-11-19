@@ -77,7 +77,7 @@ public class ChangePasswordService {
                 );
 
         passwordDailyLimits.changed(user, now);
-        authMailService.sendPasswordChangedNotificationEmail(user.getEmail(), user.getFirstName());
+        authMailService.sendPasswordChangedNotificationEmail(user.getLanguage(), user.getEmail(), user.getFirstName());
         accountAudit.about(user, user.getId(), "PASSWORD_CHANGED", AccountAudit.nameOf(user) + " changed their password; their other devices were signed out");
     }
 }

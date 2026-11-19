@@ -46,7 +46,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -403,8 +403,8 @@ internal fun HoursAndPay(
                     else repository.setPayRate(r, b, id, centsToDecimal(cents))
                     reload++
                     editingId = null
-                    notice = "Saved: ${person.name} gets " +
-                        if (kind == PayKind.MONTHLY) "${wholeText(cents, currency)} a month." else "${centsText(cents, currency)} an hour."
+                    notice = if (kind == PayKind.MONTHLY) "Saved: ${person.name} gets ${wholeText(cents, currency)} a month."
+                        else "Saved: ${person.name} gets ${centsText(cents, currency)} an hour."
                     null
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { (e as? ApiException)?.message ?: "Couldn't save the pay. Check the connection and try again." }
@@ -1105,6 +1105,13 @@ private fun PayAmount(person: PersonPay, currency: String) {
 private fun PayOutDialog(
     person: PersonPay, currency: String, periodText: String, today: LocalDate, history: List<PayoutRecord>,
     onDismiss: () -> Unit, onPay: (Long, PayMethod, String?) -> Unit
+) =
+    com.saporini.mobile_desktop.core.money.RealMoney { PayOutDialogRealMoney(person = person, currency = currency, periodText = periodText, today = today, history = history, onDismiss = onDismiss, onPay = onPay) }
+
+@Composable
+private fun PayOutDialogRealMoney(
+    person: PersonPay, currency: String, periodText: String, today: LocalDate, history: List<PayoutRecord>,
+    onDismiss: () -> Unit, onPay: (Long, PayMethod, String?) -> Unit
 ) {
     var text by remember(person.id) { mutableStateOf(amountInput(person.left)) }
     var method by remember(person.id) { mutableStateOf(SalaryPlans.lastMethodOf(person.id) ?: PayMethod.CASH) }
@@ -1166,6 +1173,8 @@ private fun PayOutDialog(
                 } else Text("all that's left", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted, maxLines = 1)
             }
         }
+
+        com.saporini.mobile_desktop.core.money.ApproxMoneyNote(amount ?: person.left, currency)
 
         // How it's paid, for this payment.
         FieldBlock("How", problem = null) {
@@ -1231,6 +1240,12 @@ private fun PaymentLine(record: PayoutRecord, currency: String, today: LocalDate
 @Composable
 private fun PayAllDialog(
     team: String, people: List<PersonPay>, currency: String, periodText: String, onDismiss: () -> Unit, onConfirm: () -> Unit
+) =
+    com.saporini.mobile_desktop.core.money.RealMoney { PayAllDialogRealMoney(team = team, people = people, currency = currency, periodText = periodText, onDismiss = onDismiss, onConfirm = onConfirm) }
+
+@Composable
+private fun PayAllDialogRealMoney(
+    team: String, people: List<PersonPay>, currency: String, periodText: String, onDismiss: () -> Unit, onConfirm: () -> Unit
 ) {
     val total = people.sumOf { it.left }
     AppDialog(
@@ -1260,6 +1275,7 @@ private fun PayAllDialog(
             }
         }
         ValueLine("Total", centsText(total, currency), strong = true, valueColor = Kit.Green)
+        if (total > 0) com.saporini.mobile_desktop.core.money.ApproxMoneyNote(total, currency)
     }
 }
 
@@ -1485,7 +1501,11 @@ private fun SmallButton(text: String, icon: ImageVector, primary: Boolean, onCli
 
 // Set how someone is paid: by the hour or a monthly salary, and how much. Returns an error from the save, or null when it worked.
 @Composable
-private fun PayDialog(person: PersonPay, currency: String, onDismiss: () -> Unit, onSave: suspend (PayKind, Long) -> String?) {
+private fun PayDialog(person: PersonPay, currency: String, onDismiss: () -> Unit, onSave: suspend (PayKind, Long) -> String?) =
+    com.saporini.mobile_desktop.core.money.RealMoney { PayDialogRealMoney(person = person, currency = currency, onDismiss = onDismiss, onSave = onSave) }
+
+@Composable
+private fun PayDialogRealMoney(person: PersonPay, currency: String, onDismiss: () -> Unit, onSave: suspend (PayKind, Long) -> String?) {
     fun startText(kind: PayKind) = (if (kind == PayKind.MONTHLY) person.monthly else person.hourly)?.let(::amountInput) ?: ""
     var kind by remember(person.id) { mutableStateOf(if (person.monthly != null) PayKind.MONTHLY else PayKind.HOURLY) }
     var text by remember(person.id) { mutableStateOf(startText(kind)) }
@@ -1567,7 +1587,11 @@ private fun PayDialog(person: PersonPay, currency: String, onDismiss: () -> Unit
 
 /** "Change how Anisa is paid?": how they're paid now, how they'll be paid, what it means; Cancel or Yes, change it. */
 @Composable
-private fun ConfirmPayKindDialog(person: PersonPay, currency: String, from: PayKind, to: PayKind, cents: Long, onCancel: () -> Unit, onConfirm: () -> Unit) {
+private fun ConfirmPayKindDialog(person: PersonPay, currency: String, from: PayKind, to: PayKind, cents: Long, onCancel: () -> Unit, onConfirm: () -> Unit) =
+    com.saporini.mobile_desktop.core.money.RealMoney { ConfirmPayKindDialogRealMoney(person = person, currency = currency, from = from, to = to, cents = cents, onCancel = onCancel, onConfirm = onConfirm) }
+
+@Composable
+private fun ConfirmPayKindDialogRealMoney(person: PersonPay, currency: String, from: PayKind, to: PayKind, cents: Long, onCancel: () -> Unit, onConfirm: () -> Unit) {
     val first = person.name.substringBefore(' ')
     val now = if (from == PayKind.MONTHLY) person.monthly?.let { "${wholeText(it, currency)} a month" } else person.hourly?.let { "${centsText(it, currency)} an hour" }
     val next = if (to == PayKind.MONTHLY) "${wholeText(cents, currency)} a month" else "${centsText(cents, currency)} an hour"

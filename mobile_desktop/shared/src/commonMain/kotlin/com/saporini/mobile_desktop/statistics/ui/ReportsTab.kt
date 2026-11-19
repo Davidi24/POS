@@ -41,7 +41,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -355,7 +355,7 @@ internal fun StatsDownloadButton(state: StatisticsState, model: StatisticsScreen
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                         Text(kind.title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp,
                             color = if (later) Kit.Muted else Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(if (later) "Coming soon" else "CSV · " + (kind.holds(v) ?: kind.description), fontFamily = Inter(), fontSize = 11.sp,
+                        Text(if (later) "Coming soon" else "CSV · ${kind.holds(v) ?: kind.description}", fontFamily = Inter(), fontSize = 11.sp,
                             letterSpacing = 0.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     if (preparing) CircularProgressIndicator(Modifier.size(14.dp), color = Kit.Green, strokeWidth = 2.dp)

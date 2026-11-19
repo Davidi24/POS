@@ -74,6 +74,16 @@ class AuthRepository(
         return connection
     }
 
+    /** Profile → Preferences → Language: the person's own language (en, it, es, sq). */
+    suspend fun setMyLanguage(code: String) {
+        executeWithFallback { baseUrl ->
+            client.put("$baseUrl/auth/me/language") {
+                contentType(ContentType.Application.Json)
+                setBody(com.saporini.mobile_desktop.auth.data.dto.LanguageRequest(code))
+            }
+        }
+    }
+
     /** Profile → PIN. */
     suspend fun myPin(): com.saporini.mobile_desktop.auth.data.dto.PinStatus =
         executeWithFallback { baseUrl -> client.get("$baseUrl/auth/me/pin").body() }

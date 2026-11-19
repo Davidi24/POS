@@ -7,3 +7,5 @@
 !.env.example
 # Java downloaded by start.sh for this project only
 /.tools/
+# Python caches (mobile_desktop/i18n/i18n.py)
+__pycache__/

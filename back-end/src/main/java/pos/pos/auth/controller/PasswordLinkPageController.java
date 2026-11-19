@@ -7,6 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,6 +19,8 @@ import pos.pos.auth.enums.PasswordLinkStatus;
 import pos.pos.auth.service.PasswordResetService;
 import pos.pos.auth.service.PasswordRules;
 import pos.pos.exception.auth.AuthException;
+import pos.pos.i18n.PageLanguage;
+import pos.pos.i18n.Words;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -27,7 +30,8 @@ import java.util.Base64;
 
 /**
  * The page the invitation and reset emails link to: the owner (or anyone resetting) chooses a password here, in any
- * browser, without the app. Plain HTML that works on any phone; the script only ticks the rules as you type.
+ * browser, without the app. Plain HTML that works on any phone; the script only ticks the rules as you type. In the
+ * person's own language, or the one picked at the top (user, 2026-11-18; {@link PageLanguage}).
  */
 @RestController
 @RequestMapping("/public/account/password")
@@ -39,39 +43,46 @@ public class PasswordLinkPageController {
     private final PasswordResetService passwordResetService;
 
     @GetMapping(produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<String> page(@RequestParam(required = false) String token, @RequestParam(required = false) String done) {
+    public ResponseEntity<String> page(@RequestParam(required = false) String token, @RequestParam(required = false) String done,
+                                       @RequestParam(required = false) String lang,
+                                       @RequestHeader(value = HttpHeaders.ACCEPT_LANGUAGE, required = false) String browser) {
         if (done != null) {
+            String l = PageLanguage.pick(lang, null, browser);
             boolean firstPassword = "invite".equals(done);
-            return page(HttpStatus.OK, firstPassword ? "Password set" : "Password changed", null,
+            return page(HttpStatus.OK, l, code -> "/public/account/password?done=" + (firstPassword ? "invite" : "reset") + "&lang=" + code,
+                    Words.t(l, firstPassword ? "Password set" : "Password changed"), null,
                     "<div class='badge ok'>&#10003;</div>"
-                            + "<h1>" + (firstPassword ? "Your password is set" : "Your password is changed") + "</h1>"
-                            + "<p>Open the POS app and sign in with your username or email and your new password.</p>"
-                            + (firstPassword ? "" : "<p class='muted'>For your safety, you were signed out on your other devices.</p>")
-                            + "<p class='muted'>You can close this page.</p>");
+                            + "<h1>" + Words.t(l, firstPassword ? "Your password is set" : "Your password is changed") + "</h1>"
+                            + "<p>" + Words.t(l, "Open the POS app and sign in with your username or email and your new password.") + "</p>"
+                            + (firstPassword ? "" : "<p class='muted'>" + Words.t(l, "For your safety, you were signed out on your other devices.") + "</p>")
+                            + "<p class='muted'>" + Words.t(l, "You can close this page.") + "</p>");
         }
         PasswordLinkView link = passwordResetService.checkLink(token);
+        String l = PageLanguage.pick(lang, link.language(), browser);
         if (link.status() != PasswordLinkStatus.VALID) {
-            return problem(link);
+            return problem(link, l, token);
         }
-        return form(HttpStatus.OK, token, link, null);
+        return form(HttpStatus.OK, token, link, null, l);
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> setPassword(
             @RequestParam(required = false) String token,
             @RequestParam(required = false) String password,
-            @RequestParam(required = false) String confirm
+            @RequestParam(required = false) String confirm,
+            @RequestParam(required = false) String lang
     ) {
         PasswordLinkView link = passwordResetService.checkLink(token);
+        String l = PageLanguage.pick(lang, link.language(), null);
         if (link.status() != PasswordLinkStatus.VALID) {
-            return problem(link);
+            return problem(link, l, token);
         }
         String problem = PasswordRules.problem(password);
         if (problem == null && !password.equals(confirm)) {
-            problem = "The two passwords aren't the same.";
+            problem = Words.en("The two passwords aren't the same.");
         }
         if (problem != null) {
-            return form(HttpStatus.BAD_REQUEST, token, link, problem);
+            return form(HttpStatus.BAD_REQUEST, token, link, Words.tr(l, problem), l);
         }
         try {
             ResetPasswordRequest request = new ResetPasswordRequest();
@@ -81,61 +92,61 @@ public class PasswordLinkPageController {
         } catch (AuthException error) {
             // Used or replaced in the meantime: say what the link says now.
             PasswordLinkView now = passwordResetService.checkLink(token);
-            return now.status() == PasswordLinkStatus.VALID ? form(HttpStatus.BAD_REQUEST, token, now, error.getMessage()) : problem(now);
+            return now.status() == PasswordLinkStatus.VALID ? form(HttpStatus.BAD_REQUEST, token, now, Words.tr(l, error.getMessage()), l) : problem(now, l, token);
         }
         // Back to a page without the link, so refreshing doesn't send the form again.
         String done = link.purpose() == PasswordLinkPurpose.INVITE ? "invite" : "reset";
         return ResponseEntity.status(HttpStatus.SEE_OTHER)
-                .header(HttpHeaders.LOCATION, "/public/account/password?done=" + done)
+                .header(HttpHeaders.LOCATION, "/public/account/password?done=" + done + "&lang=" + l)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header("Referrer-Policy", "no-referrer")
                 .build();
     }
 
-    private ResponseEntity<String> form(HttpStatus status, String token, PasswordLinkView link, String error) {
+    private ResponseEntity<String> form(HttpStatus status, String token, PasswordLinkView link, String error, String l) {
         boolean invite = link.purpose() == PasswordLinkPurpose.INVITE;
-        String name = link.firstName() == null || link.firstName().isBlank() ? "there" : link.firstName().trim();
+        String name = esc(link.firstName() == null || link.firstName().isBlank() ? Words.t(l, "there") : link.firstName().trim());
         String who = link.username() == null || link.username().isBlank()
                 ? "<b>" + esc(link.email()) + "</b>"
-                : "<b>" + esc(link.username()) + "</b> or <b>" + esc(link.email()) + "</b>";
+                : Words.t(l, "{} or {}", "<b>" + esc(link.username()) + "</b>", "<b>" + esc(link.email()) + "</b>");
+        String greeting = !invite ? Words.t(l, "Hi {}, choose a new password for your POS account.", name)
+                : link.restaurantName() == null ? Words.t(l, "Hi {}, your POS account is ready. Choose the password you'll use to sign in.", name)
+                : Words.t(l, "Hi {}, you're the owner of {} on POS. Choose the password you'll use to sign in.", name,
+                        "<b>" + esc(link.restaurantName()) + "</b>");
         StringBuilder body = new StringBuilder()
-                .append("<h1>").append(invite ? "Set your password" : "Choose a new password").append("</h1>")
-                .append("<p>Hi ").append(esc(name)).append(", ")
-                .append(invite
-                        ? (link.restaurantName() == null ? "your POS account is ready." : "you're the owner of <b>" + esc(link.restaurantName()) + "</b> on POS.")
-                                + " Choose the password you'll use to sign in."
-                        : "choose a new password for your POS account.")
-                .append("</p>")
-                .append("<p class='muted'>You'll sign in as ").append(who).append(".</p>");
+                .append("<h1>").append(Words.t(l, invite ? "Set your password" : "Choose a new password")).append("</h1>")
+                .append("<p>").append(greeting).append("</p>")
+                .append("<p class='muted'>").append(Words.t(l, "You'll sign in as {}.", who)).append("</p>");
         if (error != null) {
             body.append("<p class='error' role='alert'>").append(esc(error)).append("</p>");
         }
         body.append("<form method='post' action='/public/account/password' autocomplete='on'>")
                 .append("<input type='hidden' name='token' value='").append(esc(token)).append("'>")
+                .append("<input type='hidden' name='lang' value='").append(l).append("'>")
                 // Lets password managers save the new password under the right name.
                 .append("<input type='text' name='username' autocomplete='username' value='")
                 .append(esc(link.username() == null ? link.email() : link.username())).append("' hidden readonly>")
-                .append("<label for='password'>New password</label>")
+                .append("<label for='password'>").append(Words.t(l, "New password")).append("</label>")
                 .append("<input id='password' name='password' type='password' autocomplete='new-password' required minlength='")
                 .append(PasswordRules.MIN_LENGTH).append("' maxlength='").append(PasswordRules.MAX_LENGTH).append("' autofocus>")
-                .append("<label for='confirm'>Type it again</label>")
+                .append("<label for='confirm'>").append(Words.t(l, "Type it again")).append("</label>")
                 .append("<input id='confirm' name='confirm' type='password' autocomplete='new-password' required maxlength='")
                 .append(PasswordRules.MAX_LENGTH).append("'>")
-                .append("<label class='show'><input id='show' type='checkbox'> Show the password</label>")
+                .append("<label class='show'><input id='show' type='checkbox'> ").append(Words.t(l, "Show the password")).append("</label>")
                 .append("<ul class='rules'>")
-                .append("<li data-rule='length'>At least 8 characters</li>")
-                .append("<li data-rule='upper'>An uppercase letter</li>")
-                .append("<li data-rule='digit'>A number</li>")
-                .append("<li data-rule='special'>A special character, like ! or #</li>")
-                .append("<li data-rule='same'>Both passwords are the same</li>")
+                .append("<li data-rule='length'>").append(Words.t(l, "At least 8 characters")).append("</li>")
+                .append("<li data-rule='upper'>").append(Words.t(l, "An uppercase letter")).append("</li>")
+                .append("<li data-rule='digit'>").append(Words.t(l, "A number")).append("</li>")
+                .append("<li data-rule='special'>").append(Words.t(l, "A special character, like ! or #")).append("</li>")
+                .append("<li data-rule='same'>").append(Words.t(l, "Both passwords are the same")).append("</li>")
                 .append("</ul>")
                 // A reset signs out every device; say so before (user, 2026-11-18).
-                .append(invite ? "" : "<p class='muted'>For your safety, you'll be signed out on all your devices.</p>")
-                .append("<button type='submit'>").append(invite ? "Set my password" : "Change my password").append("</button>")
+                .append(invite ? "" : "<p class='muted'>" + Words.t(l, "For your safety, you'll be signed out on all your devices.") + "</p>")
+                .append("<button type='submit'>").append(Words.t(l, invite ? "Set my password" : "Change my password")).append("</button>")
                 .append("</form>");
         if (link.expiresAt() != null) {
-            body.append("<p class='muted'>This link works once and expires in ")
-                    .append(inWords(Duration.between(OffsetDateTime.now(ZoneOffset.UTC), link.expiresAt()))).append(".</p>");
+            body.append("<p class='muted'>").append(Words.t(l, "This link works once and expires in {}.",
+                    pos.pos.auth.service.AuthMailService.inWords(l, Duration.between(OffsetDateTime.now(ZoneOffset.UTC), link.expiresAt())))).append("</p>");
         }
         String nonce = nonce();
         body.append("<script nonce='").append(nonce).append("'>")
@@ -147,23 +158,30 @@ public class PasswordLinkPageController {
                 .append("p.addEventListener('input',u);c.addEventListener('input',u);")
                 .append("s.addEventListener('change',function(){var k=s.checked?'text':'password';p.type=k;c.type=k});u();})();")
                 .append("</script>");
-        return page(status, invite ? "Set your password" : "Choose a new password", nonce, body.toString());
+        return page(status, l, code -> linkTo(token, code), Words.t(l, invite ? "Set your password" : "Choose a new password"), nonce, body.toString());
     }
 
-    private ResponseEntity<String> problem(PasswordLinkView link) {
+    private ResponseEntity<String> problem(PasswordLinkView link, String l, String token) {
         String title = switch (link.status()) {
-            case EXPIRED -> "This link has expired";
-            case USED -> "This link was already used";
-            case REPLACED -> "There's a newer email";
-            case UNAVAILABLE -> "This account is switched off";
-            default -> "This link doesn't work";
+            case EXPIRED -> Words.t(l, "This link has expired");
+            case USED -> Words.t(l, "This link was already used");
+            case REPLACED -> Words.t(l, "There's a newer email");
+            case UNAVAILABLE -> Words.t(l, "This account is switched off");
+            default -> Words.t(l, "This link doesn't work");
         };
         HttpStatus status = link.status() == PasswordLinkStatus.INVALID ? HttpStatus.NOT_FOUND : HttpStatus.GONE;
-        return page(status, title, null, "<div class='badge warn'>!</div><h1>" + esc(title) + "</h1><p>" + esc(link.message()) + "</p>");
+        return page(status, l, code -> linkTo(token, code), title, null,
+                "<div class='badge warn'>!</div><h1>" + esc(title) + "</h1><p>" + esc(Words.tr(l, link.message())) + "</p>");
     }
 
-    static ResponseEntity<String> page(HttpStatus status, String title, String nonce, String body) {
-        String html = "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
+    private static String linkTo(String token, String lang) {
+        return "/public/account/password?" + (token == null ? "" : "token=" + java.net.URLEncoder.encode(token, java.nio.charset.StandardCharsets.UTF_8) + "&") + "lang=" + lang;
+    }
+
+    /** A page in [lang] with the four languages at its top, each linking to [hrefFor] its code. */
+    static ResponseEntity<String> page(HttpStatus status, String lang, java.util.function.Function<String, String> hrefFor, String title,
+                                       String nonce, String body) {
+        String html = "<!doctype html><html lang='" + lang + "'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
                 + "<meta name='robots' content='noindex'><title>" + esc(title) + " · POS</title><style>"
                 + "body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f7f8f6;color:#222426;margin:0;padding:16px}"
                 + "main{max-width:440px;margin:6vh auto 0;background:#fff;border:1px solid #e3e6e1;border-radius:16px;padding:24px 24px 14px}"
@@ -180,7 +198,8 @@ public class PasswordLinkPageController {
                 + ".rules li.met{color:#2f6b2a}.rules li.met:before{background:#4f7942;border-color:#4f7942}"
                 + ".badge{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;margin-bottom:10px}"
                 + ".badge.ok{background:#e6efe1;color:#4f7942}.badge.warn{background:#fbefe0;color:#b46a0b}"
-                + "</style></head><body><main>" + body + "</main></body></html>";
+                + PageLanguage.STYLE
+                + "</style></head><body><main>" + PageLanguage.switcher(lang, hrefFor) + body + "</main></body></html>";
         String scripts = nonce == null ? "'none'" : "'nonce-" + nonce + "'";
         return ResponseEntity.status(status)
                 .contentType(MediaType.valueOf("text/html;charset=UTF-8"))
@@ -191,15 +210,6 @@ public class PasswordLinkPageController {
                 .header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; script-src " + scripts
                         + "; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
                 .body(html);
-    }
-
-    // "30 minutes", "5 hours", "3 days".
-    private static String inWords(Duration left) {
-        long minutes = Math.max(1, left.toMinutes());
-        if (minutes < 120) return minutes + (minutes == 1 ? " minute" : " minutes");
-        long hours = left.toHours();
-        if (hours < 48) return hours + " hours";
-        return left.toDays() + " days";
     }
 
     private static String nonce() {

@@ -17,6 +17,8 @@ public record PasswordLinkView(
         String username,
         String email,
         String restaurantName,
-        OffsetDateTime expiresAt
+        OffsetDateTime expiresAt,
+        // The person's own language from Profile (null when unknown), for the page.
+        String language
 ) {
 }

@@ -104,7 +104,7 @@ class ChangePasswordServiceTest {
                     any(),
                     eq(SessionRevocationReason.PASSWORD_CHANGED.name())
             );
-            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
+            verify(authMailService).sendPasswordChangedNotificationEmail(null, "cashier@pos.local", "Casey");
         }
 
         @Test
@@ -134,7 +134,7 @@ class ChangePasswordServiceTest {
                     any(),
                     eq(SessionRevocationReason.PASSWORD_CHANGED.name())
             );
-            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
+            verify(authMailService).sendPasswordChangedNotificationEmail(null, "cashier@pos.local", "Casey");
         }
 
         @Test

@@ -18,7 +18,7 @@ class GuestBookingPageControllerTest {
     @Test void missingOrClosedRestaurantReturns404InsteadOfSuccessfulNotFoundPage() {
         when(support.requirePublicBranch("closed", "MAIN"))
                 .thenThrow(new AuthException("Unavailable", HttpStatus.NOT_FOUND));
-        var result = controller.bookingForm("closed", "MAIN");
+        var result = controller.bookingForm("closed", "MAIN", null, null);
         assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(org.springframework.web.util.HtmlUtils.htmlUnescape(result.getBody())).contains("This restaurant doesn't take bookings online.");
     }
@@ -26,6 +26,6 @@ class GuestBookingPageControllerTest {
     @Test void lookupFailureIsNotDisguisedAsMissingRestaurant() {
         var failure = new AuthException("Temporarily unavailable", HttpStatus.SERVICE_UNAVAILABLE);
         when(support.requirePublicBranch("restaurant", "MAIN")).thenThrow(failure);
-        assertThatThrownBy(() -> controller.bookingForm("restaurant", "MAIN")).isSameAs(failure);
+        assertThatThrownBy(() -> controller.bookingForm("restaurant", "MAIN", null, null)).isSameAs(failure);
     }
 }

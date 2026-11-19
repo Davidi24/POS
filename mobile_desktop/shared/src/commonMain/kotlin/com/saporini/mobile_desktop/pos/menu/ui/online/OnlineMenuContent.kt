@@ -25,7 +25,7 @@ import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -386,7 +386,7 @@ private fun OnlineMenuDish.toUi(section: OnlineMenuSectionView): MenuItem {
     return MenuItem(
         name = name,
         description = cardDescription,
-        price = "$" + ((basePrice * 100).roundToInt() / 100) + "." + ((basePrice * 100).roundToInt() % 100).let { if (it < 0) -it else it }.toString().padStart(2, '0'),
+        price = com.saporini.mobile_desktop.core.format.menuPrice(basePrice),
         category = section.name,
         available = visible,
         sendToKitchen = sendToKitchen,

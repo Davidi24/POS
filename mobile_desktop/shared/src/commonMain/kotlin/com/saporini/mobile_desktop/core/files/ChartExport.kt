@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
+import com.saporini.mobile_desktop.core.i18n.tr
 
 // Documents made on the device (user, 2026-11-15: "make it look like an invoice, A4"): pages described once as text, lines,
 // boxes and pictures in points from the top left, then written as a PDF here (no PDF library needed), drawn by the
@@ -31,9 +32,14 @@ enum class DocAlign { LEFT, RIGHT, CENTER }
 
 /** One thing on a page; every position is in points from the page's top left. */
 sealed interface DocItem {
-    /** [y] is the text's baseline; [spacing] adds room between letters (for spaced-out titles). */
-    data class Text(val x: Float, val y: Float, val text: String, val size: Float, val bold: Boolean = false, val color: Color = DocInk,
-        val align: DocAlign = DocAlign.LEFT, val spacing: Float = 0f) : DocItem
+    /**
+     * [y] is the text's baseline; [spacing] adds room between letters (for spaced-out titles). The words are shown in the
+     * language in use (written in English in the code, like every screen's).
+     */
+    data class Text(val x: Float, val y: Float, private val words: String, val size: Float, val bold: Boolean = false, val color: Color = DocInk,
+        val align: DocAlign = DocAlign.LEFT, val spacing: Float = 0f) : DocItem {
+        val text: String = tr(words)
+    }
     data class Box(val x: Float, val y: Float, val w: Float, val h: Float, val fill: Color? = null, val stroke: Color? = null,
         val strokeWidth: Float = 1f, val radius: Float = 0f) : DocItem
     data class Line(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val color: Color = DocLine, val width: Float = 1f) : DocItem
@@ -73,7 +79,9 @@ private val HelveticaBoldWidths = intArrayOf(
 )
 
 /** How wide [text] is in points at [size] (Helvetica, or Helvetica-Bold), with [spacing] between letters. */
-fun textWidth(text: String, size: Float, bold: Boolean = false, spacing: Float = 0f): Float {
+fun textWidth(words: String, size: Float, bold: Boolean = false, spacing: Float = 0f): Float {
+    // Measured as it's shown: in the language in use.
+    val text = tr(words)
     val table = if (bold) HelveticaBoldWidths else HelveticaWidths
     val units = text.sumOf { c ->
         val i = PrintableAscii.indexOf(c)
@@ -87,10 +95,10 @@ fun textWidth(text: String, size: Float, bold: Boolean = false, spacing: Float =
 }
 
 /** [text] cut to lines that fit [width] at [size]. */
-fun wrapText(text: String, size: Float, width: Float, bold: Boolean = false): List<String> {
+fun wrapText(words: String, size: Float, width: Float, bold: Boolean = false): List<String> {
     val lines = mutableListOf<String>()
     var line = ""
-    text.split(' ').forEach { word ->
+    tr(words).split(' ').forEach { word ->
         val tryLine = if (line.isEmpty()) word else "$line $word"
         if (textWidth(tryLine, size, bold) <= width || line.isEmpty()) line = tryLine
         else { lines += line; line = word }

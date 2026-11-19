@@ -22,7 +22,7 @@ import androidx.compose.material.icons.outlined.Scale
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,7 +73,11 @@ import kotlin.math.round
 // then add what goes in (stock items or other sub-recipes) one by one with how much. Its cost comes from them.
 
 @Composable
-internal fun SubRecipeDialog(state: RecipesState, model: RecipesScreenModel) {
+internal fun SubRecipeDialog(state: RecipesState, model: RecipesScreenModel) =
+    com.saporini.mobile_desktop.core.money.RealMoney { SubRecipeDialogRealMoney(state = state, model = model) }
+
+@Composable
+private fun SubRecipeDialogRealMoney(state: RecipesState, model: RecipesScreenModel) {
     val draft = state.subRecipe ?: return
     val isNew = draft.recipeId == null
     val editable = state.canEdit
@@ -218,8 +222,8 @@ private fun BatchCostLine(draft: SubRecipeDraft, choices: List<IngredientChoiceD
         Icon(Icons.Outlined.Euro, null, Modifier.size(18.dp), tint = Kit.Green)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(buildString {
-                append(if (complete) "One batch costs " else "One batch costs about ")
-                append(moneyText(round(total * 100).toLong(), null))
+                val cost = moneyText(round(total * 100).toLong(), null)
+                append(if (complete) "One batch costs $cost" else "One batch costs about $cost")
                 makes?.let { append(" · ${moneyText(round(total * 100 / it).toLong(), null)} per ${unitShort(draft.yieldUnit)}") }
             }, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Green)
             Text(if (makes == null) "Say how much a batch makes to see what one ${unitShort(draft.yieldUnit)} costs." else "From today's prices of its ingredients.",

@@ -67,7 +67,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -347,7 +347,7 @@ internal fun CreateReservationDialog(
     }
     val chosenOption = suggestion
     val tableSummary = when {
-        tableMode == TableMode.MANUAL && manualTables.isNotEmpty() -> "Your pick · " + manualTables.joinToString(" + ") { it.second }
+        tableMode == TableMode.MANUAL && manualTables.isNotEmpty() -> "Your pick · ${manualTables.joinToString(" + ") { it.second }}"
         tableMode == TableMode.SUGGEST && chosenOption != null ->
             (if (chosenSuggestion == 0) "Best fit" else "Suggestion") +
                 " · ${chosenOption.tableNumbers.joinToString(" + ")} · ${chosenOption.capacityLabel()}"

@@ -23,7 +23,7 @@ import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +58,11 @@ import com.saporini.mobile_desktop.core.theme.Inter
 
 /** The same change for every picked stock line: an amount per line, one "to" place for moves, one reason. */
 @Composable
-internal fun BulkMoveDialog(bulk: BulkMoveDraft, state: InventoryState, model: InventoryScreenModel) {
+internal fun BulkMoveDialog(bulk: BulkMoveDraft, state: InventoryState, model: InventoryScreenModel) =
+    com.saporini.mobile_desktop.core.money.RealMoney { BulkMoveDialogRealMoney(bulk = bulk, state = state, model = model) }
+
+@Composable
+private fun BulkMoveDialogRealMoney(bulk: BulkMoveDraft, state: InventoryState, model: InventoryScreenModel) {
     val look = moveKindLook(bulk.kind)
     val needsReason = bulk.kind == StockMoveKind.WASTE || bulk.kind == StockMoveKind.ADJUST
     AppDialog(

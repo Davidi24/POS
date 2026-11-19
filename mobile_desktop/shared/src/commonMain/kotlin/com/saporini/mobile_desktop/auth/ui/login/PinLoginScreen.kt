@@ -29,7 +29,7 @@ import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -138,6 +138,8 @@ class PinLoginScreenModel(
             try {
                 repository.pinLogin(till, pin)
                 val me = repository.me()
+                // The person's own language from Profile, from now on on this device (user, 2026-11-18).
+                com.saporini.mobile_desktop.core.i18n.AppLanguage.of(me.language)?.let { com.saporini.mobile_desktop.core.i18n.I18n.use(it) }
                 sessionManager.signIn(me)
                 _state.update { it.copy(busy = false, pin = "", user = me) }
             } catch (e: CancellationException) {

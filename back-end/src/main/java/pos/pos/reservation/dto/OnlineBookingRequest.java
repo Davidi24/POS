@@ -50,6 +50,10 @@ public class OnlineBookingRequest {
     @Size(max = 2000, message = "The note is too long")
     private String specialRequests;
 
+    // The language the guest books in (en, it, es, sq); their emails come in it, with English under it.
+    @Size(max = 5)
+    private String language;
+
     @Size(max = 40)
     private String occasionCode;
 

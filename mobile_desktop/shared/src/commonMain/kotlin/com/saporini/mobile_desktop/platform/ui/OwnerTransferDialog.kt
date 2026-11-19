@@ -20,7 +20,7 @@ import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -157,7 +157,7 @@ private fun Consequences(step: OwnerTransferStep) {
     ) {
         Icon(Icons.Outlined.WarningAmber, null, Modifier.size(18.dp), tint = Kit.Amber)
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("$newOwner becomes the owner" + if (step.mode == TransferMode.INVITE) " and gets an email to set a password." else ".",
+            Text(if (step.mode == TransferMode.INVITE) "$newOwner becomes the owner and gets an email to set a password." else "$newOwner becomes the owner.",
                 fontFamily = Inter(), fontSize = 13.sp, color = Kit.Ink)
             Text("${step.currentOwnerName} loses the restaurant: their account is switched off, they're signed out everywhere and their " +
                 "open invitation or reset links stop working.", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Ink)

@@ -32,7 +32,7 @@ import androidx.compose.material.icons.outlined.ReportProblem
 import androidx.compose.material.icons.outlined.Sell
 import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -222,7 +222,11 @@ private fun BranchMethodsPanel(v: StatsView, modifier: Modifier) {
  * only on this screen for now), and the difference: green when they match, amber when they don't.
  */
 @Composable
-internal fun ReconciliationPanel(v: StatsView, modifier: Modifier, size: ScreenSize) {
+internal fun ReconciliationPanel(v: StatsView, modifier: Modifier, size: ScreenSize) =
+    com.saporini.mobile_desktop.core.money.RealMoney { ReconciliationPanelRealMoney(v = v, modifier = modifier, size = size) }
+
+@Composable
+private fun ReconciliationPanelRealMoney(v: StatsView, modifier: Modifier, size: ScreenSize) {
     val typed = remember(v.from, v.to, v.state.branchId) { mutableStateMapOf<String, String>() }
     val methods = v.methods
     StatsPanel(Icons.Outlined.Balance, "Check against the terminal and the bank", modifier, empty = methods.isEmpty()) {

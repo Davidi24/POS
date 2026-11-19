@@ -32,4 +32,6 @@ public class CurrentUserResponse {
     private String branchName;
     // The person's own photo (Profile), or null for their initials.
     private String photoUrl;
+    // The language the person picked in Profile (en, it, es, sq), or null for English.
+    private String language;
 }

@@ -27,7 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -228,7 +228,7 @@ private fun EventsEditor(restaurantId: String, canEdit: Boolean) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(event.icon, fontSize = 18.sp)
                 Column(Modifier.weight(1f)) {
-                    Text(event.name + if (!event.active) " (off)" else "", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
+                    Text(if (!event.active) "${event.name} (off)" else event.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Ink)
                     Text(
                         listOfNotNull(
                             if (event.startDate == event.endDate) event.startDate else "${event.startDate} – ${event.endDate}",

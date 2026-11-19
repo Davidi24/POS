@@ -51,7 +51,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -441,6 +441,46 @@ internal fun ItemEditorDialog(
     extras: ItemExtras? = null,
     occasions: List<Pair<String, String>> = emptyList(),
     onExtrasChange: (ItemExtras) -> Unit = {}
+) =
+    com.saporini.mobile_desktop.core.money.RealMoney { ItemEditorDialogRealMoney(existingItem = existingItem, sectionName = sectionName, sections = sections, currentSectionId = currentSectionId, status = status, onRetry = onRetry, onSuccessSettled = onSuccessSettled, loadOnlineSections = loadOnlineSections, loadIngredientChoices = loadIngredientChoices, loadDishRecipe = loadDishRecipe, onDismiss = onDismiss, onDeleteItem = onDeleteItem, onSave = onSave, extras = extras, occasions = occasions, onExtrasChange = onExtrasChange) }
+
+@Composable
+private fun ItemEditorDialogRealMoney(
+    existingItem: EditableMenuItem? = null,
+    // Which section a new item lands in — shown as a subtitle so it's clear before
+    // saving; irrelevant (and unused) once editing an item that already has one.
+    sectionName: String? = null,
+    // Only used while editing: lets the item be moved to a different section.
+    sections: List<MenuCategory> = emptyList(),
+    currentSectionId: String? = null,
+    status: DialogActionStatus = DialogActionStatus.Idle,
+    onRetry: () -> Unit = {},
+    onSuccessSettled: () -> Unit = {},
+    // Loads the online menu's sections for the "Show in online menu" chooser.
+    loadOnlineSections: suspend () -> Result<List<OnlineMenuSection>> = { Result.success(emptyList()) },
+    // The stock items and preparations dishes can be made with, and (for a saved dish) its amounts from stock.
+    loadIngredientChoices: suspend () -> Result<List<IngredientChoiceDto>> = { Result.success(emptyList()) },
+    loadDishRecipe: (suspend () -> Result<DishRecipeDto>)? = null,
+    onDismiss: () -> Unit,
+    onDeleteItem: (() -> Unit)? = null,
+    onSave: (
+        name: String,
+        priceLabel: String,
+        sku: String?,
+        description: String?,
+        photo: PhotoChange,
+        available: Boolean,
+        sendToKitchen: Boolean,
+        online: OnlinePlacement,
+        ingredients: List<DraftIngredient>,
+        sectionId: String?,
+        // The dish's ingredients from stock to save as its recipe; null leaves the recipe as it is.
+        stock: List<DishIngredientRequestDto>?
+    ) -> Unit,
+    // Items in a special menu (occasion extras): shown only when not null, reported just before onSave.
+    extras: ItemExtras? = null,
+    occasions: List<Pair<String, String>> = emptyList(),
+    onExtrasChange: (ItemExtras) -> Unit = {}
 ) {
     val isEditing = existingItem != null
     var extraHours by remember { mutableStateOf(extras?.orderBeforeHours?.toString().orEmpty()) }
@@ -681,7 +721,7 @@ internal fun ItemEditorDialog(
                         placeholder = { Text("0.00") },
                         leadingIcon = {
                             Text(
-                                text = "$",
+                                text = com.saporini.mobile_desktop.core.format.currencySign(com.saporini.mobile_desktop.core.money.ShownMoney.restaurantCurrency).trim(),
                                 fontFamily = Inter(),
                                 fontWeight = FontWeight.SemiBold,
                                 color = ItemEditorMuted
@@ -956,6 +996,18 @@ internal fun ItemEditorDialog(
 
 @Composable
 internal fun VariantEditorDialog(
+    itemName: String,
+    variants: List<DraftVariant>,
+    onDismiss: () -> Unit,
+    onDoneEditing: (List<DraftVariant>) -> Unit,
+    onCreateVariant: suspend (name: String, priceDelta: Double, displayOrder: Int) -> Result<String>,
+    onUpdateVariant: suspend (variantId: String, name: String, priceDelta: Double, displayOrder: Int) -> Result<Unit>,
+    onDeleteVariant: suspend (variantId: String) -> Result<Unit>
+) =
+    com.saporini.mobile_desktop.core.money.RealMoney { VariantEditorDialogRealMoney(itemName = itemName, variants = variants, onDismiss = onDismiss, onDoneEditing = onDoneEditing, onCreateVariant = onCreateVariant, onUpdateVariant = onUpdateVariant, onDeleteVariant = onDeleteVariant) }
+
+@Composable
+private fun VariantEditorDialogRealMoney(
     itemName: String,
     variants: List<DraftVariant>,
     onDismiss: () -> Unit,
@@ -1581,6 +1633,19 @@ private fun DeleteOptionGroupDialog(
 
 @Composable
 internal fun OptionsEditorDialog(
+    itemName: String,
+    optionGroups: List<DraftOptionGroup>,
+    inventoryRecipes: List<RecipeDto>,
+    onDismiss: () -> Unit,
+    onDoneEditing: (List<DraftOptionGroup>) -> Unit,
+    onCreateGroup: suspend (group: DraftOptionGroup, displayOrder: Int) -> Result<DraftOptionGroup>,
+    onUpdateGroup: suspend (existing: DraftOptionGroup, updated: DraftOptionGroup, displayOrder: Int) -> Result<DraftOptionGroup>,
+    onDeleteGroup: suspend (group: DraftOptionGroup) -> Result<Unit>
+) =
+    com.saporini.mobile_desktop.core.money.RealMoney { OptionsEditorDialogRealMoney(itemName = itemName, optionGroups = optionGroups, inventoryRecipes = inventoryRecipes, onDismiss = onDismiss, onDoneEditing = onDoneEditing, onCreateGroup = onCreateGroup, onUpdateGroup = onUpdateGroup, onDeleteGroup = onDeleteGroup) }
+
+@Composable
+private fun OptionsEditorDialogRealMoney(
     itemName: String,
     optionGroups: List<DraftOptionGroup>,
     inventoryRecipes: List<RecipeDto>,
@@ -2232,14 +2297,7 @@ private fun isValidItemPrice(value: String): Boolean {
     return Regex("^\\d+(\\.\\d{1,2})?$").matches(value.trim())
 }
 
-private fun formatItemPrice(raw: String): String {
-    val value = raw.trim().toDoubleOrNull() ?: 0.0
-    val cents = round(value * 100).toLong()
-    val dollars = cents / 100
-    val remainder = if (cents % 100 < 0) -(cents % 100) else cents % 100
-    val centsText = if (remainder < 10) "0$remainder" else "$remainder"
-    return "$$dollars.$centsText"
-}
+private fun formatItemPrice(raw: String): String = com.saporini.mobile_desktop.core.format.menuPrice(raw.trim().toDoubleOrNull() ?: 0.0)
 
 private fun extractPriceValue(priceLabel: String): String {
     return Regex("\\d+(\\.\\d{1,2})?").find(priceLabel)?.value.orEmpty()
@@ -2263,14 +2321,8 @@ private fun formatPriceDelta(raw: String): String {
     val trimmed = raw.trim()
     if (trimmed.isBlank()) return ""
     val negative = trimmed.startsWith("-")
-    val numberPart = trimmed.removePrefix("+").removePrefix("-")
-    val value = numberPart.toDoubleOrNull() ?: return ""
-    val cents = round(value * 100).toLong()
-    val dollars = cents / 100
-    val remainder = if (cents % 100 < 0) -(cents % 100) else cents % 100
-    val centsText = if (remainder < 10) "0$remainder" else "$remainder"
-    val sign = if (negative) "-" else "+"
-    return "$sign$$dollars.$centsText"
+    val value = trimmed.removePrefix("+").removePrefix("-").toDoubleOrNull() ?: return ""
+    return com.saporini.mobile_desktop.core.format.menuPrice(if (negative) -value else value, signed = true)
 }
 
 private fun priceDeltaInputValue(label: String): String {

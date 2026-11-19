@@ -108,6 +108,8 @@ public class GuestBookingService {
         reservation.setContactPhone(blankToNull(request.getContactPhone()));
         reservation.setContactEmail(blankToNull(request.getContactEmail()));
         reservation.setSpecialRequests(blankToNull(request.getSpecialRequests()));
+        String language = pos.pos.i18n.Words.language(request.getLanguage());
+        reservation.setLanguage(request.getLanguage() == null || "en".equals(language) ? null : language);
         reservationOccasionService.apply(reservation, request.getOccasionCode(), request.getOccasionOptions(), request.getOccasionNote());
 
         // Big groups and restaurants that answer every booking themselves get a request; otherwise a free table
@@ -260,6 +262,7 @@ public class GuestBookingService {
                 .timezone(zone.getId())
                 .status(reservation.getStatus())
                 .statusText(statusText(reservation))
+                .language(reservation.getLanguage())
                 .partySize(reservation.getPartySize())
                 .reservationStart(reservation.getReservationStart())
                 .reservationEnd(reservation.getReservationEnd())
@@ -288,14 +291,14 @@ public class GuestBookingService {
 
     private static String statusText(Reservation reservation) {
         return switch (reservation.getStatus()) {
-            case PENDING -> "Request sent: we'll let you know soon";
-            case CONFIRMED -> reservation.getAttendanceConfirmedAt() != null ? "Confirmed ✓ · you confirmed you're coming" : "Confirmed ✓";
-            case CHECKED_IN, SEATED -> "You're here. Enjoy!";
-            case COMPLETED -> "Thank you for your visit";
-            case CANCELLED -> ReservationLifecycleService.isDeclined(reservation) ? "Sorry, we couldn't take this booking" : "Cancelled";
-            case NO_SHOW -> "Missed";
-            case EXPIRED -> "Sorry, we couldn't confirm this request";
-            case NO_ACTION -> "Please contact us about this booking";
+            case PENDING -> pos.pos.i18n.Words.en("Request sent: we'll let you know soon");
+            case CONFIRMED -> reservation.getAttendanceConfirmedAt() != null ? pos.pos.i18n.Words.en("Confirmed ✓ · you confirmed you're coming") : pos.pos.i18n.Words.en("Confirmed ✓");
+            case CHECKED_IN, SEATED -> pos.pos.i18n.Words.en("You're here. Enjoy!");
+            case COMPLETED -> pos.pos.i18n.Words.en("Thank you for your visit");
+            case CANCELLED -> ReservationLifecycleService.isDeclined(reservation) ? pos.pos.i18n.Words.en("Sorry, we couldn't take this booking") : pos.pos.i18n.Words.en("Cancelled");
+            case NO_SHOW -> pos.pos.i18n.Words.en("Missed");
+            case EXPIRED -> pos.pos.i18n.Words.en("Sorry, we couldn't confirm this request");
+            case NO_ACTION -> pos.pos.i18n.Words.en("Please contact us about this booking");
         };
     }
 

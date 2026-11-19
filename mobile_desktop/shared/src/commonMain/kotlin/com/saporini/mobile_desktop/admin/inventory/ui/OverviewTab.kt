@@ -64,7 +64,7 @@ import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.NotificationImportant
 import androidx.compose.material.icons.outlined.Paid
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -447,7 +447,8 @@ private fun TopValuePanel(state: InventoryState, modifier: Modifier) {
                     ValuableRow(state, index, item, value, currency, share = if (total > 0) value.toFloat() / total else null)
                 }
             }
-            Text("Together ${moneyText(valuable.sumOf { it.second }, currency)}${if (total > 0) ", ${percentText(valuable.sumOf { it.second }.toFloat() / total)} of all your stock" else ""}. " +
+            val together = moneyText(valuable.sumOf { it.second }, currency)
+            Text((if (total > 0) "Together $together, ${percentText(valuable.sumOf { it.second }.toFloat() / total)} of all your stock. " else "Together $together. ") +
                 "Set from what value an item counts in Admin Hub → Settings → Inventory.",
                 Modifier.padding(top = 4.dp), fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = Kit.Muted)
         }

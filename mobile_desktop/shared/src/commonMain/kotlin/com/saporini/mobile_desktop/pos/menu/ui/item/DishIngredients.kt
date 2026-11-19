@@ -45,7 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -300,8 +300,7 @@ private fun CostLine(rows: List<IngredientRow>, choices: List<IngredientChoiceDt
     val text = when {
         cost == null -> "Pick ingredients from stock to count them out when the dish is served and see what it costs you."
         else -> buildString {
-            append(if (cost.complete) "Cost per portion " else "Cost per portion about ")
-            append(money(cost.total))
+            append(if (cost.complete) "Cost per portion ${money(cost.total)}" else "Cost per portion about ${money(cost.total)}")
             if (price != null && price > 0) append(" · ${round(cost.total / price * 100).toLong()}% of the price")
         }
     }

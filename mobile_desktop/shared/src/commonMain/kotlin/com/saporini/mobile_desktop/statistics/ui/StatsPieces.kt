@@ -26,7 +26,7 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -402,13 +402,18 @@ internal fun StatsPanel(
     // them (user, 2026-11-15: "don't include the download button or any unnecessary icon"); they keep their room, so nothing moves.
     val layer = androidx.compose.ui.graphics.rememberGraphicsLayer()
     var printing by remember { mutableStateOf(false) }
+    // Downloads keep the restaurant's own currency: amounts shown in another one go back to it while the picture is taken.
     val picture: suspend () -> androidx.compose.ui.graphics.ImageBitmap? = {
         printing = true
-        androidx.compose.runtime.withFrameNanos { }
-        androidx.compose.runtime.withFrameNanos { }
-        val shot = runCatching { layer.toImageBitmap() }.getOrNull()
-        printing = false
-        shot
+        com.saporini.mobile_desktop.core.money.ShownMoney.capturing = true
+        try {
+            androidx.compose.runtime.withFrameNanos { }
+            androidx.compose.runtime.withFrameNanos { }
+            runCatching { layer.toImageBitmap() }.getOrNull()
+        } finally {
+            printing = false
+            com.saporini.mobile_desktop.core.money.ShownMoney.capturing = false
+        }
     }
     androidx.compose.runtime.CompositionLocalProvider(LocalPanelPicture provides picture, LocalPrinting provides printing) {
         OverviewPanel(icon, title, modifier.drawWithContent {

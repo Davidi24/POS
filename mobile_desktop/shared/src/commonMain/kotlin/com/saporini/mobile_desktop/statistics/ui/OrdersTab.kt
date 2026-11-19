@@ -47,11 +47,11 @@ internal fun OrdersSection(v: StatsView, size: ScreenSize, today: kotlinx.dateti
             icon = Icons.Outlined.HighlightOff, tone = Kit.Grey) },
         { m -> StatTile("Voided", countText(t.voided), m, v.change(t.voided, c?.voided), inverted = true, detail = "taken back after sending",
             icon = Icons.Outlined.Block, tone = Kit.Grey) },
-        { m -> StatTile("Items removed", countText(t.removedItems), m, inverted = true, detail = v.money(t.removedValue) + " in value",
+        { m -> StatTile("Items removed", countText(t.removedItems), m, inverted = true, detail = "${v.money(t.removedValue)} in value",
             icon = Icons.Outlined.RemoveShoppingCart, tone = Kit.Grey) },
         // Guests who left without paying (user, 2026-11-01); voided orders don't count these.
         { m -> StatTile("Unpaid", countText(t.unpaid), m, v.change(t.unpaid, c?.unpaid), inverted = true,
-            detail = if (t.unpaid > 0) v.money(t.unpaidValue) + " not paid" else "everyone paid",
+            detail = if (t.unpaid > 0) "${v.money(t.unpaidValue)} not paid" else "everyone paid",
             icon = Icons.Outlined.MoneyOff, tone = Kit.Danger) }
     ))
     // The same graph as Sales, for the orders, in blue (user, 2026-11-14).
@@ -101,7 +101,7 @@ private fun BusyTimesPanel(v: StatsView, modifier: Modifier) {
     val heat = v.heat
     StatsPanel(Icons.Outlined.GridView, "Busy hours and days", modifier, empty = heat.all { row -> row.all { it == 0L } }, note = "orders by weekday and hour") {
         val busiest = heat.indices.flatMap { r -> heat[r].indices.map { c -> Triple(r, c, heat[r][c]) } }.maxBy { it.third }
-        PanelNote("Busiest: ${weekdayName(v.weekdays[busiest.first].day)}s at ${hourLabel(busiest.second)}:00, about ${busiest.third} orders in that hour over the period")
+        PanelNote("Busiest: ${weekdayPlural(v.weekdays[busiest.first].day)} at ${hourLabel(busiest.second)}:00, about ${busiest.third} orders in that hour over the period")
         HeatMap(v.weekdays.map { weekdayName(it.day).take(3) }, (0..23).map { hourLabel(it) }, heat.map { row -> row.map { it.toFloat() } },
             cellHeight = 26.dp, format = { "${it.toLong()} orders" }, titleOf = { r, c -> "${weekdayName(v.weekdays[r].day)} ${hourLabel(c)}:00" })
     }

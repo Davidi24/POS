@@ -142,7 +142,7 @@ val CURRENCIES = listOf(
     CurrencyChoice("UAH", "Ukrainian hryvnia"), CurrencyChoice("MDL", "Moldovan leu"), CurrencyChoice("GEL", "Georgian lari"),
     CurrencyChoice("AED", "UAE dirham"), CurrencyChoice("SAR", "Saudi riyal"), CurrencyChoice("QAR", "Qatari riyal"),
     CurrencyChoice("ILS", "Israeli shekel"), CurrencyChoice("EGP", "Egyptian pound"), CurrencyChoice("MAD", "Moroccan dirham"),
-    CurrencyChoice("ZAR", "South African rand"), CurrencyChoice("CAD", "Canadian dollar"), CurrencyChoice("MXN", "Mexican peso"),
+    CurrencyChoice("ZAR", "South African rand"), CurrencyChoice("CAD", "Canadian dollar"), CurrencyChoice("MXN", "Mexican peso"), CurrencyChoice("DOP", "Dominican peso"),
     CurrencyChoice("BRL", "Brazilian real"), CurrencyChoice("ARS", "Argentine peso"), CurrencyChoice("AUD", "Australian dollar"),
     CurrencyChoice("NZD", "New Zealand dollar"), CurrencyChoice("JPY", "Japanese yen"), CurrencyChoice("CNY", "Chinese yuan"),
     CurrencyChoice("HKD", "Hong Kong dollar"), CurrencyChoice("SGD", "Singapore dollar"), CurrencyChoice("INR", "Indian rupee"),

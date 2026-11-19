@@ -45,7 +45,9 @@ data class CurrentUserResponse(
     val restaurantName: String? = null,
     val branchName: String? = null,
     // The person's own photo, or null for their initials.
-    val photoUrl: String? = null
+    val photoUrl: String? = null,
+    // The language the person picked in Profile (en, it, es, sq), or null.
+    val language: String? = null
 )
 
 /** Profile → My details as the server keeps them; [pendingEmail] = a new address waiting for its link. */
@@ -227,3 +229,6 @@ data class PinSuggestion(val pin: String, val suggestionsLeft: Int = 0)
 
 @Serializable
 data class SavePinRequest(val pin: String)
+
+@Serializable
+data class LanguageRequest(val language: String)

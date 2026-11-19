@@ -59,6 +59,7 @@ public class CurrentUserMapper {
                 .permissions(normalizeCodes(permissions))
                 .restaurantName(restaurantName(user.getRestaurantId()))
                 .photoUrl(user.getAvatarUrl())
+                .language(user.getLanguage())
                 .branchName(branchName(user.getRestaurantId(), availableBranch(user.getRestaurantId(), user.getDefaultBranchId())))
                 .build();
     }
@@ -88,6 +89,7 @@ public class CurrentUserMapper {
                 .permissions(normalizeCodes(permissions))
                 .restaurantName(restaurantName(user.getRestaurantId()))
                 .photoUrl(user.getPhotoUrl())
+                .language(user.getLanguage())
                 .branchName(branchName(user.getRestaurantId(), availableBranch(user.getRestaurantId(), user.getDefaultBranchId())))
                 .build();
     }

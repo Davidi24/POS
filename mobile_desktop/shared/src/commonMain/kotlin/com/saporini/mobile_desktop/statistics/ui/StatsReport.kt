@@ -22,7 +22,7 @@ import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -544,7 +544,11 @@ class CardExport(val report: CardReport, val chart: ImageBitmap?)
  * and sees the pages as they'll be; Print sends those pages to the printer (the computer), Download asks where to save.
  */
 @Composable
-internal fun ReportExportDialog(export: CardExport, info: ReportInfo, onClose: () -> Unit, onResult: (String) -> Unit) {
+internal fun ReportExportDialog(export: CardExport, info: ReportInfo, onClose: () -> Unit, onResult: (String) -> Unit) =
+    com.saporini.mobile_desktop.core.money.RealMoney { ReportExportDialogRealMoney(export = export, info = info, onClose = onClose, onResult = onResult) }
+
+@Composable
+private fun ReportExportDialogRealMoney(export: CardExport, info: ReportInfo, onClose: () -> Unit, onResult: (String) -> Unit) {
     val report = export.report
     val scope = rememberCoroutineScope()
     var pdf by remember(export) { mutableStateOf(true) }
@@ -692,9 +696,14 @@ internal fun PageExportButton(info: ReportInfo, size: Dp, onResult: (String) -> 
  * leave the report out. Reports with nothing ticked are left out. Print all prints what's ticked (the computer); Download
  * all asks for a folder and saves into a folder of its own ("Sales 2026-11-01 to 2026-11-14").
  */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun PageExportDialog(items: List<PageExportItem>, info: ReportInfo, onClose: () -> Unit, onResult: (String) -> Unit,
+                              onePdf: String? = null, pdfHint: String = "Each report's chart and table, as A4 pages") =
+    com.saporini.mobile_desktop.core.money.RealMoney { PageExportDialogRealMoney(items = items, info = info, onClose = onClose, onResult = onResult, onePdf = onePdf, pdfHint = pdfHint) }
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun PageExportDialogRealMoney(items: List<PageExportItem>, info: ReportInfo, onClose: () -> Unit, onResult: (String) -> Unit,
                               onePdf: String? = null, pdfHint: String = "Each report's chart and table, as A4 pages") {
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }

@@ -2,6 +2,8 @@ package com.saporini.mobile_desktop.account.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,7 +27,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
@@ -83,10 +86,12 @@ internal fun AccountAvatar(user: CurrentUserResponse?, size: Dp, fontSize: TextU
 
 /**
  * The menu behind the person's name in every top bar (user, 2026-11-18: "the menu has profile, log out, the restaurant's
- * name"): who they are, their role and restaurant, then Profile and Sign out. [compact] = only the picture.
+ * name"): who they are, their role and restaurant, then Profile and Sign out. Inside a workspace the button is only the
+ * picture and the arrow (user, 2026-11-19: "only show DO with the down arrow"); [withName] (the workspace picker, where
+ * there's room) adds the name and role beside the picture ("leave it big only on the first page").
  */
 @Composable
-internal fun AccountMenu(onLogout: () -> Unit, compact: Boolean, small: Boolean = false, loggingOut: Boolean = false) {
+internal fun AccountMenu(onLogout: () -> Unit, withName: Boolean = false, small: Boolean = false, loggingOut: Boolean = false) {
     val account = LocalAccount.current
     val user = account.user
     val navigator = LocalNavigator.current
@@ -110,27 +115,40 @@ internal fun AccountMenu(onLogout: () -> Unit, compact: Boolean, small: Boolean 
         }
     }
     Box {
-        Surface(
+        if (withName) Surface(
             onClick = { open = true },
             shape = RoundedCornerShape(50),
             color = Color.White,
             border = BorderStroke(1.dp, Kit.Border)
         ) {
             Row(
-                Modifier.padding(start = if (small) 3.dp else 5.dp, end = if (compact) 8.dp else 12.dp, top = if (small) 3.dp else 5.dp,
+                Modifier.padding(start = if (small) 3.dp else 5.dp, end = 12.dp, top = if (small) 3.dp else 5.dp,
                     bottom = if (small) 3.dp else 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(if (small) 6.dp else 10.dp)
             ) {
                 AccountAvatar(user, if (small) 28.dp else 34.dp, if (small) 11.sp else 13.sp)
-                if (!compact) {
-                    Column {
-                        Text(name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, letterSpacing = 0.sp, color = Kit.Ink,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        role?.let { Text(it, fontFamily = Inter(), fontSize = 11.5.sp, letterSpacing = 0.sp, color = Kit.Muted, maxLines = 1) }
-                    }
+                Column {
+                    Text(name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, letterSpacing = 0.sp, color = Kit.Ink,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    role?.let { Text(it, fontFamily = Inter(), fontSize = 11.5.sp, letterSpacing = 0.sp, color = Kit.Muted, maxLines = 1) }
                 }
-                Icon(Icons.Outlined.ExpandMore, null, Modifier.size(18.dp), tint = Kit.Ink)
+                Icon(Icons.Outlined.ExpandMore, "$name, account menu", Modifier.size(18.dp), tint = Kit.Ink)
+            }
+        } else {
+            // Inside a workspace: the picture and the arrow in a slim pill, the same height, line and arrow as the language
+            // button beside it (user, 2026-11-19: "only DO with the down arrow"; a bare picture with a corner badge looked bad).
+            Row(
+                Modifier.height(34.dp).clip(RoundedCornerShape(17.dp))
+                    .background(if (open) Color(0xFFF3F5EF) else Color.White)
+                    .border(1.dp, Color(0xFFE3E5E1), RoundedCornerShape(17.dp))
+                    .clickable(onClickLabel = "$name, account menu") { open = true }
+                    .padding(start = 3.dp, end = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                AccountAvatar(user, 28.dp, 11.sp)
+                Icon(Icons.Outlined.ExpandMore, null, Modifier.size(17.dp), tint = Kit.Ink)
             }
         }
         DropdownMenu(

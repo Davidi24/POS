@@ -10,12 +10,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import pos.pos.config.properties.AppMailProperties;
+import pos.pos.i18n.Words;
 import pos.pos.reservation.dto.MoneyLineResponse;
 import pos.pos.reservation.entity.Reservation;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
+import java.util.function.Function;
 
 // Emails to guests about their booking, each with a link to their booking page (confirm, cancel, running late, pay).
 // Sent after the change is saved; a mail problem never undoes or blocks the booking.
@@ -24,7 +25,7 @@ import java.util.Locale;
 public class ReservationMailService {
 
     private static final Logger logger = LoggerFactory.getLogger(ReservationMailService.class);
-    private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEEE d MMMM 'at' HH:mm", Locale.ENGLISH);
+    private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm");
 
     private final JavaMailSender mailSender;
     private final AppMailProperties appMailProperties;
@@ -51,96 +52,100 @@ public class ReservationMailService {
 
     // "Your table is confirmed ✓". Booked less than the reminder time ahead, it already asks them to confirm.
     public void confirmed(Reservation reservation, boolean acceptedRequest, boolean askToConfirm, List<MoneyLineResponse> due) {
-        String opening = acceptedRequest ? "Good news: your table is confirmed ✓" : "Your table is confirmed ✓";
-        StringBuilder body = new StringBuilder(greeting(reservation))
-                .append(opening).append("\n\n").append(details(reservation)).append("\n");
-        appendDue(body, due, reservation);
-        if (askToConfirm) {
-            // This email is the "Still coming?" one, so the reminder job won't send another.
-            body.append("\nPlease let us know you're coming, or cancel if your plans changed (it's free):\n");
-        } else {
-            body.append("\nWe'll send a reminder before your visit. Need to change or cancel? It's free:\n");
-        }
-        body.append(bookingPage(reservation)).append("\n").append(signature(reservation));
         Runnable onDelivered = askToConfirm
                 ? () -> reminderDeliveryService.recordGuestReminderSent(reservation.getId())
                 : () -> { };
-        send(reservation, (acceptedRequest ? "Your table is confirmed" : "Booking confirmed") + " · " + restaurant(reservation), body.toString(), onDelivered);
+        send(reservation, l -> Words.t(l, acceptedRequest ? "Your table is confirmed" : "Booking confirmed") + " · " + restaurant(reservation, l), l -> {
+            StringBuilder body = new StringBuilder(greeting(reservation, l))
+                    .append(Words.t(l, acceptedRequest ? "Good news: your table is confirmed ✓" : "Your table is confirmed ✓"))
+                    .append("\n\n").append(details(reservation, l)).append("\n");
+            appendDue(body, due, l);
+            if (askToConfirm) {
+                // This email is the "Still coming?" one, so the reminder job won't send another.
+                body.append("\n").append(Words.t(l, "Please let us know you're coming, or cancel if your plans changed (it's free):")).append("\n");
+            } else {
+                body.append("\n").append(Words.t(l, "We'll send a reminder before your visit. Need to change or cancel? It's free:")).append("\n");
+            }
+            return body.append(bookingPage(reservation)).append("\n").append(signature(reservation, l)).toString();
+        }, onDelivered);
     }
 
     // No table free (or a big group): a request staff answer.
     public void requestReceived(Reservation reservation, List<MoneyLineResponse> due) {
-        StringBuilder body = new StringBuilder(greeting(reservation))
-                .append("Your reservation request has been sent. We'll let you know as soon as we can confirm it.\n\n")
-                .append(details(reservation)).append("\n");
-        appendDue(body, due, reservation);
-        body.append("\nYour request: ").append(bookingPage(reservation)).append("\n").append(signature(reservation));
-        send(reservation, "Reservation request received · " + restaurant(reservation), body.toString());
+        send(reservation, l -> Words.t(l, "Reservation request received") + " · " + restaurant(reservation, l), l -> {
+            StringBuilder body = new StringBuilder(greeting(reservation, l))
+                    .append(Words.t(l, "Your reservation request has been sent. We'll let you know as soon as we can confirm it.")).append("\n\n")
+                    .append(details(reservation, l)).append("\n");
+            appendDue(body, due, l);
+            return body.append("\n").append(Words.t(l, "Your request: {}", bookingPage(reservation))).append("\n").append(signature(reservation, l)).toString();
+        });
     }
 
     public void declined(Reservation reservation, List<MoneyLineResponse> money) {
-        StringBuilder body = new StringBuilder(greeting(reservation))
-                .append("Sorry, we can't take your booking for ").append(when(reservation)).append(": we're full.\n");
-        appendRefunds(body, money, reservation);
-        body.append(signature(reservation));
-        send(reservation, "Sorry, we're full · " + restaurant(reservation), body.toString());
+        send(reservation, l -> Words.t(l, "Sorry, we're full") + " · " + restaurant(reservation, l), l -> {
+            StringBuilder body = new StringBuilder(greeting(reservation, l))
+                    .append(Words.t(l, "Sorry, we can't take your booking for {}: we're full.", when(reservation, l))).append("\n");
+            appendRefunds(body, money, reservation, l);
+            return body.append(signature(reservation, l)).toString();
+        });
     }
 
     public void expired(Reservation reservation, List<MoneyLineResponse> money) {
-        StringBuilder body = new StringBuilder(greeting(reservation))
-                .append("Sorry, we couldn't confirm your request for ").append(when(reservation)).append(".\n");
-        appendRefunds(body, money, reservation);
-        body.append(signature(reservation));
-        send(reservation, "We couldn't confirm your request · " + restaurant(reservation), body.toString());
+        send(reservation, l -> Words.t(l, "We couldn't confirm your request") + " · " + restaurant(reservation, l), l -> {
+            StringBuilder body = new StringBuilder(greeting(reservation, l))
+                    .append(Words.t(l, "Sorry, we couldn't confirm your request for {}.", when(reservation, l))).append("\n");
+            appendRefunds(body, money, reservation, l);
+            return body.append(signature(reservation, l)).toString();
+        });
     }
 
     public void cancelled(Reservation reservation, List<MoneyLineResponse> money) {
-        StringBuilder body = new StringBuilder(greeting(reservation))
-                .append("Your booking for ").append(when(reservation)).append(" is cancelled.\n");
-        appendRefunds(body, money, reservation);
-        body.append(signature(reservation));
-        send(reservation, "Booking cancelled · " + restaurant(reservation), body.toString());
+        send(reservation, l -> Words.t(l, "Booking cancelled") + " · " + restaurant(reservation, l), l -> {
+            StringBuilder body = new StringBuilder(greeting(reservation, l))
+                    .append(Words.t(l, "Your booking for {} is cancelled.", when(reservation, l))).append("\n");
+            appendRefunds(body, money, reservation, l);
+            return body.append(signature(reservation, l)).toString();
+        });
     }
 
     // "See you tomorrow? [Confirm] [Cancel]" (and "I'm running late").
     public void reminder(Reservation reservation) {
-        String body = greeting(reservation)
-                + "See you soon? Your table is booked for " + when(reservation) + " (" + guests(reservation) + ").\n\n"
-                + "Please confirm you're still coming, tell us if you're running late, or cancel for free:\n"
-                + bookingPage(reservation) + "\n" + signature(reservation);
-        send(reservation, "See you soon? Please confirm · " + restaurant(reservation), body,
+        send(reservation, l -> Words.t(l, "See you soon? Please confirm") + " · " + restaurant(reservation, l), l -> greeting(reservation, l)
+                + Words.t(l, "See you soon? Your table is booked for {} ({}).", when(reservation, l), guests(reservation, l)) + "\n\n"
+                + Words.t(l, "Please confirm you're still coming, tell us if you're running late, or cancel for free:") + "\n"
+                + bookingPage(reservation) + "\n" + signature(reservation, l),
                 () -> reminderDeliveryService.recordGuestReminderSent(reservation.getId()));
     }
 
     // No answer to the first one: asked once more, a few hours before (Settings → Reservations).
     public void reminderAgain(Reservation reservation) {
-        String body = greeting(reservation)
-                + "We haven't heard from you yet. Your table is booked for " + when(reservation) + " (" + guests(reservation) + ").\n\n"
-                + "Please confirm you're still coming, or cancel for free:\n"
-                + bookingPage(reservation) + "\n" + signature(reservation);
-        send(reservation, "Still coming today? Please confirm · " + restaurant(reservation), body,
+        send(reservation, l -> Words.t(l, "Still coming today? Please confirm") + " · " + restaurant(reservation, l), l -> greeting(reservation, l)
+                + Words.t(l, "We haven't heard from you yet. Your table is booked for {} ({}).", when(reservation, l), guests(reservation, l)) + "\n\n"
+                + Words.t(l, "Please confirm you're still coming, or cancel for free:") + "\n"
+                + bookingPage(reservation) + "\n" + signature(reservation, l),
                 () -> reminderDeliveryService.recordGuestReminderSent(reservation.getId(), pos.pos.reservation.enums.ReservationEventType.GUEST_REMINDED_AGAIN));
     }
 
     public void paymentLink(Reservation reservation, List<MoneyLineResponse> due) {
-        StringBuilder body = new StringBuilder(greeting(reservation)).append("For your booking on ").append(when(reservation)).append(":\n");
-        appendDue(body, due, reservation);
-        body.append("\nPay here: ").append(bookingPage(reservation)).append("\n").append(signature(reservation));
-        send(reservation, "Payment for your booking · " + restaurant(reservation), body.toString());
+        send(reservation, l -> Words.t(l, "Payment for your booking") + " · " + restaurant(reservation, l), l -> {
+            StringBuilder body = new StringBuilder(greeting(reservation, l)).append(Words.t(l, "For your booking on {}:", when(reservation, l))).append("\n");
+            appendDue(body, due, l);
+            return body.append("\n").append(Words.t(l, "Pay here: {}", bookingPage(reservation))).append("\n").append(signature(reservation, l)).toString();
+        });
     }
 
-    // ---- Text ----
+    // ---- Text (each email is written for a language; see send) ----
 
-    private void appendDue(StringBuilder body, List<MoneyLineResponse> due, Reservation reservation) {
+    private void appendDue(StringBuilder body, List<MoneyLineResponse> due, String l) {
         if (due == null || due.isEmpty()) {
             return;
         }
-        body.append("\nTo pay:\n");
-        due.forEach(line -> body.append("  • ").append(line.getDescription()).append(": ").append(money(line, reservation)).append("\n"));
-        body.append("If you cancel in time you get it back minus the card fee. After the deadline, or if you don't come, there's no refund.\n");
+        body.append("\n").append(Words.t(l, "To pay:")).append("\n");
+        due.forEach(line -> body.append("  • ").append(Words.tr(l, line.getDescription())).append(": ").append(money(line)).append("\n"));
+        body.append(Words.t(l, "If you cancel in time you get it back minus the card fee. After the deadline, or if you don't come, there's no refund.")).append("\n");
     }
 
-    private void appendRefunds(StringBuilder body, List<MoneyLineResponse> money, Reservation reservation) {
+    private void appendRefunds(StringBuilder body, List<MoneyLineResponse> money, Reservation reservation, String l) {
         if (money == null || money.isEmpty()) {
             body.append("\n");
             return;
@@ -148,58 +153,60 @@ public class ReservationMailService {
         body.append("\n");
         money.forEach(line -> {
             String what = switch (line.getStatus()) {
-                case "REFUNDED" -> "refunded " + amount(line.getRefundedAmount(), line.getCurrency());
-                case "KEPT" -> "no refund (after the deadline)";
-                case "CANCELLED" -> "nothing was charged";
-                default -> line.getExplanation();
+                case "REFUNDED" -> Words.t(l, "refunded {}", amount(line.getRefundedAmount(), line.getCurrency()));
+                case "KEPT" -> Words.t(l, "no refund (after the deadline)");
+                case "CANCELLED" -> Words.t(l, "nothing was charged");
+                default -> Words.tr(l, line.getExplanation());
             };
-            body.append("  • ").append(line.getDescription()).append(" ").append(money(line, reservation)).append(": ").append(what).append("\n");
+            body.append("  • ").append(Words.tr(l, line.getDescription())).append(" ").append(money(line)).append(": ").append(what).append("\n");
         });
         body.append("\n");
     }
 
-    private String greeting(Reservation reservation) {
+    private String greeting(Reservation reservation, String l) {
         String name = reservation.getContactName();
-        return "Hello " + (name == null || name.isBlank() ? "there" : name.trim().split("\\s+")[0]) + ",\n\n";
+        return Words.t(l, "Hello {},", name == null || name.isBlank() ? Words.t(l, "there") : name.trim().split("\\s+")[0]) + "\n\n";
     }
 
-    private String details(Reservation reservation) {
+    private String details(Reservation reservation, String l) {
         StringBuilder text = new StringBuilder()
-                .append("  ").append(restaurant(reservation)).append("\n")
-                .append("  ").append(when(reservation)).append("\n")
-                .append("  ").append(guests(reservation)).append("\n");
+                .append("  ").append(restaurant(reservation, l)).append("\n")
+                .append("  ").append(when(reservation, l)).append("\n")
+                .append("  ").append(guests(reservation, l)).append("\n");
         if (reservation.getOccasionName() != null) {
             text.append("  ").append(reservation.getOccasionIcon() == null ? "" : reservation.getOccasionIcon() + " ").append(reservation.getOccasionName()).append("\n");
         }
-        text.append("  Booking code ").append(reservation.getReservationCode()).append("\n");
+        text.append("  ").append(Words.t(l, "Booking code {}", reservation.getReservationCode())).append("\n");
         return text.toString();
     }
 
-    private String when(Reservation reservation) {
-        return WHEN.format(reservation.getReservationStart().atZoneSameInstant(reservationSupport.restaurantZone(reservation.getRestaurant())));
+    // "Friday 6 November at 19:00", in the email's language.
+    private String when(Reservation reservation, String l) {
+        java.time.ZonedDateTime local = reservation.getReservationStart().atZoneSameInstant(reservationSupport.restaurantZone(reservation.getRestaurant()));
+        return Words.t(l, "{} at {}", pos.pos.reservation.controller.GuestBookingPageController.day(local, l), CLOCK.format(local));
     }
 
-    private static String guests(Reservation reservation) {
-        return reservation.getPartySize() + (reservation.getPartySize() == 1 ? " guest" : " guests");
+    private static String guests(Reservation reservation, String l) {
+        return reservation.getPartySize() == 1 ? Words.t(l, "1 guest") : Words.t(l, "{} guests", reservation.getPartySize());
     }
 
-    private static String restaurant(Reservation reservation) {
-        return reservation.getRestaurant() == null ? "the restaurant" : reservation.getRestaurant().getName();
+    private static String restaurant(Reservation reservation, String l) {
+        return reservation.getRestaurant() == null ? Words.t(l, "the restaurant") : reservation.getRestaurant().getName();
     }
 
     // The restaurant's name and how to reach it (the branch's phone/email, otherwise the restaurant's).
-    private String signature(Reservation reservation) {
-        StringBuilder text = new StringBuilder("\nSee you soon,\n").append(restaurant(reservation)).append("\n");
+    private String signature(Reservation reservation, String l) {
+        StringBuilder text = new StringBuilder("\n").append(Words.t(l, "See you soon,")).append("\n").append(restaurant(reservation, l)).append("\n");
         var branch = reservation.getBranch();
         var owner = reservation.getRestaurant();
         String phone = branch != null && branch.getPhone() != null ? branch.getPhone() : owner == null ? null : owner.getPhone();
         String email = branch != null && branch.getEmail() != null ? branch.getEmail() : owner == null ? null : owner.getEmail();
-        if (phone != null) text.append("Phone: ").append(phone).append("\n");
-        if (email != null) text.append("Email: ").append(email).append("\n");
+        if (phone != null) text.append(Words.t(l, "Phone: {}", phone)).append("\n");
+        if (email != null) text.append(Words.t(l, "Email: {}", email)).append("\n");
         return text.toString();
     }
 
-    private static String money(MoneyLineResponse line, Reservation reservation) {
+    private static String money(MoneyLineResponse line) {
         return amount(line.getAmount(), line.getCurrency());
     }
 
@@ -215,8 +222,20 @@ public class ReservationMailService {
 
     // ---- Sending ----
 
-    private void send(Reservation reservation, String subject, String body) {
-        send(reservation, subject, body, () -> { });
+    private void send(Reservation reservation, Function<String, String> subjectIn, Function<String, String> bodyIn) {
+        send(reservation, subjectIn, bodyIn, () -> { });
+    }
+
+    /**
+     * In the language the guest booked in, with the English under it (user, 2026-11-18: "English is always included");
+     * only English when they booked in English or staff made the booking.
+     */
+    private void send(Reservation reservation, Function<String, String> subjectIn, Function<String, String> bodyIn, Runnable onDelivered) {
+        String lang = Words.language(reservation.getLanguage());
+        String subject = subjectIn.apply(lang);
+        String body = "en".equals(lang) ? bodyIn.apply("en")
+                : bodyIn.apply(lang) + "\n\n———— English ————\n\n" + bodyIn.apply("en");
+        send(reservation, subject, body, onDelivered);
     }
 
     private void send(Reservation reservation, String subject, String body, Runnable onDelivered) {

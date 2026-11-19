@@ -41,7 +41,7 @@ public class EmailVerificationService {
     void setLinkSettings(pos.pos.config.properties.PasswordResetProperties linkSettings) { this.linkSettings = linkSettings; }
 
     /** What a confirmation link is (for its page): still works, used, expired or unknown; the new address for an email change. */
-    public record EmailLinkView(String status, String email, String newEmail, String firstName) {
+    public record EmailLinkView(String status, String email, String newEmail, String firstName, String language) {
     }
 
     @Transactional
@@ -110,14 +110,14 @@ public class EmailVerificationService {
     /** The link's state for its page, without using it (link scanners open links; only the page's button confirms). */
     @Transactional(readOnly = true)
     public EmailLinkView checkLink(String rawToken) {
-        if (rawToken == null || rawToken.isBlank()) return new EmailLinkView("INVALID", null, null, null);
+        if (rawToken == null || rawToken.isBlank()) return new EmailLinkView("INVALID", null, null, null, null);
         AuthEmailVerificationToken token = authEmailVerificationTokenRepository
                 .findByTokenHash(opaqueTokenService.hash(rawToken.trim(), emailVerificationProperties.getTokenPepper())).orElse(null);
-        if (token == null) return new EmailLinkView("INVALID", null, null, null);
+        if (token == null) return new EmailLinkView("INVALID", null, null, null, null);
         User user = userRepository.findById(token.getUserId()).filter(u -> u.getDeletedAt() == null && u.isActive()).orElse(null);
-        if (user == null) return new EmailLinkView("INVALID", null, null, null);
+        if (user == null) return new EmailLinkView("INVALID", null, null, null, null);
         String status = token.getUsedAt() != null ? "USED" : !token.getExpiresAt().isAfter(OffsetDateTime.now(ZoneOffset.UTC)) ? "EXPIRED" : "VALID";
-        return new EmailLinkView(status, user.getEmail(), token.getNewEmail(), user.getFirstName());
+        return new EmailLinkView(status, user.getEmail(), token.getNewEmail(), user.getFirstName(), user.getLanguage());
     }
 
     /**
@@ -181,6 +181,7 @@ public class EmailVerificationService {
         );
 
         authMailService.sendEmailVerificationEmail(
+                user.getLanguage(),
                 user.getEmail(),
                 user.getFirstName(),
                 emailVerificationProperties.getSubject(),

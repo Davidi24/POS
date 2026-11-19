@@ -21,7 +21,7 @@ import androidx.compose.material.icons.filled.SyncAlt
 import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -140,7 +140,8 @@ private fun TablePicker(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            (action.tableNumber ?: "Its table") + (if (fitting.isEmpty()) " isn't free, and no free table fits right now." else " isn't free now. Choose a table:"),
+            action.tableNumber?.let { if (fitting.isEmpty()) "$it isn't free, and no free table fits right now." else "$it isn't free now. Choose a table:" }
+                ?: if (fitting.isEmpty()) "Its table isn't free, and no free table fits right now." else "Its table isn't free now. Choose a table:",
             fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, letterSpacing = 0.sp, color = Color(0xFF92580A)
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

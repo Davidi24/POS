@@ -89,7 +89,7 @@ public class BookingMoneyService {
         ReservationPayment deposit = new ReservationPayment();
         deposit.setReservation(reservation);
         deposit.setKind(PaymentKind.DEPOSIT);
-        deposit.setDescription("Deposit for " + reservation.getPartySize() + " guests");
+        deposit.setDescription(pos.pos.i18n.Words.en("Deposit for {} guests", reservation.getPartySize()));
         deposit.setAmount(rule.getDepositValue().setScale(2, RoundingMode.HALF_UP));
         deposit.setCurrency(currency(reservation));
         deposit.setRefundDeadline(reservation.getReservationStart().minusHours(Math.max(0, rule.getCancellationWindowHours())));
@@ -285,7 +285,7 @@ public class BookingMoneyService {
         return MoneyLineResponse.builder()
                 .id("pre-order-" + preOrder.getId())
                 .kind("PRE_ORDER")
-                .description("Food pre-order")
+                .description(pos.pos.i18n.Words.en("Food pre-order"))
                 .amount(preOrder.getPaidAmount())
                 .currency(preOrder.getCurrency())
                 .status(status)
@@ -298,21 +298,24 @@ public class BookingMoneyService {
 
     // e.g. "€49.10 back if cancelled now: food pre-order €50.00 minus the card fee (€0.90)".
     private String explain(Reservation reservation, String what, BigDecimal amount, String status, OffsetDateTime deadline, BigDecimal refunded, BigDecimal ifCancelled) {
+        // Whole sentences in English, shown in the guest's language on their pages and emails (pos.pos.i18n.Words).
         String name = what.substring(0, 1).toLowerCase(Locale.ROOT) + what.substring(1);
         return switch (status) {
-            case "PENDING" -> "Waiting for payment" + (deadline == null ? "" : ", order before " + when(deadline, reservation));
-            case "REFUNDED" -> money(refunded, reservation) + " refunded";
-            case "KEPT" -> "Kept by the restaurant" + (refunded.signum() > 0 ? " (" + money(refunded, reservation) + " given back)" : "");
-            case "CANCELLED" -> "Not needed anymore";
+            case "PENDING" -> deadline == null ? pos.pos.i18n.Words.en("Waiting for payment")
+                    : pos.pos.i18n.Words.en("Waiting for payment, order before {}", when(deadline, reservation));
+            case "REFUNDED" -> pos.pos.i18n.Words.en("{} refunded", money(refunded, reservation));
+            case "KEPT" -> refunded.signum() > 0 ? pos.pos.i18n.Words.en("Kept by the restaurant ({} given back)", money(refunded, reservation))
+                    : pos.pos.i18n.Words.en("Kept by the restaurant");
+            case "CANCELLED" -> pos.pos.i18n.Words.en("Not needed anymore");
             default -> ifCancelled.signum() > 0
-                    ? money(ifCancelled, reservation) + " back if cancelled now: " + name + " " + money(amount, reservation)
-                        + " minus the card fee (" + money(amount.subtract(ifCancelled), reservation) + ")"
-                    : "No refund if cancelled now: " + name + " (the deadline was " + when(deadline, reservation) + ")";
+                    ? pos.pos.i18n.Words.en("{} back if cancelled now: {} {} minus the card fee ({})", money(ifCancelled, reservation), name,
+                        money(amount, reservation), money(amount.subtract(ifCancelled), reservation))
+                    : pos.pos.i18n.Words.en("No refund if cancelled now: {} (the deadline was {})", name, when(deadline, reservation));
         };
     }
 
     private String when(OffsetDateTime moment, Reservation reservation) {
-        return moment == null ? "the booking time" : WHEN.format(moment.atZoneSameInstant(reservationSupport.restaurantZone(reservation.getRestaurant())));
+        return moment == null ? pos.pos.i18n.Words.en("the booking time") : WHEN.format(moment.atZoneSameInstant(reservationSupport.restaurantZone(reservation.getRestaurant())));
     }
 
     private java.util.Optional<PreOrder> preOrderOf(Reservation reservation) {

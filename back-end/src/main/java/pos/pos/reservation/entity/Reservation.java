@@ -130,6 +130,10 @@ public class Reservation extends AbstractAuditedEntity {
     @Column(name = "special_requests", columnDefinition = "text")
     private String specialRequests;
 
+    // The language the guest booked in (en, it, es, sq): their emails come in it, with English under it. Null = English.
+    @Column(name = "language", length = 5)
+    private String language;
+
     @Column(name = "internal_notes", columnDefinition = "text")
     private String internalNotes;
 
