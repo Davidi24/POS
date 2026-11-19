@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -94,6 +94,8 @@ private fun AuthFrame(content: @Composable BoxScope.() -> Unit) {
                 ) {
                     BottomLeftDecoration(Modifier.matchParentSize(), cornerScale)
                     content()
+                    // The language, chosen before anyone signs in (user, 2026-11-18).
+                    Box(Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 14.dp)) { com.saporini.mobile_desktop.pos.ui.shell.LanguageSelector(inBar = false) }
                 }
                 AuthPhotoPanel(Modifier.weight(0.55f).fillMaxHeight().padding(14.dp))
             }
@@ -105,6 +107,7 @@ private fun AuthFrame(content: @Composable BoxScope.() -> Unit) {
             ) {
                 BottomLeftDecoration(Modifier.matchParentSize(), cornerScale)
                 content()
+                Box(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 10.dp)) { com.saporini.mobile_desktop.pos.ui.shell.LanguageSelector(inBar = false) }
             }
         }
     }

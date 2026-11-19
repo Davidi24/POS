@@ -56,7 +56,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -271,7 +271,8 @@ fun BoxScope.TableDetailsModal(
                             // An orange table's order has no dishes, so there's nothing to close as unpaid.
                             val closesOrder = hasOrder && table.state != TableVisualState.Paid && table.state != TableVisualState.Occupied
                             MessageBar(
-                                "Nobody has acted on this table. At ${at.clockTime()} it's set free" + (if (closesOrder) " and the order closes as unpaid." else "."),
+                                if (closesOrder) "Nobody has acted on this table. At ${at.clockTime()} it's set free and the order closes as unpaid."
+                                else "Nobody has acted on this table. At ${at.clockTime()} it's set free.",
                                 MessageKind.WARNING
                             )
                             Spacer(Modifier.height(10.dp))

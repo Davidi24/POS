@@ -41,7 +41,7 @@ import androidx.compose.material.icons.outlined.RoomService
 import androidx.compose.material.icons.outlined.Sell
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.Percent
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier

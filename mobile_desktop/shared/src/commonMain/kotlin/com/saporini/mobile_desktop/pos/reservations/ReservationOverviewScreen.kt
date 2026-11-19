@@ -104,7 +104,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.alpha
@@ -2299,15 +2299,16 @@ private fun NarrowReservationCard(
 internal data class ListFilter(val status: String?, val area: String?, val query: String, val floor: String?) {
     val active: Boolean get() = status != null || area != null || query.isNotEmpty()
 
-    // e.g. "No cancelled reservations on 1st Floor on Friday, 25 September."
-    fun emptyMessage(date: LocalDate): String = buildString {
-        append("No ")
-        status?.let { append(if (it == "No show") "no-show " else "${it.lowercase()} ") }
-        append("reservations")
-        area?.let { append(if (it == "Unassigned") " without a table" else " in $it") }
-        if (query.isNotEmpty()) append(" matching \"$query\"")
-        floor?.let { append(" on $it") }
-        append(" on ${date.fullDay()}.")
+    // e.g. "No reservations on 1st Floor on Friday, 25 September." Whole sentences, so each has its translation; with
+    // filters on it says so instead of listing them (they show above the list).
+    fun emptyMessage(date: LocalDate): String {
+        val day = date.fullDay()
+        return when {
+            active && floor != null -> "No reservations on $floor match the filters on $day."
+            active -> "No reservations match the filters on $day."
+            floor != null -> "No reservations on $floor on $day."
+            else -> "No reservations on $day."
+        }
     }
 }
 

@@ -49,6 +49,23 @@ fun App() {
         }
     }
 
+    // Amounts also in the currency chosen on this device (user, 2026-11-19: only to see; payments stay in the restaurant's
+    // currency): the restaurant's currency and today's rates after sign-in, on a change of restaurant or currency, then
+    // every 6 hours. Signed out, nothing is known about a restaurant.
+    val exchangeRates = koinInject<com.saporini.mobile_desktop.core.money.ExchangeRateApi>()
+    val shownCurrency = com.saporini.mobile_desktop.core.money.ShownMoney.chosen
+    LaunchedEffect(isAuthenticated, user?.id, user?.restaurantId, shownCurrency) {
+        val money = com.saporini.mobile_desktop.core.money.ShownMoney
+        if (!isAuthenticated || user == null) {
+            money.forget()
+            return@LaunchedEffect
+        }
+        while (true) {
+            money.refresh(exchangeRates)
+            kotlinx.coroutines.delay(6 * 60 * 60 * 1000L)
+        }
+    }
+
     // A connected till locks when nobody touches it (user, 2026-11-18): 30 seconds, 3 minutes inside important work, never
     // on the kitchen display. Locking signs the person out, and the PIN pad comes back. Devices that aren't tills never lock.
     val till by TokenStore.till.collectAsState()
@@ -88,6 +105,14 @@ fun App() {
         isCheckingSession = false
     }
 
+    // The app's words in the language in use (user, 2026-11-18); every Text below looks them up.
+    val language by com.saporini.mobile_desktop.core.i18n.I18n.language.collectAsState()
+    val translations by com.saporini.mobile_desktop.core.i18n.I18n.revision.collectAsState()
+    LaunchedEffect(Unit) { com.saporini.mobile_desktop.core.i18n.I18n.load() }
+    CompositionLocalProvider(
+        com.saporini.mobile_desktop.core.i18n.LocalAppLanguage provides language,
+        com.saporini.mobile_desktop.core.i18n.LocalTranslations provides translations
+    ) {
     SaporiniTheme {
         Surface(modifier = Modifier.fillMaxSize().pointerInput(Unit) {
             // Any touch or click in the app keeps a connected till awake (desktop also hears it from the window itself).
@@ -153,6 +178,7 @@ fun App() {
                 }
             }
         }
+    }
     }
 }
 

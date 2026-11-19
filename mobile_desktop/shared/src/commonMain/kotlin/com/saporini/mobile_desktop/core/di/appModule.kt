@@ -167,6 +167,7 @@ private val appModule = module {
     factory { com.saporini.mobile_desktop.platform.RestaurantDetailsScreenModel(repository = get(), people = get(), session = get()) }
 
     single { com.saporini.mobile_desktop.notifications.NotificationApi(client = get()) }
+    single { com.saporini.mobile_desktop.core.money.ExchangeRateApi(client = get()) }
     single { com.saporini.mobile_desktop.notifications.NotificationCenter(api = get(), sessionManager = get()) }
 
     single { MenuApi(client = get()) }

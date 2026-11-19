@@ -40,7 +40,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -346,7 +346,7 @@ internal fun PickerTopBar(
                 }
             )
             // One menu behind the person's name in every top bar: who they are, Profile, Sign out (user, 2026-11-18).
-            com.saporini.mobile_desktop.account.ui.AccountMenu(onLogout, compact, small = slim, loggingOut = loggingOut)
+            com.saporini.mobile_desktop.account.ui.AccountMenu(onLogout, withName = !compact, small = slim, loggingOut = loggingOut)
             // Always in sight on wider windows; on a phone Log out is only in the profile menu (user, 2026-10-30).
             if (!compact) Surface(
                 onClick = onLogout, enabled = !loggingOut, shape = RoundedCornerShape(50), color = Color.White,

@@ -14,7 +14,9 @@ internal fun safeFileName(name: String): String =
  * One CSV line. Cells with commas, quotes or line breaks are quoted, and cells starting like a formula get a leading
  * apostrophe so a spreadsheet shows them as text instead of running them.
  */
-internal fun csvRow(cells: List<String>): String = cells.joinToString(",") { raw ->
+internal fun csvRow(cells: List<String>): String = cells.joinToString(",") { words ->
+    // Headings and other app words in the language in use; names and numbers stay as they are.
+    val raw = com.saporini.mobile_desktop.core.i18n.tr(words)
     val cell = if (raw.firstOrNull() in setOf('=', '+', '-', '@', '\t', '\r') && raw.toDoubleOrNull() == null) "'$raw" else raw
     if (cell.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"${cell.replace("\"", "\"\"")}\"" else cell
 }

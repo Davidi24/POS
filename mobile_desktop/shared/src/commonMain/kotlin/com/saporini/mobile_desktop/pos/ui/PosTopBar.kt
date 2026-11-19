@@ -2,6 +2,10 @@ package com.saporini.mobile_desktop.pos.ui.shell
 
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -36,10 +41,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -205,7 +211,7 @@ internal fun WorkspaceTopBar(
             ) {
                 LogoutButton(onClick = onLogout)
                 // The person's own menu (name, role, restaurant, Profile, Sign out), the same in every workspace (user, 2026-11-18).
-                com.saporini.mobile_desktop.account.ui.AccountMenu(onLogout, compact = tier != TopBarTier.FULL)
+                com.saporini.mobile_desktop.account.ui.AccountMenu(onLogout)
             }
         }
     }
@@ -423,22 +429,50 @@ private fun TopBarSeparator() {
     )
 }
 
-private enum class LanguageOption(
-    val code: String,
-    val label: String
-) {
-    ENGLISH("EN", "English"),
-    SPANISH("ES", "Spanish"),
-    ITALIAN("IT", "Italian")
-}
 
 @Composable
-internal fun LanguageSelector() {
+internal fun LanguageSelector(inBar: Boolean = true) {
     var expanded by remember { mutableStateOf(false) }
-    var selectedLanguage by remember { mutableStateOf(LanguageOption.ENGLISH) }
+    // The language in use on this device (user, 2026-11-18: "a default in profile, then change it any time in the nav bar").
+    val selectedLanguage by com.saporini.mobile_desktop.core.i18n.I18n.language.collectAsState()
+    // With another currency chosen for amounts, its own sign shows beside the language (user, 2026-11-19: "make it look
+    // better and show the special char when it has one"; no ≈ here, it takes room): [globe EN | RD$ v].
+    val money = com.saporini.mobile_desktop.core.money.ShownMoney
+    // Always the currency amounts show in (user, 2026-11-19: "it should always show"): the restaurant's own in grey, another
+    // one chosen for amounts in green.
+    val shownCode = money.restaurantCurrency?.let { home -> money.chosen ?: home }
+    val converting = shownCode != null && shownCode != money.restaurantCurrency
 
     Box {
-        TextButton(
+        if (inBar) {
+            Row(
+                Modifier
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(17.dp))
+                    .background(if (expanded) MenuSelectedBackground else Color.White)
+                    .border(1.dp, BarPillBorder, RoundedCornerShape(17.dp))
+                    .clickable { expanded = true }
+                    .padding(start = 10.dp, end = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Outlined.Language, null, Modifier.size(17.dp), tint = MutedInk)
+                Spacer(Modifier.width(6.dp))
+                androidx.compose.material3.Text(selectedLanguage.short, fontFamily = Inter(), fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp, letterSpacing = 0.sp, color = Ink)
+                if (shownCode != null) {
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.width(1.dp).height(16.dp).background(BarPillBorder))
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.clip(RoundedCornerShape(8.dp)).background(if (converting) CurrencyTint else Color(0xFFF1F2EF))
+                        .padding(horizontal = 7.dp, vertical = 2.dp)) {
+                        androidx.compose.material3.Text(com.saporini.mobile_desktop.core.money.shownSymbol(shownCode), fontFamily = Inter(),
+                            fontWeight = FontWeight.Bold, fontSize = 12.5.sp, letterSpacing = 0.sp, color = if (converting) ActiveOlive else Ink, maxLines = 1)
+                    }
+                }
+                Spacer(Modifier.width(3.dp))
+                Icon(Icons.Outlined.ExpandMore, null, Modifier.size(17.dp), tint = Ink)
+            }
+        } else TextButton(
             onClick = { expanded = true },
             shape = RoundedCornerShape(18.dp),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
@@ -454,8 +488,8 @@ internal fun LanguageSelector() {
                     modifier = Modifier.size(18.dp),
                     tint = MutedInk
                 )
-                Text(
-                    text = selectedLanguage.code,
+                androidx.compose.material3.Text(
+                    text = selectedLanguage.short,
                     fontFamily = Inter(),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
@@ -474,38 +508,111 @@ internal fun LanguageSelector() {
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(Color.White),
+            modifier = Modifier.background(Color.White).widthIn(min = if (money.restaurantCurrency != null) 260.dp else 0.dp),
             shape = RoundedCornerShape(10.dp),
             containerColor = Color.White,
             tonalElevation = 0.dp,
             shadowElevation = 6.dp
         ) {
-            LanguageOption.entries.forEach { language ->
+            val money = com.saporini.mobile_desktop.core.money.ShownMoney
+            val home = money.restaurantCurrency
+            if (home != null) MenuCaption("Language")
+            com.saporini.mobile_desktop.core.i18n.AppLanguage.entries.forEach { language ->
                 DropdownMenuItem(
                     text = {
                         MenuText(
-                            text = language.label,
-                            selected = language == selectedLanguage
+                            text = language.nativeName,
+                            selected = language == selectedLanguage,
+                            translate = false
                         )
                     },
                     onClick = {
-                        selectedLanguage = language
+                        com.saporini.mobile_desktop.core.i18n.I18n.use(language)
                         expanded = false
                     }
                 )
             }
+            // Amounts also in a currency the person knows, only to see (user, 2026-11-19: "put the currency together
+            // with the language"); signed in to a restaurant only. Payments always stay in the restaurant's currency.
+            if (home != null) {
+                HorizontalDivider(Modifier.padding(vertical = 4.dp), color = Color(0xFFE3E5E1))
+                MenuCaption("Show amounts in")
+                DropdownMenuItem(
+                    text = { CurrencyLine(home, "Restaurant's currency", money.chosen == null) },
+                    onClick = { money.choose(null); expanded = false }
+                )
+                com.saporini.mobile_desktop.core.money.shownCurrencyChoices().forEach { code ->
+                    DropdownMenuItem(
+                        text = { CurrencyLine(code, com.saporini.mobile_desktop.platform.currencyName(code).ifBlank { code }, money.chosen == code) },
+                        onClick = { money.choose(code); expanded = false }
+                    )
+                }
+                if (money.chosen != null) {
+                    val rate = com.saporini.mobile_desktop.core.money.shownRateLine()
+                    MenuNote(when {
+                        money.unavailable -> "No rate right now, so amounts show in $home."
+                        rate != null -> "Approximate amounts, at $rate. Payments stay in $home."
+                        else -> "Payments stay in $home."
+                    })
+                }
+            }
         }
     }
+}
+
+private val BarPillBorder = Color(0xFFE3E5E1)
+private val CurrencyTint = Color(0xFFE6EFE2)
+
+/** A currency in the globe's menu: its sign in a small tile, its name, its code; the chosen one green with a tick. */
+@Composable
+private fun CurrencyLine(code: String, name: String, selected: Boolean) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
+            .background(if (selected) MenuSelectedBackground else Color.Transparent)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            Modifier.defaultMinSize(minWidth = 36.dp).height(26.dp).clip(RoundedCornerShape(7.dp))
+                .background(if (selected) CurrencyTint else Color(0xFFF1F2EF)).padding(horizontal = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.material3.Text(com.saporini.mobile_desktop.core.money.shownSymbol(code), fontFamily = Inter(),
+                fontWeight = FontWeight.Bold, fontSize = 12.5.sp, letterSpacing = 0.sp, color = if (selected) ActiveOlive else Ink, maxLines = 1)
+        }
+        Text(name, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.sp,
+            color = if (selected) ActiveOlive else Ink, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        androidx.compose.material3.Text(code, fontFamily = Inter(), fontSize = 12.sp, letterSpacing = 0.sp, color = Color(0xFF8A8D89))
+        Box(Modifier.size(16.dp)) {
+            if (selected) Icon(Icons.Outlined.Check, null, Modifier.size(16.dp), tint = ActiveOlive)
+        }
+    }
+}
+
+@Composable
+private fun MenuCaption(text: String) {
+    Text(text, Modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 2.dp), fontFamily = Inter(),
+        fontWeight = FontWeight.SemiBold, fontSize = 11.sp, letterSpacing = 0.sp, color = Color(0xFF8A8D89))
+}
+
+@Composable
+private fun MenuNote(text: String) {
+    Text(text, Modifier.widthIn(max = 260.dp).padding(start = 20.dp, end = 16.dp, top = 6.dp, bottom = 8.dp), fontFamily = Inter(),
+        fontSize = 11.5.sp, lineHeight = 15.sp, letterSpacing = 0.sp, color = Color(0xFF747572))
 }
 
 @Composable
 private fun MenuText(
     text: String,
     selected: Boolean,
-    fontSize: Int = 14
+    fontSize: Int = 14,
+    // A language by its own name, never translated ("Italiano" stays "Italiano").
+    translate: Boolean = true
 ) {
     Text(
         text = text,
+        translate = translate,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))

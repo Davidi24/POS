@@ -36,7 +36,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -278,7 +278,7 @@ private fun EventRow(
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                event.name + if (!event.active) " (off)" else "",
+                if (!event.active) "${event.name} (off)" else event.name,
                 fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = PickerInk,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
             )

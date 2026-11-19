@@ -739,12 +739,7 @@ class MenuScreenModel(
     }
 }
 
-private fun formatOptionPriceDelta(value: Double): String {
-    val cents = kotlin.math.round(value * 100).toLong()
-    val absolute = kotlin.math.abs(cents)
-    val sign = if (cents < 0) "-" else "+"
-    return sign + "$" + (absolute / 100) + "." + (absolute % 100).toString().padStart(2, '0')
-}
+private fun formatOptionPriceDelta(value: Double): String = com.saporini.mobile_desktop.core.format.menuPrice(value, signed = true)
 
 internal fun OptionGroup.toDraftOptionGroup(previous: DraftOptionGroup): DraftOptionGroup = previous.copy(
     name = name,

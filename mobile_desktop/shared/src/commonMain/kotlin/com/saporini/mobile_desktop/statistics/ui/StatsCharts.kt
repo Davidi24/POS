@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -118,7 +118,8 @@ internal fun niceAxis(max: Float, steps: Int = 3): Pair<Float, Float> {
 private fun axisStyle() = TextStyle(fontFamily = Inter(), fontSize = 10.sp, color = Kit.Muted)
 
 private fun DrawScope.label(measurer: TextMeasurer, text: String, style: TextStyle, x: Float, y: Float, alignEnd: Boolean = false, center: Boolean = false) {
-    val layout = measurer.measure(text, style)
+    // Amounts also in the currency chosen on this device (not while a card's picture is taken for a download).
+    val layout = measurer.measure(com.saporini.mobile_desktop.core.money.ShownMoney.show(com.saporini.mobile_desktop.core.i18n.tr(text)), style)
     val left = when {
         alignEnd -> x - layout.size.width
         center -> x - layout.size.width / 2f
@@ -232,7 +233,8 @@ internal fun LineChart(
     // The axis has a place per label, also past where the lines stop (a month still running).
     val count = maxOf(labels.size, series.maxOfOrNull { it.values.size } ?: 0)
     val (top, step) = niceAxis(series.flatMap { it.values }.filterNotNull().maxOrNull() ?: 0f, steps)
-    val axisWidth = remember(top) { measurer.measure(axisFormat(top), style).size.width + 8 }
+    val shownMoney = com.saporini.mobile_desktop.core.money.ShownMoney.view
+    val axisWidth = remember(top, shownMoney) { measurer.measure(com.saporini.mobile_desktop.core.money.ShownMoney.show(axisFormat(top)), style).size.width + 8 }
     val gutter = with(androidx.compose.ui.platform.LocalDensity.current) { 6.dp.toPx() }
     // The day under the pointer, snapped to the nearest one.
     val at = spot?.let { p ->
@@ -351,7 +353,8 @@ internal fun ColumnChart(
     var spot by remember { mutableStateOf<Offset?>(null) }
     var width by remember { mutableStateOf(0) }
     val (top, step) = niceAxis(columns.flatMap { listOfNotNull(it.value, it.compare) }.maxOrNull() ?: 0f)
-    val axisWidth = remember(top) { measurer.measure(axisFormat(top), style).size.width + 8 }
+    val shownMoney = com.saporini.mobile_desktop.core.money.ShownMoney.view
+    val axisWidth = remember(top, shownMoney) { measurer.measure(com.saporini.mobile_desktop.core.money.ShownMoney.show(axisFormat(top)), style).size.width + 8 }
     val peak = columns.indices.maxByOrNull { columns[it].value }?.takeIf { columns[it].value > 0f }
     val compareKey = compareName?.takeIf { columns.any { it.compare != null } }
     val keyRoom = if (compareKey != null) 18.dp else 0.dp
@@ -437,7 +440,8 @@ internal fun StackedColumnChart(
     var spot by remember { mutableStateOf<Offset?>(null) }
     var width by remember { mutableStateOf(0) }
     val (top, step) = niceAxis(values.maxOfOrNull { it.sum() } ?: 0f)
-    val axisWidth = remember(top) { measurer.measure(axisFormat(top), style).size.width + 8 }
+    val shownMoney = com.saporini.mobile_desktop.core.money.ShownMoney.view
+    val axisWidth = remember(top, shownMoney) { measurer.measure(com.saporini.mobile_desktop.core.money.ShownMoney.show(axisFormat(top)), style).size.width + 8 }
     val at = spot?.let { p ->
         val slot = (width - axisWidth).toFloat() / values.size.coerceAtLeast(1)
         if (values.isEmpty() || slot <= 0f || p.x < axisWidth) null else ((p.x - axisWidth) / slot).toInt().coerceIn(0, values.size - 1)
@@ -512,7 +516,7 @@ internal fun HeatMap(
     val style = axisStyle()
     var spot by remember { mutableStateOf<Offset?>(null) }
     var width by remember { mutableStateOf(0) }
-    val labelWidth = remember(rows) { (rows.maxOfOrNull { measurer.measure(it, style).size.width } ?: 0) + 10 }
+    val labelWidth = remember(rows) { (rows.maxOfOrNull { measurer.measure(com.saporini.mobile_desktop.core.i18n.tr(it), style).size.width } ?: 0) + 10 }
     val total = cellHeight * rows.size + 22.dp
     val cellPx = with(androidx.compose.ui.platform.LocalDensity.current) { cellHeight.toPx() }
     val at = spot?.let { p ->
@@ -704,7 +708,7 @@ internal fun QuadrantChart(
             // Names may not cover the corners' names or any dot.
             val taken = mutableListOf<Rect>()
             fun corner(text: String, at: Offset, end: Boolean) {
-                val layout = measurer.measure(text.uppercase(), cornerStyle)
+                val layout = measurer.measure(com.saporini.mobile_desktop.core.i18n.tr(text).uppercase(), cornerStyle)
                 val topLeft = Offset(if (end) at.x - layout.size.width else at.x, at.y - layout.size.height / 2f)
                 drawText(layout, topLeft = topLeft)
                 taken += Rect(topLeft, Size(layout.size.width.toFloat(), layout.size.height.toFloat()))
@@ -900,7 +904,8 @@ internal fun Waterfall(steps: List<Step>, modifier: Modifier = Modifier, height:
         }
     }
     val (top, gridStep) = niceAxis(spans.maxOfOrNull { it.second } ?: 0f)
-    val axisWidth = remember(top) { measurer.measure(axisFormat(top), style).size.width + 8 }
+    val shownMoney = com.saporini.mobile_desktop.core.money.ShownMoney.view
+    val axisWidth = remember(top, shownMoney) { measurer.measure(com.saporini.mobile_desktop.core.money.ShownMoney.show(axisFormat(top)), style).size.width + 8 }
     val at = spot?.let { p ->
         val slot = (width - axisWidth).toFloat() / steps.size.coerceAtLeast(1)
         if (steps.isEmpty() || slot <= 0f || p.x < axisWidth) null else ((p.x - axisWidth) / slot).toInt().coerceIn(0, steps.size - 1)

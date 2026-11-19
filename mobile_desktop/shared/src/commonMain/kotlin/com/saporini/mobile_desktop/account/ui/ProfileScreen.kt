@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.outlined.CurrencyExchange
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.TextButton
@@ -61,7 +62,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -261,7 +262,7 @@ private fun SectionBody(section: ProfileSection, account: AccountInfo, state: Pr
             SignInsCard(state, model)
         }
         ProfileSection.DEVICES -> DevicesCard(state, model, phone, onSignOutEverywhere)
-        ProfileSection.PREFERENCES -> PreferencesCard()
+        ProfileSection.PREFERENCES -> PreferencesCard(account, state, model)
     }
 }
 
@@ -543,16 +544,95 @@ private fun PagerButton(icon: ImageVector, description: String, enabled: Boolean
     }
 }
 
-/** Language, what opens first and notifications: shown now, switched on with their own steps. */
+/**
+ * Language (user, 2026-11-18: "each person makes a default in profile, then can change it any time in the nav bar"): the
+ * person's own, used at every sign-in; what opens first and notifications are switched on with their own steps.
+ */
 @Composable
-private fun PreferencesCard() {
+private fun PreferencesCard(account: AccountInfo, state: ProfileState, model: ProfileScreenModel?) {
+    val inUse by com.saporini.mobile_desktop.core.i18n.I18n.language.collectAsState()
+    val chosen = com.saporini.mobile_desktop.core.i18n.AppLanguage.of(account.user?.language) ?: inUse
     ProfileCard("Preferences", Icons.Outlined.Tune, Modifier.fillMaxWidth()) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val narrow = maxWidth < 480.dp
             Column {
-                PreferenceLine(Icons.Outlined.Language, "Language", "The language of the app", "English", narrow, first = true)
+                Row(Modifier.fillMaxWidth().padding(vertical = 13.dp), verticalAlignment = if (narrow) Alignment.Top else Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Outlined.Language, null, Modifier.size(20.dp), tint = Kit.Muted)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Language", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink)
+                        Text("Yours on every device you sign in on. The globe at the top changes it for now.", fontFamily = Inter(),
+                            fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Muted)
+                        if (narrow) {
+                            Spacer(Modifier.height(8.dp))
+                            LanguageChoice(chosen, state.savingLanguage) { model?.saveLanguage(it) }
+                        }
+                    }
+                    if (!narrow) LanguageChoice(chosen, state.savingLanguage) { model?.saveLanguage(it) }
+                }
+                // Amounts also in a currency the person knows, on this device, only to see (user, 2026-11-19).
+                val home = com.saporini.mobile_desktop.core.money.ShownMoney.restaurantCurrency
+                if (home != null) {
+                    HorizontalDivider(color = Kit.RowBorder)
+                    Row(Modifier.fillMaxWidth().padding(vertical = 13.dp), verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Outlined.CurrencyExchange, null, Modifier.size(20.dp), tint = Kit.Muted)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text("Show amounts in", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink)
+                            Text("On this device, only to give you an idea. Payments stay in $home.", fontFamily = Inter(),
+                                fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Muted)
+                            Spacer(Modifier.height(8.dp))
+                            CurrencyChoice(home)
+                        }
+                    }
+                }
                 PreferenceLine(Icons.Outlined.Apps, "Opens first", "What you see after signing in", "Choose a workspace", narrow)
                 PreferenceLine(Icons.Outlined.NotificationsNone, "Notifications", "Which alerts you get", "All", narrow)
+            }
+        }
+    }
+}
+
+/** The restaurant's own currency, then the others amounts can also be seen in; the chosen one green. */
+@Composable
+private fun CurrencyChoice(home: String) {
+    val money = com.saporini.mobile_desktop.core.money.ShownMoney
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        (listOf<String?>(null) + com.saporini.mobile_desktop.core.money.shownCurrencyChoices()).forEach { code ->
+            val on = code == money.chosen
+            Row(Modifier.clip(RoundedCornerShape(50)).background(if (on) Kit.GreenSoft else Color.White)
+                .border(1.dp, if (on) Kit.Green.copy(alpha = 0.45f) else Kit.Border, RoundedCornerShape(50))
+                .clickable(enabled = !on) { money.choose(code) }.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (on) Icon(Icons.Outlined.CheckCircle, null, Modifier.size(14.dp), tint = Kit.Green)
+                // Its own sign first ("RD$"), then its name.
+                androidx.compose.material3.Text(com.saporini.mobile_desktop.core.money.shownSymbol(code ?: home), fontFamily = Inter(),
+                    fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 0.sp, color = if (on) Kit.Green else Kit.Muted)
+                Text(code?.let { com.saporini.mobile_desktop.platform.currencyName(it).ifBlank { it } } ?: "Restaurant's currency",
+                    fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp,
+                    color = if (on) Kit.Green else Kit.Ink)
+            }
+        }
+    }
+    val rate = com.saporini.mobile_desktop.core.money.shownRateLine()
+    if (money.chosen != null) Text(if (money.unavailable) "No rate right now, so amounts show in $home." else rate?.let { "Rate: $it" } ?: "",
+        Modifier.padding(top = 6.dp), fontFamily = Inter(), fontSize = 12.sp, letterSpacing = 0.sp, color = Kit.Muted)
+}
+
+/** The four languages by their own names; the chosen one green. */
+@Composable
+private fun LanguageChoice(chosen: com.saporini.mobile_desktop.core.i18n.AppLanguage, busy: Boolean,
+                           onPick: (com.saporini.mobile_desktop.core.i18n.AppLanguage) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        com.saporini.mobile_desktop.core.i18n.AppLanguage.entries.forEach { language ->
+            val on = language == chosen
+            Row(Modifier.clip(RoundedCornerShape(50)).background(if (on) Kit.GreenSoft else Color.White)
+                .border(1.dp, if (on) Kit.Green.copy(alpha = 0.45f) else Kit.Border, RoundedCornerShape(50))
+                .clickable(enabled = !busy && !on) { onPick(language) }.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (on) Icon(Icons.Outlined.CheckCircle, null, Modifier.size(14.dp), tint = Kit.Green)
+                Text(language.nativeName, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp,
+                    color = if (on) Kit.Green else Kit.Ink, translate = false)
             }
         }
     }

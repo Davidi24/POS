@@ -60,7 +60,7 @@ import com.saporini.mobile_desktop.statistics.StatsView
 import androidx.compose.ui.Alignment
 import com.saporini.mobile_desktop.statistics.DayPoint
 import com.saporini.mobile_desktop.statistics.CompareMode
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.theme.Inter
@@ -404,8 +404,9 @@ private fun WeekdaysPanel(v: StatsView, today: LocalDate, onWeek: (LocalDate?) -
         val best = days.maxBy { it.average }
         val closedAny = days.any { it.closed > 0 }
         Box(Modifier.alpha(dim)) {
-            PanelNote("${weekdayName(best.day)}s are the strongest: ${v.money(best.average)} on an average ${if (closedAny) "open " else ""}day" +
-                if (closedAny) " (closed days left out)" else "")
+            // Whole sentences, so each one has its translation.
+            PanelNote(if (closedAny) "${weekdayPlural(best.day)} are the strongest: ${v.money(best.average)} on an average open day (closed days left out)"
+                else "${weekdayPlural(best.day)} are the strongest: ${v.money(best.average)} on an average day")
         }
         ColumnChart(days.map { d -> ColumnDatum(weekdayName(d.day).take(3), d.average / 100f, weekdayTip(v, d)) }, roomLeft().alpha(dim), height = 220.dp,
             color = StatsSeries[0], axisFormat = { v.axisMoney(it) }, peakLabel = { v.axisMoney(it) })
@@ -433,11 +434,12 @@ private fun weekdayAverages(v: StatsView, today: LocalDate): List<WeekdayAverage
 /** "€8,252.04 on an average Friday · from 2 Fridays (only 2 in these dates) · 1 closed day left out". */
 private fun weekdayTip(v: StatsView, d: WeekdayAverage): String {
     val name = weekdayName(d.day)
-    if (d.open == 0) return if (d.closed > 0) "Closed every $name in these dates" else "No ${name}s in these dates"
+    val plural = weekdayPlural(d.day)
+    if (d.open == 0) return if (d.closed > 0) "Closed every $name in these dates" else "No $plural in these dates"
     return buildList {
         add("${v.money(d.average)} on an average $name")
-        add("from ${d.open} ${if (d.open == 1) name else "${name}s"}" + if (d.open <= 2) " (few, read with care)" else "")
-        if (d.closed > 0) add("${d.closed} closed ${if (d.closed == 1) "day" else "days"} left out")
+        add(when (d.open) { 1 -> "from 1 $name (few, read with care)"; 2 -> "from 2 $plural (few, read with care)"; else -> "from ${d.open} $plural" })
+        if (d.closed > 0) add(if (d.closed == 1) "1 closed day left out" else "${d.closed} closed days left out")
     }.joinToString(" · ")
 }
 
@@ -491,6 +493,17 @@ private fun SectionsPanel(v: StatsView, modifier: Modifier) {
 }
 
 internal fun weekdayName(day: kotlinx.datetime.DayOfWeek): String = day.name.lowercase().replaceFirstChar { it.uppercase() }
+
+/** "Mondays"…, written out so they have their translations. */
+internal fun weekdayPlural(day: kotlinx.datetime.DayOfWeek): String = when (day) {
+    kotlinx.datetime.DayOfWeek.MONDAY -> "Mondays"
+    kotlinx.datetime.DayOfWeek.TUESDAY -> "Tuesdays"
+    kotlinx.datetime.DayOfWeek.WEDNESDAY -> "Wednesdays"
+    kotlinx.datetime.DayOfWeek.THURSDAY -> "Thursdays"
+    kotlinx.datetime.DayOfWeek.FRIDAY -> "Fridays"
+    kotlinx.datetime.DayOfWeek.SATURDAY -> "Saturdays"
+    else -> "Sundays"
+}
 
 /** "November". */
 private fun monthName(date: LocalDate): String = date.month.name.lowercase().replaceFirstChar { it.uppercase() }

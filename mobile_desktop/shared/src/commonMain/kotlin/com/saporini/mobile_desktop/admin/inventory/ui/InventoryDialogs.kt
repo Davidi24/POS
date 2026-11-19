@@ -27,7 +27,7 @@ import androidx.compose.material.icons.outlined.Scale
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,7 +99,11 @@ import com.saporini.mobile_desktop.core.components.CheckState
 
 /** Every dialog the Inventory page can show, driven by the model's state. */
 @Composable
-internal fun InventoryDialogs(state: InventoryState, model: InventoryScreenModel) {
+internal fun InventoryDialogs(state: InventoryState, model: InventoryScreenModel) =
+    com.saporini.mobile_desktop.core.money.RealMoney { InventoryDialogsRealMoney(state = state, model = model) }
+
+@Composable
+private fun InventoryDialogsRealMoney(state: InventoryState, model: InventoryScreenModel) {
     state.itemDraft?.let { ItemEditorDialog(state, model) }
     // Manage places stays open under a place's editor and the delete question.
     if (state.managingPlaces) ManagePlacesDialog(state, model)
@@ -534,7 +538,11 @@ private fun MoveDialog(state: InventoryState, model: InventoryScreenModel) {
 
 /** Where this branch's sales take this item's stock from. */
 @Composable
-internal fun SaleSourceDialog(item: StockItemDto, state: InventoryState, model: InventoryScreenModel, branchId: String, onClose: () -> Unit) {
+internal fun SaleSourceDialog(item: StockItemDto, state: InventoryState, model: InventoryScreenModel, branchId: String, onClose: () -> Unit) =
+    com.saporini.mobile_desktop.core.money.RealMoney { SaleSourceDialogRealMoney(item = item, state = state, model = model, branchId = branchId, onClose = onClose) }
+
+@Composable
+private fun SaleSourceDialogRealMoney(item: StockItemDto, state: InventoryState, model: InventoryScreenModel, branchId: String, onClose: () -> Unit) {
     val current = state.saleSource(branchId, item.id)
     val places = state.activeLocations.filter { it.branchId == null || it.branchId == branchId }
     var chosen by remember { mutableStateOf(places.firstOrNull { it.id == current?.locationId }) }

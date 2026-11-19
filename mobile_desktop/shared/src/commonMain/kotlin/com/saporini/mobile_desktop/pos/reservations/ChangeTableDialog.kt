@@ -85,7 +85,7 @@ internal fun ChangeTableDialog(
         if (keepCurrent && ownTables.isNotEmpty()) {
             MapChoiceRow(
                 icon = Icons.Outlined.TableRestaurant,
-                title = (if (compact) "Keep " else "Keep current: ") + ownTables.joinToString(" + ") { it.second },
+                title = ownTables.joinToString(" + ") { it.second }.let { if (compact) "Keep $it" else "Keep current: $it" },
                 detail = if (compact) null else "The table it has now",
                 selected = picked == ownTables,
                 compact = false
@@ -101,7 +101,7 @@ internal fun ChangeTableDialog(
                 val tables = option.tableIds.zip(option.tableNumbers)
                 MapChoiceRow(
                     icon = if (index == 0) Icons.Outlined.AutoAwesome else Icons.Outlined.TableRestaurant,
-                    title = (if (index == 0 && !compact) "Best fit: " else "") + option.tableNumbers.joinToString(" + "),
+                    title = option.tableNumbers.joinToString(" + ").let { if (index == 0 && !compact) "Best fit: $it" else it },
                     detail = "${option.totalCapacity ?: 0} seats",
                     selected = picked == tables,
                     compact = compact

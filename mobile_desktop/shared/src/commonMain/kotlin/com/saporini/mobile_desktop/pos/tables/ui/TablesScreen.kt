@@ -124,7 +124,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -1243,7 +1243,7 @@ fun TablesScreen(
                             booking?.name?.takeIf { it.isNotBlank() },
                             booking?.start?.clockTime(),
                             booking?.guests?.let { if (it == 1) "1 guest" else "$it guests" },
-                            "now on " + selectedTables.joinToString("-") { it.label }
+                            "now on ${selectedTables.joinToString("-") { it.label }}"
                         ).joinToString(" · "),
                         options = bookingOptions,
                         loading = bookingOptionsLoading,

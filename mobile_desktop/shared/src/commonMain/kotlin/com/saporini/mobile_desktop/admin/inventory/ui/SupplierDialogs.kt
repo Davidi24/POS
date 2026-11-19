@@ -17,7 +17,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import com.saporini.mobile_desktop.admin.inventory.PurchaseSteps
@@ -104,6 +104,13 @@ import com.saporini.mobile_desktop.core.components.MessageKind
 /** Whichever supplier dialog is open. */
 @Composable
 internal fun SupplierDialogs(
+    dialog: SupplierDialog?, state: InventoryState, model: InventoryScreenModel, today: LocalDate,
+    onDialog: (SupplierDialog?) -> Unit, onAdded: (String) -> Unit, onPlaced: (PurchaseOrder) -> Unit, onNote: (String) -> Unit = {}
+) =
+    com.saporini.mobile_desktop.core.money.RealMoney { SupplierDialogsRealMoney(dialog = dialog, state = state, model = model, today = today, onDialog = onDialog, onAdded = onAdded, onPlaced = onPlaced, onNote = onNote) }
+
+@Composable
+private fun SupplierDialogsRealMoney(
     dialog: SupplierDialog?, state: InventoryState, model: InventoryScreenModel, today: LocalDate,
     onDialog: (SupplierDialog?) -> Unit, onAdded: (String) -> Unit, onPlaced: (PurchaseOrder) -> Unit, onNote: (String) -> Unit = {}
 ) {
@@ -300,7 +307,7 @@ private fun PlaceCard(place: SupplierPlace, onRemove: () -> Unit) {
                     fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (place.deliveryDays.isNotEmpty()) {
                     val names = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                    Text(if (place.deliveryDays.size == 7) "Delivers every day" else "Delivers " + place.deliveryDays.sorted().joinToString(" · ") { names[it - 1] },
+                    Text(if (place.deliveryDays.size == 7) "Delivers every day" else "Delivers ${place.deliveryDays.sorted().joinToString(" · ") { com.saporini.mobile_desktop.core.i18n.tr(names[it - 1]) }}",
                         fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Kit.Green, maxLines = 1)
                 }
             }
@@ -1060,8 +1067,9 @@ private fun ImportCatalogDialog(supplier: Supplier, onDismiss: () -> Unit, onDon
             KitButton("Save a template", {
                 scope.launch {
                     saved = runCatching {
-                        "Saved to " + saveTextFile("price-list-template.csv", "text/csv",
+                        val where = saveTextFile("price-list-template.csv", "text/csv",
                             "Name,Code,Unit,Pack size,Price,Category\nMussels live,ADR-2001,kg,5 kg net,6.40,Fish\nSquid cleaned,ADR-2014,kg,2 kg box,11.90,Fish\n")
+                        "Saved to $where"
                     }.getOrElse { "Couldn't save the template: ${it.message ?: "unknown problem"}" }
                 }
             }, icon = Icons.Outlined.FileDownload, style = ButtonStyle.SECONDARY)

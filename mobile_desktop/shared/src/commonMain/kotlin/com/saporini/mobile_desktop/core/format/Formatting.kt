@@ -36,6 +36,18 @@ internal fun moneyText(cents: Long, currency: String?): String {
     return "$sign${currencySign(currency)}$whole.${(abs % 100).toString().padStart(2, '0')}"
 }
 
+/**
+ * A menu price in the restaurant's own currency, without thousands commas since menu screens read it back: "€12.50",
+ * "+€2.00" with [signed]. (Menus used to write "$" whatever the restaurant's currency.)
+ */
+internal fun menuPrice(value: Double, signed: Boolean = false): String {
+    val cents = kotlin.math.round(value * 100).toLong()
+    val abs = kotlin.math.abs(cents)
+    val sign = when { cents < 0 -> "-"; signed -> "+"; else -> "" }
+    val mark = currencySign(com.saporini.mobile_desktop.core.money.ShownMoney.restaurantCurrency)
+    return "$sign$mark${abs / 100}.${(abs % 100).toString().padStart(2, '0')}"
+}
+
 /** Decimal text from the server as money; "–" when missing. */
 internal fun money(value: OrderDecimal?, currency: String?): String = value.centsOrNull()?.let { moneyText(it, currency) } ?: "–"
 

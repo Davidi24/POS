@@ -31,7 +31,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -284,7 +284,7 @@ fun BookingMoveDialog(
             options.take(if (compact) 8 else 12).forEachIndexed { index, option ->
                 MapChoiceRow(
                     icon = if (index == 0) Icons.Outlined.AutoAwesome else Icons.Outlined.TableRestaurant,
-                    title = (if (index == 0 && !compact) "Best fit: " else "") + option.tableNumbers.joinToString(" + "),
+                    title = option.tableNumbers.joinToString(" + ").let { if (index == 0 && !compact) "Best fit: $it" else it },
                     detail = option.seats?.let { "$it seats" },
                     selected = picked == option,
                     compact = compact

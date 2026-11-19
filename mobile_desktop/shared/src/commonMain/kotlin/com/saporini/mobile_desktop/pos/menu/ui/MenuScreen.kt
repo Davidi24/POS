@@ -65,7 +65,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -188,21 +188,13 @@ private fun DomainMenuSection.toMenuCategory(): MenuCategory =
 // The backend wants a raw Double; the UI only ever shows a formatted
 // string. Both directions avoid java.util.Formatter (not available on
 // every Kotlin target) by sticking to plain arithmetic.
-private fun formatPrice(basePrice: Double): String {
-    val cents = (basePrice * 100).roundToInt()
-    val dollars = cents / 100
-    val remainder = (cents % 100).let { if (it < 0) -it else it }
-    return "$" + dollars + "." + remainder.toString().padStart(2, '0')
-}
+private fun formatPrice(basePrice: Double): String = com.saporini.mobile_desktop.core.format.menuPrice(basePrice)
 
 // Loading a variant fresh from the backend used plain formatPrice() here (no sign),
 // while the Variant Editor's own formatPriceDelta(String) always added one — so a
 // variant showed "+$2.50" right after adding it but just "$2.50" once reloaded. This
 // is the Double-typed equivalent so both paths agree.
-private fun formatPriceDelta(delta: Double): String {
-    val sign = if (delta < 0) "-" else "+"
-    return sign + formatPrice(kotlin.math.abs(delta))
-}
+private fun formatPriceDelta(delta: Double): String = com.saporini.mobile_desktop.core.format.menuPrice(delta, signed = true)
 
 private fun parsePrice(label: String): Double =
     label.filter { it.isDigit() || it == '.' }.toDoubleOrNull() ?: 0.0

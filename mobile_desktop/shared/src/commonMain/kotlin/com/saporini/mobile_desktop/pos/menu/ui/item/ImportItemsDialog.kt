@@ -18,7 +18,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -125,7 +125,4 @@ internal fun ImportItemsDialog(
     )
 }
 
-private fun price(value: Double): String {
-    val cents = kotlin.math.round(value * 100).toLong()
-    return "€${cents / 100}.${(cents % 100).toString().padStart(2, '0')}"
-}
+private fun price(value: Double): String = com.saporini.mobile_desktop.core.format.menuPrice(value)

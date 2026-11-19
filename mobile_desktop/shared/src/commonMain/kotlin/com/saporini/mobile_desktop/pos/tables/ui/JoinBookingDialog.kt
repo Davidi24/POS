@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -80,7 +80,7 @@ internal fun JoinBookingDialog(
                     when {
                         pick != null -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
-                                "Moves to " + pick.tableNumbers.joinToString(" + ") + (pick.seats?.let { " · $it seats" } ?: ""),
+                                "Moves to ${pick.tableNumbers.joinToString(" + ")}" + (pick.seats?.let { " · $it seats" } ?: ""),
                                 Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Green
                             )
                             KitButton("Change", { mapFor = table }, style = ButtonStyle.SECONDARY)

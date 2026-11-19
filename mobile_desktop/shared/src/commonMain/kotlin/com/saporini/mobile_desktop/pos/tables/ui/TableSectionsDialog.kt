@@ -54,7 +54,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
@@ -997,7 +997,8 @@ private fun PriorityRow(
         Column(Modifier.weight(1f)) {
             Text(section.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = SectionInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                (if (priority == 1) "Used first · " else "") + "$tableCount ${if (tableCount == 1) "table" else "tables"}",
+                if (priority == 1) { if (tableCount == 1) "Used first · 1 table" else "Used first · $tableCount tables" }
+                else if (tableCount == 1) "1 table" else "$tableCount tables",
                 fontFamily = Inter(), fontSize = 11.sp, color = SectionMuted
             )
         }
