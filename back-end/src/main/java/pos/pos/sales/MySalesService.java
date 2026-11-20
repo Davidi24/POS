@@ -25,11 +25,12 @@ public class MySalesService {
 
     @Transactional(readOnly=true, isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public MySalesResponse report(Authentication auth, UUID restaurantId, UUID branchId, LocalDate date, UUID staffId, UUID shiftId) {
-        require(auth,"ORDER_READ");
+        require(auth,"SALES_SELF");
         var branch = scope.requireAccessibleBranch(auth,restaurantId,branchId);
         UUID actor = scope.currentUserId(auth);
-        UUID selected = staffId == null ? actor : staffId;
-        if (!selected.equals(actor)) { require(auth,"ORDER_AUDIT"); require(auth,"SHIFT_READ"); }
+        // Only their own sales (user, 2026-11-20: "only sees his sales, that's all").
+        if (staffId != null && !staffId.equals(actor)) throw new AuthException("You can only see your own sales", HttpStatus.FORBIDDEN);
+        UUID selected = actor;
         var user = selected.equals(actor) ? scope.currentActor(auth) : users.findById(selected).orElseThrow(() -> bad("Staff member not found"));
         if (!selected.equals(actor) && (!restaurantId.equals(user.getRestaurantId()) ||
                 (user.getDefaultBranchId()!=null && !branchId.equals(user.getDefaultBranchId())))) throw new AuthException("Staff member belongs to another branch", HttpStatus.FORBIDDEN);

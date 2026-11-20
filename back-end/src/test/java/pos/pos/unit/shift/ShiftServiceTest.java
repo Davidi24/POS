@@ -34,17 +34,18 @@ class ShiftServiceTest {
     @Mock pos.pos.settings.repository.SettingsRepository settings;
     @Mock pos.pos.shift.repository.StaffPayRateRepository payRates;
     @Mock pos.pos.role.service.RolePayService rolePay;
+    @Mock pos.pos.role.scope.PermissionScopeService permissionScopes;
     ShiftService service;
     UUID r = UUID.randomUUID(), b = UUID.randomUUID(), actor = UUID.randomUUID(), other = UUID.randomUUID();
     Restaurant restaurant; Branch branch; User user; Shift shift;
     Authentication self, manager;
 
     @BeforeEach void setup() {
-        service = new ShiftService(repository, scope, em, audits, settings, payRates, rolePay);
+        service = new ShiftService(repository, scope, em, audits, settings, payRates, rolePay, permissionScopes);
         restaurant = new Restaurant(); restaurant.setId(r); restaurant.setTimezone("Europe/Berlin");
         branch = new Branch(); branch.setId(b); branch.setRestaurant(restaurant);
         user = user(actor); shift = new Shift(); shift.setId(UUID.randomUUID()); shift.setRestaurant(restaurant); shift.setBranch(branch); shift.setUser(user); shift.setStatus(ShiftStatus.OPEN); shift.setVersion(3); shift.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC).minusHours(2));
-        self = auth("SHIFT_SELF"); manager = auth("SHIFT_SELF", "SHIFT_READ", "SHIFT_MANAGE");
+        self = auth("SHIFT_SELF", "SHIFT_PAY_SELF", "SHIFT_TEAM"); manager = auth("SHIFT_SELF", "SHIFT_READ", "SHIFT_MANAGE");
         lenient().when(scope.currentUserId(any())).thenReturn(actor);
         lenient().when(scope.requireAccessibleBranch(any(Authentication.class), eq(r), eq(b))).thenReturn(branch);
         lenient().when(em.find(eq(User.class), eq(actor), eq(LockModeType.PESSIMISTIC_WRITE))).thenReturn(user);

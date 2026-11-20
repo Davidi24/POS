@@ -40,9 +40,12 @@ import kotlinx.datetime.todayIn
 // get its own downloads.
 // Orders is a place of its own since 2026-11-14 (user: "put Orders separate, not with Sales"; it was a Sales | Orders switch),
 // and Finance comes right after Sales (user, 2026-11-14). The nav bar follows this order.
-enum class StatsTab(val title: String) {
+// Each page shows only with its own "See …" (user, 2026-11-19: "it can see maybe only the sales, not the finance").
+enum class StatsTab(val title: String, val permission: String) {
     // Stock is its own place after Dishes (user, 2026-11-16: "make stock separate, not with dishes").
-    OVERVIEW("Overview"), SALES("Sales"), FINANCE("Finance"), ORDERS("Orders"), DISHES("Dishes"), STOCK("Stock"), TABLES("Tables"), TEAM("Team")
+    OVERVIEW("Overview", "REPORTS_READ"), SALES("Sales", "STATS_SALES_READ"), FINANCE("Finance", "STATS_FINANCE_READ"),
+    ORDERS("Orders", "STATS_ORDERS_READ"), DISHES("Dishes", "STATS_DISHES_READ"), STOCK("Stock", "STATS_STOCK_READ"),
+    TABLES("Tables", "STATS_TABLES_READ"), TEAM("Team", "STATS_TEAM_READ")
 }
 
 enum class StatsPeriod(val label: String) {
@@ -301,7 +304,7 @@ class StatisticsScreenModel(
                     // The whole restaurant for everyone while the branch filter is off (user, 2026-11-14); platform admins used to
                     // start on the branch they entered: user?.defaultBranchId.takeIf { isPlatformAdmin(user) }.
                     branchId = null,
-                    canRead = user != null && "REPORTS_READ" in user.permissions,
+                    canRead = user != null && StatsTab.entries.any { it.permission in user.permissions },
                     canSeeOrders = user != null && "ORDER_READ" in user.permissions,
                     from = from,
                     to = to

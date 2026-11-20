@@ -31,7 +31,7 @@ public class InventoryKindController {
     private final InventoryKindService inventoryKindService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "The kinds of stock items (for=ITEM) or places (for=PLACE), with how many each has")
     public ResponseEntity<List<InventoryKindResponse>> listKinds(
             @PathVariable UUID restaurantId,
@@ -42,7 +42,7 @@ public class InventoryKindController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('INVENTORY_ITEMS_UPDATE', 'INVENTORY_PLACES')")
     @Operation(summary = "Add one of the restaurant's own kinds")
     public ResponseEntity<InventoryKindResponse> createKind(
             @PathVariable UUID restaurantId,
@@ -53,7 +53,7 @@ public class InventoryKindController {
     }
 
     @DeleteMapping("/{ref}")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('INVENTORY_ITEMS_UPDATE', 'INVENTORY_PLACES')")
     @Operation(summary = "Remove a kind (a built-in code or the id of an own kind); what it held goes to Uncategorized")
     public ResponseEntity<Void> deleteKind(
             @PathVariable UUID restaurantId,

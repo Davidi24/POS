@@ -25,7 +25,7 @@ class MySalesServiceTest {
     @Mock RestaurantScopeService scope; @Mock ShiftRepository shifts; @Mock UserRepository users; @Mock MySalesRepository reports;
     @InjectMocks MySalesService service;
     UUID r=UUID.randomUUID(), b=UUID.randomUUID(), u=UUID.randomUUID();
-    Authentication auth=authentication("ORDER_READ");
+    Authentication auth=authentication("SALES_SELF");
     static Authentication authentication(String... p) { return new UsernamePasswordAuthenticationToken("actor","",Arrays.stream(p).map(SimpleGrantedAuthority::new).toList()); }
     void setup() {
         Restaurant restaurant=new Restaurant();restaurant.setId(r);restaurant.setTimezone("Europe/Berlin");restaurant.setCurrency("EUR");

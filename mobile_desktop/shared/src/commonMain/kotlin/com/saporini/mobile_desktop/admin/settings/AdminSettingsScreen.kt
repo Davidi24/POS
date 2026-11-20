@@ -132,9 +132,19 @@ private fun SettingsGrid(onOpen: (SettingsCategory) -> Unit, modifier: Modifier)
                     Text("Settings", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (phone) 19.sp else 22.sp, color = Ink)
                     Text("Choose what you want to set up.", fontFamily = Inter(), fontSize = if (phone) 12.sp else 13.sp, color = Muted)
                 }
+                // Payments and fraud checks need their own permission, devices too (user, 2026-11-19: the owner's unless given).
+                val user by org.koin.compose.koinInject<com.saporini.mobile_desktop.core.session.SessionManager>().currentUser.collectAsState()
+                val permissions = user?.permissions.orEmpty()
+                val categories = SettingsCategory.entries.filter { category ->
+                    when (category) {
+                        SettingsCategory.PAYMENTS, SettingsCategory.FRAUD -> "SETTINGS_MONEY" in permissions
+                        SettingsCategory.DEVICES -> "DEVICES_MANAGE" in permissions
+                        else -> true
+                    }
+                }
                 // A phone: a line per category with its picture on the left, like the Users and Salary lists.
-                if (phone) SettingsCategory.entries.forEach { category -> CategoryLine(category, onClick = { onOpen(category) }) }
-                else SettingsCategory.entries.chunked(columns).forEach { row ->
+                if (phone) categories.forEach { category -> CategoryLine(category, onClick = { onOpen(category) }) }
+                else categories.chunked(columns).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         row.forEach { category -> CategoryCard(category, onClick = { onOpen(category) }, modifier = Modifier.weight(1f)) }
                         repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }

@@ -57,7 +57,7 @@ class ShiftPayServiceTest {
         when(rates.tips(eq(r), eq(b), eq(me), any(), any(), eq("Europe/Berlin"), eq("EUR")))
             .thenReturn(List.of(new StaffPayRateRepository.TipRow(me, "2026-09-22", new BigDecimal("5.50"))));
 
-        PayReport report = service.pay(auth("SHIFT_SELF"), r, b, LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 27), true);
+        PayReport report = service.pay(auth("SHIFT_SELF", "SHIFT_PAY_SELF"), r, b, LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 27), true);
         StaffPay pay = report.staff().get(0);
         assertEquals(720, pay.workedMinutes());
         assertEquals(new BigDecimal("128.00"), pay.wages());      // 8h × 10 + 4h × 12

@@ -50,6 +50,12 @@ data class StaffState(
     // Roles this person may hand out (the server's choice: below their own, inside their restaurant).
     val assignableRoles: List<RoleDto> = emptyList(),
     val draft: StaffDraft? = null,
+    // Adding or editing a person goes in two parts (user, 2026-11-19): their details and roles, then what they can do.
+    val draftStep: DraftStep = DraftStep.DETAILS,
+    // The Permissions part: what the chosen roles give, and what's switched off or added for this person alone.
+    val draftPermissions: DraftPermissions? = null,
+    // The roles the edited person had when the editor opened (null while loading, and when adding someone).
+    val draftRolesBefore: Set<String>? = null,
     val problems: Map<StaffField, String> = emptyMap(),
     val saving: Boolean = false,
     // Ids being changed by a quick action (switch on/off, password reset, remove).
@@ -66,11 +72,42 @@ data class StaffState(
     val superAdmin: Boolean = false,
     // A person's own permissions being changed (Users → a role → a person's Permissions).
     val personPermissions: PersonPermissionsEditor? = null,
+    // The support admins taking care of this restaurant (to write to for help) and what it asked the Super Admin.
+    val supportAdmins: List<SupportContactDto> = emptyList(),
+    val requests: List<PlatformRequestDto> = emptyList(),
+    // The "Ask for a support admin" window, and the owner a removal is being asked for (user, 2026-11-19).
+    val askingAdmin: Boolean = false,
+    val askingRemoval: String? = null,
+    val asking: Boolean = false,
     val notice: String? = null,
     val error: String? = null
 ) {
     fun canEdit(person: StaffUserDto): Boolean = canUpdate && person.id != myId
     fun canRemove(person: StaffUserDto): Boolean = canDelete && person.id != myId
+
+    /** An edited person's roles were changed: their own permission changes are cleared (user, 2026-11-19). */
+    val draftRolesChanged: Boolean get() = draft?.let { !it.isNew && draftRolesBefore != null && it.roleIds != draftRolesBefore } ?: false
+
+    /** Adding someone, or changing an edited person's roles, goes through the Permissions part before saving. */
+    val draftNeedsPermissions: Boolean get() = draft?.isNew == true || draftRolesChanged
+}
+
+enum class DraftStep { DETAILS, PERMISSIONS }
+
+/**
+ * The Permissions part of adding or editing a person (user, 2026-11-19: "by default they're on, only if you want to add or
+ * remove"): what the chosen roles ([roleIds]) give ([fromRoles], all on at first) and what's ticked now ([ticked]).
+ */
+data class DraftPermissions(
+    val roleIds: Set<String>,
+    val fromRoles: Set<String> = emptySet(),
+    val ticked: Set<String> = emptySet(),
+    val loading: Boolean = true,
+    val error: String? = null,
+    // What was on under a permission switched off, brought back when it's switched on again (user, 2026-11-20).
+    val remembered: Map<String, Set<String>> = emptyMap()
+) {
+    val changed: Boolean get() = ticked != fromRoles
 }
 
 /**
@@ -86,9 +123,16 @@ data class PersonPermissionsEditor(
     val ticked: Set<String> = emptySet(),
     val loading: Boolean = true,
     val saving: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val remembered: Map<String, Set<String>> = emptyMap(),
+    // Their own floors / roles for "See tables" and "See others' shifts" (none = as their roles give).
+    val savedScopes: Map<String, List<String>> = emptyMap(),
+    val scopes: Map<String, List<String>> = emptyMap(),
+    val scopeChoices: ScopeChoicesDto = ScopeChoicesDto(),
+    // Goes up each time a save works: the page stays and plays "Saved" (user, 2026-11-20).
+    val savedTick: Int = 0
 ) {
-    val dirty: Boolean get() = ticked != saved
+    val dirty: Boolean get() = ticked != saved || scopes != savedScopes
 }
 
 /** How many people a role's page shows at a time. */
@@ -232,12 +276,60 @@ class StaffScreenModel(
                         hasNext = result.hasNext, stale = false, error = null)
                 }
                 if (current.canCreate || current.canUpdate) loadRoles(token)
+                loadSupport(token)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (token == revision) mutable.update { it.copy(stale = true, error = adminMessage(e, write = false), canRead = it.canRead && !isDenied(e)) }
             } finally {
                 if (token == revision) mutable.update { it.copy(loading = false) }
+            }
+        }
+    }
+
+    /** The support admins of this restaurant and its requests to the Super Admin; nothing changes when they can't be read. */
+    private suspend fun loadSupport(token: Long) {
+        val restaurantId = state.value.restaurantId ?: return
+        try {
+            val (admins, asked) = coroutineScope {
+                val admins = async { repository.supportAdmins(restaurantId) }
+                val asked = async { runCatching { repository.requests(restaurantId) }.getOrDefault(emptyList()) }
+                admins.await() to asked.await()
+            }
+            if (token == revision) mutable.update { it.copy(supportAdmins = admins, requests = asked) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Owners and co-owners ask the Super Admin; an owner asks to remove another owner (owners never remove each other). */
+    val canAsk: Boolean get() = state.value.myRoles.any { it == "OWNER" || it == "CO_OWNER" }
+
+    fun startAskAdmin() = mutable.update { it.copy(askingAdmin = true, error = null) }
+    fun askRemoveOwner(personId: String) = mutable.update { it.copy(askingRemoval = personId, error = null) }
+    fun cancelAsk() = mutable.update { it.copy(askingAdmin = false, askingRemoval = null) }
+
+    /** Sends what's being asked (a support admin, or removing [StaffState.askingRemoval]) with an optional note. */
+    fun sendAsk(note: String) {
+        val current = state.value
+        val restaurantId = current.restaurantId ?: return
+        if (current.asking) return
+        val target = current.askingRemoval
+        val request = CreatePlatformRequestDto(if (target != null) "REMOVE_OWNER" else "NEED_ADMIN", target, note.trim().ifEmpty { null })
+        val token = signIn
+        mutable.update { it.copy(asking = true, error = null) }
+        work.launch {
+            try {
+                val sent = repository.askSuperAdmin(restaurantId, request)
+                if (token == signIn) mutable.update {
+                    it.copy(asking = false, askingAdmin = false, askingRemoval = null, requests = listOf(sent) + it.requests.filterNot { r -> r.id == sent.id },
+                        notice = "Sent to the Super Admin. They'll answer soon.")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (token == signIn) mutable.update { it.copy(asking = false, error = adminMessage(e, write = true)) }
             }
         }
     }
@@ -286,7 +378,12 @@ class StaffScreenModel(
             return
         }
         val roles = setOfNotNull(roleId?.takeIf { id -> current.assignableRoles.any { it.id == id } })
-        mutable.update { it.copy(draft = StaffDraft(defaultBranchId = it.myBranchId, roleIds = roles), problems = emptyMap(), error = null, notice = null) }
+        mutable.update {
+            it.copy(draft = StaffDraft(defaultBranchId = it.myBranchId, roleIds = roles), draftStep = DraftStep.DETAILS, draftPermissions = null,
+                draftRolesBefore = null, problems = emptyMap(), error = null, notice = null)
+        }
+        // Adding someone straight into a role: that role is their main one (an admin gets the roles below too).
+        roles.firstOrNull()?.let { chooseMainRole(it) }
     }
 
     /** Opens [personId] for editing; their current roles are read from the server. */
@@ -298,12 +395,17 @@ class StaffScreenModel(
             return
         }
         val token = signIn
-        mutable.update { it.copy(draft = draftOf(person, emptySet()), problems = emptyMap(), error = null, notice = null, busy = it.busy + personId) }
+        mutable.update {
+            it.copy(draft = draftOf(person, emptySet()), draftStep = DraftStep.DETAILS, draftPermissions = null, draftRolesBefore = null,
+                problems = emptyMap(), error = null, notice = null, busy = it.busy + personId)
+        }
         work.launch {
             try {
                 val roles = repository.rolesOf(personId)
                 if (token == signIn) mutable.update { state ->
-                    state.copy(draft = state.draft?.takeIf { it.id == personId }?.copy(roleIds = roles.map { it.id }.toSet()) ?: state.draft)
+                    val ids = roles.map { it.id }.toSet()
+                    val editing = state.draft?.takeIf { it.id == personId }
+                    if (editing == null) state else state.copy(draft = editing.copy(roleIds = ids), draftRolesBefore = ids)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -322,11 +424,88 @@ class StaffScreenModel(
         state.copy(draft = next, problems = staffProblems(next).filterKeys { it in state.problems })
     }
 
+    /**
+     * The person's main role (user, 2026-11-19): the extra roles stay only when they're below it. An admin gets every role
+     * below by default (POS and the kitchen display come from Waiter, Kitchen…); the person adding them switches off
+     * what they shouldn't have.
+     */
+    fun chooseMainRole(roleId: String) = edit { draft ->
+        val roles = state.value.assignableRoles
+        val main = roles.firstOrNull { it.id == roleId } ?: return@edit draft
+        val below = roles.filter { (it.rank ?: 0) < (main.rank ?: 0) }
+        val others = if (main.code == "ADMIN") below.map { it.id }.toSet()
+            else draft.roleIds.filter { id -> below.any { it.id == id } }.toSet()
+        draft.copy(roleIds = others + roleId)
+    }
+
     fun toggleRole(roleId: String) = edit { draft ->
         draft.copy(roleIds = if (roleId in draft.roleIds) draft.roleIds - roleId else draft.roleIds + roleId)
     }
 
-    fun cancelEdit() = mutable.update { it.copy(draft = null, problems = emptyMap()) }
+    fun cancelEdit() = mutable.update { it.copy(draft = null, draftStep = DraftStep.DETAILS, draftPermissions = null, draftRolesBefore = null, problems = emptyMap()) }
+
+    // ---- The Permissions part of adding or editing someone ----
+
+    /** From the details to the Permissions part, once the details are right: the chosen roles' permissions, all on. */
+    fun toPermissions() {
+        val current = state.value
+        val draft = current.draft ?: return
+        if (draft.id != null && draft.id in current.busy) return
+        val problems = staffProblems(draft)
+        if (problems.isNotEmpty()) {
+            mutable.update { it.copy(problems = problems, error = "Check the highlighted fields") }
+            return
+        }
+        // The same roles keep what was already switched; other roles start again from what they give.
+        val kept = current.draftPermissions?.takeIf { it.roleIds == draft.roleIds && !it.loading && it.error == null }
+        mutable.update { it.copy(draftStep = DraftStep.PERMISSIONS, draftPermissions = kept ?: DraftPermissions(draft.roleIds), problems = emptyMap(), error = null) }
+        if (kept == null) loadDraftPermissions(draft.roleIds)
+    }
+
+    fun backToDetails() = mutable.update { it.copy(draftStep = DraftStep.DETAILS, error = null) }
+
+    fun retryDraftPermissions() {
+        val roles = state.value.draftPermissions?.roleIds ?: return
+        mutable.update { it.copy(draftPermissions = DraftPermissions(roles)) }
+        loadDraftPermissions(roles)
+    }
+
+    private fun loadDraftPermissions(roleIds: Set<String>) {
+        val token = signIn
+        work.launch {
+            try {
+                val codes = coroutineScope { roleIds.map { id -> async { repository.rolePermissions(id).map { it.code } } }.awaitAll() }.flatten().toSet()
+                if (token == signIn) mutable.update { state ->
+                    val perms = state.draftPermissions?.takeIf { it.roleIds == roleIds } ?: return@update state
+                    state.copy(draftPermissions = perms.copy(fromRoles = codes, ticked = codes, loading = false, error = null))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (token == signIn) mutable.update { state ->
+                    val perms = state.draftPermissions?.takeIf { it.roleIds == roleIds } ?: return@update state
+                    state.copy(draftPermissions = perms.copy(loading = false, error = adminMessage(e, write = false)))
+                }
+            }
+        }
+    }
+
+    /** Switches [codes] on or off for the person being added or edited; nobody gives what they don't have themselves. */
+    fun tickDraftPermissions(codes: List<String>, on: Boolean, tree: PermissionTree) = mutable.update { state ->
+        val perms = state.draftPermissions ?: return@update state
+        if (perms.loading || state.saving) return@update state
+        // What a permission needs comes on with it, and what needs it goes off with it (user, 2026-11-19).
+        val switched = tree.switchRemembering(perms.ticked, codes, on, { code ->
+            state.superAdmin || code in state.myPermissions || code in perms.fromRoles
+        }, perms.remembered)
+        state.copy(draftPermissions = perms.copy(ticked = switched.codes, remembered = switched.remembered))
+    }
+
+    /** Back to exactly what the roles give. */
+    fun resetDraftPermissions() = mutable.update { state ->
+        val perms = state.draftPermissions ?: return@update state
+        state.copy(draftPermissions = perms.copy(ticked = perms.fromRoles))
+    }
 
     // ---- One person's own permissions ----
 
@@ -340,10 +519,12 @@ class StaffScreenModel(
         work.launch {
             try {
                 val loaded = repository.personPermissions(personId)
+                val scopes = runCatching { repository.personScopes(personId) }.getOrDefault(emptyMap())
+                val choices = state.value.restaurantId?.let { r -> runCatching { repository.scopeChoices(r) }.getOrNull() } ?: ScopeChoicesDto()
                 if (token == signIn) mutable.update { state ->
                     val editor = state.personPermissions?.takeIf { it.personId == personId } ?: return@update state
                     state.copy(personPermissions = editor.copy(fromRoles = loaded.fromRoles.toSet(), saved = loaded.permissions.toSet(),
-                        ticked = loaded.permissions.toSet(), loading = false))
+                        ticked = loaded.permissions.toSet(), loading = false, savedScopes = scopes, scopes = scopes, scopeChoices = choices))
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -357,29 +538,51 @@ class StaffScreenModel(
     }
 
     /** Switches [codes] on or off for the person (one permission, or a whole area). */
-    fun tickPersonPermissions(codes: List<String>, on: Boolean) = mutable.update { state ->
+    fun tickPersonPermissions(codes: List<String>, on: Boolean, tree: PermissionTree) = mutable.update { state ->
         val editor = state.personPermissions ?: return@update state
         if (editor.loading || editor.saving) return@update state
-        // Nobody gives what they don't have themselves; taking it away is fine.
-        val allowed = codes.filter { !on || state.superAdmin || it in state.myPermissions || it in editor.saved }
-        state.copy(personPermissions = editor.copy(ticked = if (on) editor.ticked + allowed else editor.ticked - allowed.toSet(), error = null))
+        // Nobody gives what they don't have themselves; taking it away is fine. What a permission needs comes on with it,
+        // and what needs it goes off with it (user, 2026-11-19).
+        val switched = tree.switchRemembering(editor.ticked, codes, on, { code ->
+            state.superAdmin || code in state.myPermissions || code in editor.saved
+        }, editor.remembered)
+        state.copy(personPermissions = editor.copy(ticked = switched.codes, remembered = switched.remembered, error = null))
+    }
+
+    /** Their own floors / roles for [code]; an empty list or all of them = as their roles give. */
+    fun setPersonScope(code: String, targets: List<String>) = mutable.update { state ->
+        val editor = state.personPermissions ?: return@update state
+        if (editor.loading || editor.saving) return@update state
+        state.copy(personPermissions = editor.copy(scopes = if (targets.isEmpty()) editor.scopes - code else editor.scopes + (code to targets.sorted())))
     }
 
     /** Back to what their roles give them, nothing extra and nothing taken away. */
     fun resetPersonPermissions() = mutable.update { state ->
         val editor = state.personPermissions ?: return@update state
-        state.copy(personPermissions = editor.copy(ticked = editor.fromRoles, error = null))
+        state.copy(personPermissions = editor.copy(ticked = editor.fromRoles, scopes = emptyMap(), remembered = emptyMap(), error = null))
     }
 
-    fun savePersonPermissions() {
+    /** Saves; with [thenClose] the page closes once it's saved (leaving with changes, "Save"). */
+    fun savePersonPermissions(thenClose: Boolean = false) {
         val editor = state.value.personPermissions ?: return
         if (editor.loading || editor.saving || !editor.dirty) return
         val token = signIn
         mutable.update { it.copy(personPermissions = editor.copy(saving = true, error = null)) }
         work.launch {
             try {
-                repository.savePersonPermissions(editor.personId, editor.ticked.sorted())
-                if (token == signIn) mutable.update { it.copy(personPermissions = null, notice = "${editor.name}'s permissions were saved") }
+                val saved = repository.savePersonPermissions(editor.personId, editor.ticked.sorted())
+                val scopes = if (editor.scopes != editor.savedScopes) repository.savePersonScopes(editor.personId, editor.scopes) else editor.scopes
+                // The page stays open with what was saved, and a short "Saved" plays (user, 2026-11-20).
+                if (token == signIn && thenClose) {
+                    mutable.update { it.copy(personPermissions = null, notice = "${editor.name}'s permissions were saved") }
+                    return@launch
+                }
+                if (token == signIn) mutable.update { state ->
+                    val now = state.personPermissions?.takeIf { it.personId == editor.personId } ?: return@update state
+                    val ticked = saved.permissions.toSet().ifEmpty { editor.ticked }
+                    state.copy(personPermissions = now.copy(saving = false, saved = ticked, ticked = ticked, fromRoles = saved.fromRoles.toSet().ifEmpty { now.fromRoles },
+                        savedScopes = scopes, scopes = scopes, remembered = emptyMap(), savedTick = now.savedTick + 1, error = null))
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -392,10 +595,23 @@ class StaffScreenModel(
 
     fun closePermissions() = mutable.update { it.copy(personPermissions = null) }
 
+    /** Back to what was saved, staying on the page. */
+    fun discardPersonPermissions() = mutable.update { state ->
+        val editor = state.personPermissions ?: return@update state
+        if (editor.saving) return@update state
+        state.copy(personPermissions = editor.copy(ticked = editor.saved, scopes = editor.savedScopes, remembered = emptyMap(), error = null))
+    }
+
     fun save() {
         val current = state.value
         val draft = current.draft ?: return
         if (current.saving) return
+        // Adding someone or changing their roles shows what they can do before anything is saved.
+        if (current.draftNeedsPermissions && current.draftStep == DraftStep.DETAILS) {
+            toPermissions()
+            return
+        }
+        if (current.draftNeedsPermissions && current.draftPermissions?.loading == true) return
         if (draft.id != null && draft.id in current.busy) {
             mutable.update { it.copy(error = "Still loading this person's roles") }
             return
@@ -417,11 +633,28 @@ class StaffScreenModel(
                     if (token != signIn) return@withLock
                     val saved = if (draft.isNew) create(draft) else update(draft)
                     if (token != signIn) return@withLock
+                    // Then what they can do: a new person's own changes, or (their roles changed) what's set for the new roles,
+                    // which also clears what was changed for them before. The person is saved either way.
+                    val perms = current.draftPermissions?.takeIf { !it.loading && it.error == null && it.roleIds == draft.roleIds }
+                    val permissionsProblem = if (perms != null && (draft.isNew && perms.changed || current.draftRolesChanged)) {
+                        try {
+                            repository.savePersonPermissions(saved.id, perms.ticked.sorted())
+                            null
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            "${saved.displayName} was saved, but their permissions weren't: open their Permissions to try again."
+                        }
+                    } else null
                     mutable.update { state ->
                         val matches = matchesFilter(saved, state.filter)
                         val known = state.people.any { it.id == saved.id }
                         state.copy(
                             draft = null,
+                            draftStep = DraftStep.DETAILS,
+                            draftPermissions = null,
+                            draftRolesBefore = null,
+                            error = permissionsProblem,
                             people = when {
                                 known && matches -> state.people.map { if (it.id == saved.id) saved else it }
                                 known -> state.people.filterNot { it.id == saved.id }

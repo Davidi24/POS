@@ -140,7 +140,7 @@ public class RestaurantOrderController {
     }
 
     @PatchMapping("/orders/{orderId}/table")
-    @PreAuthorize("hasAuthority('ORDER_TRANSFER')")
+    @PreAuthorize("hasAnyAuthority('ORDER_TRANSFER', 'TABLES_UPDATE')")
     @Operation(summary = "Update the order table link")
     public ResponseEntity<OrderResponse> updateOrderTable(
             @PathVariable UUID restaurantId,
@@ -233,7 +233,7 @@ public class RestaurantOrderController {
     }
 
     @PostMapping("/orders/{orderId}/close-unpaid")
-    @PreAuthorize("hasAuthority('ORDER_VOID')")
+    @PreAuthorize("hasAuthority('ORDER_CLOSE_UNPAID')")
     @Operation(summary = "Close an order the guests didn't pay (walked out, will pay later)")
     public ResponseEntity<OrderResponse> closeUnpaid(
             @PathVariable UUID restaurantId,
@@ -246,7 +246,7 @@ public class RestaurantOrderController {
     }
 
     @PostMapping("/orders/{orderId}/reopen-for-payment")
-    @PreAuthorize("hasAuthority('ORDER_CLOSE')")
+    @PreAuthorize("hasAuthority('ORDER_REOPEN_PAYMENT')")
     @Operation(summary = "Reopen an order closed as unpaid, to take its payment")
     public ResponseEntity<OrderResponse> reopenForPayment(
             @PathVariable UUID restaurantId,
@@ -257,7 +257,7 @@ public class RestaurantOrderController {
     }
 
     @PostMapping("/orders/{orderId}/bill-request")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('ORDER_CLOSE', 'TABLES_PAYMENT')")
     @Operation(summary = "The guests asked for the bill")
     public ResponseEntity<OrderResponse> requestBill(
             @PathVariable UUID restaurantId,
@@ -268,7 +268,7 @@ public class RestaurantOrderController {
     }
 
     @DeleteMapping("/orders/{orderId}/bill-request")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasAnyAuthority('ORDER_CLOSE', 'TABLES_PAYMENT')")
     @Operation(summary = "Take back a bill request made by mistake")
     public ResponseEntity<OrderResponse> cancelBillRequest(
             @PathVariable UUID restaurantId,
@@ -285,7 +285,7 @@ public class RestaurantOrderController {
     }
 
     @PostMapping("/orders/{orderId}/close")
-    @PreAuthorize("hasAuthority('ORDER_CLOSE')")
+    @PreAuthorize("hasAnyAuthority('ORDER_CLOSE', 'TABLES_PAYMENT')")
     @Operation(summary = "Close an order")
     public ResponseEntity<OrderResponse> closeOrder(
             @PathVariable UUID restaurantId,
@@ -345,7 +345,7 @@ public class RestaurantOrderController {
     }
 
     @PostMapping("/orders/{orderId}/transfer/table")
-    @PreAuthorize("hasAuthority('ORDER_TRANSFER')")
+    @PreAuthorize("hasAnyAuthority('ORDER_TRANSFER', 'TABLES_UPDATE')")
     @Operation(summary = "Transfer an order to another table")
     public ResponseEntity<OrderResponse> transferOrderTable(
             @PathVariable UUID restaurantId,
@@ -682,7 +682,7 @@ public class RestaurantOrderController {
     }
 
     @PostMapping("/orders/{orderId}/mark-paid")
-    @PreAuthorize("hasAuthority('ORDER_CLOSE')")
+    @PreAuthorize("hasAnyAuthority('ORDER_CLOSE', 'TABLES_PAYMENT')")
     @Operation(summary = "Mark order paid")
     public ResponseEntity<OrderResponse> markPaid(
             @PathVariable UUID restaurantId,
@@ -694,7 +694,7 @@ public class RestaurantOrderController {
     }
 
     @PostMapping("/orders/{orderId}/mark-partially-paid")
-    @PreAuthorize("hasAuthority('ORDER_CLOSE')")
+    @PreAuthorize("hasAnyAuthority('ORDER_CLOSE', 'TABLES_PAYMENT')")
     @Operation(summary = "Mark order partially paid")
     public ResponseEntity<OrderResponse> markPartiallyPaid(
             @PathVariable UUID restaurantId,

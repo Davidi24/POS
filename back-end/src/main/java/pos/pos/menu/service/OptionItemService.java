@@ -93,6 +93,7 @@ public class OptionItemService {
 
         item.setCode(normalizedCode);
         item.setName(normalizedName);
+        pos.pos.menu.policy.MenuPriceRule.assertMayChange(authentication, item.getPriceDelta(), request.getPriceDelta());
         item.setPriceDelta(request.getPriceDelta());
         item.setAvailable(Boolean.TRUE.equals(request.getAvailable()));
         item.setDisplayOrder(request.getDisplayOrder());

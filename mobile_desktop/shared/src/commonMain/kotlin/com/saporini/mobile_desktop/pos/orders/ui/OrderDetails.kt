@@ -27,7 +27,7 @@ import com.saporini.mobile_desktop.pos.orders.domain.model.*
                         if(order.editable && state.can("ORDER_TRANSFER")) { add("Move table"); add("Split order"); add("Merge orders") }
                         if(order.editable && state.can("ORDER_CANCEL")) add("Cancel order")
                         if(order.editable && state.can("ORDER_VOID")) add("Void order")
-                        if(order.canCloseUnpaid && state.can("ORDER_VOID")) add("Close as unpaid")
+                        if(order.canCloseUnpaid && state.can("ORDER_CLOSE_UNPAID")) add("Close as unpaid")
                         if(order.editable && state.can("ORDER_CLOSE")) add("Close order")
                         if(order.status == OrderStatus.CLOSED && reopenOrder) add("Reopen order")
                     }
@@ -35,7 +35,7 @@ import com.saporini.mobile_desktop.pos.orders.domain.model.*
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OrderBadge(if (order.closedUnpaid) "Unpaid" else order.status.label()); if (order.status.showsFulfillmentProgress) OrderBadge(order.fulfillmentStatus.label()); notSentNote(order.fulfillmentStatus, order.notSentItems)?.let { OrderText(it, 12, true, OrderNotSentColor) } }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { OrderBadge(if (order.closedUnpaid) "Unpaid" else order.status.label()); if (order.status.showsFulfillmentProgress && com.saporini.mobile_desktop.pos.orders.LocalSeesOrderKitchen.current) OrderBadge(order.fulfillmentStatus.label()); (if (com.saporini.mobile_desktop.pos.orders.LocalSeesOrderKitchen.current) notSentNote(order.fulfillmentStatus, order.notSentItems) else null)?.let { OrderText(it, 12, true, OrderNotSentColor) } }
         if (order.unpaidAt != null) UnpaidStrip(order)
         if (order.closedUnpaid && reopenForPayment) OrderButton("Reopen for payment", !state.isSaving && !state.needsReconciliation, Modifier.fillMaxWidth()) { onAction("Reopen for payment") }
         if (order.unpaidAt != null && order.status == OrderStatus.OPEN && state.can("ORDER_CLOSE")) OrderButton("Pay", !state.isSaving && !state.needsReconciliation, Modifier.fillMaxWidth()) { onAction("Pay") }

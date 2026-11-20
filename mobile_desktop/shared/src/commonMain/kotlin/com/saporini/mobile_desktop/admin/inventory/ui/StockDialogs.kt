@@ -78,7 +78,7 @@ private fun BulkMoveDialogRealMoney(bulk: BulkMoveDraft, state: InventoryState, 
         state.error?.let { MessageBar(it, MessageKind.ERROR) }
         // The kind can still be switched here.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ChangeKinds.forEach { kind ->
+            ChangeKinds.filter(state.rights::canMove).forEach { kind ->
                 val l = moveKindLook(kind)
                 val chosen = kind == bulk.kind
                 Surface(onClick = { model.changeBulk { it.copy(kind = kind) } }, enabled = !state.saving, modifier = Modifier.weight(1f).height(60.dp),

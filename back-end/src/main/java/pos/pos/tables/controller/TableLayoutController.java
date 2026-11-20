@@ -43,7 +43,7 @@ public class TableLayoutController {
             path = "/table-layout/events",
             produces = MediaType.TEXT_EVENT_STREAM_VALUE
     )
-    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'ORDER_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'ORDER_READ', 'TABLES_READ')")
     @Operation(summary = "Subscribe to branch table-layout changes")
     public SseEmitter subscribeToTableLayoutChanges(
             @PathVariable UUID restaurantId,
@@ -58,7 +58,7 @@ public class TableLayoutController {
     }
 
     @GetMapping("/table-layout")
-    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'ORDER_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'ORDER_READ', 'TABLES_READ')")
     @Operation(summary = "Get branch table layout")
     public ResponseEntity<TableLayoutResponse> getTableLayout(
             @PathVariable UUID restaurantId,
@@ -69,7 +69,7 @@ public class TableLayoutController {
     }
 
     @PutMapping("/table-layout")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Replace parts of branch table layout")
     public ResponseEntity<TableLayoutResponse> updateTableLayout(
             @PathVariable UUID restaurantId,
@@ -88,7 +88,7 @@ public class TableLayoutController {
     }
 
     @PostMapping("/table-layout/auto-arrange")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Auto arrange table positions")
     public ResponseEntity<TableLayoutResponse> autoArrangeTableLayout(
             @PathVariable UUID restaurantId,
@@ -107,7 +107,7 @@ public class TableLayoutController {
     }
 
     @GetMapping("/floors")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'TABLES_READ')")
     @Operation(summary = "List branch floors derived from table layout")
     public ResponseEntity<List<FloorSummaryResponse>> getFloors(
             @PathVariable UUID restaurantId,
@@ -118,7 +118,7 @@ public class TableLayoutController {
     }
 
     @PutMapping("/floors")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Rename branch floors derived from table layout")
     public ResponseEntity<List<FloorSummaryResponse>> updateFloors(
             @PathVariable UUID restaurantId,
@@ -137,7 +137,7 @@ public class TableLayoutController {
     }
 
     @GetMapping("/tables/map")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'TABLES_READ')")
     @Operation(summary = "Get grouped table map by floor")
     public ResponseEntity<TableMapResponse> getTableMap(
             @PathVariable UUID restaurantId,

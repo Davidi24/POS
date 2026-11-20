@@ -30,11 +30,10 @@ object AdminScreen : Screen {
     override fun Content() {
         val sessionManager = koinInject<SessionManager>()
         val currentUser by sessionManager.currentUser.collectAsState()
-        // Inventory and Suppliers are their own workspace now; the Admin Hub opens on Shifts (Users for people who can't see shifts).
-        var selected by remember {
-            val canReadShifts = currentUser?.permissions.orEmpty().any { it == "SHIFT_READ" || it == "SHIFT_MANAGE" }
-            mutableStateOf(if (canReadShifts) AdminSection.SHIFTS else AdminSection.USERS)
-        }
+        // The Admin Hub opens on its first place the person may open (Shifts for most); a hidden one moves to the first allowed.
+        val allowed = AdminSection.allowed(currentUser?.permissions.orEmpty())
+        var selected by remember { mutableStateOf(allowed.firstOrNull() ?: AdminSection.SHIFTS) }
+        androidx.compose.runtime.LaunchedEffect(allowed, selected) { if (selected !in allowed && allowed.isNotEmpty()) selected = allowed.first() }
         val navigator = LocalNavigator.current
         val backToWorkspaces: (() -> Unit)? =
             if ((currentUser?.let { accessibleWorkspaces(it) }?.size ?: 0) > 1) {

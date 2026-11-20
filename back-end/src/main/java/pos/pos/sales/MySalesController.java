@@ -11,7 +11,7 @@ import java.util.UUID;
 public class MySalesController {
     private final MySalesService service;
     @GetMapping
-    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @PreAuthorize("hasAuthority('SALES_SELF')")
     public MySalesResponse report(@PathVariable UUID restaurantId,@PathVariable UUID branchId,
         @RequestParam(required=false) LocalDate date,@RequestParam(required=false) UUID staffId,
         @RequestParam(required=false) UUID shiftId,Authentication authentication) {

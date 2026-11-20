@@ -42,13 +42,15 @@ data class KdsState(
     val posTiming: KdsPosTiming = KdsPosTiming()
 ) {
     // POS → Kitchen Status reads the kitchen with ORDER_READ (waiters hold no Kitchen display permission; user, 2026-10-30).
-    val canRead get() = scope != null && ("KDS_READ" in permissions || "ORDER_READ" in permissions) && !accessDenied
+    // Every kitchen place reads the same board (its photos, history and Upcoming), so any of them reads it; the bar shows
+    // only the places allowed (2026-11-19).
+    val canRead get() = scope != null && KdsReadPermissions.any { it in permissions } && !accessDenied
     val canUpdate get() = canRead && "KDS_UPDATE" in permissions
     // Waiters (order staff) can say the ready food was taken out, as well as kitchen staff.
     val canPickUp get() = canRead && ("KDS_UPDATE" in permissions || "ORDER_UPDATE" in permissions)
     // The kitchen sees the menu with KDS_READ (Kitchen holds no POS permission).
-    val canReadMenu get() = scope != null && ("MENUS_READ" in permissions || "KDS_READ" in permissions)
-    val canUpdateMenu get() = canReadMenu && "MENUS_UPDATE" in permissions
+    val canReadMenu get() = scope != null && ("MENUS_READ" in permissions || "KDS_READ" in permissions || "KDS_MENU_READ" in permissions)
+    val canUpdateMenu get() = canReadMenu && "MENUS_SOLD_OUT" in permissions
     val canConfigure get() = scope != null && "SETTINGS_UPDATE" in permissions
     val needsStationSetup get() = loaded && boards.isEmpty() && stationId == null && deviceId == null
     val tickets get() = boards.flatMap { it.tickets }.distinctBy { it.id }
@@ -81,3 +83,6 @@ data class KdsState(
     }
 }
 internal fun String?.asInstant(): Instant? = this?.let { runCatching { Instant.parse(it) }.getOrNull() }
+
+/** What reads the kitchen board: any kitchen place, or the POS's orders and Kitchen Status. */
+internal val KdsReadPermissions = listOf("KDS_READ", "KDS_UPCOMING_READ", "KDS_HISTORY_READ", "ORDER_READ", "KITCHEN_STATUS_READ")

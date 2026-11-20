@@ -48,7 +48,7 @@ public class PersonPermissionService {
     public PersonPermissionsResponse getPermissions(Authentication authentication, UUID userId) {
         User person = manageable(authentication, userId);
         List<UUID> roleIds = roleRepository.findActiveRolesByUserId(userId).stream().map(Role::getId).toList();
-        Set<String> fromRoles = EffectivePermissions.forRoles(permissionRepository, person.getRestaurantId(), roleIds);
+        Set<String> fromRoles = pos.pos.security.rbac.PermissionTree.withBundles(EffectivePermissions.forRoles(permissionRepository, person.getRestaurantId(), roleIds));
         List<String> permissions = EffectivePermissions.forUser(permissionRepository, userId, person.getRestaurantId(), roleIds);
         return new PersonPermissionsResponse(List.copyOf(fromRoles), permissions);
     }
@@ -56,13 +56,15 @@ public class PersonPermissionService {
     @Transactional
     public PersonPermissionsResponse replacePermissions(Authentication authentication, UUID userId, ReplacePersonPermissionsRequest request) {
         User person = manageable(authentication, userId);
-        Set<String> requested = new LinkedHashSet<>(request.getPermissionCodes());
+        Set<String> asked = new LinkedHashSet<>(request.getPermissionCodes());
         Set<String> known = permissionRepository.findAll().stream().map(Permission::getCode).collect(Collectors.toSet());
-        if (!known.containsAll(requested)) {
+        if (!known.containsAll(asked)) {
             throw new PermissionNotFoundException();
         }
+        // Nothing without what it needs (PermissionTree).
+        Set<String> requested = pos.pos.security.rbac.PermissionTree.normalize(asked);
         List<UUID> roleIds = roleRepository.findActiveRolesByUserId(userId).stream().map(Role::getId).toList();
-        Set<String> fromRoles = EffectivePermissions.forRoles(permissionRepository, person.getRestaurantId(), roleIds);
+        Set<String> fromRoles = pos.pos.security.rbac.PermissionTree.withBundles(EffectivePermissions.forRoles(permissionRepository, person.getRestaurantId(), roleIds));
         Set<String> now = Set.copyOf(EffectivePermissions.forUser(permissionRepository, userId, person.getRestaurantId(), roleIds));
 
         // Nobody hands out something they can't do themselves.

@@ -28,7 +28,7 @@ public class RecipePhotoController {
     private final RecipePhotoService photoService;
 
     @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_ITEMS_UPDATE')")
     @Operation(summary = "The house-made item's photo (PNG, JPEG or WebP, up to 5 MB); replaces the old one")
     public ResponseEntity<RecipeResponse> upload(@PathVariable UUID restaurantId, @PathVariable UUID recipeId,
                                                  @RequestPart("file") MultipartFile file, Authentication authentication) {
@@ -36,7 +36,7 @@ public class RecipePhotoController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_ITEMS_UPDATE')")
     @Operation(summary = "Remove the house-made item's photo")
     public ResponseEntity<RecipeResponse> remove(@PathVariable UUID restaurantId, @PathVariable UUID recipeId,
                                                   Authentication authentication) {

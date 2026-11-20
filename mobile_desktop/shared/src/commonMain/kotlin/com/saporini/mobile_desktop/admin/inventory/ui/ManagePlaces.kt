@@ -83,7 +83,7 @@ internal fun ManagePlacesDialog(state: InventoryState, model: InventoryScreenMod
     AppDialog("Manage places", close, subtitle = "Where you keep stock. Add a place, change it or delete it.", maxWidth = 1080.dp,
         buttons = {
             KitButton("Done", close, style = ButtonStyle.SECONDARY)
-            if (state.canEdit) KitButton("New place", model::newLocation, icon = Icons.Outlined.Add)
+            if (state.rights.places) KitButton("New place", model::newLocation, icon = Icons.Outlined.Add)
         }) {
         if (places.isEmpty()) {
             Box(Modifier.fillMaxWidth(), Alignment.Center) {
@@ -125,7 +125,7 @@ private fun PlaceCard(place: StockLocationDto, state: InventoryState, model: Inv
     }
     val kind = place.kindLabel()
     val edit = { model.editLocation(place.id) }
-    Surface(onClick = edit, enabled = state.canEdit,
+    Surface(onClick = edit, enabled = state.rights.places,
         modifier = modifier.hoverable(interaction).pointerHoverIcon(PointerIcon.Hand).alpha(if (place.active) 1f else 0.62f),
         shape = RoundedCornerShape(18.dp), color = Color.White,
         border = BorderStroke(if (hovered) 1.5.dp else 1.dp, if (hovered) color.copy(alpha = 0.5f) else Kit.RowBorder),
@@ -149,7 +149,7 @@ private fun PlaceCard(place: StockLocationDto, state: InventoryState, model: Inv
                         color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Spacer(Modifier.weight(1f))
-                if (state.canEdit) {
+                if (state.rights.places) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         KitButton("Edit", edit, Modifier.weight(1f), icon = Icons.Outlined.Edit, style = ButtonStyle.SECONDARY)
                         KitButton("Delete", { model.askDeleteLocation(place.id) }, Modifier.weight(1f), icon = Icons.Outlined.Delete, style = ButtonStyle.DANGER_OUTLINE)

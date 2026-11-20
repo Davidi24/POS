@@ -260,7 +260,7 @@ class PermissionMatrixIntegrationTest {
     @Test
     @DisplayName("SEC-004 Normal admin cannot manage protected roles or higher-rank users")
     void sec004NormalAdminCannotManageProtectedRolesOrHigherRankUsers() throws Exception {
-        User admin = createUser("sec004-admin", role("ADMIN"));
+        User admin = adminManagingRoles("sec004-admin");
         Role protectedRole = createRole("sec004-protected", 5_000L, true, true, true);
         Role higherRankRole = createRole("sec004-higher-rank", 35_000L, true, true, false);
         User higherRankUser = createUser("sec004-target", higherRankRole);
@@ -439,6 +439,21 @@ class PermissionMatrixIntegrationTest {
         role.setAssignable(false);
         role.setDeletedAt(OffsetDateTime.now(ZoneOffset.UTC));
         roleRepository.save(role);
+    }
+
+    @Autowired
+    private pos.pos.role.repository.UserPermissionGrantRepository userPermissionGrantRepository;
+
+    /** An admin who may also change roles (owner-level since 2026-11-19); the test is about the rules at Admin's rank. */
+    private User adminManagingRoles(String label) {
+        User user = createUser(label, role("ADMIN"));
+        for (String code : java.util.List.of("ROLES_CREATE", "ROLES_UPDATE", "ROLES_DELETE", "ROLES_ASSIGN_PERMISSIONS")) {
+            pos.pos.role.entity.UserPermissionGrant grant = new pos.pos.role.entity.UserPermissionGrant();
+            grant.setUserId(user.getId());
+            grant.setPermissionCode(code);
+            userPermissionGrantRepository.save(grant);
+        }
+        return user;
     }
 
     private User createUser(String label, Role... roles) {

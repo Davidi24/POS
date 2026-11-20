@@ -193,6 +193,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 contextError(response, 403, "The selected restaurant or branch is no longer available. Choose another selection.");
                 return;
             }
+            // A support admin (Co-Super-Admin) works only in the restaurants the Super Admin gave them (user, 2026-11-19).
+            boolean superAdmin = activeRoles.stream().anyMatch(role -> "SUPER_ADMIN".equals(role.getCode()));
+            if (actingRestaurant != null && !superAdmin && !restaurantRepository.supportAdminMayEnter(user.getId(), actingRestaurant)) {
+                contextError(response, 403, "This restaurant isn't one of yours. Ask the Super Admin for it.");
+                return;
+            }
         }
         AuthenticatedUser principal = platformAdmin
                 ? AuthenticatedUser.actingFor(user, actingRestaurant, actingBranch)

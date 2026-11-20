@@ -339,7 +339,8 @@ class MenuItemServiceTest {
                         .active(true)
                         .build(),
                 null,
-                List.of()
+                // An owner may change prices (MENUS_PRICES, 2026-11-20).
+                List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("MENUS_PRICES"))
         );
     }
 

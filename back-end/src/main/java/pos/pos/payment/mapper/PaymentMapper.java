@@ -54,10 +54,7 @@ public class PaymentMapper {
     }
 
     public static String displayName(User user) {
-        String first = user.getFirstName() == null ? "" : user.getFirstName().trim();
-        String last = user.getLastName() == null ? "" : user.getLastName().trim();
-        String full = (first + " " + last).trim();
-        return full.isEmpty() ? user.getUsername() : full;
+        return pos.pos.user.support.PersonName.of(user);
     }
 
     private PaymentResponse toResponse(Payment payment, Map<UUID, String> names) {

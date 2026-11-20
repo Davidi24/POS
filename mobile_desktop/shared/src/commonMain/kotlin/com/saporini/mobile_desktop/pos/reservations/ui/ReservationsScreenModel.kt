@@ -557,7 +557,7 @@ class ReservationsScreenModel(
         repository.confirmReservation(scope.restaurantId, id, input)
     }
 
-    fun cancelReservation(reservationId: String, reason: String? = null): Job = lifecycle("Reservation cancelled", reservationId, reason) { scope, id, input ->
+    fun cancelReservation(reservationId: String, reason: String? = null): Job = lifecycle("Reservation cancelled", reservationId, reason, CANCEL_PERMISSION) { scope, id, input ->
         repository.cancelReservation(scope.restaurantId, id, input)
     }
 
@@ -673,7 +673,7 @@ class ReservationsScreenModel(
         repository.completeReservation(scope.restaurantId, id, input)
     }
 
-    fun markNoShow(reservationId: String, reason: String? = null): Job = lifecycle("Reservation marked no-show", reservationId, reason) { scope, id, input ->
+    fun markNoShow(reservationId: String, reason: String? = null): Job = lifecycle("Reservation marked no-show", reservationId, reason, CANCEL_PERMISSION) { scope, id, input ->
         repository.markNoShow(scope.restaurantId, id, input)
     }
 
@@ -747,8 +747,9 @@ class ReservationsScreenModel(
         operation: String,
         reservationId: String,
         reason: String?,
+        permission: String = WRITE_PERMISSION,
         action: suspend (ReservationsScope, String, ReservationActionInput) -> Reservation
-    ): Job = mutateReservation(withGuest(operation, reservationId)) { scope ->
+    ): Job = mutateReservation(withGuest(operation, reservationId), permission = permission) { scope ->
         action(scope, reservationId, ReservationActionInput(reason = reason))
     }
 
@@ -781,9 +782,10 @@ class ReservationsScreenModel(
         operation: String,
         selectResult: Boolean = false,
         describe: (Reservation) -> String = { operation },
+        permission: String = WRITE_PERMISSION,
         action: suspend (ReservationsScope) -> Reservation
     ): Job = work.launch {
-        mutate(WRITE_PERMISSION, operation, describe) { scope -> action(scope) }
+        mutate(permission, operation, describe) { scope -> action(scope) }
             .onSuccess { reservation -> applyReservationMutation(reservation, selectResult) }
     }
 
@@ -968,6 +970,8 @@ class ReservationsScreenModel(
         const val WRITE_PERMISSION = "RESERVATION_MANAGE"
         // Fix bookings after the staff time limits or from an earlier day (Manager and above by default).
         const val CORRECT_PERMISSION = "RESERVATION_CORRECT"
+        // Cancelling a booking or marking a no-show is its own permission (user, 2026-11-20).
+        const val CANCEL_PERMISSION = "RESERVATION_CANCEL"
         // Accept requests from big groups.
         const val APPROVE_PERMISSION = "RESERVATION_APPROVE"
         // Give part of kept money back as goodwill (Owner, or whoever the Owner allows).

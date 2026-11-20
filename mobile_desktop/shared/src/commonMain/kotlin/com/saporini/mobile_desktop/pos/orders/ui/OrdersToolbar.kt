@@ -27,9 +27,12 @@ internal fun OrdersToolbar(
     query: String, onQueryChange: (String) -> Unit,
     orderStatus: OrderStatus?, onOrderStatusChange: (OrderStatus?) -> Unit,
     foodStatus: OrderFulfillmentStatus?, onFoodStatusChange: (OrderFulfillmentStatus?) -> Unit,
+    // Food status only with "See an order's kitchen status" (2026-11-20).
+    showFood: Boolean = true,
     mineOnly: Boolean, onMineChange: (Boolean) -> Unit,
     // A plain button: it opens POS → History (user, 2026-11-01).
-    onOpenHistory: () -> Unit = {},
+    // Null when the person can't open History (2026-11-19).
+    onOpenHistory: (() -> Unit)? = {},
     historyOnly: Boolean = false, historyStatus: OrderStatus? = null,
     onHistoryStatusChange: (OrderStatus?) -> Unit = {},
     // History's choice of the orders closed as unpaid (user, 2026-11-01).
@@ -60,7 +63,7 @@ internal fun OrdersToolbar(
                 DropdownMenuItem(text = { HeaderText("Unpaid", color = Color(0xFFDC2626)) }, onClick = { onHistoryUnpaid(); close() })
             }
         } else {
-            HeaderPlainButton("History", Icons.AutoMirrored.Outlined.EventNote, onOpenHistory)
+            if (onOpenHistory != null) HeaderPlainButton("History", Icons.AutoMirrored.Outlined.EventNote, onOpenHistory)
         }
         Surface(
             modifier = Modifier.width(132.dp).height(44.dp),
@@ -84,7 +87,7 @@ internal fun OrdersToolbar(
                 }
             }
         }
-        if (!historyOnly) StatusDropdown(orderStatus, onOrderStatusChange, foodStatus, onFoodStatusChange)
+        if (!historyOnly) StatusDropdown(orderStatus, onOrderStatusChange, foodStatus, onFoodStatusChange, showFood)
     }
     // On the left, beside the title (user, 2026-11-01).
     val search: @Composable () -> Unit = {
@@ -115,7 +118,8 @@ internal fun OrdersToolbar(
 @Composable
 private fun StatusDropdown(
     orderStatus: OrderStatus?, onOrderStatusChange: (OrderStatus?) -> Unit,
-    foodStatus: OrderFulfillmentStatus?, onFoodStatusChange: (OrderFulfillmentStatus?) -> Unit
+    foodStatus: OrderFulfillmentStatus?, onFoodStatusChange: (OrderFulfillmentStatus?) -> Unit,
+    showFood: Boolean = true
 ) {
     val label = listOfNotNull(orderStatus?.label(), foodStatus?.label()).joinToString(" · ").ifEmpty { "Status" }
     val width = if (orderStatus != null && foodStatus != null) 206.dp else 170.dp
@@ -125,9 +129,11 @@ private fun StatusDropdown(
         listOf(OrderStatus.DRAFT, OrderStatus.OPEN).forEach { status ->
             StatusChoice(status.label(), orderStatusColor(status), status == orderStatus) { onOrderStatusChange(status.takeUnless { it == orderStatus }); close() }
         }
-        StatusHeading("Food status")
-        OrderFulfillmentStatus.entries.forEach { status ->
-            StatusChoice(status.label(), progressColor(status), status == foodStatus) { onFoodStatusChange(status.takeUnless { it == foodStatus }); close() }
+        if (showFood) {
+            StatusHeading("Food status")
+            OrderFulfillmentStatus.entries.forEach { status ->
+                StatusChoice(status.label(), progressColor(status), status == foodStatus) { onFoodStatusChange(status.takeUnless { it == foodStatus }); close() }
+            }
         }
     }
 }

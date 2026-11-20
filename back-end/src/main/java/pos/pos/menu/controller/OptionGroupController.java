@@ -36,7 +36,7 @@ public class OptionGroupController {
     private final OptionGroupService optionGroupService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "List option groups for one restaurant")
     public ResponseEntity<List<OptionGroupResponse>> getOptionGroups(
             Authentication authentication,
@@ -57,7 +57,7 @@ public class OptionGroupController {
     }
 
     @GetMapping("/{groupId}")
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "Get one option group")
     public ResponseEntity<OptionGroupResponse> getOptionGroup(
             Authentication authentication,

@@ -121,6 +121,7 @@ public class MenuVariantService {
 
         variant.setName(normalizedName);
         variant.setSku(NormalizationUtils.normalizeUpper(request.getSku()));
+        pos.pos.menu.policy.MenuPriceRule.assertMayChange(authentication, variant.getPriceDelta(), request.getPriceDelta());
         variant.setPriceDelta(request.getPriceDelta());
         variant.setDefault(Boolean.TRUE.equals(request.getIsDefault()));
         variant.setActive(Boolean.TRUE.equals(request.getActive()));

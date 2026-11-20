@@ -68,6 +68,8 @@ internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier
     var pending by remember { mutableStateOf<Pair<String, ShiftItem?>?>(null) }
     // My shifts, or the team's week (everyone at my level or below).
     var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(if (startOnTeam) TEAM else MY_SHIFTS) }
+    // The team's shifts only with "See others' shifts" (user, 2026-11-20).
+    LaunchedEffect(state.canSeeTeam, tab) { if (tab == TEAM && !state.canSeeTeam && state.ready) tab = MY_SHIFTS }
     LaunchedEffect(tab) { model.showTeam(tab == TEAM) }
     val board = state.board
     val zone = state.zone
@@ -182,12 +184,15 @@ internal fun MyShiftContent(state: ShiftState, model: ShiftScreenModel, modifier
                             )
                         }
                     )
+                    // Without "See their pay" the pay card isn't there (user, 2026-11-20).
+                    val shownCards = if (state.canSeePay) cards else cards.filterIndexed { index, _ -> index != 1 }
                     if (size.isDesktop) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { cards.forEach { it(Modifier.weight(1f)) } }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { shownCards.forEach { it(Modifier.weight(1f)) } }
                     } else {
                         val gap = if (size.isPhone) 10.dp else 12.dp
-                        Row(horizontalArrangement = Arrangement.spacedBy(gap)) { cards[0](Modifier.weight(1f)); cards[1](Modifier.weight(1f)) }
-                        Row(horizontalArrangement = Arrangement.spacedBy(gap)) { cards[2](Modifier.weight(1f)); cards[3](Modifier.weight(1f)) }
+                        shownCards.chunked(2).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(gap)) { row.forEach { it(Modifier.weight(1f)) } }
+                        }
                     }
 
                     val nowCard: @Composable (Modifier) -> Unit = { m ->
@@ -257,7 +262,9 @@ private fun MyShiftHeader(state: ShiftState, size: ScreenSize, today: LocalDate,
                 fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
-    val tabs: @Composable (Modifier) -> Unit = { m -> OverviewTabs(listOf(MY_SHIFTS, TEAM), tab, onTab, m, height = ToolbarHeight) }
+    val tabs: @Composable (Modifier) -> Unit = { m ->
+        if (state.canSeeTeam) OverviewTabs(listOf(MY_SHIFTS, TEAM), tab, onTab, m, height = ToolbarHeight)
+    }
     val controls: @Composable () -> Unit = {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (!size.isPhone) tabs(Modifier.width(210.dp))

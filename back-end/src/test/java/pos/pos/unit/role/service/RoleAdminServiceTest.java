@@ -202,7 +202,8 @@ class RoleAdminServiceTest {
         Authentication authentication = authentication("ROLES_ASSIGN_PERMISSIONS");
         ReplaceRolePermissionsRequest request = new ReplaceRolePermissionsRequest();
         request.setPermissionIds(Set.of(PERMISSION_ID));
-        Permission permission = permission("USERS_DELETE");
+        // A workspace's "Open …" needs nothing else, so it isn't dropped by the permission tree before the check.
+        Permission permission = permission("FRAUD_ACCESS");
 
         when(roleRepository.findByIdAndDeletedAtIsNull(ROLE_ID)).thenReturn(Optional.of(customRole()));
         when(permissionRepository.findAllById(Set.of(PERMISSION_ID))).thenReturn(List.of(permission));
@@ -217,7 +218,7 @@ class RoleAdminServiceTest {
     @Test
     @DisplayName("Should replace role permissions with a diff instead of rewriting everything")
     void shouldReplaceRolePermissionsWithDiff() {
-        Authentication authentication = authentication("ROLES_ASSIGN_PERMISSIONS", "USERS_READ", "USERS_UPDATE");
+        Authentication authentication = authentication("ROLES_ASSIGN_PERMISSIONS", "POS_ACCESS", "SHIFT_SELF");
         ReplaceRolePermissionsRequest request = new ReplaceRolePermissionsRequest();
         request.setPermissionIds(Set.of(
                 PERMISSION_ID,
@@ -225,8 +226,9 @@ class RoleAdminServiceTest {
         ));
 
         Role role = customRole();
-        Permission readUsers = permission(PERMISSION_ID, "USERS_READ");
-        Permission updateUsers = permission(UUID.fromString("00000000-0000-0000-0000-000000000225"), "USERS_UPDATE");
+        // A permission with what it needs (SHIFT_SELF needs POS_ACCESS), so the permission tree keeps both.
+        Permission readUsers = permission(PERMISSION_ID, "POS_ACCESS");
+        Permission updateUsers = permission(UUID.fromString("00000000-0000-0000-0000-000000000225"), "SHIFT_SELF");
         RolePermission oldAssignment = assignment(UUID.fromString("00000000-0000-0000-0000-000000000226"));
         RolePermission keepAssignment = assignment(PERMISSION_ID);
 
@@ -246,7 +248,7 @@ class RoleAdminServiceTest {
                 .permissionId(updateUsers.getId())
                 .build()));
         assertThat(response).extracting(pos.pos.role.dto.PermissionResponse::getCode)
-                .containsExactly("USERS_READ", "USERS_UPDATE");
+                .containsExactly("POS_ACCESS", "SHIFT_SELF");
     }
 
     @Test

@@ -130,7 +130,7 @@ fun OrdersScreen(
     focusOrderId: String? = null, onFocusHandled: () -> Unit = {}, openItems: Boolean = false,
     startOrder: Pair<String, Int>? = null, onStartOrderHandled: () -> Unit = {},
     onTableFreed: (tableNumber: String) -> Unit = {}, onOrderReopened: (orderId: String) -> Unit = {},
-    onOpenHistory: () -> Unit = {},
+    onOpenHistory: (() -> Unit)? = {},
     historySearch: String? = null, onHistorySearchHandled: () -> Unit = {}
 ) {
     val model = koinInject<OrdersScreenModel>(qualifier = if(historyOnly) org.koin.core.qualifier.named("pos-history") else null)
@@ -144,8 +144,15 @@ fun OrdersScreen(
         model.setActive(owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
         onDispose { owner.lifecycle.removeObserver(observer); model.setActive(false); model.onDispose() }
     }
-    OrdersContent(model, modifier, onPaymentRequested, focusOrderId, onFocusHandled, openItems, startOrder, onStartOrderHandled, onTableFreed, onOrderReopened, onOpenHistory, historySearch, onHistorySearchHandled)
+    // An order's kitchen status (its food status and what's not sent) is its own permission (user, 2026-11-20).
+    val user by org.koin.compose.koinInject<com.saporini.mobile_desktop.core.session.SessionManager>().currentUser.collectAsState()
+    androidx.compose.runtime.CompositionLocalProvider(LocalSeesOrderKitchen provides ("ORDER_KITCHEN_READ" in user?.permissions.orEmpty())) {
+        OrdersContent(model, modifier, onPaymentRequested, focusOrderId, onFocusHandled, openItems, startOrder, onStartOrderHandled, onTableFreed, onOrderReopened, onOpenHistory, historySearch, onHistorySearchHandled)
+    }
 }
+
+/** Whether the signed-in person may see an order's kitchen status. */
+internal val LocalSeesOrderKitchen = androidx.compose.runtime.staticCompositionLocalOf { true }
 
 /** Separate from lifecycle ownership to support deterministic screenshots and previews. */
 @Composable
@@ -156,7 +163,7 @@ fun OrdersContent(
     // Closed as unpaid: on to the table it freed (user, 2026-11-01).
     onTableFreed: (tableNumber: String) -> Unit = {},
     onOrderReopened: (orderId: String) -> Unit = {},
-    onOpenHistory: () -> Unit = {},
+    onOpenHistory: (() -> Unit)? = {},
     // History opened from a table: that table's orders.
     historySearch: String? = null,
     onHistorySearchHandled: () -> Unit = {}
@@ -212,7 +219,7 @@ fun OrdersContent(
     var unpaidDone by remember { mutableStateOf<String?>(null) }
     // Only History reopens orders (user, 2026-11-01). For payment: straight to its payment.
     val inHistory = model.historyOnly || state.filter.mode == OrderListMode.HISTORY
-    val canReopenForPayment = inHistory && model.hasPermission("ORDER_CLOSE")
+    val canReopenForPayment = inHistory && model.hasPermission("ORDER_REOPEN_PAYMENT")
     val canReopenOrder = inHistory && model.hasPermission("ORDER_REOPEN")
     var reopenAsking by remember { mutableStateOf<Order?>(null) }
     val reopenForPayment: (Order) -> Unit = { reopened ->
@@ -292,6 +299,7 @@ fun OrdersContent(
                     orderStatus = orderStatus,
                     onOrderStatusChange = { orderStatus = it },
                     foodStatus = kitchen,
+                    showFood = LocalSeesOrderKitchen.current,
                     onFoodStatusChange = { kitchen = it },
                     mineOnly = mineOnly,
                     onMineChange = { mineOnly = it; model.historyMine(it) },
@@ -1926,7 +1934,7 @@ private fun OrderLineItem.orderItemSubtitle(): String {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Current", fontFamily = Inter(), fontSize = 12.sp, color = OrderMuted)
                         OrderListBadge(statusLabel(order.status, order.unpaidAt), statusColor(order.status, order.unpaidAt), dot = true)
-                        if (order.status.showsFulfillmentProgress) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
+                        if (order.status.showsFulfillmentProgress && LocalSeesOrderKitchen.current) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
                     }
                     Text("Choose the next step, then save your changes.", fontFamily = Inter(), fontSize = 13.sp, color = OrderMuted)
                     Column {
@@ -2224,7 +2232,7 @@ private fun OrdersListPanel(
                             modifier = Modifier.fillMaxWidth()
                         )
                         // Some dishes still wait to be sent: the reminder takes this line, in amber.
-                        val notSent = notSentNote(order.fulfillmentStatus, order.notSentItems)
+                        val notSent = (if (LocalSeesOrderKitchen.current) notSentNote(order.fulfillmentStatus, order.notSentItems) else null)
                         OrderListIconText(
                             Icons.Outlined.FormatListBulleted,
                             if (notSent != null) "${order.notSentItems} of ${order.itemCount ?: 0} not sent"
@@ -2236,7 +2244,7 @@ private fun OrdersListPanel(
                     OrderColumnDivider()
                     Column(Modifier.widthIn(min = 150.dp, max = 176.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         OrderListBadge(statusLabel(order.status, order.unpaidAt), statusColor(order.status, order.unpaidAt), dot = true)
-                        if (order.status.showsFulfillmentProgress) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
+                        if (order.status.showsFulfillmentProgress && LocalSeesOrderKitchen.current) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.width(102.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -2268,7 +2276,7 @@ private fun OrdersListPanel(
             OrderListPill(Icons.Outlined.TableRestaurant, order.tableName ?: order.tableNumber?.let { "Table $it" } ?: "Table -")
             if(order.customerName != null || order.guestCount != null) OrderText(listOfNotNull(order.guestCount?.let { "$it guests" }, order.customerName).joinToString(" · "), 13, color = OrderMuted)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                OrderBadge(statusLabel(order.status, order.unpaidAt)); if (order.status.showsFulfillmentProgress) OrderBadge(order.progressLabel()); notSentNote(order.fulfillmentStatus, order.notSentItems)?.let { OrderText(it, 12, true, OrderNotSentColor) }; Spacer(Modifier.weight(1f)); OrderText((order.unpaidAmount.takeIf { order.closedUnpaid } ?: order.total).money(order.currency), 14, true)
+                OrderBadge(statusLabel(order.status, order.unpaidAt)); if (order.status.showsFulfillmentProgress && LocalSeesOrderKitchen.current) OrderBadge(order.progressLabel()); (if (LocalSeesOrderKitchen.current) notSentNote(order.fulfillmentStatus, order.notSentItems) else null)?.let { OrderText(it, 12, true, OrderNotSentColor) }; Spacer(Modifier.weight(1f)); OrderText((order.unpaidAmount.takeIf { order.closedUnpaid } ?: order.total).money(order.currency), 14, true)
             }
         }
     }
@@ -2294,7 +2302,7 @@ private fun OrdersListPanel(
     onReopenForPayment: () -> Unit = {}
 ) {
     var tab by remember(order.id) { mutableStateOf("Items") }
-    val canCloseUnpaid = order.canCloseUnpaid && state.can("ORDER_VOID")
+    val canCloseUnpaid = order.canCloseUnpaid && state.can("ORDER_CLOSE_UNPAID")
     val canEdit = order.editable && state.can("ORDER_UPDATE")
     var editMenu by remember { mutableStateOf(false) }
     var headerMenu by remember(order.id) { mutableStateOf(false) }
@@ -2341,8 +2349,8 @@ private fun OrdersListPanel(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(Modifier.widthIn(min = 124.dp, max = 158.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OrderListBadge(statusLabel(order.status, order.unpaidAt), statusColor(order.status, order.unpaidAt), dot = true)
-                if (order.status.showsFulfillmentProgress) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
-                notSentNote(order.fulfillmentStatus, order.notSentItems)?.let {
+                if (order.status.showsFulfillmentProgress && LocalSeesOrderKitchen.current) OrderListBadge(order.progressLabel(), orderProgressColor(order.fulfillmentStatus), Icons.Outlined.Restaurant)
+                (if (LocalSeesOrderKitchen.current) notSentNote(order.fulfillmentStatus, order.notSentItems) else null)?.let {
                     Text(it, Modifier.padding(start = 10.dp), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = OrderNotSentColor, maxLines = 1)
                 }
             }
@@ -2429,7 +2437,7 @@ private fun OrdersListPanel(
                 }
             }
             // One button for the bill (user, 2026-11-01): "Request bill" while the guests eat, then "Pay" once they asked for it.
-            val canRequest = order.billRequestedAt == null && order.editable && order.paymentStatus != OrderPaymentStatus.PAID && state.can("ORDER_UPDATE")
+            val canRequest = order.billRequestedAt == null && order.editable && order.paymentStatus != OrderPaymentStatus.PAID && state.can("ORDER_CLOSE")
             if (order.closedUnpaid) {
                 if (canReopenForPayment) DesktopOrderActionButton("Reopen for payment", Icons.Outlined.CreditCard, Modifier.weight(1.6f),
                     container = OrderGreen, content = Color.White) { if (!state.isSaving && !state.needsReconciliation) onReopenForPayment() }

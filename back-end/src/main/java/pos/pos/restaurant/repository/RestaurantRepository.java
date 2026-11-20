@@ -14,6 +14,13 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
 
     Optional<Restaurant> findByIdAndDeletedAtIsNull(UUID id);
 
+    /** Whether support admin [userId] may work in [restaurantId]: every restaurant, or one given to them (user, 2026-11-19). */
+    @org.springframework.data.jpa.repository.Query(value = "select coalesce((select u.admin_all_restaurants from {h-schema}users u where u.id = :userId), false)"
+            + " or exists (select 1 from {h-schema}admin_restaurant_access a where a.user_id = :userId and a.restaurant_id = :restaurantId)",
+            nativeQuery = true)
+    boolean supportAdminMayEnter(@org.springframework.data.repository.query.Param("userId") UUID userId,
+                                 @org.springframework.data.repository.query.Param("restaurantId") UUID restaurantId);
+
     Optional<Restaurant> findBySlugAndDeletedAtIsNull(String slug);
 
     // Codes and web addresses stay reserved after a restaurant is archived (the database keeps them unique too).

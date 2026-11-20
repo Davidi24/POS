@@ -28,8 +28,14 @@ public class RestaurantCardRepository {
 
     /** [searchLike] is a lower-case LIKE pattern or null; [open] true = open only, false = suspended/closed only. */
     public List<RestaurantCardResponse> cards(String searchLike, Boolean open, int limit, int offset) {
+        return cards(searchLike, open, limit, offset, null);
+    }
+
+    /** The same, only the restaurants support admin [adminId] takes care of when it isn't null (user, 2026-11-19). */
+    public List<RestaurantCardResponse> cards(String searchLike, Boolean open, int limit, int offset, UUID adminId) {
         Map<String, Object> p = new HashMap<>();
         p.put("search", searchLike);
+        p.put("admin", adminId);
         p.put("limit", limit);
         p.put("offset", offset);
         String sql = "select r.id, r.name, r.code, r.status, r.is_active, r.currency, r.timezone, a.city, a.country,"
@@ -52,6 +58,7 @@ public class RestaurantCardRepository {
                 + " where r.deleted_at is null and r.status not in ('PENDING','REJECTED')"
                 + " and (cast(:search as text) is null or lower(r.name) like :search or lower(r.code) like :search or lower(coalesce(a.city, '')) like :search)"
                 + (open == null ? "" : open ? " and r.is_active and r.status = 'ACTIVE'" : " and not (r.is_active and r.status = 'ACTIVE')")
+                + (adminId == null ? "" : adminFilter())
                 + " order by r.display_order, lower(r.name), r.id limit :limit offset :offset";
         return jdbc.query(sql, p, (row, i) -> new RestaurantCardResponse(
                 row.getObject("id", UUID.class),
@@ -79,16 +86,28 @@ public class RestaurantCardRepository {
     }
 
     public long count(String searchLike, Boolean open) {
+        return count(searchLike, open, null);
+    }
+
+    public long count(String searchLike, Boolean open, UUID adminId) {
         Map<String, Object> p = new HashMap<>();
         p.put("search", searchLike);
+        p.put("admin", adminId);
         String sql = "select count(*) from " + schema + "restaurants r"
                 + " left join lateral (select ad.city from " + schema + "\"restaurant-addresses\" ad where ad.restaurant_id = r.id"
                 + "   and ad.deleted_at is null order by ad.is_primary desc, ad.created_at limit 1) a on true"
                 + " where r.deleted_at is null and r.status not in ('PENDING','REJECTED')"
                 + " and (cast(:search as text) is null or lower(r.name) like :search or lower(r.code) like :search or lower(coalesce(a.city, '')) like :search)"
-                + (open == null ? "" : open ? " and r.is_active and r.status = 'ACTIVE'" : " and not (r.is_active and r.status = 'ACTIVE')");
+                + (open == null ? "" : open ? " and r.is_active and r.status = 'ACTIVE'" : " and not (r.is_active and r.status = 'ACTIVE')")
+                + (adminId == null ? "" : adminFilter());
         Long value = jdbc.queryForObject(sql, p, Long.class);
         return value == null ? 0 : value;
+    }
+
+    /** Only the restaurants given to the support admin :admin (or all of them when they have every restaurant). */
+    private String adminFilter() {
+        return " and (exists (select 1 from " + schema + "users au where au.id = :admin and au.admin_all_restaurants)"
+                + " or exists (select 1 from " + schema + "admin_restaurant_access ara where ara.user_id = :admin and ara.restaurant_id = r.id))";
     }
 
     // Any fixed number: the transaction-scoped PostgreSQL lock that serializes giving out list positions.

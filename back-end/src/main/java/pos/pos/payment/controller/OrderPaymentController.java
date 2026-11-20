@@ -51,7 +51,7 @@ public class OrderPaymentController {
     }
 
     @PostMapping("/orders/{orderId}/payments")
-    @PreAuthorize("hasAuthority('ORDER_CLOSE')")
+    @PreAuthorize("hasAnyAuthority('ORDER_CLOSE', 'TABLES_PAYMENT')")
     @Operation(summary = "Take a payment (cash, card, ...) towards the bill; send an Idempotency-Key to retry safely")
     public ResponseEntity<TakePaymentResponse> takePayment(
             @PathVariable UUID restaurantId,

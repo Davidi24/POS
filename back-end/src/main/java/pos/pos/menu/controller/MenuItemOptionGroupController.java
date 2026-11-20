@@ -33,7 +33,7 @@ public class MenuItemOptionGroupController {
     private final MenuItemOptionGroupService menuItemOptionGroupService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "List assigned option groups for one menu item")
     public ResponseEntity<List<MenuItemOptionGroupSummaryResponse>> getOptionGroups(
             Authentication authentication,

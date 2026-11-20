@@ -30,7 +30,7 @@ public class InventoryActivityController {
     private final pos.pos.inventory.service.InventoryChangeNotifier inventoryChangeNotifier;
 
     @GetMapping(value = "/events", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "Subscribe to restaurant inventory changes")
     public org.springframework.web.servlet.mvc.method.annotation.SseEmitter events(
             @PathVariable UUID restaurantId,
@@ -40,7 +40,7 @@ public class InventoryActivityController {
     }
 
     @GetMapping("/activity")
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "Stock received, used by sales and wasted per day (at cost) for the last days, for the overview")
     public ResponseEntity<InventoryActivityResponse> activity(
             @PathVariable UUID restaurantId,

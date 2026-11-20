@@ -123,6 +123,13 @@ def app_texts():
                 s = java_message(src, m.end())
                 key = wanted(s) if s else None
                 if key and ' ' in key and key[0].isupper() and key not in found: found[key] = 'server:' + f
+            # Permission and role names and what they do (AppPermission / AppRole: CODE("Name", "What it does", …)): the app
+            # shows them as the server sends them.
+            if f in ('AppPermission.java', 'AppRole.java'):
+                for m in re.finditer(r'^\s+[A-Z_]+\(\s*"([^"]+)",\s*"([^"]+)"', src, re.M):
+                    for text in (m.group(1), m.group(2)):
+                        key = wanted(text)
+                        if key and key not in found: found[key] = 'server:' + f
             # Texts the server makes now and the app shows later (a booking's money lines): Words.en("…").
             for m in re.finditer(r'Words\.en\(\s*(?=")', src):
                 text, _ = java_literal(src, m.end())

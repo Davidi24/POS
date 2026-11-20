@@ -87,6 +87,40 @@ private val TableMuted = Color(0xFF71736E)
 private val TableBorder = Color(0xFFE1DCD8)
 
 /**
+ * What the signed-in person may do from a table's panel (user, 2026-11-19: Tables has its own permissions): seat guests
+ * and free tables (TABLES_SEAT), move and join tables (ORDER_TRANSFER), start orders (ORDER_CREATE), see them (ORDER_READ),
+ * request the bill (ORDER_UPDATE) and take the payment (ORDER_CLOSE).
+ */
+data class TableRights(
+    val seat: Boolean = true,
+    val move: Boolean = true,
+    val startOrder: Boolean = true,
+    val seeOrders: Boolean = true,
+    val requestBill: Boolean = true,
+    val pay: Boolean = true,
+    // A table's booking buttons follow Reservations (user, 2026-11-20): see it, seat it.
+    val seeBookings: Boolean = true,
+    val seatBookings: Boolean = true,
+    // An order's food status on the table (user, 2026-11-20).
+    val seeKitchen: Boolean = true
+) {
+    companion object {
+        // Tables (user, 2026-11-20): "Change tables" seats, frees, moves and joins; "Take payments" requests the bill and pays.
+        fun of(permissions: Collection<String>) = TableRights(
+            seat = "TABLES_UPDATE" in permissions,
+            move = "TABLES_UPDATE" in permissions,
+            startOrder = "ORDER_CREATE" in permissions,
+            seeOrders = "ORDER_READ" in permissions,
+            requestBill = "TABLES_PAYMENT" in permissions,
+            pay = "TABLES_PAYMENT" in permissions,
+            seeBookings = "RESERVATION_READ" in permissions,
+            seatBookings = "RESERVATION_MANAGE" in permissions,
+            seeKitchen = "ORDER_KITCHEN_READ" in permissions
+        )
+    }
+}
+
+/**
  * Everyday actions for a table during service (seat, order, move, join/separate,
  * availability). Table-plan editing (add/resize/rotate tables, the background
  * image) lives in TableLayoutToolbar's edit mode instead — this modal is about
@@ -125,7 +159,8 @@ fun BoxScope.TableDetailsModal(
     onChooseBookingTable: () -> Unit = {},
     onGiveMoreTime: (Int) -> Unit = {},
     onBookingWaits: () -> Unit = {},
-    onStillHere: () -> Unit = {}
+    onStillHere: () -> Unit = {},
+    rights: TableRights = TableRights()
 ) {
     val table = tables.toServiceSummaryTable()
     val tableTitle = tables.joinToString(separator = "-") { it.label }
@@ -222,12 +257,14 @@ fun BoxScope.TableDetailsModal(
                     small = true
                 )
                 Spacer(Modifier.weight(1f))
-                StatusCaption("Food")
-                StatusPill(
-                    text = foodStatus.label(),
-                    color = if (foodStatus == OrderFulfillmentStatus.FULFILLED) PanelStatusGreen else progressColor(foodStatus),
-                    small = true
-                )
+                if (rights.seeKitchen) {
+                    StatusCaption("Food")
+                    StatusPill(
+                        text = foodStatus.label(),
+                        color = if (foodStatus == OrderFulfillmentStatus.FULFILLED) PanelStatusGreen else progressColor(foodStatus),
+                        small = true
+                    )
+                }
             }
         } else {
             StatusPill(text = table.statusLabel(), color = table.statusColor())
@@ -236,7 +273,7 @@ fun BoxScope.TableDetailsModal(
         // reservation"), with what it celebrates. The next one can be moved to another table from here, on the map.
         val seatedBooking = tables.firstNotNullOfOrNull { it.seatedBooking }
         val nextBooking = tables.firstNotNullOfOrNull { it.nextBooking() }?.takeIf { it.id != seatedBooking?.id }
-        if (seatedBooking != null || nextBooking != null) {
+        if (rights.seeBookings && (seatedBooking != null || nextBooking != null)) {
             Spacer(Modifier.height(14.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 seatedBooking?.let { booking ->
@@ -276,7 +313,7 @@ fun BoxScope.TableDetailsModal(
                                 MessageKind.WARNING
                             )
                             Spacer(Modifier.height(10.dp))
-                            DialogActionButton(
+                            if (rights.seat) DialogActionButton(
                                 text = "Still here", icon = Icons.Filled.Groups,
                                 modifier = Modifier.fillMaxWidth().height(50.dp), dark = clash == null, isLoading = isSaving,
                                 onClick = onStillHere
@@ -284,7 +321,7 @@ fun BoxScope.TableDetailsModal(
                             if (clash != null) Spacer(Modifier.height(16.dp))
                         }
                         clash?.let {
-                            val actions = clashActions(table.state, it, canMoveBooking, canMoveGuests)
+                            val actions = clashActions(table.state, it, canMoveBooking, canMoveGuests && rights.move, rights)
                             MessageBar(
                                 listOfNotNull(it.panelText(), it.waitingText()).joinToString(" "), MessageKind.WARNING,
                                 // A phone keeps the words on the whole width, with Handle on the line under them (user, 2026-11-02).
@@ -377,6 +414,7 @@ fun BoxScope.TableDetailsModal(
                     hasOrder = hasOrder,
                     isMergedGroup = isMergedGroup,
                     isSaving = isSaving,
+                    rights = rights,
                     onSeatCustomers = {
                         if (table.state == TableVisualState.HoldEnding) startFromBooking()
                         mode = DetailMode.GUEST_COUNT
@@ -628,7 +666,8 @@ private enum class ClashAction(val label: String, val icon: ImageVector) {
 
 // What can be done about the booking, the best first (user, 2026-11-01). A move that can't happen drops out, so Give more
 // time leads when no free table fits.
-private fun clashActions(state: TableVisualState, clash: TableClash, canMoveBooking: Boolean, canMoveGuests: Boolean): List<ClashAction> {
+private fun clashActions(state: TableVisualState, clash: TableClash, canMoveBooking: Boolean, canMoveGuests: Boolean,
+                         rights: TableRights = TableRights()): List<ClashAction> {
     val wanted = when {
         state == TableVisualState.Paid -> listOf(ClashAction.SET_FREE, ClashAction.MOVE_BOOKING)
         state == TableVisualState.BillPending -> listOf(ClashAction.PAY, ClashAction.MOVE_BOOKING, ClashAction.MORE_TIME)
@@ -640,7 +679,9 @@ private fun clashActions(state: TableVisualState, clash: TableClash, canMoveBook
         when (action) {
             ClashAction.MOVE_BOOKING -> canMoveBooking
             ClashAction.MOVE_GUESTS -> canMoveGuests
-            ClashAction.MORE_TIME -> clash.moreTime.isNotEmpty()
+            ClashAction.SET_FREE, ClashAction.BOOKING_WAITS -> rights.seat
+            ClashAction.PAY -> rights.pay
+            ClashAction.MORE_TIME -> rights.seat && clash.moreTime.isNotEmpty()
             else -> true
         }
     }
@@ -715,6 +756,7 @@ private fun ActionList(
     hasOrder: Boolean,
     isMergedGroup: Boolean,
     isSaving: Boolean,
+    rights: TableRights,
     onSeatCustomers: () -> Unit,
     onSeatReservation: () -> Unit,
     onChangeGuestCount: () -> Unit,
@@ -734,12 +776,13 @@ private fun ActionList(
         when (table.state) {
             // A late booking's table is still free to seat (its guests, or others once the hold ends).
             TableVisualState.Free, TableVisualState.HoldEnding -> {
-                DialogActionButton(
+                if (rights.seat) DialogActionButton(
                     text = "Seat customers", icon = Icons.Filled.Groups,
                     modifier = Modifier.fillMaxWidth().height(50.dp), dark = true,
                     onClick = onSeatCustomers
                 )
-                if (isMergedGroup) {
+                if (!rights.move) Unit
+                else if (isMergedGroup) {
                     MergedGroupButtons(isSaving, onSeparateTables, onJoinTables)
                 } else {
                     DialogActionButton(
@@ -753,14 +796,14 @@ private fun ActionList(
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     onClick = onViewBooking
                 )
-                DialogActionButton(
+                if (rights.seat) DialogActionButton(
                     text = "Mark unavailable", icon = Icons.Filled.Block,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     onClick = onMarkUnavailable
                 )
             }
             TableVisualState.Reserved -> {
-                DialogActionButton(
+                if (rights.seat && rights.seatBookings) DialogActionButton(
                     text = "Seat reservation", icon = Icons.Filled.Groups,
                     modifier = Modifier.fillMaxWidth().height(50.dp), dark = true,
                     onClick = onSeatReservation
@@ -770,7 +813,8 @@ private fun ActionList(
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     onClick = onViewBooking
                 )
-                if (isMergedGroup) {
+                if (!rights.move) Unit
+                else if (isMergedGroup) {
                     MergedGroupButtons(isSaving, onSeparateTables, onJoinTables)
                 } else {
                     DialogActionButton(
@@ -783,7 +827,7 @@ private fun ActionList(
             TableVisualState.Occupied, TableVisualState.Ordered, TableVisualState.BillPending -> {
                 // Nothing ordered yet: it stays Start order and opens that same order (user, 2026-11-01).
                 val emptyOrder = hasOrder && table.state == TableVisualState.Occupied
-                DialogActionButton(
+                if (if (hasOrder) rights.seeOrders else rights.startOrder) DialogActionButton(
                     text = if (hasOrder && !emptyOrder) "View order" else "Start order",
                     icon = Icons.Filled.List,
                     modifier = Modifier.fillMaxWidth().height(50.dp), dark = !clashShown,
@@ -798,12 +842,12 @@ private fun ActionList(
                 // An orange table's order has no dishes, so there's no bill yet.
                 if (hasOrder && table.state != TableVisualState.Occupied) {
                     if (table.state == TableVisualState.BillPending) {
-                        if (!clashShown) DialogActionButton(
+                        if (!clashShown && rights.pay) DialogActionButton(
                             text = "Pay", icon = Icons.Filled.Payments,
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             onClick = onGoToPayment
                         )
-                    } else {
+                    } else if (rights.requestBill) {
                         DialogActionButton(
                             text = "Request bill", icon = Icons.AutoMirrored.Filled.ReceiptLong,
                             modifier = Modifier.fillMaxWidth().height(50.dp), isLoading = isSaving,
@@ -811,18 +855,18 @@ private fun ActionList(
                         )
                     }
                 }
-                DialogActionButton(
+                if (rights.seat) DialogActionButton(
                     text = "Change guest count", icon = Icons.Filled.Groups,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     onClick = onChangeGuestCount
                 )
-                if (!clashShown) DialogActionButton(
+                if (!clashShown && rights.move) DialogActionButton(
                     text = "Move guests", icon = Icons.Filled.SyncAlt,
                     modifier = Modifier.fillMaxWidth().height(50.dp), isLoading = isSaving,
                     onClick = onMoveGuests
                 )
                 // Seated but nothing ordered: they may decide not to stay. An order with no dishes ends with it (server).
-                if (table.state == TableVisualState.Occupied) DialogActionButton(
+                if (table.state == TableVisualState.Occupied && rights.seat) DialogActionButton(
                     text = "Set free", icon = Icons.Filled.CheckCircle,
                     modifier = Modifier.fillMaxWidth().height(50.dp), isLoading = isSaving,
                     onClick = onSetFree
@@ -830,7 +874,8 @@ private fun ActionList(
                 // Close as unpaid is done in the order, not from the table (user, 2026-11-01).
                 // A table whose bill was requested joins nothing.
                 val canJoin = table.state != TableVisualState.BillPending
-                if (isMergedGroup) {
+                if (!rights.move) Unit
+                else if (isMergedGroup) {
                     MergedGroupButtons(isSaving, onSeparateTables, onJoinTables, canMergeNew = canJoin)
                 } else if (canJoin) {
                     DialogActionButton(
@@ -841,19 +886,19 @@ private fun ActionList(
                 }
             }
             TableVisualState.Paid -> {
-                if (!clashShown) DialogActionButton(
+                if (!clashShown && rights.seat) DialogActionButton(
                     text = "Set free", icon = Icons.Filled.CheckCircle,
                     modifier = Modifier.fillMaxWidth().height(50.dp), dark = true, isLoading = isSaving,
                     onClick = onSetFree
                 )
-                if (hasOrder) DialogActionButton(
+                if (hasOrder && rights.seeOrders) DialogActionButton(
                     text = "View order", icon = Icons.Filled.List,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     onClick = onViewOrder
                 )
             }
             TableVisualState.Unavailable -> {
-                DialogActionButton(
+                if (rights.seat) DialogActionButton(
                     text = "Mark available", icon = Icons.Filled.CheckCircle,
                     modifier = Modifier.fillMaxWidth().height(50.dp), dark = true, isLoading = isSaving,
                     onClick = onMarkAvailable

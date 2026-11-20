@@ -47,7 +47,7 @@ public class MenuController {
     private final MenuWaiterViewService menuWaiterViewService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "List menus with pagination and optional filters")
     public ResponseEntity<PageResponse<MenuViewResponse>> getMenus(
             Authentication authentication,
@@ -74,7 +74,7 @@ public class MenuController {
     }
 
     @GetMapping("/available-now")
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "The menus the till offers right now (scheduled for this day and time; only the event menu on a special-menu-only event night)")
     public ResponseEntity<PageResponse<MenuViewResponse>> getMenusAvailableNow(
             Authentication authentication,
@@ -96,7 +96,7 @@ public class MenuController {
     }
 
     @GetMapping("/waiter-view")
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "Which menus waiters see: special menus only, or the chosen menus")
     public ResponseEntity<MenuWaiterViewResponse> getWaiterView(
             Authentication authentication,
@@ -127,7 +127,7 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}")
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "Get one menu by id")
     public ResponseEntity<MenuViewResponse> getMenu(
             Authentication authentication,

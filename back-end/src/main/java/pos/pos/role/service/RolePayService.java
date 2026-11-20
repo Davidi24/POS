@@ -128,8 +128,8 @@ public class RolePayService {
     }
 
     /**
-     * Each person's pay in [restaurantId]: paid when any of their active roles is, in the team of their highest paid role
-     * (a manager who also waits tables is paid as a manager). People without a role aren't paid.
+     * Each person's pay in [restaurantId]: their highest role decides (user, 2026-11-19): paid when it's a paid role, in its
+     * team; an admin who also has Waiter and Kitchen isn't paid as a waiter. People without a role aren't paid.
      */
     @Transactional(readOnly = true)
     public Map<UUID, Pay> peoplePay(UUID restaurantId, Collection<UUID> userIds) {
@@ -144,9 +144,8 @@ public class RolePayService {
         for (Object[] row : rows) {
             UUID userId = (UUID) row[0];
             Pay pay = rolePay.get(((Role) row[1]).getId());
-            // Rows come highest rank first: the first paid role decides the team.
-            if (pay.paid() && (!people.containsKey(userId) || !people.get(userId).paid())) people.put(userId, pay);
-            else people.putIfAbsent(userId, new Pay(false, pay.team()));
+            // Rows come highest rank first: the first one decides.
+            people.putIfAbsent(userId, pay.paid() ? pay : new Pay(false, pay.team()));
         }
         return people;
     }

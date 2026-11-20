@@ -34,7 +34,7 @@ public class DishRecipeController {
     private final DishRecipeService dishRecipeService;
 
     @GetMapping("/sections/{sectionId}/items/{itemId}/recipe")
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "The dish's ingredients from stock and what one portion costs")
     public ResponseEntity<DishRecipeResponse> getRecipe(
             @PathVariable UUID menuId,

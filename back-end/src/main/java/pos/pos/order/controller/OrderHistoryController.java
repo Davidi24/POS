@@ -14,7 +14,7 @@ import java.util.UUID;
 public class OrderHistoryController {
     private final OrderHistoryService service;
     @GetMapping
-    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @PreAuthorize("hasAnyAuthority('ORDER_HISTORY_READ', 'REPORTS_READ', 'STATS_SALES_READ')")
     public OrderHistoryPage history(@PathVariable UUID restaurantId, @PathVariable UUID branchId,
             @RequestParam(required=false) OffsetDateTime from, @RequestParam(required=false) OffsetDateTime to,
             @RequestParam(required=false) OrderStatus status, @RequestParam(required=false) UUID customerId,

@@ -352,12 +352,12 @@ internal fun HoursAndPay(
                 PeriodControls(size, period, from, to, anchor, { anchor = it }, today, loading, { reload++ }, m)
             }
             // Inside a team its own header holds the month, so the people get the room (user, 2026-10-31).
-            if (teamKey == null || !state.canManage) SalaryHeader(size, periodControls, loading) { reload++ }
+            if (teamKey == null || !state.canManagePay) SalaryHeader(size, periodControls, loading) { reload++ }
             else TeamHeader(team, members, people.size, showing != null, currency, size, onBack = { openTeam(null, PayShow.ALL) },
                 chosen, canPick = pickable.isNotEmpty(), onPay = { payingPicked = true }, periodControls, loading) { reload++ }
             when {
-                !state.canManage -> Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) {
-                    OverviewEmpty("Managers only", "Salaries need the “Manage Shifts” permission.", Icons.Outlined.Lock)
+                !state.canManagePay -> Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) {
+                    OverviewEmpty("Owners only", "Salaries need the “Manage Salary” permission.", Icons.Outlined.Lock)
                 }
                 showing == null && !loading && error != null -> Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) {
                     OverviewEmpty("Couldn't load pay", "Check the connection, then try again.", Icons.Outlined.CloudOff)

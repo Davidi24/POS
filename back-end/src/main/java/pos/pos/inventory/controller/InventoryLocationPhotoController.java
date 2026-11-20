@@ -28,7 +28,7 @@ public class InventoryLocationPhotoController {
     private final InventoryLocationPhotoService photoService;
 
     @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_PLACES')")
     @Operation(summary = "The place's own picture (PNG, JPEG or WebP, up to 5 MB); replaces the old one")
     public ResponseEntity<InventoryLocationResponse> uploadPhoto(@PathVariable UUID restaurantId, @PathVariable UUID locationId,
                                                              @RequestPart("file") MultipartFile file, Authentication authentication) {
@@ -36,7 +36,7 @@ public class InventoryLocationPhotoController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_PLACES')")
     @Operation(summary = "Remove the place's own picture (back to its icon)")
     public ResponseEntity<InventoryLocationResponse> removePhoto(@PathVariable UUID restaurantId, @PathVariable UUID locationId,
                                                              Authentication authentication) {

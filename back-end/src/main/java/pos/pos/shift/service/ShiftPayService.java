@@ -42,7 +42,8 @@ public class ShiftPayService {
 
     @Transactional(readOnly = true)
     public PayReport pay(Authentication auth, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to, boolean mine) {
-        require(auth, mine ? "SHIFT_SELF" : "SHIFT_MANAGE");
+        // Salary is its own permission since 2026-11-19 (user: not for admins by default); your own pay needs only My shift.
+        require(auth, mine ? "SHIFT_PAY_SELF" : "SALARY_MANAGE");
         Branch branch = scope.requireAccessibleBranch(auth, restaurantId, branchId);
         if (from == null || to == null || to.isBefore(from) || to.isAfter(from.plusDays(MAX_DAYS - 1))) bad("Choose a date range of up to " + MAX_DAYS + " days.");
         UUID actor = scope.currentUserId(auth);
@@ -113,7 +114,7 @@ public class ShiftPayService {
     }
 
     public PayRate setRate(Authentication auth, UUID restaurantId, UUID branchId, UUID userId, PayRate request) {
-        require(auth, "SHIFT_MANAGE");
+        require(auth, "SALARY_MANAGE");
         Branch branch = scope.requireAccessibleBranch(auth, restaurantId, branchId);
         User user = em.find(User.class, userId);
         if (user == null || user.getDeletedAt() != null || !Objects.equals(user.getRestaurantId(), restaurantId)) bad("Choose a staff member of this restaurant.");
@@ -139,10 +140,10 @@ public class ShiftPayService {
     private static BigDecimal wages(long minutes, BigDecimal rate) {
         return rate == null ? null : rate.multiply(BigDecimal.valueOf(minutes)).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
     }
-    private static String name(User u) { return (Objects.toString(u.getFirstName(), "") + " " + Objects.toString(u.getLastName(), "")).trim(); }
+    private static String name(User u) { return pos.pos.user.support.PersonName.of(u); }
     private static boolean has(Authentication auth, String permission) { return auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals(permission)); }
     private static void require(Authentication auth, String permission) {
-        if (!has(auth, permission) && !has(auth, "SHIFT_MANAGE")) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to see this pay.");
+        if (!has(auth, permission) && !has(auth, "SALARY_MANAGE")) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to see this pay.");
     }
     private static void bad(String message) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message); }
 }

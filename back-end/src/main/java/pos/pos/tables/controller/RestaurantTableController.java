@@ -45,7 +45,7 @@ public class RestaurantTableController {
     private final TableLayoutChangeNotifier layoutChangeNotifier;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'TABLES_READ')")
     @Operation(summary = "List branch tables")
     public ResponseEntity<List<TableResponse>> getTables(
             @PathVariable UUID restaurantId,
@@ -56,7 +56,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Create a branch table")
     public ResponseEntity<TableResponse> createTable(
             @PathVariable UUID restaurantId,
@@ -75,7 +75,7 @@ public class RestaurantTableController {
     }
 
     @GetMapping("/{tableId}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'TABLES_READ')")
     @Operation(summary = "Get one branch table")
     public ResponseEntity<TableResponse> getTable(
             @PathVariable UUID restaurantId,
@@ -87,7 +87,7 @@ public class RestaurantTableController {
     }
 
     @PutMapping("/{tableId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Replace a branch table")
     public ResponseEntity<TableResponse> updateTable(
             @PathVariable UUID restaurantId,
@@ -108,7 +108,7 @@ public class RestaurantTableController {
     }
 
     @PatchMapping("/{tableId}/status")
-    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_UPDATE')")
     @Operation(summary = "Update a branch table status")
     public ResponseEntity<TableResponse> updateTableStatus(
             @PathVariable UUID restaurantId,
@@ -129,7 +129,7 @@ public class RestaurantTableController {
     }
 
     @PatchMapping("/{tableId}/position")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Update a branch table position")
     public ResponseEntity<TableResponse> updateTablePosition(
             @PathVariable UUID restaurantId,
@@ -150,7 +150,7 @@ public class RestaurantTableController {
     }
 
     @PatchMapping("/{tableId}/qr-code")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Update a branch table QR code value")
     public ResponseEntity<TableResponse> updateTableQrCode(
             @PathVariable UUID restaurantId,
@@ -163,7 +163,7 @@ public class RestaurantTableController {
     }
 
     @DeleteMapping("/{tableId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Delete a branch table")
     public ResponseEntity<Void> deleteTable(
             @PathVariable UUID restaurantId,
@@ -177,7 +177,7 @@ public class RestaurantTableController {
     }
 
     @GetMapping("/availability")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'TABLES_READ')")
     @Operation(summary = "List table availability for a requested window")
     public ResponseEntity<List<TableAvailabilityResponse>> getTableAvailability(
             @PathVariable UUID restaurantId,
@@ -191,7 +191,7 @@ public class RestaurantTableController {
     }
 
     @GetMapping("/available")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'TABLES_READ')")
     @Operation(summary = "List available tables for a requested window")
     public ResponseEntity<List<TableAvailabilityResponse>> getAvailableTables(
             @PathVariable UUID restaurantId,
@@ -205,7 +205,7 @@ public class RestaurantTableController {
     }
 
     @GetMapping("/{tableId}/availability")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'TABLES_READ')")
     @Operation(summary = "Get one table availability for a requested window")
     public ResponseEntity<TableAvailabilityResponse> getTableAvailability(
             @PathVariable UUID restaurantId,
@@ -220,7 +220,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping("/{tableId}/block")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Block a branch table")
     public ResponseEntity<TableResponse> blockTable(
             @PathVariable UUID restaurantId,
@@ -232,7 +232,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping("/{tableId}/unblock")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Unblock a branch table")
     public ResponseEntity<TableResponse> unblockTable(
             @PathVariable UUID restaurantId,
@@ -244,7 +244,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping("/{tableId}/mark-clean")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Mark a branch table as clean")
     public ResponseEntity<TableResponse> markTableClean(
             @PathVariable UUID restaurantId,
@@ -256,7 +256,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping("/{tableId}/mark-dirty")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Mark a branch table as dirty")
     public ResponseEntity<TableResponse> markTableDirty(
             @PathVariable UUID restaurantId,
@@ -268,7 +268,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping("/{tableId}/merge")
-    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_UPDATE')")
     @Operation(summary = "Merge child tables into a primary table")
     public ResponseEntity<TableResponse> mergeTable(
             @PathVariable UUID restaurantId,
@@ -289,7 +289,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping("/{tableId}/unmerge-tables")
-    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_UPDATE')")
     @Operation(summary = "Take some tables out of a merged group; they become free and one table keeps the guests and order")
     public ResponseEntity<TableResponse> unmergeTables(
             @PathVariable UUID restaurantId,
@@ -305,7 +305,7 @@ public class RestaurantTableController {
     }
 
     @PostMapping("/{tableId}/unmerge")
-    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_UPDATE')")
     @Operation(summary = "Unmerge a child table or all child tables from a primary table")
     public ResponseEntity<TableResponse> unmergeTable(
             @PathVariable UUID restaurantId,

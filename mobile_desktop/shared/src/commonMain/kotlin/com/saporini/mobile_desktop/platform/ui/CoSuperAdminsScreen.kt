@@ -49,6 +49,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
+import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Key
@@ -162,18 +164,29 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         BackArrow("Back to the restaurants", onBack)
                         Column(Modifier.weight(1f)) {
-                            Text("Co-Super-Admins", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (narrow) 18.sp else 21.sp, color = Kit.Ink)
+                            Text("Admins", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (narrow) 18.sp else 21.sp, color = Kit.Ink)
                             Text(
-                                if (state.loaded && state.people.isNotEmpty()) "${state.people.size} ${if (state.people.size == 1) "person helps" else "people help"} you run the restaurants"
-                                else "People who help you run the restaurants",
+                                if (state.view == "SUPPORT") "Support admins take care of the restaurants you give them"
+                                else "Restaurant admins are made by an owner and work only in that restaurant",
                                 fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted
                             )
                         }
                         RefreshButton(state.loading, model::refresh)
-                        if (state.allowed && state.people.isNotEmpty()) {
-                            KitButton(if (narrow) "Add" else "Add Co-Super-Admin", model::startAdd, icon = Icons.Outlined.PersonAdd, enabled = !state.saving)
+                        if (state.allowed && state.people.isNotEmpty() && state.view == "SUPPORT") {
+                            KitButton(if (narrow) "Add" else "Add support admin", model::startAdd, icon = Icons.Outlined.PersonAdd, enabled = !state.saving)
                         }
                     }
+                }
+                // Support admins (made by you) | Restaurant admins (made by an owner), user 2026-11-19.
+                if (state.allowed) item(key = "views") {
+                    val restaurantAdmins = state.cards.count { it.kind == "RESTAURANT" }
+                    val support = "Support admins · ${state.people.size}"
+                    val restaurant = "Restaurant admins · $restaurantAdmins"
+                    com.saporini.mobile_desktop.core.components.OverviewTabs(
+                        listOf(support, restaurant),
+                        if (state.view == "SUPPORT") support else restaurant,
+                        { option -> model.showView(if (option == support) "SUPPORT" else "RESTAURANT") }
+                    )
                 }
                 when {
                     !state.allowed -> item(key = "denied") {
@@ -185,13 +198,30 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
                     !state.loaded && state.error != null -> item(key = "failed") {
                         PageState(PageStateKind.FAILED, action = { RetryText(onClick = model::refresh) })
                     }
+                    state.view == "RESTAURANT" -> {
+                        val list = state.cards.filter { it.kind == "RESTAURANT" }
+                        if (list.isEmpty()) item(key = "no-restaurant-admins") {
+                            Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
+                                OverviewEmpty("No restaurant admins", "Owners add admins for their own restaurant in Admin Hub → Users.", Icons.Outlined.AdminPanelSettings)
+                            }
+                        } else item(key = "restaurant-admins") {
+                            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
+                                Column {
+                                    list.forEachIndexed { index, admin ->
+                                        if (index > 0) KitDivider(Modifier.padding(horizontal = 18.dp))
+                                        RestaurantAdminRow(admin)
+                                    }
+                                }
+                            }
+                        }
+                    }
                     state.people.isEmpty() -> item(key = "empty") {
                         Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
                             OverviewEmpty(
-                                "No Co-Super-Admins yet",
-                                "Add someone to help you run the restaurants. They can do only what you allow.",
+                                "No support admins yet",
+                                "Add someone to take care of restaurants for you. They work only in the restaurants you give them.",
                                 Icons.Outlined.AdminPanelSettings,
-                                action = { KitButton("Add Co-Super-Admin", model::startAdd, icon = Icons.Outlined.PersonAdd) }
+                                action = { KitButton("Add support admin", model::startAdd, icon = Icons.Outlined.PersonAdd) }
                             )
                         }
                     }
@@ -208,7 +238,7 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
                         }
                         item(key = "rules") {
                             Text(
-                                "They can do only what you allow. They never see or change you, and they remove only people they added themselves.",
+                                "They work only in the restaurants you give them and do only what you allow. They never see or change you, remove owners only when you allow it, and remove only people they added themselves.",
                                 Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                                 fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted
                             )
@@ -220,9 +250,10 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
     }
     state.draft?.let { AddDialog(it, state, model) }
     state.ticks?.let { PermissionsDialog(it, model) }
+    state.access?.let { AccessDialog(it, model) }
     state.confirmRemove?.let { person ->
         ConfirmDialog("Remove ${person.displayName}?",
-            "They can no longer sign in or manage any restaurant. People and changes they made stay. To stop them for a while, switch them off instead.",
+            "They can no longer sign in or take care of any restaurant. People and changes they made stay. To stop them for a while, switch them off instead.",
             "Remove", onConfirm = model::confirmRemove, onDismiss = model::dismissRemove, danger = true)
     }
 }
@@ -255,6 +286,19 @@ private fun PersonRow(person: StaffUserDto, state: CoSuperAdminsState, model: Co
             Text(person.displayName, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Kit.Ink,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(person.email, fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Which restaurants they take care of.
+            val card = state.cards.firstOrNull { it.id == person.id }
+            Text(
+                when {
+                    card == null -> ""
+                    card.allRestaurants -> "All restaurants"
+                    card.restaurants.isEmpty() -> "No restaurants yet"
+                    card.restaurants.size <= 2 -> card.restaurants.joinToString(", ") { it.name }
+                    else -> "${card.restaurants.size} restaurants"
+                } + if (card?.mayRemoveOwners == true) " · may remove owners" else "",
+                fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp,
+                color = if (card != null && !card.allRestaurants && card.restaurants.isEmpty()) Kit.Amber else Kit.Blue, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
         }
         if (!narrow) {
             Text(
@@ -271,6 +315,7 @@ private fun PersonRow(person: StaffUserDto, state: CoSuperAdminsState, model: Co
             Text(statusText, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Kit.Ink, maxLines = 1)
         }
         RowActionsMenu(listOf(
+            RowAction("Restaurants", Icons.Outlined.Storefront) { model.openAccess(person) },
             RowAction("What they can do", Icons.Outlined.Tune) { model.openPermissions(person) },
             if (person.isActive) RowAction("Switch off", Icons.Outlined.PersonOff) { model.setPersonActive(person, false) }
             else RowAction("Switch on", Icons.Outlined.Person) { model.setPersonActive(person, true) },
@@ -284,7 +329,7 @@ private fun PersonRow(person: StaffUserDto, state: CoSuperAdminsState, model: Co
 private fun AddDialog(draft: NewCoSuperAdminDraft, state: CoSuperAdminsState, model: CoSuperAdminsScreenModel) {
     val problems = if (draft.showProblems) coSuperAdminProblems(draft) else emptyMap()
     AppDialog(
-        "Add a Co-Super-Admin", model::cancelAdd,
+        "Add a support admin", model::cancelAdd,
         subtitle = "They confirm their email, then sign in with this temporary password and choose their own.",
         busy = state.saving, maxWidth = 640.dp,
         buttons = {
@@ -452,4 +497,68 @@ private fun areaIcon(area: String): androidx.compose.ui.graphics.vector.ImageVec
     "Shifts and pay" -> Icons.Outlined.Schedule
     "Statistics and fraud" -> Icons.Outlined.Insights
     else -> Icons.Outlined.MoreHoriz
+}
+
+
+/** A restaurant's own admin (made by its owner): who, which restaurant, and whether they can sign in. View only. */
+@Composable
+private fun RestaurantAdminRow(admin: com.saporini.mobile_desktop.platform.AdminCardDto) {
+    val accent = accentOf(admin.id)
+    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(accent.soft), contentAlignment = Alignment.Center) {
+            Text(initialsOf(admin.name), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = accent.strong)
+        }
+        Column(Modifier.weight(1f)) {
+            Text(admin.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(admin.email.orEmpty(), fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            com.saporini.mobile_desktop.core.components.StatusChip("Restaurant admin", Kit.Green)
+            Text(admin.restaurants.firstOrNull()?.name.orEmpty(), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, maxLines = 1)
+        }
+        if (!admin.active) com.saporini.mobile_desktop.core.components.StatusChip("Switched off", Kit.Grey)
+    }
+}
+
+/** The restaurants a support admin takes care of: all of them, or the ones ticked; and whether they may remove owners. */
+@Composable
+private fun AccessDialog(editor: com.saporini.mobile_desktop.platform.AdminAccessEditor, model: CoSuperAdminsScreenModel) {
+    AppDialog(
+        "${editor.name}'s restaurants", model::closeAccess,
+        subtitle = "They see and work only in these restaurants.",
+        busy = editor.saving, maxWidth = 560.dp,
+        buttons = {
+            KitButton("Cancel", model::closeAccess, style = ButtonStyle.SECONDARY, enabled = !editor.saving)
+            KitButton("Save", model::saveAccess, icon = Icons.Outlined.Check, loading = editor.saving, enabled = !editor.loading)
+        }
+    ) {
+        editor.error?.let { MessageBar(it, MessageKind.ERROR) }
+        if (editor.loading) {
+            Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { CircularProgressIndicator(color = Kit.Green) }
+            return@AppDialog
+        }
+        com.saporini.mobile_desktop.core.components.SettingsRow("All restaurants", "Every restaurant, also the ones added later.", divider = false,
+            onClick = { model.editAccess { it.copy(allRestaurants = !it.allRestaurants) } }) {
+            com.saporini.mobile_desktop.core.components.SettingsSwitch(editor.allRestaurants, { v -> model.editAccess { it.copy(allRestaurants = v) } })
+        }
+        com.saporini.mobile_desktop.core.components.SettingsRow("May remove owners and co-owners", "Off: they can't remove a restaurant's owners or co-owners.",
+            onClick = { model.editAccess { it.copy(mayRemoveOwners = !it.mayRemoveOwners) } }) {
+            com.saporini.mobile_desktop.core.components.SettingsSwitch(editor.mayRemoveOwners, { v -> model.editAccess { it.copy(mayRemoveOwners = v) } })
+        }
+        if (!editor.allRestaurants) {
+            Text("${editor.chosen.size} of ${editor.restaurants.size} restaurants", Modifier.padding(top = 8.dp), fontFamily = Inter(),
+                fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Ink)
+            editor.restaurants.forEach { restaurant ->
+                val on = restaurant.id in editor.chosen
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(if (on) Kit.GreenSoft else Color.Transparent)
+                    .clickable { model.editAccess { it.copy(chosen = if (on) it.chosen - restaurant.id else it.chosen + restaurant.id) } }
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(if (on) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank, null, Modifier.size(19.dp), tint = if (on) Kit.Green else Kit.Faint)
+                    Text(restaurant.name, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.5.sp, color = Kit.Ink)
+                }
+            }
+        }
+    }
 }

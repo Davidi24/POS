@@ -190,7 +190,8 @@ abstract class AbstractSettingsIntegrationTest {
 
         userRoleRepository.save(UserRole.builder()
                 .userId(user.getId())
-                .roleId(role("ADMIN").getId())
+                // Payments, receipts, fraud checks and devices are owner-level since 2026-11-19, so these tests use a co-owner.
+                .roleId(role("CO_OWNER").getId())
                 .assignedBy(actorId)
                 .build());
 

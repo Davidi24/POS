@@ -242,7 +242,12 @@ public abstract class AbstractPosApiIntegrationTest {
     protected String login(String identifier) throws Exception {
         String cached = TOKENS.get(identifier);
         if (cached != null) {
-            return cached;
+            // Another test class may have ended this sign-in (more sign-ins than one person may keep, sign out
+            // everywhere): sign in again then, instead of failing with 401 depending on the order the classes run in.
+            int status = mockMvc.perform(MockMvcRequestBuilders.get("/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + cached))
+                    .andReturn().getResponse().getStatus();
+            if (status == 200) return cached;
+            TOKENS.remove(identifier);
         }
         MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/auth/web/login")
                         .header(HttpHeaders.USER_AGENT, "pos-it")

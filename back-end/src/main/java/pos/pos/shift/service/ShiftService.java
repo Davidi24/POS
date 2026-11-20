@@ -34,14 +34,16 @@ public class ShiftService {
     private final pos.pos.settings.repository.SettingsRepository settings;
     private final pos.pos.shift.repository.StaffPayRateRepository payRates;
     private final pos.pos.role.service.RolePayService rolePay;
+    private final pos.pos.role.scope.PermissionScopeService permissionScopes;
     private static final UUID NONE = new UUID(0, 0);
 
     @Transactional(readOnly=true)
     public Board board(Authentication auth, UUID restaurantId, UUID branchId, LocalDate from, LocalDate to, boolean mine) {
         // POS → My shift → Team: anyone with their own shifts may see who works (user, 2026-10-31), but only from last month to
         // next month and without other people's notes. Everyone working, or only their own role (Admin Hub → Settings → Shifts).
+        // Others' shifts are their own permission since 2026-11-20, for the roles chosen (PermissionScopeService).
         boolean teamOnly = !mine && !has(auth, "SHIFT_READ") && !has(auth, "SHIFT_MANAGE");
-        require(auth, mine || teamOnly ? "SHIFT_SELF" : "SHIFT_READ");
+        require(auth, mine ? "SHIFT_SELF" : teamOnly ? "SHIFT_TEAM" : "SHIFT_READ");
         Branch branch = scope.requireAccessibleBranch(auth, restaurantId, branchId);
         UUID actor = scope.currentUserId(auth);
         if (from == null || to == null || to.isBefore(from) || to.isAfter(from.plusDays(30))) bad("Choose a date range of up to 31 days.");
@@ -64,11 +66,10 @@ public class ShiftService {
             // Nothing about the super admin shows inside a restaurant.
             long platform = pos.pos.security.rbac.AppRole.CO_SUPER_ADMIN.rank();
             boolean platformViewer = ranks.getOrDefault(actor, 0L) >= platform;
-            Map<UUID, Set<String>> roles = new HashMap<>();
-            boolean ownRoleOnly = teamOnly && !settings.findByRestaurant_Id(restaurantId).map(pos.pos.settings.entity.Settings::isStaffSeeWholeTeam).orElse(true);
-            if (ownRoleOnly) shifts.roleNames(people).forEach(row -> roles.computeIfAbsent((UUID) row[0], ignored -> new HashSet<>()).add((String) row[1]));
+            Set<String> allowedRoles = teamOnly ? permissionScopes.allowed(actor, restaurantId, "SHIFT_TEAM") : null;
+            Map<UUID, Set<String>> roles = allowedRoles == null ? Map.of() : permissionScopes.roleTargetsOf(people);
             visible = id -> id.equals(actor) || ((platformViewer || ranks.getOrDefault(id, 0L) < platform)
-                    && (!ownRoleOnly || !Collections.disjoint(roles.getOrDefault(id, Set.of()), roles.getOrDefault(actor, Set.of()))));
+                    && (allowedRoles == null || !Collections.disjoint(roles.getOrDefault(id, Set.of()), allowedRoles)));
         }
         java.util.function.Predicate<UUID> canSee = visible;
         Shift current = has(auth, "SHIFT_SELF") ? shifts.findActive(actor).filter(s -> s.getBranch().getId().equals(branchId)).orElse(null) : null;
@@ -250,7 +251,7 @@ public class ShiftService {
         return new Item(s.getId(), s.getVersion(), s.getUser().getId(), name(s.getUser()), s.getStatus(), s.getScheduledStart(), s.getScheduledEnd(), s.getStartedAt(), s.getEndedAt(), workedMinutes(s, now), breakMinutes(s, now, false), s.getNotes(), s.getBreaks().stream().map(b -> new Break(b.getId(), b.getBreakType(), b.isPaid(), b.getStartedAt(), b.getEndedAt())).toList());
     }
     private static String snapshot(Shift s) { return "status=" + s.getStatus() + "; scheduled=" + s.getScheduledStart() + "/" + s.getScheduledEnd() + "; actual=" + s.getStartedAt() + "/" + s.getEndedAt() + "; user=" + s.getUser().getId() + "; notes=" + s.getNotes() + "; breaks=" + s.getBreaks().stream().map(b -> b.getId() + ":" + b.getBreakType() + ":" + b.isPaid() + ":" + b.getStartedAt() + "/" + b.getEndedAt()).toList(); }
-    private static String name(User u) { return (Objects.toString(u.getFirstName(), "") + " " + Objects.toString(u.getLastName(), "")).trim(); }
+    private static String name(User u) { return pos.pos.user.support.PersonName.of(u); }
     private static OffsetDateTime now() { return OffsetDateTime.now(ZoneOffset.UTC); }
     private static boolean has(Authentication auth, String permission) { return auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals(permission)); }
     private static void require(Authentication auth, String permission) { if (!has(auth, permission) && !has(auth, "SHIFT_MANAGE")) forbidden(); }

@@ -404,12 +404,8 @@ internal fun SettingsCategory.sections(): List<SettingsSection> = when (this) {
                 NumberField(G, "clockInEarlyMinutes", "Staff can clock in for a shift from", "min before", 0, 720, 15, "Before that, clocking in starts a shift that isn't planned")
             ),
             note = "Hourly wages and monthly salaries are set per person in Admin Hub → Salary."
-        ),
-        SettingsSection(
-            "Who works", listOf(
-                ToggleField(G, "staffSeeWholeTeam", "Staff see the whole team", "In POS → Shift → Team. Off: they see only people in their own role.")
-            )
         )
+        // "Staff see the whole team" is a permission since 2026-11-20: My shift → See others' shifts, for the roles chosen.
     )
     SettingsCategory.INVENTORY -> listOf(
         SettingsSection(

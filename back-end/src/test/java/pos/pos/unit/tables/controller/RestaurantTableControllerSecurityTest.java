@@ -113,7 +113,7 @@ class RestaurantTableControllerSecurityTest {
 
         mockMvc.perform(post("/restaurants/{restaurantId}/branches/{branchId}/tables", RESTAURANT_ID, BRANCH_ID)
                         .header("X-Test-User", "manager@pos.local")
-                        .header("X-Test-Authorities", "ROLE_MANAGER")
+                        .header("X-Test-Authorities", "ROLE_MANAGER,TABLES_LAYOUT")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isCreated());

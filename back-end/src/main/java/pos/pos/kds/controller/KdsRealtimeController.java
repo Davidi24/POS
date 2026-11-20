@@ -15,7 +15,7 @@ import java.util.UUID;
 public class KdsRealtimeController {
     private final OrderChangeNotifier changes;
     @GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasAnyAuthority('KDS_READ', 'ORDER_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.KDS_ANY_READ)
     public SseEmitter events(@PathVariable UUID restaurantId, @PathVariable UUID branchId, Authentication authentication) {
         // KDS workers need not have ORDER_READ. Both workspaces receive committed branch invalidations.
         return changes.subscribe(authentication, restaurantId, branchId);

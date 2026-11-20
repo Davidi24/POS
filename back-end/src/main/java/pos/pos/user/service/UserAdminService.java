@@ -68,6 +68,10 @@ public class UserAdminService {
     private final UserSessionRepository userSessionRepository;
     private final NotificationService notificationService;
     private final pos.pos.restaurant.repository.BranchRepository branchRepository;
+    private final pos.pos.role.repository.UserPermissionGrantRepository grantRepository;
+    private final pos.pos.role.repository.UserPermissionDenialRepository denialRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
+    private final pos.pos.auth.service.AccountAudit accountAudit;
 
     private pos.pos.user.repository.UsernameChangeRepository usernameChanges;
 
@@ -143,6 +147,7 @@ public class UserAdminService {
     @Transactional
     public UserResponse updateUser(Authentication authentication, UUID userId, UpdateUserRequest request) {
         User user = findExistingUser(userId);
+        if (Boolean.FALSE.equals(request.getIsActive())) assertMayRemove(authentication, userId);
         roleHierarchyService.assertCanManageUser(authentication, userId);
 
         String newNormalizedPhone = NormalizationUtils.normalizePhone(request.getPhone());
@@ -236,6 +241,15 @@ public class UserAdminService {
             userRoleRepository.saveAll(assignmentsToAdd);
         }
 
+        // A new role starts from what it gives (user, 2026-11-19): what was switched on or off for them alone is cleared.
+        // Not for platform roles, whose holders' limits are set one by one by the Super Admin.
+        boolean rolesChanged = !assignmentsToRemove.isEmpty() || !assignmentsToAdd.isEmpty();
+        boolean platform = requestedRoles.stream().anyMatch(role -> "SUPER_ADMIN".equals(role.getCode()) || "CO_SUPER_ADMIN".equals(role.getCode()));
+        if (rolesChanged && !platform) {
+            grantRepository.deleteAllByUserId(userId);
+            denialRepository.deleteAllByUserId(userId);
+        }
+
         User user = findExistingUser(userId);
         if (user.getRestaurantId() != null) {
             notificationService.publishUserRoleChange(user.getRestaurantId(), userId, actorId);
@@ -249,6 +263,7 @@ public class UserAdminService {
     @Transactional
     public void deleteUser(Authentication authentication, UUID userId) {
         User user = findExistingUser(userId);
+        assertMayRemove(authentication, userId);
         roleHierarchyService.assertCanManageUser(authentication, userId);
         // A Co-Super-Admin only removes people they added themselves.
         if (roleHierarchyService.isCoSuperAdmin(authentication) && !roleHierarchyService.isSuperAdmin(authentication)
@@ -256,14 +271,50 @@ public class UserAdminService {
             throw new AuthException("You can only remove people you added", HttpStatus.FORBIDDEN);
         }
 
+        remove(user, roleHierarchyService.currentUserId(authentication));
+    }
+
+    /** The Super Admin approved a restaurant's request to remove one of its owners (user, 2026-11-19). */
+    @Transactional
+    public void removeApprovedBySuperAdmin(UUID userId, UUID superAdminId) {
+        remove(findExistingUser(userId), superAdminId);
+    }
+
+    private void remove(User user, UUID actorId) {
+        UUID userId = user.getId();
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         user.setActive(false);
         user.setStatus(STATUS_DELETED);
         user.setDeletedAt(now);
-        user.setUpdatedBy(roleHierarchyService.currentUserId(authentication));
+        user.setUpdatedBy(actorId);
         userRepository.save(user);
 
-        revokeAllActiveSessions(userId);
+        // Signed out of every device at once (they see "Account switched off"); their planned shifts go with them, and what
+        // they did (orders, worked shifts, pay) stays (user, 2026-11-19).
+        userSessionRepository.revokeAllActiveSessionsByUserId(userId, now, SessionRevocationReason.USER_NOT_ALLOWED.name());
+        events.publishEvent(new pos.pos.user.event.UserRemovedEvent(userId, user.getRestaurantId(), actorId));
+        accountAudit.about(user, actorId, "USER_REMOVED",
+                pos.pos.i18n.Words.en("{} was removed from the staff and signed out everywhere", pos.pos.auth.service.AccountAudit.nameOf(user)));
+    }
+
+    /**
+     * Owners never remove each other (user, 2026-11-19): only the Super Admin removes an owner, after the restaurant asks.
+     * Co-owners are removed by owners. A support admin removes neither unless the Super Admin allowed it.
+     */
+    private void assertMayRemove(Authentication authentication, UUID targetUserId) {
+        Set<String> roles = roleRepository.findActiveRolesByUserId(targetUserId).stream().map(Role::getCode).collect(Collectors.toSet());
+        boolean owner = roles.contains("OWNER");
+        if (!owner && !roles.contains("CO_OWNER")) return;
+        if (roleHierarchyService.isSuperAdmin(authentication)) return;
+        if (roleHierarchyService.isCoSuperAdmin(authentication)) {
+            boolean allowed = userRepository.findById(roleHierarchyService.currentUserId(authentication))
+                    .map(User::isAdminMayRemoveOwners).orElse(false);
+            if (allowed) return;
+            throw new AuthException("The Super Admin hasn't allowed you to remove owners or co-owners.", HttpStatus.FORBIDDEN);
+        }
+        if (owner) {
+            throw new AuthException("An owner can't remove another owner. Ask the Super Admin from their menu.", HttpStatus.FORBIDDEN);
+        }
     }
 
     private User findExistingUser(UUID userId) {

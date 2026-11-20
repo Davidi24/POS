@@ -140,6 +140,24 @@ abstract class AbstractRoleIntegrationTest {
         userSessionRepository.deleteAllInBatch();
     }
 
+    @Autowired
+    protected pos.pos.role.repository.UserPermissionGrantRepository userPermissionGrantRepository;
+
+    /**
+     * An admin who may also manage roles. Admin no longer holds the role permissions (they're the owner's since
+     * 2026-11-19, given person by person), but these tests are about the role rules at Admin's rank.
+     */
+    protected User adminManagingRoles(String label) {
+        User user = createUser(label, role("ADMIN"));
+        for (String code : java.util.List.of("ROLES_CREATE", "ROLES_UPDATE", "ROLES_DELETE", "ROLES_ASSIGN_PERMISSIONS")) {
+            pos.pos.role.entity.UserPermissionGrant grant = new pos.pos.role.entity.UserPermissionGrant();
+            grant.setUserId(user.getId());
+            grant.setPermissionCode(code);
+            userPermissionGrantRepository.save(grant);
+        }
+        return user;
+    }
+
     protected User adminUser() {
         return userRepository.findByEmailAndDeletedAtIsNull(ADMIN_EMAIL).orElseThrow();
     }

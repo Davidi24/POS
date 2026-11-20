@@ -98,7 +98,7 @@ public class BranchOrderController {
     }
 
     @GetMapping("/orders/history")
-    @PreAuthorize("hasAuthority('ORDER_READ')")
+    @PreAuthorize("hasAnyAuthority('ORDER_HISTORY_READ', 'REPORTS_READ', 'STATS_SALES_READ')")
     @Operation(summary = "List branch order history")
     public ResponseEntity<List<OrderResponse>> getBranchHistory(
             @PathVariable UUID restaurantId,

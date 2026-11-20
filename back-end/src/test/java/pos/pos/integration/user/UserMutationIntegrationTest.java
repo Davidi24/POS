@@ -150,7 +150,7 @@ class UserMutationIntegrationTest extends AbstractUserIntegrationTest {
         assertThat(sessionsFor(target))
                 .allSatisfy(session -> {
                     assertThat(session.isRevoked()).isTrue();
-                    assertThat(session.getRevokedReason()).isEqualTo("SESSION_REVOKED");
+                    assertThat(session.getRevokedReason()).isEqualTo("USER_NOT_ALLOWED");
                 });
     }
 }

@@ -64,6 +64,14 @@ data class RolesState(
     // What the selected role has on the server, and what the editor shows (equal until something is ticked).
     val savedPermissionIds: Set<String> = emptySet(),
     val permissionIds: Set<String> = emptySet(),
+    // What was on under a permission switched off, brought back when it's switched on again (user, 2026-11-20).
+    val remembered: Map<String, Set<String>> = emptyMap(),
+    // Some floors / roles only (user, 2026-11-20): saved and shown; a permission missing is given for all of them.
+    val savedScopes: Map<String, List<String>> = emptyMap(),
+    val scopes: Map<String, List<String>> = emptyMap(),
+    val scopeChoices: ScopeChoicesDto = ScopeChoicesDto(),
+    // Goes up each time the role's permissions are saved: "Saved" plays (user, 2026-11-20).
+    val savedTick: Int = 0,
     val loading: Boolean = false,
     val loadingRole: Boolean = false,
     val saving: Boolean = false,
@@ -74,7 +82,7 @@ data class RolesState(
     val error: String? = null
 ) {
     val selected: RoleDto? get() = roles.firstOrNull { it.id == selectedId }
-    val dirty: Boolean get() = permissionIds != savedPermissionIds
+    val dirty: Boolean get() = permissionIds != savedPermissionIds || scopes != savedScopes
     private val codesById: Map<String, String> get() = catalog.associate { it.id to it.code }
 
     /** Built-in roles are fixed; custom roles can be changed by people who hold every permission they would give. */
@@ -94,9 +102,11 @@ data class RolesState(
         canSavePermissions(savedPermissionIds.mapNotNull { codesById[it] }.toSet(), myPermissions, superAdmin))
 
     /** The editor's ticks, grouped by area; a permission the signed-in person lacks can't be given. */
-    val groups: List<Pair<String, List<PermissionChoice>>> get() = permissionGroups(catalog.map {
-        PermissionChoice(it, it.id in permissionIds, superAdmin || it.code in myPermissions)
-    })
+    val groups: List<Pair<String, List<PermissionChoice>>> get() {
+        // What counts: a permission only with what it needs (PermissionTree, user 2026-11-19).
+        val on = PermissionTree(catalog).shown(permissionIds.mapNotNull { codesById[it] }.toSet())
+        return permissionGroups(catalog.map { PermissionChoice(it, it.code in on, superAdmin || it.code in myPermissions) })
+    }
 }
 
 /**
@@ -186,7 +196,8 @@ class RolesScreenModel(
     /** Shows [roleId]'s permissions. Unsaved ticks on the previous role are dropped. */
     fun select(roleId: String) {
         if (state.value.roles.none { it.id == roleId }) return
-        mutable.update { it.copy(selectedId = roleId, savedPermissionIds = emptySet(), permissionIds = emptySet(), error = null, notice = null) }
+        mutable.update { it.copy(selectedId = roleId, savedPermissionIds = emptySet(), permissionIds = emptySet(), remembered = emptyMap(),
+            savedScopes = emptyMap(), scopes = emptyMap(), error = null, notice = null) }
         loadRole(roleId)
     }
 
@@ -196,8 +207,11 @@ class RolesScreenModel(
         work.launch {
             try {
                 val granted = repository.rolePermissions(roleId).map { it.id }.toSet()
+                val scopes = runCatching { repository.roleScopes(roleId) }.getOrDefault(emptyMap())
+                val choices = state.value.restaurantId?.let { r -> runCatching { repository.scopeChoices(r) }.getOrNull() }
                 if (token == roleRevision && state.value.selectedId == roleId) {
-                    mutable.update { it.copy(savedPermissionIds = granted, permissionIds = granted) }
+                    mutable.update { it.copy(savedPermissionIds = granted, permissionIds = granted, remembered = emptyMap(),
+                        savedScopes = scopes, scopes = scopes, scopeChoices = choices ?: it.scopeChoices) }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -228,10 +242,25 @@ class RolesScreenModel(
         }
         val allowed = current.catalog.filter { it.id in ids && (current.superAdmin || it.code in current.myPermissions) }.map { it.id }
         if (allowed.isEmpty()) return
-        mutable.update { it.copy(permissionIds = if (on) it.permissionIds + allowed else it.permissionIds - allowed.toSet(), notice = null) }
+        // What a permission needs comes on with it, and what needs it goes off with it (user, 2026-11-19).
+        val idOf = current.catalog.associate { it.code to it.id }
+        val codeOf = current.catalog.associate { it.id to it.code }
+        val tree = PermissionTree(current.catalog)
+        mutable.update { state ->
+            val switched = tree.switchRemembering(state.permissionIds.mapNotNull { codeOf[it] }.toSet(), allowed.mapNotNull { codeOf[it] }, on,
+                { code -> state.superAdmin || code in state.myPermissions }, state.remembered)
+            state.copy(permissionIds = switched.codes.mapNotNull { idOf[it] }.toSet(), remembered = switched.remembered, notice = null)
+        }
     }
 
-    fun discardChanges() = mutable.update { it.copy(permissionIds = it.savedPermissionIds) }
+    /** Gives [code] for these floors / roles only; an empty list or all of them = everything. */
+    fun setScope(code: String, targets: List<String>) = mutable.update { state ->
+        if (!state.canEditPermissions()) return@update state
+        // The editor sends nothing for "all of them" (ScopeSection works out the shortest list: branch, floor or places).
+        state.copy(scopes = if (targets.isEmpty()) state.scopes - code else state.scopes + (code to targets.sorted()), notice = null)
+    }
+
+    fun discardChanges() = mutable.update { it.copy(permissionIds = it.savedPermissionIds, scopes = it.savedScopes, remembered = emptyMap()) }
 
     fun savePermissions() {
         val current = state.value
@@ -242,10 +271,14 @@ class RolesScreenModel(
             return
         }
         val ids = current.permissionIds
+        val scopes = current.scopes
+        val scopesChanged = scopes != current.savedScopes
         write(onStale = { loadRole(roleId) }) {
             val saved = repository.replacePermissions(roleId, ids.sorted()).map { it.id }.toSet()
+            val savedScopes = if (scopesChanged) repository.saveRoleScopes(roleId, scopes) else scopes
             mutable.update {
-                if (it.selectedId == roleId) it.copy(savedPermissionIds = saved, permissionIds = saved, notice = "Permissions saved") else it
+                if (it.selectedId == roleId) it.copy(savedPermissionIds = saved, permissionIds = saved, savedScopes = savedScopes, scopes = savedScopes,
+                    remembered = emptyMap(), savedTick = it.savedTick + 1) else it
             }
         }
     }

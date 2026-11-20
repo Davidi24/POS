@@ -273,7 +273,7 @@ class KdsScreenModel(
         val entry = state.value.menu.items.find { it.item.id == itemId }
         if (entry == null) { actionProblem("Refresh the menu and choose a dish."); return null }
         if (entry.item.available == available) return null
-        return mutate("menu:$itemId", "MENUS_UPDATE", "Dish availability updated.") { s, token ->
+        return mutate("menu:$itemId", "MENUS_SOLD_OUT", "Dish availability updated.") { s, token ->
             val saved = menuRepository.availability(entry, available); require(saved.id == itemId)
             if (current(token, s)) mutable.update { it.copy(menu = it.menu.copy(items = it.menu.items.map { row -> if (row.item.id == itemId) row.copy(item = saved) else row })) }
         }
