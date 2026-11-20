@@ -15,7 +15,7 @@ Read the step's file before working on it, keep its sections and "Done" up to da
 
 ## Where we are
 
-**Now: step 2, [Languages](02-languages.md), built; PR open to `develop`, waiting for your merge.** Keep this list up to date as each part is finished (user, 2026-11-18:
+**Now: step 3, [Users & roles](03-users-and-roles.md): screens agreed, development under way.** Keep this list up to date as each part is finished (user, 2026-11-18:
 "check boxes so I know what I have left and where I am").
 
 - [x] 1. [Sign-in & accounts](01-sign-in-and-accounts.md): built and merged (#100, #101); its hard testing list is written.
@@ -25,19 +25,49 @@ Read the step's file before working on it, keep its sections and "Done" up to da
   - [ ] Waiting on outside things: the phone app's server address (no domain yet), real email on the deployed server, phone confirmation by SMS
   - [ ] Your decisions in [decide-later.md](decide-later.md)
   - [ ] Hard testing (later, when you say)
-- [ ] 2. [Languages](02-languages.md) ← **now**
+- [x] 2. [Languages](02-languages.md): built and merged (#102), with amounts in another currency; its hard testing list is written.
   - [x] Decisions
-  - [x] Screens (waiting for your look)
+  - [x] Screens
   - [x] Development (numbers and money in each language's style left for [decide-later.md](decide-later.md))
   - [x] Hard testing list written
-  - [ ] Merged
+  - [x] Merged
   - [ ] Native speakers check the translations (later)
   - [ ] Hard testing (later, when you say)
-- [ ] 3. [Users & roles](03-users-and-roles.md)
+- [ ] 3. [Users & roles](03-users-and-roles.md) ← **now**
+  - [x] Decisions
+  - [x] Screens
+  - [x] Development (the other workspaces' permissions decided later: to do in the step file)
+  - [x] Hard testing list written
+  - [ ] Merged
+  - [ ] Hard testing (later, when you say)
 - [ ] 4. [Restaurant & branches (plus opening hours)](04-restaurant-and-branches.md)
+  - [ ] Decisions
+  - [ ] Screens
+  - [ ] Development
+  - [ ] Hard testing list written
+  - [ ] Merged
+  - [ ] Hard testing (later, when you say)
 - [ ] 5. [Settings](05-settings.md)
+  - [ ] Decisions
+  - [ ] Screens
+  - [ ] Development
+  - [ ] Hard testing list written
+  - [ ] Merged
+  - [ ] Hard testing (later, when you say)
 - [ ] 6. [Devices & printing](06-devices-and-printing.md)
+  - [ ] Decisions
+  - [ ] Screens
+  - [ ] Development
+  - [ ] Hard testing list written
+  - [ ] Merged
+  - [ ] Hard testing (later, when you say)
 - [ ] 7. [Notifications](07-notifications.md)
+  - [ ] Decisions
+  - [ ] Screens
+  - [ ] Development
+  - [ ] Hard testing list written
+  - [ ] Merged
+  - [ ] Hard testing (later, when you say)
 - [ ] 8. [Shifts](08-shifts.md)
 - [ ] 9. [Inventory](09-inventory.md)
 - [ ] 10. [Suppliers](10-suppliers.md)

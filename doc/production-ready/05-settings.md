@@ -14,19 +14,20 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 - Each later step checks that its own settings are actually used.
 
 ## Known gaps
-- Online booking page is empty ("coming later").
+- [ ] Online booking page is empty ("coming later").
 
 ## Decisions to take
-- What Online booking holds, or hide it until the booking website step.
+- [ ] What Online booking holds, or hide it until the booking website step. **(your call)**
 
 ## 1. Screens
-- To agree with the user when this step starts (mock data where the server isn't ready).
+- [ ] Agree the screens with the user when this step starts (mock data where the server isn't ready).
 
 ## 2. Development (the feature complete, no tests)
-- Starts after the user approves the screens.
+- [ ] The feature complete, after the user approves the screens.
 
 ## 3. Hard testing list (run later, when the user says)
-- To write once development is done.
+- [ ] Written once development is done.
+- [ ] Run (later, when the user says).
 
 ## Done
 - Nothing yet.

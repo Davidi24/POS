@@ -11,20 +11,22 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 - The owner changes contact details, addresses, logo, colours and receipt texts; only super admins change name, legal name, code, status, tax profiles and branches.
 
 ## Known gaps
-- Opening hours and special days exist on the server but the app doesn't show or use them (Statistics guesses closed days from the sales).
+- [ ] Opening hours and special days exist on the server but the app doesn't show or use them (Statistics guesses closed days from the sales).
 
 ## To do in this step
-- A quick re-check of what was finished.
-- Opening hours and special days: where they're set, and used by Statistics (and later by bookings).
+- [ ] A quick re-check of what was finished.
+- [ ] Opening hours and special days: where they're set, and used by Statistics (and later by bookings).
+- [ ] Today's exchange rate filled in when a restaurant's currency is changed. **(your call)** → [decide-later.md](decide-later.md) step 4
 
 ## 1. Screens
-- To agree with the user when this step starts (mock data where the server isn't ready).
+- [ ] Agree the screens with the user when this step starts (mock data where the server isn't ready).
 
 ## 2. Development (the feature complete, no tests)
-- Starts after the user approves the screens.
+- [ ] The feature complete, after the user approves the screens.
 
 ## 3. Hard testing list (run later, when the user says)
-- To write once development is done.
+- [ ] Written once development is done.
+- [ ] Run (later, when the user says).
 
 ## Done
 - Nothing yet.
