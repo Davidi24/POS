@@ -34,11 +34,38 @@ public class RestaurantTableLayoutService {
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantTableSupport restaurantTableSupport;
     private final TableSeatingRules tableSeatingRules;
+    private final pos.pos.role.scope.PermissionScopeService permissionScopes;
 
     @Transactional(readOnly = true)
     public TableLayoutResponse getTableLayout(Authentication authentication, UUID restaurantId, UUID branchId) {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
-        return buildLayoutResponse(restaurantId, branchId);
+        return onlyAllowedFloors(authentication, restaurantId, branchId, buildLayoutResponse(restaurantId, branchId));
+    }
+
+    /**
+     * "See tables" can be given for some floors only (user, 2026-11-20: "the floors it can access, it doesn't mean it can
+     * access all"): the others and their tables are left out.
+     */
+    private TableLayoutResponse onlyAllowedFloors(Authentication authentication, UUID restaurantId, UUID branchId, TableLayoutResponse layout) {
+        java.util.Set<String> allowed = allowedFloors(authentication, restaurantId);
+        if (allowed == null || layout == null) return layout;
+        // A whole branch, a whole floor or single places (user, 2026-11-20: "branches, floors or places, as subgroups").
+        java.util.Map<UUID, UUID> placeOf = new java.util.HashMap<>();
+        restaurantTableSupport.loadBranchTables(restaurantId, branchId).tables().forEach(t ->
+                { if (t.getCategory() != null) placeOf.put(t.getId(), t.getCategory().getId()); });
+        if (layout.getTables() != null) layout.setTables(layout.getTables().stream()
+                .filter(t -> pos.pos.role.scope.PermissionScopeService.tableAllowed(allowed, branchId, t.getFloor(), placeOf.get(t.getTableId())))
+                .toList());
+        java.util.Set<String> floorsWithTables = new java.util.HashSet<>();
+        if (layout.getTables() != null) layout.getTables().forEach(t -> floorsWithTables.add(t.getFloor()));
+        if (layout.getFloors() != null) layout.setFloors(layout.getFloors().stream()
+                .filter(f -> floorsWithTables.contains(f.getName()) || pos.pos.role.scope.PermissionScopeService.tableAllowed(allowed, branchId, f.getName(), null))
+                .toList());
+        return layout;
+    }
+
+    private java.util.Set<String> allowedFloors(Authentication authentication, UUID restaurantId) {
+        return permissionScopes.allowed(restaurantScopeService.currentUserId(authentication), restaurantId, "TABLES_READ");
     }
 
     @Transactional
@@ -89,7 +116,14 @@ public class RestaurantTableLayoutService {
     public List<FloorSummaryResponse> getFloors(Authentication authentication, UUID restaurantId, UUID branchId) {
         restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
         BranchTableSnapshot snapshot = restaurantTableSupport.loadBranchTables(restaurantId, branchId);
-        return restaurantTableSupport.summarizeFloors(snapshot.tables());
+        java.util.Set<String> allowed = allowedFloors(authentication, restaurantId);
+        if (allowed == null) return restaurantTableSupport.summarizeFloors(snapshot.tables());
+        java.util.Set<String> shown = new java.util.HashSet<>();
+        snapshot.tables().forEach(t -> {
+            if (pos.pos.role.scope.PermissionScopeService.tableAllowed(allowed, branchId, t.getFloor(), t.getCategory() == null ? null : t.getCategory().getId()))
+                shown.add(t.getFloor());
+        });
+        return restaurantTableSupport.summarizeFloors(snapshot.tables()).stream().filter(f -> shown.contains(f.getName())).toList();
     }
 
     @Transactional
@@ -115,6 +149,7 @@ public class RestaurantTableLayoutService {
         }
 
         restaurantTableSupport.saveTables(changedTables);
+        renameMap.forEach((from, to) -> permissionScopes.renameFloor(restaurantId, branchId, from, to));
         return restaurantTableSupport.summarizeFloors(snapshot.tables());
     }
 

@@ -133,10 +133,12 @@ class KitchenAndShiftsIntegrationTest extends AbstractPosApiIntegrationTest {
         User manager = staff(world, "manager", "MANAGER");
         String waiterToken = token(waiter);
         String managerToken = token(manager);
+        // Salary is the owner's since 2026-11-19 (SALARY_MANAGE); a co-owner sees and sets pay.
+        String payToken = token(staff(world, "coowner", "CO_OWNER"));
 
-        put(SHIFTS + "/pay-rates/{u}", r, b, waiter.getId()).as(managerToken).body(Map.of("hourlyRate", new BigDecimal("12.50"))).expect(200);
+        put(SHIFTS + "/pay-rates/{u}", r, b, waiter.getId()).as(payToken).body(Map.of("hourlyRate", new BigDecimal("12.50"))).expect(200);
         put(SHIFTS + "/pay-rates/{u}", r, b, waiter.getId()).as(waiterToken).body(Map.of("hourlyRate", new BigDecimal("99"))).expect(403);
-        put(SHIFTS + "/pay-rates/{u}", r, b, waiter.getId()).as(managerToken).body(Map.of("hourlyRate", new BigDecimal("10000000.01"))).expect(400);
+        put(SHIFTS + "/pay-rates/{u}", r, b, waiter.getId()).as(payToken).body(Map.of("hourlyRate", new BigDecimal("10000000.01"))).expect(400);
 
         JsonNode shift = post(SHIFTS + "/clock-in", r, b).as(waiterToken).body(Map.of()).expect(200);
         UUID shiftId = id(shift);
@@ -162,7 +164,7 @@ class KitchenAndShiftsIntegrationTest extends AbstractPosApiIntegrationTest {
         assertThat(money(me, "hourlyRate")).isEqualByComparingTo("12.50");
         assertThat(money(me, "tips")).isEqualByComparingTo("1.00");
         get(SHIFTS + "/pay", r, b).as(waiterToken).param("from", today).param("to", today).param("mine", false).expect(403);
-        get(SHIFTS + "/pay", r, b).as(managerToken).param("from", today.minusDays(70)).param("to", today).param("mine", false).expect(400);
+        get(SHIFTS + "/pay", r, b).as(payToken).param("from", today.minusDays(70)).param("to", today).param("mine", false).expect(400);
 
         JsonNode mySales = get("/restaurants/{r}/branches/{b}/sales/mine", r, b).as(waiterToken).param("date", today).expect(200);
         JsonNode totals = mySales.get("currencies").get(0);
@@ -183,9 +185,9 @@ class KitchenAndShiftsIntegrationTest extends AbstractPosApiIntegrationTest {
         assertThat(shiftSales.get("currencies").get(0).get("paymentCount").asInt()).isEqualTo(1);
         assertThat(get("/restaurants/{r}/branches/{b}/sales/mine", r, b).as(waiterToken)
                 .param("date", today.plusDays(1)).param("shiftId", shiftId).send().status()).isEqualTo(400);
-        JsonNode managerView = get("/restaurants/{r}/branches/{b}/sales/mine", r, b).as(managerToken)
-                .param("date", today).param("staffId", waiter.getId()).expect(200);
-        assertThat(money(managerView.get("currencies").get(0), "collected")).isEqualByComparingTo("7.00");
+        // My Sales shows only one's own sales (user, 2026-11-20), managers too.
+        get("/restaurants/{r}/branches/{b}/sales/mine", r, b).as(managerToken)
+                .param("date", today).param("staffId", waiter.getId()).expect(403);
         get("/restaurants/{r}/branches/{b}/sales/mine", r, b).as(waiterToken)
                 .param("date", today).param("staffId", manager.getId()).expect(403);
     }
@@ -202,6 +204,8 @@ class KitchenAndShiftsIntegrationTest extends AbstractPosApiIntegrationTest {
         User manager = staff(world, "manager", "MANAGER");
         String waiterToken = token(waiter);
         String managerToken = token(manager);
+        // Salary is the owner's since 2026-11-19 (SALARY_MANAGE); a co-owner sees and sets pay.
+        String payToken = token(staff(world, "coowner", "CO_OWNER"));
 
         JsonNode order = order(world, waiterToken, Map.of(soup, 1));
         JsonNode paid = post("/restaurants/{r}/orders/{o}/payments", r, id(order)).as(waiterToken)
@@ -223,7 +227,7 @@ class KitchenAndShiftsIntegrationTest extends AbstractPosApiIntegrationTest {
                 .as(managerToken).body(Map.of("amount", new BigDecimal("7.00"), "reason", "Refunded bill and tip")).expect(200);
 
         LocalDate today = LocalDate.now(ZoneId.of("Europe/Rome"));
-        JsonNode report = get(SHIFTS + "/pay", r, b).as(managerToken)
+        JsonNode report = get(SHIFTS + "/pay", r, b).as(payToken)
                 .param("from", today.minusDays(1)).param("to", today.plusDays(1)).param("mine", false).expect(200);
         JsonNode waiterPay = null;
         for (JsonNode staffPay : report.get("staff")) {

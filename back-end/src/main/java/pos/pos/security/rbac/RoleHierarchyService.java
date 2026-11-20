@@ -54,10 +54,22 @@ public class RoleHierarchyService {
         }
 
         long actorRank = highestActiveRank(currentUserId(authentication));
-        return roleRepository.findAssignableRolesForActorRank(actorRank).stream()
+        List<Role> roles = new java.util.ArrayList<>(roleRepository.findAssignableRolesForActorRank(actorRank).stream()
                 .filter(role -> visibleTo(authentication, role))
                 .filter(role -> meetsRoleFloor(authentication, actorRank, role))
-                .toList();
+                .toList());
+        // An owner may add another owner (user, 2026-11-19), with a warning in the app; the role is protected otherwise.
+        if (hasRole(authentication, AppRole.OWNER.name())) {
+            roleRepository.findByCode(AppRole.OWNER.name()).filter(Role::isActive)
+                    .filter(owner -> roles.stream().noneMatch(role -> role.getId().equals(owner.getId())))
+                    .ifPresent(owner -> roles.add(0, owner));
+        }
+        return roles;
+    }
+
+    /** Whether the signed-in person holds role [code]. */
+    public boolean hasRole(Authentication authentication, String code) {
+        return authentication != null && authentication.getAuthorities().stream().anyMatch(a -> ("ROLE_" + code).equals(a.getAuthority()));
     }
 
     // it takes the rank of the user role, and it checks the role that he wants to access is it below it rank
@@ -73,6 +85,10 @@ public class RoleHierarchyService {
             return;
         }
 
+        // An owner may make another person an owner of their restaurant (user, 2026-11-19).
+        if (AppRole.OWNER.name().equals(targetRole.getCode()) && hasRole(authentication, AppRole.OWNER.name())) {
+            return;
+        }
         long actorRank = highestActiveRank(currentUserId(authentication));
         // Roles below your own, and your own level too (a manager may add another manager, then manages them).
         if (!visibleTo(authentication, targetRole)

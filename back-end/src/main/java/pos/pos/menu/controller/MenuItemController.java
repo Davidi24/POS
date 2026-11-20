@@ -40,7 +40,7 @@ public class MenuItemController {
     private final pos.pos.menu.service.MenuItemImportService menuItemImportService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "List items for one section")
     public ResponseEntity<List<MenuItemSummaryResponse>> getItems(
             Authentication authentication,
@@ -61,7 +61,7 @@ public class MenuItemController {
     }
 
     @GetMapping("/{itemId}")
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "Get one item scoped to its section")
     public ResponseEntity<MenuItemSummaryResponse> getItem(
             Authentication authentication,
@@ -121,7 +121,7 @@ public class MenuItemController {
     }
 
     @PatchMapping("/{itemId}/availability")
-    @PreAuthorize("hasAuthority('MENUS_UPDATE')")
+    @PreAuthorize("hasAuthority('MENUS_SOLD_OUT')")
     @Operation(summary = "Update only the availability of an item")
     public ResponseEntity<MenuItemSummaryResponse> updateItemAvailability(
             Authentication authentication,

@@ -26,7 +26,8 @@ public final class EffectivePermissions {
         Set<String> codes = forRoles(permissions, restaurantId, roleIds);
         codes.removeAll(Set.copyOf(permissions.findDeniedCodesByUserId(userId)));
         codes.addAll(permissions.findGrantedCodesByUserId(userId));
-        return List.copyOf(codes);
+        // Starting and cancelling an order come with "Edit orders" (2026-11-20).
+        return List.copyOf(pos.pos.security.rbac.PermissionTree.withBundles(codes));
     }
 
     /**

@@ -38,7 +38,7 @@ public class SubRecipeController {
     private final SubRecipeService subRecipeService;
 
     @GetMapping("/choices")
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "What a sub-recipe can be made with: stock items and other sub-recipes, with unit costs")
     public List<IngredientChoiceResponse> choices(
             @PathVariable UUID restaurantId,
@@ -49,14 +49,14 @@ public class SubRecipeController {
     }
 
     @GetMapping("/{recipeId}")
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "A sub-recipe with its item, ingredients and cost")
     public SubRecipeResponse get(@PathVariable UUID restaurantId, @PathVariable UUID recipeId, Authentication authentication) {
         return subRecipeService.get(authentication, restaurantId, recipeId);
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_ITEMS_CREATE')")
     @Operation(summary = "Create a sub-recipe: its item and its recipe with every ingredient")
     @ApiResponse(responseCode = "201", description = "Sub-recipe created")
     public ResponseEntity<SubRecipeResponse> create(
@@ -68,7 +68,7 @@ public class SubRecipeController {
     }
 
     @PutMapping("/{recipeId}")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_ITEMS_UPDATE')")
     @Operation(summary = "Change a sub-recipe as a whole: name, kind, batch, ingredients, in use or not")
     public SubRecipeResponse update(
             @PathVariable UUID restaurantId,

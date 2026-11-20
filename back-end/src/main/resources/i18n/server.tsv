@@ -164,6 +164,10 @@ the restaurant	il ristorante	el restaurante	restoranti
 See you soon,	A presto,	Hasta pronto,	Shihemi së shpejti,
 Phone: {}	Telefono: {}	Teléfono: {}	Telefoni: {}
 Email: {}	Email: {}	Correo: {}	Email: {}
+{} was removed from the staff and signed out everywhere	{} è stato rimosso dal personale e disconnesso ovunque	{} fue eliminado del personal y se cerró su sesión en todas partes	{} u hoq nga stafi dhe doli nga të gjitha pajisjet
+{} (removed)	{} (rimosso)	{} (eliminado)	{} (i hequr)
+Choose what you ask for	Scegli cosa chiedi	Elige lo que pides	Zgjidh çfarë kërkon
+Invalid schema	Invalid schema	Invalid schema	Invalid schema
 Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}
 SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding
 Super admin username is already used by another account: {}	Super admin username is already used by another account: {}	Super admin username is already used by another account: {}	Super admin username is already used by another account: {}
@@ -193,6 +197,7 @@ First name must be at most 100 characters	Il nome può avere al massimo 100 cara
 Your last name is needed	Serve il tuo cognome	Se necesita tu apellido	Duhet mbiemri yt
 Last name must be at most 100 characters	Il cognome può avere al massimo 100 caratteri	El apellido puede tener como máximo 100 caracteres	Mbiemri mund të ketë deri në 100 karaktere
 The invitation could not be sent. Try again.	Impossibile inviare l'invito. Riprova.	No se pudo enviar la invitación. Inténtalo de nuevo.	Ftesa nuk u dërgua. Provo përsëri.
+Add the restaurant's owner first.	Aggiungi prima il proprietario del ristorante.	Agrega primero al dueño del restaurante.	Shto fillimisht pronarin e restorantit.
 Restaurant not found	Ristorante non trovato	Restaurante no encontrado	Restoranti nuk u gjet
 Only staff of a restaurant can add people to it	Solo il personale di un ristorante può aggiungervi persone	Solo el personal de un restaurante puede agregarle personas	Vetëm stafi i një restoranti mund të shtojë njerëz në të
 You can only add people to your own restaurant	Puoi aggiungere persone solo al tuo ristorante	Solo puedes agregar personas a tu propio restaurante	Mund të shtosh njerëz vetëm në restorantin tënd
@@ -240,7 +245,6 @@ Assigned user must belong to the same restaurant as the device	L'utente assegnat
 Device assignment update violates a data constraint	L'aggiornamento dell'assegnazione viola un vincolo dei dati	La actualización de la asignación infringe una regla de datos	Përditësimi i caktimit shkel një rregull të të dhënave
 Device pairing token update violates a data constraint	L'aggiornamento del codice di associazione viola un vincolo dei dati	La actualización del código de vinculación infringe una regla de datos	Përditësimi i kodit të lidhjes shkel një rregull të të dhënave
 Pairing token is invalid or expired	Il codice di associazione non è valido o è scaduto	El código de vinculación no es válido o expiró	Kodi i lidhjes është i pavlefshëm ose ka skaduar
-Invalid schema	Invalid schema	Invalid schema	Invalid schema
 Give the place a name	Dai un nome al luogo	Ponle un nombre al lugar	Jepi një emër vendit
 Write the supplier's name	Scrivi il nome del fornitore	Escribe el nombre del proveedor	Shkruaj emrin e furnitorit
 A sale stock source requires its restaurant, branch, item, and location	Una fonte di magazzino per la vendita richiede ristorante, sede, articolo e luogo	Una fuente de inventario de venta necesita su restaurante, sucursal, artículo y lugar	Një burim stoku për shitje kërkon restorantin, pikën, artikullin dhe vendin
@@ -313,6 +317,7 @@ Color must be at most 20 characters	Il colore può avere al massimo 20 caratteri
 Name must be at most 120 characters	Il nome può avere al massimo 120 caratteri	El nombre puede tener como máximo 120 caracteres	Emri mund të ketë deri në 120 karaktere
 Not a menu photo key	Not a menu photo key	Not a menu photo key	Not a menu photo key
 Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set	Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set	Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set	Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set
+Changing prices needs “Change prices”.	Per cambiare i prezzi serve “Modificare i prezzi”.	Para cambiar precios se necesita “Cambiar precios”.	Për të ndryshuar çmimet duhet “Ndrysho çmimet”.
 This dish's recipe is used inside {}. Remove it there first (Admin Hub → Inventory → Preparations).	La ricetta di questo piatto è usata in {}. Prima toglila da lì (Admin Hub → Magazzino → Preparazioni).	La receta de este plato se usa en {}. Quítala de ahí primero (Admin Hub → Inventario → Preparaciones).	Receta e kësaj pjate përdoret te {}. Hiqe së pari prej andej (Admin Hub → Stoku → Përgatitjet).
 Choose a stock item or a preparation for each ingredient	Scegli un articolo di magazzino o un semilavorato per ogni ingrediente	Elige un artículo de inventario o una preparación para cada ingrediente	Zgjidh një artikull stoku ose një përgatitje për çdo përbërës
 One of the ingredients is no longer a stock item. Refresh and try again.	Uno degli ingredienti non è più un articolo di magazzino. Aggiorna e riprova.	Uno de los ingredientes ya no es un artículo de inventario. Actualiza e inténtalo de nuevo.	Një nga përbërësit nuk është më artikull stoku. Rifresko dhe provo përsëri.
@@ -563,13 +568,217 @@ Choose a Salary team	Scegli un team degli stipendi	Elige un equipo de salarios	Z
 Permission code is required	Permission code is required	Permission code is required	Permission code is required
 Permission id is required	Permission id is required	Permission id is required	Permission id is required
 Say whether the role is paid	Indica se il ruolo è pagato	Indica si el rol se paga	Thuaj nëse roli paguhet
+Open this restaurant first	Apri prima questo ristorante	Abre primero este restaurante	Hap fillimisht këtë restorant
+Role not found	Ruolo non trovato	Rol no encontrado	Roli nuk u gjet
+Open a restaurant first	Prima apri un ristorante	Primero abre un restaurante	Hap së pari një restorant
+Person not found	Persona non trovata	Persona no encontrada	Personi nuk u gjet
+This person works in no restaurant	Questa persona non lavora in nessun ristorante	Esta persona no trabaja en ningún restaurante	Ky person nuk punon në asnjë restorant
+This permission is given for everything	Questo permesso vale per tutto	Este permiso se da para todo	Kjo leje jepet për gjithçka
+Too many choices	Troppe scelte	Demasiadas opciones	Shumë zgjedhje
+Choose from the restaurant's own floors and roles	Scegli tra i piani e i ruoli del ristorante	Elige entre los pisos y roles del restaurante	Zgjidh nga katet dhe rolet e restorantit
 Only the Super Admin can change a Co-Super-Admin's permissions	Solo il Super Admin può cambiare i permessi di un Co-Super-Admin	Solo el Super Admin puede cambiar los permisos de un Co-Super-Admin	Vetëm Super Admini mund të ndryshojë lejet e një Co-Super-Admini
 This person is not a Co-Super-Admin	Questa persona non è un Co-Super-Admin	Esta persona no es Co-Super-Admin	Ky person nuk është Co-Super-Admin
-Open a restaurant first	Prima apri un ristorante	Primero abre un restaurante	Hap së pari një restorant
 System roles cannot be modified	I ruoli di sistema non si possono modificare	Los roles del sistema no se pueden modificar	Rolet e sistemit nuk mund të ndryshohen
+You can only see your own sales	Puoi vedere solo le tue vendite	Solo puedes ver tus propias ventas	Mund të shikosh vetëm shitjet e tua
 Staff member belongs to another branch	Il membro del personale appartiene a un'altra sede	El miembro del personal pertenece a otra sucursal	Anëtari i stafit i përket një pike tjetër
 Shift does not belong to this staff member and branch	Il turno non appartiene a questo membro del personale e a questa sede	El turno no pertenece a este miembro del personal y sucursal	Turni nuk i përket këtij anëtari të stafit dhe kësaj pike
 You do not have permission to view these sales	Non hai il permesso di vedere queste vendite	No tienes permiso para ver estas ventas	Nuk ke leje për të parë këto shitje
+See tables	Vedere i tavoli	Ver las mesas	Shiko tavolinat
+The floor plan, on the floors chosen for them	La pianta, sui piani scelti per lui	El plano, en los pisos elegidos para esa persona	Plani, në katet e zgjedhura për të
+Change tables	Modificare i tavoli	Cambiar mesas	Ndrysho tavolinat
+Seat guests, set tables free or out of use, move guests and join tables	Far accomodare gli ospiti, liberare i tavoli o metterli fuori uso, spostare gli ospiti e unire i tavoli	Sentar comensales, liberar mesas o dejarlas fuera de uso, mover comensales y unir mesas	Ul mysafirët, liro tavolinat ose nxirri jashtë përdorimit, lëviz mysafirët dhe bashko tavolinat
+Take payments	Incassare	Cobrar	Merr pagesa
+Request the bill and take the payment from a table	Chiedere il conto e incassare da un tavolo	Pedir la cuenta y cobrar desde una mesa	Kërko faturën dhe merr pagesën nga një tavolinë
+Edit the floor plan	Modificare la pianta	Editar el plano	Ndrysho planin
+Add, move and remove tables, floors and places	Aggiungere, spostare e togliere tavoli, piani e zone	Agregar, mover y quitar mesas, pisos y zonas	Shto, lëviz dhe hiq tavolina, kate dhe zona
+See orders	Vedere gli ordini	Ver los pedidos	Shiko porositë
+The open orders and what's on them	Gli ordini aperti e cosa contengono	Los pedidos abiertos y lo que llevan	Porositë e hapura dhe çfarë kanë
+Edit orders	Modificare gli ordini	Editar pedidos	Ndrysho porositë
+Start orders, add and remove dishes, notes, send to the kitchen, serve, cancel unpaid-for orders	Aprire ordini, aggiungere e togliere piatti, note, inviare in cucina, servire, annullare ordini non pagati	Abrir pedidos, agregar y quitar platos, notas, enviar a cocina, servir, cancelar pedidos sin pagar	Hap porosi, shto dhe hiq pjata, shënime, dërgo në kuzhinë, shërbe, anulo porosi të papaguara
+Start orders	Aprire ordini	Abrir pedidos	Hap porosi
+Start an order on a table or without one	Aprire un ordine su un tavolo o senza tavolo	Abrir un pedido en una mesa o sin mesa	Hap një porosi në një tavolinë ose pa tavolinë
+Cancel orders	Annullare ordini	Cancelar pedidos	Anulo porosi
+Cancel an order nothing was paid on	Annullare un ordine su cui non è stato pagato niente	Cancelar un pedido en el que no se pagó nada	Anulo një porosi për të cilën s'është paguar asgjë
+Request the bill and take the payment for an order	Chiedere il conto e incassare un ordine	Pedir la cuenta y cobrar un pedido	Kërko faturën dhe merr pagesën e një porosie
+Close an order whose guests left without paying	Chiudere un ordine i cui ospiti sono andati via senza pagare	Cerrar un pedido cuyos comensales se fueron sin pagar	Mbyll një porosi mysafirët e së cilës ikën pa paguar
+Void what was sent	Stornare ciò che è stato inviato	Anular lo enviado	Storno atë që u dërgua
+Void orders or dishes the kitchen already has	Stornare ordini o piatti che la cucina ha già	Anular pedidos o platos que la cocina ya tiene	Storno porosi ose pjata që i ka kuzhina
+Move orders to another table	Spostare ordini su un altro tavolo	Mover pedidos a otra mesa	Lëviz porositë në një tavolinë tjetër
+Move an order to another table	Spostare un ordine su un altro tavolo	Mover un pedido a otra mesa	Lëviz një porosi në një tavolinë tjetër
+Give discounts	Fare sconti	Dar descuentos	Bëj zbritje
+Take money off a dish or a whole order	Togliere soldi da un piatto o da tutto l'ordine	Descontar dinero de un plato o de todo el pedido	Ul çmimin e një pjate ose të gjithë porosisë
+Where every order is in the kitchen	A che punto è ogni ordine in cucina	En qué punto está cada pedido en la cocina	Ku është çdo porosi në kuzhinë
+See reservations	Vedere le prenotazioni	Ver las reservas	Shiko rezervimet
+Bookings, the overview and free tables for walk-ins	Prenotazioni, panoramica e tavoli liberi per chi arriva senza prenotazione	Reservas, el resumen y mesas libres para clientes sin reserva	Rezervime, përmbledhja dhe tavolina të lira për ata pa rezervim
+Make and change bookings	Fare e modificare prenotazioni	Hacer y cambiar reservas	Bëj dhe ndrysho rezervime
+Book, change time, guests, notes and table, confirm attendance, check in and seat	Prenotare, cambiare ora, ospiti, note e tavolo, confermare la presenza, registrare l'arrivo e far accomodare	Reservar, cambiar hora, comensales, notas y mesa, confirmar asistencia, registrar llegada y sentar	Rezervo, ndrysho orën, mysafirët, shënimet dhe tavolinën, konfirmo ardhjen, regjistro hyrjen dhe ul
+Cancel bookings	Annullare prenotazioni	Cancelar reservas	Anulo rezervime
+Cancel a booking or mark a no-show	Annullare una prenotazione o segnare una mancata presentazione	Cancelar una reserva o marcar que no se presentó	Anulo një rezervim ose shëno mosparaqitje
+Approve bookings	Approvare prenotazioni	Aprobar reservas	Mirato rezervime
+Accept or decline booking requests and move bookings to other tables	Accettare o rifiutare richieste di prenotazione e spostare prenotazioni su altri tavoli	Aceptar o rechazar solicitudes de reserva y mover reservas a otras mesas	Prano ose refuzo kërkesat për rezervim dhe lëviz rezervimet në tavolina të tjera
+Fix past bookings	Correggere prenotazioni passate	Corregir reservas pasadas	Korrigjo rezervime të kaluara
+Correct bookings after the time limits or from an earlier day, with a reason	Correggere prenotazioni oltre i limiti di tempo o di un giorno precedente, con un motivo	Corregir reservas pasado el tiempo límite o de un día anterior, con un motivo	Korrigjo rezervime pas afateve ose nga një ditë më parë, me një arsye
+Give goodwill refunds	Fare rimborsi di cortesia	Dar reembolsos de cortesía	Bëj rimbursime mirëbesimi
+Give back part of money the restaurant kept, like a late cancel's deposit	Restituire parte dei soldi trattenuti dal ristorante, come il deposito di una disdetta tardiva	Devolver parte del dinero que se quedó el restaurante, como el depósito de una cancelación tardía	Kthe një pjesë të parave që mbajti restoranti, si depozitën e një anulimi të vonë
+See the menu	Vedere il menù	Ver el menú	Shiko menunë
+Menus, sections, dishes and their prices	Menù, sezioni, piatti e prezzi	Menús, secciones, platos y sus precios	Menu, seksione, pjata dhe çmimet e tyre
+Mark sold out	Segnare esaurito	Marcar agotado	Shëno të mbaruar
+Mark a dish or an option sold out and available again	Segnare un piatto o un'opzione come esaurito e di nuovo disponibile	Marcar un plato o una opción como agotado y disponible de nuevo	Shëno një pjatë ose opsion si të mbaruar dhe sërish në dispozicion
+Add dishes and menus	Aggiungere piatti e menù	Agregar platos y menús	Shto pjata dhe menu
+Add menus, sections, dishes, variants and options	Aggiungere menù, sezioni, piatti, varianti e opzioni	Agregar menús, secciones, platos, variantes y opciones	Shto menu, seksione, pjata, variante dhe opsione
+Change dishes and menus	Modificare piatti e menù	Cambiar platos y menús	Ndrysho pjata dhe menu
+Change dishes, photos, ingredients, the order and what waiters see, not prices	Modificare piatti, foto, ingredienti, l'ordine e cosa vedono i camerieri, non i prezzi	Cambiar platos, fotos, ingredientes, el orden y lo que ven los meseros, no los precios	Ndrysho pjatat, fotot, përbërësit, renditjen dhe çfarë shohin kamarierët, jo çmimet
+Change prices	Modificare i prezzi	Cambiar precios	Ndrysho çmimet
+Change the price of dishes, variants and options	Modificare il prezzo di piatti, varianti e opzioni	Cambiar el precio de platos, variantes y opciones	Ndrysho çmimin e pjatave, varianteve dhe opsioneve
+Delete dishes and menus	Eliminare piatti e menù	Eliminar platos y menús	Fshi pjata dhe menu
+Delete menus, sections, dishes, variants and options	Eliminare menù, sezioni, piatti, varianti e opzioni	Eliminar menús, secciones, platos, variantes y opciones	Fshi menu, seksione, pjata, variante dhe opsione
+See My Sales	Vedere Le mie vendite	Ver Mis ventas	Shiko Shitjet e mia
+Their own sales and tips	Le proprie vendite e mance	Sus propias ventas y propinas	Shitjet dhe bakshishet e veta
+See history	Vedere lo storico	Ver el historial	Shiko historikun
+Closed, cancelled and unpaid orders, their bills, printed again	Ordini chiusi, annullati e non pagati, i loro conti, ristampati	Pedidos cerrados, cancelados y no pagados, sus cuentas, impresas de nuevo	Porosi të mbyllura, të anuluara dhe të papaguara, faturat e tyre, të printuara sërish
+Reopen an unpaid order to take its payment	Riaprire un ordine non pagato per incassarlo	Reabrir un pedido no pagado para cobrarlo	Rihap një porosi të papaguar për ta paguar
+Reopen orders	Riaprire ordini	Reabrir pedidos	Rihap porosi
+Reopen a closed order	Riaprire un ordine chiuso	Reabrir un pedido cerrado	Rihap një porosi të mbyllur
+Refund payments	Rimborsare pagamenti	Reembolsar pagos	Rimburso pagesa
+Give money back on a paid order, with a reason	Restituire denaro su un ordine pagato, con un motivo	Devolver dinero de un pedido pagado, con un motivo	Kthe para për një porosi të paguar, me një arsye
+See what changed on orders	Vedere cosa è cambiato negli ordini	Ver qué cambió en los pedidos	Shiko çfarë ndryshoi në porosi
+Every change made to an order, by whom and when	Ogni modifica a un ordine, chi l'ha fatta e quando	Cada cambio en un pedido, quién lo hizo y cuándo	Çdo ndryshim në një porosi, kush e bëri dhe kur
+Their own shifts: clock in and out, take breaks	I propri turni: timbrare entrata e uscita, fare pause	Sus propios turnos: fichar entrada y salida, tomar descansos	Turnet e veta: shëno hyrjen dhe daljen, bëj pushime
+See their pay	Vedere la propria paga	Ver su pago	Shiko pagën e vet
+Their hours, wage or salary and tips	Le proprie ore, paga oraria o stipendio e mance	Sus horas, pago por hora o salario y propinas	Orët, paga për orë ose rroga dhe bakshishet e veta
+See others' shifts	Vedere i turni degli altri	Ver los turnos de otros	Shiko turnet e të tjerëve
+Who works when, for the roles chosen for them	Chi lavora quando, per i ruoli scelti per lui	Quién trabaja cuándo, para los roles elegidos para esa persona	Kush punon kur, për rolet e zgjedhura për të
+See tickets	Vedere le comande	Ver las comandas	Shiko porositë e kuzhinës
+The tickets on the kitchen board	Le comande sulla bacheca della cucina	Las comandas en el tablero de cocina	Porositë në tabelën e kuzhinës
+Move tickets	Spostare le comande	Mover comandas	Lëviz porositë e kuzhinës
+Start dishes, mark them ready and send tickets back	Iniziare i piatti, segnarli pronti e rimandare indietro le comande	Empezar platos, marcarlos listos y devolver comandas	Fillo pjatat, shënoji gati dhe kthe mbrapa porositë
+See Upcoming	Vedere In arrivo	Ver Próximos	Shiko Në ardhje
+Food ordered ahead for bookings and timed orders	Cibo ordinato in anticipo per prenotazioni e ordini programmati	Comida pedida por adelantado para reservas y pedidos programados	Ushqim i porositur paraprakisht për rezervime dhe porosi me orar
+The menu, as the POS shows it	Il menù, come lo mostra il POS	El menú, como lo muestra el POS	Menuja, siç e tregon POS
+Tickets that went out	Comande uscite	Comandas que salieron	Porositë e kuzhinës që dolën
+See the overview	Vedere la panoramica	Ver el resumen	Shiko përmbledhjen
+Stock health, value and the stock in and out chart	Stato del magazzino, valore e grafico di entrate e uscite	Estado del inventario, valor y el gráfico de entradas y salidas	Gjendja e stokut, vlera dhe grafiku i hyrjeve dhe daljeve
+See stock	Vedere il magazzino	Ver el inventario	Shiko stokun
+What's in stock, where, and what's running low	Cosa c'è in magazzino, dove, e cosa sta finendo	Qué hay en inventario, dónde, y qué se está acabando	Çfarë ka në stok, ku, dhe çfarë po mbaron
+Receive deliveries	Ricevere consegne	Recibir entregas	Prit dërgesat
+Put deliveries in stock	Mettere le consegne in magazzino	Poner las entregas en el inventario	Fut dërgesat në stok
+Take out what was thrown away	Togliere ciò che è stato buttato	Sacar lo que se tiró	Hiq atë që u hodh
+Move stock from one place to another	Spostare merce da un posto all'altro	Mover inventario de un lugar a otro	Lëviz stokun nga një vend në tjetrin
+Correct amounts and send things back to suppliers	Correggere quantità e rimandare merce ai fornitori	Corregir cantidades y devolver cosas a los proveedores	Korrigjo sasitë dhe kthe gjëra te furnitorët
+Add, change and delete places and where dishes take stock from	Aggiungere, modificare ed eliminare posti e da dove i piatti prendono la merce	Agregar, cambiar y eliminar lugares y de dónde toman inventario los platos	Shto, ndrysho dhe fshi vende dhe nga ku marrin stok pjatat
+See items	Vedere gli articoli	Ver los artículos	Shiko artikujt
+Every item and sub-recipe with its cost, supplier and levels	Ogni articolo e semilavorato con costo, fornitore e livelli	Cada artículo y subreceta con su costo, proveedor y niveles	Çdo artikull dhe nënrecetë me koston, furnitorin dhe nivelet
+Add items	Aggiungere articoli	Agregar artículos	Shto artikuj
+Add items and sub-recipes	Aggiungere articoli e semilavorati	Agregar artículos y subrecetas	Shto artikuj dhe nënreceta
+Change items	Modificare articoli	Cambiar artículos	Ndrysho artikuj
+Change items, their levels, photos and kinds, and sub-recipes	Modificare articoli, livelli, foto e tipi, e semilavorati	Cambiar artículos, sus niveles, fotos y tipos, y subrecetas	Ndrysho artikujt, nivelet, fotot dhe llojet e tyre, dhe nënrecetat
+Delete items	Eliminare articoli	Eliminar artículos	Fshi artikuj
+Delete items; what's left in stock is written off	Eliminare articoli; ciò che resta in magazzino viene scaricato	Eliminar artículos; lo que queda en inventario se da de baja	Fshi artikuj; ajo që mbetet në stok shlyhet
+See counts	Vedere gli inventari	Ver los conteos	Shiko numërimet
+Stock counts and their differences	Inventari e loro differenze	Conteos de inventario y sus diferencias	Numërimet e stokut dhe diferencat e tyre
+Count stock	Fare l'inventario	Contar inventario	Numëro stokun
+Start counts, write what was counted and finish them	Iniziare inventari, scrivere cosa è stato contato e concluderli	Empezar conteos, anotar lo contado y terminarlos	Fillo numërime, shkruaj çfarë u numërua dhe përfundoji
+Approve counts	Approvare inventari	Aprobar conteos	Mirato numërimet
+Approve a count, which changes the stock to what was counted	Approvare un inventario, che porta il magazzino a quanto contato	Aprobar un conteo, que cambia el inventario a lo contado	Mirato një numërim, që e kthen stokun në atë që u numërua
+Every stock change and what happened to items	Ogni movimento di magazzino e cosa è successo agli articoli	Cada cambio de inventario y lo que pasó con los artículos	Çdo ndryshim stoku dhe çfarë ndodhi me artikujt
+See suppliers	Vedere i fornitori	Ver los proveedores	Shiko furnitorët
+Suppliers, their places, the items bought from them and orders	Fornitori, loro sedi, articoli acquistati da loro e ordini	Proveedores, sus lugares, los artículos que se les compran y pedidos	Furnitorët, vendet e tyre, artikujt e blerë prej tyre dhe porositë
+Change suppliers	Modificare fornitori	Cambiar proveedores	Ndrysho furnitorët
+Add and change suppliers, their items and prices, and make orders	Aggiungere e modificare fornitori, articoli e prezzi, e fare ordini	Agregar y cambiar proveedores, sus artículos y precios, y hacer pedidos	Shto dhe ndrysho furnitorë, artikujt dhe çmimet e tyre, dhe bëj porosi
+See shifts	Vedere i turni	Ver los turnos	Shiko turnet
+Who works when, and who's clocked in	Chi lavora quando, e chi ha timbrato	Quién trabaja cuándo, y quién fichó	Kush punon kur, dhe kush ka shënuar hyrjen
+Plan shifts, put people on them and fix clock-ins	Pianificare turni, assegnare le persone e correggere le timbrature	Planificar turnos, asignar personas y corregir fichajes	Planifiko turne, vendos njerëz në to dhe korrigjo hyrjet
+See wages and tips, set how people are paid and record payouts	Vedere paghe e mance, impostare come vengono pagate le persone e registrare i pagamenti	Ver sueldos y propinas, definir cómo se paga a cada persona y registrar pagos	Shiko pagat dhe bakshishet, cakto si paguhen njerëzit dhe regjistro pagesat
+See people	Vedere le persone	Ver a las personas	Shiko njerëzit
+The people working here and their roles	Le persone che lavorano qui e i loro ruoli	Las personas que trabajan aquí y sus roles	Njerëzit që punojnë këtu dhe rolet e tyre
+Add people	Aggiungere persone	Agregar personas	Shto njerëz
+Add people and choose their roles	Aggiungere persone e scegliere i loro ruoli	Agregar personas y elegir sus roles	Shto njerëz dhe zgjidh rolet e tyre
+Change people	Modificare le persone	Cambiar personas	Ndrysho njerëzit
+Change details, roles, permissions and PINs, and reset passwords	Modificare dati, ruoli, permessi e PIN, e reimpostare password	Cambiar datos, roles, permisos y PIN, y restablecer contraseñas	Ndrysho të dhënat, rolet, lejet dhe PIN-et, dhe rivendos fjalëkalime
+Remove people	Rimuovere persone	Quitar personas	Hiq njerëz
+Remove people from the staff	Rimuovere persone dal personale	Quitar personas del personal	Hiq njerëz nga stafi
+Sign people out	Disconnettere le persone	Cerrar la sesión de otras personas	Nxirr njerëzit nga llogaria
+See where people are signed in and sign them out	Vedere dove le persone hanno effettuato l'accesso e disconnetterle	Ver dónde iniciaron sesión las personas y cerrarla	Shiko ku kanë hyrë njerëzit dhe nxirri
+See roles	Vedere i ruoli	Ver los roles	Shiko rolet
+The roles and what each can do	I ruoli e cosa può fare ciascuno	Los roles y lo que puede hacer cada uno	Rolet dhe çfarë mund të bëjë secili
+Make roles	Creare ruoli	Crear roles	Krijo role
+Make the restaurant's own roles	Creare i ruoli del ristorante	Crear los roles propios del restaurante	Krijo rolet e vetë restorantit
+Change roles	Modificare ruoli	Cambiar roles	Ndrysho role
+Rename roles, change their pay and switch them off	Rinominare ruoli, cambiarne la paga e disattivarli	Renombrar roles, cambiar su pago y desactivarlos	Riemërto role, ndrysho pagën e tyre dhe çaktivizoji
+Delete roles	Eliminare ruoli	Eliminar roles	Fshi role
+Delete the restaurant's own roles	Eliminare i ruoli del ristorante	Eliminar los roles propios del restaurante	Fshi rolet e vetë restorantit
+Change what roles can do	Cambiare cosa possono fare i ruoli	Cambiar lo que pueden hacer los roles	Ndrysho çfarë mund të bëjnë rolet
+Switch a role's permissions on and off	Attivare e disattivare i permessi di un ruolo	Activar y desactivar los permisos de un rol	Aktivizo dhe çaktivizo lejet e një roli
+See settings	Vedere le impostazioni	Ver la configuración	Shiko cilësimet
+How the restaurant is set up	Come è impostato il ristorante	Cómo está configurado el restaurante	Si është konfiguruar restoranti
+Change settings	Modificare le impostazioni	Cambiar la configuración	Ndrysho cilësimet
+Bookings, tables, orders, shifts, inventory and other settings	Prenotazioni, tavoli, ordini, turni, magazzino e altre impostazioni	Reservas, mesas, pedidos, turnos, inventario y otras configuraciones	Rezervime, tavolina, porosi, turne, stok dhe cilësime të tjera
+Change payment and fraud settings	Modificare le impostazioni di pagamento e frodi	Cambiar la configuración de pagos y fraude	Ndrysho cilësimet e pagesave dhe të mashtrimit
+Tax, service charge, paying, receipts and fraud checks	Tasse, servizio, pagamenti, scontrini e controlli antifrode	Impuestos, cargo por servicio, pagos, recibos y controles de fraude	Taksat, tarifa e shërbimit, pagesat, faturat dhe kontrollet e mashtrimit
+See the audit log	Vedere il registro attività	Ver el registro de actividad	Shiko regjistrin e veprimeve
+Every change made, by whom and when	Ogni modifica, chi l'ha fatta e quando	Cada cambio, quién lo hizo y cuándo	Çdo ndryshim, kush e bëri dhe kur
+Manage devices	Gestire i dispositivi	Gestionar dispositivos	Menaxho pajisjet
+Add, connect and remove tills, tablets, printers and other devices	Aggiungere, collegare e rimuovere casse, tablet, stampanti e altri dispositivi	Agregar, conectar y quitar cajas, tablets, impresoras y otros dispositivos	Shto, lidh dhe hiq arka, tableta, printera dhe pajisje të tjera
+See restaurant info	Vedere le informazioni del ristorante	Ver la información del restaurante	Shiko informacionin e restorantit
+The restaurant's details, branches, logo and currency	Dati del ristorante, sedi, logo e valuta	Los datos del restaurante, sucursales, logo y moneda	Të dhënat e restorantit, pikat, logoja dhe monedha
+Change restaurant info	Modificare le informazioni del ristorante	Cambiar la información del restaurante	Ndrysho informacionin e restorantit
+Description, phone, email, addresses, logo, colours and receipt texts	Descrizione, telefono, email, indirizzi, logo, colori e testi dello scontrino	Descripción, teléfono, correo, direcciones, logo, colores y textos del recibo	Përshkrimi, telefoni, email-i, adresat, logoja, ngjyrat dhe tekstet e faturës
+Sales, orders and guests at a glance	Vendite, ordini e ospiti in sintesi	Ventas, pedidos y comensales de un vistazo	Shitje, porosi dhe mysafirë me një shikim
+See Sales	Vedere Vendite	Ver Ventas	Shiko Shitjet
+Sales by day, hour, service and floor	Vendite per giorno, ora, servizio e piano	Ventas por día, hora, servicio y piso	Shitjet sipas ditës, orës, shërbimit dhe katit
+See Finance	Vedere Finanza	Ver Finanzas	Shiko Financat
+Money in and out, wages, refunds, tips and tax	Entrate e uscite, paghe, rimborsi, mance e tasse	Entradas y salidas de dinero, salarios, reembolsos, propinas e impuestos	Paratë që hyjnë e dalin, pagat, rimbursimet, bakshishet dhe taksat
+See Orders	Vedere Ordini	Ver Pedidos	Shiko Porositë
+How many orders, of what kind, and when	Quanti ordini, di che tipo e quando	Cuántos pedidos, de qué tipo y cuándo	Sa porosi, të çfarë lloji dhe kur
+See Dishes	Vedere Piatti	Ver Platos	Shiko Pjatat
+Every dish sold, its cost and margin	Ogni piatto venduto, il suo costo e il margine	Cada plato vendido, su costo y margen	Çdo pjatë e shitur, kostoja dhe marzhi i saj
+See Stock	Vedere Magazzino	Ver Inventario	Shiko Stokun
+Stock in and out, food cost and waste	Entrate e uscite di magazzino, costo del cibo e sprechi	Entradas y salidas de inventario, costo de alimentos y desperdicio	Hyrjet dhe daljet e stokut, kostoja e ushqimit dhe humbjet
+See Tables	Vedere Tavoli	Ver Mesas	Shiko Tavolinat
+Bookings, guests and how tables were used	Prenotazioni, ospiti e come sono stati usati i tavoli	Reservas, comensales y cómo se usaron las mesas	Rezervime, mysafirë dhe si u përdorën tavolinat
+See Team	Vedere Squadra	Ver Equipo	Shiko Ekipin
+Sales, hours and tips by person	Vendite, ore e mance per persona	Ventas, horas y propinas por persona	Shitje, orë dhe bakshishe për person
+See alerts	Vedere gli avvisi	Ver las alertas	Shiko sinjalizimet
+Flagged discounts, refunds, removals and other risky actions	Sconti, rimborsi, rimozioni segnalati e altre azioni a rischio	Descuentos, reembolsos, eliminaciones marcadas y otras acciones de riesgo	Zbritje, rimbursime, heqje të shënuara dhe veprime të tjera me rrezik
+Review alerts	Esaminare gli avvisi	Revisar alertas	Shqyrto sinjalizimet
+Mark flagged actions as checked, dismissed or confirmed	Segnare le azioni segnalate come verificate, archiviate o confermate	Marcar las acciones señaladas como revisadas, descartadas o confirmadas	Shëno veprimet e sinjalizuara si të kontrolluara, të hedhura poshtë ose të konfirmuara
+Open POS	Apri POS	Abrir POS	Hap POS-in
+Open the POS workspace	Aprire lo spazio di lavoro POS	Abrir el espacio de trabajo POS	Hap hapësirën e punës POS
+Open Kitchen Display	Apri schermo cucina	Abrir pantalla de cocina	Hap ekranin e kuzhinës
+Open the kitchen display workspace	Aprire lo schermo della cucina	Abrir la pantalla de cocina	Hap ekranin e kuzhinës
+Open Admin Hub	Apri Admin Hub	Abrir Admin Hub	Hap Admin Hub-in
+Open the admin hub workspace	Aprire l'Admin Hub	Abrir el Admin Hub	Hap Admin Hub-in
+Open Statistics	Apri statistiche	Abrir estadísticas	Hap statistikat
+Open the statistics workspace	Aprire le statistiche	Abrir las estadísticas	Hap statistikat
+Open Inventory	Apri inventario	Abrir inventario	Hap inventarin
+Open the inventory workspace	Aprire l'inventario	Abrir el inventario	Hap inventarin
+Open Fraud Detection	Apri rilevamento frodi	Abrir detección de fraude	Hap zbulimin e mashtrimit
+Open the fraud detection workspace	Aprire il rilevamento frodi	Abrir la detección de fraude	Hap zbulimin e mashtrimit
+Create restaurants	Creare ristoranti	Crear restaurantes	Krijo restorante
+Add restaurants and review applications	Aggiungere ristoranti ed esaminare le richieste	Agregar restaurantes y revisar solicitudes	Shto restorante dhe shqyrto aplikimet
+Delete restaurants	Eliminare ristoranti	Eliminar restaurantes	Fshi restorante
+Remove restaurants	Rimuovere ristoranti	Quitar restaurantes	Hiq restorante
+Export settings	Esportare impostazioni	Exportar configuración	Eksporto cilësimet
+Export a restaurant's settings	Esportare le impostazioni di un ristorante	Exportar la configuración de un restaurante	Eksporto cilësimet e një restoranti
+Import settings	Importare impostazioni	Importar configuración	Importo cilësimet
+Import a restaurant's settings	Importare le impostazioni di un ristorante	Importar la configuración de un restaurante	Importo cilësimet e një restoranti
+Manage settings templates	Gestire modelli di impostazioni	Gestionar plantillas de configuración	Menaxho modelet e cilësimeve
+Create, change and delete settings templates	Creare, modificare ed eliminare modelli di impostazioni	Crear, cambiar y eliminar plantillas de configuración	Krijo, ndrysho dhe fshi modele cilësimesh
+Apply settings templates	Applicare modelli di impostazioni	Aplicar plantillas de configuración	Zbato modelet e cilësimeve
+Apply settings templates to restaurants	Applicare modelli di impostazioni ai ristoranti	Aplicar plantillas de ajustes a los restaurantes	Zbato shabllone cilësimesh te restorantet
+Super Admin	Super Admin	Super Admin	Super Admin
+System-level control across all tenants	Controllo di tutto il sistema, per ogni cliente	Control de todo el sistema, para cada cliente	Kontroll i gjithë sistemit, për çdo klient
+Support admin	Admin di supporto	Admin de soporte	Admin mbështetjeje
+Takes care of the restaurants the Super Admin gives them	Si occupa dei ristoranti che gli assegna il Super Admin	Se encarga de los restaurantes que le asigna el Super Admin	Kujdeset për restorantet që i jep Super Admini
+Business owner - full control over the restaurant	Titolare: pieno controllo del ristorante	Dueño del negocio: control total del restaurante	Pronari i biznesit: kontroll i plotë mbi restorantin
+Shares ownership with limited restrictions	Condivide la proprietà con poche restrizioni	Comparte la propiedad con pocas restricciones	Ndan pronësinë me pak kufizime
+Store administrator - manages staff, inventory, settings and reports	Amministratore: gestisce personale, inventario, impostazioni e report	Administrador: gestiona personal, inventario, ajustes e informes	Administrator: menaxhon stafin, inventarin, cilësimet dhe raportet
+Store manager - oversees operations and staff	Responsabile: segue il lavoro e il personale	Encargado: supervisa la operación y el personal	Menaxher: mbikëqyr punën dhe stafin
+Handles orders and customer service	Gestisce ordini e servizio ai clienti	Atiende pedidos y el servicio a clientes	Merret me porositë dhe shërbimin ndaj klientëve
+Read-only access - sees POS, kitchen display and admin hub without changing anything	Solo lettura: vede POS, schermo cucina e Admin Hub senza modificare nulla	Solo lectura: ve el POS, la pantalla de cocina y el Admin Hub sin cambiar nada	Vetëm lexim: sheh POS-in, ekranin e kuzhinës dhe Admin Hub-in pa ndryshuar asgjë
+Kitchen staff - views and updates kitchen display tickets	Personale di cucina: vede e fa avanzare le comande	Personal de cocina: ve y avanza las comandas	Stafi i kuzhinës: sheh dhe ecën përpara me porositë
+Keeps the restaurant clean - tables, floors, kitchen and toilets	Tiene pulito il ristorante: tavoli, pavimenti, cucina e bagni	Mantiene limpio el restaurante: mesas, pisos, cocina y baños	Mban pastër restorantin: tavolinat, dyshemetë, kuzhinën dhe tualetet
+Temporary help for busy nights and events, paid for the hours they come in	Aiuto temporaneo per serate piene ed eventi, pagato per le ore in cui viene	Ayuda temporal para noches llenas y eventos, pagada por las horas que viene	Ndihmë e përkohshme për mbrëmje të ngarkuara dhe evente, e paguar për orët që vjen
 Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id
 Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token
 The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters
@@ -628,3 +837,5 @@ At least one role id is required	Serve almeno un id di ruolo	Se requiere al meno
 User email is already verified	L'email dell'utente è già verificata	El correo del usuario ya está verificado	Emaili i përdoruesit është verifikuar tashmë
 User phone is already verified	Il telefono dell'utente è già verificato	El teléfono del usuario ya está verificado	Telefoni i përdoruesit është verifikuar tashmë
 You can only remove people you added	Puoi rimuovere solo le persone che hai aggiunto tu	Solo puedes quitar a las personas que agregaste	Mund të heqësh vetëm njerëzit që shtove ti
+The Super Admin hasn't allowed you to remove owners or co-owners.	Il Super Admin non ti ha permesso di rimuovere proprietari o comproprietari.	El Super Admin no te permitió quitar dueños o codueños.	Super Admini nuk të ka lejuar të heqësh pronarë ose bashkëpronarë.
+An owner can't remove another owner. Ask the Super Admin from their menu.	Un proprietario non può rimuovere un altro proprietario. Chiedilo al Super Admin dal suo menu.	Un dueño no puede quitar a otro dueño. Pídeselo al Super Admin desde su menú.	Një pronar nuk mund të heqë një pronar tjetër. Kërkoja Super Adminit nga menyja e tij.

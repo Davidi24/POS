@@ -39,7 +39,7 @@ public class FloorLayoutController {
     private final TableLayoutChangeNotifier layoutChangeNotifier;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'ORDER_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'ORDER_READ', 'TABLES_READ')")
     @Operation(summary = "List floor layouts for a branch")
     public ResponseEntity<List<FloorLayoutResponse>> getFloorLayouts(
             @PathVariable UUID restaurantId,
@@ -52,7 +52,7 @@ public class FloorLayoutController {
     }
 
     @GetMapping("/{floorLayoutId}")
-    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'ORDER_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'ORDER_READ', 'TABLES_READ')")
     @Operation(summary = "Get one floor layout")
     public ResponseEntity<FloorLayoutResponse> getFloorLayout(
             @PathVariable UUID restaurantId,
@@ -66,7 +66,7 @@ public class FloorLayoutController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Create a floor layout")
     public ResponseEntity<FloorLayoutResponse> createFloorLayout(
             @PathVariable UUID restaurantId,
@@ -85,7 +85,7 @@ public class FloorLayoutController {
     }
 
     @PutMapping("/{floorLayoutId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Update a floor layout")
     public ResponseEntity<FloorLayoutResponse> updateFloorLayout(
             @PathVariable UUID restaurantId,
@@ -109,7 +109,7 @@ public class FloorLayoutController {
             path = "/{floorLayoutId}/plan-image",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Upload or replace a floor plan image")
     public ResponseEntity<FloorLayoutResponse> uploadPlanImage(
             @PathVariable UUID restaurantId,
@@ -130,7 +130,7 @@ public class FloorLayoutController {
     }
 
     @DeleteMapping("/{floorLayoutId}/plan-image")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Remove a floor plan image")
     public ResponseEntity<FloorLayoutResponse> removePlanImage(
             @PathVariable UUID restaurantId,
@@ -149,7 +149,7 @@ public class FloorLayoutController {
     }
 
     @DeleteMapping("/{floorLayoutId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Delete a floor layout")
     public ResponseEntity<Void> deleteFloorLayout(
             @PathVariable UUID restaurantId,

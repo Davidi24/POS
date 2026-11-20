@@ -156,7 +156,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/cancel")
-    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @PreAuthorize("hasAuthority('RESERVATION_CANCEL')")
     @Operation(summary = "Cancel a reservation")
     public ResponseEntity<ReservationResponse> cancelReservation(
             @PathVariable UUID restaurantId,
@@ -376,7 +376,7 @@ public class RestaurantReservationController {
     }
 
     @PostMapping("/{reservationId}/mark-no-show")
-    @PreAuthorize("hasAuthority('RESERVATION_MANAGE')")
+    @PreAuthorize("hasAuthority('RESERVATION_CANCEL')")
     @Operation(summary = "Mark a reservation as no-show")
     public ResponseEntity<ReservationResponse> markNoShow(
             @PathVariable UUID restaurantId,

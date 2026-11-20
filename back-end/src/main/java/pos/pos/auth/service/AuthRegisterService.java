@@ -59,6 +59,10 @@ public class AuthRegisterService {
         boolean platformRole = AppRole.CO_SUPER_ADMIN.name().equals(role.getCode());
         UUID restaurantId = platformRole ? null : resolveRestaurant(request, authentication);
         UUID defaultBranchId = platformRole ? null : resolveBranch(request.getDefaultBranchId(), restaurantId);
+        // A restaurant's staff start with its owner (user, 2026-11-19): nobody else is added before it has one.
+        if (restaurantId != null && !AppRole.OWNER.name().equals(role.getCode()) && !userRepository.restaurantHasOwner(restaurantId)) {
+            throw new pos.pos.exception.auth.AuthException("Add the restaurant's owner first.", org.springframework.http.HttpStatus.CONFLICT);
+        }
 
         User user = User.builder()
                 .email(identity.email())

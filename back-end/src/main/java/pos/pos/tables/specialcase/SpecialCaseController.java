@@ -25,7 +25,7 @@ public class SpecialCaseController {
     private final SpecialCaseService specialCases;
 
     @PostMapping("/tables/{tableId}/more-time")
-    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_UPDATE')")
     @Operation(summary = "Give the guests at a table more time before the next booking")
     public ResponseEntity<Void> moreTime(
             @PathVariable UUID restaurantId,
@@ -39,7 +39,7 @@ public class SpecialCaseController {
     }
 
     @PostMapping("/tables/{tableId}/still-here")
-    @PreAuthorize("hasAnyAuthority('SETTINGS_UPDATE', 'ORDER_CREATE', 'ORDER_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_UPDATE')")
     @Operation(summary = "The guests are still here: restart the table's clock")
     public ResponseEntity<Void> stillHere(
             @PathVariable UUID restaurantId,

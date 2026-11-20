@@ -156,16 +156,20 @@ public class RoleAdminService {
         assertCustomRole(role);
         roleHierarchyService.assertCanManageRole(authentication, role);
 
-        Set<UUID> requestedPermissionIds = request.getPermissionIds() == null
+        Set<UUID> askedPermissionIds = request.getPermissionIds() == null
                 ? Set.of()
                 : new LinkedHashSet<>(request.getPermissionIds());
-        List<Permission> requestedPermissions = permissionRepository.findAllById(requestedPermissionIds).stream()
-                .sorted(PERMISSION_ORDER)
-                .toList();
-
-        if (requestedPermissions.size() != requestedPermissionIds.size()) {
+        List<Permission> asked = permissionRepository.findAllById(askedPermissionIds);
+        if (asked.size() != askedPermissionIds.size()) {
             throw new PermissionNotFoundException();
         }
+        // Nothing without what it needs (PermissionTree): an edit without its view, a view without its workspace.
+        Set<String> keptCodes = pos.pos.security.rbac.PermissionTree.normalize(asked.stream().map(Permission::getCode).toList());
+        List<Permission> requestedPermissions = asked.stream()
+                .filter(permission -> keptCodes.contains(permission.getCode()))
+                .sorted(PERMISSION_ORDER)
+                .toList();
+        Set<UUID> requestedPermissionIds = requestedPermissions.stream().map(Permission::getId).collect(Collectors.toCollection(LinkedHashSet::new));
 
         assertActorCanGrantPermissions(authentication, requestedPermissions);
 
@@ -206,10 +210,12 @@ public class RoleAdminService {
                                                                 ReplaceRolePermissionsRequest request) {
         roleHierarchyService.assertCanChangeRoleInRestaurant(authentication, role);
         Set<UUID> requestedPermissionIds = request.getPermissionIds() == null ? Set.of() : new LinkedHashSet<>(request.getPermissionIds());
-        List<Permission> requested = permissionRepository.findAllById(requestedPermissionIds).stream().sorted(PERMISSION_ORDER).toList();
-        if (requested.size() != requestedPermissionIds.size()) {
+        List<Permission> asked = permissionRepository.findAllById(requestedPermissionIds);
+        if (asked.size() != requestedPermissionIds.size()) {
             throw new PermissionNotFoundException();
         }
+        Set<String> keptCodes = pos.pos.security.rbac.PermissionTree.normalize(asked.stream().map(Permission::getCode).toList());
+        List<Permission> requested = asked.stream().filter(p -> keptCodes.contains(p.getCode())).sorted(PERMISSION_ORDER).toList();
         Set<String> requestedCodes = requested.stream().map(Permission::getCode).collect(Collectors.toCollection(LinkedHashSet::new));
         Set<String> current = EffectivePermissions.forRoles(permissionRepository, restaurantId, List.of(role.getId()));
         assertActorCanGrantPermissions(authentication, requested.stream().filter(p -> !current.contains(p.getCode())).toList());

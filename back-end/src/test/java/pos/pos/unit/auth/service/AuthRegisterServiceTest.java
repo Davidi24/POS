@@ -124,6 +124,8 @@ class AuthRegisterServiceTest {
 
         UUID restaurantId = UUID.randomUUID();
         when(roleHierarchyService.actorRestaurantId(authentication)).thenReturn(restaurantId);
+        // The restaurant has its owner, so other staff can be added (2026-11-19).
+        when(userRepository.restaurantHasOwner(restaurantId)).thenReturn(true);
 
         UserResponse response = authRegisterService.register(request, authentication);
 

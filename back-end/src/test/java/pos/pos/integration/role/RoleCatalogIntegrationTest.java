@@ -163,7 +163,8 @@ class RoleCatalogIntegrationTest extends AbstractRoleIntegrationTest {
                 .andReturn();
 
         assertThat(codesOf(bodyOf(result)))
-                .containsExactly("ROLES_ASSIGN_PERMISSIONS", "USERS_CREATE", "ROLES_UPDATE");
+                // By name: "Add people", "Change roles", "Change what roles can do".
+                .containsExactly("USERS_CREATE", "ROLES_UPDATE", "ROLES_ASSIGN_PERMISSIONS");
     }
 
     @Test
@@ -185,7 +186,8 @@ class RoleCatalogIntegrationTest extends AbstractRoleIntegrationTest {
         List<String> codes = codesOf(bodyOf(result));
         // Their own level and below (an Admin may add another Admin), Viewer, Cleaner and Extra worker; Managers are left
         // to Owner and Co-Owner unless the restaurant allows Admins too.
-        assertThat(codes).containsExactly("ADMIN", "ROLE007_SHIFT_LEAD", "ROLE007_CASHIER", "WAITER", "VIEWER", "CLEANER", "EXTRA_WORKER");
+        // Kitchen is assignable since 2026-11-19 (anyone ranked above it adds kitchen staff).
+        assertThat(codes).containsExactly("ADMIN", "ROLE007_SHIFT_LEAD", "ROLE007_CASHIER", "WAITER", "VIEWER", "KITCHEN", "CLEANER", "EXTRA_WORKER");
         assertThat(codes).doesNotContain(
                 "MANAGER",
                 aboveActor.getCode(),

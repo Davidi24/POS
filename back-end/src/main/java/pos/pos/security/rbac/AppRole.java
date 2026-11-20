@@ -22,9 +22,11 @@ public enum AppRole {
     // Helps the Super Admin run every restaurant. Starts with every permission; the Super Admin switches single
     // permissions off per person (user_permission_denials). Only the Super Admin hands it out or manages its holders,
     // and a Co-Super-Admin never reaches the Super Admin or other Co-Super-Admins.
+    // Shown as a support admin since 2026-11-19 (user: "co-super-admins become admins"): takes care of the restaurants the
+    // Super Admin gives them (or all of them, users.admin_all_restaurants), and removes owners only when allowed.
     CO_SUPER_ADMIN(
-            "Co-Super-Admin",
-            "Helps the Super Admin manage every restaurant",
+            "Support admin",
+            "Takes care of the restaurants the Super Admin gives them",
             55_000L,
             false,
             true,
@@ -46,24 +48,9 @@ public enum AppRole {
             40_000L,
             true,
             false,
-            EnumSet.of(
-                    RESTAURANTS_READ, RESTAURANTS_UPDATE,
-                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE, MENUS_DELETE,
-                    USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
-                    ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
-                    SESSIONS_MANAGE,
-                    SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
-                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
-                    RESERVATION_READ, RESERVATION_MANAGE, RESERVATION_APPROVE, RESERVATION_CORRECT,
-                    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
-                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
-                    KDS_READ, KDS_UPDATE,
-                    SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
-                    PAYMENT_REFUND,
-                    REPORTS_READ, FRAUD_READ, FRAUD_REVIEW,
-                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS, STATISTICS_ACCESS, FRAUD_ACCESS,
-                    INVENTORY_ACCESS, INVENTORY_READ, INVENTORY_UPDATE
-            )
+            // Everything in the restaurant (2026-11-19: and every new permission by part), but goodwill refunds and creating or
+            // removing restaurants.
+            EnumSet.complementOf(EnumSet.of(RESTAURANTS_CREATE, RESTAURANTS_DELETE, PAYMENT_GOODWILL_REFUND))
     ),
 
     ADMIN(
@@ -72,23 +59,25 @@ public enum AppRole {
             30_000L,
             true,
             false,
+            // Admin Hub (shifts, users, settings without money and fraud, the audit log), Inventory and Statistics (user,
+            // 2026-11-19). POS and the kitchen display come from the roles under it, given with it by default; the owner
+            // can add the rest (salary, devices, restaurant info, roles, fraud) with a warning. V127 took the rest away.
             EnumSet.of(
-                    RESTAURANTS_READ, RESTAURANTS_UPDATE,
-                    MENUS_CREATE, MENUS_READ, MENUS_UPDATE, MENUS_DELETE,
+                    RESTAURANTS_READ,
                     USERS_CREATE, USERS_READ, USERS_UPDATE, USERS_DELETE,
-                    ROLES_READ, ROLES_CREATE, ROLES_UPDATE, ROLES_DELETE, ROLES_ASSIGN_PERMISSIONS,
-                    SESSIONS_MANAGE,
-                    SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT, SETTINGS_EXPORT, SETTINGS_IMPORT,
-                    SETTINGS_TEMPLATE_MANAGE, SETTINGS_TEMPLATE_APPLY,
-                    RESERVATION_READ, RESERVATION_MANAGE, RESERVATION_APPROVE, RESERVATION_CORRECT,
-                    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
-                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
-                    KDS_READ, KDS_UPDATE,
-                    SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
-                    PAYMENT_REFUND,
-                    REPORTS_READ,
-                    POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS, STATISTICS_ACCESS,
-                    INVENTORY_ACCESS, INVENTORY_READ, INVENTORY_UPDATE
+                    ROLES_READ,
+                    SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT,
+                    SHIFT_READ, SHIFT_MANAGE,
+                    ADMIN_ACCESS,
+                    // Statistics without Finance (wages and money out are the owner's).
+                    STATISTICS_ACCESS, REPORTS_READ, STATS_SALES_READ, STATS_ORDERS_READ, STATS_DISHES_READ, STATS_STOCK_READ,
+                    STATS_TABLES_READ, STATS_TEAM_READ,
+                    INVENTORY_ACCESS, INVENTORY_READ,
+                    INVENTORY_STOCK_READ, INVENTORY_RECEIVE, INVENTORY_WASTE, INVENTORY_TRANSFER, INVENTORY_ADJUST, INVENTORY_PLACES,
+                    INVENTORY_ITEMS_READ, INVENTORY_ITEMS_CREATE, INVENTORY_ITEMS_UPDATE, INVENTORY_ITEMS_DELETE,
+                    INVENTORY_COUNTS_READ, INVENTORY_COUNT, INVENTORY_COUNTS_APPROVE,
+                    INVENTORY_HISTORY_READ,
+                    SUPPLIERS_READ, SUPPLIERS_UPDATE
             )
     ),
 
@@ -105,14 +94,17 @@ public enum AppRole {
                     USERS_CREATE, USERS_READ, USERS_UPDATE,
                     ROLES_READ,
                     SETTINGS_READ,
-                    RESERVATION_READ, RESERVATION_MANAGE, RESERVATION_APPROVE, RESERVATION_CORRECT,
-                    ORDER_READ, ORDER_CREATE, ORDER_UPDATE, ORDER_CLOSE, ORDER_CANCEL,
-                    ORDER_VOID, ORDER_DISCOUNT_APPLY, ORDER_TRANSFER, ORDER_REOPEN, ORDER_AUDIT,
-                    KDS_READ, KDS_UPDATE,
-                    SHIFT_SELF, SHIFT_READ, SHIFT_MANAGE,
-                    PAYMENT_REFUND,
+                    TABLES_READ, TABLES_UPDATE, TABLES_PAYMENT, TABLES_LAYOUT,
+                    ORDER_READ, ORDER_UPDATE, ORDER_CREATE, ORDER_CANCEL, ORDER_CLOSE, ORDER_CLOSE_UNPAID, ORDER_VOID,
+                    ORDER_TRANSFER, ORDER_DISCOUNT_APPLY, KITCHEN_STATUS_READ, ORDER_KITCHEN_READ,
+                    RESERVATION_READ, RESERVATION_MANAGE, RESERVATION_CANCEL, RESERVATION_APPROVE, RESERVATION_CORRECT,
+                    MENUS_SOLD_OUT, MENUS_PRICES,
+                    SALES_SELF, ORDER_HISTORY_READ, ORDER_REOPEN_PAYMENT, ORDER_REOPEN, PAYMENT_REFUND, ORDER_AUDIT,
+                    // No Kitchen display permissions: they'd need "Open Kitchen Display" (PermissionTree, V126).
+                    SHIFT_SELF, SHIFT_PAY_SELF, SHIFT_TEAM, SHIFT_READ, SHIFT_MANAGE,
                     POS_ACCESS, ADMIN_ACCESS,
-                    INVENTORY_ACCESS, INVENTORY_READ
+                    INVENTORY_ACCESS, INVENTORY_READ, INVENTORY_STOCK_READ, INVENTORY_ITEMS_READ, INVENTORY_COUNTS_READ,
+                    INVENTORY_HISTORY_READ, SUPPLIERS_READ
             ),
             CO_OWNER
     ),
@@ -124,17 +116,15 @@ public enum AppRole {
             true,
             false,
             EnumSet.of(
-                    MENUS_READ,
-                    RESERVATION_READ,
-                    RESERVATION_MANAGE,
-                    ORDER_READ,
-                    ORDER_CREATE,
-                    ORDER_UPDATE,
-                    ORDER_CLOSE,
-                    ORDER_DISCOUNT_APPLY,
-                    ORDER_TRANSFER,
-                    SHIFT_SELF,
-                    // POS → Kitchen Status reads the kitchen with ORDER_READ; no Kitchen display permission (user, 2026-10-30).
+                    TABLES_READ, TABLES_UPDATE, TABLES_PAYMENT,
+                    ORDER_READ, ORDER_UPDATE, ORDER_CREATE, ORDER_CANCEL, ORDER_CLOSE, ORDER_TRANSFER, ORDER_DISCOUNT_APPLY,
+                    // POS → Kitchen Status reads the kitchen with its own permission; no Kitchen display one (user, 2026-10-30).
+                    KITCHEN_STATUS_READ, ORDER_KITCHEN_READ,
+                    RESERVATION_READ, RESERVATION_MANAGE, RESERVATION_CANCEL,
+                    MENUS_READ, MENUS_SOLD_OUT,
+                    // Waiters take the money when a guest comes back to pay an unpaid order.
+                    SALES_SELF, ORDER_HISTORY_READ, ORDER_REOPEN_PAYMENT,
+                    SHIFT_SELF, SHIFT_PAY_SELF, SHIFT_TEAM,
                     POS_ACCESS
             )
     ),
@@ -152,26 +142,30 @@ public enum AppRole {
                     USERS_READ,
                     ROLES_READ,
                     SETTINGS_READ,
-                    RESERVATION_READ,
-                    ORDER_READ,
-                    KDS_READ,
+                    TABLES_READ, RESERVATION_READ, ORDER_READ, KITCHEN_STATUS_READ, ORDER_KITCHEN_READ, ORDER_HISTORY_READ,
+                    KDS_READ, KDS_UPCOMING_READ, KDS_MENU_READ, KDS_HISTORY_READ,
                     POS_ACCESS, KDS_ACCESS, ADMIN_ACCESS,
-                    INVENTORY_ACCESS, INVENTORY_READ
+                    INVENTORY_ACCESS, INVENTORY_READ, INVENTORY_STOCK_READ, INVENTORY_ITEMS_READ, INVENTORY_COUNTS_READ,
+                    INVENTORY_HISTORY_READ, SUPPLIERS_READ
             ),
             ADMIN
     ),
 
+    // Anyone ranked above it adds kitchen staff, like waiters (user, 2026-11-19); startup seeding updates the flag.
     KITCHEN(
             "Kitchen",
             "Kitchen staff - views and updates kitchen display tickets",
             5_000L,
+            true,
             false,
-            false,
-            // Only the Kitchen display: its Menu and Upcoming read with KDS_READ (user, 2026-10-30: "Kitchen only KDS").
+            // The Kitchen display (user, 2026-10-30: "Kitchen only KDS"), each of its places with its own permission.
             EnumSet.of(
-                    KDS_READ,
-                    KDS_UPDATE,
-                    KDS_ACCESS
+                    KDS_ACCESS, KDS_READ, KDS_UPDATE, KDS_UPCOMING_READ, KDS_MENU_READ, KDS_HISTORY_READ,
+                    // Clocks in from the kitchen display's My shift.
+                    SHIFT_SELF, SHIFT_PAY_SELF, SHIFT_TEAM,
+                    // Inventory's stock and items, to look only (user, 2026-11-19: "kitchen sees stock and items, not the
+                    // overview, counts or history"); the owner can let them receive, waste or add items.
+                    INVENTORY_ACCESS, INVENTORY_STOCK_READ, INVENTORY_ITEMS_READ
             )
     ),
 
@@ -183,7 +177,7 @@ public enum AppRole {
             true,
             false,
             EnumSet.of(
-                    SHIFT_SELF,
+                    SHIFT_SELF, SHIFT_PAY_SELF, SHIFT_TEAM,
                     POS_ACCESS
             )
     ),
@@ -196,9 +190,11 @@ public enum AppRole {
             true,
             false,
             EnumSet.of(
+                    TABLES_READ,
                     MENUS_READ,
                     ORDER_READ,
-                    SHIFT_SELF,
+                    KITCHEN_STATUS_READ, ORDER_KITCHEN_READ,
+                    SHIFT_SELF, SHIFT_PAY_SELF, SHIFT_TEAM,
                     POS_ACCESS
             )
     );

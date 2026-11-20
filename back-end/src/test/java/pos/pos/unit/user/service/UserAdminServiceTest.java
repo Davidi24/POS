@@ -79,6 +79,18 @@ class UserAdminServiceTest {
     @Mock
     private UserSessionRepository userSessionRepository;
 
+    @Mock
+    private pos.pos.role.repository.UserPermissionGrantRepository grantRepository;
+
+    @Mock
+    private pos.pos.role.repository.UserPermissionDenialRepository denialRepository;
+
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher events;
+
+    @Mock
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     @Spy
     private UserMapper userMapper = new UserMapper();
 
@@ -571,7 +583,7 @@ class UserAdminServiceTest {
     }
 
     @Test
-    @DisplayName("deleteUser should soft delete the user and revoke active sessions")
+    @DisplayName("deleteUser should soft delete the user, sign them out everywhere and tell the other modules")
     void deleteUserShouldSoftDeleteAndRevokeSessions() {
         Authentication authentication = authentication();
         User user = user("cashier@pos.local", "cashier.one");
@@ -588,8 +600,9 @@ class UserAdminServiceTest {
         verify(userSessionRepository).revokeAllActiveSessionsByUserId(
                 eq(TARGET_USER_ID),
                 any(OffsetDateTime.class),
-                eq(SessionRevocationReason.SESSION_REVOKED.name())
+                eq(SessionRevocationReason.USER_NOT_ALLOWED.name())
         );
+        verify(events).publishEvent(any(pos.pos.user.event.UserRemovedEvent.class));
     }
 
     @Test

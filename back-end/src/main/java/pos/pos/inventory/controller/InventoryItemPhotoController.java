@@ -28,7 +28,7 @@ public class InventoryItemPhotoController {
     private final InventoryItemPhotoService photoService;
 
     @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_ITEMS_UPDATE')")
     @Operation(summary = "The stock item's photo (PNG, JPEG or WebP, up to 5 MB); replaces the old one")
     public ResponseEntity<InventoryItemResponse> uploadPhoto(@PathVariable UUID restaurantId, @PathVariable UUID itemId,
                                                              @RequestPart("file") MultipartFile file, Authentication authentication) {
@@ -36,7 +36,7 @@ public class InventoryItemPhotoController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_ITEMS_UPDATE')")
     @Operation(summary = "Remove the stock item's photo")
     public ResponseEntity<InventoryItemResponse> removePhoto(@PathVariable UUID restaurantId, @PathVariable UUID itemId,
                                                              Authentication authentication) {

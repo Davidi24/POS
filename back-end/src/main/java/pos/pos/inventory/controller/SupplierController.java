@@ -35,14 +35,15 @@ public class SupplierController {
     private final SupplierService supplierService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    // Item forms list suppliers too, so seeing stock is enough to read them (user, 2026-11-19: suppliers have their own permissions).
+    @PreAuthorize("hasAnyAuthority('SUPPLIERS_READ', 'INVENTORY_ITEMS_READ', 'INVENTORY_STOCK_READ')")
     @Operation(summary = "Every supplier with their places and the items bought from them")
     public ResponseEntity<List<SupplierResponse>> list(@PathVariable UUID restaurantId, Authentication authentication) {
         return ResponseEntity.ok(supplierService.list(authentication, restaurantId));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_UPDATE')")
     @Operation(summary = "Add a supplier")
     public ResponseEntity<SupplierResponse> create(@PathVariable UUID restaurantId, @Valid @RequestBody SupplierRequest request,
                                                    Authentication authentication) {
@@ -50,7 +51,7 @@ public class SupplierController {
     }
 
     @PutMapping("/{supplierId}")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_UPDATE')")
     @Operation(summary = "Change a supplier's details (or switch them off with active false)")
     public ResponseEntity<SupplierResponse> update(@PathVariable UUID restaurantId, @PathVariable UUID supplierId,
                                                    @Valid @RequestBody SupplierRequest request, Authentication authentication) {
@@ -58,7 +59,7 @@ public class SupplierController {
     }
 
     @PostMapping("/{supplierId}/places")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_UPDATE')")
     @Operation(summary = "Add one of the supplier's places")
     public ResponseEntity<SupplierResponse> addPlace(@PathVariable UUID restaurantId, @PathVariable UUID supplierId,
                                                      @Valid @RequestBody SupplierPlaceRequest request, Authentication authentication) {
@@ -66,7 +67,7 @@ public class SupplierController {
     }
 
     @PutMapping("/{supplierId}/places/{placeId}")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_UPDATE')")
     @Operation(summary = "Change one of the supplier's places")
     public ResponseEntity<SupplierResponse> updatePlace(@PathVariable UUID restaurantId, @PathVariable UUID supplierId, @PathVariable UUID placeId,
                                                         @Valid @RequestBody SupplierPlaceRequest request, Authentication authentication) {
@@ -74,7 +75,7 @@ public class SupplierController {
     }
 
     @DeleteMapping("/{supplierId}/places/{placeId}")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_UPDATE')")
     @Operation(summary = "Remove one of the supplier's places")
     public ResponseEntity<SupplierResponse> removePlace(@PathVariable UUID restaurantId, @PathVariable UUID supplierId, @PathVariable UUID placeId,
                                                         Authentication authentication) {
@@ -82,7 +83,7 @@ public class SupplierController {
     }
 
     @PutMapping("/{supplierId}/items/{itemId}")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_UPDATE')")
     @Operation(summary = "Link a stock item to the supplier, or change their code and price for it")
     public ResponseEntity<SupplierResponse> saveItem(@PathVariable UUID restaurantId, @PathVariable UUID supplierId, @PathVariable UUID itemId,
                                                      @Valid @RequestBody SupplierItemRequest request, Authentication authentication) {
@@ -90,7 +91,7 @@ public class SupplierController {
     }
 
     @DeleteMapping("/{supplierId}/items/{itemId}")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('SUPPLIERS_UPDATE')")
     @Operation(summary = "Stop buying a stock item from the supplier")
     public ResponseEntity<SupplierResponse> removeItem(@PathVariable UUID restaurantId, @PathVariable UUID supplierId, @PathVariable UUID itemId,
                                                        Authentication authentication) {

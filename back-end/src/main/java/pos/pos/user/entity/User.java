@@ -101,6 +101,16 @@ public class User implements AuditedEntityLifecycle {
     @Column(name = "language", length = 5)
     private String language;
 
+    // Support admins (the Super Admin's helpers; role CO_SUPER_ADMIN, shown as "Admin"): every restaurant, or only the ones
+    // in admin_restaurant_access; and whether they may remove owners and co-owners (user, 2026-11-19). False for everyone else.
+    @Builder.Default
+    @Column(name = "admin_all_restaurants", nullable = false)
+    private boolean adminAllRestaurants = false;
+
+    @Builder.Default
+    @Column(name = "admin_may_remove_owners", nullable = false)
+    private boolean adminMayRemoveOwners = false;
+
     @Builder.Default
     @Column(name = "status", nullable = false, length = 30)
     private String status = "ACTIVE";

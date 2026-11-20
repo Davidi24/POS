@@ -171,6 +171,7 @@ public class MenuItemService {
         item.setSku(NormalizationUtils.normalizeUpper(request.getSku()));
         item.setName(NormalizationUtils.normalize(request.getName()));
         item.setDescription(NormalizationUtils.normalize(request.getDescription()));
+        pos.pos.menu.policy.MenuPriceRule.assertMayChange(authentication, item.getBasePrice(), request.getBasePrice());
         item.setBasePrice(request.getBasePrice());
         // Photos change through their own upload. An update only touches the photo when it names one ("" clears it);
         // a photo it drops is removed from storage once this is saved.

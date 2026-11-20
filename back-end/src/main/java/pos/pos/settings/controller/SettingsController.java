@@ -97,7 +97,7 @@ public class SettingsController {
     }
 
     @PatchMapping("/billing")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('SETTINGS_MONEY')")
     @Operation(summary = "Update billing-related settings")
     public ResponseEntity<SettingsResponse> updateBilling(
             @PathVariable UUID restaurantId,
@@ -196,7 +196,7 @@ public class SettingsController {
     }
 
     @PatchMapping("/payments")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('SETTINGS_MONEY')")
     @Operation(summary = "Set tips, closing paid orders and the refund window")
     public ResponseEntity<SettingsResponse> updatePayments(
             @PathVariable UUID restaurantId,
@@ -207,7 +207,7 @@ public class SettingsController {
     }
 
     @PatchMapping("/fraud-checks")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('SETTINGS_MONEY')")
     @Operation(summary = "Set when discounts, refunds, removals and tips are flagged for review, and which checks run")
     public ResponseEntity<SettingsResponse> updateFraudChecks(
             @PathVariable UUID restaurantId,

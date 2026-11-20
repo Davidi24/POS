@@ -46,7 +46,7 @@ public class InventoryMovementController {
     private final InventoryMovementService inventoryMovementService;
 
     @PostMapping("/receive")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_RECEIVE')")
     @Operation(summary = "Log a delivery (stock receipt)")
     @ApiResponse(responseCode = "201", description = "Receipt recorded")
     public ResponseEntity<InventoryMovementResponse> receive(
@@ -59,7 +59,7 @@ public class InventoryMovementController {
     }
 
     @PostMapping("/waste")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_WASTE')")
     @Operation(summary = "Log wasted or spoiled stock")
     @ApiResponse(responseCode = "201", description = "Waste recorded")
     public ResponseEntity<InventoryMovementResponse> logWaste(
@@ -72,7 +72,7 @@ public class InventoryMovementController {
     }
 
     @PostMapping("/transfer")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_TRANSFER')")
     @Operation(summary = "Move stock from one location to another")
     @ApiResponse(responseCode = "201", description = "Transfer recorded (a TRANSFER_OUT and a TRANSFER_IN movement)")
     public ResponseEntity<List<InventoryMovementResponse>> transfer(
@@ -85,7 +85,7 @@ public class InventoryMovementController {
     }
 
     @PostMapping("/returns")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_ADJUST')")
     @Operation(summary = "Log stock returned to the supplier")
     @ApiResponse(responseCode = "201", description = "Return recorded")
     public ResponseEntity<InventoryMovementResponse> logReturn(
@@ -98,7 +98,7 @@ public class InventoryMovementController {
     }
 
     @PostMapping("/adjustments")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_ADJUST')")
     @Operation(summary = "Log a manual stock correction")
     @ApiResponse(responseCode = "201", description = "Adjustment recorded")
     public ResponseEntity<InventoryMovementResponse> adjust(
@@ -111,7 +111,7 @@ public class InventoryMovementController {
     }
 
     @GetMapping("/movements/{movementId}")
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "Get one movement by id")
     @ApiResponse(responseCode = "200", description = "Movement found")
     @ApiResponse(responseCode = "404", description = "Movement not found")
@@ -124,7 +124,7 @@ public class InventoryMovementController {
     }
 
     @GetMapping("/movements")
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "List movement history, optionally filtered by order line, type, and/or item")
     public ResponseEntity<List<InventoryMovementResponse>> listMovements(
             @PathVariable UUID restaurantId,
@@ -142,7 +142,7 @@ public class InventoryMovementController {
     }
 
     @GetMapping("/item-events")
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "What happened to stock items themselves (added, changed, deleted) and who did it, newest first")
     public ResponseEntity<List<InventoryItemEventResponse>> listItemEvents(
             @PathVariable UUID restaurantId,
@@ -155,7 +155,7 @@ public class InventoryMovementController {
     }
 
     @GetMapping("/movements/people")
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "Who made stock changes (optionally for one item), with how many each")
     public ResponseEntity<List<InventoryMovementPersonResponse>> listMovementPeople(
             @PathVariable UUID restaurantId,

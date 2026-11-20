@@ -39,7 +39,7 @@ public class StatisticsController {
     private final StatisticsService statisticsService;
 
     @GetMapping("/overview")
-    @PreAuthorize("hasAuthority('REPORTS_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.STATISTICS_ANY_READ)
     @Operation(summary = "Key figures with the period before, sales per day, payment methods, order types, best dishes")
     public ResponseEntity<Overview> overview(
             @PathVariable UUID restaurantId,
@@ -53,7 +53,7 @@ public class StatisticsController {
     }
 
     @GetMapping("/sales")
-    @PreAuthorize("hasAuthority('REPORTS_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.STATISTICS_ANY_READ)
     @Operation(summary = "Sales per day, hour and weekday; by order type, source, floor and menu section; best and slowest dishes")
     public ResponseEntity<Sales> sales(
             @PathVariable UUID restaurantId,
@@ -67,7 +67,7 @@ public class StatisticsController {
     }
 
     @GetMapping("/staff")
-    @PreAuthorize("hasAuthority('REPORTS_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.STATISTICS_ANY_READ)
     @Operation(summary = "Per person: orders, sales, tips, discounts, removals, refunds and hours")
     public ResponseEntity<Staff> staff(
             @PathVariable UUID restaurantId,
@@ -81,14 +81,14 @@ public class StatisticsController {
     }
 
     @GetMapping("/reports")
-    @PreAuthorize("hasAuthority('REPORTS_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.STATISTICS_ANY_READ)
     @Operation(summary = "The reports that can be downloaded")
     public ResponseEntity<List<ReportInfo>> reports(@PathVariable UUID restaurantId, Authentication authentication) {
         return ResponseEntity.ok(statisticsService.reports(authentication, restaurantId));
     }
 
     @GetMapping(value = "/reports/{code}.csv", produces = "text/csv")
-    @PreAuthorize("hasAuthority('REPORTS_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.STATISTICS_ANY_READ)
     @Operation(summary = "Download a report as CSV (daily-sales, items, staff, payments)")
     public ResponseEntity<byte[]> report(
             @PathVariable UUID restaurantId,

@@ -31,8 +31,8 @@ import java.util.stream.Collectors;
 
 /**
  * Inventory workspace → Suppliers, kept by the server (2026-10-30): suppliers, their places and the items you buy from
- * them. A stock item's supplier is picked from these ({@link #attachToItem}). Reading needs INVENTORY_READ, changes
- * INVENTORY_UPDATE (as the rest of Inventory).
+ * them. A stock item's supplier is picked from these ({@link #attachToItem}). Reading needs SUPPLIERS_READ (or seeing
+ * items or stock, for the item form), changes SUPPLIERS_UPDATE.
  */
 @Service
 @RequiredArgsConstructor

@@ -36,7 +36,7 @@ public class OptionItemController {
     private final OptionItemService optionItemService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ')")
+    @PreAuthorize("hasAnyAuthority('MENUS_READ', 'KDS_READ', 'KDS_MENU_READ')")
     @Operation(summary = "List items for one option group")
     public ResponseEntity<List<OptionItemResponse>> getOptionItems(
             Authentication authentication,
@@ -71,7 +71,7 @@ public class OptionItemController {
     }
 
     @PatchMapping("/{itemId}/availability")
-    @PreAuthorize("hasAuthority('MENUS_UPDATE')")
+    @PreAuthorize("hasAuthority('MENUS_SOLD_OUT')")
     @Operation(summary = "Update only the availability of an option item")
     public ResponseEntity<OptionItemResponse> updateOptionItemAvailability(
             Authentication authentication,

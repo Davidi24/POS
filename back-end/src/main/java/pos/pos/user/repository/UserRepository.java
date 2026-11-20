@@ -16,6 +16,12 @@ import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
 
+    /** Whether [restaurantId] has an owner (invited or signed up, not removed). */
+    @org.springframework.data.jpa.repository.Query("select count(u) > 0 from User u, UserRole ur, Role r where ur.userId = u.id and ur.roleId = r.id"
+            + " and u.restaurantId = :restaurantId and u.deletedAt is null and r.code = 'OWNER'")
+    boolean restaurantHasOwner(@org.springframework.data.repository.query.Param("restaurantId") java.util.UUID restaurantId);
+
+
     Optional<User> findByIdAndDeletedAtIsNull(UUID id);
 
     Optional<User> findByEmailAndDeletedAtIsNull(String email);

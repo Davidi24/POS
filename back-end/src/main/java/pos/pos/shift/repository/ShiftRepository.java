@@ -13,6 +13,11 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
     @Query("delete from Shift s where s.planId = :planId and s.status = pos.pos.shift.enums.ShiftStatus.SCHEDULED and s.scheduledStart > :now")
     int deletePlannedOfPlan(UUID planId, OffsetDateTime now);
 
+    /** A removed person's planned shifts that haven't started (worked, missed and cancelled ones stay). */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("delete from Shift s where s.user.id = :userId and s.status = pos.pos.shift.enums.ShiftStatus.SCHEDULED and s.scheduledStart > :now")
+    int deletePlannedOfUser(UUID userId, OffsetDateTime now);
+
     /** Like overlaps, but someone clocked in right now doesn't count as busy for all time. */
     @Query("""
         select count(s) from Shift s where s.user.id = :userId

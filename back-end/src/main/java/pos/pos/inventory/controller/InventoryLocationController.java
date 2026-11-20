@@ -36,7 +36,7 @@ public class InventoryLocationController {
     private final InventoryLocationService inventoryLocationService;
 
     @PostMapping
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_PLACES')")
     @Operation(summary = "Register a new inventory location")
     @ApiResponse(responseCode = "201", description = "Location created")
     public ResponseEntity<InventoryLocationResponse> createLocation(
@@ -49,7 +49,7 @@ public class InventoryLocationController {
     }
 
     @PutMapping("/{locationId}")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_PLACES')")
     @Operation(summary = "Replace an inventory location")
     @ApiResponse(responseCode = "200", description = "Location updated")
     @ApiResponse(responseCode = "404", description = "Location not found")
@@ -63,7 +63,7 @@ public class InventoryLocationController {
     }
 
     @GetMapping("/{locationId}")
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "Get one inventory location by id")
     @ApiResponse(responseCode = "200", description = "Location found")
     @ApiResponse(responseCode = "404", description = "Location not found")
@@ -76,7 +76,7 @@ public class InventoryLocationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "List active inventory locations")
     public ResponseEntity<List<InventoryLocationResponse>> listActiveLocations(
             @PathVariable UUID restaurantId,
@@ -86,7 +86,7 @@ public class InventoryLocationController {
     }
 
     @GetMapping("/all")
-    @PreAuthorize("hasAuthority('INVENTORY_READ')")
+    @PreAuthorize(pos.pos.security.rbac.Gates.INVENTORY_ANY_READ)
     @Operation(summary = "List all inventory locations, including inactive")
     public ResponseEntity<List<InventoryLocationResponse>> listAllLocations(
             @PathVariable UUID restaurantId,
@@ -96,7 +96,7 @@ public class InventoryLocationController {
     }
 
     @PostMapping("/{locationId}/delete")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_PLACES')")
     @Operation(summary = "Delete a place: its stock moves to Uncategorized (keepStock) or is taken out; its history stays")
     @ApiResponse(responseCode = "204", description = "Place deleted")
     @ApiResponse(responseCode = "404", description = "Place not found")
@@ -112,7 +112,7 @@ public class InventoryLocationController {
     }
 
     @DeleteMapping("/{locationId}")
-    @PreAuthorize("hasAuthority('INVENTORY_UPDATE')")
+    @PreAuthorize("hasAuthority('INVENTORY_PLACES')")
     @Operation(summary = "Deactivate an inventory location (soft, not a real delete)")
     @ApiResponse(responseCode = "204", description = "Location deactivated")
     @ApiResponse(responseCode = "404", description = "Location not found")

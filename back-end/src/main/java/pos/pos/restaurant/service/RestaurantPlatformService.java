@@ -64,8 +64,11 @@ public class RestaurantPlatformService {
         String searchLike = NormalizationUtils.normalizeLowerLike(search);
         long offset = (long) pageNumber * pageSize;
         if (offset > Integer.MAX_VALUE) throw new AuthException("page is too large", HttpStatus.BAD_REQUEST);
-        var items = restaurantCardRepository.cards(searchLike, open, pageSize, (int) offset);
-        long total = restaurantCardRepository.count(searchLike, open);
+        // A support admin sees only the restaurants the Super Admin gave them (user, 2026-11-19).
+        var scope = actorScopeService.resolve(authentication);
+        UUID onlyFor = scope.roleCodes().contains("SUPER_ADMIN") ? null : scope.userId();
+        var items = restaurantCardRepository.cards(searchLike, open, pageSize, (int) offset, onlyFor);
+        long total = restaurantCardRepository.count(searchLike, open, onlyFor);
         return PageResponse.from(new PageImpl<>(items, PageRequest.of(pageNumber, pageSize), total));
     }
 
