@@ -1,0 +1,2 @@
+ALTER TABLE order_write_requests RENAME TO write_request_replays;
+ALTER INDEX idx_order_write_requests_created RENAME TO idx_write_request_replays_created;

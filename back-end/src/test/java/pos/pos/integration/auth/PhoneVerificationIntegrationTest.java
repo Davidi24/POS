@@ -29,6 +29,7 @@ import pos.pos.auth.repository.AuthSmsOtpCodeRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.auth.service.SmsMessageService;
 import pos.pos.security.service.PasswordService;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -39,6 +40,11 @@ import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -57,13 +63,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PhoneVerificationIntegrationTest {
 
     private static final String SCHEMA = "phone_verify_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String DEFAULT_PASSWORD = "StrongPass123!";
     private static final String TOO_MANY_REQUESTS_MESSAGE = "Too many phone verification requests. Try again later.";
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "phone-verification-test-secret-key-for-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "phone-verification-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "phone-verification-password-reset-pepper-value");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "phone-verification-email-verification-pepper");
@@ -260,6 +267,61 @@ class PhoneVerificationIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("AUTH-049A concurrent wrong phone codes cannot bypass the attempt limit")
+    void concurrentWrongPhoneCodesCannotBypassAttemptLimit() throws Exception {
+        User user = createUser("auth049a", false);
+        AuthTokens tokens = webLogin(user.getUsername(), DEFAULT_PASSWORD, nextIp(), "AUTH-049A-login", status().isOk());
+        mockMvc.perform(post("/auth/request-phone-verification")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tokens.accessToken())))
+                .andExpect(status().isNoContent());
+
+        String issuedCode = latestPhoneVerificationCode.get();
+        String wrongCode = differentCodeFrom(issuedCode);
+        AuthSmsOtpCode issued = latestPhoneCodeFor(user.getId());
+        int requests = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(requests);
+        CountDownLatch ready = new CountDownLatch(requests);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            java.util.List<Future<Integer>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < requests; i++) {
+                results.add(pool.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Concurrent phone verification requests did not start");
+                    }
+                    return mockMvc.perform(post("/auth/verify-phone")
+                                    .header(HttpHeaders.AUTHORIZATION, bearer(tokens.accessToken()))
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(Map.of("code", wrongCode))))
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            for (Future<Integer> result : results) {
+                assertThat(result.get(20, TimeUnit.SECONDS)).isEqualTo(401);
+            }
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+
+        AuthSmsOtpCode exhausted = authSmsOtpCodeRepository.findById(issued.getId()).orElseThrow();
+        assertThat(exhausted.getFailedAttempts()).isEqualTo(5);
+        assertThat(exhausted.getUsedAt()).isNotNull();
+        assertThat(userRepository.findById(user.getId()).orElseThrow().isPhoneVerified()).isFalse();
+
+        mockMvc.perform(post("/auth/verify-phone")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tokens.accessToken()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("code", issuedCode))))
+                .andExpect(status().isUnauthorized());
+    }
+
     private AuthTokens webLogin(String identifier, String password, String ip, String userAgent, ResultMatcher expectedStatus)
             throws Exception {
         MvcResult result = mockMvc.perform(post("/auth/web/login")
@@ -272,8 +334,7 @@ class PhoneVerificationIntegrationTest {
                 .andExpect(expectedStatus)
                 .andReturn();
 
-        JsonNode body = bodyOf(result);
-        return new AuthTokens(body.get("accessToken").asText());
+        return new AuthTokens(extractCookieValue(result, ACCESS_COOKIE_NAME));
     }
 
     private User createUser(String label, boolean phoneVerified) {
@@ -314,6 +375,19 @@ class PhoneVerificationIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private RequestPostProcessor client(String ip, String userAgent) {

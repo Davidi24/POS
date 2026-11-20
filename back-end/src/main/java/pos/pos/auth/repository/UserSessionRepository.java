@@ -22,6 +22,9 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
 
     long countByUserIdAndRevokedFalseAndExpiresAtAfter(UUID userId, OffsetDateTime now);
 
+    /** Signed-in devices of one kind (the 5-device limit counts PASSWORD sessions only; PIN ones are on shared tills). */
+    long countByUserIdAndRevokedFalseAndExpiresAtAfterAndSessionType(UUID userId, OffsetDateTime now, pos.pos.auth.enums.SessionType sessionType);
+
     Optional<UserSession> findByIdAndUserIdAndRevokedFalse(UUID id, UUID userId);
 
     //Fetches a non-revoked session by tokenId and locks it so no one else can modify it concurrently, so it locks in the db so no one uses that row.
@@ -47,15 +50,18 @@ public interface UserSessionRepository extends JpaRepository<UserSession, UUID> 
     // When a new session is created and the limit is exceeded,
     // the oldest active (non-revoked, non-expired) session is revoked
     // to make room for the new one.
+    // {h-schema} is required: hibernate's default_schema applies to HQL/entity
+    // mappings but NOT to native SQL, so an unqualified name fails with
+    // "relation user_sessions does not exist".
     @Modifying
     @Query(value = """
-        UPDATE user_sessions
+        UPDATE {h-schema}user_sessions
         SET revoked = true,
             revoked_at = :now,
             revoked_reason = :reason
         WHERE id = (
             SELECT id
-            FROM user_sessions
+            FROM {h-schema}user_sessions
             WHERE user_id = :userId
               AND revoked = false
               AND expires_at > :now

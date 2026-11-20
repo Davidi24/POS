@@ -45,7 +45,7 @@ public class DeviceManagementController {
     }
 
     @PostMapping("/assignments")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Create or replace the active device assignment")
     public ResponseEntity<DeviceAssignmentResponse> createAssignment(
             @PathVariable UUID restaurantId,
@@ -58,7 +58,7 @@ public class DeviceManagementController {
     }
 
     @PostMapping("/assignments/{assignmentId}/unassign")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Close an active device assignment")
     public ResponseEntity<DeviceAssignmentResponse> unassign(
             @PathVariable UUID restaurantId,
@@ -81,7 +81,7 @@ public class DeviceManagementController {
     }
 
     @PostMapping("/pairing-tokens")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Issue a new device pairing token")
     public ResponseEntity<DevicePairingTokenResponse> createPairingToken(
             @PathVariable UUID restaurantId,
@@ -94,7 +94,7 @@ public class DeviceManagementController {
     }
 
     @PostMapping("/pairing-tokens/{pairingTokenId}/revoke")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Revoke a device pairing token")
     public ResponseEntity<DevicePairingTokenResponse> revokePairingToken(
             @PathVariable UUID restaurantId,

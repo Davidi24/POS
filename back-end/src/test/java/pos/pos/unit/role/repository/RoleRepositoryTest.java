@@ -134,8 +134,9 @@ class RoleRepositoryTest extends AbstractTestProfilePostgresTest {
     class FindAssignableRolesForActorRankTests {
 
         @Test
-        @DisplayName("Should return only active assignable unprotected roles below actor rank in sorted order")
-        void shouldReturnOnlyAssignableRolesBelowActorRank() {
+        @DisplayName("Should return only active assignable unprotected roles at or below actor rank in sorted order")
+        void shouldReturnOnlyAssignableRolesAtOrBelowActorRank() {
+            repository.save(role("admin", "Admin", 30_000L, true, true, false));
             repository.save(role("manager", "Manager", 20_000L, true, true, false));
             repository.save(role("supervisor", "Supervisor", 15_000L, true, true, false));
             repository.save(role("cashier", "Cashier", 10_000L, true, true, false));
@@ -150,7 +151,7 @@ class RoleRepositoryTest extends AbstractTestProfilePostgresTest {
 
             assertThat(result)
                     .extracting(Role::getCode)
-                    .containsExactly("SUPERVISOR", "BAKER", "CASHIER");
+                    .containsExactly("MANAGER", "SUPERVISOR", "BAKER", "CASHIER");
         }
     }
 

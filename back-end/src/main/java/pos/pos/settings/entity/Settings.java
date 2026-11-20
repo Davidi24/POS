@@ -27,6 +27,7 @@ import pos.pos.settings.enums.WeekStartDay;
 import pos.pos.utils.NormalizationUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -120,6 +121,12 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "service_charge_value", precision = 12, scale = 2)
     private BigDecimal serviceChargeValue;
 
+    @Column(name = "order_tax_rate", nullable = false, precision = 7, scale = 4)
+    private BigDecimal orderTaxRate = BigDecimal.ZERO;
+
+    @Column(name = "order_tax_inclusive", nullable = false)
+    private boolean orderTaxInclusive = false;
+
     // if you want to round the amount like 10.291 dollar to make 290 dollar
     @Column(name = "cash_rounding_enabled", nullable = false)
     private boolean cashRoundingEnabled = false;
@@ -142,11 +149,228 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "enable_qr_ordering", nullable = false)
     private boolean enableQrOrdering = false;
 
+    // Off until the restaurant switches it on (user rule, 2026-10-29): no takeaway tabs or orders unless it's enabled.
     @Column(name = "enable_takeaway", nullable = false)
-    private boolean enableTakeaway = true;
+    private boolean enableTakeaway = false;
 
     @Column(name = "enable_delivery", nullable = false)
     private boolean enableDelivery = false;
+
+    // Off: only Owner and Co-Owner create, edit and delete Managers. On: Admins can too. Only Owner and Co-Owner flip it.
+    @Column(name = "admins_can_manage_managers", nullable = false)
+    private boolean adminsCanManageManagers = false;
+
+    // Guests may order dishes with their reservation; off until the restaurant opts in.
+    @Column(name = "pre_orders_enabled", nullable = false)
+    private boolean preOrdersEnabled = false;
+
+    // How many minutes before the booking a pre-order goes to the kitchen; until then it can still be changed or refunded.
+    @Column(name = "pre_order_lead_minutes", nullable = false)
+    private int preOrderLeadMinutes = 30;
+
+    // Reservation policy (Admin Hub → Settings → Reservations). Groups of largeGroupFrom+ get extra table time.
+    @Column(name = "large_group_from", nullable = false)
+    private int largeGroupFrom = 5;
+
+    @Column(name = "large_group_extra_minutes", nullable = false)
+    private int largeGroupExtraMinutes = 15;
+
+    // Bookings of this many guests or more need staff approval.
+    @Column(name = "approval_group_size", nullable = false)
+    private int approvalGroupSize = 7;
+
+    // A late guest's table is held this long after the start; the "hold ends" warning shows at holdWarningMinutes.
+    @Column(name = "hold_minutes", nullable = false)
+    private int holdMinutes = 30;
+
+    @Column(name = "hold_warning_minutes", nullable = false)
+    private int holdWarningMinutes = 20;
+
+    @Column(name = "check_in_opens_minutes", nullable = false)
+    private int checkInOpensMinutes = 120;
+
+    // When managers are told the day before about bookings still waiting for attendance confirmation.
+    @Column(name = "confirm_reminder_time", nullable = false)
+    private LocalTime confirmReminderTime = LocalTime.of(15, 0);
+
+    // Same-day bookings: attendance should be confirmed this long before the start.
+    @Column(name = "same_day_confirm_minutes", nullable = false)
+    private int sameDayConfirmMinutes = 120;
+
+    // No attendance reply this long before the start: staff are asked to call.
+    @Column(name = "attendance_call_minutes", nullable = false)
+    private int attendanceCallMinutes = 120;
+
+    // Staff may reopen a cancelled / no-show booking within this window; after it, a manager with a reason.
+    @Column(name = "reopen_window_minutes", nullable = false)
+    private int reopenWindowMinutes = 60;
+
+    @Column(name = "undo_seat_minutes", nullable = false)
+    private int undoSeatMinutes = 15;
+
+    // Staff bookings confirmed at once when a table fits; off = every booking waits for approval (user, 2026-11-02).
+    @Column(name = "auto_confirm_bookings", nullable = false)
+    private boolean autoConfirmBookings = true;
+
+    // No answer to "Still coming?": asked again this many hours before (0 = never).
+    @Column(name = "guest_second_reminder_hours", nullable = false)
+    private int guestSecondReminderHours = 6;
+
+    // A guest who never confirmed: their table waits this long (0 = the usual hold).
+    @Column(name = "unconfirmed_hold_minutes", nullable = false)
+    private int unconfirmedHoldMinutes = 15;
+
+    // Told about tomorrow's bookings and about bookings staff must look at.
+    @Column(name = "booking_alert_roles", nullable = false, length = 200)
+    private String bookingAlertRoles = "OWNER,MANAGER";
+
+    // How much extra hold a guest can ask for with "I'm running late".
+    @Column(name = "running_late_max_minutes", nullable = false)
+    private int runningLateMaxMinutes = 30;
+
+    // A guest counts as late this long after the booking time.
+    @Column(name = "late_after_minutes", nullable = false)
+    private int lateAfterMinutes = 15;
+
+    // How long before the booking the guest gets "Still coming? [Confirm] [Cancel]".
+    @Column(name = "guest_reminder_hours", nullable = false)
+    private int guestReminderHours = 24;
+
+    // Staff are warned about a guest's new booking from this many no-shows.
+    @Column(name = "no_show_warning_from", nullable = false)
+    private int noShowWarningFrom = 1;
+
+    // When deposits are on, bookings from this many guests pay one.
+    @Column(name = "deposit_from_guests", nullable = false)
+    private int depositFromGuests = 7;
+
+    // The payment provider's fee, kept back on refunds: percent of the amount plus a fixed part.
+    @Column(name = "card_fee_percent", nullable = false, precision = 5, scale = 2)
+    private java.math.BigDecimal cardFeePercent = new java.math.BigDecimal("1.50");
+
+    @Column(name = "card_fee_fixed", nullable = false, precision = 12, scale = 2)
+    private java.math.BigDecimal cardFeeFixed = new java.math.BigDecimal("0.25");
+
+    // The waiters' Kitchen Status: an order counts as taking long after this, and ready food as waiting too long.
+    @Column(name = "kitchen_slow_after_minutes", nullable = false)
+    private int kitchenSlowAfterMinutes = 20;
+
+    @Column(name = "kitchen_ready_waiting_minutes", nullable = false)
+    private int kitchenReadyWaitingMinutes = 5;
+
+    // Inventory → Overview: stock worth at least this much (at cost) counts as valuable.
+    @Column(name = "valuable_stock_from", nullable = false, precision = 12, scale = 2)
+    private java.math.BigDecimal valuableStockFrom = new java.math.BigDecimal("100.00");
+
+    // How often each active inventory place should be physically counted.
+    @Column(name = "inventory_count_frequency", nullable = false)
+    private int inventoryCountFrequency = 1;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "inventory_count_period", nullable = false, length = 10)
+    private pos.pos.settings.enums.InventoryCountPeriod inventoryCountPeriod = pos.pos.settings.enums.InventoryCountPeriod.WEEKLY;
+
+    // Schedule changes start a fresh run so enabling the schedule doesn't create old missed counts.
+    @Column(name = "inventory_count_schedule_started_at", nullable = false)
+    private java.time.OffsetDateTime inventoryCountScheduleStartedAt = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);
+
+    // Who is told when an order is closed as unpaid: role codes separated by commas.
+    @Column(name = "unpaid_alert_roles", nullable = false, length = 500)
+    private String unpaidAlertRoles = "OWNER,MANAGER";
+
+    // Seating: up to this many guests over a table's seats is normal.
+    @Column(name = "seating_extra_guests", nullable = false)
+    private int seatingExtraGuests = 2;
+
+    // Seating: a table can't take more than this many guests over its seats. Above the normal number it's unusual, and the
+    // people below are told right away.
+    @Column(name = "seating_most_extra_guests", nullable = false)
+    private int seatingMostExtraGuests = 4;
+
+    // Seating: who is told, role codes separated by commas.
+    @Column(name = "seating_alert_roles", nullable = false, length = 500)
+    private String seatingAlertRoles = "OWNER,MANAGER";
+
+    // Guests still at a table this long before its next booking: the table warns.
+    @Column(name = "next_booking_warning_minutes", nullable = false)
+    private int nextBookingWarningMinutes = 15;
+
+    @Column(name = "join_booking_warning_minutes", nullable = false)
+    private int joinBookingWarningMinutes = 120;
+
+    @Column(name = "booking_coming_minutes", nullable = false)
+    private int bookingComingMinutes = 30;
+
+    // Special cases (Settings → Tables): minutes without any action on a table or its order before the system steps in; 0 = never.
+    @Column(name = "special_case_paid_minutes", nullable = false)
+    private int specialCasePaidMinutes = 60;
+
+    @Column(name = "special_case_seated_minutes", nullable = false)
+    private int specialCaseSeatedMinutes = 240;
+
+    @Column(name = "special_case_order_minutes", nullable = false)
+    private int specialCaseOrderMinutes = 240;
+
+    @Column(name = "special_case_warning_minutes", nullable = false)
+    private int specialCaseWarningMinutes = 30;
+
+    @Column(name = "special_case_auto_move", nullable = false)
+    private boolean specialCaseAutoMove = true;
+
+    @Column(name = "special_case_booking_no_action", nullable = false)
+    private boolean specialCaseBookingNoAction = true;
+
+    // The "Give more time" buttons, minutes separated by commas.
+    @Column(name = "special_case_more_time", nullable = false, length = 30)
+    private String specialCaseMoreTime = "10,15,30";
+
+    @Column(name = "special_case_alert_roles", nullable = false, length = 500)
+    private String specialCaseAlertRoles = "OWNER,MANAGER";
+
+    // Staff can clock in for a scheduled shift from this long before it starts.
+    @Column(name = "clock_in_early_minutes", nullable = false)
+    private int clockInEarlyMinutes = 120;
+
+    // POS → My shift → Team: staff see everyone working; off, only people in their own role.
+    @Column(name = "staff_see_whole_team", nullable = false)
+    private boolean staffSeeWholeTeam = true;
+
+    // Payments: tips offered at the till, the biggest tip accepted (as a share of the bill), closing paid orders,
+    // and how many days after payment a refund can still be given.
+    @Column(name = "tips_enabled", nullable = false)
+    private boolean tipsEnabled = true;
+
+    @Column(name = "tip_suggestions", nullable = false, length = 50)
+    private String tipSuggestions = "5,10,15";
+
+    @Column(name = "max_tip_percent", nullable = false)
+    private int maxTipPercent = 50;
+
+    @Column(name = "auto_close_paid_orders", nullable = false)
+    private boolean autoClosePaidOrders = true;
+
+    @Column(name = "refund_window_days", nullable = false)
+    private int refundWindowDays = 30;
+
+    // Fraud checks: when a discount, refund, void or tip is flagged for an owner to look at.
+    @Column(name = "fraud_discount_percent", nullable = false)
+    private int fraudDiscountPercent = 30;
+
+    @Column(name = "fraud_refund_amount", nullable = false, precision = 12, scale = 2)
+    private java.math.BigDecimal fraudRefundAmount = new java.math.BigDecimal("50.00");
+
+    @Column(name = "fraud_voids_per_day", nullable = false)
+    private int fraudVoidsPerDay = 5;
+
+    @Column(name = "fraud_tip_percent", nullable = false)
+    private int fraudTipPercent = 30;
+
+    @Column(name = "fraud_cash_refunds_per_day", nullable = false)
+    private int fraudCashRefundsPerDay = 2;
+
+    // Rule codes the owner switched off, comma separated.
+    @Column(name = "fraud_disabled_rules", nullable = false, length = 500)
+    private String fraudDisabledRules = "";
 
     @OneToOne(mappedBy = "settings", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private SettingsReceipt receiptSettings;

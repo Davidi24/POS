@@ -28,6 +28,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -63,7 +64,7 @@ class RestaurantTaxProfileServiceTest {
                 .isDefault(true)
                 .build();
 
-        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant);
+        given(restaurantScopeService.requirePlatformManagedRestaurant(eq(authentication), eq(RESTAURANT_ID), org.mockito.ArgumentMatchers.anyString())).willReturn(restaurant);
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
         given(restaurantTaxProfileRepository.save(any(RestaurantTaxProfile.class))).willAnswer(invocation -> {
             RestaurantTaxProfile taxProfile = invocation.getArgument(0);
@@ -77,7 +78,7 @@ class RestaurantTaxProfileServiceTest {
 
         assertThat(response.getId()).isNotNull();
         assertThat(response.getIsDefault()).isTrue();
-        verify(restaurantTaxProfileRepository).clearAllDefault(RESTAURANT_ID, ACTOR_ID);
+        verify(restaurantTaxProfileRepository).clearAllDefault(RESTAURANT_ID, ACTOR_ID, null);
     }
 
     @Test
@@ -101,7 +102,7 @@ class RestaurantTaxProfileServiceTest {
         Authentication authentication = authentication();
         RestaurantTaxProfile target = taxProfile(TAX_PROFILE_ID, false);
 
-        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant());
+        given(restaurantScopeService.requirePlatformManagedRestaurant(eq(authentication), eq(RESTAURANT_ID), org.mockito.ArgumentMatchers.anyString())).willReturn(restaurant());
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
         given(restaurantTaxProfileRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(TAX_PROFILE_ID, RESTAURANT_ID))
                 .willReturn(Optional.of(target));
@@ -110,7 +111,7 @@ class RestaurantTaxProfileServiceTest {
 
         assertThat(target.isDefault()).isTrue();
         assertThat(response.getId()).isEqualTo(TAX_PROFILE_ID);
-        verify(restaurantTaxProfileRepository).clearAllDefault(RESTAURANT_ID, ACTOR_ID);
+        verify(restaurantTaxProfileRepository).clearAllDefault(RESTAURANT_ID, ACTOR_ID, TAX_PROFILE_ID);
         verify(restaurantTaxProfileRepository).save(target);
     }
 
@@ -126,7 +127,7 @@ class RestaurantTaxProfileServiceTest {
                 .isDefault(true)
                 .build();
 
-        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant());
+        given(restaurantScopeService.requirePlatformManagedRestaurant(eq(authentication), eq(RESTAURANT_ID), org.mockito.ArgumentMatchers.anyString())).willReturn(restaurant());
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
         given(restaurantTaxProfileRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(TAX_PROFILE_ID, RESTAURANT_ID))
                 .willReturn(Optional.of(target));
@@ -137,7 +138,7 @@ class RestaurantTaxProfileServiceTest {
 
         assertThat(target.isDefault()).isTrue();
         assertThat(response.getId()).isEqualTo(TAX_PROFILE_ID);
-        verify(restaurantTaxProfileRepository).clearAllDefault(RESTAURANT_ID, ACTOR_ID);
+        verify(restaurantTaxProfileRepository).clearAllDefault(RESTAURANT_ID, ACTOR_ID, TAX_PROFILE_ID);
     }
 
     @Test
@@ -146,7 +147,7 @@ class RestaurantTaxProfileServiceTest {
         Authentication authentication = authentication();
         RestaurantTaxProfile target = taxProfile(TAX_PROFILE_ID, false);
 
-        given(restaurantScopeService.requireManageableRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant());
+        given(restaurantScopeService.requirePlatformManagedRestaurant(eq(authentication), eq(RESTAURANT_ID), org.mockito.ArgumentMatchers.anyString())).willReturn(restaurant());
         given(restaurantScopeService.currentUserId(authentication)).willReturn(ACTOR_ID);
         given(restaurantTaxProfileRepository.findByIdAndRestaurantIdAndDeletedAtIsNull(TAX_PROFILE_ID, RESTAURANT_ID))
                 .willReturn(Optional.of(target));

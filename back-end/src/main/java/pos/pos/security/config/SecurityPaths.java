@@ -3,16 +3,19 @@ package pos.pos.security.config;
 public class SecurityPaths {
 
     public static final String[] PUBLIC = {
+            "/auth/.well-known/jwks.json",
             "/auth/web/login",
             "/auth/web/refresh",
             "/auth/web/logout",
             "/auth/web/logout-all",
             "/auth/device/login",
+            "/auth/device/pin-login",
             "/auth/device/refresh",
             "/auth/device/logout",
             "/auth/device/logout-all",
             "/auth/forgot-password",
             "/auth/reset-password",
+            "/auth/password-link",
             "/auth/reset-password/code",
             "/auth/verify-email",
             "/auth/resend-verification",
@@ -21,6 +24,8 @@ public class SecurityPaths {
             "/restaurants/registrations",
             "/restaurants/registrations/*",
             "/public/**",
+            "/health/live",
+            "/health/ready",
 
             "/v3/api-docs/**",
             "/swagger-ui/**",

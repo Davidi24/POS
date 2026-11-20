@@ -73,14 +73,19 @@ public class BranchValidationService {
         return manager.getId();
     }
 
+    // Removed branches keep their code (the database keeps codes unique per restaurant), so they count too.
     private void assertUniqueCode(UUID restaurantId, String code, UUID branchId) {
         boolean exists = branchId == null
-                ? branchRepository.existsByRestaurantIdAndCodeAndDeletedAtIsNull(restaurantId, code)
-                : branchRepository.existsByRestaurantIdAndCodeAndIdNotAndDeletedAtIsNull(restaurantId, code, branchId);
-
-        if (exists) {
-            throw new BranchCodeAlreadyExistsException();
+                ? branchRepository.existsByRestaurantIdAndCode(restaurantId, code)
+                : branchRepository.existsByRestaurantIdAndCodeAndIdNot(restaurantId, code, branchId);
+        if (!exists) {
+            return;
         }
+        if (branchRepository.existsByRestaurantIdAndCodeAndDeletedAtIsNotNull(restaurantId, code)) {
+            throw new BranchCodeAlreadyExistsException(
+                    "This code belonged to a removed branch and stays reserved. Choose another code.");
+        }
+        throw new BranchCodeAlreadyExistsException();
     }
 
     public record NormalizedBranchFields(String code) {

@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.repository.RestaurantRepository;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -51,6 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RestaurantRegistrationApiIntegrationTest {
 
     private static final String SCHEMA = "restaurant_reg_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String ADMIN_EMAIL = "prod.admin@pos.example";
     private static final String ADMIN_USERNAME = "prodadmin";
     private static final String ADMIN_PASSWORD = "StrongPass123!";
@@ -59,11 +61,16 @@ class RestaurantRegistrationApiIntegrationTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "restaurant-reg-test-secret-key-for-hs256");
+        TestJwtKeySupport.registerJwtProperties(registry);
+        registry.add("app.restaurants.public-registration-enabled", () -> "true");
+        // Every request here comes from the same address; the limits have their own test.
+        registry.add("app.restaurants.applications.max-per-ip", () -> "1000");
+        registry.add("app.restaurants.applications.status-checks-per-ip", () -> "1000");
         registry.add("REFRESH_TOKEN_PEPPER", () -> "restaurant-reg-test-refresh-token-pepper");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "restaurant-reg-test-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "restaurant-reg-test-email-verification-pepper");
         registry.add("SMS_CODE_PEPPER", () -> "restaurant-reg-test-sms-pepper");
+        registry.add("app.storage.menu-images.provider", () -> "disabled");
         registry.add("MAIL_HOST", () -> "localhost");
         registry.add("MAIL_PORT", () -> "2525");
         registry.add("MAIL_USERNAME", () -> "integration");
@@ -110,7 +117,7 @@ class RestaurantRegistrationApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should create a pending registration and allow super admin to approve it")
+    @DisplayName("Should create a pending application, email its code, and let a super admin approve it")
     void shouldRegisterAndApproveRestaurant() throws Exception {
         assertThat(List.of(environment.getActiveProfiles())).containsExactly("prod");
 
@@ -120,35 +127,42 @@ class RestaurantRegistrationApiIntegrationTest {
 
         JsonNode pending = bodyOf(mockMvc.perform(post("/restaurants/registrations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "name", "Reg Restaurant " + uid,
-                                "legalName", "Reg Restaurant " + uid + " LLC",
-                                "currency", "EUR",
-                                "timezone", "Europe/Tirane",
-                                "owner", Map.of(
-                                        "email", ownerEmail,
-                                        "username", ownerUsername,
-                                        "firstName", "Reg",
-                                        "lastName", "Owner"
-                                )
-                        ))))
+                        .content(objectMapper.writeValueAsString(application("Reg Restaurant " + uid, ownerEmail, ownerUsername, "Europe/Tirane"))))
                 .andExpect(status().isCreated())
                 .andReturn());
 
         UUID restaurantId = UUID.fromString(pending.get("id").asText());
+        String code = pending.get("statusCode").asText();
         assertThat(pending.get("status").asText()).isEqualTo("PENDING");
-        assertThat(pending.get("isActive").asBoolean()).isFalse();
-        assertThat(pending.get("ownerUserId").isNull()).isTrue();
+        assertThat(code).matches("[0-9A-Z]{5}(-[0-9A-Z]{5}){3}");
+        assertThat(pending.has("ownerUserId")).isFalse();
 
         Restaurant saved = restaurantRepository.findByIdAndDeletedAtIsNull(restaurantId).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(RestaurantStatus.PENDING);
         assertThat(saved.getPendingOwnerEmail()).isEqualTo(ownerEmail.toLowerCase());
         assertThat(saved.getOwnerId()).isNull();
+        assertThat(saved.getEmail()).isEqualTo("contact." + uid + "@restaurant.example");
+        assertThat(saved.getApplicationCodeHash()).isNotBlank().doesNotContain(code);
+        assertThat(saved.getApplicationCodeHash()).doesNotContain(code.replace("-", ""));
 
-        verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
+        // The applicant got their code by email; no account exists yet.
+        ArgumentCaptor<SimpleMailMessage> received = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(javaMailSender).send(received.capture());
+        assertThat(received.getValue().getTo()).contains(ownerEmail.toLowerCase());
+        assertThat(received.getValue().getText()).contains(code);
+        assertThat(userRepository.findByEmailAndDeletedAtIsNull(ownerEmail.toLowerCase())).isEmpty();
+        assertThat(applicationStatus(code).get("status").asText()).isEqualTo("PENDING");
+        reset(javaMailSender);
+        doNothing().when(javaMailSender).send(any(SimpleMailMessage.class));
 
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
-        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
+        JsonNode queue = bodyOf(mockMvc.perform(MockMvcRequestBuilders.get("/platform/restaurant-applications")
+                        .param("search", uid)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andReturn());
+        assertThat(queue.get("items")).hasSize(1);
+        assertThat(queue.get("items").get(0).get("owner").get("username").asText()).isEqualTo(ownerUsername);
 
         JsonNode approved = bodyOf(mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", restaurantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
@@ -157,10 +171,10 @@ class RestaurantRegistrationApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn());
 
-        assertThat(approved.get("status").asText()).isEqualTo("ACTIVE");
-        assertThat(approved.get("isActive").asBoolean()).isTrue();
-        assertThat(approved.get("ownerUserId").isNull()).isFalse();
+        assertThat(approved.get("status").asText()).isEqualTo("APPROVED");
+        assertThat(approved.get("reviewedAt").isNull()).isFalse();
 
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(javaMailSender).send(captor.capture());
         SimpleMailMessage inviteMail = captor.getValue();
         assertThat(inviteMail.getTo()).contains(ownerEmail.toLowerCase());
@@ -169,6 +183,11 @@ class RestaurantRegistrationApiIntegrationTest {
         assertThat(approvedDb.getStatus()).isEqualTo(RestaurantStatus.ACTIVE);
         assertThat(approvedDb.getOwnerId()).isNotNull();
         assertThat(approvedDb.getPendingOwnerEmail()).isNull();
+        assertThat(approvedDb.getReviewedBy()).isNotNull();
+        // Approved restaurants open with a first branch, like the ones super admins create.
+        assertThat(jdbcTemplate.queryForObject("SELECT code FROM branches WHERE restaurant_id = ? AND deleted_at IS NULL",
+                String.class, restaurantId)).isEqualTo("MAIN");
+        assertThat(applicationStatus(code).get("status").asText()).isEqualTo("APPROVED");
 
         User owner = userRepository.findByEmailAndDeletedAtIsNull(ownerEmail.toLowerCase()).orElseThrow();
         assertThat(owner.getRestaurantId()).isEqualTo(restaurantId);
@@ -182,7 +201,7 @@ class RestaurantRegistrationApiIntegrationTest {
                         ))))
                 .andExpect(status().isNoContent());
 
-        String ownerToken = bodyOf(webLogin(ownerUsername, OWNER_SETUP_PASSWORD)).get("accessToken").asText();
+        String ownerToken = accessTokenOf(webLogin(ownerUsername, OWNER_SETUP_PASSWORD));
         JsonNode ownerView = bodyOf(mockMvc.perform(
                         MockMvcRequestBuilders.get("/restaurants/{restaurantId}", restaurantId)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken)))
@@ -192,7 +211,7 @@ class RestaurantRegistrationApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should create a pending registration and allow super admin to reject it")
+    @DisplayName("Should need a reason to reject, then show it to the applicant and email it, creating no account")
     void shouldRegisterAndRejectRestaurant() throws Exception {
         String uid = uid();
         String ownerEmail = "rej.owner." + uid + "@pos.example";
@@ -200,75 +219,69 @@ class RestaurantRegistrationApiIntegrationTest {
 
         JsonNode pending = bodyOf(mockMvc.perform(post("/restaurants/registrations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "name", "Rejected Restaurant " + uid,
-                                "legalName", "Rejected Restaurant " + uid + " LLC",
-                                "currency", "USD",
-                                "timezone", "America/New_York",
-                                "owner", Map.of(
-                                        "email", ownerEmail,
-                                        "username", ownerUsername,
-                                        "firstName", "Rej",
-                                        "lastName", "Owner"
-                                )
-                        ))))
+                        .content(objectMapper.writeValueAsString(application("Rejected Restaurant " + uid, ownerEmail, ownerUsername, "America/New_York"))))
                 .andExpect(status().isCreated())
                 .andReturn());
 
         UUID restaurantId = UUID.fromString(pending.get("id").asText());
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
-
-        JsonNode rejected = bodyOf(mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", restaurantId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("decision", "REJECT"))))
-                .andExpect(status().isOk())
-                .andReturn());
-
-        assertThat(rejected.get("status").asText()).isEqualTo("REJECTED");
-        assertThat(rejected.get("isActive").asBoolean()).isFalse();
-        assertThat(rejected.get("ownerUserId").isNull()).isTrue();
-
-        verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
-        assertThat(userRepository.findByEmailAndDeletedAtIsNull(ownerEmail.toLowerCase())).isEmpty();
-    }
-
-    @Test
-    @DisplayName("Should reject a second review attempt on an already reviewed registration")
-    void shouldRejectDoubleReview() throws Exception {
-        String uid = uid();
-
-        JsonNode pending = bodyOf(mockMvc.perform(post("/restaurants/registrations")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "name", "Double Review " + uid,
-                                "legalName", "Double Review " + uid + " LLC",
-                                "currency", "USD",
-                                "timezone", "Europe/Berlin",
-                                "owner", Map.of(
-                                        "email", "double.owner." + uid + "@pos.example",
-                                        "username", "double.owner." + uid,
-                                        "firstName", "Double",
-                                        "lastName", "Owner"
-                                )
-                        ))))
-                .andExpect(status().isCreated())
-                .andReturn());
-
-        UUID restaurantId = UUID.fromString(pending.get("id").asText());
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String code = pending.get("statusCode").asText();
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
+        reset(javaMailSender);
+        doNothing().when(javaMailSender).send(any(SimpleMailMessage.class));
 
         mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", restaurantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("decision", "REJECT"))))
+                .andExpect(status().isBadRequest());
+
+        JsonNode rejected = bodyOf(mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", restaurantId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("decision", "REJECT", "rejectionReason", "We need your business licence"))))
+                .andExpect(status().isOk())
+                .andReturn());
+
+        assertThat(rejected.get("status").asText()).isEqualTo("REJECTED");
+        assertThat(rejected.get("rejectionReason").asText()).isEqualTo("We need your business licence");
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(javaMailSender).send(captor.capture());
+        assertThat(captor.getValue().getTo()).contains(ownerEmail.toLowerCase());
+        assertThat(captor.getValue().getText()).contains("We need your business licence");
+        assertThat(userRepository.findByEmailAndDeletedAtIsNull(ownerEmail.toLowerCase())).isEmpty();
+
+        JsonNode status = applicationStatus(code);
+        assertThat(status.get("status").asText()).isEqualTo("REJECTED");
+        assertThat(status.get("rejectionReason").asText()).isEqualTo("We need your business licence");
+    }
+
+    @Test
+    @DisplayName("Should refuse a second decision on an application with 409")
+    void shouldRejectDoubleReview() throws Exception {
+        String uid = uid();
+
+        JsonNode pending = bodyOf(mockMvc.perform(post("/restaurants/registrations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(application("Double Review " + uid,
+                                "double.owner." + uid + "@pos.example", "double.owner." + uid, "Europe/Berlin"))))
+                .andExpect(status().isCreated())
+                .andReturn());
+
+        UUID restaurantId = UUID.fromString(pending.get("id").asText());
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
+
+        mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", restaurantId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("decision", "REJECT", "rejectionReason", "Duplicate"))))
                 .andExpect(status().isOk());
 
         mockMvc.perform(patch("/restaurants/registrations/{restaurantId}/review", restaurantId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("decision", "APPROVE"))))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -278,7 +291,7 @@ class RestaurantRegistrationApiIntegrationTest {
         String ownerEmail = "owner.rev." + uid + "@pos.example";
         String ownerUsername = "owner.rev." + uid;
 
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
 
         bodyOf(mockMvc.perform(post("/restaurants")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
@@ -288,6 +301,8 @@ class RestaurantRegistrationApiIntegrationTest {
                                 "legalName", "Owner Rev Restaurant " + uid + " LLC",
                                 "currency", "USD",
                                 "timezone", "Europe/Berlin",
+                                "email", "contact@pos.example",
+                                "phone", "+355690001111",
                                 "owner", Map.of(
                                         "email", ownerEmail,
                                         "username", ownerUsername,
@@ -316,18 +331,8 @@ class RestaurantRegistrationApiIntegrationTest {
         String uid = uid();
         mockMvc.perform(post("/restaurants/registrations")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "name", "Bad Timezone Restaurant " + uid,
-                                "legalName", "Bad Timezone LLC",
-                                "currency", "USD",
-                                "timezone", "Mars/Phobos",
-                                "owner", Map.of(
-                                        "email", "bad.tz." + uid + "@pos.example",
-                                        "username", "bad.tz." + uid,
-                                        "firstName", "Bad",
-                                        "lastName", "Tz"
-                                )
-                        ))))
+                        .content(objectMapper.writeValueAsString(application("Bad Timezone Restaurant " + uid,
+                                "bad.tz." + uid + "@pos.example", "bad.tz." + uid, "Mars/Phobos"))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -338,7 +343,7 @@ class RestaurantRegistrationApiIntegrationTest {
         String ownerEmail = "cascade." + uid + "@pos.example";
         String ownerUsername = "cascade." + uid;
 
-        String adminToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
 
         JsonNode created = bodyOf(mockMvc.perform(post("/restaurants")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
@@ -348,6 +353,8 @@ class RestaurantRegistrationApiIntegrationTest {
                                 "legalName", "Cascade Restaurant " + uid + " LLC",
                                 "currency", "USD",
                                 "timezone", "Europe/Berlin",
+                                "email", "contact@pos.example",
+                                "phone", "+355690001111",
                                 "owner", Map.of(
                                         "email", ownerEmail,
                                         "username", ownerUsername,
@@ -368,7 +375,7 @@ class RestaurantRegistrationApiIntegrationTest {
         String ownerToken = extractTokenAndLogin(captor.getValue().getText(), ownerUsername);
 
         JsonNode branch = bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/branches", restaurantId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(ownerToken))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Cascade Branch",
@@ -401,6 +408,32 @@ class RestaurantRegistrationApiIntegrationTest {
         assertThat(archivedBranchCount).isEqualTo(1);
     }
 
+    private Map<String, Object> application(String name, String ownerEmail, String ownerUsername, String timezone) {
+        String uid = uid();
+        return Map.of(
+                "name", name,
+                "legalName", name + " LLC",
+                "email", "contact." + name.substring(name.lastIndexOf(' ') + 1) + "@restaurant.example",
+                "phone", "+35569" + (1_000_000 + Math.abs(uid.hashCode() % 8_000_000)),
+                "currency", "USD",
+                "timezone", timezone,
+                "owner", Map.of(
+                        "email", ownerEmail,
+                        "username", ownerUsername,
+                        "firstName", "Reg",
+                        "lastName", "Owner"
+                )
+        );
+    }
+
+    private JsonNode applicationStatus(String code) throws Exception {
+        return bodyOf(mockMvc.perform(post("/restaurants/registrations/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("code", code))))
+                .andExpect(status().isOk())
+                .andReturn());
+    }
+
     private String extractTokenAndLogin(String messageText, String username) throws Exception {
         String token = extractToken(messageText);
         mockMvc.perform(post("/auth/reset-password")
@@ -410,7 +443,7 @@ class RestaurantRegistrationApiIntegrationTest {
                                 "newPassword", OWNER_SETUP_PASSWORD
                         ))))
                 .andExpect(status().isNoContent());
-        return bodyOf(webLogin(username, OWNER_SETUP_PASSWORD)).get("accessToken").asText();
+        return accessTokenOf(webLogin(username, OWNER_SETUP_PASSWORD));
     }
 
     private String uid() {
@@ -430,6 +463,23 @@ class RestaurantRegistrationApiIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String accessTokenOf(MvcResult result) {
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private String bearer(String accessToken) {

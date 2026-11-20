@@ -13,21 +13,31 @@ import org.springframework.transaction.annotation.Transactional;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.menu.MenuCodeAlreadyExistsException;
-import pos.pos.exception.menu.MenuDeletionBlockedException;
+import pos.pos.exception.menu.MenuDeletionRequiresConfirmationException;
 import pos.pos.exception.menu.MenuNotFoundException;
-import pos.pos.menu.dto.CreateMenuRequest;
-import pos.pos.menu.dto.MenuResponse;
-import pos.pos.menu.dto.UpdateMenuRequest;
-import pos.pos.menu.dto.UpdateMenuStatusRequest;
+import pos.pos.menu.dto.request.CreateMenuRequest;
+import pos.pos.menu.dto.request.MenuOrderRequest;
+import pos.pos.menu.dto.request.SpecialMenuKind;
+import pos.pos.menu.dto.response.MenuEventSummaryResponse;
+import pos.pos.menu.dto.response.MenuResponse;
+import pos.pos.menu.dto.update.UpdateMenuRequest;
+import pos.pos.menu.dto.update.UpdateMenuStatusRequest;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
+import pos.pos.menu.entity.MenuItemOptionGroup;
+import pos.pos.menu.entity.MenuVariant;
+import pos.pos.menu.image.MenuImageReleaser;
 import pos.pos.menu.mapper.MenuMapper;
 import pos.pos.menu.policy.MenuPolicy;
+import pos.pos.menu.repository.MenuItemOptionGroupRepository;
 import pos.pos.menu.repository.MenuItemRepository;
 import pos.pos.menu.repository.MenuRepository;
 import pos.pos.menu.repository.MenuSectionRepository;
+import pos.pos.menu.repository.MenuVariantRepository;
 import pos.pos.menu.util.MenuCodeNormalizer;
+import pos.pos.reservation.entity.RestaurantEvent;
+import pos.pos.reservation.service.ReservationPolicy;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.service.RestaurantScopeService;
@@ -36,8 +46,13 @@ import pos.pos.security.scope.ActorScope;
 import pos.pos.security.scope.ActorScopeService;
 import pos.pos.utils.NormalizationUtils;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -47,16 +62,25 @@ import java.util.stream.Collectors;
 public class MenuService {
 
     private static final int DEFAULT_PAGE_SIZE = 20;
+    private final MenuContentTransferService contentTransfer;
 
     private final MenuRepository menuRepository;
     private final MenuSectionRepository menuSectionRepository;
     private final MenuItemRepository menuItemRepository;
+    private final MenuVariantRepository menuVariantRepository;
+    private final MenuItemOptionGroupRepository menuItemOptionGroupRepository;
     private final MenuMapper menuMapper;
     private final ActorScopeService actorScopeService;
     private final MenuPolicy menuPolicy;
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantValidationService restaurantValidationService;
+    private final OnlineMenuService onlineMenuService;
+    private final SpecialMenuEventLinks specialMenuEventLinks;
+    private final MenuWaiterViewService menuWaiterViewService;
+    private final MenuImageReleaser menuImageReleaser;
+    private final pos.pos.menu.recipe.DishRecipeCleanup dishRecipeCleanup;
 
+    //returns a paginated, filtered, sorted list of menus that the logged-in user is allowed to see.
     @Transactional(readOnly = true)
     public PageResponse<MenuResponse> getMenus(
             Authentication authentication,
@@ -68,19 +92,15 @@ public class MenuService {
             String sortBy,
             String direction
     ) {
-        ActorScope scope = actorScopeService.resolve(authentication);
-        if (restaurantId != null) {
+        ActorScope scope = actorScopeService.resolve(authentication);//gets the logged in user's access scope
+        if (restaurantId != null) {//if restaurant id is provided it checks if the user can access that restaurant
             restaurantScopeService.requireAccessibleRestaurant(scope, restaurantId);
         }
-
-        Pageable pageable = PageRequest.of(
-                page == null ? 0 : page,
-                size == null ? DEFAULT_PAGE_SIZE : size,
-                resolveSort(sortBy, direction)
-        );
-
+        //creates pagination and sorting
+        Pageable pageable = pos.pos.utils.PageableUtils.of(page, size, DEFAULT_PAGE_SIZE, resolveSort(sortBy, direction));
+        //normalizing user's search text i.e "  LUNCH  " → "%lunch%"
         String searchLike = NormalizationUtils.normalizeLowerLike(search);
-
+        //searching menus in the db
         Page<Menu> menusPage = menuRepository.searchVisibleMenus(
                 restaurantId,
                 active,
@@ -90,34 +110,160 @@ public class MenuService {
                 scope.userId(),
                 pageable
         );
-        List<MenuResponse> items = menusPage.getContent().stream()
-                .map(menuMapper::toMenuResponse)
+        //converts each menu entity into a MenuResponse DTO
+        List<Menu> menuEntities = menusPage.getContent();
+        List<UUID> menuIds = menuEntities.stream().map(Menu::getId).toList();
+        Map<UUID, Integer> itemCountsByMenuId = menuIds.isEmpty()
+                ? Map.of()
+                : menuItemRepository.countItemsByMenuIds(menuIds).stream()
+                        .collect(Collectors.toMap(
+                                MenuItemRepository.MenuItemCountRow::getMenuId,
+                                row -> row.getItemCount().intValue()
+                        ));
+        Map<UUID, RestaurantEvent> eventsByMenuId = specialMenuEventLinks.eventsOf(menuIds);
+        List<MenuResponse> items = menuEntities.stream()
+                .map(menu -> withEvent(
+                        menuMapper.toMenuResponse(menu, itemCountsByMenuId.getOrDefault(menu.getId(), 0)),
+                        eventsByMenuId.get(menu.getId())
+                ))
                 .toList();
 
+        //returns a paged list of menus
         return PageResponse.from(new PageImpl<>(items, pageable, menusPage.getTotalElements()));
     }
 
+    // What the till offers right now: the menus waiters see (Menu → "Menus shown") whose days and hours cover this
+    // moment in the restaurant's time, event menus included on their event's days. On an event night set to "only the
+    // special menu", just that menu (even outside its hours, so the till is never empty that night).
     @Transactional(readOnly = true)
-    public MenuResponse getMenu(Authentication authentication, UUID menuId, boolean includeSections, boolean includeItems) {
+    public PageResponse<MenuResponse> getMenusAvailableNow(Authentication authentication, UUID restaurantId) {
         ActorScope scope = actorScopeService.resolve(authentication);
-        Menu menu = findExistingMenu(menuId);
-        menuPolicy.assertCanAccess(scope, menu);
-        if (!includeSections && !includeItems) {
-            return menuMapper.toMenuResponse(menu);
+        Restaurant restaurant = restaurantScopeService.requireAccessibleRestaurant(scope, restaurantId);
+        LocalDateTime now = LocalDateTime.now(restaurantZone(restaurant));
+        List<Menu> activeMenus = menuRepository.searchVisibleMenus(
+                restaurantId,
+                true,
+                null,
+                scope.superAdmin(),
+                scope.restaurantId(),
+                scope.userId(),
+                PageRequest.of(0, 500, resolveSort("displayOrder", "asc"))
+        ).getContent();
+        // The restaurant's day starts at 06:00, so at 01:00 last night's menus (and event) are still on.
+        LocalDate serviceDate = now.minusHours(ReservationPolicy.SERVICE_DAY_START_HOUR).toLocalDate();
+        List<Menu> onNow = activeMenus.stream()
+                .filter(menu -> menu.isAvailableAt(now)
+                        || (menu.isAvailableOn(serviceDate) && menu.isOpenAt(now.toLocalTime())))
+                .toList();
+        List<Menu> shown = MenuWaiterViewService.forWaiters(onNow, menuWaiterViewService.specialMenusOnly(restaurantId));
+
+        RestaurantEvent tonight = specialMenuEventLinks.activeEventOn(restaurantId, serviceDate).orElse(null);
+        if (tonight != null && tonight.isSpecialMenuOnly() && tonight.getMenuId() != null) {
+            List<Menu> eventMenu = activeMenus.stream().filter(menu -> menu.getId().equals(tonight.getMenuId())).toList();
+            if (!eventMenu.isEmpty()) {
+                shown = eventMenu;
+            }
         }
 
-        List<MenuSection> sections = menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(menuId);
-        Map<UUID, List<MenuItem>> itemsBySectionId = includeItems
-                ? menuItemRepository.findByMenuIdOrdered(menuId).stream()
-                .collect(Collectors.groupingBy(
-                        item -> item.getSection().getId(),
-                        Collectors.mapping(Function.identity(), Collectors.toList())
+        List<UUID> menuIds = shown.stream().map(Menu::getId).toList();
+        Map<UUID, Integer> itemCountsByMenuId = menuIds.isEmpty()
+                ? Map.of()
+                : menuItemRepository.countItemsByMenuIds(menuIds).stream()
+                        .collect(Collectors.toMap(
+                                MenuItemRepository.MenuItemCountRow::getMenuId,
+                                row -> row.getItemCount().intValue()
+                        ));
+        Map<UUID, RestaurantEvent> eventsByMenuId = specialMenuEventLinks.eventsOf(menuIds);
+        List<MenuResponse> items = shown.stream()
+                .map(menu -> withEvent(
+                        menuMapper.toMenuResponse(menu, itemCountsByMenuId.getOrDefault(menu.getId(), 0)),
+                        eventsByMenuId.get(menu.getId())
                 ))
-                : Map.of();
-
-        return menuMapper.toMenuResponse(menu, sections, itemsBySectionId);
+                .toList();
+        return PageResponse.from(new PageImpl<>(items, PageRequest.of(0, Math.max(1, items.size())), items.size()));
     }
 
+    private static ZoneId restaurantZone(Restaurant restaurant) {
+        try {
+            return ZoneId.of(restaurant.getTimezone());
+        } catch (Exception ex) {
+            return ZoneOffset.UTC;
+        }
+    }
+
+    //finds one menu, checks if the user can access it, and returns it with or without sections/items.
+    @Transactional(readOnly = true)//means it only reads data from the db, doesnt save/update/delete anything
+    public MenuResponse getMenu(
+            Authentication authentication,
+            UUID menuId,
+            boolean includeSections,
+            boolean includeItems,
+            boolean includeVariants,
+            boolean includeOptionGroups
+    ) {
+        ActorScope scope = actorScopeService.resolve(authentication);
+        Menu menu = findExistingMenu(menuId);
+        menuPolicy.assertCanAccess(scope, menu);//checks if the user is allowed to see the menu
+        int itemCount = (int) menuItemRepository.countByMenuId(menuId);
+        if (!includeSections && !includeItems) {
+            return withEvent(menuMapper.toMenuResponse(menu, itemCount));
+        }
+        //gets all sections of the menu ordered by displayOrder, name
+        List<MenuSection> sections = menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(menuId);
+        //if includeItems is true it loads menu items, if not it creates an empty map
+        Map<UUID, List<MenuItem>> itemsBySectionId = Map.of();
+        Map<UUID, List<MenuVariant>> variantsByItemId = Map.of();
+        Map<UUID, List<MenuItemOptionGroup>> optionGroupsByItemId = Map.of();
+
+        if (includeItems) {
+            List<MenuItem> items = menuItemRepository.findByMenuIdOrdered(menuId);
+            itemsBySectionId = items.stream()
+                    .collect(Collectors.groupingBy(
+                            item -> item.getSection().getId(),
+                            Collectors.mapping(Function.identity(), Collectors.toList())
+                    ));
+
+            if (includeVariants || includeOptionGroups) {
+                List<UUID> itemIds = items.stream()
+                        .map(MenuItem::getId)
+                        .toList();
+
+                if (includeVariants) {
+                    variantsByItemId = itemIds.isEmpty()
+                            ? Map.of()
+                            : menuVariantRepository.findByMenuItemIdInOrdered(itemIds).stream()
+                            .collect(Collectors.groupingBy(
+                                    variant -> variant.getMenuItem().getId(),
+                                    Collectors.mapping(Function.identity(), Collectors.toList())
+                            ));
+                }
+
+                if (includeOptionGroups) {
+                    optionGroupsByItemId = itemIds.isEmpty()
+                            ? Map.of()
+                            : menuItemOptionGroupRepository.findByMenuItemIdInOrdered(itemIds).stream()
+                            .collect(Collectors.groupingBy(
+                                    link -> link.getMenuItem().getId(),
+                                    Collectors.mapping(Function.identity(), Collectors.toList())
+                            ));
+                }
+            }
+        }
+
+        return withEvent(menuMapper.toMenuResponse(
+                menu,
+                sections,
+                itemsBySectionId,
+                includeItems,
+                includeVariants,
+                variantsByItemId,
+                includeOptionGroups,
+                optionGroupsByItemId,
+                itemCount
+        ));
+    }
+
+    //checked
     @Transactional
     public MenuResponse createMenu(Authentication authentication, CreateMenuRequest request) {
         Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, request.getRestaurantId());
@@ -125,6 +271,7 @@ public class MenuService {
 
         String normalizedCode = resolveCreateCode(request.getCode(), request.getName());
         assertUniqueCode(restaurant.getId(), normalizedCode, null);
+        validateAvailabilityDateRange(request.getAvailableFromDate(), request.getAvailableUntilDate());
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         Menu menu = new Menu();
@@ -134,61 +281,191 @@ public class MenuService {
         menu.setDescription(NormalizationUtils.normalize(request.getDescription()));
         menu.setActive(request.getActive() == null || request.getActive());
         menu.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
+        menu.setAvailableFrom(request.getAvailableFrom());
+        menu.setAvailableUntil(request.getAvailableUntil());
+        menu.setAvailableFromDate(request.getAvailableFromDate());
+        menu.setAvailableUntilDate(request.getAvailableUntilDate());
+        menu.setColor(NormalizationUtils.normalize(request.getColor()));
+        menu.setSpecial(Boolean.TRUE.equals(request.getSpecial()));
         menu.setCreatedBy(actorId);
         menu.setUpdatedBy(actorId);
 
-        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
+        menu.setShownToWaiters(!Boolean.FALSE.equals(request.getShownToWaiters()));
+
+        Menu saved = menuRepository.saveAndFlush(menu);
+        applySpecial(saved, request.getSpecial(), request.getSpecialKind(), request.getEventId());
+        return withEvent(menuMapper.toMenuResponse(saved, 0));
     }
 
+    //checked
     @Transactional
     public MenuResponse updateMenu(Authentication authentication, UUID menuId, UpdateMenuRequest request) {
-        Menu menu = requireManageableMenu(authentication, menuId);
+        Menu menu = requireManageableMenu(authentication, menuId); //this line protects the whole update
 
-        String normalizedCode = resolveUpdateCode(request.getCode(), menu.getCode());
-        assertUniqueCode(menu.getRestaurant().getId(), normalizedCode, menu.getId());
+        String normalizedCode = resolveUpdateCode(request.getCode(), menu.getCode());//decides what the menu code should be
+        assertUniqueCode(menu.getRestaurant().getId(), normalizedCode, menu.getId());//menu code must be unique inside one restaurant
+        validateAvailabilityDateRange(request.getAvailableFromDate(), request.getAvailableUntilDate());
 
-        menu.setCode(normalizedCode);
-        menu.setName(NormalizationUtils.normalize(request.getName()));
+        menu.setCode(normalizedCode); //saves the final menu code
+        menu.setName(NormalizationUtils.normalize(request.getName()));//normalize space "  Breakfast Menu  " → "Breakfast Menu"
         menu.setDescription(NormalizationUtils.normalize(request.getDescription()));
-        menu.setActive(Boolean.TRUE.equals(request.getActive()));
-        menu.setDisplayOrder(request.getDisplayOrder());
-        menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        menu.setActive(Boolean.TRUE.equals(request.getActive()));//is the menu active or not
+        menu.setDisplayOrder(request.getDisplayOrder());//saves the order position of the menu
+        if (request.getAllFilterPosition() != null) {
+            menu.setAllFilterPosition(request.getAllFilterPosition());
+        }
+        menu.setAvailableFrom(request.getAvailableFrom());
+        menu.setAvailableUntil(request.getAvailableUntil());
+        menu.setAvailableFromDate(request.getAvailableFromDate());
+        menu.setAvailableUntilDate(request.getAvailableUntilDate());
+        menu.setColor(NormalizationUtils.normalize(request.getColor()));
+        menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));//stores who updated the menu
+        if (request.getShownToWaiters() != null) {
+            if (!request.getShownToWaiters() && menu.isShownToWaiters()
+                    && menuWaiterViewService.isLastShownMenu(menu)) {
+                throw new AuthException("At least one menu must show in POS", HttpStatus.BAD_REQUEST);
+            }
+            menu.setShownToWaiters(request.getShownToWaiters());
+        }
+        applySpecial(menu, request.getSpecial(), request.getSpecialKind(), request.getEventId());
 
-        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
+        int itemCount = (int) menuItemRepository.countByMenuId(menu.getId());
+        return withEvent(menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), itemCount));
     }
 
+    // Saves the order menus are shown in (Menu → "Menus shown" → Change position): the listed menus first, in that
+    // order; any menu not listed keeps its place after them.
+    @Transactional
+    public void reorderMenus(Authentication authentication, MenuOrderRequest request) {
+        Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, request.getRestaurantId());
+        assertMenuWriteAllowed(restaurant);
+        List<Menu> menus = menuRepository.findAllByRestaurantId(restaurant.getId());
+        Map<UUID, Menu> byId = menus.stream().collect(Collectors.toMap(Menu::getId, Function.identity()));
+        List<UUID> requested = request.getMenuIds().stream().distinct().toList();
+        if (!byId.keySet().containsAll(requested)) {
+            throw new AuthException("Choose this restaurant's menus", HttpStatus.BAD_REQUEST);
+        }
+        List<Menu> ordered = new java.util.ArrayList<>(requested.stream().map(byId::get).toList());
+        menus.stream()
+                .filter(menu -> !requested.contains(menu.getId()))
+                .sorted(java.util.Comparator.comparingInt(Menu::getDisplayOrder).thenComparing(Menu::getName))
+                .forEach(ordered::add);
+        UUID actorId = restaurantScopeService.currentUserId(authentication);
+        for (int index = 0; index < ordered.size(); index++) {
+            Menu menu = ordered.get(index);
+            if (menu.getDisplayOrder() != index) {
+                menu.setDisplayOrder(index);
+                menu.setUpdatedBy(actorId);
+                menuRepository.save(menu);
+            }
+        }
+    }
+
+    //checked
     @Transactional
     public MenuResponse updateMenuStatus(Authentication authentication, UUID menuId, UpdateMenuStatusRequest request) {
         Menu menu = requireManageableMenu(authentication, menuId);
-        menu.setActive(Boolean.TRUE.equals(request.getActive()));
-        menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        menu.setActive(Boolean.TRUE.equals(request.getActive())); //sets the new updated status
+        menu.setUpdatedBy(restaurantScopeService.currentUserId(authentication));//stores who updated it
 
-        return menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu));
+        int itemCount = (int) menuItemRepository.countByMenuId(menu.getId());
+        return withEvent(menuMapper.toMenuResponse(menuRepository.saveAndFlush(menu), itemCount));
     }
 
+    //checked
     @Transactional
-    public void deleteMenu(Authentication authentication, UUID menuId) {
+    public void deleteMenu(Authentication authentication, UUID menuId, boolean deleteItems) {
         Menu menu = requireManageableMenu(authentication, menuId);
-        if (menuSectionRepository.existsByMenuId(menuId)) {
-            throw new MenuDeletionBlockedException();
+
+        contentTransfer.lock(menu);
+        List<MenuSection> sections = menuSectionRepository.findByMenuIdOrderByDisplayOrderAscNameAsc(menuId);
+        if (!sections.isEmpty()) {
+            if (deleteItems) {
+                for (MenuSection section : sections) {
+                    for (MenuItem item : menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId())) {
+                        menuVariantRepository.deleteAll(
+                                menuVariantRepository.findByMenuItemIdOrderByDisplayOrderAscNameAsc(item.getId()));
+                        menuItemOptionGroupRepository.deleteAll(
+                                menuItemOptionGroupRepository.findByMenuItemIdOrdered(item.getId()));
+                    }
+                    List<MenuItem> sectionItems = menuItemRepository.findBySectionIdOrderByDisplayOrderAscNameAsc(section.getId());
+                    if (!sectionItems.isEmpty()) {
+                        menuItemRepository.deleteKdsRoutingsOf(sectionItems.stream().map(MenuItem::getId).toList());
+                    }
+                    dishRecipeCleanup.releaseDishes(sectionItems.stream().map(MenuItem::getId).toList());
+                    menuItemRepository.deleteAll(sectionItems);
+                    // Their photos go too, once this is saved (unless another dish still shows them).
+                    sectionItems.stream().map(MenuItem::getImageUrl).filter(Objects::nonNull).distinct()
+                            .forEach(menuImageReleaser::releaseAfterCommit);
+                }
+                menuSectionRepository.deleteAll(sections);
+                onlineMenuService.removeEmptySections(menu.getRestaurant().getId());
+            } else {
+                contentTransfer.preserveSections(menu, sections, restaurantScopeService.currentUserId(authentication));
+            }
         }
 
         menuRepository.delete(menu);
     }
 
+    // A special menu is booking extras (no event) or one event night's menu; special = false makes it a regular menu.
+    // specialKind is read only with special = true (null keeps what it is). An event menu always keeps its event's days.
+    private void applySpecial(Menu menu, Boolean special, SpecialMenuKind kind, UUID eventId) {
+        if (Boolean.FALSE.equals(special)) {
+            menu.setSpecial(false);
+            specialMenuEventLinks.menuLeavesEvent(menu);
+        } else if (Boolean.TRUE.equals(special)) {
+            menu.setSpecial(true);
+            if (kind == SpecialMenuKind.EVENT) {
+                if (eventId == null) {
+                    throw new AuthException("Choose the event this menu is for", HttpStatus.BAD_REQUEST);
+                }
+                specialMenuEventLinks.menuJoinsEvent(menu, eventId);
+            } else if (kind == SpecialMenuKind.BOOKING_EXTRAS) {
+                specialMenuEventLinks.menuLeavesEvent(menu);
+            }
+        }
+        specialMenuEventLinks.keepEventDays(menu);
+    }
+
+    private MenuResponse withEvent(MenuResponse response) {
+        if (response == null) {
+            return null;
+        }
+        return withEvent(response, specialMenuEventLinks.eventOf(response.getId()).orElse(null));
+    }
+
+    private static MenuResponse withEvent(MenuResponse response, RestaurantEvent event) {
+        if (response != null && event != null) {
+            response.setEvent(MenuEventSummaryResponse.builder()
+                    .id(event.getId())
+                    .name(event.getName())
+                    .icon(event.getIcon())
+                    .startDate(event.getStartDate())
+                    .endDate(event.getEndDate())
+                    .active(event.isActive())
+                    .specialMenuOnly(event.isSpecialMenuOnly())
+                    .build());
+        }
+        return response;
+    }
+
+    //helper funct, finds a menu only if its restaurant it's not deleted
     private Menu findExistingMenu(UUID menuId) {
         return menuRepository.findByIdAndRestaurantDeletedAtIsNull(menuId)
                 .orElseThrow(MenuNotFoundException::new);
     }
 
+    //before updating, get the menu safely while going through some checks such as:
     private Menu requireManageableMenu(Authentication authentication, UUID menuId) {
         ActorScope scope = actorScopeService.resolve(authentication);
-        Menu menu = findExistingMenu(menuId);
-        menuPolicy.assertCanManage(scope, menu);
-        assertMenuWriteAllowed(menu.getRestaurant());
-        return menu;
+        Menu menu = findExistingMenu(menuId);// if menu doesnt exist stop,
+        menuPolicy.assertCanManage(scope, menu); //if user not allowed stop,
+        assertMenuWriteAllowed(menu.getRestaurant()); //if restaurant cannot be edited stop
+        return menu; //otherwise return the menu
     }
 
+    //checks if the restaurant can be modified
     private void assertMenuWriteAllowed(Restaurant restaurant) {
         RestaurantStatus status = restaurant.getStatus();
         restaurantValidationService.validateManageableStatus(status);
@@ -197,6 +474,7 @@ public class MenuService {
         }
     }
 
+    //checks that no other menu in the same restaurant already uses that code
     private void assertUniqueCode(UUID restaurantId, String code, UUID menuIdToExclude) {
         boolean exists = menuIdToExclude == null
                 ? menuRepository.existsByRestaurantIdAndCode(restaurantId, code)
@@ -206,16 +484,34 @@ public class MenuService {
         }
     }
 
-    private String resolveCreateCode(String requestedCode, String fallbackName) {
-        String normalizedCode = MenuCodeNormalizer.normalize(
+    private void validateAvailabilityDateRange(LocalDate availableFromDate, LocalDate availableUntilDate) {
+        if ((availableFromDate == null) != (availableUntilDate == null)) {
+            throw new AuthException(
+                    "availableFromDate and availableUntilDate must both be provided",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        if (availableFromDate != null && availableFromDate.isAfter(availableUntilDate)) {
+            throw new AuthException(
+                    "availableFromDate must not be after availableUntilDate",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+    }
+
+    //decides what code a new menu should get
+    private String resolveCreateCode(String requestedCode, String fallbackName) {//if request code is given, use it
+        String normalizedCode = MenuCodeNormalizer.normalize(//if its not given, use the name and normalize it
                 NormalizationUtils.normalize(requestedCode) == null ? fallbackName : requestedCode
         );
-        if (normalizedCode == null) {
+        if (normalizedCode == null) {//if both code and name arent given, cannot create menu
             throw new AuthException("Name is required", HttpStatus.BAD_REQUEST);
         }
         return normalizedCode;
     }
 
+    //If the user sent a new Menu code, use it.
+    //If the user did not send a code, keep the old database code.
     private String resolveUpdateCode(String requestedCode, String existingCode) {
         String rawCode = NormalizationUtils.normalize(requestedCode) == null ? existingCode : requestedCode;
         String normalizedCode = MenuCodeNormalizer.normalize(rawCode);
@@ -225,6 +521,7 @@ public class MenuService {
         return normalizedCode;
     }
 
+    //decides how menus should be ordered
     private Sort resolveSort(String sortBy, String direction) {
         Sort.Direction sortDirection;
         try {

@@ -19,12 +19,22 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.Check;
+import pos.pos.audit.entity.AuditLog;
 import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
 import pos.pos.device.entity.Device;
+import pos.pos.inventory.entity.InventoryItem;
+import pos.pos.inventory.entity.InventoryLocation;
+import pos.pos.kds.entity.KdsStation;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.OptionGroup;
+import pos.pos.notification.entity.Notification;
+import pos.pos.notification.entity.NotificationTemplate;
 import pos.pos.auth.enums.ClientLinkTarget;
+import pos.pos.payment.entity.Payment;
+import pos.pos.recipe.entity.Recipe;
+import pos.pos.report.entity.ReportDefinition;
 import pos.pos.restaurant.enums.RestaurantStatus;
+import pos.pos.shift.entity.Shift;
 import pos.pos.restaurant.util.RestaurantFieldNormalizer;
 import pos.pos.settings.entity.Settings;
 import pos.pos.user.entity.User;
@@ -62,7 +72,6 @@ import java.util.UUID;
         AND char_length(btrim(slug)) > 0
         AND char_length(currency) = 3
         AND status IN ('PENDING', 'REJECTED', 'ACTIVE', 'INACTIVE', 'SUSPENDED', 'ARCHIVED')
-        AND (owner_id IS NOT NULL OR status IN ('PENDING', 'REJECTED'))
         AND (
             pending_owner_client_target IS NULL
             OR pending_owner_client_target IN ('WEB', 'MOBILE', 'UNIVERSAL')
@@ -74,6 +83,10 @@ import java.util.UUID;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 public class Restaurant extends AbstractAuditedSoftDeleteEntity {
+
+    @jakarta.persistence.Version
+    @Column(nullable = false)
+    private long version;
 
     @Column(name = "name", nullable = false, length = 150)
     private String name;
@@ -98,6 +111,14 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
 
     @Column(name = "website", length = 255)
     private String website;
+
+    // The picture on the restaurant's card in the super admins' restaurant list.
+    @Column(name = "cover_url", length = 2048)
+    private String coverUrl;
+
+    // Its place on the super admins' restaurant list.
+    @Column(name = "display_order", nullable = false)
+    private int displayOrder;
 
     @Column(name = "currency", nullable = false, length = 3, columnDefinition = "char(3)")
     private String currency;
@@ -136,6 +157,20 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
 
     @Column(name = "rejection_reason", length = 500)
     private String rejectionReason;
+
+    // A public application: the hash of the applicant's private status code and when they sent it.
+    @Column(name = "application_code_hash", length = 64)
+    private String applicationCodeHash;
+
+    @Column(name = "application_submitted_at", columnDefinition = "timestamptz")
+    private java.time.OffsetDateTime applicationSubmittedAt;
+
+    // When and by whom an application was approved or rejected.
+    @Column(name = "reviewed_at", columnDefinition = "timestamptz")
+    private java.time.OffsetDateTime reviewedAt;
+
+    @Column(name = "reviewed_by", columnDefinition = "uuid")
+    private UUID reviewedBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
@@ -182,6 +217,36 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
     @OneToMany(mappedBy = "restaurant")
     private List<Device> devices = new ArrayList<>();
 
+    @OneToMany(mappedBy = "restaurant")
+    private List<InventoryItem> inventoryItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<InventoryLocation> inventoryLocations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Recipe> recipes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<KdsStation> kdsStations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Payment> payments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Shift> shifts = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<ReportDefinition> reportDefinitions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<NotificationTemplate> notificationTemplates = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<Notification> notifications = new ArrayList<>();
+
+    @OneToMany(mappedBy = "restaurant")
+    private List<AuditLog> auditLogs = new ArrayList<>();
+
     @Override
     protected void normalizeFields() {
         name = NormalizationUtils.normalize(name);
@@ -207,8 +272,6 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
             throw new IllegalStateException("timezone must be a valid IANA identifier");
         }
 
-        if (ownerId == null && status != RestaurantStatus.PENDING && status != RestaurantStatus.REJECTED) {
-            throw new IllegalStateException("ownerId is required unless restaurant status is PENDING or REJECTED");
-        }
+        // A restaurant can be set up before its owner is added (the owner is invited in a second step).
     }
 }

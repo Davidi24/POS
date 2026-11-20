@@ -6,6 +6,13 @@ import org.springframework.stereotype.Component;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.exception.tables.RestaurantTableNotFoundException;
 import pos.pos.exception.tables.TableCategoryNotFoundException;
+import pos.pos.order.entity.Order;
+import pos.pos.order.enums.OrderStatus;
+import pos.pos.order.repository.OrderRepository;
+import pos.pos.reservation.entity.Reservation;
+import pos.pos.reservation.entity.ReservationTableAssignment;
+import pos.pos.reservation.enums.ReservationStatus;
+import pos.pos.reservation.repository.ReservationTableAssignmentRepository;
 import pos.pos.tables.dto.FloorRenameRequest;
 import pos.pos.tables.dto.FloorSummaryResponse;
 import pos.pos.tables.dto.TableAvailabilityResponse;
@@ -20,8 +27,12 @@ import pos.pos.tables.repository.RestaurantTableRepository;
 import pos.pos.tables.repository.TableCategoryRepository;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.function.Function;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,6 +50,15 @@ public class RestaurantTableSupport {
     private final RestaurantTableRepository restaurantTableRepository;
     private final TableCategoryRepository tableCategoryRepository;
     private final RestaurantTableMapper restaurantTableMapper;
+    private final ReservationTableAssignmentRepository reservationTableAssignmentRepository;
+    private final OrderRepository orderRepository;
+    private pos.pos.reservation.service.ReservationPolicy reservationPolicy;
+
+    // Optional so the table module works on its own (and in tests); gives each booking's hold time.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setReservationPolicy(pos.pos.reservation.service.ReservationPolicy reservationPolicy) {
+        this.reservationPolicy = reservationPolicy;
+    }
 
     // Loads all tables for a specific branch.
     // Also builds:
@@ -107,13 +127,20 @@ public class RestaurantTableSupport {
     }
 
     public TableLayoutResponse buildLayoutResponse(BranchTableSnapshot snapshot) {
+        Map<UUID, ReservationTableAssignment> nextReservationsByTableId = loadNextReservationAssignments(snapshot.tables());
+        Map<UUID, Order> currentOrdersByTableId = loadCurrentOrders(snapshot.tables());
+        List<TableLayoutItemResponse> tables = snapshot.tables().stream()
+                .map(table -> toLayoutResponseItem(table, snapshot.childrenByParentId(), nextReservationsByTableId, currentOrdersByTableId))
+                .toList();
+        fillServedCounts(tables);
+        fillPaid(tables, snapshot.tables());
+        fillSeatedBookings(tables, snapshot.tables());
+        fillLastAction(tables, snapshot.tables(), currentOrdersByTableId);
         return TableLayoutResponse.builder()
                 .restaurantId(snapshot.restaurantId())
                 .branchId(snapshot.branchId())
                 .floors(summarizeFloors(snapshot.tables()))
-                .tables(snapshot.tables().stream()
-                        .map(table -> toLayoutResponseItem(table, snapshot.childrenByParentId()))
-                        .toList())
+                .tables(tables)
                 .build();
     }
 
@@ -184,12 +211,144 @@ public class RestaurantTableSupport {
 
     // same as toResponse function just return different DTO( simpler one)
     public TableLayoutItemResponse toLayoutResponseItem(RestaurantTable table, Map<UUID, List<RestaurantTable>> childrenByParentId) {
+        return toLayoutResponseItem(table, childrenByParentId, Map.of(), Map.of());
+    }
+
+    public TableLayoutItemResponse toLayoutResponseItem(
+            RestaurantTable table,
+            Map<UUID, List<RestaurantTable>> childrenByParentId,
+            Map<UUID, ReservationTableAssignment> nextReservationsByTableId,
+            Map<UUID, Order> currentOrdersByTableId
+    ) {
         List<RestaurantTable> mergedChildren = mergedChildren(table, childrenByParentId);
-        return restaurantTableMapper.toLayoutItemResponse(
+        TableLayoutItemResponse response = restaurantTableMapper.toLayoutItemResponse(
                 table,
                 mergedChildren.stream().map(RestaurantTable::getId).toList(),
                 effectiveCapacity(table, mergedChildren)
         );
+        ReservationTableAssignment nextReservationAssignment = nextReservationsByTableId.get(table.getId());
+        if (nextReservationAssignment != null && nextReservationAssignment.getReservation() != null) {
+            Reservation reservation = nextReservationAssignment.getReservation();
+            response.setNextReservationStart(reservation.getReservationStart());
+            response.setNextReservationEnd(reservation.getReservationEnd());
+            response.setNextReservationCode(reservation.getReservationCode());
+            response.setNextReservationName(reservation.getContactName());
+            response.setNextReservationId(reservation.getId());
+            response.setNextReservationStatus(reservation.getStatus());
+            response.setNextReservationPartySize(reservation.getPartySize());
+            response.setNextReservationArrivedGuests(reservation.getArrivedGuests());
+            response.setNextReservationCheckedInAt(reservation.getCheckedInAt());
+            response.setNextReservationOccasionIcon(reservation.getOccasionIcon());
+            response.setNextReservationOccasionName(reservation.getOccasionName());
+            response.setNextReservationHoldUntil(reservationPolicy == null
+                    ? reservation.getHoldUntil()
+                    : reservationPolicy.holdUntil(reservation));
+            if (reservationPolicy != null && response.getNextReservationHoldUntil() != null) {
+                var values = reservationPolicy.values(reservation.getRestaurant());
+                response.setNextReservationHoldWarningAt(response.getNextReservationHoldUntil()
+                        .minusMinutes(Math.max(0, values.holdMinutes() - values.holdWarningMinutes())));
+            }
+        }
+        Order currentOrder = currentOrdersByTableId.get(table.getId());
+        if (currentOrder != null) {
+            response.setCurrentOrderId(currentOrder.getId());
+            response.setCurrentOrderNumber(currentOrder.getOrderNumber());
+            response.setCurrentOrderStatus(currentOrder.getStatus());
+            response.setCurrentOrderFulfillmentStatus(currentOrder.getFulfillmentStatus());
+            response.setCurrentOrderBillRequested(currentOrder.getBillRequestedAt() != null);
+            response.setPaid(currentOrder.getPaymentStatus() == pos.pos.order.enums.OrderPaymentStatus.PAID);
+        }
+        return response;
+    }
+
+    private Map<UUID, Order> loadCurrentOrders(List<RestaurantTable> tables) {
+        List<UUID> tableIds = tables.stream()
+                .map(RestaurantTable::getId)
+                .toList();
+        if (tableIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Order> open = orderRepository.findAllByRestaurantTable_IdInAndStatusInOrderByOpenedAtAsc(
+                tableIds,
+                List.of(OrderStatus.DRAFT, OrderStatus.OPEN)
+        );
+        if (open.isEmpty()) {
+            return Map.of();
+        }
+        // A table can hold several open orders: the newest with dishes leads, so an empty one started later doesn't hide what's ordered.
+        java.util.Set<UUID> withDishes = orderRepository.countServed(open.stream().map(Order::getId).toList()).stream()
+                .map(OrderRepository.OrderServedCount::getOrderId)
+                .collect(Collectors.toSet());
+        return open.stream()
+                .filter(order -> order.getRestaurantTable() != null)
+                .collect(Collectors.toMap(
+                        order -> order.getRestaurantTable().getId(),
+                        Function.identity(),
+                        (existing, replacement) -> withDishes.contains(existing.getId()) && !withDishes.contains(replacement.getId()) ? existing : replacement,
+                        LinkedHashMap::new
+                ));
+    }
+
+    // The booking whose guests sit at an occupied table now: it was seated with these guests (not an older one left open).
+    private void fillSeatedBookings(List<TableLayoutItemResponse> items, List<RestaurantTable> tables) {
+        Map<UUID, RestaurantTable> seated = tables.stream()
+                .filter(table -> table.getStatus() == pos.pos.tables.enums.TableStatus.OCCUPIED && table.getSeatedAt() != null)
+                .collect(Collectors.toMap(RestaurantTable::getId, Function.identity(), (a, b) -> a));
+        if (seated.isEmpty()) {
+            return;
+        }
+        Map<UUID, Reservation> byTable = new LinkedHashMap<>();
+        reservationTableAssignmentRepository.findSeatedByTableIds(seated.keySet(), OffsetDateTime.now(ZoneOffset.UTC).minusHours(18))
+                .forEach(assignment -> {
+                    RestaurantTable table = seated.get(assignment.getRestaurantTable().getId());
+                    Reservation reservation = assignment.getReservation();
+                    if (table != null && reservation.getSeatedAt() != null
+                            && !reservation.getSeatedAt().isBefore(table.getSeatedAt().minusMinutes(10))) {
+                        byTable.putIfAbsent(table.getId(), reservation);
+                    }
+                });
+        items.forEach(item -> {
+            Reservation reservation = byTable.get(item.getTableId());
+            if (reservation != null) {
+                item.setSeatedReservationId(reservation.getId());
+                item.setSeatedReservationName(reservation.getContactName());
+                item.setSeatedReservationStart(reservation.getReservationStart());
+                item.setSeatedReservationPartySize(reservation.getPartySize());
+                item.setSeatedReservationOccasionIcon(reservation.getOccasionIcon());
+                item.setSeatedReservationOccasionName(reservation.getOccasionName());
+            }
+        });
+    }
+
+    private Map<UUID, ReservationTableAssignment> loadNextReservationAssignments(List<RestaurantTable> tables) {
+        List<UUID> tableIds = tables.stream()
+                .map(RestaurantTable::getId)
+                .toList();
+        if (tableIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return reservationTableAssignmentRepository.findUpcomingByTableIds(
+                        tableIds,
+                        EnumSet.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN),
+                        OffsetDateTime.now(ZoneOffset.UTC)
+                )
+                .stream()
+                .collect(Collectors.toMap(
+                        assignment -> assignment.getRestaurantTable().getId(),
+                        Function.identity(),
+                        (existing, ignored) -> existing,
+                        LinkedHashMap::new
+                ));
+    }
+
+    // Holds these tables until transaction end and follows one lock order across workflows.
+    public void lockTablesForUpdateInStableOrder(UUID branchId, Collection<UUID> tableIds) {
+        if (tableIds.isEmpty()) {
+            return;
+        }
+        restaurantTableRepository.lockTablesForUpdateInStableOrder(branchId, new LinkedHashSet<>(tableIds));
     }
 
     public Map<UUID, RestaurantTable> loadTablesForUpdate(UUID branchId, Collection<UUID> tableIds) {
@@ -319,6 +478,63 @@ public class RestaurantTableSupport {
     }
 
     // returns the map of all tables capacity
+    // How much of each table's order has been served, for the ring around it.
+    /** Seated tables whose guests already paid: the order closed and paid since they sat down. */
+    private void fillPaid(List<TableLayoutItemResponse> items, List<RestaurantTable> tables) {
+        Map<UUID, OffsetDateTime> paid = paidSinceSeated(tables);
+        for (TableLayoutItemResponse item : items) {
+            if (item.getCurrentOrderId() == null && paid.containsKey(item.getTableId())) item.setPaid(true);
+        }
+    }
+
+    /** The seated tables among [tables] whose last order was closed and paid after the guests sat down, with when. */
+    public Map<UUID, OffsetDateTime> paidSinceSeated(List<RestaurantTable> tables) {
+        Map<UUID, RestaurantTable> seated = tables.stream()
+                .filter(table -> table.getStatus() == pos.pos.tables.enums.TableStatus.OCCUPIED && table.getSeatedAt() != null)
+                .collect(Collectors.toMap(RestaurantTable::getId, Function.identity()));
+        if (seated.isEmpty()) return Map.of();
+        Map<UUID, OffsetDateTime> result = new java.util.HashMap<>();
+        orderRepository.lastPaidCloseByTable(seated.keySet()).forEach(row -> {
+            OffsetDateTime closedAt = (OffsetDateTime) row[1];
+            if (closedAt != null && !closedAt.isBefore(seated.get((UUID) row[0]).getSeatedAt())) result.put((UUID) row[0], closedAt);
+        });
+        return result;
+    }
+
+    // The last thing done on each table or its order, for Settings → Tables → Special cases.
+    private void fillLastAction(List<TableLayoutItemResponse> items, List<RestaurantTable> tables, Map<UUID, Order> orders) {
+        List<UUID> orderIds = orders.values().stream().map(Order::getId).toList();
+        Map<UUID, OffsetDateTime> lines = new java.util.HashMap<>();
+        if (!orderIds.isEmpty()) {
+            orderRepository.lastLineChange(orderIds).forEach(row -> lines.put((UUID) row[0], (OffsetDateTime) row[1]));
+        }
+        Map<UUID, RestaurantTable> byId = tables.stream().collect(Collectors.toMap(RestaurantTable::getId, Function.identity()));
+        for (TableLayoutItemResponse item : items) {
+            RestaurantTable table = byId.get(item.getTableId());
+            Order order = orders.get(item.getTableId());
+            item.setMoreTimeUntil(table.getMoreTimeUntil());
+            item.setLastActionAt(pos.pos.tables.specialcase.SpecialCaseLimits.latest(
+                    table.getUpdatedAt(), table.getSeatedAt(), table.getStillHereAt(),
+                    order == null ? null : order.getUpdatedAt(), order == null ? null : lines.get(order.getId())));
+        }
+    }
+
+    private void fillServedCounts(List<TableLayoutItemResponse> tables) {
+        List<UUID> orderIds = tables.stream().map(TableLayoutItemResponse::getCurrentOrderId).filter(java.util.Objects::nonNull).toList();
+        if (orderIds.isEmpty()) {
+            return;
+        }
+        Map<UUID, OrderRepository.OrderServedCount> counts = orderRepository.countServed(orderIds).stream()
+                .collect(Collectors.toMap(OrderRepository.OrderServedCount::getOrderId, count -> count));
+        for (TableLayoutItemResponse table : tables) {
+            OrderRepository.OrderServedCount count = counts.get(table.getCurrentOrderId());
+            if (count != null) {
+                table.setCurrentOrderServedItems(count.getServed().intValue());
+                table.setCurrentOrderTotalItems(count.getTotal().intValue());
+            }
+        }
+    }
+
     public int effectiveCapacity(RestaurantTable table, List<RestaurantTable> mergedChildren) {
         return table.getCapacity() + mergedChildren.stream()
                 .mapToInt(RestaurantTable::getCapacity)

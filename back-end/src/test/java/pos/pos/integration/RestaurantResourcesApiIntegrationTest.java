@@ -21,6 +21,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 
 import java.util.Iterator;
@@ -46,6 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RestaurantResourcesApiIntegrationTest {
 
     private static final String SCHEMA = "restaurant_resources_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String ADMIN_EMAIL = "prod.admin@pos.example";
     private static final String ADMIN_USERNAME = "prodadmin";
     private static final String ADMIN_PASSWORD = "StrongPass123!";
@@ -54,11 +56,12 @@ class RestaurantResourcesApiIntegrationTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "restaurant-resources-test-secret-key-for-hs256");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "restaurant-resources-test-refresh-token-pepper");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "restaurant-resources-test-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "restaurant-resources-test-email-verification-pepper");
         registry.add("SMS_CODE_PEPPER", () -> "restaurant-resources-test-sms-pepper");
+        registry.add("app.storage.menu-images.provider", () -> "disabled");
         registry.add("MAIL_HOST", () -> "localhost");
         registry.add("MAIL_PORT", () -> "2525");
         registry.add("MAIL_USERNAME", () -> "integration");
@@ -219,7 +222,7 @@ class RestaurantResourcesApiIntegrationTest {
         assertSingleBooleanFlag(restaurantContacts, "isPrimary", contactOneId);
 
         UUID taxProfileOneId = UUID.fromString(bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/tax-profiles", context.restaurantId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(context.adminAccessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "country", "Albania",
@@ -230,7 +233,7 @@ class RestaurantResourcesApiIntegrationTest {
                 .andReturn()).get("id").asText());
 
         UUID taxProfileTwoId = UUID.fromString(bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/tax-profiles", context.restaurantId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(context.adminAccessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "country", "Kosovo",
@@ -247,7 +250,7 @@ class RestaurantResourcesApiIntegrationTest {
         assertSingleBooleanFlag(taxProfiles, "isDefault", taxProfileTwoId);
 
         mockMvc.perform(patch("/restaurants/{restaurantId}/tax-profiles/{taxProfileId}/default", context.restaurantId(), taxProfileOneId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken())))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(context.adminAccessToken())))
                 .andExpect(status().isOk());
 
         taxProfiles = bodyOf(mockMvc.perform(get("/restaurants/{restaurantId}/tax-profiles", context.restaurantId())
@@ -257,7 +260,7 @@ class RestaurantResourcesApiIntegrationTest {
         assertSingleBooleanFlag(taxProfiles, "isDefault", taxProfileOneId);
 
         JsonNode createdBranch = bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/branches", context.restaurantId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(context.adminAccessToken()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Downtown Branch",
@@ -273,8 +276,8 @@ class RestaurantResourcesApiIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken())))
                 .andExpect(status().isOk())
                 .andReturn());
-        assertThat(branchesPage.get("items")).hasSize(1);
-        assertThat(branchesPage.get("items").get(0).get("id").asText()).isEqualTo(branchId.toString());
+        assertThat(branchesPage.get("items")).hasSize(2);
+        assertThat(branchesPage.get("items").findValuesAsText("id")).contains(branchId.toString());
 
         UUID branchAddressOneId = UUID.fromString(bodyOf(mockMvc.perform(post("/restaurants/{restaurantId}/branches/{branchId}/addresses", context.restaurantId(), branchId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken()))
@@ -367,7 +370,7 @@ class RestaurantResourcesApiIntegrationTest {
         String ownerUsername = "owner." + unique;
         String restaurantName = "Resource Restaurant " + unique.substring(0, 8);
 
-        String adminAccessToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminAccessToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
 
         JsonNode createdRestaurant = bodyOf(mockMvc.perform(post("/restaurants")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
@@ -377,6 +380,8 @@ class RestaurantResourcesApiIntegrationTest {
                                 "legalName", restaurantName + " LLC",
                                 "currency", "USD",
                                 "timezone", "Europe/Berlin",
+                                "email", "contact@pos.example",
+                                "phone", "+355690001111",
                                 "owner", Map.of(
                                         "email", ownerEmail,
                                         "username", ownerUsername,
@@ -400,8 +405,8 @@ class RestaurantResourcesApiIntegrationTest {
                         ))))
                 .andExpect(status().isNoContent());
 
-        String ownerAccessToken = bodyOf(webLogin(ownerUsername, OWNER_SETUP_PASSWORD)).get("accessToken").asText();
-        return new OwnedRestaurantContext(UUID.fromString(createdRestaurant.get("id").asText()), ownerAccessToken);
+        String ownerAccessToken = accessTokenOf(webLogin(ownerUsername, OWNER_SETUP_PASSWORD));
+        return new OwnedRestaurantContext(UUID.fromString(createdRestaurant.get("id").asText()), ownerAccessToken, adminAccessToken);
     }
 
     private void assertSingleBooleanFlag(JsonNode items, String flagField, UUID expectedTrueId) {
@@ -438,6 +443,23 @@ class RestaurantResourcesApiIntegrationTest {
         return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
+    private String accessTokenOf(MvcResult result) {
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
+    }
+
     private String bearer(String accessToken) {
         return "Bearer " + accessToken;
     }
@@ -456,6 +478,6 @@ class RestaurantResourcesApiIntegrationTest {
         return messageText.substring(tokenStart, end);
     }
 
-    private record OwnedRestaurantContext(UUID restaurantId, String ownerAccessToken) {
+    private record OwnedRestaurantContext(UUID restaurantId, String ownerAccessToken, String adminAccessToken) {
     }
 }

@@ -1,9 +1,9 @@
 package pos.pos.menu.mapper;
 
 import org.springframework.stereotype.Component;
-import pos.pos.menu.dto.PublicMenuItemResponse;
-import pos.pos.menu.dto.PublicMenuResponse;
-import pos.pos.menu.dto.PublicMenuSectionResponse;
+import pos.pos.menu.dto.response.PublicMenuItemResponse;
+import pos.pos.menu.dto.response.PublicMenuResponse;
+import pos.pos.menu.dto.response.PublicMenuSectionResponse;
 import pos.pos.menu.entity.Menu;
 import pos.pos.menu.entity.MenuItem;
 import pos.pos.menu.entity.MenuSection;
@@ -34,6 +34,8 @@ public class PublicMenuMapper {
                 .name(menu.getName())
                 .description(menu.getDescription())
                 .displayOrder(menu.getDisplayOrder())
+                .availableFromDate(menu.getAvailableFromDate())
+                .availableUntilDate(menu.getAvailableUntilDate())
                 .sections(sections == null ? null : sections.stream()
                         .map(section -> toSectionResponse(section, itemsBySectionId.get(section.getId())))
                         .toList())
@@ -59,6 +61,7 @@ public class PublicMenuMapper {
                 .basePrice(item.getBasePrice())
                 .imageUrl(item.getImageUrl())
                 .displayOrder(item.getDisplayOrder())
+                .ingredients(List.copyOf(item.getIngredients()))
                 .build();
     }
 }

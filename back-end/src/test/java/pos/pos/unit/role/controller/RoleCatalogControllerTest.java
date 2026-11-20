@@ -67,7 +67,7 @@ class RoleCatalogControllerTest {
     @Test
     @DisplayName("GET /roles should return active roles when authorized")
     void shouldReturnRolesWhenAuthorized() throws Exception {
-        given(roleCatalogService.getRoles()).willReturn(List.of(
+        given(roleCatalogService.getRoles(any())).willReturn(List.of(
                 RoleResponse.builder().id(ROLE_ID).code("ADMIN").name("Admin").build()
         ));
 
@@ -78,7 +78,7 @@ class RoleCatalogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("ADMIN"));
 
-        verify(roleCatalogService).getRoles();
+        verify(roleCatalogService).getRoles(any());
     }
 
     @Test
@@ -101,7 +101,7 @@ class RoleCatalogControllerTest {
     @Test
     @DisplayName("GET /roles/{roleId} should return one role when authorized")
     void shouldReturnOneRoleWhenAuthorized() throws Exception {
-        given(roleCatalogService.getRole(ROLE_ID)).willReturn(
+        given(roleCatalogService.getRole(any(), eq(ROLE_ID))).willReturn(
                 RoleResponse.builder().id(ROLE_ID).code("ADMIN").name("Admin").build()
         );
 
@@ -117,7 +117,7 @@ class RoleCatalogControllerTest {
     @Test
     @DisplayName("GET /roles/{roleId}/permissions should return role permissions when authorized")
     void shouldReturnRolePermissionsWhenAuthorized() throws Exception {
-        given(roleCatalogService.getRolePermissions(eq(ROLE_ID))).willReturn(List.of(
+        given(roleCatalogService.getRolePermissions(any(), eq(ROLE_ID))).willReturn(List.of(
                 PermissionResponse.builder().id(UUID.randomUUID()).code("USERS_UPDATE").name("Update Users").build()
         ));
 

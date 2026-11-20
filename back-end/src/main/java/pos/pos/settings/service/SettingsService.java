@@ -8,13 +8,21 @@ import org.springframework.transaction.annotation.Transactional;
 import pos.pos.exception.auth.AuthException;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
+import pos.pos.security.rbac.AppRole;
+import pos.pos.security.rbac.RoleHierarchyService;
 import pos.pos.settings.dto.SettingsResponse;
 import pos.pos.settings.dto.UpdateRestaurantSettingsRequest;
 import pos.pos.settings.dto.UpdateSettingsBillingRequest;
+import pos.pos.settings.dto.UpdateSettingsInventoryRequest;
 import pos.pos.settings.dto.UpdateSettingsDefaultBranchRequest;
 import pos.pos.settings.dto.UpdateSettingsLocalizationRequest;
 import pos.pos.settings.dto.UpdateSettingsOrderChannelsRequest;
 import pos.pos.settings.dto.UpdateSettingsSequencePrefixesRequest;
+import pos.pos.settings.dto.UpdateSettingsPreOrdersRequest;
+import pos.pos.settings.dto.UpdateSettingsReservationPolicyRequest;
+import pos.pos.settings.dto.UpdateSettingsKitchenStatusRequest;
+import pos.pos.settings.dto.UpdateSettingsShiftsRequest;
+import pos.pos.settings.dto.UpdateSettingsStaffPermissionsRequest;
 import pos.pos.settings.entity.Settings;
 import pos.pos.settings.enums.ServiceChargeType;
 import pos.pos.settings.enums.WeekStartDay;
@@ -33,6 +41,8 @@ public class SettingsService {
     private final SettingsDomainSupport settingsDomainSupport;
     private final SettingsMapper settingsMapper;
     private final SettingsAuditService settingsAuditService;
+    private final RoleHierarchyService roleHierarchyService;
+    private final pos.pos.tables.repository.RestaurantTableRepository restaurantTableRepository;
 
     @Transactional
     public SettingsResponse getSettings(Authentication authentication, UUID restaurantId) {
@@ -138,6 +148,9 @@ public class SettingsService {
         SettingsContext context = loadSettingsContext(authentication, restaurantId);
         Settings settings = context.settings();
 
+        if (request.getOrderTaxRate() != null) settings.setOrderTaxRate(request.getOrderTaxRate());
+        if (request.getOrderTaxInclusive() != null) settings.setOrderTaxInclusive(request.getOrderTaxInclusive());
+
         applyBilling(
                 settings,
                 request.getServiceChargeEnabled(),
@@ -182,6 +195,222 @@ public class SettingsService {
                 "UPDATE_ORDER_CHANNELS",
                 "Updated order channel settings"
         );
+    }
+
+    @Transactional
+    public SettingsResponse updateStaffPermissions(
+            Authentication authentication,
+            UUID restaurantId,
+            UpdateSettingsStaffPermissionsRequest request
+    ) {
+        // Admins hold SETTINGS_UPDATE too, so this switch needs an explicit Owner/Co-Owner check or they could grant it to themselves.
+        if (roleHierarchyService.actorRank(authentication) < AppRole.CO_OWNER.rank()) {
+            throw new AuthException("Only the Owner or a Co-Owner can change staff permissions", HttpStatus.FORBIDDEN);
+        }
+
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setAdminsCanManageManagers(request.getAdminsCanManageManagers());
+
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_STAFF_PERMISSIONS",
+                "Updated staff permissions"
+        );
+    }
+
+    @Transactional
+    public SettingsResponse updatePreOrders(
+            Authentication authentication,
+            UUID restaurantId,
+            UpdateSettingsPreOrdersRequest request
+    ) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setPreOrdersEnabled(request.getPreOrdersEnabled());
+        settings.setPreOrderLeadMinutes(request.getPreOrderLeadMinutes());
+
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_PRE_ORDERS",
+                "Updated reservation pre-order settings"
+        );
+    }
+
+    @Transactional
+    public SettingsResponse updateReservationPolicy(
+            Authentication authentication,
+            UUID restaurantId,
+            UpdateSettingsReservationPolicyRequest request
+    ) {
+        // The "hold ends" warning has to come before the hold itself runs out.
+        if (request.getHoldWarningMinutes() >= request.getHoldMinutes()) {
+            throw new AuthException("The hold warning must come before the hold ends", HttpStatus.BAD_REQUEST);
+        }
+        if (request.getLateAfterMinutes() >= request.getHoldMinutes()) {
+            throw new AuthException("A guest must count as late before the hold ends", HttpStatus.BAD_REQUEST);
+        }
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setLargeGroupFrom(request.getLargeGroupFrom());
+        settings.setLargeGroupExtraMinutes(request.getLargeGroupExtraMinutes());
+        settings.setApprovalGroupSize(request.getApprovalGroupSize());
+        settings.setHoldMinutes(request.getHoldMinutes());
+        settings.setHoldWarningMinutes(request.getHoldWarningMinutes());
+        settings.setCheckInOpensMinutes(request.getCheckInOpensMinutes());
+        settings.setConfirmReminderTime(request.getConfirmReminderTime());
+        settings.setSameDayConfirmMinutes(request.getSameDayConfirmMinutes());
+        settings.setAttendanceCallMinutes(request.getAttendanceCallMinutes());
+        settings.setReopenWindowMinutes(request.getReopenWindowMinutes());
+        settings.setUndoSeatMinutes(request.getUndoSeatMinutes());
+        settings.setRunningLateMaxMinutes(request.getRunningLateMaxMinutes());
+        settings.setLateAfterMinutes(request.getLateAfterMinutes());
+        settings.setGuestReminderHours(request.getGuestReminderHours());
+        settings.setNoShowWarningFrom(request.getNoShowWarningFrom());
+        settings.setDepositFromGuests(request.getDepositFromGuests());
+        if (request.getCardFeePercent() != null) {
+            settings.setCardFeePercent(request.getCardFeePercent());
+        }
+        if (request.getCardFeeFixed() != null) {
+            settings.setCardFeeFixed(request.getCardFeeFixed());
+        }
+        if (request.getAutoConfirmBookings() != null) {
+            settings.setAutoConfirmBookings(request.getAutoConfirmBookings());
+        }
+        if (request.getGuestSecondReminderHours() != null) {
+            settings.setGuestSecondReminderHours(request.getGuestSecondReminderHours());
+        }
+        if (request.getUnconfirmedHoldMinutes() != null) {
+            settings.setUnconfirmedHoldMinutes(request.getUnconfirmedHoldMinutes());
+        }
+        if (request.getBookingAlertRoles() != null) {
+            settings.setBookingAlertRoles(request.getBookingAlertRoles().trim());
+        }
+
+        return saveSettingsAndAudit(
+                context,
+                settings,
+                null,
+                "UPDATE_RESERVATION_POLICY",
+                "Updated reservation policy settings"
+        );
+    }
+
+    @Transactional
+    public SettingsResponse updateKitchenStatus(Authentication authentication, UUID restaurantId, UpdateSettingsKitchenStatusRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setKitchenSlowAfterMinutes(request.getKitchenSlowAfterMinutes());
+        settings.setKitchenReadyWaitingMinutes(request.getKitchenReadyWaitingMinutes());
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_KITCHEN_STATUS", "Updated kitchen status settings");
+    }
+
+    @Transactional
+    public SettingsResponse updateInventory(Authentication authentication, UUID restaurantId, UpdateSettingsInventoryRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setValuableStockFrom(request.getValuableStockFrom().setScale(2, java.math.RoundingMode.HALF_UP));
+        var frequency = request.getInventoryCountFrequency() == null ? settings.getInventoryCountFrequency() : request.getInventoryCountFrequency();
+        var period = request.getInventoryCountPeriod() == null ? settings.getInventoryCountPeriod() : request.getInventoryCountPeriod();
+        if (period == pos.pos.settings.enums.InventoryCountPeriod.WEEKLY && frequency > 7) {
+            throw new AuthException("Weekly inventory counts must be between 1 and 7", HttpStatus.BAD_REQUEST);
+        }
+        if (frequency != settings.getInventoryCountFrequency() || period != settings.getInventoryCountPeriod()) {
+            settings.setInventoryCountFrequency(frequency);
+            settings.setInventoryCountPeriod(period);
+            settings.setInventoryCountScheduleStartedAt(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC));
+        }
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_INVENTORY", "Updated inventory settings");
+    }
+
+    @Transactional
+    public SettingsResponse updateTables(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsTablesRequest request) {
+        if (request.getSeatingMostExtraGuests() < request.getSeatingExtraGuests()) {
+            throw new AuthException("The most guests can't be below the normal number", HttpStatus.BAD_REQUEST);
+        }
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setSeatingExtraGuests(request.getSeatingExtraGuests());
+        settings.setSeatingMostExtraGuests(request.getSeatingMostExtraGuests());
+        settings.setSeatingAlertRoles(request.getSeatingAlertRoles().trim());
+        settings.setNextBookingWarningMinutes(request.getNextBookingWarningMinutes());
+        settings.setJoinBookingWarningMinutes(request.getJoinBookingWarningMinutes());
+        settings.setBookingComingMinutes(request.getBookingComingMinutes());
+        // A limit switched on starts its clock now, so nothing old is closed the moment it's saved.
+        if ((settings.getSpecialCasePaidMinutes() == 0 && request.getSpecialCasePaidMinutes() > 0)
+                || (settings.getSpecialCaseSeatedMinutes() == 0 && request.getSpecialCaseSeatedMinutes() > 0)
+                || (settings.getSpecialCaseOrderMinutes() == 0 && request.getSpecialCaseOrderMinutes() > 0)) {
+            restaurantTableRepository.restartClocks(restaurantId, java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC));
+        }
+        settings.setSpecialCasePaidMinutes(request.getSpecialCasePaidMinutes());
+        settings.setSpecialCaseSeatedMinutes(request.getSpecialCaseSeatedMinutes());
+        settings.setSpecialCaseOrderMinutes(request.getSpecialCaseOrderMinutes());
+        settings.setSpecialCaseWarningMinutes(request.getSpecialCaseWarningMinutes());
+        settings.setSpecialCaseAutoMove(request.getSpecialCaseAutoMove());
+        settings.setSpecialCaseBookingNoAction(request.getSpecialCaseBookingNoAction());
+        settings.setSpecialCaseMoreTime(request.getSpecialCaseMoreTime());
+        settings.setSpecialCaseAlertRoles(request.getSpecialCaseAlertRoles().trim());
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_TABLES", "Updated table seating settings");
+    }
+
+    @Transactional
+    public SettingsResponse updateShifts(Authentication authentication, UUID restaurantId, UpdateSettingsShiftsRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setClockInEarlyMinutes(request.getClockInEarlyMinutes());
+        settings.setStaffSeeWholeTeam(request.getStaffSeeWholeTeam());
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_SHIFTS", "Updated shift settings");
+    }
+
+    @Transactional
+    public SettingsResponse updatePayments(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsPaymentsRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        java.util.List<Integer> suggestions = request.getTipSuggestions() != null
+                ? request.getTipSuggestions()
+                : request.getTipSuggestionsText() != null
+                ? pos.pos.settings.mapper.SettingsCodes.parsePercents(request.getTipSuggestionsText())
+                : null;
+        if (suggestions == null) {
+            throw new AuthException("tipSuggestions is required", HttpStatus.BAD_REQUEST);
+        }
+        if (suggestions.stream().anyMatch(percent -> percent < 1 || percent > 100)) {
+            throw new AuthException("Suggested tips must be between 1 and 100%", HttpStatus.BAD_REQUEST);
+        }
+        if (suggestions.stream().anyMatch(percent -> percent > request.getMaxTipPercent())) {
+            throw new AuthException("A suggested tip can't be above the biggest tip allowed", HttpStatus.BAD_REQUEST);
+        }
+        settings.setTipsEnabled(request.getTipsEnabled());
+        settings.setTipSuggestions(pos.pos.settings.mapper.SettingsCodes.joinPercents(suggestions.stream().sorted().toList()));
+        settings.setMaxTipPercent(request.getMaxTipPercent());
+        settings.setAutoClosePaidOrders(request.getAutoClosePaidOrders());
+        settings.setRefundWindowDays(request.getRefundWindowDays());
+        if (request.getUnpaidAlertRoles() != null) {
+            settings.setUnpaidAlertRoles(request.getUnpaidAlertRoles().trim());
+        }
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_PAYMENTS", "Updated payment settings");
+    }
+
+    @Transactional
+    public SettingsResponse updateFraudChecks(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsFraudRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        for (String code : request.getFraudDisabledRules()) {
+            if (pos.pos.fraud.FraudRule.fromCode(code).isEmpty()) {
+                throw new AuthException("Unknown fraud rule: " + code, HttpStatus.BAD_REQUEST);
+            }
+        }
+        settings.setFraudDiscountPercent(request.getFraudDiscountPercent());
+        settings.setFraudRefundAmount(request.getFraudRefundAmount());
+        settings.setFraudVoidsPerDay(request.getFraudVoidsPerDay());
+        settings.setFraudTipPercent(request.getFraudTipPercent());
+        settings.setFraudCashRefundsPerDay(request.getFraudCashRefundsPerDay());
+        settings.setFraudDisabledRules(pos.pos.settings.mapper.SettingsCodes.joinCodes(request.getFraudDisabledRules()));
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_FRAUD_CHECKS", "Updated fraud check settings");
     }
 
     @Transactional
@@ -325,6 +554,60 @@ public class SettingsService {
                 defaults.isEnableTakeaway(),
                 defaults.isEnableDelivery()
         );
+        applyReservationPolicyDefaults(settings, defaults);
+    }
+
+    private void applyReservationPolicyDefaults(Settings settings, Settings defaults) {
+        settings.setPreOrdersEnabled(defaults.isPreOrdersEnabled());
+        settings.setPreOrderLeadMinutes(defaults.getPreOrderLeadMinutes());
+        settings.setLargeGroupFrom(defaults.getLargeGroupFrom());
+        settings.setLargeGroupExtraMinutes(defaults.getLargeGroupExtraMinutes());
+        settings.setApprovalGroupSize(defaults.getApprovalGroupSize());
+        settings.setHoldMinutes(defaults.getHoldMinutes());
+        settings.setHoldWarningMinutes(defaults.getHoldWarningMinutes());
+        settings.setCheckInOpensMinutes(defaults.getCheckInOpensMinutes());
+        settings.setConfirmReminderTime(defaults.getConfirmReminderTime());
+        settings.setSameDayConfirmMinutes(defaults.getSameDayConfirmMinutes());
+        settings.setAttendanceCallMinutes(defaults.getAttendanceCallMinutes());
+        settings.setReopenWindowMinutes(defaults.getReopenWindowMinutes());
+        settings.setUndoSeatMinutes(defaults.getUndoSeatMinutes());
+        settings.setRunningLateMaxMinutes(defaults.getRunningLateMaxMinutes());
+        settings.setLateAfterMinutes(defaults.getLateAfterMinutes());
+        settings.setGuestReminderHours(defaults.getGuestReminderHours());
+        settings.setNoShowWarningFrom(defaults.getNoShowWarningFrom());
+        settings.setDepositFromGuests(defaults.getDepositFromGuests());
+        settings.setCardFeePercent(defaults.getCardFeePercent());
+        settings.setCardFeeFixed(defaults.getCardFeeFixed());
+        settings.setKitchenSlowAfterMinutes(defaults.getKitchenSlowAfterMinutes());
+        settings.setKitchenReadyWaitingMinutes(defaults.getKitchenReadyWaitingMinutes());
+        settings.setValuableStockFrom(defaults.getValuableStockFrom());
+        settings.setClockInEarlyMinutes(defaults.getClockInEarlyMinutes());
+        settings.setSeatingExtraGuests(defaults.getSeatingExtraGuests());
+        settings.setSeatingMostExtraGuests(defaults.getSeatingMostExtraGuests());
+        settings.setSeatingAlertRoles(defaults.getSeatingAlertRoles());
+        settings.setUnpaidAlertRoles(defaults.getUnpaidAlertRoles());
+        settings.setNextBookingWarningMinutes(defaults.getNextBookingWarningMinutes());
+        settings.setJoinBookingWarningMinutes(defaults.getJoinBookingWarningMinutes());
+        settings.setBookingComingMinutes(defaults.getBookingComingMinutes());
+        settings.setSpecialCasePaidMinutes(defaults.getSpecialCasePaidMinutes());
+        settings.setSpecialCaseSeatedMinutes(defaults.getSpecialCaseSeatedMinutes());
+        settings.setSpecialCaseOrderMinutes(defaults.getSpecialCaseOrderMinutes());
+        settings.setSpecialCaseWarningMinutes(defaults.getSpecialCaseWarningMinutes());
+        settings.setSpecialCaseAutoMove(defaults.isSpecialCaseAutoMove());
+        settings.setSpecialCaseBookingNoAction(defaults.isSpecialCaseBookingNoAction());
+        settings.setSpecialCaseMoreTime(defaults.getSpecialCaseMoreTime());
+        settings.setSpecialCaseAlertRoles(defaults.getSpecialCaseAlertRoles());
+        settings.setTipsEnabled(defaults.isTipsEnabled());
+        settings.setTipSuggestions(defaults.getTipSuggestions());
+        settings.setMaxTipPercent(defaults.getMaxTipPercent());
+        settings.setAutoClosePaidOrders(defaults.isAutoClosePaidOrders());
+        settings.setRefundWindowDays(defaults.getRefundWindowDays());
+        settings.setFraudDiscountPercent(defaults.getFraudDiscountPercent());
+        settings.setFraudRefundAmount(defaults.getFraudRefundAmount());
+        settings.setFraudVoidsPerDay(defaults.getFraudVoidsPerDay());
+        settings.setFraudTipPercent(defaults.getFraudTipPercent());
+        settings.setFraudCashRefundsPerDay(defaults.getFraudCashRefundsPerDay());
+        settings.setFraudDisabledRules(defaults.getFraudDisabledRules());
     }
 
     private void validateLocalization(String defaultLanguage, String dateFormat, String timeFormat) {

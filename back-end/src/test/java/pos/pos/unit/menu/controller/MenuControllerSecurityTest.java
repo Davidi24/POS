@@ -27,8 +27,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.filter.OncePerRequestFilter;
 import pos.pos.common.dto.PageResponse;
 import pos.pos.menu.controller.MenuController;
-import pos.pos.menu.dto.CreateMenuRequest;
-import pos.pos.menu.dto.MenuResponse;
+import pos.pos.menu.dto.request.CreateMenuRequest;
+import pos.pos.menu.dto.response.MenuResponse;
 import pos.pos.menu.service.MenuService;
 import pos.pos.security.config.JwtAuthenticationEntryPoint;
 import pos.pos.security.filter.JwtAuthenticationFilter;
@@ -124,12 +124,18 @@ class MenuControllerSecurityTest {
         StubMenuService menuService() {
             return new StubMenuService();
         }
+
+        // The controller also needs this; these tests don't call the waiter-view endpoints.
+        @Bean
+        pos.pos.menu.service.MenuWaiterViewService menuWaiterViewService() {
+            return new pos.pos.menu.service.MenuWaiterViewService(null, null, null);
+        }
     }
 
     static class StubMenuService extends MenuService {
 
         StubMenuService() {
-            super(null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override
@@ -155,7 +161,7 @@ class MenuControllerSecurityTest {
         }
 
         @Override
-        public void deleteMenu(Authentication authentication, UUID menuId) {
+        public void deleteMenu(Authentication authentication, UUID menuId, boolean deleteItems) {
         }
     }
 

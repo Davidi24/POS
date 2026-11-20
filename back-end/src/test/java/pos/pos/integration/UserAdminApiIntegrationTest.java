@@ -24,6 +24,7 @@ import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.role.entity.Role;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.service.PasswordService;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserRole;
@@ -52,6 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class UserAdminApiIntegrationTest {
 
     private static final String SCHEMA = "user_admin_" + UUID.randomUUID().toString().replace("-", "");
+    private static final String ACCESS_COOKIE_NAME = "access-token";
     private static final String ADMIN_EMAIL = "prod.admin@pos.example";
     private static final String ADMIN_USERNAME = "prodadmin";
     private static final String ADMIN_PASSWORD = "StrongPass123!";
@@ -64,7 +66,7 @@ class UserAdminApiIntegrationTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "user-admin-test-secret-key-for-hs256");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "user-admin-test-refresh-token-pepper");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "user-admin-test-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "user-admin-test-email-verification-pepper");
@@ -138,7 +140,7 @@ class UserAdminApiIntegrationTest {
         User target = createUser(admin.getId(), TARGET_EMAIL, TARGET_USERNAME, TARGET_PASSWORD, TARGET_PHONE);
         assignRole(target, waiterRole, admin.getId());
 
-        String adminAccessToken = bodyOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD)).get("accessToken").asText();
+        String adminAccessToken = accessTokenOf(webLogin(ADMIN_USERNAME, ADMIN_PASSWORD));
 
         JsonNode usersPage = bodyOf(mockMvc.perform(get("/users")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminAccessToken))
@@ -257,6 +259,23 @@ class UserAdminApiIntegrationTest {
 
     private JsonNode bodyOf(MvcResult result) throws Exception {
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private String accessTokenOf(MvcResult result) {
+        return extractCookieValue(result, ACCESS_COOKIE_NAME);
+    }
+
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
     private String bearer(String accessToken) {

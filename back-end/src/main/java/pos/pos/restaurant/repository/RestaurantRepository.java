@@ -14,15 +14,68 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
 
     Optional<Restaurant> findByIdAndDeletedAtIsNull(UUID id);
 
+    /** Whether support admin [userId] may work in [restaurantId]: every restaurant, or one given to them (user, 2026-11-19). */
+    @org.springframework.data.jpa.repository.Query(value = "select coalesce((select u.admin_all_restaurants from {h-schema}users u where u.id = :userId), false)"
+            + " or exists (select 1 from {h-schema}admin_restaurant_access a where a.user_id = :userId and a.restaurant_id = :restaurantId)",
+            nativeQuery = true)
+    boolean supportAdminMayEnter(@org.springframework.data.repository.query.Param("userId") UUID userId,
+                                 @org.springframework.data.repository.query.Param("restaurantId") UUID restaurantId);
+
     Optional<Restaurant> findBySlugAndDeletedAtIsNull(String slug);
 
-    boolean existsByCodeAndDeletedAtIsNull(String code);
+    // Codes and web addresses stay reserved after a restaurant is archived (the database keeps them unique too).
+    boolean existsByCode(String code);
 
-    boolean existsByCodeAndIdNotAndDeletedAtIsNull(String code, UUID id);
+    boolean existsByCodeAndIdNot(String code, UUID id);
 
-    boolean existsBySlugAndDeletedAtIsNull(String slug);
+    boolean existsByCodeAndDeletedAtIsNotNull(String code);
 
-    boolean existsBySlugAndIdNotAndDeletedAtIsNull(String slug, UUID id);
+    boolean existsBySlug(String slug);
+
+    boolean existsBySlugAndIdNot(String slug, UUID id);
+
+    boolean existsBySlugAndDeletedAtIsNotNull(String slug);
+
+    Optional<Restaurant> findByApplicationCodeHash(String applicationCodeHash);
+
+    boolean existsByStatusAndPendingOwnerEmailAndDeletedAtIsNull(RestaurantStatus status, String pendingOwnerEmail);
+
+    boolean existsByStatusAndPendingOwnerUsernameAndDeletedAtIsNull(RestaurantStatus status, String pendingOwnerUsername);
+
+    boolean existsByOwnerIdAndIdNotAndDeletedAtIsNull(UUID ownerId, UUID id);
+
+    /** Public applications waiting for review ([statuses] PENDING) or already rejected, newest or oldest first. */
+    @Query(
+            value = """
+            SELECT r
+            FROM Restaurant r
+            WHERE r.deletedAt IS NULL
+              AND r.status IN :statuses
+              AND (
+                    :searchLike IS NULL
+                    OR lower(r.name) LIKE :searchLike
+                    OR lower(r.legalName) LIKE :searchLike
+                    OR lower(r.email) LIKE :searchLike
+                    OR lower(r.pendingOwnerEmail) LIKE :searchLike
+                    OR lower(concat(coalesce(r.pendingOwnerFirstName, ''), ' ', coalesce(r.pendingOwnerLastName, ''))) LIKE :searchLike
+              )
+            """,
+            countQuery = """
+            SELECT COUNT(r)
+            FROM Restaurant r
+            WHERE r.deletedAt IS NULL
+              AND r.status IN :statuses
+              AND (
+                    :searchLike IS NULL
+                    OR lower(r.name) LIKE :searchLike
+                    OR lower(r.legalName) LIKE :searchLike
+                    OR lower(r.email) LIKE :searchLike
+                    OR lower(r.pendingOwnerEmail) LIKE :searchLike
+                    OR lower(concat(coalesce(r.pendingOwnerFirstName, ''), ' ', coalesce(r.pendingOwnerLastName, ''))) LIKE :searchLike
+              )
+            """
+    )
+    Page<Restaurant> searchApplications(java.util.Collection<RestaurantStatus> statuses, String searchLike, Pageable pageable);
 
     @Query(
             value = """

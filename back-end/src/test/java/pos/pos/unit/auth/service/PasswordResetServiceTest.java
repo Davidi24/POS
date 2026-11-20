@@ -47,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -91,6 +92,12 @@ class PasswordResetServiceTest {
     @Mock
     private RoleRepository roleRepository;
 
+    @Mock
+    private pos.pos.auth.service.PasswordDailyLimits passwordDailyLimits;
+
+    @Mock
+    private pos.pos.security.service.PublicRequestRateLimiter publicRequestRateLimiter;
+
     private PasswordResetService passwordResetService;
 
     @BeforeEach
@@ -125,8 +132,14 @@ class PasswordResetServiceTest {
                 authSmsOtpCodeRepository,
                 oneTimeCodeService,
                 smsMessageService,
-                roleRepository
+                roleRepository,
+                org.mockito.Mockito.mock(pos.pos.restaurant.repository.RestaurantRepository.class),
+                passwordDailyLimits,
+                publicRequestRateLimiter,
+                org.mockito.Mockito.mock(pos.pos.auth.service.AccountAudit.class)
         );
+        // Under the daily limit unless a test says otherwise.
+        org.mockito.Mockito.lenient().when(passwordDailyLimits.maySendResetLink(any(), any())).thenReturn(true);
     }
 
     @Nested
@@ -151,7 +164,9 @@ class PasswordResetServiceTest {
 
             passwordResetService.requestReset(request);
 
-            verify(authPasswordResetTokenRepository).deleteByUserId(USER_ID);
+            // Older links are marked replaced (kept so they can explain why they no longer work), not deleted.
+            verify(authPasswordResetTokenRepository).supersedeOpenLinks(eq(USER_ID), any(OffsetDateTime.class));
+            verify(authPasswordResetTokenRepository, never()).deleteByUserId(any());
 
             ArgumentCaptor<AuthPasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(AuthPasswordResetToken.class);
             verify(authPasswordResetTokenRepository).save(tokenCaptor.capture());
@@ -159,13 +174,14 @@ class PasswordResetServiceTest {
             assertThat(savedToken.getUserId()).isEqualTo(USER_ID);
             assertThat(savedToken.getTokenHash()).isEqualTo("hashed-reset-token");
             assertThat(savedToken.getExpiresAt()).isNotNull();
+            assertThat(savedToken.getPurpose()).isEqualTo(pos.pos.auth.enums.PasswordLinkPurpose.RESET);
 
             verify(authMailService).sendPasswordResetEmail(
-                    "cashier@pos.local",
-                    "Casey",
-                    "Reset your POS password",
-                    "https://web.pos.local/reset-password?token=raw-reset-token",
-                    Duration.ofMinutes(30)
+                    same(user),
+                    eq("Reset your POS password"),
+                    eq("https://web.pos.local/reset-password?token=raw-reset-token"),
+                    eq(Duration.ofMinutes(30)),
+                    any(OffsetDateTime.class)
             );
         }
 
@@ -258,14 +274,14 @@ class PasswordResetServiceTest {
 
             passwordResetService.issueAdminReset(user, RecoveryChannel.EMAIL, ClientLinkTarget.MOBILE);
 
-            verify(authPasswordResetTokenRepository).deleteByUserId(USER_ID);
+            verify(authPasswordResetTokenRepository).supersedeOpenLinks(eq(USER_ID), any(OffsetDateTime.class));
             verify(authPasswordResetTokenRepository).save(any(AuthPasswordResetToken.class));
             verify(authMailService).sendPasswordResetEmail(
-                    "cashier@pos.local",
-                    "Casey",
-                    "Reset your POS password",
-                    "pos://reset/reset-password?token=raw-reset-token",
-                    Duration.ofMinutes(30)
+                    same(user),
+                    eq("Reset your POS password"),
+                    eq("pos://reset/reset-password?token=raw-reset-token"),
+                    eq(Duration.ofMinutes(30)),
+                    any(OffsetDateTime.class)
             );
         }
 
@@ -320,14 +336,17 @@ class PasswordResetServiceTest {
 
             passwordResetService.issueRestaurantOwnerInvite(user, ClientLinkTarget.UNIVERSAL, "Main Restaurant");
 
-            verify(authPasswordResetTokenRepository).deleteByUserId(USER_ID);
-            verify(authPasswordResetTokenRepository).save(any(AuthPasswordResetToken.class));
+            verify(authPasswordResetTokenRepository).supersedeOpenLinks(eq(USER_ID), any(OffsetDateTime.class));
+            ArgumentCaptor<AuthPasswordResetToken> saved = ArgumentCaptor.forClass(AuthPasswordResetToken.class);
+            verify(authPasswordResetTokenRepository).save(saved.capture());
+            assertThat(saved.getValue().getPurpose()).isEqualTo(pos.pos.auth.enums.PasswordLinkPurpose.INVITE);
+            // Invitations last longer than reset links (72 hours by default).
             verify(authMailService).sendAccountSetupEmail(
-                    "cashier@pos.local",
-                    "Casey",
-                    "https://links.pos.local/reset-password?token=setup-token",
-                    Duration.ofMinutes(30),
-                    "Main Restaurant"
+                    same(user),
+                    eq("https://links.pos.local/reset-password?token=setup-token"),
+                    eq(Duration.ofHours(72)),
+                    any(OffsetDateTime.class),
+                    eq("Main Restaurant")
             );
         }
     }
@@ -355,10 +374,7 @@ class PasswordResetServiceTest {
             user.setLockedUntil(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5));
 
             when(opaqueTokenService.hash("raw-reset-token", "reset-token-pepper")).thenReturn("hashed-reset-token");
-            when(authPasswordResetTokenRepository.findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(
-                    eq("hashed-reset-token"),
-                    any(OffsetDateTime.class)
-            )).thenReturn(Optional.of(token));
+            when(authPasswordResetTokenRepository.findByTokenHashForUpdate("hashed-reset-token")).thenReturn(Optional.of(token));
             when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
             when(passwordService.hash("NewSecurePass1!")).thenReturn("new-hash");
 
@@ -375,7 +391,7 @@ class PasswordResetServiceTest {
                     any(OffsetDateTime.class),
                     eq(SessionRevocationReason.PASSWORD_RESET.name())
             );
-            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
+            verify(authMailService).sendPasswordChangedNotificationEmail(null, "cashier@pos.local", "Casey");
             assertThat(token.getUsedAt()).isNotNull();
             verify(authPasswordResetTokenRepository).save(token);
         }
@@ -393,15 +409,13 @@ class PasswordResetServiceTest {
                     .expiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(30))
                     .build();
 
+            token.setPurpose(pos.pos.auth.enums.PasswordLinkPurpose.INVITE);
             User user = emailUser();
             user.setEmailVerified(false);
             user.setEmailVerifiedAt(null);
 
             when(opaqueTokenService.hash("raw-reset-token", "reset-token-pepper")).thenReturn("hashed-reset-token");
-            when(authPasswordResetTokenRepository.findByTokenHashAndUsedAtIsNullAndExpiresAtAfter(
-                    eq("hashed-reset-token"),
-                    any(OffsetDateTime.class)
-            )).thenReturn(Optional.of(token));
+            when(authPasswordResetTokenRepository.findByTokenHashForUpdate("hashed-reset-token")).thenReturn(Optional.of(token));
             when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
             when(passwordService.hash("NewSecurePass1!")).thenReturn("new-hash");
 
@@ -410,6 +424,8 @@ class PasswordResetServiceTest {
             assertThat(user.isEmailVerified()).isTrue();
             assertThat(user.getEmailVerifiedAt()).isNotNull();
             verify(userRepository).save(user);
+            // A first password is not a change, so no "your password was changed" email.
+            verify(authMailService, never()).sendPasswordChangedNotificationEmail(any(), any(), any());
         }
     }
 
@@ -461,7 +477,7 @@ class PasswordResetServiceTest {
                     any(OffsetDateTime.class),
                     eq(SessionRevocationReason.PASSWORD_RESET.name())
             );
-            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
+            verify(authMailService).sendPasswordChangedNotificationEmail(null, "cashier@pos.local", "Casey");
 
             ArgumentCaptor<AuthSmsOtpCode> codeCaptor = ArgumentCaptor.forClass(AuthSmsOtpCode.class);
             verify(authSmsOtpCodeRepository).save(codeCaptor.capture());

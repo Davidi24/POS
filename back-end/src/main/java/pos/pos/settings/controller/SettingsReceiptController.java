@@ -43,7 +43,7 @@ public class SettingsReceiptController {
     }
 
     @PutMapping
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('SETTINGS_MONEY')")
     @Operation(summary = "Replace receipt settings")
     public ResponseEntity<ReceiptSettingsResponse> updateReceiptSettings(
             @PathVariable UUID restaurantId,

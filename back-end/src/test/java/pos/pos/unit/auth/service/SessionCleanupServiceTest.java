@@ -33,6 +33,9 @@ class SessionCleanupServiceTest {
     @Mock
     private AuthLoginAttemptRepository authLoginAttemptRepository;
 
+    @Mock
+    private pos.pos.auth.repository.AuthPasswordEventRepository authPasswordEventRepository;
+
     @InjectMocks
     private SessionCleanupService sessionCleanupService;
 

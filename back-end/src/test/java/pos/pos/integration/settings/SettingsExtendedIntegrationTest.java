@@ -35,6 +35,35 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SettingsExtendedIntegrationTest extends AbstractSettingsIntegrationTest {
 
     @Test
+    @DisplayName("tip suggestions accept normal spacing but reject unbounded whitespace")
+    void tipSuggestionsTextHasARequestSizeLimit() throws Exception {
+        Restaurant restaurant = createRestaurant("tip-suggestions-size");
+        User admin = createRestaurantAdmin(restaurant, "tip-suggestions-size");
+        String accessToken = accessTokenFor(admin, "TIP-SUGGESTIONS-SIZE");
+        Map<String, Object> valid = Map.of(
+                "tipsEnabled", true,
+                "tipSuggestionsText", " 5, 10, 15 ",
+                "maxTipPercent", 40,
+                "autoClosePaidOrders", true,
+                "refundWindowDays", 7
+        );
+
+        mockMvc.perform(patch("/restaurants/{restaurantId}/settings/payments", restaurant.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(valid)))
+                .andExpect(status().isOk());
+
+        Map<String, Object> oversizedWhitespace = new java.util.HashMap<>(valid);
+        oversizedWhitespace.put("tipSuggestionsText", " ".repeat(65));
+        mockMvc.perform(patch("/restaurants/{restaurantId}/settings/payments", restaurant.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(oversizedWhitespace)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("SETTINGS-101 receipt, order rules, and audit endpoints should work end to end")
     void settings101ReceiptOrderRulesAndAuditShouldWorkEndToEnd() throws Exception {
         Restaurant restaurant = createRestaurant("settings101");
@@ -116,6 +145,11 @@ class SettingsExtendedIntegrationTest extends AbstractSettingsIntegrationTest {
         JsonNode auditBody = bodyOf(auditResult);
         assertThat(auditBody.get("totalElements").asInt()).isGreaterThanOrEqualTo(4);
         assertThat(auditBody.get("items").toString()).contains("SETTINGS_RECEIPT");
+        // Each change names who made it.
+        JsonNode latest = auditBody.get("items").get(0);
+        assertThat(latest.get("actorUserId").asText()).isEqualTo(admin.getId().toString());
+        String expectedName = (admin.getFirstName() + " " + admin.getLastName()).trim();
+        assertThat(latest.get("actorName").asText()).isEqualTo(expectedName.isEmpty() ? admin.getUsername() : expectedName);
     }
 
     @Test

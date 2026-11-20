@@ -15,6 +15,8 @@ import java.util.UUID;
 public class CurrentUserResponse {
 
     private UUID id;
+    private UUID restaurantId;
+    private UUID defaultBranchId;
     private String email;
     private String username;
     private String firstName;
@@ -25,4 +27,11 @@ public class CurrentUserResponse {
     private boolean phoneVerified;
     private List<String> roles;
     private List<String> permissions;
+    // For the person's own profile and menu (user, 2026-11-18): their restaurant's and default branch's names.
+    private String restaurantName;
+    private String branchName;
+    // The person's own photo (Profile), or null for their initials.
+    private String photoUrl;
+    // The language the person picked in Profile (en, it, es, sq), or null for English.
+    private String language;
 }

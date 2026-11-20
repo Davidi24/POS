@@ -83,7 +83,7 @@ class BranchContactServiceTest {
 
         assertThat(response.getId()).isEqualTo(CONTACT_ID);
         assertThat(response.getIsPrimary()).isTrue();
-        verify(branchContactRepository).clearAllPrimary(BRANCH_ID, ACTOR_ID);
+        verify(branchContactRepository).clearAllPrimary(BRANCH_ID, ACTOR_ID, null);
     }
 
     @Test
@@ -109,7 +109,7 @@ class BranchContactServiceTest {
         ContactResponse response = branchContactService.createContact(authentication, RESTAURANT_ID, BRANCH_ID, request);
 
         assertThat(response.getIsPrimary()).isFalse();
-        verify(branchContactRepository, never()).clearAllPrimary(any(), any());
+        verify(branchContactRepository, never()).clearAllPrimary(any(), any(), any());
     }
 
     @Test
@@ -127,7 +127,7 @@ class BranchContactServiceTest {
 
         assertThat(target.isPrimary()).isTrue();
         assertThat(response.getId()).isEqualTo(CONTACT_ID);
-        verify(branchContactRepository).clearAllPrimary(BRANCH_ID, ACTOR_ID);
+        verify(branchContactRepository).clearAllPrimary(BRANCH_ID, ACTOR_ID, CONTACT_ID);
         verify(branchContactRepository).save(target);
     }
 
@@ -155,7 +155,7 @@ class BranchContactServiceTest {
 
         assertThat(target.isPrimary()).isTrue();
         assertThat(response.getId()).isEqualTo(CONTACT_ID);
-        verify(branchContactRepository).clearAllPrimary(BRANCH_ID, ACTOR_ID);
+        verify(branchContactRepository).clearAllPrimary(BRANCH_ID, ACTOR_ID, CONTACT_ID);
     }
 
     @Test

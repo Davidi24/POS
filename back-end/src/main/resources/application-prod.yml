@@ -30,6 +30,34 @@ springdoc:
     enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
 
 app:
+  # Test payments are never enabled in the production profile. Set a real provider
+  # only when its verified integration is installed and configured.
+  payments:
+    provider: ${APP_PAYMENTS_PROVIDER:disabled}
+
+  auth:
+    password-reset:
+      # The public address of this backend (https://…); invitation and reset emails link to its page.
+      link-base-url: ${PASSWORD_LINK_BASE_URL:${PUBLIC_BASE_URL}}
+    sms:
+      # No SMS gateway is connected; never log OTPs or report SMS delivery as available.
+      delivery-mode: ${SMS_DELIVERY_MODE:DISABLED}
+
+  storage:
+    floor-plans:
+      # Require an explicit durable storage choice; local disk is not a safe production fallback.
+      provider: ${FLOOR_PLAN_STORAGE_PROVIDER:disabled}
+    menu-images:
+      # Dish photos live in R2; the backend refuses to start if the R2_* values are missing.
+      provider: ${MENU_IMAGE_STORAGE_PROVIDER:r2}
+    r2:
+      # Supply these through the deployment secret manager after rotating the exposed token.
+      endpoint: ${R2_ENDPOINT:}
+      access-key-id: ${R2_ACCESS_KEY_ID:}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+      bucket: ${R2_BUCKET:saporini-assets}
+      public-base-url: ${R2_PUBLIC_BASE_URL:}
+
   security:
     trusted-proxies: ${TRUSTED_PROXIES}
     cookie:

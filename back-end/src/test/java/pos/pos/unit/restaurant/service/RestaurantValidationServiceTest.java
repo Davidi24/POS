@@ -43,8 +43,8 @@ class RestaurantValidationServiceTest {
     @Test
     @DisplayName("normalizeAndGenerateUniqueRegistrationFields should keep the base identifiers when available")
     void shouldKeepBaseIdentifiersWhenAvailable() {
-        given(restaurantRepository.existsByCodeAndDeletedAtIsNull("BURGER_HOUSE")).willReturn(false);
-        given(restaurantRepository.existsBySlugAndDeletedAtIsNull("burger-house")).willReturn(false);
+        given(restaurantRepository.existsByCode("BURGER_HOUSE")).willReturn(false);
+        given(restaurantRepository.existsBySlug("burger-house")).willReturn(false);
 
         RestaurantValidationService.NormalizedRestaurantFields response =
                 restaurantValidationService.normalizeAndGenerateUniqueRegistrationFields(
@@ -59,10 +59,10 @@ class RestaurantValidationServiceTest {
     @Test
     @DisplayName("normalizeAndGenerateUniqueRegistrationFields should append a numeric suffix when the base identifiers are taken")
     void shouldAppendNumericSuffixWhenBaseIdentifiersAreTaken() {
-        given(restaurantRepository.existsByCodeAndDeletedAtIsNull("BURGER_HOUSE")).willReturn(false);
-        given(restaurantRepository.existsByCodeAndDeletedAtIsNull("BURGER_HOUSE_2")).willReturn(false);
-        given(restaurantRepository.existsBySlugAndDeletedAtIsNull("burger-house")).willReturn(true);
-        given(restaurantRepository.existsBySlugAndDeletedAtIsNull("burger-house-2")).willReturn(false);
+        given(restaurantRepository.existsByCode("BURGER_HOUSE")).willReturn(false);
+        given(restaurantRepository.existsByCode("BURGER_HOUSE_2")).willReturn(false);
+        given(restaurantRepository.existsBySlug("burger-house")).willReturn(true);
+        given(restaurantRepository.existsBySlug("burger-house-2")).willReturn(false);
 
         RestaurantValidationService.NormalizedRestaurantFields response =
                 restaurantValidationService.normalizeAndGenerateUniqueRegistrationFields(
@@ -126,13 +126,9 @@ class RestaurantValidationServiceTest {
     }
 
     @Test
-    @DisplayName("validateOwnerUser should reject null owner for operational statuses")
-    void shouldRejectNullOwnerForOperationalStatuses() {
-        assertThatThrownBy(() -> restaurantValidationService.validateOwnerUser(null, RESTAURANT_ID, RestaurantStatus.ACTIVE))
-                .isInstanceOf(AuthException.class)
-                .hasMessage("ownerUserId is required unless restaurant status is PENDING or REJECTED")
-                .extracting(ex -> ((AuthException) ex).getStatus())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+    @DisplayName("validateOwnerUser allows setup before an owner is invited")
+    void shouldAllowNullOwnerForOperationalStatuses() {
+        assertThat(restaurantValidationService.validateOwnerUser(null, RESTAURANT_ID, RestaurantStatus.ACTIVE)).isNull();
     }
 
     @Test
@@ -221,5 +217,73 @@ class RestaurantValidationServiceTest {
                 .isActive(active)
                 .restaurantId(restaurantId)
                 .build();
+    }
+
+    @Test
+    @DisplayName("normalizeAndGenerateUniqueRegistrationFields skips identifiers an archived restaurant still holds")
+    void shouldSkipIdentifiersHeldByArchivedRestaurants() {
+        // existsByCode counts archived restaurants too, so their code is never generated again.
+        given(restaurantRepository.existsByCode("BURGER_HOUSE")).willReturn(true);
+        given(restaurantRepository.existsByCode("BURGER_HOUSE_2")).willReturn(false);
+        given(restaurantRepository.existsBySlug("burger-house-2")).willReturn(false);
+
+        RestaurantValidationService.NormalizedRestaurantFields response =
+                restaurantValidationService.normalizeAndGenerateUniqueRegistrationFields("Burger House", "Europe/Tirane");
+
+        assertThat(response.code()).isEqualTo("BURGER_HOUSE_2");
+        assertThat(response.slug()).isEqualTo("burger-house-2");
+    }
+
+    @Test
+    @DisplayName("normalizeAndValidateFields reports a code kept by an archived restaurant as a reserved conflict")
+    void shouldReserveArchivedRestaurantCode() {
+        given(restaurantRepository.existsByCode("OLD_PLACE")).willReturn(true);
+        given(restaurantRepository.existsByCodeAndDeletedAtIsNotNull("OLD_PLACE")).willReturn(true);
+
+        assertThatThrownBy(() -> restaurantValidationService.normalizeAndValidateFields("old place", "old-place", "Old Place", "Europe/Tirane", null))
+                .isInstanceOf(pos.pos.exception.restaurant.RestaurantCodeAlreadyExistsException.class)
+                .hasMessageContaining("removed restaurant and stays reserved")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("normalizeAndValidateFields reports a code used by a live restaurant as a plain conflict")
+    void shouldRejectLiveRestaurantCode() {
+        given(restaurantRepository.existsByCodeAndIdNot("TAKEN", RESTAURANT_ID)).willReturn(true);
+        given(restaurantRepository.existsByCodeAndDeletedAtIsNotNull("TAKEN")).willReturn(false);
+
+        assertThatThrownBy(() -> restaurantValidationService.normalizeAndValidateFields("taken", "taken", "Taken", "Europe/Tirane", RESTAURANT_ID))
+                .isInstanceOf(pos.pos.exception.restaurant.RestaurantCodeAlreadyExistsException.class)
+                .hasMessage("Restaurant code already in use")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("normalizeAndValidateFields reports a web address kept by an archived restaurant as reserved")
+    void shouldReserveArchivedRestaurantSlug() {
+        given(restaurantRepository.existsByCode("FRESH_CODE")).willReturn(false);
+        given(restaurantRepository.existsBySlug("old-place")).willReturn(true);
+        given(restaurantRepository.existsBySlugAndDeletedAtIsNotNull("old-place")).willReturn(true);
+
+        assertThatThrownBy(() -> restaurantValidationService.normalizeAndValidateFields("fresh code", "old-place", "Old Place", "Europe/Tirane", null))
+                .isInstanceOf(pos.pos.exception.restaurant.RestaurantSlugAlreadyExistsException.class)
+                .hasMessageContaining("removed restaurant and stays reserved")
+                .extracting(ex -> ((AuthException) ex).getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("normalizeAndValidateFields lets a restaurant keep its own code and web address")
+    void shouldAllowOwnIdentifiersOnUpdate() {
+        given(restaurantRepository.existsByCodeAndIdNot("MINE", RESTAURANT_ID)).willReturn(false);
+        given(restaurantRepository.existsBySlugAndIdNot("mine", RESTAURANT_ID)).willReturn(false);
+
+        RestaurantValidationService.NormalizedRestaurantFields fields =
+                restaurantValidationService.normalizeAndValidateFields("mine", "mine", "Mine", "Europe/Tirane", RESTAURANT_ID);
+
+        assertThat(fields.code()).isEqualTo("MINE");
+        assertThat(fields.slug()).isEqualTo("mine");
     }
 }

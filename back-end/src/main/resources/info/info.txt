@@ -1,39 +1,20 @@
 AUTH / SECURITY REVIEW VERDICT
 
-Status: Not production-ready yet
+Status: Not production-ready yet; deployment integrations and policies remain open.
 
-Main blockers
+Verified configuration safeguards
 
-1. Base configuration is still development-grade.
-- spring.profiles.default=local
-- spring.sql.init.mode=always
-- spring.jpa.hibernate.ddl-auto=create
-- spring.jpa.show-sql=true
-- localhost database defaults are in the base config
-
-2. Super-admin bootstrap is unsafe if environment variables are missed.
-- Default fallback values can create a predictable admin account.
-- BOOTSTRAP_SUPER_ADMIN_EMAIL defaults to admin@pos.local
-- BOOTSTRAP_SUPER_ADMIN_PASSWORD defaults to ChangeMe123!
-
-3. Mail configuration has a startup bug.
-- app.mail.from can resolve to blank when MAIL_USERNAME is not set.
-- This breaks full application startup.
-
-4. Schema management is not production-ready.
-- schema.sql is drop-only and contains stale table names.
-- The project currently depends on ddl-auto create/create-drop behavior instead of real migrations.
-
-5. The full test suite is not green end-to-end.
-- Current full run result: 438 tests, 0 failures, 2 errors
-- Error 1: PosApplicationTests fails because app.mail.from is blank
-- Error 2: SessionCleanupServiceTest fails because authSmsOtpCodeRepository is not mocked/injected
+1. The default/base profile has no local profile selection, database credentials, or SQL initialization. The production profile requires DB settings, validates the schema with Flyway migrations, and disables SQL initialization and SQL logging.
+2. Production super-admin bootstrap is disabled by default; credentials have no predictable fallback.
+3. Payment, SMS, and floor-plan storage providers default to disabled in production until real providers are configured.
+4. Production mail sender/host settings are environment-provided; mail delivery still needs durable retry/outbox handling and operational verification.
+5. The last complete backend run on 2026-10-07 passed 1,244 unit and 297 PostgreSQL integration tests. Subsequent online-menu changes passed 10 focused unit and 28 integration tests.
 
 Important risks
 
-1. Refresh rate limiting is in-memory only.
-- Works on a single node.
-- Will not be reliable across multiple app instances.
+1. Refresh rate limits now use shared PostgreSQL state.
+- IP and token IDs are stored as peppered hashes in the V62 rate-limit table.
+- Login throttling also uses shared database records; monitor database load as request volume grows.
 
 2. Proxy/client IP handling must be overridden in production.
 - trusted-proxies defaults to loopback only
@@ -61,17 +42,14 @@ What is already strong
 
 Production readiness verdict
 
-The auth part is structurally good, but it is not ready for production deployment yet because of configuration, bootstrap, schema, and full-suite issues.
+Authentication has solid coverage, but release still depends on deployment-specific proxy/cookie configuration and durable email delivery.
 
 Minimum work required before production
 
-1. Remove development defaults from application.yml.
-2. Move production settings to a dedicated production profile or environment variables.
-3. Replace ddl-auto=create with proper database migrations.
-4. Fix app.mail.from so startup fails only when configuration is truly invalid, not because of an empty fallback.
-5. Remove predictable super-admin fallback credentials and fail fast if they are missing.
-6. Fix the 2 failing tests and get the full suite green.
-7. Recheck proxy and cookie settings against the real deployment topology.
+1. Supply and verify deployment-specific trusted proxy, cookie domain, JWT keys, and database secrets.
+2. Connect live payment and email providers, including durable payment reconciliation and email retries/outbox.
+3. Configure durable floor-plan object storage.
+4. Recheck production API exposure and proxy/cookie settings against the real deployment topology.
 
 Recommended future features
 
@@ -94,8 +72,8 @@ Recommended future features
 - Phone verification
 - Role changes
 
-5. Redis-backed rate limiting and session support
-- Needed if the app will run on multiple nodes
+5. Redis-backed session support
+- Consider only if session validation load or database capacity requires it; login and refresh throttling already use shared database state.
 
 6. Step-up authentication for sensitive actions
 - Owner/admin changes
@@ -158,9 +136,9 @@ Work through this list in order.
 - Decide whether Swagger/OpenAPI should be public in production
 - If not, disable it or protect it behind auth/profile-based config
 
-[ ] 10. Replace single-node throttling if you plan horizontal scaling.
-- Move refresh/login rate limiting to Redis or another shared store
-- Make sure rate limits work across multiple app instances
+[x] 10. Use shared throttling state when running multiple app instances.
+- Login throttling uses shared database records.
+- Refresh IP/token limits use the shared PostgreSQL table introduced in V62.
 
 [ ] 11. Reduce request-time DB overhead where needed.
 - Measure JWT filter query cost

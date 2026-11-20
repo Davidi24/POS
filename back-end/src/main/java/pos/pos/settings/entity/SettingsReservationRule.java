@@ -93,10 +93,10 @@ public class SettingsReservationRule extends AbstractTimestampedEntity {
     private int maxPartySize = 12;
 
     @Column(name = "default_duration_minutes", nullable = false)
-    private int defaultDurationMinutes = 90;
+    private int defaultDurationMinutes = 120;
 
     @Column(name = "buffer_minutes", nullable = false)
-    private int bufferMinutes = 15;
+    private int bufferMinutes = 5;
 
     @Column(name = "allow_online_reservations", nullable = false)
     private boolean allowOnlineReservations = true;
@@ -112,7 +112,7 @@ public class SettingsReservationRule extends AbstractTimestampedEntity {
     private BigDecimal depositValue;
 
     @Column(name = "auto_confirm_reservations", nullable = false)
-    private boolean autoConfirmReservations = false;
+    private boolean autoConfirmReservations = true;
 
     @Column(name = "cancellation_window_hours", nullable = false)
     private int cancellationWindowHours = 24;

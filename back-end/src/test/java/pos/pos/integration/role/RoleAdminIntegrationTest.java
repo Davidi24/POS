@@ -44,7 +44,7 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-008 POST /roles creates custom role with derived code and actor-safe rank")
     void role008CreatesCustomRoleWithDerivedCodeAndActorSafeRank() throws Exception {
-        User actor = createUser("role008-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role008-admin");
 
         MvcResult result = mockMvc.perform(post("/roles")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessTokenFor(actor, "ROLE-008-login")))
@@ -70,7 +70,7 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-009 POST /roles rejects duplicate role name or derived role code")
     void role009RejectsDuplicateRoleNameOrDerivedRoleCode() throws Exception {
-        User actor = createUser("role009-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role009-admin");
         createRole("FLOOR_SUPERVISOR", "Floor Supervisor", "existing", 12_000L, false, true, true, false);
         String accessToken = accessTokenFor(actor, "ROLE-009-login");
 
@@ -101,7 +101,7 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-010 PUT /roles/{roleId} updates custom role name and description")
     void role010UpdatesCustomRoleNameAndDescription() throws Exception {
-        User actor = createUser("role010-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role010-admin");
         Role target = createRole("ROLE010_TARGET", "Role010 Target", "before", 14_000L, false, true, true, false);
 
         MvcResult result = mockMvc.perform(put("/roles/{roleId}", target.getId())
@@ -127,7 +127,7 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-011 PUT /roles/{roleId} rejects updates to system roles")
     void role011RejectsUpdatesToSystemRoles() throws Exception {
-        User actor = createUser("role011-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role011-admin");
 
         MvcResult result = mockMvc.perform(put("/roles/{roleId}", role("MANAGER").getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessTokenFor(actor, "ROLE-011-login")))
@@ -145,7 +145,7 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-012 PUT /roles/{roleId} rejects role outside actor management scope")
     void role012RejectsRoleOutsideActorManagementScope() throws Exception {
-        User actor = createUser("role012-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role012-admin");
         Role aboveActor = createRole("ROLE012_ABOVE", "Role012 Above", "above actor", 35_000L, false, true, true, false);
 
         MvcResult result = mockMvc.perform(put("/roles/{roleId}", aboveActor.getId())
@@ -164,26 +164,32 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-013 PUT /roles/{roleId}/permissions replaces role permissions")
     void role013ReplacesRolePermissions() throws Exception {
-        User actor = createUser("role013-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role013-admin");
         Role target = createRole("ROLE013_TARGET", "Role013 Target", "permissions", 13_000L, false, true, true, false);
 
         MvcResult result = mockMvc.perform(put("/roles/{roleId}/permissions", target.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessTokenFor(actor, "ROLE-013-login")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
+                                // With what they need (PermissionTree): the Admin Hub, then each part's View.
                                 "permissionIds", List.of(
+                                        permission("ADMIN_ACCESS").getId().toString(),
                                         permission("ROLES_READ").getId().toString(),
+                                        permission("USERS_READ").getId().toString(),
                                         permission("USERS_UPDATE").getId().toString()
                                 )
                         ))))
                 .andExpect(status().isOk())
                 .andReturn();
 
-        assertThat(codesOf(bodyOf(result))).containsExactly("USERS_UPDATE", "ROLES_READ");
+        // By name: "Change people", "Open Admin Hub", "See people", "See roles".
+        assertThat(codesOf(bodyOf(result))).containsExactly("USERS_UPDATE", "ADMIN_ACCESS", "USERS_READ", "ROLES_READ");
         assertThat(rolePermissionRepository.findByRoleId(target.getId()))
                 .extracting(assignment -> assignment.getPermissionId().toString())
                 .containsExactlyInAnyOrder(
+                        permission("ADMIN_ACCESS").getId().toString(),
                         permission("ROLES_READ").getId().toString(),
+                        permission("USERS_READ").getId().toString(),
                         permission("USERS_UPDATE").getId().toString()
                 );
     }
@@ -191,7 +197,7 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-014 PUT /roles/{roleId}/permissions rejects unknown permission ids")
     void role014RejectsUnknownPermissionIds() throws Exception {
-        User actor = createUser("role014-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role014-admin");
         Role target = createRole("ROLE014_TARGET", "Role014 Target", "permissions", 13_000L, false, true, true, false);
 
         MvcResult result = mockMvc.perform(put("/roles/{roleId}/permissions", target.getId())
@@ -227,7 +233,8 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessTokenFor(actor, "ROLE-015-login")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "permissionIds", List.of(permission("USERS_DELETE").getId().toString())
+                                // A workspace's "Open …" needs nothing else, so the permission tree keeps it for the check.
+                                "permissionIds", List.of(permission("ADMIN_ACCESS").getId().toString())
                         ))))
                 .andExpect(status().isForbidden())
                 .andReturn();
@@ -238,7 +245,7 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-016 PATCH /roles/{roleId}/status activates or deactivates a custom role")
     void role016ActivatesOrDeactivatesACustomRole() throws Exception {
-        User actor = createUser("role016-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role016-admin");
         Role target = createRole("ROLE016_TARGET", "Role016 Target", "status", 12_000L, false, true, true, false);
         String accessToken = accessTokenFor(actor, "ROLE-016-login");
 
@@ -264,7 +271,7 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-017 DELETE /roles/{roleId} soft deletes a custom role")
     void role017SoftDeletesACustomRole() throws Exception {
-        User actor = createUser("role017-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role017-admin");
         Role target = createRole("ROLE017_TARGET", "Role017 Target", "delete", 12_000L, false, true, true, false);
 
         mockMvc.perform(delete("/roles/{roleId}", target.getId())
@@ -280,7 +287,7 @@ class RoleAdminIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-018 DELETE /roles/{roleId} keeps deleted role out of GET /roles results")
     void role018KeepsDeletedRoleOutOfGetRolesResults() throws Exception {
-        User actor = createUser("role018-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role018-admin");
         Role target = createRole("ROLE018_TARGET", "Role018 Target", "delete", 12_000L, false, true, true, false);
         String accessToken = accessTokenFor(actor, "ROLE-018-login");
 

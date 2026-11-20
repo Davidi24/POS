@@ -40,7 +40,7 @@ class RoleCloneIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-019 POST /roles/{roleId}/clone clones role with copied permissions and rank into a custom role")
     void role019ClonesRoleWithCopiedPermissionsAndRankIntoACustomRole() throws Exception {
-        User actor = createUser("role019-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role019-admin");
         Role source = createRoleWithPermissions(
                 "ROLE019_SOURCE",
                 "Role019 Source",
@@ -80,18 +80,21 @@ class RoleCloneIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-020 POST /roles/{roleId}/clone rejects duplicate target name or derived target code")
     void role020RejectsDuplicateTargetNameOrDerivedTargetCode() throws Exception {
-        User actor = createUser("role020-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role020-admin");
         createRole("ASSISTANT_MANAGER", "Assistant Manager", "existing", 12_000L, false, true, true, false);
+        // The source holds only what an admin has (since 2026-11-19 an admin holds no POS permissions to copy).
+        Role source = createRoleWithPermissions("ROLE020_SOURCE", "Role020 Source", "source", 10_000L, false, true, true, false,
+                "INVENTORY_ACCESS", "INVENTORY_READ");
         String accessToken = accessTokenFor(actor, "ROLE-020-login");
 
-        MvcResult duplicateNameResult = mockMvc.perform(post("/roles/{roleId}/clone", role("MANAGER").getId())
+        MvcResult duplicateNameResult = mockMvc.perform(post("/roles/{roleId}/clone", source.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("name", "Assistant Manager"))))
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
-        MvcResult duplicateCodeResult = mockMvc.perform(post("/roles/{roleId}/clone", role("MANAGER").getId())
+        MvcResult duplicateCodeResult = mockMvc.perform(post("/roles/{roleId}/clone", source.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of("name", "Assistant-Manager"))))
@@ -105,7 +108,7 @@ class RoleCloneIntegrationTest extends AbstractRoleIntegrationTest {
     @Test
     @DisplayName("ROLE-021 POST /roles/{roleId}/clone rejects cloning role outside actor assignment scope")
     void role021RejectsCloningRoleOutsideActorAssignmentScope() throws Exception {
-        User actor = createUser("role021-admin", role("ADMIN"));
+        User actor = adminManagingRoles("role021-admin");
         Role source = createRole("ROLE021_SOURCE", "Role021 Source", "source", 35_000L, false, true, true, false);
 
         MvcResult result = mockMvc.perform(post("/roles/{roleId}/clone", source.getId())

@@ -48,9 +48,9 @@ class AuthMailServiceTest {
             assertThat(message.getSubject()).isEqualTo("Reset your POS password");
             assertThat(message.getText())
                     .contains("Hello Casey,")
-                    .contains("Reset your password using this link:")
+                    .contains("Choose a new password using this link:")
                     .contains("https://pos.local/reset?token=abc")
-                    .contains("This link expires in 30 minutes.")
+                    .contains("This link works once and expires in 30 minutes.")
                     .contains("If you did not request this, you can ignore this email.");
         }
 
@@ -76,8 +76,8 @@ class AuthMailServiceTest {
     class SendEmailVerificationEmailTests {
 
         @Test
-        @DisplayName("Should send verification email with minimum one hour display")
-        void shouldSendVerificationEmailWithMinimumOneHourDisplay() {
+        @DisplayName("Should send verification email with the link's lifetime in minutes when it is short")
+        void shouldSendVerificationEmailWithMinutesForShortLinks() {
             AuthMailService authMailService = service("no-reply@pos.local");
 
             authMailService.sendEmailVerificationEmail(
@@ -95,7 +95,7 @@ class AuthMailServiceTest {
                     .contains("Hello Olivia,")
                     .contains("Verify your email address for your POS account using this link:")
                     .contains("https://pos.local/verify?token=xyz")
-                    .contains("This link expires in 1 hours.")
+                    .contains("This link expires in 30 minutes.")
                     .contains("If you did not create this account, you can ignore this email.");
         }
 

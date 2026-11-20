@@ -20,4 +20,7 @@ public class LoginRequest {
     @NotBlank(message = "Password is required")
     @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
     private String password;
+
+    // At the device limit: the signed-in device the person chose to sign out so this one can sign in (user, 2026-11-18).
+    private java.util.UUID signOutSessionId;
 }

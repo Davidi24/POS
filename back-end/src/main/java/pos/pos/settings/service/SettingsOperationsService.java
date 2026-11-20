@@ -77,6 +77,7 @@ public class SettingsOperationsService {
     private final SettingsSpecialHourRepository specialHourRepository;
     private final BranchRepository branchRepository;
     private final SettingsMapper settingsMapper;
+    private final pos.pos.user.repository.UserRepository userRepository;
 
     @Transactional
     public BranchEffectiveSettingsResponse getEffectiveBranchSettings(
@@ -232,14 +233,23 @@ public class SettingsOperationsService {
             Integer size
     ) {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
-        Page<SettingsAuditLogResponse> historyPage = settingsAuditLogRepository
-                .findAllByRestaurant_IdOrderByCreatedAtDesc(
-                        restaurantId,
-                        PageRequest.of(page == null ? 0 : page, size == null ? 50 : size, Sort.by(Sort.Direction.DESC, "createdAt"))
-                )
-                .map(this::toAuditLogResponse);
+        Page<SettingsAuditLog> logs = settingsAuditLogRepository.findAllByRestaurant_IdOrderByCreatedAtDesc(
+                restaurantId,
+                pos.pos.utils.PageableUtils.of(page, size, 50, Sort.by(Sort.Direction.DESC, "createdAt"))
+        );
+        // Who made each change, read once for the whole page.
+        Map<UUID, String> actorNames = new java.util.HashMap<>();
+        java.util.Set<UUID> actorIds = logs.getContent().stream().map(SettingsAuditLog::getActorUserId)
+                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        if (!actorIds.isEmpty()) {
+            userRepository.findAllById(actorIds).forEach(user -> {
+                String name = ((user.getFirstName() == null ? "" : user.getFirstName()) + " "
+                        + (user.getLastName() == null ? "" : user.getLastName())).trim();
+                actorNames.put(user.getId(), name.isEmpty() ? user.getUsername() : name);
+            });
+        }
 
-        return PageResponse.from(historyPage);
+        return PageResponse.from(logs.map(log -> toAuditLogResponse(log, actorNames)));
     }
 
     @Transactional(readOnly = true)
@@ -685,7 +695,7 @@ public class SettingsOperationsService {
                 .build();
     }
 
-    private SettingsAuditLogResponse toAuditLogResponse(SettingsAuditLog auditLog) {
+    private SettingsAuditLogResponse toAuditLogResponse(SettingsAuditLog auditLog, Map<UUID, String> actorNames) {
         return SettingsAuditLogResponse.builder()
                 .id(auditLog.getId())
                 .restaurantId(auditLog.getRestaurant() == null ? null : auditLog.getRestaurant().getId())
@@ -695,6 +705,7 @@ public class SettingsOperationsService {
                 .action(auditLog.getAction())
                 .message(auditLog.getMessage())
                 .actorUserId(auditLog.getActorUserId())
+                .actorName(auditLog.getActorUserId() == null ? null : actorNames.get(auditLog.getActorUserId()))
                 .occurredAt(auditLog.getCreatedAt())
                 .build();
     }
