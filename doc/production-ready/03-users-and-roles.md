@@ -90,8 +90,8 @@ down… start with the development"):
   a time on 2026-11-20; the other workspaces later (to do below).
 - [x] Full backend suite: the 35 tests the new rules broke updated (role tests act as an admin who may manage roles via
   grants, settings/device tests as a co-owner, pay as a co-owner, Kitchen assignable, removal reason USER_NOT_ALLOWED).
-- [ ] Full backend suite again after the permissions by place, then commit, push and PR to `develop` (after the final
-  confirmation).
+- [x] Full backend suite again after the permissions by place (1,373 unit tests, 419 ITs; the 14 the new rules broke
+  fixed), then commit, push and PR to `develop`: PR #103 (2026-11-20).
 
 ## Final decisions on the permissions (user, 2026-11-20, one place at a time; built after the last one)
 - [x] POS → Tables: four permissions. (1) Edit the floor plan: tables and floors, one switch. (2) Take payments: Request

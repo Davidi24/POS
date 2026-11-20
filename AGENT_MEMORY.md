@@ -1,3 +1,8 @@
+## 2026-11-20 (Claude, users-and-roles-production) — Step 3 committed, PR #103
+- Full suite in a clean copy: 1,373 unit / 419 IT; 14 failures from the new rules fixed (MySales SALES_SELF, table layout TABLES_LAYOUT, menu prices, own pay SHIFT_PAY_SELF, role permission order by name, My Sales own only, close as unpaid / reopen for payment), Waiter gets ORDER_REOPEN_PAYMENT by default (waiters take the money when a guest comes back); `AbstractPosApiIntegrationTest.login` re-signs-in when a cached token was ended (order-dependent 401). App test sources compile.
+- Three commits (backend, app, docs) in the user's name, no Claude lines; pushed `users-and-roles-production`, PR #103 to develop. `res-closed.png` at the repo root is not ours, left untracked.
+- Backend restarted on the new jar. Next: user merges #103, then step 4 (Restaurant & branches) on a new branch from develop.
+
 ## 2026-11-20 (Claude, users-and-roles-production, not committed) — To-do added, kitchen display next
 - User happy with the POS round; to-do added in 03-users-and-roles.md: check the permissions again for every workspace once all are decided. The user then said the other workspaces' permissions are fine for now and go to the to-do (later). Step 3 development and hard testing list marked done in README; next: full suite, commit, push, PR (asked the user).
 
