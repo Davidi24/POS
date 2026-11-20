@@ -26,7 +26,12 @@ internal data class ShiftState(
     val viewerRank get() = ShiftVisibility.rankOf(viewerRoles)
     val zone get() = board?.timezone?.let { runCatching { TimeZone.of(it) }.getOrNull() } ?: TimeZone.currentSystemDefault()
     val canManage get() = "SHIFT_MANAGE" in permissions
+    // Salary is its own permission since 2026-11-19 (user: not for admins by default).
+    val canManagePay get() = "SALARY_MANAGE" in permissions
     val canSelf get() = "SHIFT_SELF" in permissions
+    // My shift's pay and the team's shifts are their own permissions (user, 2026-11-20).
+    val canSeePay get() = "SHIFT_PAY_SELF" in permissions
+    val canSeeTeam get() = "SHIFT_TEAM" in permissions
     val canRead get() = "SHIFT_READ" in permissions || canManage
     val weekStart get() = date.minus(DatePeriod(days = date.dayOfWeek.ordinal))
 }
@@ -93,7 +98,7 @@ internal class ShiftScreenModel(private val repository: ShiftRepository, private
             ShiftTemplates.connect(repository, r, b)
             runCatching { repository.templates(r, b) }.onFailure { if (it is CancellationException) throw it }.getOrNull()?.let(ShiftTemplates::fill)
             // My pay for the week on screen. Pay is extra: the shifts still show when it can't be read.
-            val pay = if (admin) null else runCatching { repository.pay(r, b, from.toString(), from.plus(DatePeriod(days = 6)).toString(), mine = true) }
+            val pay = if (admin || !mutable.value.canSeePay) null else runCatching { repository.pay(r, b, from.toString(), from.plus(DatePeriod(days = 6)).toString(), mine = true) }
                 .onFailure { if (it is CancellationException) throw it }.getOrNull()
             if (token == generation) mutable.update { it.copy(board = board, boardFrom = from, boardTo = to, loading = false, error = null, pay = pay) }
             if (!admin && teamActive && token == generation) teamMonth(mutable.value.teamMonth ?: today())

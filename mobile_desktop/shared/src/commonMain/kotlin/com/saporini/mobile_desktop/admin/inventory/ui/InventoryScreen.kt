@@ -102,7 +102,16 @@ internal enum class InventoryView(val label: String, val tab: InventoryTab?) {
     STOCK("Stock", InventoryTab.STOCK),
     ITEMS("Items", InventoryTab.ITEMS),
     COUNTS("Counts", InventoryTab.COUNTS),
-    HISTORY("History", InventoryTab.HISTORY)
+    HISTORY("History", InventoryTab.HISTORY);
+
+    /** Each place shows only with its own "See …" (user, 2026-11-19). */
+    fun allowedIn(rights: com.saporini.mobile_desktop.admin.inventory.InventoryRights): Boolean = when (this) {
+        OVERVIEW -> rights.overview
+        STOCK -> rights.stock
+        ITEMS -> rights.items
+        COUNTS -> rights.counts
+        HISTORY -> rights.history
+    }
 }
 
 /**
@@ -133,6 +142,9 @@ internal fun InventoryContent(
     onView: (InventoryView) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Only the places the person may see; a hidden one moves to the first allowed.
+    val views = InventoryView.entries.filter { it.allowedIn(state.rights) }
+    LaunchedEffect(views, view) { if (view !in views && views.isNotEmpty()) onView(views.first()) }
     LaunchedEffect(view) { view.tab?.let(model::tab) }
     var startCount by remember { mutableStateOf(false) }
     // After a press on refresh the tab shows its skeleton until everything is back (and at least a moment), so it's
@@ -175,17 +187,17 @@ internal fun InventoryContent(
                     Spacer(Modifier.width(10.dp))
                     refresh()
                 }
-                PhoneViewTabs(view, onView)
+                PhoneViewTabs(view, views, onView)
             } else {
                 PageHeader("Inventory", "What you have, where it is, and every change") {
-                    if (size.isDesktop) OverviewTabs(InventoryView.entries.map { it.label }, view.label, { label -> onView(InventoryView.entries.first { it.label == label }) },
+                    if (size.isDesktop) OverviewTabs(views.map { it.label }, view.label, { label -> onView(InventoryView.entries.first { it.label == label }) },
                         Modifier.width(660.dp), height = 44.dp)
                     // The header always holds the same controls, so the tabs never move; adding is the edge button below.
                     refresh()
                 }
                 if (!size.isDesktop) {
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                        OverviewTabs(InventoryView.entries.map { it.label }, view.label, { label -> onView(InventoryView.entries.first { it.label == label }) },
+                        OverviewTabs(views.map { it.label }, view.label, { label -> onView(InventoryView.entries.first { it.label == label }) },
                             Modifier.width(660.dp))
                     }
                 }
@@ -228,8 +240,8 @@ internal fun InventoryContent(
 
         // Adding something new, on the tabs where that's the main job (Stock has its change buttons).
         val edge: Triple<String, Dp, () -> Unit>? = when (view) {
-            InventoryView.ITEMS -> if (state.canEdit) Triple("New item", if (size.isPhone) 82.dp else 100.dp, model::newItem) else null
-            InventoryView.COUNTS -> if (state.canEdit) Triple("New count", if (size.isPhone) 86.dp else 104.dp, { startCount = true }) else null
+            InventoryView.ITEMS -> if (state.rights.createItems) Triple("New item", if (size.isPhone) 82.dp else 100.dp, model::newItem) else null
+            InventoryView.COUNTS -> if (state.rights.count) Triple("New count", if (size.isPhone) 86.dp else 104.dp, { startCount = true }) else null
             else -> null
         }
         if (edge != null && state.canRead) {
@@ -266,7 +278,7 @@ internal fun InventoryContent(
  * and keeps the chosen tab in sight.
  */
 @Composable
-private fun PhoneViewTabs(view: InventoryView, onView: (InventoryView) -> Unit) {
+private fun PhoneViewTabs(view: InventoryView, views: List<InventoryView>, onView: (InventoryView) -> Unit) {
     val scroll = rememberScrollState()
     // Where each tab sits inside the row (start, width), to slide the chosen one to the middle.
     val tabs = remember { mutableStateMapOf<InventoryView, Pair<Int, Int>>() }
@@ -275,7 +287,7 @@ private fun PhoneViewTabs(view: InventoryView, onView: (InventoryView) -> Unit) 
         Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(Kit.Border))
         // The edges fade where more tabs wait off-screen.
         Row(Modifier.fillMaxWidth().fadingEdges(scroll).horizontalScroll(scroll)) {
-            InventoryView.entries.forEach { option ->
+            views.forEach { option ->
                 val chosen = option == view
                 Column(Modifier.width(IntrinsicSize.Max).onGloballyPositioned { tabs[option] = it.positionInParent().x.roundToInt() to it.size.width }
                     .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).clickable { onView(option) }.padding(horizontal = 12.dp),

@@ -484,7 +484,7 @@ private fun MoveDialog(state: InventoryState, model: InventoryScreenModel) {
             if (!draft.itemFixed) KitButton("Scan", { scanning = true }, icon = Icons.Outlined.QrCodeScanner, style = ButtonStyle.SECONDARY,
                 enabled = !frozen && !state.saving)
         }
-        missed?.let { code -> ScanMissBox(code, state.canEdit, onCreate = { missed = null; model.createItemFromScan(code) }, onScanAgain = { scanning = true }) }
+        missed?.let { code -> ScanMissBox(code, state.rights.createItems, onCreate = { missed = null; model.createItemFromScan(code) }, onScanAgain = { scanning = true }) }
         notCounted?.let { MessageBar("$it isn't counted (or is switched off), so it has no stock to change.", MessageKind.WARNING) }
         if (scanning) ScanBarcodeDialog("Scan an item", "Its stock change is filled in here.", onCode = { code ->
             scanning = false

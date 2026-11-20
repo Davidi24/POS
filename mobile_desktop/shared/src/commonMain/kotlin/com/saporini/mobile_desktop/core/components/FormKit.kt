@@ -243,6 +243,21 @@ internal fun KitButton(
 }
 
 /** Asks before something that can't be undone easily. */
+/**
+ * Leaving with changes not saved (user, 2026-11-20: "if I leave and haven't saved, it asks discard or save"): Discard leaves
+ * without them, Save saves and then leaves; closing the window stays.
+ */
+@Composable
+internal fun UnsavedLeaveDialog(onDiscard: () -> Unit, onSave: () -> Unit, onStay: () -> Unit, saving: Boolean = false,
+                                message: String = "You made changes and didn't save them.") {
+    AppDialog("Save your changes?", onStay, busy = saving, maxWidth = 460.dp, buttons = {
+        KitButton("Discard", onDiscard, style = ButtonStyle.DANGER_OUTLINE, enabled = !saving)
+        KitButton("Save", onSave, loading = saving)
+    }) {
+        Text(message, fontFamily = Inter(), fontSize = 14.sp, lineHeight = 20.sp, color = Kit.Muted)
+    }
+}
+
 @Composable
 internal fun ConfirmDialog(
     title: String,

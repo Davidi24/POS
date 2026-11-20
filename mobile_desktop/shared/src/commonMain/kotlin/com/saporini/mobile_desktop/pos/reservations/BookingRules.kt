@@ -78,6 +78,25 @@ internal fun bookingActions(
     can: (String) -> Boolean,
     now: Instant
 ): BookingActions {
+    // Seeing bookings only looks; each change needs its own permission (user, 2026-11-20): cancelling and no-shows
+    // "Cancel bookings", accepting requests "Approve bookings" (or making them), the rest "Make and change bookings".
+    fun allowed(offered: OfferedAction?): OfferedAction? = offered?.takeIf {
+        when (it.action) {
+            BookingAction.CANCEL, BookingAction.NO_SHOW, BookingAction.LEFT_BEFORE_SEATING -> can(ReservationsScreenModel.CANCEL_PERMISSION)
+            BookingAction.ACCEPT, BookingAction.DECLINE -> can(ReservationsScreenModel.WRITE_PERMISSION) || can(ReservationsScreenModel.APPROVE_PERMISSION)
+            else -> can(ReservationsScreenModel.WRITE_PERMISSION)
+        }
+    }
+    val all = offeredActions(reservation, policy, can, now)
+    return BookingActions(allowed(all.primary), allowed(all.secondary), all.menu.mapNotNull(::allowed))
+}
+
+private fun offeredActions(
+    reservation: Reservation,
+    policy: ReservationPolicy,
+    can: (String) -> Boolean,
+    now: Instant
+): BookingActions {
     val start = reservation.reservationStart.instant() ?: return BookingActions()
     val end = reservation.reservationEnd.instant() ?: start + 2.hours
     val earlierDay = serviceDate(start, policy) < serviceDate(now, policy)

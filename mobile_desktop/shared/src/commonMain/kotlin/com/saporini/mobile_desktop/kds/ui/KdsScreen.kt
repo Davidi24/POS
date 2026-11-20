@@ -14,6 +14,7 @@ import com.saporini.mobile_desktop.kds.KdsScreenModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,6 +54,9 @@ object KdsScreen : Screen {
                 { if (navigator?.pop() != true) navigator?.replaceAll(WorkspacePickerScreen) }
             } else null
         val isPhoneLayout = isPhoneWindow()
+        // Only the places the person may open (user, 2026-11-19): a hidden one moves to the first allowed.
+        val allowed = KdsSection.allowed(currentUser?.permissions.orEmpty())
+        LaunchedEffect(allowed, selected) { if (selected !in allowed && allowed.isNotEmpty()) model.selectSection(allowed.first()) }
 
         Column(
             Modifier

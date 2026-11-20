@@ -32,21 +32,27 @@ fun accessibleWorkspaces(user: CurrentUserResponse): Set<Workspace> {
     }
 
     // Each workspace has its own entry permission, so a role's workspaces don't depend on what it can do inside them.
-    if (user.defaultBranchId != null && "POS_ACCESS" in user.permissions) {
+    // A workspace shows when it's open to them and at least one of its places is (user, 2026-11-19: each place has its own
+    // "See …").
+    if (user.defaultBranchId != null && "POS_ACCESS" in user.permissions &&
+        com.saporini.mobile_desktop.pos.ui.PosSection.allowed(user.permissions).isNotEmpty()) {
         workspaces.add(Workspace.POS)
     }
-    if (user.defaultBranchId != null && "KDS_ACCESS" in user.permissions) {
+    if (user.defaultBranchId != null && "KDS_ACCESS" in user.permissions &&
+        com.saporini.mobile_desktop.kds.ui.KdsSection.allowed(user.permissions).isNotEmpty()) {
         workspaces.add(Workspace.KDS)
     }
-    if ("ADMIN_ACCESS" in user.permissions) {
+    if ("ADMIN_ACCESS" in user.permissions && com.saporini.mobile_desktop.admin.ui.AdminSection.allowed(user.permissions).isNotEmpty()) {
         workspaces.add(Workspace.ADMIN)
     }
-    // Inventory has its own permissions since 2026-10-30: opening it and seeing stock.
-    if ("INVENTORY_ACCESS" in user.permissions && "INVENTORY_READ" in user.permissions) {
+    // Inventory has its own permissions since 2026-10-30: opening it, then each of its places (2026-11-19).
+    if ("INVENTORY_ACCESS" in user.permissions && (com.saporini.mobile_desktop.admin.inventory.InventoryRights.of(user.permissions).sees ||
+            "SUPPLIERS_READ" in user.permissions)) {
         workspaces.add(Workspace.INVENTORY)
     }
 
-    if ("STATISTICS_ACCESS" in user.permissions) {
+    if ("STATISTICS_ACCESS" in user.permissions &&
+        com.saporini.mobile_desktop.statistics.StatsTab.entries.any { it.permission in user.permissions }) {
         workspaces.add(Workspace.STATISTICS)
     }
     // Older servers don't send FRAUD_ACCESS yet; owners and co-owners always had Fraud Detection.

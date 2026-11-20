@@ -56,6 +56,7 @@ import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -171,7 +172,14 @@ internal fun SuppliersScreen(modifier: Modifier = Modifier, onBackToInventory: (
     remember(model) { model.tab(InventoryTab.SUPPLIERS); true }
     BindToLifecycle(model::setActive, model::onDispose)
     val state by model.state.collectAsState()
-    SuppliersContent(state, model, modifier, onBackToInventory = onBackToInventory)
+    if (!state.canSeeSuppliers) {
+        Box(modifier, Alignment.Center) {
+            OverviewEmpty("No access to suppliers", "Your role needs “View Suppliers”. Ask the owner.", Icons.Outlined.Lock)
+        }
+        return
+    }
+    // Changing suppliers follows its own permission, not the stock one.
+    SuppliersContent(state.copy(canEdit = state.canEditSuppliers), model, modifier, onBackToInventory = onBackToInventory)
 }
 
 @Composable

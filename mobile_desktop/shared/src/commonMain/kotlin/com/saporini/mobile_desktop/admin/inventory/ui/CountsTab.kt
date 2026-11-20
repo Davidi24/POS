@@ -335,7 +335,7 @@ private fun CountScheduleContent(state: InventoryState, model: InventoryScreenMo
                     PlaceToCount(entry.place, entry.detail, tone,
                         if (entry.openCount != null) "Continue" else "Start",
                         onAction = { if (entry.openCount != null) model.openCount(entry.openCount.id) else model.newCount(entry.place.id) },
-                        enabled = state.canEdit)
+                        enabled = state.rights.count)
                 }
             }
         }
@@ -582,7 +582,7 @@ internal fun CountDialog(count: StockCountDto, state: InventoryState, model: Inv
     val items = state.items.filter { (it.active && it.trackInventory) || it.id in lines }
         .filter { item -> words.all { it in item.name.lowercase() } }
         .sortedWith(compareBy({ it.id !in lines }, { it.id !in levels }, { it.name.lowercase() }))
-    val editable = count.editable && state.canEdit
+    val editable = count.editable && state.rights.count
     val summary = "${count.lines.count { it.countedQuantity != null }} of ${count.lines.size} counted" + (count.varianceValue?.let { " · difference ${money(it, null)}" } ?: "")
     // A phone has no room for the table, the summary in the footer or a Close button (the cross closes): each item is a small card.
     // (Narrow is only known inside the dialog, so it's read there.)
@@ -593,7 +593,8 @@ internal fun CountDialog(count: StockCountDto, state: InventoryState, model: Inv
         busy = state.saving, maxWidth = 920.dp,
         buttons = {
             val narrow = LocalNarrowDialog.current
-            val steps = if (state.canEdit) countSteps(count.status) else emptyList()
+            // Approving changes the stock, so it has its own permission (2026-11-19).
+            val steps = countSteps(count.status).filter { step -> if (step == "approve") state.rights.approveCounts else state.rights.count }
             if (!narrow) {
                 Text(summary, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted)
             }

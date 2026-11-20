@@ -78,6 +78,11 @@ internal fun KdsSectionContent(
         com.saporini.mobile_desktop.pos.menu.ui.MenuScreen(modifier.fillMaxSize())
         return
     }
+    // My shift, the same page as in the POS: kitchen staff clock in here (user, 2026-11-19).
+    if (section == KdsSection.SHIFT) {
+        com.saporini.mobile_desktop.pos.shifts.ShiftScreen(modifier.fillMaxSize())
+        return
+    }
 
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val size = screenSizeFor(maxWidth)
@@ -111,7 +116,7 @@ internal fun KdsSectionContent(
                     else -> when (section) {
                         KdsSection.TICKETS -> TicketsSection(state, model, size, now, if (state.canConfigure) ({ stations = true }) else null, startPrepList = showPrepList, pageSide = side, pageTop = top)
                         KdsSection.UPCOMING -> UpcomingSection(state, model, size, now, preOrderModel())
-                        KdsSection.MENU -> Unit
+                        KdsSection.MENU, KdsSection.SHIFT -> Unit
                         KdsSection.HISTORY -> HistorySection(state, model, size)
                     }
                 }

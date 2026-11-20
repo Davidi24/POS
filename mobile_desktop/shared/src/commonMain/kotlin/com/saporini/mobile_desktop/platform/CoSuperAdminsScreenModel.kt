@@ -59,8 +59,26 @@ data class PermissionTicks(
     val changed: Boolean get() = granted != permissions.filter { it.granted }.map { it.code }.toSet()
 }
 
+/** A support admin's restaurants being chosen: every restaurant, or some; and whether they may remove owners. */
+data class AdminAccessEditor(
+    val adminId: String,
+    val name: String,
+    val allRestaurants: Boolean = false,
+    val mayRemoveOwners: Boolean = false,
+    val chosen: Set<String> = emptySet(),
+    val restaurants: List<RestaurantRefDto> = emptyList(),
+    val search: String = "",
+    val loading: Boolean = true,
+    val saving: Boolean = false,
+    val error: String? = null
+)
+
 data class CoSuperAdminsState(
     val allowed: Boolean = false,
+    // Support admins (made by the Super Admin) or restaurant admins (made by an owner) on the Admins page (user, 2026-11-19).
+    val view: String = "SUPPORT",
+    val cards: List<AdminCardDto> = emptyList(),
+    val access: AdminAccessEditor? = null,
     val people: List<StaffUserDto> = emptyList(),
     // How many permissions each person has on, out of how many (for the cards).
     val allowedCounts: Map<String, Pair<Int, Int>> = emptyMap(),
@@ -129,12 +147,67 @@ class CoSuperAdminsScreenModel(
                     }.map { it.await() }
                 }.mapNotNull { (id, permissions) -> permissions?.let { id to (it.count { p -> p.granted } to it.size) } }.toMap()
                 if (token == revision) mutable.update { it.copy(allowedCounts = counts) }
+                val cards = runCatching { platform.admins() }.getOrNull()
+                if (token == revision && cards != null) mutable.update { it.copy(cards = cards) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (token == revision) mutable.update { it.copy(error = platformMessage(e, write = false)) }
             } finally {
                 if (token == revision) mutable.update { it.copy(loading = false) }
+            }
+        }
+    }
+
+    fun showView(view: String) = mutable.update { it.copy(view = view) }
+
+    // ---- A support admin's restaurants ----
+
+    fun openAccess(person: StaffUserDto) {
+        mutable.update { it.copy(access = AdminAccessEditor(person.id, person.displayName), error = null) }
+        work.launch {
+            try {
+                val (access, restaurants) = coroutineScope {
+                    val access = async { platform.supportAdminAccess(person.id) }
+                    val all = async {
+                        val first = platform.cards("", null, 0, 100)
+                        first.items.map { RestaurantRefDto(it.id, it.name) }
+                    }
+                    access.await() to all.await()
+                }
+                mutable.update { state ->
+                    val editor = state.access?.takeIf { it.adminId == person.id } ?: return@update state
+                    state.copy(access = editor.copy(allRestaurants = access.allRestaurants, mayRemoveOwners = access.mayRemoveOwners,
+                        chosen = access.restaurants.map { it.id }.toSet(), restaurants = restaurants, loading = false))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                mutable.update { state -> state.copy(access = state.access?.copy(loading = false, error = platformMessage(e, write = false))) }
+            }
+        }
+    }
+
+    fun editAccess(change: (AdminAccessEditor) -> AdminAccessEditor) = mutable.update { state ->
+        state.copy(access = state.access?.let { if (it.loading || it.saving) it else change(it) })
+    }
+
+    fun closeAccess() = mutable.update { it.copy(access = null) }
+
+    fun saveAccess() {
+        val editor = state.value.access ?: return
+        if (editor.loading || editor.saving) return
+        mutable.update { it.copy(access = editor.copy(saving = true, error = null)) }
+        work.launch {
+            try {
+                platform.setSupportAdminAccess(editor.adminId, UpdateSupportAdminAccessDto(editor.allRestaurants, editor.mayRemoveOwners,
+                    if (editor.allRestaurants) emptyList() else editor.chosen.toList()))
+                mutable.update { it.copy(access = null, notice = "${editor.name}'s restaurants were saved") }
+                refresh()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                mutable.update { state -> state.copy(access = state.access?.copy(saving = false, error = platformMessage(e, write = true))) }
             }
         }
     }

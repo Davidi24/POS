@@ -134,8 +134,15 @@ fun PosTopBar(
         onBackToWorkspaces = onBackToWorkspaces, logo = logo)
 }
 
-/** POS's places, in bar order: the first four on a phone, and Menu sits in the slot More rotates through. */
-internal fun posNavEntries(): List<NavEntry<PosSection>> = PosSection.entries.map { NavEntry(it, it.label, it.icon(), it.filledPhoneIcon()) }
+/**
+ * POS's places, in bar order, without the ones the signed-in person can't open: the first four on a phone, and the next
+ * sits in the slot More rotates through.
+ */
+@Composable
+internal fun posNavEntries(): List<NavEntry<PosSection>> {
+    val user by org.koin.compose.koinInject<com.saporini.mobile_desktop.core.session.SessionManager>().currentUser.collectAsState()
+    return PosSection.allowed(user?.permissions.orEmpty()).map { NavEntry(it, it.label, it.icon(), it.filledPhoneIcon()) }
+}
 
 // Desktop top bar frame shared by the POS and KDS workspaces; each workspace passes in its own tabs.
 @Composable

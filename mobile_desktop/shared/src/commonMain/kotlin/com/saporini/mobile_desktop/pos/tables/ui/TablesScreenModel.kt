@@ -467,6 +467,8 @@ class TablesScreenModel(
     // ---- Settings → Tables → Special cases ----
 
     fun can(permission: String): Boolean = permission in sessionManager.currentUser.value?.permissions.orEmpty()
+    /** What the signed-in person may do from a table's panel. */
+    fun rights(): TableRights = TableRights.of(sessionManager.currentUser.value?.permissions.orEmpty())
 
     fun loadSpecialActions() {
         val scope = currentBranchScope() ?: return

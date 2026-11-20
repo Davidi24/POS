@@ -88,7 +88,7 @@ class PreOrderScreenModel(
                     restaurantId = user?.takeIf { it.isActive }?.restaurantId,
                     branchId = user?.defaultBranchId,
                     // The KDS's Upcoming reads pre-orders with KDS_READ.
-                    canRead = "ORDER_READ" in permissions || "KDS_READ" in permissions,
+                    canRead = "ORDER_READ" in permissions || "KDS_READ" in permissions || "KDS_UPCOMING_READ" in permissions,
                     canPlace = "ORDER_CREATE" in permissions,
                     canCancel = "ORDER_CANCEL" in permissions,
                     canSend = "ORDER_UPDATE" in permissions,

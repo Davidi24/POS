@@ -30,8 +30,9 @@ class MySalesScreenModel(private val repository: MySalesRepository, session: Ses
             revision++
             val scope = user?.takeIf { it.isActive && !it.restaurantId.isNullOrBlank() && !it.defaultBranchId.isNullOrBlank() }
                 ?.let { OrdersScope(it.id,it.restaurantId!!,it.defaultBranchId!!) }
-            mutable.value = MySalesState(scope = scope, canRead = scope != null && "ORDER_READ" in user?.permissions.orEmpty(),
-                canReadOthers = "ORDER_AUDIT" in user?.permissions.orEmpty() && "SHIFT_READ" in user?.permissions.orEmpty())
+            mutable.value = MySalesState(scope = scope, canRead = scope != null && "SALES_SELF" in user?.permissions.orEmpty(),
+                // Only their own sales (user, 2026-11-20).
+                canReadOthers = false)
             restart()
         } }
     }

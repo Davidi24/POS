@@ -24,6 +24,7 @@ Your new PIN is ready to use on the tills.	Il tuo nuovo PIN è pronto per le cas
 Your language was saved.	La tua lingua è stata salvata.	Tu idioma se guardó.	Gjuha jote u ruajt.
 Signed in	Accesso eseguito	Sesión iniciada	I hyrë
 Lock	Blocca	Bloquear	Kyç
+{}, account menu	{}, menu dell'account	{}, menú de la cuenta	{}, menyja e llogarisë
 Profile	Profilo	Perfil	Profili
 Signing out…	Uscita in corso…	Cerrando sesión…	Duke dalë…
 Sign out	Esci	Cerrar sesión	Dil
@@ -1243,6 +1244,7 @@ Not active	Non attivo	Inactivo	Joaktiv
 All suppliers	Tutti i fornitori	Todos los proveedores	Të gjithë furnitorët
 In progress	In corso	En curso	Në vazhdim
 No access to suppliers	Nessun accesso ai fornitori	Sin acceso a los proveedores	Pa qasje te furnitorët
+Your role needs “View Suppliers”. Ask the owner.	Il tuo ruolo richiede “Vedi fornitori”. Chiedi al proprietario.	Tu rol necesita “Ver proveedores”. Pídeselo al dueño.	Roli yt ka nevojë për “Shiko furnitorët”. Pyet pronarin.
 Your role needs “View stock” to see suppliers.	Il tuo ruolo deve avere “Vedere il magazzino” per vedere i fornitori.	Tu rol necesita “Ver inventario” para ver los proveedores.	Roli yt duhet të ketë “Shiko stokun” për të parë furnitorët.
 Choose a supplier	Scegli un fornitore	Elige un proveedor	Zgjidh një furnitor
 See their places, the items you buy from them and their orders.	Vedi i loro luoghi, gli articoli che compri da loro e i loro ordini.	Ve sus lugares, los artículos que les compras y sus pedidos.	Shiko vendet e tyre, artikujt që blen prej tyre dhe porositë.
@@ -1330,6 +1332,7 @@ Dec	Dic	Dic	Dhj
 PIN reset isn't available here	La reimpostazione del PIN non è disponibile qui	Restablecer el PIN no está disponible aquí	Rivendosja e PIN-it nuk është e disponueshme këtu
 Personal permissions are unavailable	I permessi personali non sono disponibili	Los permisos personales no están disponibles	Lejet personale nuk janë të disponueshme
 Role pay is unavailable	La retribuzione del ruolo non è disponibile	El pago del rol no está disponible	Pagesa e rolit nuk është e disponueshme
+Requests are unavailable	Le richieste non sono disponibili	Las solicitudes no están disponibles	Kërkesat nuk janë të disponueshme
 ^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$	^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$	^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$	^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$
 ^[A-Za-z0-9._-]+$	^[A-Za-z0-9._-]+$	^[A-Za-z0-9._-]+$	^[A-Za-z0-9._-]+$
 Enter an email	Inserisci un'email	Escribe un correo	Shkruaj një email
@@ -1346,7 +1349,6 @@ Enter a role name	Inserisci il nome del ruolo	Escribe el nombre del rol	Shkruaj 
 Managers	Responsabili	Gerentes	Menaxherët
 Waiters	Camerieri	Meseros	Kamarierët
 Extra workers	Lavoratori extra	Trabajadores extra	Punëtorë shtesë
-Permissions saved	Permessi salvati	Permisos guardados	Lejet u ruajtën
 You can't change what roles may do	Non puoi cambiare cosa possono fare i ruoli	No puedes cambiar lo que pueden hacer los roles	Nuk mund të ndryshosh çfarë mund të bëjnë rolet
 Only someone above this role can change it	Solo chi è sopra questo ruolo può cambiarlo	Solo alguien por encima de este rol puede cambiarlo	Vetëm dikush mbi këtë rol mund ta ndryshojë
 This role has permissions you don't have, so only someone above you can change it	Questo ruolo ha permessi che tu non hai, quindi solo chi è sopra di te può cambiarlo	Este rol tiene permisos que tú no tienes, así que solo alguien por encima de ti puede cambiarlo	Ky rol ka leje që ti s'i ke, ndaj vetëm dikush mbi ty mund ta ndryshojë
@@ -1356,11 +1358,13 @@ A role called {} already exists	Esiste già un ruolo chiamato {}	Ya existe un ro
 You can't switch this role off	Non puoi disattivare questo ruolo	No puedes desactivar este rol	Nuk mund ta çaktivizosh këtë rol
 Built-in roles can't be removed	I ruoli predefiniti non possono essere rimossi	Los roles predefinidos no se pueden eliminar	Rolet e paracaktuara nuk mund të hiqen
 The role was removed	Il ruolo è stato rimosso	El rol se eliminó	Roli u hoq
+Sent to the Super Admin. They'll answer soon.	Inviato al Super Admin. Risponderà presto.	Enviado al Super Admin. Responderá pronto.	U dërgua te Super Admini. Do të përgjigjet së shpejti.
 You can't add staff	Non puoi aggiungere personale	No puedes añadir personal	Nuk mund të shtosh staf
 Change your own details in your profile	Cambia i tuoi dati nel tuo profilo	Cambia tus datos en tu perfil	Ndrysho të dhënat e tua në profilin tënd
 You can't edit staff	Non puoi modificare il personale	No puedes editar al personal	Nuk mund ta ndryshosh stafin
 {}'s permissions were saved	I permessi di {} sono stati salvati	Se guardaron los permisos de {}	Lejet e {} u ruajtën
 Still loading this person's roles	Caricamento dei ruoli di questa persona in corso	Todavía se cargan los roles de esta persona	Ende po ngarkohen rolet e këtij personi
+{} was saved, but their permissions weren't: open their Permissions to try again.	{}: salvato, ma i permessi no. Apri i suoi Permessi per riprovare.	{}: guardado, pero sus permisos no. Abre sus Permisos para intentarlo de nuevo.	{}: u ruajt, por lejet jo. Hap Lejet për të provuar përsëri.
 Editing needs a person	Per modificare serve una persona	Para editar se necesita una persona	Për të ndryshuar duhet një person
 You can't switch yourself off	Non puoi disattivare te stesso	No puedes desactivarte a ti mismo	Nuk mund ta çaktivizosh veten
 {} can sign in again	{} può accedere di nuovo	{} puede iniciar sesión de nuevo	{} mund të hyjë përsëri
@@ -1410,6 +1414,7 @@ Remove the role “{}”?	Rimuovere il ruolo “{}”?	¿Eliminar el rol “{}�
 People who have it lose what it allows. If someone still has it, switch it off instead.	Chi lo ha perde ciò che consente. Se qualcuno lo ha ancora, disattivalo invece.	Quienes lo tienen pierden lo que permite. Si alguien todavía lo tiene, mejor desactívalo.	Ata që e kanë humbasin atë që lejon. Nëse dikush e ka ende, më mirë çaktivizoje.
 Remove role	Rimuovi ruolo	Eliminar rol	Hiq rolin
 Kitchen display	Display cucina	Pantalla de cocina	Ekrani i kuzhinës
+My shift	Il mio turno	Mi turno	Turni im
 Admin Hub	Admin Hub	Admin Hub	Admin Hub
 Statistics	Statistiche	Estadísticas	Statistika
 Fraud Detection	Rilevamento frodi	Detección de fraude	Zbulimi i mashtrimit
@@ -1417,13 +1422,17 @@ Tables	Tavoli	Mesas	Tavolinat
 Payments	Pagamenti	Pagos	Pagesat
 Reservations	Prenotazioni	Reservas	Rezervimet
 Menu	Menù	Menú	Menu
-My shift	Il mio turno	Mi turno	Turni im
-Shifts & salary	Turni e stipendi	Turnos y salarios	Turnet dhe rrogat
+Shifts	Turni	Turnos	Turnet
+Salary	Stipendi	Salarios	Rrogat
 Users	Utenti	Usuarios	Përdoruesit
 Roles	Ruoli	Roles	Rolet
 Settings	Impostazioni	Configuración	Cilësimet
 Sign-in sessions	Sessioni di accesso	Sesiones iniciadas	Seancat e hyrjes
 Restaurant info	Info ristorante	Información del restaurante	Info e restorantit
+Kitchen Status	Stato cucina	Estado de cocina	Gjendja e kuzhinës
+My Sales	Le mie vendite	Mis ventas	Shitjet e mia
+Tickets	Comande	Comandas	Fletët
+Upcoming	In arrivo	Próximos	Në vijim
 {} of {} allowed	{} di {} consentiti	{} de {} permitidos	{} nga {} të lejuara
 What {} can do	Cosa può fare {}	Qué puede hacer {}	Çfarë mund të bëjë {}
 You can look at what this role allows, but not change it.	Puoi vedere cosa consente questo ruolo, ma non cambiarlo.	Puedes ver lo que permite este rol, pero no cambiarlo.	Mund të shohësh çfarë lejon ky rol, por jo ta ndryshosh.
@@ -1431,21 +1440,52 @@ Only someone above this role can change it.	Solo chi è sopra questo ruolo può 
 This role has permissions you don't have, so only someone above you can change it.	Questo ruolo ha permessi che tu non hai, quindi solo chi è sopra di te può cambiarlo.	Este rol tiene permisos que tú no tienes, así que solo alguien por encima de ti puede cambiarlo.	Ky rol ka leje që ti s'i ke, ndaj vetëm dikush mbi ty mund ta ndryshojë.
 Unsaved changes	Modifiche non salvate	Cambios sin guardar	Ndryshime të paruajtura
 Unsaved changes: they apply to everyone with {}	Modifiche non salvate: valgono per tutti con {}	Cambios sin guardar: se aplican a todos con {}	Ndryshime të paruajtura: vlejnë për të gjithë me {}
+You changed {}'s permissions and didn't save them.	Hai cambiato i permessi di {} e non li hai salvati.	Cambiaste los permisos de {} y no los guardaste.	Ndryshove lejet e {} dhe nuk i ruajte.
 {}'s permissions	Permessi di {}	Permisos de {}	Lejet e {}
 Starts from what {} can do	Parte da ciò che può fare {}	Empieza por lo que puede hacer {}	Nis nga ajo që mund të bëjë {}
 Same as the role	Come il ruolo	Igual que el rol	Si roli
 Same as {}	Come {}	Igual que {}	Si {}
 {} more than {}	{} in più di {}	{} más que {}	{} më shumë se {}
 {} taken away	{} tolti	{} quitados	{} të hequra
+their own floors or roles	piani o ruoli propri	sus propios pisos o roles	katet ose rolet e veta
 Unsaved changes: they apply to {} only	Modifiche non salvate: valgono solo per {}	Cambios sin guardar: se aplican solo a {}	Ndryshime të paruajtura: vlejnë vetëm për {}
+Permissions saved	Permessi salvati	Permisos guardados	Lejet u ruajtën
 Make a copy	Fai una copia	Hacer una copia	Bëj një kopje
-All {}	Tutti {}	Todos {}	Të gjitha {}
-{} of {}	{} di {}	{} de {}	{} nga {}
-You don't have this yourself, so you can't give it	Non ce l'hai tu stesso, quindi non puoi darlo	No lo tienes tú, así que no puedes darlo	Nuk e ke vetë, ndaj nuk mund ta japësh
+Be careful	Fai attenzione	Ten cuidado	Ki kujdes
+“{}” is usually only for owners. Give it only to someone you trust.	“{}” di solito è solo per i proprietari. Dallo solo a qualcuno di cui ti fidi.	“{}” suele ser solo para dueños. Dalo solo a alguien de confianza.	“{}” zakonisht është vetëm për pronarët. Jepja vetëm dikujt që i beson.
+These are usually only for owners. Give them only to someone you trust.	Di solito sono solo per i proprietari. Dalli solo a qualcuno di cui ti fidi.	Suelen ser solo para dueños. Dalos solo a alguien de confianza.	Zakonisht janë vetëm për pronarët. Jepi vetëm dikujt që i beson.
+Give it	Dallo	Darlo	Jepe
+On	Attivo	Activado	Aktiv
+Nothing here yet	Ancora niente qui	Todavía no hay nada aquí	Ende asgjë këtu
+Can't open {}	Non può aprire {}	No puede abrir {}	Nuk mund të hapë {}
+Turn all on	Attiva tutto	Activar todo	Aktivizo të gjitha
 Locked	Bloccato	Bloqueado	I kyçur
+Switch it on to choose what they can do in {}.	Attivalo per scegliere cosa può fare in {}.	Actívalo para elegir lo que puede hacer en {}.	Aktivizoje për të zgjedhur çfarë mund të bëjë në {}.
+Owner-level	Da proprietario	Nivel dueño	Nivel pronari
+You don't have this yourself	Non ce l'hai nemmeno tu	Tú no lo tienes	Nuk e ke as vetë
+Needs “{}”	Serve “{}”	Necesita “{}”	Duhet “{}”
+1 more when it's on	1 in più quando è attivo	1 más cuando está activado	1 më shumë kur është aktiv
+{} more when it's on	{} in più quando è attivo	{} más cuando está activado	{} më shumë kur është aktiv
+1 place	1 zona	1 zona	1 zonë
+{} places	{} zone	{} zonas	{} zona
+branch:{}	branch:{}	branch:{}	branch:{}
+1 floor	1 piano	1 piso	1 kat
+{} floors	{} piani	{} pisos	{} kate
+Everywhere: every floor and place	Ovunque: ogni piano e zona	En todas partes: cada piso y zona	Kudo: çdo kat dhe zonë
+Every role	Ogni ruolo	Todos los roles	Çdo rol
+{} and {} more	{} e altri {}	{} y {} más	{} dhe {} të tjerë
+Where	Dove	Dónde	Ku
+Whose shifts	Turni di chi	Turnos de quién	Turnet e kujt
+See	Vedi	Ver	Shiko
+Everywhere	Ovunque	En todas partes	Kudo
+At least one stays chosen.	Almeno uno resta scelto.	Al menos uno queda elegido.	Të paktën një mbetet i zgjedhur.
+their role	il suo ruolo	su rol	roli i tyre
 Add a person	Aggiungi una persona	Añadir una persona	Shto një person
+What they can do. Everything {} gives is on; change only what you want.	Cosa può fare. Tutto ciò che dà {} è attivo; cambia solo quello che vuoi.	Lo que puede hacer. Todo lo que da {} está activado; cambia solo lo que quieras.	Çfarë mund të bëjë. Gjithçka që jep {} është aktive; ndrysho vetëm atë që do.
+What {} can do. Everything {} gives is on; change only what you want.	Cosa può fare {}. Tutto ciò che dà {} è attivo; cambia solo quello che vuoi.	Lo que puede hacer {}. Todo lo que da {} está activado; cambia solo lo que quieras.	Çfarë mund të bëjë {}. Gjithçka që jep {} është aktive; ndrysho vetëm atë që do.
 They sign in with this username or email and the temporary password, then choose their own.	Accede con questo nome utente o email e la password temporanea, poi sceglie la propria.	Inicia sesión con este usuario o correo y la contraseña temporal, y luego elige la suya.	Hyn me këtë emër përdoruesi ose email dhe fjalëkalimin e përkohshëm, pastaj zgjedh të vetin.
 Add person	Aggiungi persona	Añadir persona	Shto person
+Next: permissions	Avanti: permessi	Siguiente: permisos	Tjetër: lejet
 name@restaurant.com	name@restaurant.com	name@restaurant.com	name@restaurant.com
 Letters, numbers, dots, dashes or underscores	Lettere, numeri, punti, trattini o trattini bassi	Letras, números, puntos, guiones o guiones bajos	Shkronja, numra, pika, viza ose nënviza
 Temporary password	Password temporanea	Contraseña temporal	Fjalëkalim i përkohshëm
@@ -1456,13 +1496,29 @@ Can sign in	Può accedere	Puede iniciar sesión	Mund të hyjë
 Switch off someone who left or is away for a long time. You can switch them on again later.	Disattiva chi se n'è andato o è assente a lungo. Puoi riattivarlo più tardi.	Desactiva a quien se fue o estará fuera mucho tiempo. Puedes activarlo de nuevo después.	Çaktivizo dikë që iku ose mungon gjatë. Mund ta riaktivizosh më vonë.
 Loading their roles…	Caricamento dei ruoli…	Cargando sus roles…	Duke ngarkuar rolet…
 No roles you can give. Ask an owner to give you permission to manage roles.	Nessun ruolo che puoi dare. Chiedi a un titolare il permesso di gestire i ruoli.	No hay roles que puedas dar. Pide a un propietario permiso para gestionar roles.	Asnjë rol që mund të japësh. Kërkoji një pronari leje për të menaxhuar rolet.
+Their role changed, so the permissions you changed for them before are cleared. You set them again in the next part.	Il ruolo è cambiato, quindi i permessi che avevi cambiato per questa persona vengono azzerati. Li imposti di nuovo nella parte successiva.	Su rol cambió, así que los permisos que cambiaste para esta persona se borran. Los vuelves a configurar en la siguiente parte.	Roli ndryshoi, ndaj lejet që kishe ndryshuar për këtë person fshihen. I vendos përsëri në pjesën tjetër.
+Permissions	Permessi	Permisos	Lejet
+Their role changed: this starts from what {} gives. What you changed for them before is cleared.	Il ruolo è cambiato: si parte da ciò che dà {}. Quello che avevi cambiato per questa persona viene azzerato.	Su rol cambió: se parte de lo que da {}. Lo que cambiaste antes para esta persona se borra.	Roli ndryshoi: fillohet nga ajo që jep {}. Ajo që kishe ndryshuar më parë për këtë person fshihet.
+Couldn't load what {} can do. {}	Impossibile caricare cosa può fare {}. {}	No se pudo cargar lo que puede hacer {}. {}	Nuk u ngarkua çfarë mund të bëjë {}. {}
+Try again	Riprova	Reintentar	Provo përsëri
+Their role	Il suo ruolo	Su rol	Roli i tyre
+An owner can do everything in this restaurant, the same as you. Only the Super Admin can remove an owner later.	Un proprietario può fare tutto in questo ristorante, come te. Solo il Super Admin può rimuovere un proprietario in seguito.	Un dueño puede hacer todo en este restaurante, igual que tú. Solo el Super Admin puede quitar a un dueño después.	Një pronar mund të bëjë gjithçka në këtë restorant, njësoj si ti. Vetëm Super Admini mund ta heqë një pronar më vonë.
+An admin opens the Admin Hub (shifts, users, settings, audit log), Inventory and Statistics. POS and the kitchen display come from the roles below, which are on for them: switch off what they shouldn't do. Only the owner can give them more.	Un admin apre l'Admin Hub (turni, utenti, impostazioni, registro delle modifiche), Inventario e Statistiche. POS e schermo della cucina vengono dai ruoli sotto, attivi per lui: disattiva ciò che non deve fare. Solo il proprietario può dargli di più.	Un admin abre el Admin Hub (turnos, usuarios, ajustes, registro de cambios), Inventario y Estadísticas. El POS y la pantalla de cocina vienen de los roles de abajo, activados para él: desactiva lo que no deba hacer. Solo el dueño puede darle más.	Një admin hap Admin Hub-in (turnet, përdoruesit, cilësimet, regjistrin e ndryshimeve), Inventarin dhe Statistikat. POS-i dhe ekrani i kuzhinës vijnë nga rolet më poshtë, të aktivizuara për të: çaktivizo atë që nuk duhet të bëjë. Vetëm pronari mund t'i japë më shumë.
+Other roles	Altri ruoli	Otros roles	Role të tjera
+Other roles · {} on	Altri ruoli · {} attivi	Otros roles · {} activos	Role të tjera · {} aktive
+Roles below {} they also have.	Ruoli sotto {} che ha anche.	Roles por debajo de {} que también tiene.	Role nën {} që i ka gjithashtu.
 Owners	Titolari	Propietarios	Pronarët
 The owner and the co-owners who run the restaurant	Il titolare e i contitolari che gestiscono il ristorante	El propietario y los copropietarios que dirigen el restaurante	Pronari dhe bashkëpronarët që drejtojnë restorantin
 People	Persone	Personas	Njerëzit
 What they can do	Cosa possono fare	Qué pueden hacer	Çfarë mund të bëjnë
 No access to users	Nessun accesso agli utenti	Sin acceso a los usuarios	Pa qasje te përdoruesit
 Your role needs “View users” to see staff accounts.	Il tuo ruolo deve avere “Vedere gli utenti” per vedere gli account del personale.	Tu rol necesita “Ver usuarios” para ver las cuentas del personal.	Roli yt duhet të ketë “Shiko përdoruesit” për të parë llogaritë e stafit.
-They won't be able to sign in any more, and they leave the staff list. Their past orders and shifts stay in the records.	Non potrà più accedere e lascerà l'elenco del personale. I suoi ordini e turni passati restano registrati.	Ya no podrá iniciar sesión y saldrá de la lista del personal. Sus pedidos y turnos anteriores quedan registrados.	Nuk do të mund të hyjë më dhe del nga lista e stafit. Porositë dhe turnet e kaluara mbeten në regjistër.
+They leave the staff list and can't sign in any more.	Esce dalla lista del personale e non può più accedere.	Sale de la lista del personal y ya no puede iniciar sesión.	Del nga lista e stafit dhe nuk mund të hyjë më.
+Signed out of every device at once.	Disconnesso subito da ogni dispositivo.	Se cierra su sesión en todos los dispositivos de inmediato.	Del menjëherë nga çdo pajisje.
+Their planned shifts that haven't started are removed.	I turni pianificati non ancora iniziati vengono eliminati.	Sus turnos planificados que aún no empezaron se eliminan.	Turnet e planifikuara që nuk kanë filluar fshihen.
+Their orders, worked shifts and pay stay, marked as removed.	Ordini, turni lavorati e paga restano, segnati come rimossi.	Sus pedidos, turnos trabajados y pagos se quedan, marcados como eliminados.	Porositë, turnet e punuara dhe pagesa mbeten, të shënuara si të hequra.
+Orders they have open stay open for the team.	Gli ordini che ha aperti restano aperti per il team.	Los pedidos que tiene abiertos siguen abiertos para el equipo.	Porositë që ka të hapura mbeten të hapura për ekipin.
+You changed what {} can do and didn't save it.	Hai cambiato cosa può fare {} e non l'hai salvato.	Cambiaste lo que puede hacer {} y no lo guardaste.	Ndryshove çfarë mund të bëjë {} dhe nuk e ruajte.
 Changes apply to everyone with {} here	Le modifiche valgono per tutti con {} qui	Los cambios se aplican a todos con {} aquí	Ndryshimet vlejnë për të gjithë me {} këtu
 Discard	Scarta	Descartar	Hidh poshtë
 Who works here, by role	Chi lavora qui, per ruolo	Quién trabaja aquí, por rol	Kush punon këtu, sipas rolit
@@ -1488,18 +1544,35 @@ Try part of the name, the email or the username.	Prova una parte del nome, l'ema
 Add a person with this role to give them a sign-in.	Aggiungi una persona con questo ruolo per darle un accesso.	Añade una persona con este rol para darle acceso.	Shto një person me këtë rol për t'i dhënë hyrje.
 People with this role show here.	Le persone con questo ruolo compaiono qui.	Aquí aparecen las personas con este rol.	Njerëzit me këtë rol shfaqen këtu.
 All {} shown	Tutti i {} mostrati	Se muestran los {}	U shfaqën të gjitha {}
+Removal asked	Rimozione richiesta	Eliminación solicitada	Heqja u kërkua
+Ask the Super Admin to remove	Chiedi al Super Admin di rimuovere	Pide al Super Admin que lo quite	Kërkoji Super Adminit ta heqë
 Send password reset email	Invia email di reimpostazione password	Enviar correo para restablecer la contraseña	Dërgo email për rivendosjen e fjalëkalimit
 Reset PIN	Reimposta PIN	Restablecer PIN	Rivendos PIN-in
 You	Tu	Tú	Ti
 Email confirmed	Email confermata	Correo confirmado	Email-i u konfirmua
 Email not confirmed yet	Email non ancora confermata	Correo aún sin confirmar	Email-i ende i pakonfirmuar
-Permissions	Permessi	Permisos	Lejet
+Support admins	Admin di supporto	Admins de soporte	Adminët e mbështetjes
+Nobody from support takes care of this restaurant yet.	Nessuno del supporto si occupa ancora di questo ristorante.	Nadie de soporte se encarga todavía de este restaurante.	Askush nga mbështetja nuk kujdeset ende për këtë restorant.
+They take care of this restaurant for you. Write to them if you need help with the app.	Si occupano di questo ristorante per te. Scrivi loro se ti serve aiuto con l'app.	Se encargan de este restaurante por ti. Escríbeles si necesitas ayuda con la app.	Kujdesen për këtë restorant për ty. Shkruaju nëse të duhet ndihmë me aplikacionin.
+Asked	Richiesto	Solicitado	U kërkua
+Ask	Chiedi	Pedir	Kërko
+Ask for one	Chiedine uno	Pide uno	Kërko një
+Support	Assistenza	Soporte	Ndihma
+Email them	Scrivi un'email	Envíales un correo	Dërgo email
+mailto:{}	mailto:{}	mailto:{}	mailto:{}
+Ask to remove {}	Chiedi di rimuovere {}	Pedir que quiten a {}	Kërko heqjen e {}
+Ask for a support admin	Chiedi un admin di supporto	Pide un admin de soporte	Kërko një admin mbështetjeje
+Owners can't remove each other. The Super Admin checks with them, then removes them or not.	I proprietari non possono rimuoversi a vicenda. Il Super Admin verifica con loro, poi lo rimuove oppure no.	Los dueños no pueden quitarse entre sí. El Super Admin lo confirma con ellos y luego lo quita o no.	Pronarët nuk mund ta heqin njëri-tjetrin. Super Admini verifikon me ta, pastaj e heq ose jo.
+Someone from support who takes care of the restaurant and helps you with the app.	Qualcuno del supporto che si occupa del ristorante e ti aiuta con l'app.	Alguien de soporte que se encarga del restaurante y te ayuda con la app.	Dikush nga mbështetja që kujdeset për restorantin dhe të ndihmon me aplikacionin.
+Send to the Super Admin	Invia al Super Admin	Enviar al Super Admin	Dërgoja Super Adminit
+Note	Nota	Nota	Shënim
+Why, and how to reach them	Perché, e come contattarlo	Por qué, y cómo contactarlo	Pse, dhe si ta kontaktosh
+What you need help with	Con cosa ti serve aiuto	Con qué necesitas ayuda	Për çfarë të duhet ndihmë
 Choose what you want to set up.	Scegli cosa vuoi impostare.	Elige lo que quieres configurar.	Zgjidh çfarë do të vendosësh.
 Couldn't load the settings.	Impossibile caricare le impostazioni.	No se pudo cargar la configuración.	Cilësimet nuk u ngarkuan dot.
 Couldn't save. Please try again.	Impossibile salvare. Riprova.	No se pudo guardar. Inténtalo de nuevo.	Nuk u ruajt dot. Provo përsëri.
 Back to settings	Torna alle impostazioni	Volver a configuración	Kthehu te cilësimet
 Sign in with an assigned restaurant to change its settings.	Accedi con un ristorante assegnato per cambiarne le impostazioni.	Inicia sesión con un restaurante asignado para cambiar su configuración.	Hyr me një restorant të caktuar për të ndryshuar cilësimet e tij.
-Try again	Riprova	Reintentar	Provo përsëri
 You can see these settings, but only people with permission to change settings can edit them.	Puoi vedere queste impostazioni, ma solo chi ha il permesso può modificarle.	Puedes ver esta configuración, pero solo quien tiene permiso puede editarla.	Mund t'i shohësh këto cilësime, por vetëm ata me leje mund t'i ndryshojnë.
 Saved.	Salvato.	Guardado.	U ruajt.
 Leave without saving?	Uscire senza salvare?	¿Salir sin guardar?	Të dalësh pa ruajtur?
@@ -1548,7 +1621,6 @@ Special menu	Menù speciale	Menú especial	Menu e veçantë
 A menu belongs to one event; greyed-out menus are already used by the event shown.	Un menù appartiene a un solo evento; i menù in grigio sono già usati dall'evento indicato.	Un menú pertenece a un evento; los menús en gris ya los usa el evento indicado.	Një menu i përket një ngjarjeje; menutë gri përdoren tashmë nga ngjarja e treguar.
 "{}" will be hidden in POS and stop being a special menu.	"{}" verrà nascosto nel POS e smetterà di essere un menù speciale.	"{}" se ocultará en el POS y dejará de ser un menú especial.	"{}" do të fshihet në POS dhe nuk do të jetë më menu e veçantë.
 The event's menu shows only on the event's days.	Il menù dell'evento compare solo nei giorni dell'evento.	El menú del evento solo aparece los días del evento.	Menuja e ngjarjes shfaqet vetëm në ditët e ngjarjes.
-On	Attivo	Activado	Aktiv
 Saving…	Salvataggio…	Guardando…	Duke ruajtur…
 Save occasions	Salva occasioni	Guardar ocasiones	Ruaj rastet
 Default	Predefinito	Predeterminado	I paracaktuar
@@ -1560,7 +1632,6 @@ Orders & kitchen	Ordini e cucina	Pedidos y cocina	Porositë dhe kuzhina
 Kitchen, order changes, order types and pre-orders	Cucina, modifiche agli ordini, tipi di ordine e preordini	Cocina, cambios en pedidos, tipos de pedido y prepedidos	Kuzhina, ndryshimet e porosive, llojet e porosive dhe paraporositë
 Payments & receipts	Pagamenti e scontrini	Pagos y recibos	Pagesat dhe faturat
 Tax, service charge, paying and what receipts show	Tasse, coperto, pagamento e cosa mostrano gli scontrini	Impuestos, cargo por servicio, pagos y lo que muestran los recibos	Taksat, tarifa shërbimi, pagesa dhe çfarë tregojnë faturat
-Shifts	Turni	Turnos	Turnet
 Clock-in, breaks and schedules	Timbrature, pause e orari	Fichajes, descansos y horarios	Shënimet e hyrjes, pushimet dhe oraret
 Stock value and count schedule	Valore del magazzino e pianificazione inventari	Valor del inventario y programación de conteos	Vlera e stokut dhe plani i numërimeve
 Fraud checks	Controlli antifrode	Controles de fraude	Kontrollet kundër mashtrimit
@@ -1739,9 +1810,6 @@ Clocking in	Timbratura	Fichaje	Shënimi i hyrjes
 Staff can clock in for a shift from	Il personale può timbrare l'entrata per un turno da	El personal puede fichar entrada a un turno desde	Stafi mund të shënojë hyrjen për një turn nga
 Before that, clocking in starts a shift that isn't planned	Prima, timbrare avvia un turno non pianificato	Antes de eso, fichar inicia un turno no planificado	Para kësaj, shënimi i hyrjes nis një turn të paplanifikuar
 Hourly wages and monthly salaries are set per person in Admin Hub → Salary.	Paghe orarie e stipendi mensili si impostano per persona in Admin Hub → Stipendi.	Los pagos por hora y los salarios mensuales se definen por persona en Admin Hub → Salarios.	Pagat për orë dhe rrogat mujore vendosen për person te Admin Hub → Rrogat.
-Who works	Chi lavora	Quién trabaja	Kush punon
-Staff see the whole team	Il personale vede tutta la squadra	El personal ve a todo el equipo	Stafi sheh gjithë ekipin
-In POS → Shift → Team. Off: they see only people in their own role.	In POS → Turno → Squadra. Disattivato: vedono solo le persone del proprio ruolo.	En POS → Turno → Equipo. Desactivado: solo ven a las personas de su rol.	Te POS → Turni → Ekipi. Joaktiv: shohin vetëm njerëzit e rolit të tyre.
 Count each place	Fai l'inventario di ogni luogo	Contar cada lugar	Numëro çdo vend
 Set how often each active place is counted. Weekly schedules allow up to 7; daily schedules up to 24.	Imposta ogni quanto si fa l'inventario di ogni luogo attivo. Le pianificazioni settimanali consentono fino a 7; quelle giornaliere fino a 24.	Define cada cuánto se cuenta cada lugar activo. Las programaciones semanales permiten hasta 7; las diarias hasta 24.	Vendos sa shpesh numërohet çdo vend aktiv. Planet javore lejojnë deri në 7; ato ditore deri në 24.
 Every	Ogni	Cada	Çdo
@@ -1775,8 +1843,6 @@ Valuable stock must start between 0 and 1,000,000.	La merce di valore deve parti
 Count frequency must be between 1 and 24.	La frequenza degli inventari deve essere tra 1 e 24.	La frecuencia de conteo debe estar entre 1 y 24.	Shpeshtësia e numërimit duhet të jetë ndërmjet 1 dhe 24.
 A weekly schedule can have up to 7 counts per place.	Una pianificazione settimanale può avere fino a 7 inventari per luogo.	Una programación semanal puede tener hasta 7 conteos por lugar.	Një plan javor mund të ketë deri në 7 numërime për vend.
 The refund amount must be between 0 and 1,000,000.	L'importo del rimborso deve essere tra 0 e 1.000.000.	El importe del reembolso debe estar entre 0 y 1.000.000.	Shuma e rimbursimit duhet të jetë ndërmjet 0 dhe 1.000.000.
-Salary	Stipendi	Salarios	Rrogat
-Audit Logs	Registro attività	Registro de actividad	Regjistri i veprimeve
 X-Device-Id	X-Device-Id	X-Device-Id	X-Device-Id
 X-Device-Name	X-Device-Name	X-Device-Name	X-Device-Name
 No backend URL candidates configured	No backend URL candidates configured	No backend URL candidates configured	No backend URL candidates configured
@@ -1932,6 +1998,8 @@ Sign in with password	Accedi con password	Iniciar sesión con contraseña	Hyr me
 This device isn't a till any more	Questo dispositivo non è più una cassa	Este dispositivo ya no es una caja	Kjo pajisje nuk është më arkë
 Sign in with your password.	Accedi con la tua password.	Inicia sesión con tu contraseña.	Hyr me fjalëkalimin tënd.
 no data before	nessun dato prima	sin datos previos	pa të dhëna më parë
+You made changes and didn't save them.	Hai fatto delle modifiche e non le hai salvate.	Hiciste cambios y no los guardaste.	Bëre ndryshime dhe nuk i ruajte.
+Save your changes?	Salvare le modifiche?	¿Guardar los cambios?	T'i ruash ndryshimet?
 [\\r\\n\\t]+	[\\r\\n\\t]+	[\\r\\n\\t]+	[\\r\\n\\t]+
 Hide	Nascondi	Ocultar	Fshih
 Type to search	Digita per cercare	Escribe para buscar	Shkruaj për të kërkuar
@@ -1943,7 +2011,6 @@ Dismiss	Chiudi	Descartar	Mbyll
 No access	Nessun accesso	Sin acceso	Pa qasje
 Your role doesn't include this page. Ask an owner or manager.	Il tuo ruolo non include questa pagina. Chiedi a un titolare o responsabile.	Tu rol no incluye esta página. Pregunta a un propietario o gerente.	Roli yt nuk e përfshin këtë faqe. Pyet një pronar ose menaxher.
 Couldn't load this	Impossibile caricare	No se pudo cargar	Nuk u ngarkua dot
-Nothing here yet	Ancora niente qui	Todavía no hay nada aquí	Ende asgjë këtu
 Load more	Carica altro	Cargar más	Ngarko më shumë
 Show more	Mostra altro	Mostrar más	Shfaq më shumë
 Showing {} of {}	{} di {} mostrati	Mostrando {} de {}	Po shfaqen {} nga {}
@@ -2042,7 +2109,6 @@ Unknown	Sconosciuto	Desconocido	E panjohur
 Order	Ordine	Pedido	Porosia
 When	Quando	Cuándo	Kur
 {} by {} · {}	{} di {} · {}	{} por {} · {}	{} nga {} · {}
-Note	Nota	Nota	Shënim
 What happened? e.g. “Manager approved the discount for a regular”	Cos'è successo? es. “Il responsabile ha approvato lo sconto per un cliente abituale”	¿Qué pasó? p. ej. “El gerente aprobó el descuento para un cliente habitual”	Çfarë ndodhi? p.sh. “Menaxheri miratoi zbritjen për një klient të rregullt”
 To check	Da controllare	Por revisar	Për t'u kontrolluar
 Discount	Sconto	Descuento	Zbritje
@@ -2181,8 +2247,6 @@ Pass	Pass	Pase	Banak
 Packing	Imballaggio	Empaque	Paketim
 Table {}	Tavolo {}	Mesa {}	Tavolina {}
 seat {}	posto {}	lugar {}	vendi {}
-Tickets	Comande	Comandas	Fletët
-Upcoming	In arrivo	Próximos	Në vijim
 Dish	Piatto	Plato	Pjata
 Kitchen stations	Postazioni della cucina	Estaciones de cocina	Stacionet e kuzhinës
 Each station has its own board of tickets.	Ogni postazione ha la sua bacheca di comande.	Cada estación tiene su propio tablero de comandas.	Çdo stacion ka tabelën e vet të fletëve.
@@ -2253,7 +2317,6 @@ You can't put it here. Start cooking it first.	Non puoi metterlo qui. Prima iniz
 You can't put it here.	Non puoi metterlo qui.	No puedes ponerlo aquí.	Nuk mund ta vendosësh këtu.
 Kitchen printing comes once a printer is connected (Admin Hub → Devices).	La stampa in cucina arriva quando una stampante è collegata (Admin Hub → Dispositivi).	La impresión en cocina llega cuando se conecta una impresora (Admin Hub → Dispositivos).	Printimi në kuzhinë vjen pasi të lidhet një printer (Admin Hub → Pajisjet).
 You can't put it here	Non puoi metterlo qui	No puedes ponerlo aquí	Nuk mund ta vendosësh këtu
-Kitchen Status	Stato cucina	Estado de cocina	Gjendja e kuzhinës
 {} open {}	{} {} aperti	{} {} abiertos	{} {} të hapura
 Table, dish or order	Tavolo, piatto o ordine	Mesa, plato o pedido	Tavolinë, pjatë ose porosi
 Search orders	Cerca ordini	Buscar pedidos	Kërko porosi
@@ -2329,11 +2392,13 @@ This restaurant or branch is no longer open. Choose another branch or refresh th
 {}'s picture was removed	L'immagine di {} è stata rimossa	Se quitó la imagen de {}	Fotoja e {} u hoq
 a first name	un nome	un nombre	një emër
 a last name	un cognome	un apellido	një mbiemër
+{}'s restaurants were saved	Ristoranti di {} salvati	Se guardaron los restaurantes de {}	Restorantet e {} u ruajtën
 The Co-Super-Admin role isn't available. Refresh and try again.	Il ruolo Co-Super-Admin non è disponibile. Aggiorna e riprova.	El rol Co-Super-Admin no está disponible. Actualiza e inténtalo de nuevo.	Roli Co-Super-Admin nuk është i disponueshëm. Rifresko dhe provo përsëri.
 {} was added. They get an email to confirm it, then sign in with the temporary password. Choose below what they can do.	{} è stato aggiunto. Riceve un'email per confermarla, poi accede con la password temporanea. Scegli qui sotto cosa può fare.	Se agregó a {}. Recibe un correo para confirmarlo y luego inicia sesión con la contraseña temporal. Elige abajo qué puede hacer.	{} u shtua. Merr një email për ta konfirmuar, pastaj hyn me fjalëkalimin e përkohshëm. Zgjidh më poshtë çfarë mund të bëjë.
 {} can now do {} of {} things. It applies from their next click.	{} ora può fare {} cose su {}. Vale dal suo prossimo clic.	{} ahora puede hacer {} de {} cosas. Se aplica desde su próximo clic.	{} tani mund të bëjë {} nga {} gjëra. Vlen nga klikimi i tij i radhës.
 {} can't sign in until you switch them on	{} non può accedere finché non lo attivi	{} no puede iniciar sesión hasta que lo actives	{} nuk mund të hyjë derisa ta aktivizosh
 {} was removed and can no longer sign in	{} è stato rimosso e non può più accedere	{} se eliminó y ya no puede iniciar sesión	{} u hoq dhe nuk mund të hyjë më
+Not available	Non disponibile	No disponible	Nuk është i disponueshëm
 ^#([0-9a-fA-F]{3}){1,2}$	^#([0-9a-fA-F]{3}){1,2}$	^#([0-9a-fA-F]{3}){1,2}$	^#([0-9a-fA-F]{3}){1,2}$
 ^[A-Za-z0-9._-]{3,50}$	^[A-Za-z0-9._-]{3,50}$	^[A-Za-z0-9._-]{3,50}$	^[A-Za-z0-9._-]{3,50}$
 Use digits, spaces and + ( ) - only (7 or more)	Usa solo cifre, spazi e + ( ) - (7 o più)	Usa solo dígitos, espacios y + ( ) - (7 o más)	Përdor vetëm shifra, hapësira dhe + ( ) - (7 ose më shumë)
@@ -2396,7 +2461,6 @@ Billing address	Indirizzo di fatturazione	Dirección de facturación	Adresa e fa
 Head office	Sede principale	Oficina central	Zyra qendrore
 Deliveries	Consegne	Entregas	Dorëzimet
 Accounting	Contabilità	Contabilidad	Kontabiliteti
-Support	Assistenza	Soporte	Ndihma
 Apps they can open	App che può aprire	Apps que puede abrir	Aplikacionet që mund të hapë
 Restaurants	Ristoranti	Restaurantes	Restorantet
 Staff and roles	Personale e ruoli	Personal y roles	Stafi dhe rolet
@@ -2508,20 +2572,26 @@ Add branch	Aggiungi sede	Añadir sucursal	Shto pikë
 Unavailable	Non disponibile	No disponible	E padisponueshme
 No phone yet	Ancora nessun telefono	Todavía sin teléfono	Ende pa telefon
 No email yet	Ancora nessuna email	Todavía sin correo	Ende pa email
-Co-Super-Admins	Co-Super-Admins	Co-Super-Admins	Co-Super-Admins
-{} {} you run the restaurants	{} {} gestire i ristoranti	{} {} dirigir los restaurantes	{} {} drejton restorantet
-People who help you run the restaurants	Persone che ti aiutano a gestire i ristoranti	Personas que te ayudan a dirigir los restaurantes	Njerëz që të ndihmojnë të drejtosh restorantet
-Add Co-Super-Admin	Aggiungi Co-Super-Admin	Añadir Co-Super-Admin	Shto Co-Super-Admin
+Admins	Amministratori	Administradores	Administratorë
+Support admins take care of the restaurants you give them	Gli admin di supporto si occupano dei ristoranti che gli dai	Los admins de soporte se encargan de los restaurantes que les das	Adminët e mbështetjes kujdesen për restorantet që u jep
+Restaurant admins are made by an owner and work only in that restaurant	Gli admin del ristorante li crea un proprietario e lavorano solo in quel ristorante	Los admins del restaurante los crea un dueño y trabajan solo en ese restaurante	Adminët e restorantit i krijon një pronar dhe punojnë vetëm në atë restorant
+Add support admin	Aggiungi admin di supporto	Agregar admin de soporte	Shto admin mbështetjeje
+Support admins · {}	Admin di supporto · {}	Admins de soporte · {}	Adminët e mbështetjes · {}
+Restaurant admins · {}	Admin del ristorante · {}	Admins del restaurante · {}	Adminët e restorantit · {}
 Only the Super Admin	Solo il Super Admin	Solo el Super Admin	Vetëm Super Admin
 Only the Super Admin adds Co-Super-Admins and chooses what they can do.	Solo il Super Admin aggiunge i Co-Super-Admin e sceglie cosa possono fare.	Solo el Super Admin añade Co-Super-Admins y elige lo que pueden hacer.	Vetëm Super Admin shton Co-Super-Admin dhe zgjedh çfarë mund të bëjnë.
-No Co-Super-Admins yet	Ancora nessun Co-Super-Admin	Todavía no hay Co-Super-Admins	Ende pa Co-Super-Admin
-Add someone to help you run the restaurants. They can do only what you allow.	Aggiungi qualcuno che ti aiuti a gestire i ristoranti. Può fare solo ciò che consenti.	Añade a alguien que te ayude a dirigir los restaurantes. Solo puede hacer lo que permitas.	Shto dikë që të ndihmojë të drejtosh restorantet. Mund të bëjë vetëm atë që lejon ti.
-They can do only what you allow. They never see or change you, and they remove only people they added themselves.	Può fare solo ciò che consenti. Non vede né modifica mai te e rimuove solo le persone che ha aggiunto lui stesso.	Solo puede hacer lo que permitas. Nunca te ve ni te cambia, y solo elimina a personas que añadió él mismo.	Mund të bëjë vetëm atë që lejon ti. Nuk të sheh dhe nuk të ndryshon kurrë, dhe heq vetëm njerëzit që shtoi vetë.
-They can no longer sign in or manage any restaurant. People and changes they made stay. To stop them for a while, switch them off instead.	Non potrà più accedere né gestire alcun ristorante. Le persone e le modifiche che ha fatto restano. Per fermarlo per un po', disattivalo invece.	Ya no podrá iniciar sesión ni gestionar ningún restaurante. Las personas y los cambios que hizo se mantienen. Para detenerlo un tiempo, mejor desactívalo.	Nuk do të mund të hyjë apo të menaxhojë asnjë restorant. Njerëzit dhe ndryshimet që bëri mbeten. Për ta ndalur për pak kohë, më mirë çaktivizoje.
+No restaurant admins	Nessun admin del ristorante	Sin admins del restaurante	Asnjë admin restoranti
+Owners add admins for their own restaurant in Admin Hub → Users.	I proprietari aggiungono gli admin del proprio ristorante in Admin Hub → Utenti.	Los dueños agregan admins para su restaurante en Admin Hub → Usuarios.	Pronarët shtojnë adminë për restorantin e tyre te Admin Hub → Përdoruesit.
+No support admins yet	Ancora nessun admin di supporto	Aún no hay admins de soporte	Ende asnjë admin mbështetjeje
+Add someone to take care of restaurants for you. They work only in the restaurants you give them.	Aggiungi qualcuno che si occupi dei ristoranti per te. Lavora solo nei ristoranti che gli dai.	Agrega a alguien que se encargue de restaurantes por ti. Trabaja solo en los restaurantes que le das.	Shto dikë që të kujdeset për restorantet për ty. Punon vetëm në restorantet që i jep.
+They work only in the restaurants you give them and do only what you allow. They never see or change you, remove owners only when you allow it, and remove only people they added themselves.	Lavorano solo nei ristoranti che gli dai e fanno solo ciò che permetti. Non vedono né modificano mai te, rimuovono i proprietari solo se lo permetti e rimuovono solo persone che hanno aggiunto loro.	Trabajan solo en los restaurantes que les das y hacen solo lo que permites. Nunca te ven ni te cambian, quitan dueños solo si lo permites y quitan solo a personas que agregaron ellos.	Punojnë vetëm në restorantet që u jep dhe bëjnë vetëm atë që lejon. Nuk të shohin e nuk të ndryshojnë kurrë, heqin pronarë vetëm kur e lejon dhe heqin vetëm njerëz që i kanë shtuar vetë.
+They can no longer sign in or take care of any restaurant. People and changes they made stay. To stop them for a while, switch them off instead.	Non potrà più accedere né occuparsi di alcun ristorante. Le persone e le modifiche che ha fatto restano. Per fermarlo per un po', disattivalo invece.	Ya no podrá iniciar sesión ni encargarse de ningún restaurante. Las personas y cambios que hizo se quedan. Para detenerlo por un tiempo, desactívalo.	Nuk do të mund të hyjë më as të kujdeset për asnjë restorant. Njerëzit dhe ndryshimet që bëri mbeten. Për ta ndaluar për pak kohë, çaktivizoje.
 Email to confirm	Email da confermare	Correo por confirmar	Email për t'u konfirmuar
+No restaurants yet	Ancora nessun ristorante	Todavía no hay restaurantes	Ende pa restorante
+{} restaurants	{} ristoranti	{} restaurantes	{} restorante
 Can do everything	Può fare tutto	Puede hacer todo	Mund të bëjë gjithçka
 Send password reset	Invia reimpostazione password	Enviar restablecimiento de contraseña	Dërgo rivendosjen e fjalëkalimit
-Add a Co-Super-Admin	Aggiungi un Co-Super-Admin	Añadir un Co-Super-Admin	Shto një Co-Super-Admin
+Add a support admin	Aggiungi un admin di supporto	Agregar un admin de soporte	Shto një admin mbështetjeje
 They confirm their email, then sign in with this temporary password and choose their own.	Conferma l'email, poi accede con questa password temporanea e sceglie la propria.	Confirma su correo, luego inicia sesión con esta contraseña temporal y elige la suya.	Konfirmon email-in, pastaj hyn me këtë fjalëkalim të përkohshëm dhe zgjedh të vetin.
 Share it with them yourself; it isn't emailed	Comunicaglielo tu; non viene inviato via email	Compártela tú; no se envía por correo	Jepja vetë; nuk dërgohet me email
 After adding them you choose what they can do. They start with everything.	Dopo averlo aggiunto scegli cosa può fare. Parte con tutto.	Después de añadirlo eliges lo que puede hacer. Empieza con todo.	Pasi ta shtosh zgjedh çfarë mund të bëjë. Nis me gjithçka.
@@ -2532,6 +2602,13 @@ Find a permission (e.g. refund, menus, delete)	Trova un permesso (es. rimborso, 
 All on	Tutto attivo	Todo activado	Të gjitha aktive
 All off	Tutto disattivato	Todo desactivado	Të gjitha joaktive
 Without “View Restaurants” {} can't see the restaurant list, so they can't open any restaurant.	Senza “Vedere i ristoranti” {} non vede l'elenco dei ristoranti, quindi non può aprirne nessuno.	Sin “Ver restaurantes” {} no ve la lista de restaurantes, así que no puede abrir ninguno.	Pa “Shiko restorantet” {} nuk e sheh listën e restoranteve, ndaj nuk mund të hapë asnjë.
+Restaurant admin	Admin del ristorante	Admin del restaurante	Admin restoranti
+{}'s restaurants	Ristoranti di {}	Restaurantes de {}	Restorantet e {}
+They see and work only in these restaurants.	Vede e lavora solo in questi ristoranti.	Ve y trabaja solo en estos restaurantes.	Sheh dhe punon vetëm në këto restorante.
+Every restaurant, also the ones added later.	Ogni ristorante, anche quelli aggiunti dopo.	Todos los restaurantes, también los que se agreguen después.	Çdo restorant, edhe ata që shtohen më vonë.
+May remove owners and co-owners	Può rimuovere proprietari e comproprietari	Puede quitar dueños y codueños	Mund të heqë pronarë dhe bashkëpronarë
+Off: they can't remove a restaurant's owners or co-owners.	Disattivato: non può rimuovere i proprietari o comproprietari di un ristorante.	Desactivado: no puede quitar a los dueños o codueños de un restaurante.	Çaktivizuar: nuk mund të heqë pronarët ose bashkëpronarët e një restoranti.
+{} of {} restaurants	{} di {} ristoranti	{} de {} restaurantes	{} nga {} restorante
 Add the owner of {}	Aggiungi il titolare di {}	Añadir el propietario de {}	Shto pronarin e {}
 They get an email with a link to set their password.	Riceve un'email con un link per impostare la password.	Recibe un correo con un enlace para crear su contraseña.	Merr një email me lidhje për të vendosur fjalëkalimin.
 Add owner and send the invitation	Aggiungi titolare e invia l'invito	Añadir propietario y enviar la invitación	Shto pronarin dhe dërgo ftesën
@@ -2781,6 +2858,7 @@ CO-SUPER-ADMIN	CO-SUPER-ADMIN	CO-SUPER-ADMIN	CO-SUPER-ADMIN
 Welcome back, {}	Bentornato, {}	Bienvenido de nuevo, {}	Mirë se u ktheve, {}
 Pick a restaurant to work in, or set up a new one.	Scegli un ristorante in cui lavorare o configurane uno nuovo.	Elige un restaurante para trabajar o configura uno nuevo.	Zgjidh një restorant për të punuar ose ngri një të ri.
 open now	aperto ora	abierto ahora	i hapur tani
+Requests	Richieste	Solicitudes	Kërkesat
 Applications ({})	Domande ({})	Solicitudes ({})	Aplikimet ({})
 Applications	Domande	Solicitudes	Aplikimet
 Save or cancel the new order to return to search and filters.	Salva o annulla il nuovo ordine per tornare a ricerca e filtri.	Guarda o cancela el nuevo orden para volver a la búsqueda y los filtros.	Ruaj ose anulo renditjen e re për t'u kthyer te kërkimi dhe filtrat.
@@ -2792,7 +2870,6 @@ Invitation expired	Invito scaduto	Invitación vencida	Ftesa skadoi
 Invitation not delivered	Invito non consegnato	Invitación no entregada	Ftesa nuk u dorëzua
 Sending invitation…	Invio dell'invito…	Enviando invitación…	Duke dërguar ftesën…
 Invitation sent	Invito inviato	Invitación enviada	Ftesa u dërgua
-No restaurants yet	Ancora nessun ristorante	Todavía no hay restaurantes	Ende pa restorante
 Create the first one. Its owner gets an email to set a password, and you can open it right away.	Crea il primo. Il titolare riceve un'email per impostare una password e puoi aprirlo subito.	Crea el primero. Su propietario recibe un correo para crear una contraseña y puedes abrirlo enseguida.	Krijo të parin. Pronari merr një email për të vendosur fjalëkalimin dhe mund ta hapësh menjëherë.
 Now the person who owns {}.	Ora la persona che possiede {}.	Ahora la persona dueña de {}.	Tani personi që zotëron {}.
 First the restaurant, then its owner.	Prima il ristorante, poi il titolare.	Primero el restaurante, luego su propietario.	Fillimisht restoranti, pastaj pronari.
@@ -2824,8 +2901,26 @@ the restaurant's details	i dati del ristorante	los datos del restaurante	të dh�
 the owner's details	i dati del titolare	los datos del propietario	të dhënat e pronarit
 before going to the {}	prima di andare a {}	antes de ir a {}	para se të shkosh te {}
 before closing	prima di chiudere	antes de cerrar	para mbylljes
-Save your changes?	Salvare le modifiche?	¿Guardar los cambios?	T'i ruash ndryshimet?
 You changed {}. Save them {}?	Hai modificato {}. Salvarli {}?	Cambiaste {}. ¿Guardarlos {}?	Ndryshove {}. T'i ruash {}?
+Couldn't load the requests.	Impossibile caricare le richieste.	No se pudieron cargar las solicitudes.	Kërkesat nuk u ngarkuan.
+What restaurants ask you	Cosa ti chiedono i ristoranti	Lo que te piden los restaurantes	Çfarë të kërkojnë restorantet
+No requests yet	Ancora nessuna richiesta	Aún no hay solicitudes	Ende asnjë kërkesë
+Owners ask here to remove another owner, or for a support admin.	Qui i proprietari chiedono di rimuovere un altro proprietario o un admin di supporto.	Aquí los dueños piden quitar a otro dueño o un admin de soporte.	Këtu pronarët kërkojnë të heqin një pronar tjetër ose një admin mbështetjeje.
+Decline this request?	Rifiutare questa richiesta?	¿Rechazar esta solicitud?	Ta refuzosh këtë kërkesë?
+Mark as done?	Segnare come fatto?	¿Marcar como hecho?	Ta shënosh si të kryer?
+The restaurant sees that you declined it.	Il ristorante vede che l'hai rifiutata.	El restaurante ve que la rechazaste.	Restoranti sheh që e refuzove.
+Check with {} first. They're removed from {} and signed out everywhere.	Verifica prima con {}. Viene rimosso da {} e disconnesso ovunque.	Confírmalo primero con {}. Se le quita de {} y se cierra su sesión en todas partes.	Verifiko fillimisht me {}. Hiqet nga {} dhe del nga të gjitha pajisjet.
+Give them a support admin on the Admins page (Restaurants).	Assegnagli un admin di supporto nella pagina Admin (Ristoranti).	Dales un admin de soporte en la página Admins (Restaurantes).	Jepu një admin mbështetjeje te faqja Adminët (Restorantet).
+Decline	Rifiuta	Rechazar	Refuzo
+Declined	Rifiutata	Rechazada	U refuzua
+Couldn't save the answer.	Impossibile salvare la risposta.	No se pudo guardar la respuesta.	Përgjigjja nuk u ruajt.
+Note for the restaurant	Nota per il ristorante	Nota para el restaurante	Shënim për restorantin
+Remove an owner: {}	Rimuovere un proprietario: {}	Quitar a un dueño: {}	Hiq një pronar: {}
+Needs a support admin	Serve un admin di supporto	Necesita un admin de soporte	I duhet një admin mbështetjeje
+asked by {}	chiesto da {}	pedido por {}	kërkuar nga {}
+Your answer: {}	La tua risposta: {}	Tu respuesta: {}	Përgjigjja jote: {}
+Remove the owner	Rimuovi il proprietario	Quitar al dueño	Hiq pronarin
+Mark as done	Segna come fatto	Marcar como hecho	Shëno si të kryer
 Select a finished order status.	Seleziona uno stato di ordine concluso.	Selecciona un estado de pedido terminado.	Zgjidh një gjendje porosie të përfunduar.
 Search must be 200 characters or fewer.	La ricerca deve avere al massimo 200 caratteri.	La búsqueda debe tener 200 caracteres o menos.	Kërkimi duhet të ketë deri në 200 shkronja.
 Live updates disconnected. Retrying automatically.	Aggiornamenti in tempo reale disconnessi. Nuovo tentativo automatico.	Actualizaciones en vivo desconectadas. Se reintenta automáticamente.	Përditësimet e drejtpërdrejta u shkëputën. Po provohet përsëri automatikisht.
@@ -3665,6 +3760,7 @@ Back to orders	Torna agli ordini	Volver a los pedidos	Kthehu te porositë
 Reason (optional)	Motivo (facoltativo)	Motivo (opcional)	Arsyeja (opsionale)
 Booked for {}. The rest can be added when they arrive.	Prenotato per {}. Il resto si può aggiungere al loro arrivo.	Reservado para {}. El resto se puede añadir cuando lleguen.	E rezervuar për {}. Pjesa tjetër mund të shtohet kur të mbërrijnë.
 Fewer	Meno	Menos	Më pak
+{} of {}	{} di {}	{} de {}	{} nga {}
 Reason for the correction	Motivo della correzione	Motivo de la corrección	Arsyeja e korrigjimit
 Hold the table longer?	Tenere il tavolo più a lungo?	¿Guardar la mesa más tiempo?	Ta mbash tavolinën më gjatë?
 The table waits longer for {}. The booking still ends at {}.	Il tavolo aspetta {} più a lungo. La prenotazione finisce comunque alle {}.	La mesa espera más a {}. La reserva sigue terminando a las {}.	Tavolina pret më gjatë për {}. Rezervimi mbaron përsëri në {}.
@@ -3830,7 +3926,6 @@ Outdoor seating	Tavolo all'aperto	Mesa al aire libre	Ulëse jashtë
 e.g. "Cake with 30 candles at dessert", "It's a surprise"	es. "Torta con 30 candeline al dolce", "È una sorpresa"	p. ej. "Pastel con 30 velas en el postre", "Es una sorpresa"	p.sh. "Tortë me 30 qirinj te ëmbëlsira", "Është surprizë"
 Accept this request?	Accettare questa richiesta?	¿Aceptar esta solicitud?	Ta pranosh këtë kërkesë?
 Accept	Accetta	Aceptar	Prano
-Decline this request?	Rifiutare questa richiesta?	¿Rechazar esta solicitud?	Ta refuzosh këtë kërkesë?
 The request from {} is declined and its table becomes free. The guest is told by email, and anything they paid goes back in full.	La richiesta di {} viene rifiutata e il tavolo si libera. L'ospite viene avvisato via email e tutto ciò che ha pagato viene rimborsato per intero.	Se rechaza la solicitud de {} y su mesa queda libre. Se avisa al cliente por correo y se le devuelve todo lo que pagó.	Kërkesa e {} refuzohet dhe tavolina lirohet. Mysafiri njoftohet me email dhe gjithçka që pagoi i kthehet plotësisht.
 Fully booked	Tutto prenotato	Completo	Plotësisht i rezervuar
 Closed that day	Chiuso quel giorno	Cerrado ese día	I mbyllur atë ditë
@@ -3872,7 +3967,6 @@ Could not load this reservation.	Impossibile caricare questa prenotazione.	No se
 Unassigned	Non assegnato	Sin asignar	E pacaktuar
 tel:{}	tel:{}	tel:{}	tel:{}
 Email {}	Email {}	Correo {}	Email {}
-mailto:{}	mailto:{}	mailto:{}	mailto:{}
 Back to details	Torna ai dettagli	Volver a los detalles	Kthehu te detajet
 Edit info	Modifica info	Editar info	Ndrysho info
 Edit notes	Modifica note	Editar notas	Ndrysho shënimet
@@ -4186,7 +4280,6 @@ Pay isn't available	La paga non è disponibile	El pago no está disponible	Pages
 Your hourly wage isn't set yet	La tua paga oraria non è ancora impostata	Tu pago por hora todavía no está definido	Paga jote për orë nuk është vendosur ende
 Tables served	Tavoli serviti	Mesas atendidas	Tavolina të shërbyera
 {} guests · {} still open	{} ospiti · {} ancora aperti	{} comensales · {} aún abiertos	{} mysafirë · {} ende të hapura
-My Sales	Le mie vendite	Mis ventas	Shitjet e mia
 {} · your sales, tips and pay	{} · le tue vendite, mance e paga	{} · tus ventas, propinas y pago	{} · shitjet, bakshishet dhe pagesa jote
 Day before	Giorno prima	Día anterior	Dita e mëparshme
 Day after	Giorno dopo	Día siguiente	Dita pas
@@ -4236,8 +4329,8 @@ Most hours	Più ore	Más horas	Më shumë orë
 Couldn't load pay. Check the connection and try again.	Impossibile caricare la paga. Controlla la connessione e riprova.	No se pudo cargar el pago. Revisa la conexión e inténtalo de nuevo.	Pagesa nuk u ngarkua dot. Kontrollo lidhjen dhe provo përsëri.
 {} is no longer marked as paid for {}.	{} non risulta più pagato per {}.	{} ya no está marcado como pagado por {}.	{} nuk shënohet më i paguar për {}.
 {} is {} in {}.	{} è {} in {}.	{} está {} en {}.	{} është {} te {}.
-Managers only	Solo responsabili	Solo gerentes	Vetëm menaxherët
-Salaries need the “Manage Shifts” permission.	Gli stipendi richiedono il permesso “Gestire i turni”.	Los salarios necesitan el permiso “Gestionar turnos”.	Rrogat kërkojnë lejen “Menaxho turnet”.
+Owners only	Solo proprietari	Solo dueños	Vetëm pronarët
+Salaries need the “Manage Salary” permission.	Gli stipendi richiedono il permesso “Gestisci stipendi”.	Los sueldos necesitan el permiso “Gestionar sueldos”.	Pagat kërkojnë lejen “Menaxho pagat”.
 Couldn't load pay	Impossibile caricare la paga	No se pudo cargar el pago	Pagesa nuk u ngarkua dot
 Sign in again to change pay.	Accedi di nuovo per cambiare la paga.	Inicia sesión de nuevo para cambiar el pago.	Hyr përsëri për të ndryshuar pagesën.
 Saved: {} gets {} a month.	Salvato: {} riceve {} al mese.	Guardado: {} recibe {} al mes.	U ruajt: {} merr {} në muaj.
@@ -4289,6 +4382,7 @@ Enter an amount above zero.	Inserisci un importo sopra zero.	Escribe un importe 
 That's more than the {} left.	È più dei {} rimasti.	Es más de los {} restantes.	Është më shumë se {} që kanë mbetur.
 To pay for the period	Da pagare per il periodo	A pagar por el periodo	Për të paguar për periudhën
 Paid already	Già pagato	Ya pagado	Paguar tashmë
+All {}	Tutti {}	Todos {}	Të gjitha {}
 all that's left	tutto il resto	todo lo que queda	gjithçka që mbetet
 How	Come	Cómo	Si
 Reference	Riferimento	Referencia	Referenca
@@ -4548,7 +4642,6 @@ Couldn't remove the shift. Check the connection and try again.	Impossibile rimuo
 Afternoon	Pomeriggio	Tarde	Pasdite
 Evening	Sera	Noche	Mbrëmje
 [^A-Z0-9]+	[^A-Z0-9]+	[^A-Z0-9]+	[^A-Z0-9]+
-Admins	Amministratori	Administradores	Administratorë
 Co-owners	Contitolari	Copropietarios	Bashkëpronarë
 Viewers	Osservatori	Observadores	Shikues
 Super admins	Super admin	Superadministradores	Super administratorë
@@ -5460,6 +5553,8 @@ Rules	Rules	Rules	Rules
 Discard unsaved changes?	Scartare le modifiche non salvate?	¿Descartar los cambios sin guardar?	Të hidhen ndryshimet e paruajtura?
 Your restaurant appearance and receipt changes have not been saved.	Le modifiche all'aspetto del ristorante e allo scontrino non sono state salvate.	Los cambios de apariencia y recibo del restaurante no se guardaron.	Ndryshimet e pamjes së restorantit dhe të faturës nuk u ruajtën.
 Discard and leave	Scarta ed esci	Descartar y salir	Hidhi dhe dil
+Choose what you ask for	Scegli cosa chiedi	Elige lo que pides	Zgjidh çfarë kërkon
+Invalid schema	Invalid schema	Invalid schema	Invalid schema
 Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}
 SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding
 Super admin username is already used by another account: {}	Super admin username is already used by another account: {}	Super admin username is already used by another account: {}	Super admin username is already used by another account: {}
@@ -5492,6 +5587,7 @@ The invitation could not be sent. Try again.	Impossibile inviare l'invito. Ripro
 Set up your POS owner account	Configura il tuo account di titolare POS	Configura tu cuenta de propietario en POS	Konfiguro llogarinë tënde të pronarit në POS
 Reset your POS password	Reimposta la tua password POS	Restablece tu contraseña de POS	Rivendos fjalëkalimin e POS
 Verify your POS email	Verifica la tua email POS	Verifica tu correo de POS	Verifiko emailin e POS
+Add the restaurant's owner first.	Aggiungi prima il proprietario del ristorante.	Agrega primero al dueño del restaurante.	Shto fillimisht pronarin e restorantit.
 Restaurant not found	Ristorante non trovato	Restaurante no encontrado	Restoranti nuk u gjet
 Only staff of a restaurant can add people to it	Solo il personale di un ristorante può aggiungervi persone	Solo el personal de un restaurante puede agregarle personas	Vetëm stafi i një restoranti mund të shtojë njerëz në të
 You can only add people to your own restaurant	Puoi aggiungere persone solo al tuo ristorante	Solo puedes agregar personas a tu propio restaurante	Mund të shtosh njerëz vetëm në restorantin tënd
@@ -5552,7 +5648,6 @@ Assigned user must belong to the same restaurant as the device	L'utente assegnat
 Device assignment update violates a data constraint	L'aggiornamento dell'assegnazione viola un vincolo dei dati	La actualización de la asignación infringe una regla de datos	Përditësimi i caktimit shkel një rregull të të dhënave
 Device pairing token update violates a data constraint	L'aggiornamento del codice di associazione viola un vincolo dei dati	La actualización del código de vinculación infringe una regla de datos	Përditësimi i kodit të lidhjes shkel një rregull të të dhënave
 Pairing token is invalid or expired	Il codice di associazione non è valido o è scaduto	El código de vinculación no es válido o expiró	Kodi i lidhjes është i pavlefshëm ose ka skaduar
-Invalid schema	Invalid schema	Invalid schema	Invalid schema
 Give the place a name	Dai un nome al luogo	Ponle un nombre al lugar	Jepi një emër vendit
 Write the supplier's name	Scrivi il nome del fornitore	Escribe el nombre del proveedor	Shkruaj emrin e furnitorit
 A sale stock source requires its restaurant, branch, item, and location	Una fonte di magazzino per la vendita richiede ristorante, sede, articolo e luogo	Una fuente de inventario de venta necesita su restaurante, sucursal, artículo y lugar	Një burim stoku për shitje kërkon restorantin, pikën, artikullin dhe vendin
@@ -5625,6 +5720,7 @@ Color must be at most 20 characters	Il colore può avere al massimo 20 caratteri
 Name must be at most 120 characters	Il nome può avere al massimo 120 caratteri	El nombre puede tener como máximo 120 caracteres	Emri mund të ketë deri në 120 karaktere
 Not a menu photo key	Not a menu photo key	Not a menu photo key	Not a menu photo key
 Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set	Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set	Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set	Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set
+Changing prices needs “Change prices”.	Per cambiare i prezzi serve “Modificare i prezzi”.	Para cambiar precios se necesita “Cambiar precios”.	Për të ndryshuar çmimet duhet “Ndrysho çmimet”.
 This dish's recipe is used inside {}. Remove it there first (Admin Hub → Inventory → Preparations).	La ricetta di questo piatto è usata in {}. Prima toglila da lì (Admin Hub → Magazzino → Preparazioni).	La receta de este plato se usa en {}. Quítala de ahí primero (Admin Hub → Inventario → Preparaciones).	Receta e kësaj pjate përdoret te {}. Hiqe së pari prej andej (Admin Hub → Stoku → Përgatitjet).
 Choose a stock item or a preparation for each ingredient	Scegli un articolo di magazzino o un semilavorato per ogni ingrediente	Elige un artículo de inventario o una preparación para cada ingrediente	Zgjidh një artikull stoku ose një përgatitje për çdo përbërës
 One of the ingredients is no longer a stock item. Refresh and try again.	Uno degli ingredienti non è più un articolo di magazzino. Aggiorna e riprova.	Uno de los ingredientes ya no es un artículo de inventario. Actualiza e inténtalo de nuevo.	Një nga përbërësit nuk është më artikull stoku. Rifresko dhe provo përsëri.
@@ -5896,13 +5992,220 @@ Choose a Salary team	Scegli un team degli stipendi	Elige un equipo de salarios	Z
 Permission code is required	Permission code is required	Permission code is required	Permission code is required
 Permission id is required	Permission id is required	Permission id is required	Permission id is required
 Say whether the role is paid	Indica se il ruolo è pagato	Indica si el rol se paga	Thuaj nëse roli paguhet
+Open this restaurant first	Apri prima questo ristorante	Abre primero este restaurante	Hap fillimisht këtë restorant
+Role not found	Ruolo non trovato	Rol no encontrado	Roli nuk u gjet
+Open a restaurant first	Prima apri un ristorante	Primero abre un restaurante	Hap së pari një restorant
+Person not found	Persona non trovata	Persona no encontrada	Personi nuk u gjet
+This person works in no restaurant	Questa persona non lavora in nessun ristorante	Esta persona no trabaja en ningún restaurante	Ky person nuk punon në asnjë restorant
+This permission is given for everything	Questo permesso vale per tutto	Este permiso se da para todo	Kjo leje jepet për gjithçka
+Too many choices	Troppe scelte	Demasiadas opciones	Shumë zgjedhje
+Choose from the restaurant's own floors and roles	Scegli tra i piani e i ruoli del ristorante	Elige entre los pisos y roles del restaurante	Zgjidh nga katet dhe rolet e restorantit
 Only the Super Admin can change a Co-Super-Admin's permissions	Solo il Super Admin può cambiare i permessi di un Co-Super-Admin	Solo el Super Admin puede cambiar los permisos de un Co-Super-Admin	Vetëm Super Admini mund të ndryshojë lejet e një Co-Super-Admini
 This person is not a Co-Super-Admin	Questa persona non è un Co-Super-Admin	Esta persona no es Co-Super-Admin	Ky person nuk është Co-Super-Admin
-Open a restaurant first	Prima apri un ristorante	Primero abre un restaurante	Hap së pari një restorant
 System roles cannot be modified	I ruoli di sistema non si possono modificare	Los roles del sistema no se pueden modificar	Rolet e sistemit nuk mund të ndryshohen
+You can only see your own sales	Puoi vedere solo le tue vendite	Solo puedes ver tus propias ventas	Mund të shikosh vetëm shitjet e tua
 Staff member belongs to another branch	Il membro del personale appartiene a un'altra sede	El miembro del personal pertenece a otra sucursal	Anëtari i stafit i përket një pike tjetër
 Shift does not belong to this staff member and branch	Il turno non appartiene a questo membro del personale e a questa sede	El turno no pertenece a este miembro del personal y sucursal	Turni nuk i përket këtij anëtari të stafit dhe kësaj pike
 You do not have permission to view these sales	Non hai il permesso di vedere queste vendite	No tienes permiso para ver estas ventas	Nuk ke leje për të parë këto shitje
+See tables	Vedere i tavoli	Ver las mesas	Shiko tavolinat
+The floor plan, on the floors chosen for them	La pianta, sui piani scelti per lui	El plano, en los pisos elegidos para esa persona	Plani, në katet e zgjedhura për të
+Change tables	Modificare i tavoli	Cambiar mesas	Ndrysho tavolinat
+Seat guests, set tables free or out of use, move guests and join tables	Far accomodare gli ospiti, liberare i tavoli o metterli fuori uso, spostare gli ospiti e unire i tavoli	Sentar comensales, liberar mesas o dejarlas fuera de uso, mover comensales y unir mesas	Ul mysafirët, liro tavolinat ose nxirri jashtë përdorimit, lëviz mysafirët dhe bashko tavolinat
+Take payments	Incassare	Cobrar	Merr pagesa
+Request the bill and take the payment from a table	Chiedere il conto e incassare da un tavolo	Pedir la cuenta y cobrar desde una mesa	Kërko faturën dhe merr pagesën nga një tavolinë
+Edit the floor plan	Modificare la pianta	Editar el plano	Ndrysho planin
+Add, move and remove tables, floors and places	Aggiungere, spostare e togliere tavoli, piani e zone	Agregar, mover y quitar mesas, pisos y zonas	Shto, lëviz dhe hiq tavolina, kate dhe zona
+See orders	Vedere gli ordini	Ver los pedidos	Shiko porositë
+The open orders and what's on them	Gli ordini aperti e cosa contengono	Los pedidos abiertos y lo que llevan	Porositë e hapura dhe çfarë kanë
+Edit orders	Modificare gli ordini	Editar pedidos	Ndrysho porositë
+Start orders, add and remove dishes, notes, send to the kitchen, serve, cancel unpaid-for orders	Aprire ordini, aggiungere e togliere piatti, note, inviare in cucina, servire, annullare ordini non pagati	Abrir pedidos, agregar y quitar platos, notas, enviar a cocina, servir, cancelar pedidos sin pagar	Hap porosi, shto dhe hiq pjata, shënime, dërgo në kuzhinë, shërbe, anulo porosi të papaguara
+Start orders	Aprire ordini	Abrir pedidos	Hap porosi
+Start an order on a table or without one	Aprire un ordine su un tavolo o senza tavolo	Abrir un pedido en una mesa o sin mesa	Hap një porosi në një tavolinë ose pa tavolinë
+Cancel orders	Annullare ordini	Cancelar pedidos	Anulo porosi
+Cancel an order nothing was paid on	Annullare un ordine su cui non è stato pagato niente	Cancelar un pedido en el que no se pagó nada	Anulo një porosi për të cilën s'është paguar asgjë
+Request the bill and take the payment for an order	Chiedere il conto e incassare un ordine	Pedir la cuenta y cobrar un pedido	Kërko faturën dhe merr pagesën e një porosie
+Close an order whose guests left without paying	Chiudere un ordine i cui ospiti sono andati via senza pagare	Cerrar un pedido cuyos comensales se fueron sin pagar	Mbyll një porosi mysafirët e së cilës ikën pa paguar
+Void what was sent	Stornare ciò che è stato inviato	Anular lo enviado	Storno atë që u dërgua
+Void orders or dishes the kitchen already has	Stornare ordini o piatti che la cucina ha già	Anular pedidos o platos que la cocina ya tiene	Storno porosi ose pjata që i ka kuzhina
+Move orders to another table	Spostare ordini su un altro tavolo	Mover pedidos a otra mesa	Lëviz porositë në një tavolinë tjetër
+Move an order to another table	Spostare un ordine su un altro tavolo	Mover un pedido a otra mesa	Lëviz një porosi në një tavolinë tjetër
+Give discounts	Fare sconti	Dar descuentos	Bëj zbritje
+Take money off a dish or a whole order	Togliere soldi da un piatto o da tutto l'ordine	Descontar dinero de un plato o de todo el pedido	Ul çmimin e një pjate ose të gjithë porosisë
+See an order's kitchen status	Vedere lo stato in cucina di un ordine	Ver el estado en cocina de un pedido	Shiko gjendjen në kuzhinë të një porosie
+The food status of an order and of its dishes	Lo stato del cibo di un ordine e dei suoi piatti	El estado de la comida de un pedido y de sus platos	Gjendja e ushqimit të një porosie dhe e pjatave të saj
+See reservations	Vedere le prenotazioni	Ver las reservas	Shiko rezervimet
+Bookings, the overview and free tables for walk-ins	Prenotazioni, panoramica e tavoli liberi per chi arriva senza prenotazione	Reservas, el resumen y mesas libres para clientes sin reserva	Rezervime, përmbledhja dhe tavolina të lira për ata pa rezervim
+Make and change bookings	Fare e modificare prenotazioni	Hacer y cambiar reservas	Bëj dhe ndrysho rezervime
+Book, change time, guests, notes and table, confirm attendance, check in and seat	Prenotare, cambiare ora, ospiti, note e tavolo, confermare la presenza, registrare l'arrivo e far accomodare	Reservar, cambiar hora, comensales, notas y mesa, confirmar asistencia, registrar llegada y sentar	Rezervo, ndrysho orën, mysafirët, shënimet dhe tavolinën, konfirmo ardhjen, regjistro hyrjen dhe ul
+Cancel bookings	Annullare prenotazioni	Cancelar reservas	Anulo rezervime
+Cancel a booking or mark a no-show	Annullare una prenotazione o segnare una mancata presentazione	Cancelar una reserva o marcar que no se presentó	Anulo një rezervim ose shëno mosparaqitje
+Approve bookings	Approvare prenotazioni	Aprobar reservas	Mirato rezervime
+Accept or decline booking requests and move bookings to other tables	Accettare o rifiutare richieste di prenotazione e spostare prenotazioni su altri tavoli	Aceptar o rechazar solicitudes de reserva y mover reservas a otras mesas	Prano ose refuzo kërkesat për rezervim dhe lëviz rezervimet në tavolina të tjera
+Fix past bookings	Correggere prenotazioni passate	Corregir reservas pasadas	Korrigjo rezervime të kaluara
+Correct bookings after the time limits or from an earlier day, with a reason	Correggere prenotazioni oltre i limiti di tempo o di un giorno precedente, con un motivo	Corregir reservas pasado el tiempo límite o de un día anterior, con un motivo	Korrigjo rezervime pas afateve ose nga një ditë më parë, me një arsye
+Give goodwill refunds	Fare rimborsi di cortesia	Dar reembolsos de cortesía	Bëj rimbursime mirëbesimi
+Give back part of money the restaurant kept, like a late cancel's deposit	Restituire parte dei soldi trattenuti dal ristorante, come il deposito di una disdetta tardiva	Devolver parte del dinero que se quedó el restaurante, como el depósito de una cancelación tardía	Kthe një pjesë të parave që mbajti restoranti, si depozitën e një anulimi të vonë
+See the menu	Vedere il menù	Ver el menú	Shiko menunë
+Menus, sections, dishes and their prices	Menù, sezioni, piatti e prezzi	Menús, secciones, platos y sus precios	Menu, seksione, pjata dhe çmimet e tyre
+Mark sold out	Segnare esaurito	Marcar agotado	Shëno të mbaruar
+Mark a dish or an option sold out and available again	Segnare un piatto o un'opzione come esaurito e di nuovo disponibile	Marcar un plato o una opción como agotado y disponible de nuevo	Shëno një pjatë ose opsion si të mbaruar dhe sërish në dispozicion
+Add dishes and menus	Aggiungere piatti e menù	Agregar platos y menús	Shto pjata dhe menu
+Add menus, sections, dishes, variants and options	Aggiungere menù, sezioni, piatti, varianti e opzioni	Agregar menús, secciones, platos, variantes y opciones	Shto menu, seksione, pjata, variante dhe opsione
+Change dishes and menus	Modificare piatti e menù	Cambiar platos y menús	Ndrysho pjata dhe menu
+Change dishes, photos, ingredients, the order and what waiters see, not prices	Modificare piatti, foto, ingredienti, l'ordine e cosa vedono i camerieri, non i prezzi	Cambiar platos, fotos, ingredientes, el orden y lo que ven los meseros, no los precios	Ndrysho pjatat, fotot, përbërësit, renditjen dhe çfarë shohin kamarierët, jo çmimet
+Change prices	Modificare i prezzi	Cambiar precios	Ndrysho çmimet
+Change the price of dishes, variants and options	Modificare il prezzo di piatti, varianti e opzioni	Cambiar el precio de platos, variantes y opciones	Ndrysho çmimin e pjatave, varianteve dhe opsioneve
+Delete dishes and menus	Eliminare piatti e menù	Eliminar platos y menús	Fshi pjata dhe menu
+Delete menus, sections, dishes, variants and options	Eliminare menù, sezioni, piatti, varianti e opzioni	Eliminar menús, secciones, platos, variantes y opciones	Fshi menu, seksione, pjata, variante dhe opsione
+See Kitchen Status	Vedere Stato cucina	Ver Estado de cocina	Shiko Gjendjen e kuzhinës
+The whole kitchen board: where every order is	Tutta la bacheca della cucina: a che punto è ogni ordine	Todo el tablero de cocina: en qué punto está cada pedido	E gjithë tabela e kuzhinës: ku është çdo porosi
+See My Sales	Vedere Le mie vendite	Ver Mis ventas	Shiko Shitjet e mia
+Their own sales and tips	Le proprie vendite e mance	Sus propias ventas y propinas	Shitjet dhe bakshishet e veta
+See history	Vedere lo storico	Ver el historial	Shiko historikun
+Closed, cancelled and unpaid orders, their bills, printed again	Ordini chiusi, annullati e non pagati, i loro conti, ristampati	Pedidos cerrados, cancelados y no pagados, sus cuentas, impresas de nuevo	Porosi të mbyllura, të anuluara dhe të papaguara, faturat e tyre, të printuara sërish
+Reopen an unpaid order to take its payment	Riaprire un ordine non pagato per incassarlo	Reabrir un pedido no pagado para cobrarlo	Rihap një porosi të papaguar për ta paguar
+Reopen orders	Riaprire ordini	Reabrir pedidos	Rihap porosi
+Reopen a closed order	Riaprire un ordine chiuso	Reabrir un pedido cerrado	Rihap një porosi të mbyllur
+Refund payments	Rimborsare pagamenti	Reembolsar pagos	Rimburso pagesa
+Give money back on a paid order, with a reason	Restituire denaro su un ordine pagato, con un motivo	Devolver dinero de un pedido pagado, con un motivo	Kthe para për një porosi të paguar, me një arsye
+See what changed on orders	Vedere cosa è cambiato negli ordini	Ver qué cambió en los pedidos	Shiko çfarë ndryshoi në porosi
+Every change made to an order, by whom and when	Ogni modifica a un ordine, chi l'ha fatta e quando	Cada cambio en un pedido, quién lo hizo y cuándo	Çdo ndryshim në një porosi, kush e bëri dhe kur
+Their own shifts: clock in and out, take breaks	I propri turni: timbrare entrata e uscita, fare pause	Sus propios turnos: fichar entrada y salida, tomar descansos	Turnet e veta: shëno hyrjen dhe daljen, bëj pushime
+See their pay	Vedere la propria paga	Ver su pago	Shiko pagën e vet
+Their hours, wage or salary and tips	Le proprie ore, paga oraria o stipendio e mance	Sus horas, pago por hora o salario y propinas	Orët, paga për orë ose rroga dhe bakshishet e veta
+See others' shifts	Vedere i turni degli altri	Ver los turnos de otros	Shiko turnet e të tjerëve
+Who works when, for the roles chosen for them	Chi lavora quando, per i ruoli scelti per lui	Quién trabaja cuándo, para los roles elegidos para esa persona	Kush punon kur, për rolet e zgjedhura për të
+See tickets	Vedere le comande	Ver las comandas	Shiko porositë e kuzhinës
+The tickets on the kitchen board	Le comande sulla bacheca della cucina	Las comandas en el tablero de cocina	Porositë në tabelën e kuzhinës
+Move tickets	Spostare le comande	Mover comandas	Lëviz porositë e kuzhinës
+Start dishes, mark them ready and send tickets back	Iniziare i piatti, segnarli pronti e rimandare indietro le comande	Empezar platos, marcarlos listos y devolver comandas	Fillo pjatat, shënoji gati dhe kthe mbrapa porositë
+See Upcoming	Vedere In arrivo	Ver Próximos	Shiko Në ardhje
+Food ordered ahead for bookings and timed orders	Cibo ordinato in anticipo per prenotazioni e ordini programmati	Comida pedida por adelantado para reservas y pedidos programados	Ushqim i porositur paraprakisht për rezervime dhe porosi me orar
+The menu, as the POS shows it	Il menù, come lo mostra il POS	El menú, como lo muestra el POS	Menuja, siç e tregon POS
+Tickets that went out	Comande uscite	Comandas que salieron	Porositë e kuzhinës që dolën
+See the overview	Vedere la panoramica	Ver el resumen	Shiko përmbledhjen
+Stock health, value and the stock in and out chart	Stato del magazzino, valore e grafico di entrate e uscite	Estado del inventario, valor y el gráfico de entradas y salidas	Gjendja e stokut, vlera dhe grafiku i hyrjeve dhe daljeve
+See stock	Vedere il magazzino	Ver el inventario	Shiko stokun
+What's in stock, where, and what's running low	Cosa c'è in magazzino, dove, e cosa sta finendo	Qué hay en inventario, dónde, y qué se está acabando	Çfarë ka në stok, ku, dhe çfarë po mbaron
+Receive deliveries	Ricevere consegne	Recibir entregas	Prit dërgesat
+Put deliveries in stock	Mettere le consegne in magazzino	Poner las entregas en el inventario	Fut dërgesat në stok
+Take out what was thrown away	Togliere ciò che è stato buttato	Sacar lo que se tiró	Hiq atë që u hodh
+Move stock from one place to another	Spostare merce da un posto all'altro	Mover inventario de un lugar a otro	Lëviz stokun nga një vend në tjetrin
+Correct amounts and send things back to suppliers	Correggere quantità e rimandare merce ai fornitori	Corregir cantidades y devolver cosas a los proveedores	Korrigjo sasitë dhe kthe gjëra te furnitorët
+Add, change and delete places and where dishes take stock from	Aggiungere, modificare ed eliminare posti e da dove i piatti prendono la merce	Agregar, cambiar y eliminar lugares y de dónde toman inventario los platos	Shto, ndrysho dhe fshi vende dhe nga ku marrin stok pjatat
+See items	Vedere gli articoli	Ver los artículos	Shiko artikujt
+Every item and sub-recipe with its cost, supplier and levels	Ogni articolo e semilavorato con costo, fornitore e livelli	Cada artículo y subreceta con su costo, proveedor y niveles	Çdo artikull dhe nënrecetë me koston, furnitorin dhe nivelet
+Add items	Aggiungere articoli	Agregar artículos	Shto artikuj
+Add items and sub-recipes	Aggiungere articoli e semilavorati	Agregar artículos y subrecetas	Shto artikuj dhe nënreceta
+Change items	Modificare articoli	Cambiar artículos	Ndrysho artikuj
+Change items, their levels, photos and kinds, and sub-recipes	Modificare articoli, livelli, foto e tipi, e semilavorati	Cambiar artículos, sus niveles, fotos y tipos, y subrecetas	Ndrysho artikujt, nivelet, fotot dhe llojet e tyre, dhe nënrecetat
+Delete items	Eliminare articoli	Eliminar artículos	Fshi artikuj
+Delete items; what's left in stock is written off	Eliminare articoli; ciò che resta in magazzino viene scaricato	Eliminar artículos; lo que queda en inventario se da de baja	Fshi artikuj; ajo që mbetet në stok shlyhet
+See counts	Vedere gli inventari	Ver los conteos	Shiko numërimet
+Stock counts and their differences	Inventari e loro differenze	Conteos de inventario y sus diferencias	Numërimet e stokut dhe diferencat e tyre
+Count stock	Fare l'inventario	Contar inventario	Numëro stokun
+Start counts, write what was counted and finish them	Iniziare inventari, scrivere cosa è stato contato e concluderli	Empezar conteos, anotar lo contado y terminarlos	Fillo numërime, shkruaj çfarë u numërua dhe përfundoji
+Approve counts	Approvare inventari	Aprobar conteos	Mirato numërimet
+Approve a count, which changes the stock to what was counted	Approvare un inventario, che porta il magazzino a quanto contato	Aprobar un conteo, que cambia el inventario a lo contado	Mirato një numërim, që e kthen stokun në atë që u numërua
+Every stock change and what happened to items	Ogni movimento di magazzino e cosa è successo agli articoli	Cada cambio de inventario y lo que pasó con los artículos	Çdo ndryshim stoku dhe çfarë ndodhi me artikujt
+See suppliers	Vedere i fornitori	Ver los proveedores	Shiko furnitorët
+Suppliers, their places, the items bought from them and orders	Fornitori, loro sedi, articoli acquistati da loro e ordini	Proveedores, sus lugares, los artículos que se les compran y pedidos	Furnitorët, vendet e tyre, artikujt e blerë prej tyre dhe porositë
+Change suppliers	Modificare fornitori	Cambiar proveedores	Ndrysho furnitorët
+Add and change suppliers, their items and prices, and make orders	Aggiungere e modificare fornitori, articoli e prezzi, e fare ordini	Agregar y cambiar proveedores, sus artículos y precios, y hacer pedidos	Shto dhe ndrysho furnitorë, artikujt dhe çmimet e tyre, dhe bëj porosi
+See shifts	Vedere i turni	Ver los turnos	Shiko turnet
+Who works when, and who's clocked in	Chi lavora quando, e chi ha timbrato	Quién trabaja cuándo, y quién fichó	Kush punon kur, dhe kush ka shënuar hyrjen
+Plan shifts, put people on them and fix clock-ins	Pianificare turni, assegnare le persone e correggere le timbrature	Planificar turnos, asignar personas y corregir fichajes	Planifiko turne, vendos njerëz në to dhe korrigjo hyrjet
+See wages and tips, set how people are paid and record payouts	Vedere paghe e mance, impostare come vengono pagate le persone e registrare i pagamenti	Ver sueldos y propinas, definir cómo se paga a cada persona y registrar pagos	Shiko pagat dhe bakshishet, cakto si paguhen njerëzit dhe regjistro pagesat
+See people	Vedere le persone	Ver a las personas	Shiko njerëzit
+The people working here and their roles	Le persone che lavorano qui e i loro ruoli	Las personas que trabajan aquí y sus roles	Njerëzit që punojnë këtu dhe rolet e tyre
+Add people	Aggiungere persone	Agregar personas	Shto njerëz
+Add people and choose their roles	Aggiungere persone e scegliere i loro ruoli	Agregar personas y elegir sus roles	Shto njerëz dhe zgjidh rolet e tyre
+Change people	Modificare le persone	Cambiar personas	Ndrysho njerëzit
+Change details, roles, permissions and PINs, and reset passwords	Modificare dati, ruoli, permessi e PIN, e reimpostare password	Cambiar datos, roles, permisos y PIN, y restablecer contraseñas	Ndrysho të dhënat, rolet, lejet dhe PIN-et, dhe rivendos fjalëkalime
+Remove people	Rimuovere persone	Quitar personas	Hiq njerëz
+Remove people from the staff	Rimuovere persone dal personale	Quitar personas del personal	Hiq njerëz nga stafi
+Sign people out	Disconnettere le persone	Cerrar la sesión de otras personas	Nxirr njerëzit nga llogaria
+See where people are signed in and sign them out	Vedere dove le persone hanno effettuato l'accesso e disconnetterle	Ver dónde iniciaron sesión las personas y cerrarla	Shiko ku kanë hyrë njerëzit dhe nxirri
+See roles	Vedere i ruoli	Ver los roles	Shiko rolet
+The roles and what each can do	I ruoli e cosa può fare ciascuno	Los roles y lo que puede hacer cada uno	Rolet dhe çfarë mund të bëjë secili
+Make roles	Creare ruoli	Crear roles	Krijo role
+Make the restaurant's own roles	Creare i ruoli del ristorante	Crear los roles propios del restaurante	Krijo rolet e vetë restorantit
+Change roles	Modificare ruoli	Cambiar roles	Ndrysho role
+Rename roles, change their pay and switch them off	Rinominare ruoli, cambiarne la paga e disattivarli	Renombrar roles, cambiar su pago y desactivarlos	Riemërto role, ndrysho pagën e tyre dhe çaktivizoji
+Delete roles	Eliminare ruoli	Eliminar roles	Fshi role
+Delete the restaurant's own roles	Eliminare i ruoli del ristorante	Eliminar los roles propios del restaurante	Fshi rolet e vetë restorantit
+Change what roles can do	Cambiare cosa possono fare i ruoli	Cambiar lo que pueden hacer los roles	Ndrysho çfarë mund të bëjnë rolet
+Switch a role's permissions on and off	Attivare e disattivare i permessi di un ruolo	Activar y desactivar los permisos de un rol	Aktivizo dhe çaktivizo lejet e një roli
+See settings	Vedere le impostazioni	Ver la configuración	Shiko cilësimet
+How the restaurant is set up	Come è impostato il ristorante	Cómo está configurado el restaurante	Si është konfiguruar restoranti
+Change settings	Modificare le impostazioni	Cambiar la configuración	Ndrysho cilësimet
+Bookings, tables, orders, shifts, inventory and other settings	Prenotazioni, tavoli, ordini, turni, magazzino e altre impostazioni	Reservas, mesas, pedidos, turnos, inventario y otras configuraciones	Rezervime, tavolina, porosi, turne, stok dhe cilësime të tjera
+Change payment and fraud settings	Modificare le impostazioni di pagamento e frodi	Cambiar la configuración de pagos y fraude	Ndrysho cilësimet e pagesave dhe të mashtrimit
+Tax, service charge, paying, receipts and fraud checks	Tasse, servizio, pagamenti, scontrini e controlli antifrode	Impuestos, cargo por servicio, pagos, recibos y controles de fraude	Taksat, tarifa e shërbimit, pagesat, faturat dhe kontrollet e mashtrimit
+See the audit log	Vedere il registro attività	Ver el registro de actividad	Shiko regjistrin e veprimeve
+Every change made, by whom and when	Ogni modifica, chi l'ha fatta e quando	Cada cambio, quién lo hizo y cuándo	Çdo ndryshim, kush e bëri dhe kur
+Manage devices	Gestire i dispositivi	Gestionar dispositivos	Menaxho pajisjet
+Add, connect and remove tills, tablets, printers and other devices	Aggiungere, collegare e rimuovere casse, tablet, stampanti e altri dispositivi	Agregar, conectar y quitar cajas, tablets, impresoras y otros dispositivos	Shto, lidh dhe hiq arka, tableta, printera dhe pajisje të tjera
+See restaurant info	Vedere le informazioni del ristorante	Ver la información del restaurante	Shiko informacionin e restorantit
+The restaurant's details, branches, logo and currency	Dati del ristorante, sedi, logo e valuta	Los datos del restaurante, sucursales, logo y moneda	Të dhënat e restorantit, pikat, logoja dhe monedha
+Change restaurant info	Modificare le informazioni del ristorante	Cambiar la información del restaurante	Ndrysho informacionin e restorantit
+Description, phone, email, addresses, logo, colours and receipt texts	Descrizione, telefono, email, indirizzi, logo, colori e testi dello scontrino	Descripción, teléfono, correo, direcciones, logo, colores y textos del recibo	Përshkrimi, telefoni, email-i, adresat, logoja, ngjyrat dhe tekstet e faturës
+Sales, orders and guests at a glance	Vendite, ordini e ospiti in sintesi	Ventas, pedidos y comensales de un vistazo	Shitje, porosi dhe mysafirë me një shikim
+See Sales	Vedere Vendite	Ver Ventas	Shiko Shitjet
+Sales by day, hour, service and floor	Vendite per giorno, ora, servizio e piano	Ventas por día, hora, servicio y piso	Shitjet sipas ditës, orës, shërbimit dhe katit
+See Finance	Vedere Finanza	Ver Finanzas	Shiko Financat
+Money in and out, wages, refunds, tips and tax	Entrate e uscite, paghe, rimborsi, mance e tasse	Entradas y salidas de dinero, salarios, reembolsos, propinas e impuestos	Paratë që hyjnë e dalin, pagat, rimbursimet, bakshishet dhe taksat
+See Orders	Vedere Ordini	Ver Pedidos	Shiko Porositë
+How many orders, of what kind, and when	Quanti ordini, di che tipo e quando	Cuántos pedidos, de qué tipo y cuándo	Sa porosi, të çfarë lloji dhe kur
+See Dishes	Vedere Piatti	Ver Platos	Shiko Pjatat
+Every dish sold, its cost and margin	Ogni piatto venduto, il suo costo e il margine	Cada plato vendido, su costo y margen	Çdo pjatë e shitur, kostoja dhe marzhi i saj
+See Stock	Vedere Magazzino	Ver Inventario	Shiko Stokun
+Stock in and out, food cost and waste	Entrate e uscite di magazzino, costo del cibo e sprechi	Entradas y salidas de inventario, costo de alimentos y desperdicio	Hyrjet dhe daljet e stokut, kostoja e ushqimit dhe humbjet
+See Tables	Vedere Tavoli	Ver Mesas	Shiko Tavolinat
+Bookings, guests and how tables were used	Prenotazioni, ospiti e come sono stati usati i tavoli	Reservas, comensales y cómo se usaron las mesas	Rezervime, mysafirë dhe si u përdorën tavolinat
+See Team	Vedere Squadra	Ver Equipo	Shiko Ekipin
+Sales, hours and tips by person	Vendite, ore e mance per persona	Ventas, horas y propinas por persona	Shitje, orë dhe bakshishe për person
+See alerts	Vedere gli avvisi	Ver las alertas	Shiko sinjalizimet
+Flagged discounts, refunds, removals and other risky actions	Sconti, rimborsi, rimozioni segnalati e altre azioni a rischio	Descuentos, reembolsos, eliminaciones marcadas y otras acciones de riesgo	Zbritje, rimbursime, heqje të shënuara dhe veprime të tjera me rrezik
+Review alerts	Esaminare gli avvisi	Revisar alertas	Shqyrto sinjalizimet
+Mark flagged actions as checked, dismissed or confirmed	Segnare le azioni segnalate come verificate, archiviate o confermate	Marcar las acciones señaladas como revisadas, descartadas o confirmadas	Shëno veprimet e sinjalizuara si të kontrolluara, të hedhura poshtë ose të konfirmuara
+Open POS	Apri POS	Abrir POS	Hap POS-in
+Open the POS workspace	Aprire lo spazio di lavoro POS	Abrir el espacio de trabajo POS	Hap hapësirën e punës POS
+Open Kitchen Display	Apri schermo cucina	Abrir pantalla de cocina	Hap ekranin e kuzhinës
+Open the kitchen display workspace	Aprire lo schermo della cucina	Abrir la pantalla de cocina	Hap ekranin e kuzhinës
+Open Admin Hub	Apri Admin Hub	Abrir Admin Hub	Hap Admin Hub-in
+Open the admin hub workspace	Aprire l'Admin Hub	Abrir el Admin Hub	Hap Admin Hub-in
+Open Statistics	Apri statistiche	Abrir estadísticas	Hap statistikat
+Open the statistics workspace	Aprire le statistiche	Abrir las estadísticas	Hap statistikat
+Open Inventory	Apri inventario	Abrir inventario	Hap inventarin
+Open the inventory workspace	Aprire l'inventario	Abrir el inventario	Hap inventarin
+Open Fraud Detection	Apri rilevamento frodi	Abrir detección de fraude	Hap zbulimin e mashtrimit
+Open the fraud detection workspace	Aprire il rilevamento frodi	Abrir la detección de fraude	Hap zbulimin e mashtrimit
+Create restaurants	Creare ristoranti	Crear restaurantes	Krijo restorante
+Add restaurants and review applications	Aggiungere ristoranti ed esaminare le richieste	Agregar restaurantes y revisar solicitudes	Shto restorante dhe shqyrto aplikimet
+Delete restaurants	Eliminare ristoranti	Eliminar restaurantes	Fshi restorante
+Remove restaurants	Rimuovere ristoranti	Quitar restaurantes	Hiq restorante
+Export settings	Esportare impostazioni	Exportar configuración	Eksporto cilësimet
+Export a restaurant's settings	Esportare le impostazioni di un ristorante	Exportar la configuración de un restaurante	Eksporto cilësimet e një restoranti
+Import settings	Importare impostazioni	Importar configuración	Importo cilësimet
+Import a restaurant's settings	Importare le impostazioni di un ristorante	Importar la configuración de un restaurante	Importo cilësimet e një restoranti
+Manage settings templates	Gestire modelli di impostazioni	Gestionar plantillas de configuración	Menaxho modelet e cilësimeve
+Create, change and delete settings templates	Creare, modificare ed eliminare modelli di impostazioni	Crear, cambiar y eliminar plantillas de configuración	Krijo, ndrysho dhe fshi modele cilësimesh
+Apply settings templates	Applicare modelli di impostazioni	Aplicar plantillas de configuración	Zbato modelet e cilësimeve
+Apply settings templates to restaurants	Applicare modelli di impostazioni ai ristoranti	Aplicar plantillas de configuración a restaurantes	Zbato modelet e cilësimeve në restorante
+Super Admin	Super Admin	Super Admin	Super Admin
+System-level control across all tenants	Controllo di tutto il sistema, per ogni cliente	Control de todo el sistema, para cada cliente	Kontroll i gjithë sistemit, për çdo klient
+Support admin	Admin di supporto	Admin de soporte	Admin mbështetjeje
+Takes care of the restaurants the Super Admin gives them	Si occupa dei ristoranti che gli assegna il Super Admin	Se encarga de los restaurantes que le asigna el Super Admin	Kujdeset për restorantet që i jep Super Admini
+Business owner - full control over the restaurant	Titolare: pieno controllo del ristorante	Dueño del negocio: control total del restaurante	Pronari i biznesit: kontroll i plotë mbi restorantin
+Shares ownership with limited restrictions	Condivide la proprietà con poche restrizioni	Comparte la propiedad con pocas restricciones	Ndan pronësinë me pak kufizime
+Store administrator - manages staff, inventory, settings and reports	Amministratore: gestisce personale, inventario, impostazioni e report	Administrador: gestiona personal, inventario, ajustes e informes	Administrator: menaxhon stafin, inventarin, cilësimet dhe raportet
+Store manager - oversees operations and staff	Responsabile: segue il lavoro e il personale	Encargado: supervisa la operación y el personal	Menaxher: mbikëqyr punën dhe stafin
+Handles orders and customer service	Gestisce ordini e servizio ai clienti	Atiende pedidos y el servicio a clientes	Merret me porositë dhe shërbimin ndaj klientëve
+Read-only access - sees POS, kitchen display and admin hub without changing anything	Solo lettura: vede POS, schermo cucina e Admin Hub senza modificare nulla	Solo lectura: ve el POS, la pantalla de cocina y el Admin Hub sin cambiar nada	Vetëm lexim: sheh POS-in, ekranin e kuzhinës dhe Admin Hub-in pa ndryshuar asgjë
+Kitchen staff - views and updates kitchen display tickets	Personale di cucina: vede e fa avanzare le comande	Personal de cocina: ve y avanza las comandas	Stafi i kuzhinës: sheh dhe ecën përpara me porositë
+Keeps the restaurant clean - tables, floors, kitchen and toilets	Tiene pulito il ristorante: tavoli, pavimenti, cucina e bagni	Mantiene limpio el restaurante: mesas, pisos, cocina y baños	Mban pastër restorantin: tavolinat, dyshemetë, kuzhinën dhe tualetet
+Temporary help for busy nights and events, paid for the hours they come in	Aiuto temporaneo per serate piene ed eventi, pagato per le ore in cui viene	Ayuda temporal para noches llenas y eventos, pagada por las horas que viene	Ndihmë e përkohshme për mbrëmje të ngarkuara dhe evente, e paguar për orët që vjen
 Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id
 Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token
 The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters
@@ -5961,6 +6264,10 @@ At least one role id is required	Serve almeno un id di ruolo	Se requiere al meno
 User email is already verified	L'email dell'utente è già verificata	El correo del usuario ya está verificado	Emaili i përdoruesit është verifikuar tashmë
 User phone is already verified	Il telefono dell'utente è già verificato	El teléfono del usuario ya está verificado	Telefoni i përdoruesit është verifikuar tashmë
 You can only remove people you added	Puoi rimuovere solo le persone che hai aggiunto tu	Solo puedes quitar a las personas que agregaste	Mund të heqësh vetëm njerëzit që shtove ti
+The Super Admin hasn't allowed you to remove owners or co-owners.	Il Super Admin non ti ha permesso di rimuovere proprietari o comproprietari.	El Super Admin no te permitió quitar dueños o codueños.	Super Admini nuk të ka lejuar të heqësh pronarë ose bashkëpronarë.
+An owner can't remove another owner. Ask the Super Admin from their menu.	Un proprietario non può rimuovere un altro proprietario. Chiedilo al Super Admin dal suo menu.	Un dueño no puede quitar a otro dueño. Pídeselo al Super Admin desde su menú.	Një pronar nuk mund të heqë një pronar tjetër. Kërkoja Super Adminit nga menyja e tij.
+{} was removed from the staff and signed out everywhere	{} è stato rimosso dal personale e disconnesso ovunque	{} fue eliminado del personal y se cerró su sesión en todas partes	{} u hoq nga stafi dhe doli nga të gjitha pajisjet
+{} (removed)	{} (rimosso)	{} (eliminado)	{} (i hequr)
 Last used	Ultimo utilizzo	Último uso	Përdorur së fundmi
 Next on	Prossima il	Siguiente el	E radhës më
 · difference {}	· differenza {}	· diferencia {}	· diferenca {}
@@ -5987,6 +6294,7 @@ Its menu "{}" stays in Menu, hidden in POS and no longer special.	Il suo menù "
 · to the kitchen at {}	· in cucina alle {}	· a cocina a las {}	· në kuzhinë në {}
 They got an email to set a password.	Ha ricevuto un'email per impostare una password.	Recibió un correo para configurar una contraseña.	Mori një email për të vendosur fjalëkalimin.
 {} was signed out and can no longer sign in.	{} è stato disconnesso e non può più accedere.	Se cerró la sesión de {} y ya no puede iniciar sesión.	{} doli dhe nuk mund të hyjë më.
+· may remove owners	· può rimuovere proprietari	· puede quitar dueños	· mund të heqë pronarë
 of {} allowed	di {} consentiti	de {} permitidos	nga {} të lejuara
 You can also add the owner later from the restaurant's card.	Puoi anche aggiungere il titolare dopo dalla scheda del ristorante.	También puedes agregar el propietario después desde la tarjeta del restaurante.	Mund ta shtosh pronarin edhe më vonë nga karta e restorantit.
 Next: its owner.	Poi: il suo titolare.	Siguiente: su propietario.	Më pas: pronari i tij.

@@ -1262,15 +1262,16 @@ fun TablesScreen(
                     isSaving = backendState.isSaving,
                     canMoveBooking = bookingOptions.isNotEmpty() && screenModel.can("RESERVATION_APPROVE"),
                     canMoveGuests = layoutTables.any { it.state == TableVisualState.Free },
-                    onShowHistory = {
+                    rights = screenModel.rights(),
+                    onShowHistory = if (!screenModel.can("ORDER_HISTORY_READ")) null else ({
                         val head = selectedTables.firstOrNull { it.id == primaryTableId } ?: selectedTables.firstOrNull()
                         selectedTables = emptyList()
                         head?.let { onTableHistory(it.label) }
-                    },
-                    onViewBooking = { reservationId ->
+                    }),
+                    onViewBooking = if (!screenModel.can("RESERVATION_READ")) null else ({ reservationId ->
                         selectedTables = emptyList()
                         onReservationRequested(reservationId)
-                    },
+                    }),
                     onChooseBookingTable = {
                         // Fresh choices each time the map opens: tables fill up while the panel is open.
                         movingBooking = true

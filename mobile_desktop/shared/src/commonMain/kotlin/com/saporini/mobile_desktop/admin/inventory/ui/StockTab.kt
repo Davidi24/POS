@@ -194,7 +194,7 @@ internal fun StockTab(state: InventoryState, model: InventoryScreenModel, size: 
     LaunchedEffect(present) { if (!present.containsAll(selected)) selected = selected.intersect(present) }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (!state.canEdit) InfoBox(Icons.Outlined.Storefront, "Your role can look at stock but not change it.")
+        if (!state.rights.movesStock) InfoBox(Icons.Outlined.Storefront, "Your role can look at stock but not change it.")
         val list: @Composable (Modifier) -> Unit = { m ->
             StockPanel(state, model, size, status, choose, sort, { sort = it },
                 selection = Selection(selected, onToggle = { key -> selected = if (key in selected) selected - key else selected + key },
@@ -245,7 +245,7 @@ private fun PlacesPanel(state: InventoryState, model: InventoryScreenModel) {
     val stocked = state.levels.filter { it.onHandQuantity.asDouble() > 0 }
     OverviewPanel(Icons.Outlined.Storefront, "Places", Modifier.fillMaxWidth(), count = places.count { it.active },
         // Only the places here (user, 2026-11-11): adding, changing and deleting them is in Manage places.
-        action = if (state.canEdit) ({ SmallLink("Manage places", Icons.Outlined.Tune) { model.managePlaces(true) } }) else null) {
+        action = if (state.rights.places) ({ SmallLink("Manage places", Icons.Outlined.Tune) { model.managePlaces(true) } }) else null) {
         // As wide as the lines in the scrolling box under it (which keep room for its scrollbar).
         Box(Modifier.padding(end = ScrollbarGap)) {
             PlaceLine(Icons.Outlined.Storefront, Kit.Green, "All places", stocked.map { it.inventoryItemId }.distinct().size, low = 0,
@@ -352,8 +352,8 @@ private fun StockPanel(
                     { label -> StockSort.entries.firstOrNull { it.label == label }?.let(onSort) })
             }
         }
-        if (selection.keys.isNotEmpty() && state.canEdit) {
-            SelectionBar(selection.keys.size, compact = size.isPhone, allShown = levels.all { lineKey(it) in selection.keys },
+        if (selection.keys.isNotEmpty() && state.rights.movesStock) {
+            SelectionBar(selection.keys.size, compact = size.isPhone, kinds = ChangeKinds.filter(state.rights::canMove), allShown = levels.all { lineKey(it) in selection.keys },
                 onAll = { selection.onSet(selection.keys + levels.map(::lineKey)) },
                 onNone = { selection.onSet(selection.keys - levels.map(::lineKey).toSet()) }, onClear = { selection.onSet(emptySet()) }) { kind ->
                 val lines = state.levels.filter { lineKey(it) in selection.keys }.map { it.inventoryItemId to it.locationId }
@@ -365,7 +365,7 @@ private fun StockPanel(
                 when {
                     state.levels.isEmpty() -> OverviewEmpty("No stock yet", "Receive a delivery to start: every item then shows here with how much is in each place.",
                         Icons.Outlined.Inventory2, image = Res.drawable.inventory_places,
-                        action = if (state.canEdit) ({
+                        action = if (state.rights.receive) ({
                             KitButton("Receive stock", { model.startMove(StockMoveKind.RECEIVE) }, icon = moveKindLook(StockMoveKind.RECEIVE).icon)
                         }) else null)
                     status == StockStatus.LOW && words.isEmpty() -> OverviewEmpty("Nothing is running low", "Every line here is above its reorder point.", Icons.Outlined.CheckCircle)
@@ -376,7 +376,7 @@ private fun StockPanel(
         }
         // A table: the header names each column, every line reads left to right the same way.
         val showPlace = place == null && size.isDesktop
-        if (!size.isPhone) StockListHeader(showPlace, picking = state.canEdit)
+        if (!size.isPhone) StockListHeader(showPlace, picking = state.rights.movesStock)
         ScrollList(Modifier.fillMaxWidth().weight(1f), contentPadding = PaddingValues(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             itemsIndexed(levels, key = { _, it -> "${it.locationId}-${it.inventoryItemId}" }) { index, level ->
                 // A calm re-arrange when the filter, place or sort changes (user, 2026-10-30): lines that stay glide to their
@@ -384,9 +384,9 @@ private fun StockPanel(
                 Box(Modifier.animateItem(fadeInSpec = tween(220), placementSpec = tween(320, easing = FastOutSlowInEasing), fadeOutSpec = tween(160))) {
                     StockLine(level, state, size, number = index + 1, showPlace = showPlace, placeInSubtitle = place == null && !size.isDesktop,
                         showPrice = sort == StockSort.PRICEY || sort == StockSort.CHEAP, actions = actions(level),
-                        onSetLevels = { model.editItem(level.inventoryItemId) }.takeIf { state.canEdit },
+                        onSetLevels = { model.editItem(level.inventoryItemId) }.takeIf { state.rights.editItems },
                         picked = lineKey(level) in selection.keys,
-                        onPick = { selection.onToggle(lineKey(level)) }.takeIf { state.canEdit })
+                        onPick = { selection.onToggle(lineKey(level)) }.takeIf { state.rights.movesStock })
                 }
             }
         }
@@ -406,15 +406,14 @@ private fun lineActions(level: StockLevelDto, state: InventoryState, model: Inve
     // A link to the item's supplier (user, 2026-10-30), for everyone who can see stock: it opens Suppliers on them.
     val supplier = SupplierBook.suppliersOf(level.inventoryItemId).firstOrNull()
     val toSupplier = supplier?.let { RowAction("Go to ${it.name}", Icons.Outlined.LocalShipping) { SupplierBook.openRequest = it.id } }
-    if (!state.canEdit) return listOfNotNull(toSupplier)
     val item = state.item(level.inventoryItemId)
-    return ChangeKinds.map { kind ->
+    return ChangeKinds.filter(state.rights::canMove).map { kind ->
         val look = moveKindLook(kind)
         RowAction(if (kind == StockMoveKind.TRANSFER) "Move to another place" else look.label, look.icon, danger = kind == StockMoveKind.WASTE) {
             model.startMove(kind, level.inventoryItemId, level.locationId)
         }
     } + listOfNotNull(
-        if (branch != null && item != null && item.active && item.trackInventory) RowAction("Change sale place", Icons.Outlined.PointOfSale) { onSalePlace(item.id) } else null,
+        if (state.rights.places && branch != null && item != null && item.active && item.trackInventory) RowAction("Change sale place", Icons.Outlined.PointOfSale) { onSalePlace(item.id) } else null,
         toSupplier
     )
 }
@@ -670,15 +669,15 @@ private fun PickTick(picked: Boolean, small: Boolean = false) {
 
 /** Shown only while lines are picked: how many, pick all shown, clear, and the Stock action menu for all of them. */
 @Composable
-private fun SelectionBar(count: Int, compact: Boolean, allShown: Boolean, onAll: () -> Unit, onNone: () -> Unit, onClear: () -> Unit,
-                         onAction: (StockMoveKind) -> Unit) {
+private fun SelectionBar(count: Int, compact: Boolean, kinds: List<StockMoveKind>, allShown: Boolean, onAll: () -> Unit, onNone: () -> Unit,
+                         onClear: () -> Unit, onAction: (StockMoveKind) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val actions: @Composable (Modifier) -> Unit = { m ->
         Box(m) {
             KitButton(if (compact) "Stock action for ${if (count == 1) "this line" else "these $count"}" else "Stock action", { open = true },
                 if (compact) Modifier.fillMaxWidth() else Modifier, icon = Icons.Outlined.Bolt)
             DropdownMenu(open, { open = false }, Modifier.background(Color.White)) {
-                ChangeKinds.forEach { kind ->
+                kinds.forEach { kind ->
                     val look = moveKindLook(kind)
                     DropdownMenuItem(text = {
                         Column {
@@ -754,7 +753,7 @@ private fun PhoneStockFilters(
                 OptionLine(option.name, place?.id == option.id, { model.levelsAt(option.id); close() }, icon = placeTypeIcon(option.locationType),
                     color = placeTypeColor(option.locationType), count = stocked.count { it.locationId == option.id })
             }
-            if (state.canEdit) {
+            if (state.rights.places) {
                 OptionGroup("Places")
                 OptionLine("Manage places", false, { model.managePlaces(true); close() }, icon = Icons.Outlined.Tune, color = Kit.Ink)
             }
@@ -817,17 +816,17 @@ private fun ScanResultDialog(code: String, state: InventoryState, model: Invento
         KitButton("Close", onClose, style = ButtonStyle.SECONDARY)
     }) {
         if (item == null) {
-            ScanMissBox(code, state.canEdit, onCreate = { onClose(); model.newItemWithBarcode(code) }, onScanAgain = onScanAgain)
+            ScanMissBox(code, state.rights.createItems, onCreate = { onClose(); model.newItemWithBarcode(code) }, onScanAgain = onScanAgain)
             return@AppDialog
         }
         ScannedItem(item, state)
         if (!item.active || !item.trackInventory) {
             InfoBox(Icons.Outlined.Inventory2, if (!item.active) "This item is switched off." else "This item isn't counted, so it has no stock.")
-        } else if (state.canEdit) {
-            QuickAdd(code, item, state, model)
+        } else if (state.rights.movesStock) {
+            if (state.rights.receive) QuickAdd(code, item, state, model)
             Text("OTHER CHANGES", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.6.sp, color = Kit.Muted)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChangeKinds.forEach { kind ->
+                ChangeKinds.filter(state.rights::canMove).forEach { kind ->
                     val look = moveKindLook(kind)
                     Surface(onClick = { onClose(); model.startMove(kind, item.id, state.levelLocationId) }, modifier = Modifier.weight(1f).height(64.dp),
                         shape = RoundedCornerShape(10.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {

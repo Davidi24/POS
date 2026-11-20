@@ -89,8 +89,9 @@ class RecipesScreenModel(
                 val permissions = user?.takeIf { it.isActive }?.permissions.orEmpty().toSet()
                 mutable.value = RecipesState(
                     restaurantId = user?.takeIf { it.isActive }?.restaurantId,
-                    canRead = "INVENTORY_READ" in permissions,
-                    canEdit = "INVENTORY_UPDATE" in permissions
+                    // Sub-recipes are items made here: seen with Items, changed with Add or Change items.
+                    canRead = InventoryRights.of(permissions).sees,
+                    canEdit = InventoryRights.of(permissions).let { it.createItems || it.editItems }
                 )
                 if (active) {
                     load()

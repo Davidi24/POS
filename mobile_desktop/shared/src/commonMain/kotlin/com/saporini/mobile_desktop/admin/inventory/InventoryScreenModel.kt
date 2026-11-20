@@ -53,12 +53,70 @@ val ACTIVITY_PERIODS = listOf(7, 14, 30)
 /** How many of the newest stock changes the overview lists. */
 const val RECENT_MOVEMENTS = 6
 
+/**
+ * What the signed-in person may see and do in Inventory (user, 2026-11-19: "only stock and items for the chef, and I choose
+ * if he can receive, waste…"): each place of the page has its own "See …", and each kind of change its own permission.
+ */
+data class InventoryRights(
+    val overview: Boolean = false,
+    val stock: Boolean = false,
+    val items: Boolean = false,
+    val counts: Boolean = false,
+    val history: Boolean = false,
+    val receive: Boolean = false,
+    val waste: Boolean = false,
+    val transfer: Boolean = false,
+    val adjust: Boolean = false,
+    val places: Boolean = false,
+    val createItems: Boolean = false,
+    val editItems: Boolean = false,
+    val deleteItems: Boolean = false,
+    val count: Boolean = false,
+    val approveCounts: Boolean = false
+) {
+    val sees get() = overview || stock || items || counts || history
+    val movesStock get() = receive || waste || transfer || adjust
+    val changesAnything get() = movesStock || places || createItems || editItems || deleteItems || count || approveCounts
+
+    fun canMove(kind: StockMoveKind): Boolean = when (kind) {
+        StockMoveKind.RECEIVE -> receive
+        StockMoveKind.WASTE -> waste
+        StockMoveKind.TRANSFER -> transfer
+        StockMoveKind.RETURN, StockMoveKind.ADJUST -> adjust
+    }
+
+    companion object {
+        fun of(permissions: Collection<String>) = InventoryRights(
+            overview = "INVENTORY_READ" in permissions,
+            stock = "INVENTORY_STOCK_READ" in permissions,
+            items = "INVENTORY_ITEMS_READ" in permissions,
+            counts = "INVENTORY_COUNTS_READ" in permissions,
+            history = "INVENTORY_HISTORY_READ" in permissions,
+            receive = "INVENTORY_RECEIVE" in permissions,
+            waste = "INVENTORY_WASTE" in permissions,
+            transfer = "INVENTORY_TRANSFER" in permissions,
+            adjust = "INVENTORY_ADJUST" in permissions,
+            places = "INVENTORY_PLACES" in permissions,
+            createItems = "INVENTORY_ITEMS_CREATE" in permissions,
+            editItems = "INVENTORY_ITEMS_UPDATE" in permissions,
+            deleteItems = "INVENTORY_ITEMS_DELETE" in permissions,
+            count = "INVENTORY_COUNT" in permissions,
+            approveCounts = "INVENTORY_COUNTS_APPROVE" in permissions
+        )
+    }
+}
+
 data class InventoryState(
     val userId: String? = null,
     val restaurantId: String? = null,
     val myBranchId: String? = null,
+    // Any of Inventory's places, and any change (each one is checked again by the server).
     val canRead: Boolean = false,
     val canEdit: Boolean = false,
+    val rights: InventoryRights = InventoryRights(),
+    // Suppliers have their own permissions since 2026-11-19 (user: "inventory has two permissions; we have suppliers").
+    val canSeeSuppliers: Boolean = false,
+    val canEditSuppliers: Boolean = false,
     val tab: InventoryTab = InventoryTab.STOCK,
     val showInactive: Boolean = false,
     val search: String = "",
@@ -188,7 +246,7 @@ sealed interface InventoryConfirm {
 /**
  * Admin Hub → Inventory: stock on hand and low stock, stock items and their suppliers, storage places, the
  * history of stock changes (paged; a refresh reloads every page shown), receiving/wasting/moving/correcting stock,
- * and stock counts from draft to approval. Reading needs INVENTORY_READ, changing needs INVENTORY_UPDATE.
+ * and stock counts from draft to approval. Each place and each kind of change has its own permission (InventoryRights).
  */
 class InventoryScreenModel(
     private val repository: InventoryRepository,
@@ -222,10 +280,13 @@ class InventoryScreenModel(
                     userId = activeUser?.id,
                     restaurantId = activeUser?.restaurantId,
                     myBranchId = activeUser?.defaultBranchId,
-                    canRead = "INVENTORY_READ" in permissions,
-                    canEdit = "INVENTORY_UPDATE" in permissions
+                    canRead = InventoryRights.of(permissions).sees,
+                    canEdit = InventoryRights.of(permissions).changesAnything,
+                    rights = InventoryRights.of(permissions),
+                    canSeeSuppliers = "SUPPLIERS_READ" in permissions,
+                    canEditSuppliers = "SUPPLIERS_UPDATE" in permissions
                 )
-                if (activeUser != null && "INVENTORY_UPDATE" in permissions) {
+                if (activeUser != null && InventoryRights.of(permissions).movesStock) {
                     activeUser.restaurantId?.let { restaurantId ->
                         restorePendingMove(activeUser.id, restaurantId, currentSignIn)
                     }

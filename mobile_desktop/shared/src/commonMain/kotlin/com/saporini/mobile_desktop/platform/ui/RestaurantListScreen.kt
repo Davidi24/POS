@@ -65,6 +65,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MarkEmailUnread
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AdminPanelSettings
@@ -385,6 +386,7 @@ private fun WelcomeBanner(
     onCoSuperAdmins: () -> Unit,
     onApplications: () -> Unit
 ) {
+    val requestsNavigator = cafe.adriel.voyager.navigator.LocalNavigator.current
     val shape = RoundedCornerShape(22.dp)
     Surface(Modifier.fillMaxWidth(), shape = shape, color = Color.White, border = BorderStroke(1.dp, Kit.Border), shadowElevation = 3.dp) {
         Box(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Color.White, Color(0xFFF3F7F0), Color(0xFFE6EFE1))))) {
@@ -422,7 +424,9 @@ private fun WelcomeBanner(
                     }
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (state.canCreate) KitButton("Create a new restaurant", model::startCreate, icon = Icons.Outlined.Add)
-                        if (state.superAdmin) KitButton("Co-Super-Admins", onCoSuperAdmins, icon = Icons.Outlined.ManageAccounts, style = ButtonStyle.SECONDARY)
+                        if (state.superAdmin) KitButton("Admins", onCoSuperAdmins, icon = Icons.Outlined.ManageAccounts, style = ButtonStyle.SECONDARY)
+                        // What restaurants ask: remove one of their owners, or a support admin (user, 2026-11-19).
+                        if (state.superAdmin) KitButton("Requests", { requestsNavigator?.push(RestaurantRequestsScreen) }, icon = Icons.Outlined.MarkEmailUnread, style = ButtonStyle.SECONDARY)
                         if (state.canRead) KitButton(
                             if (state.pendingApplications > 0) "Applications (${state.pendingApplications})" else "Applications",
                             onApplications, icon = Icons.Outlined.Inbox, style = ButtonStyle.SECONDARY

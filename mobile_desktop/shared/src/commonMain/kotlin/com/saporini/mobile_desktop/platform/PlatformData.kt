@@ -593,6 +593,16 @@ interface PlatformRepository {
     suspend fun coSuperAdminPermissions(userId: String): List<CoSuperAdminPermissionDto>
     suspend fun setCoSuperAdminPermissions(userId: String, grantedCodes: List<String>): List<CoSuperAdminPermissionDto>
 
+    /** Every admin: support admins (with their restaurants) and restaurant admins (user, 2026-11-19). */
+    suspend fun admins(): List<AdminCardDto> = emptyList()
+    suspend fun supportAdminAccess(userId: String): SupportAdminAccessDto = throw UnsupportedOperationException("Not available")
+    suspend fun setSupportAdminAccess(userId: String, request: UpdateSupportAdminAccessDto): SupportAdminAccessDto =
+        throw UnsupportedOperationException("Not available")
+    /** What restaurants asked the Super Admin (waiting ones first). */
+    suspend fun platformRequests(pendingOnly: Boolean): List<com.saporini.mobile_desktop.admin.people.PlatformRequestDto> = emptyList()
+    suspend fun decideRequest(requestId: String, approve: Boolean, note: String?): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+        throw UnsupportedOperationException("Not available")
+
     /** Active staff of the restaurant who could become its owner. */
     suspend fun ownerCandidates(restaurantId: String, search: String): List<OwnerCandidateDto>
     /** The Super Admin gives the restaurant to a new owner; the former owner loses access. */
@@ -823,4 +833,47 @@ class PlatformApi(
         client.patch(url("/restaurants/registrations/${id(applicationId)}/review")) {
             contentType(ContentType.Application.Json); setBody(request)
         }.body()
+
+    override suspend fun admins(): List<AdminCardDto> = client.get(url("/platform/admins")).body()
+
+    override suspend fun supportAdminAccess(userId: String): SupportAdminAccessDto =
+        client.get(url("/co-super-admins/${id(userId)}/restaurants")).body()
+
+    override suspend fun setSupportAdminAccess(userId: String, request: UpdateSupportAdminAccessDto): SupportAdminAccessDto =
+        client.put(url("/co-super-admins/${id(userId)}/restaurants")) { contentType(ContentType.Application.Json); setBody(request) }.body()
+
+    override suspend fun platformRequests(pendingOnly: Boolean): List<com.saporini.mobile_desktop.admin.people.PlatformRequestDto> =
+        client.get(url("/platform/requests")) { parameter("pendingOnly", pendingOnly) }.body()
+
+    override suspend fun decideRequest(requestId: String, approve: Boolean, note: String?): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+        client.post(url("/platform/requests/${id(requestId)}/decide")) {
+            contentType(ContentType.Application.Json); setBody(DecisionRequestDto(approve, note))
+        }.body()
 }
+
+@Serializable
+data class RestaurantRefDto(val id: String, val name: String = "")
+
+/** One admin for the Super Admin's Admins page: SUPPORT (made by the Super Admin) or RESTAURANT (made by an owner). */
+@Serializable
+data class AdminCardDto(
+    val id: String,
+    val name: String = "",
+    val email: String? = null,
+    val phone: String? = null,
+    val photoUrl: String? = null,
+    val active: Boolean = true,
+    val kind: String = "SUPPORT",
+    val allRestaurants: Boolean = false,
+    val mayRemoveOwners: Boolean = false,
+    val restaurants: List<RestaurantRefDto> = emptyList()
+)
+
+@Serializable
+data class SupportAdminAccessDto(val allRestaurants: Boolean = false, val mayRemoveOwners: Boolean = false, val restaurants: List<RestaurantRefDto> = emptyList())
+
+@Serializable
+data class UpdateSupportAdminAccessDto(val allRestaurants: Boolean, val mayRemoveOwners: Boolean, val restaurantIds: List<String>)
+
+@Serializable
+data class DecisionRequestDto(val approve: Boolean, val note: String? = null)

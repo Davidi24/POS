@@ -148,7 +148,7 @@ class OrderOperations internal constructor(
         repository.markOrderReady(restaurantId = scope.restaurantId, orderId = orderId, request = request)
     }
 
-    suspend fun requestBill(orderId: String): Result<Order> = model.mutate("ORDER_UPDATE", "requestBill", selectResult = false) { scope ->
+    suspend fun requestBill(orderId: String): Result<Order> = model.mutate("ORDER_CLOSE", "requestBill", selectResult = false) { scope ->
         repository.requestBill(restaurantId = scope.restaurantId, orderId = orderId)
     }
 
@@ -181,7 +181,7 @@ class OrderOperations internal constructor(
     }
 
     suspend fun closeUnpaid(orderId: String, reason: String): Result<Order> =
-        model.mutate("ORDER_VOID", "closeUnpaid", selectResult = false) { scope ->
+        model.mutate("ORDER_CLOSE_UNPAID", "closeUnpaid", selectResult = false) { scope ->
             repository.closeUnpaid(restaurantId = scope.restaurantId, orderId = orderId, reason = reason)
         }
 

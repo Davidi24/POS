@@ -115,7 +115,7 @@ fun MySalesScreen(modifier: Modifier = Modifier, onShiftRequested: () -> Unit = 
     var pay by remember { mutableStateOf<SalesPay?>(null) }
     LaunchedEffect(user?.id, date, state.filter.shiftId, state.report?.generatedAt) {
         val r = user?.restaurantId; val b = user?.defaultBranchId
-        if (r == null || b == null || user?.permissions?.contains("SHIFT_SELF") != true) { pay = null; return@LaunchedEffect }
+        if (r == null || b == null || user?.permissions?.contains("SHIFT_PAY_SELF") != true) { pay = null; return@LaunchedEffect }
         val weekStart = date.minus(DatePeriod(days = date.dayOfWeek.isoDayNumber - 1))
         val from = minOf(weekStart, LocalDate(date.year, date.month, 1))
         pay = try {

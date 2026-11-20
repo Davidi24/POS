@@ -312,7 +312,7 @@ class InventoryScreenModelTest {
 
     private suspend fun TestScope.check(
         repo: FakeInventory = FakeInventory(),
-        permissions: List<String> = listOf("INVENTORY_READ", "INVENTORY_UPDATE"),
+        permissions: List<String> = listOf("INVENTORY_READ", "INVENTORY_STOCK_READ", "INVENTORY_ITEMS_READ", "INVENTORY_COUNTS_READ", "INVENTORY_HISTORY_READ", "INVENTORY_RECEIVE", "INVENTORY_WASTE", "INVENTORY_TRANSFER", "INVENTORY_ADJUST", "INVENTORY_PLACES", "INVENTORY_ITEMS_CREATE", "INVENTORY_ITEMS_UPDATE", "INVENTORY_ITEMS_DELETE", "INVENTORY_COUNT", "INVENTORY_COUNTS_APPROVE"),
         pendingMoveStorage: PendingInventoryMoveStorage? = null,
         block: suspend TestScope.(InventoryScreenModel, FakeInventory) -> Unit
     ) {
@@ -555,7 +555,7 @@ class InventoryScreenModelTest {
     fun uncertainMovementSurvivesModelRestartAndReplaysTheSameKeyOnce() = runTest(dispatcher) {
         val storage = FakePendingInventoryMoveStorage()
         val repo = FakeInventory()
-        val session = SessionManager().apply { signIn(user(permissions = listOf("INVENTORY_READ", "INVENTORY_UPDATE"))) }
+        val session = SessionManager().apply { signIn(user(permissions = listOf("INVENTORY_READ", "INVENTORY_STOCK_READ", "INVENTORY_ITEMS_READ", "INVENTORY_COUNTS_READ", "INVENTORY_HISTORY_READ", "INVENTORY_RECEIVE", "INVENTORY_WASTE", "INVENTORY_TRANSFER", "INVENTORY_ADJUST", "INVENTORY_PLACES", "INVENTORY_ITEMS_CREATE", "INVENTORY_ITEMS_UPDATE", "INVENTORY_ITEMS_DELETE", "INVENTORY_COUNT", "INVENTORY_COUNTS_APPROVE"))) }
         val first = InventoryScreenModel(repo, session, storage)
         runCurrent(); first.setActive(true); runCurrent()
         first.startMove(StockMoveKind.RECEIVE, itemId = "tom", locationId = "kitchen")
@@ -692,7 +692,7 @@ class InventoryScreenModelTest {
 
     @Test
     fun readOnlyPeopleSeeStockButChangeNothing() = runTest(dispatcher) {
-        check(permissions = listOf("INVENTORY_READ")) { model, repo ->
+        check(permissions = listOf("INVENTORY_READ", "INVENTORY_STOCK_READ", "INVENTORY_ITEMS_READ", "INVENTORY_COUNTS_READ", "INVENTORY_HISTORY_READ")) { model, repo ->
             assertEquals(3, model.state.value.visibleItems.size)
             model.newItem()
             assertNull(model.state.value.itemDraft)

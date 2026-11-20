@@ -63,7 +63,8 @@ data class PaymentUiState(
     val receipt: ReceiptDto? = null,
     val loadingReceipt: Boolean = false
 ) {
-    val canTake: Boolean get() = "ORDER_CLOSE" in permissions
+    // Orders' or a table's "Take payments" (2026-11-20).
+    val canTake: Boolean get() = "ORDER_CLOSE" in permissions || "TABLES_PAYMENT" in permissions
     val canRefund: Boolean get() = "PAYMENT_REFUND" in permissions
     val canCancel: Boolean get() = "ORDER_VOID" in permissions
     val quote: PaymentQuote? get() = summary?.let { quote(it, draft) }

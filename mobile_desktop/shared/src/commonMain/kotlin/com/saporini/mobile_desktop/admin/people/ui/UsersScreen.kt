@@ -14,6 +14,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Mail
+import androidx.compose.material.icons.outlined.MarkEmailRead
+import androidx.compose.material.icons.outlined.SupportAgent
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.EventBusy
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowLeft
@@ -85,6 +92,9 @@ import com.saporini.mobile_desktop.core.components.ScrollColumn
 import com.saporini.mobile_desktop.core.components.ScrollList
 import com.saporini.mobile_desktop.core.components.SearchField
 import com.saporini.mobile_desktop.core.components.StatusChip
+import com.saporini.mobile_desktop.core.components.TextInput
+import com.saporini.mobile_desktop.core.components.MessageBar
+import com.saporini.mobile_desktop.core.components.MessageKind
 import com.saporini.mobile_desktop.core.components.StatusPill
 import com.saporini.mobile_desktop.core.components.SummaryCardRow
 import com.saporini.mobile_desktop.core.components.ToolbarButton
@@ -273,17 +283,38 @@ internal fun UsersContent(
         }
     }
 
-    state.draft?.let { UserEditorDialog(state, model) }
+    state.draft?.let { UserEditorDialog(state, model, rolesState.catalog) }
+    if (state.askingAdmin || state.askingRemoval != null) AskSuperAdminDialog(state, model)
     state.confirmRemove?.let { id ->
         val person = state.people.firstOrNull { it.id == id }
+        // What removing does, line by line (user, 2026-11-19): what ends in red, what stays in green.
         ConfirmDialog(
             "Remove ${person?.displayName ?: "this person"}?",
-            "They won't be able to sign in any more, and they leave the staff list. Their past orders and shifts stay in the records.",
-            "Remove", onConfirm = model::confirmRemove, onDismiss = model::dismissRemove, danger = true
+            "They leave the staff list and can't sign in any more.",
+            "Remove", onConfirm = model::confirmRemove, onDismiss = model::dismissRemove, danger = true,
+            extra = {
+                Column(Modifier.fillMaxWidth().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RemoveLine(Icons.AutoMirrored.Outlined.Logout, "Signed out of every device at once.", ends = true)
+                    RemoveLine(Icons.Outlined.EventBusy, "Their planned shifts that haven't started are removed.", ends = true)
+                    RemoveLine(Icons.Outlined.History, "Their orders, worked shifts and pay stay, marked as removed.", ends = false)
+                    RemoveLine(Icons.AutoMirrored.Outlined.ReceiptLong, "Orders they have open stay open for the team.", ends = false)
+                }
+            }
         )
     }
     RoleDialogs(rolesState, roles)
     permissionsFor?.let { list -> RolePermissionsDialog(list, rolesState, roles, state) { permissionsFor = null } }
+}
+
+/** One thing removing someone does: an icon tile (red for what ends, green for what stays) and the words. */
+@Composable
+private fun RemoveLine(icon: ImageVector, text: String, ends: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background((if (ends) Kit.Danger else Kit.Green).copy(alpha = 0.10f)), Alignment.Center) {
+            Icon(icon, null, Modifier.size(15.dp), tint = if (ends) Kit.Danger else Kit.Green)
+        }
+        Text(text, Modifier.weight(1f), fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = Kit.Ink)
+    }
 }
 
 /**
@@ -294,13 +325,25 @@ internal fun UsersContent(
 @Composable
 private fun RolePermissionsDialog(list: List<RoleDto>, rolesState: RolesState, roles: RolesScreenModel, staff: StaffState, onClose: () -> Unit) {
     val role = rolesState.selected?.takeIf { selected -> list.any { it.id == selected.id } } ?: list.first()
-    val close = { roles.discardChanges(); onClose() }
-    // A save that went through closes the window.
-    var saving by remember { mutableStateOf(false) }
+    // Saving keeps the window open and plays "Saved" (user, 2026-11-20: "it doesn't close, just an animation"); closing with
+    // changes not saved asks Discard or Save first, and Save closes once it's saved.
+    var leaving by remember { mutableStateOf(false) }
+    var closeAfterSave by remember { mutableStateOf(false) }
+    var sawSaving by remember { mutableStateOf(false) }
     LaunchedEffect(rolesState.saving) {
-        if (saving && !rolesState.saving && !rolesState.dirty) onClose()
-        saving = rolesState.saving
+        if (closeAfterSave && rolesState.saving) sawSaving = true
+        if (closeAfterSave && sawSaving && !rolesState.saving) {
+            if (!rolesState.dirty) onClose()
+            closeAfterSave = false
+            sawSaving = false
+        }
     }
+    val close = { if (rolesState.dirty && rolesState.canEditPermissions()) leaving = true else { roles.discardChanges(); onClose() } }
+    if (leaving) com.saporini.mobile_desktop.core.components.UnsavedLeaveDialog(
+        onDiscard = { leaving = false; roles.discardChanges(); onClose() },
+        onSave = { leaving = false; closeAfterSave = true; roles.savePermissions() },
+        onStay = { leaving = false }, saving = rolesState.saving,
+        message = "You changed what ${role.label()} can do and didn't save it.")
     AppDialog("What ${role.label()} can do", close, subtitle = "Changes apply to everyone with ${role.label()} here", busy = rolesState.saving,
         maxWidth = 1180.dp, buttons = {
             if (rolesState.dirty) KitButton("Discard", roles::discardChanges, style = ButtonStyle.SECONDARY, enabled = !rolesState.saving)
@@ -309,8 +352,13 @@ private fun RolePermissionsDialog(list: List<RoleDto>, rolesState: RolesState, r
                 enabled = rolesState.dirty)
         }) {
         if (list.size > 1) RoleSwitch(list, role, staff) { roles.select(it.id) }
-        RolePermissionsPanel(rolesState, roles, Modifier.fillMaxWidth().height(if (LocalNarrowDialog.current) 520.dp else 600.dp),
-            compact = LocalNarrowDialog.current, inDialog = true)
+        Box(Modifier.fillMaxWidth()) {
+            RolePermissionsPanel(rolesState, roles, Modifier.fillMaxWidth().height(if (LocalNarrowDialog.current) 520.dp else 600.dp),
+                compact = LocalNarrowDialog.current, inDialog = true)
+            com.saporini.mobile_desktop.core.components.DoneBurst(
+                rolesState.savedTick.takeIf { it > 0 }?.let { com.saporini.mobile_desktop.core.components.DoneMark(it, "Permissions saved") },
+                Modifier.align(Alignment.Center))
+        }
     }
 }
 
@@ -544,6 +592,8 @@ private fun RolePage(
         }
         if (canAdd && size.isPhone) KitButton("Add ${role.label().lowercase()}", { model.startNew(role.id) }, Modifier.fillMaxWidth(), icon = Icons.Outlined.PersonAdd)
         if (siblings.isNotEmpty()) RoleSwitch(siblings, role, state, onSwitch)
+        // The admins page also shows the support admins taking care of the restaurant (user, 2026-11-19).
+        if (role.code == "ADMIN") SupportAdminsPanel(state, model, size)
         // Only the people: what the role can do is changed from its card's Permissions window (user, 2026-10-30).
         RolePeople(Modifier.fillMaxWidth().weight(1f), role, state, model, size, width, canAdd)
     }
@@ -674,6 +724,16 @@ private fun RolePeople(modifier: Modifier, role: RoleDto, state: StaffState, mod
 }
 
 private fun personActions(person: StaffUserDto, state: StaffState, model: StaffScreenModel): List<RowAction> = buildList {
+    // Owners never remove each other (user, 2026-11-19): another owner can only be removed by the Super Admin, when asked.
+    if ("OWNER" in person.roles && person.id != state.myId && !state.superAdmin) {
+        if ("OWNER" in state.myRoles) {
+            val asked = state.requests.any { it.kind == "REMOVE_OWNER" && it.targetUserId == person.id && it.status == "PENDING" }
+            add(RowAction(if (asked) "Removal asked" else "Ask the Super Admin to remove", Icons.Outlined.MarkEmailRead, enabled = !asked) {
+                model.askRemoveOwner(person.id)
+            })
+        }
+        return@buildList
+    }
     if (state.canEdit(person)) {
         add(if (person.isActive) RowAction("Switch off", Icons.Outlined.PersonOff) { model.setActive(person.id, false) }
             else RowAction("Switch on", Icons.Outlined.ToggleOn) { model.setActive(person.id, true) })
@@ -789,5 +849,76 @@ private fun EditButton(compact: Boolean, onClick: () -> Unit) {
     ) {
         Icon(Icons.Outlined.Edit, if (compact) "Edit" else null, Modifier.size(15.dp), tint = Kit.Ink)
         if (!compact) Text("Edit", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Ink, maxLines = 1)
+    }
+}
+
+
+/**
+ * The support admins taking care of the restaurant (made by the Super Admin; user, 2026-11-19): who they are, and an email
+ * button to ask them for help with the app. Owners can ask the Super Admin for one.
+ */
+@Composable
+private fun SupportAdminsPanel(state: StaffState, model: StaffScreenModel, size: ScreenSize) {
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    val asked = state.requests.any { it.kind == "NEED_ADMIN" && it.status == "PENDING" }
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Kit.Blue.copy(alpha = 0.12f)), Alignment.Center) {
+                    Icon(Icons.Outlined.SupportAgent, null, Modifier.size(19.dp), tint = Kit.Blue)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("Support admins", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Kit.Ink)
+                    Text(if (state.supportAdmins.isEmpty()) "Nobody from support takes care of this restaurant yet."
+                        else "They take care of this restaurant for you. Write to them if you need help with the app.",
+                        fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
+                }
+                if (model.canAsk && state.supportAdmins.isEmpty()) {
+                    KitButton(if (asked) "Asked" else if (size.isPhone) "Ask" else "Ask for one", model::startAskAdmin, style = ButtonStyle.SECONDARY,
+                        icon = Icons.Outlined.MarkEmailRead, enabled = !asked)
+                }
+            }
+            state.supportAdmins.forEach { admin ->
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Kit.Canvas).padding(horizontal = 12.dp, vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    com.saporini.mobile_desktop.pos.shifts.ShiftAvatar(admin.name, 34.dp)
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(admin.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = Kit.Ink, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                            StatusChip("Support", Kit.Blue)
+                        }
+                        Text(listOfNotNull(admin.email, admin.phone).joinToString(" · "), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    admin.email?.let { email ->
+                        KitButton(if (size.isPhone) "Email" else "Email them", { runCatching { uri.openUri("mailto:$email") } },
+                            style = ButtonStyle.SECONDARY, icon = Icons.Outlined.Mail)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Asking the Super Admin: for a support admin, or to remove another owner (after checking with them). */
+@Composable
+private fun AskSuperAdminDialog(state: StaffState, model: StaffScreenModel) {
+    var note by remember { mutableStateOf("") }
+    val target = state.askingRemoval?.let { id -> state.people.firstOrNull { it.id == id } }
+    AppDialog(
+        if (state.askingRemoval != null) "Ask to remove ${target?.displayName ?: "this owner"}" else "Ask for a support admin",
+        model::cancelAsk,
+        subtitle = if (state.askingRemoval != null) "Owners can't remove each other. The Super Admin checks with them, then removes them or not."
+            else "Someone from support who takes care of the restaurant and helps you with the app.",
+        busy = state.asking, maxWidth = 520.dp,
+        buttons = {
+            KitButton("Cancel", model::cancelAsk, style = ButtonStyle.SECONDARY, enabled = !state.asking)
+            KitButton("Send to the Super Admin", { model.sendAsk(note) }, icon = Icons.Outlined.MarkEmailRead, loading = state.asking)
+        }
+    ) {
+        state.error?.let { MessageBar(it, MessageKind.ERROR) }
+        TextInput(note, { note = it.take(2000) }, label = "Note", optional = true, placeholder = if (state.askingRemoval != null) "Why, and how to reach them"
+            else "What you need help with", maxLength = 2000, singleLine = false)
     }
 }

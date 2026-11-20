@@ -67,7 +67,47 @@ data class RoleDto(
 )
 
 @Serializable
-data class PermissionDto(val id: String, val code: String, val name: String, val description: String? = null)
+data class PermissionDto(val id: String, val code: String, val name: String, val description: String? = null,
+                         // What it needs (a workspace's "Open …" or a part's "View …"); null for a workspace's "Open …".
+                         val parentCode: String? = null,
+                         // Owner-level: giving it asks to be careful first (user, 2026-11-19).
+                         val careful: Boolean = false,
+                         // Where it's shown (server's PermissionTree): the workspace (POS, KDS, MY_SHIFT, INVENTORY, ADMIN,
+                         // STATISTICS, FRAUD, PLATFORM), the place in its bar (null for the workspace's "Open …") and its order.
+                         val workspace: String? = null,
+                         val part: String? = null,
+                         val position: Int? = null,
+                         // The Super Admin's own: not shown inside a restaurant.
+                         val platformOnly: Boolean = false,
+                         // Comes with this permission and is never shown on its own (starting orders with "Edit orders").
+                         val bundledInto: String? = null,
+                         // FLOORS or ROLES when it can be given for some of them only.
+                         val scope: String? = null)
+
+/** A support admin who takes care of the restaurant, to write to for help (user, 2026-11-19). */
+@Serializable
+data class SupportContactDto(val id: String, val name: String = "", val email: String? = null, val phone: String? = null, val photoUrl: String? = null)
+
+/** What a restaurant asked the Super Admin: REMOVE_OWNER (another owner) or NEED_ADMIN (a support admin). */
+@Serializable
+data class PlatformRequestDto(
+    val id: String,
+    val restaurantId: String? = null,
+    val restaurantName: String? = null,
+    val kind: String = "",
+    val targetUserId: String? = null,
+    val targetName: String? = null,
+    val note: String? = null,
+    val status: String = "PENDING",
+    val createdByName: String? = null,
+    val createdAt: String? = null,
+    val decidedByName: String? = null,
+    val decidedAt: String? = null,
+    val decisionNote: String? = null
+)
+
+@Serializable
+data class CreatePlatformRequestDto(val kind: String, val targetUserId: String? = null, val note: String? = null)
 
 @Serializable
 data class CreateStaffRequestDto(
@@ -138,7 +178,47 @@ interface PeopleRepository {
     suspend fun setRolePay(roleId: String, paid: Boolean, payTeam: String?): RoleDto = throw UnsupportedOperationException("Role pay is unavailable")
     suspend fun savePersonPermissions(userId: String, codes: List<String>): PersonPermissionsDto =
         throw UnsupportedOperationException("Personal permissions are unavailable")
+
+    /** The support admins taking care of [restaurantId]. */
+    suspend fun supportAdmins(restaurantId: String): List<SupportContactDto> = emptyList()
+    /** Owners ask the Super Admin: remove another owner, or for a support admin. */
+    suspend fun askSuperAdmin(restaurantId: String, request: CreatePlatformRequestDto): PlatformRequestDto =
+        throw UnsupportedOperationException("Requests are unavailable")
+    suspend fun requests(restaurantId: String): List<PlatformRequestDto> = emptyList()
+
+    // Some floors / roles only (user, 2026-11-20): "See tables" for the floors chosen, "See others' shifts" for the roles
+    // chosen. A permission missing from the map is given for all of them.
+    suspend fun scopeChoices(restaurantId: String): ScopeChoicesDto = ScopeChoicesDto()
+    suspend fun roleScopes(roleId: String): Map<String, List<String>> = emptyMap()
+    suspend fun saveRoleScopes(roleId: String, scopes: Map<String, List<String>>): Map<String, List<String>> = scopes
+    suspend fun personScopes(userId: String): Map<String, List<String>> = emptyMap()
+    suspend fun savePersonScopes(userId: String, scopes: Map<String, List<String>>): Map<String, List<String>> = scopes
 }
+
+@Serializable
+data class ScopeBranchDto(val target: String, val branchId: String? = null, val name: String)
+
+@Serializable
+data class ScopeFloorDto(val target: String, val branchId: String? = null, val branchName: String? = null, val name: String)
+
+/** A place (Tables → Edit → Create places), under the floor most of its tables are on. */
+@Serializable
+data class ScopePlaceDto(val target: String, val branchId: String? = null, val floor: String? = null, val name: String)
+
+@Serializable
+data class ScopeRoleDto(val target: String, val name: String)
+
+/** The floors of every branch and the roles a restaurant can choose from. */
+@Serializable
+data class ScopeChoicesDto(
+    val branches: List<ScopeBranchDto> = emptyList(),
+    val floors: List<ScopeFloorDto> = emptyList(),
+    val places: List<ScopePlaceDto> = emptyList(),
+    val roles: List<ScopeRoleDto> = emptyList()
+)
+
+@Serializable
+data class ScopesDto(val scopes: Map<String, List<String>> = emptyMap())
 
 /** What a person's roles give them in their restaurant ([fromRoles]) and what they can actually do ([permissions]). */
 @Serializable
@@ -236,4 +316,28 @@ class PeopleApi(
         client.put(url("/users/${id(userId)}/permissions")) {
             contentType(ContentType.Application.Json); setBody(PersonPermissionsRequestDto(codes))
         }.body()
+
+    override suspend fun scopeChoices(restaurantId: String): ScopeChoicesDto =
+        client.get(url("/restaurants/${id(restaurantId)}/permission-scopes/choices")).body()
+
+    override suspend fun roleScopes(roleId: String): Map<String, List<String>> =
+        client.get(url("/roles/${id(roleId)}/scopes")).body<ScopesDto>().scopes
+
+    override suspend fun saveRoleScopes(roleId: String, scopes: Map<String, List<String>>): Map<String, List<String>> =
+        client.put(url("/roles/${id(roleId)}/scopes")) { contentType(ContentType.Application.Json); setBody(ScopesDto(scopes)) }.body<ScopesDto>().scopes
+
+    override suspend fun personScopes(userId: String): Map<String, List<String>> =
+        client.get(url("/users/${id(userId)}/scopes")).body<ScopesDto>().scopes
+
+    override suspend fun savePersonScopes(userId: String, scopes: Map<String, List<String>>): Map<String, List<String>> =
+        client.put(url("/users/${id(userId)}/scopes")) { contentType(ContentType.Application.Json); setBody(ScopesDto(scopes)) }.body<ScopesDto>().scopes
+
+    override suspend fun supportAdmins(restaurantId: String): List<SupportContactDto> =
+        client.get(url("/restaurants/${id(restaurantId)}/support-admins")).body()
+
+    override suspend fun askSuperAdmin(restaurantId: String, request: CreatePlatformRequestDto): PlatformRequestDto =
+        client.post(url("/restaurants/${id(restaurantId)}/requests")) { contentType(ContentType.Application.Json); setBody(request) }.body()
+
+    override suspend fun requests(restaurantId: String): List<PlatformRequestDto> =
+        client.get(url("/restaurants/${id(restaurantId)}/requests")).body()
 }

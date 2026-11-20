@@ -54,14 +54,7 @@ fun AdminBottomBar(
 @Composable
 private fun adminNavEntries(): List<NavEntry<AdminSection>> {
     val user by koinInject<SessionManager>().currentUser.collectAsState()
-    val permissions = user?.permissions.orEmpty()
-    val canReadShifts = permissions.any { it == "SHIFT_READ" || it == "SHIFT_MANAGE" }
-    // Salary shows what people earn, so only for people who manage shifts.
-    val canSeePay = "SHIFT_MANAGE" in permissions
-    // Inventory and Suppliers are their own workspace (Workspace.INVENTORY), so the Admin Hub starts with Shifts.
-    return listOf(AdminSection.SHIFTS, AdminSection.PAY, AdminSection.USERS, AdminSection.SETTINGS, AdminSection.DEVICES,
-        AdminSection.AUDIT_LOGS, AdminSection.RESTAURANT_INFO)
-        .filter { (it != AdminSection.SHIFTS || canReadShifts) && (it != AdminSection.PAY || canSeePay) }
+    return AdminSection.allowed(user?.permissions.orEmpty())
         .map { NavEntry(it, it.label, it.icon(), it.filledIcon()) }
 }
 

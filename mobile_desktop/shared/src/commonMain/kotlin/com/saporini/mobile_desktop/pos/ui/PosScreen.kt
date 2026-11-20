@@ -92,9 +92,14 @@ object PosScreen : Screen {
             if ((currentUser?.let { com.saporini.mobile_desktop.core.session.accessibleWorkspaces(it) }?.size ?: 0) > 1) {
                 { if (navigator?.pop() != true) navigator?.replaceAll(com.saporini.mobile_desktop.workspace.ui.WorkspacePickerScreen) }
             } else null
-        val canEditTableLayout =
-            "SETTINGS_UPDATE" in currentUser?.permissions.orEmpty() ||
-                "MANAGER" in currentUser?.roles.orEmpty()
+        // Its own permission since 2026-11-19 ("Edit the floor plan"; it was Change settings or the Manager role).
+        val canEditTableLayout = "TABLES_LAYOUT" in currentUser?.permissions.orEmpty()
+        // Only the places the person may open (user, 2026-11-19: "maybe I don't let someone see the tables at all"); a
+        // hidden one moves to the first allowed.
+        val allowedSections = PosSection.allowed(currentUser?.permissions.orEmpty())
+        LaunchedEffect(allowedSections, selected) {
+            if (selected !in allowedSections && allowedSections.isNotEmpty()) selected = allowedSections.first()
+        }
 
         BoxWithConstraints(Modifier.fillMaxSize().background(Color.White)) {
             val isPhoneLayout = isPhoneWindow()
@@ -186,7 +191,7 @@ object PosScreen : Screen {
                             onFocusHandled = { focusOrderId = null; openOrderItems = false },
                             startOrder = startOrder,
                             onStartOrderHandled = { startOrder = null },
-                            onOpenHistory = { selected = PosSection.HISTORY },
+                            onOpenHistory = if (PosSection.HISTORY in allowedSections) ({ selected = PosSection.HISTORY }) else null,
                             onTableFreed = { number ->
                                 freedTableNumber = number
                                 selected = PosSection.TABLES

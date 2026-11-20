@@ -165,7 +165,7 @@ internal fun ItemsTab(
     size: ScreenSize,
     modifier: Modifier
 ) {
-    val subRecipes = SubRecipeActions(state.canEdit && recipes.canEdit, recipes, onAddSubRecipe, onOpenSubRecipe)
+    val subRecipes = SubRecipeActions(state.rights.editItems && recipes.canEdit, recipes, onAddSubRecipe, onOpenSubRecipe)
     var kind by rememberSaveable { mutableStateOf<String?>(null) }
     var status by rememberSaveable { mutableStateOf(ItemStatus.IN_USE) }
     var check by rememberSaveable { mutableStateOf<ItemCheck?>(null) }
@@ -238,7 +238,7 @@ internal fun ItemsTab(
             var naming by remember { mutableStateOf(false) }
             var newName by remember { mutableStateOf("") }
             OverviewPanel(Icons.Outlined.Category, "Kinds", Modifier.fillMaxWidth(),
-                action = if (state.canEdit) ({ SmallLink("New kind", Icons.Outlined.Add) { naming = !naming } }) else null) {
+                action = if (state.rights.editItems) ({ SmallLink("New kind", Icons.Outlined.Add) { naming = !naming } }) else null) {
                 if (naming) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         TextInput(newName, { newName = it }, Modifier.weight(1f), placeholder = "Spices", maxLength = MAX_KIND_NAME)
@@ -255,7 +255,7 @@ internal fun ItemsTab(
                         val key = option.key
                         val label = option.itemLabel()
                         FilterRow(kindKeyIcon(key), label, inStatus.count { it.kindKey() == key }, kindKeyColor(key), kind == key,
-                            trailing = if (state.canEdit && option.code != UNCATEGORIZED_KIND) ({
+                            trailing = if (state.rights.editItems && option.code != UNCATEGORIZED_KIND) ({
                                 RowActionsMenu(listOf(RowAction("Remove kind", Icons.Outlined.Delete, danger = true) {
                                     model.askDeleteKind(ITEM_KINDS, option, label)
                                 }))
@@ -308,7 +308,7 @@ private fun CatalogPanel(
         // A phone: more room between the search, Add House-made, the kinds and the cards (user, 2026-10-30).
         gap = if (size.isPhone) 14.dp else 8.dp,
         countBesideTitle = true, // the count beside "Items", away from the button (user, 2026-10-30)
-        action = if (subRecipes.canEdit) ({ AddSubRecipeButton(subRecipes.add) }) else null) {
+        action = if (state.rights.createItems && subRecipes.recipes.canEdit) ({ AddSubRecipeButton(subRecipes.add) }) else null) {
         // The search keeps a sensible width; the filters and switches sit on the right.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             SearchField(state.search, model::search, Modifier.weight(1f, fill = false).widthIn(max = 380.dp).padding(end = if (size.isPhone) 8.dp else 10.dp),
@@ -325,7 +325,7 @@ private fun CatalogPanel(
             }
         }
         if (size.isPhone) {
-            if (subRecipes.canEdit) AddSubRecipeButton(subRecipes.add, Modifier.fillMaxWidth())
+            if (state.rights.createItems && subRecipes.recipes.canEdit) AddSubRecipeButton(subRecipes.add, Modifier.fillMaxWidth())
             FilterPills(listOf<Pair<String?, String>>(null to "All kinds", MADE_HERE to "Made here") + state.itemKinds.map { it.key to it.itemLabel() }, kind, onKind)
         }
         if (shown.isEmpty()) {
@@ -371,14 +371,13 @@ private fun itemActions(item: StockItemDto, state: InventoryState, model: Invent
         // Made here: its sub-recipe is where it changes (name, kind, batch, ingredients, cost).
         item.recipeId != null -> listOfNotNull(RowAction(if (subRecipes.canEdit) "Edit sub-recipe" else "See sub-recipe", Icons.AutoMirrored.Outlined.MenuBook) {
             subRecipes.open(item.recipeId)
-        }, RowAction("Delete", Icons.Outlined.Delete, danger = true) { model.askDeleteItem(item.id) }.takeIf { state.canEdit })
-        !state.canEdit -> emptyList()
-        else -> listOf(
-            RowAction("Edit", Icons.Outlined.Edit) { model.editItem(item.id) },
+        }, RowAction("Delete", Icons.Outlined.Delete, danger = true) { model.askDeleteItem(item.id) }.takeIf { state.rights.deleteItems })
+        else -> listOfNotNull(
+            RowAction("Edit", Icons.Outlined.Edit) { model.editItem(item.id) }.takeIf { state.rights.editItems },
             // A new item filled in from this one (user, 2026-10-30: "Add similar", not "Duplicate").
-            RowAction("Add similar", Icons.Outlined.ContentCopy) { model.duplicateItem(item.id) },
+            RowAction("Add similar", Icons.Outlined.ContentCopy) { model.duplicateItem(item.id) }.takeIf { state.rights.createItems },
             // Asks first; refused (with the reason) while a recipe or an open count uses it.
-            RowAction("Delete", Icons.Outlined.Delete, danger = true) { model.askDeleteItem(item.id) }
+            RowAction("Delete", Icons.Outlined.Delete, danger = true) { model.askDeleteItem(item.id) }.takeIf { state.rights.deleteItems }
         )
     }
 
@@ -634,7 +633,7 @@ private fun ItemViewDialog(item: StockItemDto, state: InventoryState, model: Inv
         maxWidth = 640.dp,
         buttons = {
             KitButton("Close", onClose, style = ButtonStyle.SECONDARY)
-            if (recipeId == null && state.canEdit) KitButton("Edit", { onClose(); model.editItem(item.id) }, icon = Icons.Outlined.Edit)
+            if (recipeId == null && state.rights.editItems) KitButton("Edit", { onClose(); model.editItem(item.id) }, icon = Icons.Outlined.Edit)
         }
     ) {
         val narrow = LocalNarrowDialog.current

@@ -73,6 +73,14 @@ internal enum class WorkspacePage(val title: String, val workspace: Workspace) {
     }
 }
 
+/** Whether the place at [index] of this workspace's bar is open to someone with [permissions]. */
+internal fun WorkspacePage.allows(index: Int, permissions: Collection<String>): Boolean = when (this) {
+    WorkspacePage.INVENTORY -> if (index == 0) com.saporini.mobile_desktop.admin.inventory.InventoryRights.of(permissions).sees
+        else "SUPPLIERS_READ" in permissions
+    WorkspacePage.STATISTICS -> com.saporini.mobile_desktop.statistics.StatsTab.entries[index].permission in permissions
+    WorkspacePage.FRAUD_DETECTION, WorkspacePage.RESTAURANT -> true
+}
+
 /** The workspace navigation and, under it, the content of the chosen tab. */
 @Composable
 internal fun WorkspaceSections(page: WorkspacePage) {
@@ -90,8 +98,13 @@ internal fun WorkspaceSections(page: WorkspacePage) {
         val wanted = com.saporini.mobile_desktop.admin.inventory.SupplierBook.openRequest
         LaunchedEffect(wanted) { if (wanted != null) selectedIndex = 1 }
     }
+    // Only the places the person may open (user, 2026-11-19: "all nav bars with chosen"); a hidden one moves to the first
+    // allowed. The places keep their own index as key.
+    val permissions = user?.permissions.orEmpty()
+    val visible = page.tabs.indices.filter { index -> page.allows(index, permissions) }
+    LaunchedEffect(visible, selectedIndex) { if (selectedIndex !in visible && visible.isNotEmpty()) selectedIndex = visible.first() }
     // The POS bar: three places always show, then the one picked last from More (Restaurant has six).
-    val entries = remember(page) { page.tabs.mapIndexed { index, tab -> NavEntry(index, tab.label, tab.icon, tab.filledIcon) } }
+    val entries = remember(page, visible) { visible.map { index -> page.tabs[index].let { tab -> NavEntry(index, tab.label, tab.icon, tab.filledIcon) } } }
     var unsaved by remember { mutableStateOf(false) }
     var pendingLeave by remember { mutableStateOf<(() -> Unit)?>(null) }
     val leave: (() -> Unit) -> Unit = { action -> if (unsaved) pendingLeave = action else action() }

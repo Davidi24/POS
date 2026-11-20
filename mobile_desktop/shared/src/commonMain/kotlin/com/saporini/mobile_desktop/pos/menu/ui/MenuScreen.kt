@@ -323,6 +323,8 @@ fun MenuScreen(
         "MENUS_UPDATE" in currentUser?.permissions.orEmpty() ||
             "MENUS_CREATE" in currentUser?.permissions.orEmpty() ||
             "MENUS_DELETE" in currentUser?.permissions.orEmpty()
+    // Sold out is its own permission (user, 2026-11-20), for waiters or the kitchen too.
+    val canMarkSoldOut = "MENUS_SOLD_OUT" in currentUser?.permissions.orEmpty()
 
     // Waiters see the menus that are on now, so their list refreshes quietly every few minutes (lunch turns into
     // dinner, an event night starts) while this screen is open.
@@ -632,6 +634,8 @@ private fun MenuDetailsContent(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Sold out is its own permission (user, 2026-11-20), for waiters or the kitchen too.
+    val canMarkSoldOut = "MENUS_SOLD_OUT" in org.koin.compose.koinInject<com.saporini.mobile_desktop.core.session.SessionManager>().currentUser.collectAsState().value?.permissions.orEmpty()
     val screenModel = koinInject<MenuScreenModel>()
     val scope = rememberCoroutineScope()
     var selectedCategory by remember(menu.id) { mutableStateOf("All") }
@@ -1031,6 +1035,7 @@ private fun MenuDetailsContent(
                                         selected = item.name == selectedSearchItemName,
                                         isPhone = isPhone,
                                         canEdit = canManageMenus,
+                                        availabilityEditable = canMarkSoldOut,
                                         modifier = Modifier
                                             .weight(1f)
                                             .then(if (rowHasAddCard) Modifier else Modifier.fillMaxHeight())
@@ -1073,7 +1078,7 @@ private fun MenuDetailsContent(
                                         onToggleAvailability = {
                                             val sectionId = item.sectionId
                                             val itemId = item.id
-                                            if (canManageMenus && sectionId != null && itemId != null) {
+                                            if (canMarkSoldOut && sectionId != null && itemId != null) {
                                                 scope.launch {
                                                     screenModel.updateItemAvailability(
                                                         menu.id, sectionId, itemId, !item.available

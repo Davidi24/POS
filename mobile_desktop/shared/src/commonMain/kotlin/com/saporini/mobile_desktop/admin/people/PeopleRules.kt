@@ -111,3 +111,71 @@ fun permissionGroups(choices: List<PermissionChoice>): List<Pair<String, List<Pe
  */
 fun canSavePermissions(granted: Set<String>, actorPermissions: Set<String>, superAdmin: Boolean): Boolean =
     superAdmin || actorPermissions.containsAll(granted)
+
+
+/**
+ * Permissions that only make sense with another one (user, 2026-11-19: "someone can't have View POS off and edit the POS
+ * on"), from the server's catalog (`parentCode`): a workspace's "Open …", then each part's "View …", then what changes
+ * things. Switching one on also switches on what it needs; switching one off also switches off what needs it.
+ */
+class PermissionTree(catalog: List<PermissionDto>) {
+    private val parent: Map<String, String> = catalog.mapNotNull { p -> p.parentCode?.let { p.code to it } }.toMap()
+    private val children: Map<String, List<String>> = parent.entries.groupBy({ it.value }, { it.key })
+
+    fun parentOf(code: String): String? = parent[code]
+
+    /** What [code] needs, nearest first. */
+    fun ancestors(code: String): List<String> = generateSequence(parent[code]) { parent[it] }.take(10).toList()
+
+    /** Everything that needs [code], however far down. */
+    fun descendants(code: String): Set<String> = buildSet {
+        val queue = ArrayDeque(children[code].orEmpty())
+        while (queue.isNotEmpty()) {
+            val next = queue.removeFirst()
+            if (add(next)) queue.addAll(children[next].orEmpty())
+        }
+    }
+
+    /** [codes] that count: only those whose every ancestor is in [codes] too. */
+    fun shown(codes: Set<String>): Set<String> = codes.filterTo(LinkedHashSet()) { code -> ancestors(code).all { it in codes } }
+
+    /**
+     * [current] with [codes] switched [on]: on brings what they need (only when [allowed] lets every one of them be on),
+     * off takes away what needs them.
+     */
+    fun switch(current: Set<String>, codes: Collection<String>, on: Boolean, allowed: (String) -> Boolean): Set<String> =
+        switchRemembering(current, codes, on, allowed, emptyMap()).codes
+
+    /** What switching gives: the permissions now on, and what each switched-off one had on under it. */
+    data class Switched(val codes: Set<String>, val remembered: Map<String, Set<String>>)
+
+    /**
+     * Like [switch], but remembers what was on under a permission switched off and brings it back when it's switched on
+     * again (user, 2026-11-20: "if it's turned off and on it remembers the permissions"), as long as they may be given.
+     * Bundled permissions (starting and cancelling an order with "Edit orders") follow theirs.
+     */
+    fun switchRemembering(current: Set<String>, codes: Collection<String>, on: Boolean, allowed: (String) -> Boolean,
+                          remembered: Map<String, Set<String>>): Switched {
+        val result = LinkedHashSet(current)
+        val memory = remembered.toMutableMap()
+        if (on) {
+            codes.forEach { code ->
+                val needed = listOf(code) + ancestors(code)
+                if (needed.all { it in result || allowed(it) }) {
+                    result.addAll(needed)
+                    memory.remove(code)?.filter { allowed(it) || it in current }?.let(result::addAll)
+                }
+            }
+        } else {
+            codes.forEach { code ->
+                val under = descendants(code).filterTo(LinkedHashSet()) { it in result }
+                if (under.isNotEmpty()) memory[code] = under
+                result.remove(code); result.removeAll(under)
+            }
+        }
+        bundled.forEach { (code, owner) -> if (owner in result) result.add(code) else result.remove(code) }
+        return Switched(result, memory)
+    }
+
+    private val bundled: Map<String, String> = catalog.mapNotNull { p -> p.bundledInto?.let { p.code to it } }.toMap()
+}

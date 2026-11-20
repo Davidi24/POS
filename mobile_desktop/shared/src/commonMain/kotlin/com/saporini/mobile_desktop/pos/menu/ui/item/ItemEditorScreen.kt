@@ -58,6 +58,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -490,6 +491,9 @@ private fun ItemEditorDialogRealMoney(
 
     var name by remember { mutableStateOf(existingItem?.name.orEmpty()) }
     var basePrice by remember { mutableStateOf(existingItem?.priceLabel?.let { extractPriceValue(it) }.orEmpty()) }
+    // A saved dish's price changes only with "Change prices" (user, 2026-11-20); a new dish gets its price when it's added.
+    val canChangePrice = existingItem == null ||
+        "MENUS_PRICES" in org.koin.compose.koinInject<com.saporini.mobile_desktop.core.session.SessionManager>().currentUser.collectAsState().value?.permissions.orEmpty()
     var sku by remember { mutableStateOf(existingItem?.sku.orEmpty()) }
     var description by remember { mutableStateOf(existingItem?.description.orEmpty()) }
     var available by remember { mutableStateOf(existingItem?.available ?: true) }
@@ -716,7 +720,9 @@ private fun ItemEditorDialogRealMoney(
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = basePrice,
-                        onValueChange = { basePrice = it },
+                        onValueChange = { if (canChangePrice) basePrice = it },
+                        readOnly = !canChangePrice,
+                        enabled = canChangePrice,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("0.00") },
                         leadingIcon = {
@@ -1392,6 +1398,7 @@ private fun EditVariantDialog(
                         ItemEditorFieldLabel(text = "Price Adjustment")
                         OutlinedTextField(
                             value = variantPriceDelta,
+                            enabled = canChangePrices(),
                             onValueChange = { variantPriceDelta = it },
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("e.g. +2.00") },
@@ -2157,6 +2164,7 @@ private fun OptionChoiceEditorRow(
             ) {
                 OutlinedTextField(
                     value = choice.priceDelta,
+                    enabled = canChangePrices(),
                     onValueChange = onPriceChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("Price adjustment (+0.00)") },
@@ -2191,6 +2199,7 @@ private fun OptionChoiceEditorRow(
                 )
                 OutlinedTextField(
                     value = choice.priceDelta,
+                    enabled = canChangePrices(),
                     onValueChange = onPriceChange,
                     modifier = Modifier.weight(1f),
                     placeholder = { Text("+0.00") },
@@ -2384,3 +2393,8 @@ private fun ItemExtrasFields(
         }
     }
 }
+
+/** Prices of saved variants and options change only with "Change prices" (user, 2026-11-20). */
+@Composable
+private fun canChangePrices(): Boolean =
+    "MENUS_PRICES" in org.koin.compose.koinInject<com.saporini.mobile_desktop.core.session.SessionManager>().currentUser.collectAsState().value?.permissions.orEmpty()
