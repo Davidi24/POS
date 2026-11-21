@@ -67,6 +67,10 @@ public class GuestBookingService {
     private final MenuItemRepository menuItemRepository;
     private final Environment environment;
 
+    // Guests book only when the branch is open (user, 2026-11-20); not in the constructor (unit tests).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pos.pos.hours.OpeningHoursService openingHours;
+
     // Until a card provider is set up, local payment pages can take a test payment (no real card).
     @Value("${app.payments.provider:disabled}")
     private String paymentProvider;
@@ -92,6 +96,10 @@ public class GuestBookingService {
             if (rule.getAdvanceBookingDays() > 0 && start.atZoneSameInstant(zone).toLocalDate().isAfter(LocalDate.now(zone).plusDays(rule.getAdvanceBookingDays()))) {
                 throw bad("You can book up to " + rule.getAdvanceBookingDays() + " days ahead");
             }
+        }
+        // Guests book only when the branch is open (user, 2026-11-20).
+        if (openingHours != null && !openingHours.isOpenAt(branch.getId(), start)) {
+            throw bad("We're closed at that time. Please pick another time");
         }
         OffsetDateTime end = start.plus(reservationPolicy.bookingLength(branch, start, guests));
 

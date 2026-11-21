@@ -62,6 +62,11 @@ public class RestaurantTableService {
     private final OrderRepository orderRepository;
     private final OrderSupport orderSupport;
     private final TableSeatingRules tableSeatingRules;
+    // While the branch is closed nobody seats guests or starts orders (user, 2026-11-20). Not in the constructor, so unit
+    // tests that build the service by hand leave it out.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pos.pos.hours.OpeningHoursService openingHours;
+
     private final pos.pos.order.service.TableOrderCombiner tableOrderCombiner;
 
     /**
@@ -546,6 +551,9 @@ public class RestaurantTableService {
         List<RestaurantTable> merged = restaurantTableRepository.findAllByMergedInto_IdOrderByTableNumberAsc(tableId);
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         int previousGuests = guestsAt(table) + merged.stream().mapToInt(this::guestsAt).sum();
+        if (status == TableStatus.OCCUPIED && previousStatus != TableStatus.OCCUPIED && openingHours != null) {
+            openingHours.assertOpenNow(branchId);
+        }
         if (status == TableStatus.OCCUPIED) {
             if (guestCount == null || guestCount <= 0) {
                 throw new AuthException(

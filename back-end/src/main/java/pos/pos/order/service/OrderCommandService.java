@@ -41,6 +41,11 @@ public class OrderCommandService {
     private final OrderSupport orderSupport;
     private final OrderDomainSupport orderDomainSupport;
     private final KdsOrderSyncService kdsOrderSyncService;
+    // While the branch is closed nobody seats guests or starts orders (user, 2026-11-20). Not in the constructor, so unit
+    // tests that build the service by hand leave it out.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pos.pos.hours.OpeningHoursService openingHours;
+
 
     @Transactional
     public OrderResponse createBranchOrder(
@@ -52,6 +57,7 @@ public class OrderCommandService {
         Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         Branch branch = orderSupport.resolveManagedBranch(authentication, restaurantId, branchId);
         orderDomainSupport.validateBranchPath(branchId, request.getBranchId());
+        if (openingHours != null) openingHours.assertOpenNow(branch.getId());
         UUID actorId = restaurantScopeService.currentUserId(authentication);
 
         Order order = new Order();
@@ -87,6 +93,7 @@ public class OrderCommandService {
         if (request.getTableId() != null && !Objects.equals(request.getTableId(), tableId)) {
             throw new AuthException("tableId in the request must match the path tableId", HttpStatus.BAD_REQUEST);
         }
+        if (openingHours != null) openingHours.assertOpenNow(branch.getId());
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         Order order = new Order();

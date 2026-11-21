@@ -32,6 +32,10 @@ public class ReservationMailService {
     private final ReservationSupport reservationSupport;
     private final ReservationReminderDeliveryService reminderDeliveryService;
 
+    // Opening hours shown to guests (user, 2026-11-20); not in the constructor (unit tests).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pos.pos.hours.OpeningHoursService openingHours;
+
     // Guest emails are switched off for now (user, 2026-11-18: "use real email but don't send anything, we'll come back to it");
     // when on, they go out through the same real sender as account emails.
     @Value("${app.mail.guest.enabled:false}")
@@ -203,6 +207,8 @@ public class ReservationMailService {
         String email = branch != null && branch.getEmail() != null ? branch.getEmail() : owner == null ? null : owner.getEmail();
         if (phone != null) text.append(Words.t(l, "Phone: {}", phone)).append("\n");
         if (email != null) text.append(Words.t(l, "Email: {}", email)).append("\n");
+        String week = openingHours == null || branch == null ? null : openingHours.weekText(branch.getId(), l);
+        if (week != null) text.append(Words.t(l, "Opening hours: {}", week)).append("\n");
         return text.toString();
     }
 

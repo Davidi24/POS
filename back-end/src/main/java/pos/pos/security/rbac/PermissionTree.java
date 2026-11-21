@@ -52,7 +52,7 @@ public final class PermissionTree {
         // POS: one place for each part of its bar (user, 2026-11-20; Payments went into Orders and History; an order's own
         // kitchen status is in Orders, the whole board is Kitchen Status).
         part("POS", null, null, "POS_ACCESS");
-        part("POS", "Tables", "POS_ACCESS", "TABLES_READ", "TABLES_UPDATE", "TABLES_PAYMENT", "TABLES_LAYOUT");
+        part("POS", "Tables", "POS_ACCESS", "TABLES_READ", "TABLES_UPDATE", "TABLES_PAYMENT", "TABLES_LAYOUT", "OPEN_OUTSIDE_HOURS");
         part("POS", "Orders", "POS_ACCESS", "ORDER_READ", "ORDER_UPDATE", "ORDER_CREATE<ORDER_READ", "ORDER_CANCEL<ORDER_READ",
                 "ORDER_CLOSE", "ORDER_CLOSE_UNPAID", "ORDER_VOID", "ORDER_TRANSFER", "ORDER_DISCOUNT_APPLY", "ORDER_KITCHEN_READ");
         part("POS", "Reservations", "POS_ACCESS", "RESERVATION_READ", "RESERVATION_MANAGE", "RESERVATION_CANCEL",
@@ -91,7 +91,7 @@ public final class PermissionTree {
         part("ADMIN", "Settings", "ADMIN_ACCESS", "SETTINGS_READ", "SETTINGS_UPDATE", "SETTINGS_MONEY");
         part("ADMIN", "Audit log", "ADMIN_ACCESS", "SETTINGS_AUDIT");
         part("ADMIN", "Devices", "ADMIN_ACCESS", "DEVICES_MANAGE");
-        part("ADMIN", "Restaurant info", "ADMIN_ACCESS", "RESTAURANTS_READ", "RESTAURANTS_UPDATE");
+        part("ADMIN", "Restaurant info", "ADMIN_ACCESS", "RESTAURANTS_READ", "RESTAURANTS_UPDATE", "HOURS_UPDATE");
         // Statistics: one place for each page.
         part("STATISTICS", null, null, "STATISTICS_ACCESS");
         part("STATISTICS", "Overview", "STATISTICS_ACCESS", "REPORTS_READ");

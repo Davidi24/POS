@@ -13,6 +13,8 @@ public enum AppPermission {
     TABLES_UPDATE("Change tables", "Seat guests, set tables free or out of use, move guests and join tables"),
     TABLES_PAYMENT("Take payments", "Request the bill and take the payment from a table"),
     TABLES_LAYOUT("Edit the floor plan", "Add, move and remove tables, floors and places"),
+    // While the branch is closed nobody seats guests or starts orders (user, 2026-11-20); this opens it for now.
+    OPEN_OUTSIDE_HOURS("Open outside the hours", "Open the branch for now while it's closed: a late group, an event"),
     // POS → Orders (user, 2026-11-20)
     ORDER_READ("See orders", "The open orders and what's on them"),
     ORDER_UPDATE("Edit orders", "Start orders, add and remove dishes, notes, send to the kitchen, serve, cancel unpaid-for orders"),
@@ -100,6 +102,7 @@ public enum AppPermission {
     DEVICES_MANAGE("Manage devices", "Add, connect and remove tills, tablets, printers and other devices"),
     RESTAURANTS_READ("See restaurant info", "The restaurant's details, branches, logo and currency"),
     RESTAURANTS_UPDATE("Change restaurant info", "Description, phone, email, addresses, logo, colours and receipt texts"),
+    HOURS_UPDATE("Change opening hours", "Each branch's week and its special days"),
 
     // Statistics → Overview, Sales, Finance, Orders, Dishes, Stock, Tables, Team
     REPORTS_READ("See the overview", "Sales, orders and guests at a glance"),

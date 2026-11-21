@@ -49,6 +49,10 @@ public class GuestBookingPageController {
     private final ReservationOccasionService reservationOccasionService;
     private final ReservationSupport reservationSupport;
 
+    // Opening hours shown to guests (user, 2026-11-20); not in the constructor (unit tests).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pos.pos.hours.OpeningHoursService openingHours;
+
     // ---- Booking form ----
 
     @GetMapping(value = "/book/{restaurantSlug}/{branchCode}", produces = MediaType.TEXT_HTML_VALUE)
@@ -228,7 +232,8 @@ public class GuestBookingPageController {
                 + "<button>" + Words.t(l, "Book") + "</button></form>"
                 + "<p class='muted'>" + Words.t(l, "If no table is free we send your request to the restaurant and email you their answer. Cancelling is always free.") + "</p>"
                 + contact(branch.getPhone() != null ? branch.getPhone() : branch.getRestaurant().getPhone(),
-                        branch.getEmail() != null ? branch.getEmail() : branch.getRestaurant().getEmail(), l);
+                        branch.getEmail() != null ? branch.getEmail() : branch.getRestaurant().getEmail(), l)
+                + hoursLine(branch.getId(), l);
         return shell(l, code -> "/public/book/" + restaurantSlug + "/" + branchCode + "?lang=" + code, Words.t(l, "Book a table"), body);
     }
 
@@ -284,6 +289,12 @@ public class GuestBookingPageController {
     }
 
     // "Questions? Call … · Write to …" at the bottom of the guest pages (phone and email links work on phones).
+    // The branch's opening hours under the contact line (user, 2026-11-20: shown to guests).
+    private String hoursLine(java.util.UUID branchId, String l) {
+        String week = openingHours == null ? null : openingHours.weekText(branchId, l);
+        return week == null ? "" : "<p class='muted contact'>" + Words.t(l, "Opening hours: {}", esc(week)) + "</p>";
+    }
+
     private static String contact(String phone, String email, String l) {
         if (phone == null && email == null) return "";
         String call = phone == null ? null : Words.t(l, "Call {}", "<a href='tel:" + esc(phone.replaceAll("[^+0-9]", "")) + "'>" + esc(phone) + "</a>");

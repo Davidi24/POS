@@ -60,6 +60,10 @@ public class ReservationLifecycleService {
     private final RestaurantTableRepository restaurantTableRepository;
     private final OrderRepository orderRepository;
     private final ApplicationEventPublisher events;
+
+    // While the branch is closed nobody seats guests (user, 2026-11-20); not in the constructor (unit tests).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pos.pos.hours.OpeningHoursService openingHours;
     private Clock clock = Clock.systemUTC();
 
     // ---- Staff actions ----
@@ -87,7 +91,10 @@ public class ReservationLifecycleService {
 
     @Transactional
     public ReservationResponse seatReservation(Authentication authentication, UUID restaurantId, UUID reservationId, ReservationActionRequest request) {
-        return act(authentication, restaurantId, reservationId, (reservation, actor) -> seat(reservation, reason(request), actor));
+        return act(authentication, restaurantId, reservationId, (reservation, actor) -> {
+            if (openingHours != null && reservation.getBranch() != null) openingHours.assertOpenNow(reservation.getBranch().getId());
+            seat(reservation, reason(request), actor);
+        });
     }
 
     @Transactional
