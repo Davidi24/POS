@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.ReportProblem
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -96,6 +97,9 @@ internal fun AccountMenu(onLogout: () -> Unit, withName: Boolean = false, small:
     val user = account.user
     val navigator = LocalNavigator.current
     var open by remember { mutableStateOf(false) }
+    // Anyone working in a restaurant can tell the Super Admin about a problem (user, 2026-11-21).
+    var reporting by remember { mutableStateOf(false) }
+    val problemRestaurant = user?.restaurantId?.takeUnless { com.saporini.mobile_desktop.core.session.isPlatformAdmin(user) }
     val name = displayName(user)
     val role = roleLabel(user)
     val till by com.saporini.mobile_desktop.core.session.TokenStore.till.collectAsState()
@@ -192,6 +196,13 @@ internal fun AccountMenu(onLogout: () -> Unit, withName: Boolean = false, small:
                     navigator?.let { generateSequence(it) { n -> n.parent }.last().push(ProfileScreen) }
                 }
             )
+            if (problemRestaurant != null) {
+                DropdownMenuItem(
+                    text = { Text("Report a problem", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink) },
+                    leadingIcon = { Icon(Icons.Outlined.ReportProblem, null, Modifier.size(19.dp), tint = Kit.Ink) },
+                    onClick = { open = false; reporting = true }
+                )
+            }
             HorizontalDivider(color = Kit.Border)
             DropdownMenuItem(
                 text = { Text(if (loggingOut) "Signing out…" else "Sign out", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
@@ -206,4 +217,5 @@ internal fun AccountMenu(onLogout: () -> Unit, withName: Boolean = false, small:
         }
     }
     }
+    if (reporting && problemRestaurant != null) ReportProblemDialog(problemRestaurant) { reporting = false }
 }

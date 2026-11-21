@@ -289,7 +289,15 @@ private fun ReservationsCalendarContent(
             }
         )
     }
-    androidx.compose.runtime.CompositionLocalProvider(LocalBookingLinks provides links) {
+    // Bookings in closed time after the hours changed (user, 2026-11-21), read again with every refresh.
+    val hoursApi = koinInject<com.saporini.mobile_desktop.hours.OpeningHoursApi>()
+    var closedThen by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val bookingScope = state.scope
+    androidx.compose.runtime.LaunchedEffect(bookingScope?.restaurantId, bookingScope?.branchId, state.lastRefreshedAt, state.reservations.size) {
+        if (bookingScope == null) return@LaunchedEffect
+        closedThen = runCatching { hoursApi.closedBookings(bookingScope.restaurantId, bookingScope.branchId).map { it.id }.toSet() }.getOrDefault(closedThen)
+    }
+    androidx.compose.runtime.CompositionLocalProvider(LocalBookingLinks provides links, LocalClosedThen provides closedThen) {
         ReservationsCalendarBody(model, state, onGoToTable, modifier, canManageAreas)
     }
 }

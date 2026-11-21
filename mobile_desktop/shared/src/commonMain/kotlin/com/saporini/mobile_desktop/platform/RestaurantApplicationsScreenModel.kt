@@ -23,6 +23,9 @@ const val MAX_REJECTION_REASON = 500
 
 enum class ApplicationFilter(val label: String, val server: String) { WAITING("Waiting", "PENDING"), REJECTED("Rejected", "REJECTED") }
 
+/** The Filters' order; when none is picked, waiting ones come oldest first and rejected ones newest first. */
+enum class ApplicationOrder(val label: String, val server: String) { OLDEST("Oldest first", "OLDEST"), NEWEST("Newest first", "NEWEST") }
+
 /** Approving or rejecting one application; a rejection needs a reason the applicant sees. */
 data class ReviewStep(
     val application: RestaurantApplicationDto,
@@ -48,6 +51,12 @@ data class ApplicationsState(
     val canReview: Boolean = false,
     val filter: ApplicationFilter = ApplicationFilter.WAITING,
     val search: String = "",
+    // The Filters (user, 2026-11-21: "pagination with filters"): the order, one place (time zone) and one currency.
+    val order: ApplicationOrder? = null,
+    val currency: String? = null,
+    val timezone: String? = null,
+    // What the Filters offer for the tab shown: each place and currency in use, with how many.
+    val choices: ApplicationFiltersDto = ApplicationFiltersDto(),
     val items: List<RestaurantApplicationDto> = emptyList(),
     // The page shown (from 0), a page at a time.
     val page: Int = 0,
@@ -60,13 +69,22 @@ data class ApplicationsState(
     val loading: Boolean = false,
     val loadingMore: Boolean = false,
     val loaded: Boolean = false,
+    // Another page was asked for: its cards show as loading shapes until it comes.
+    val turning: Boolean = false,
     val review: ReviewStep? = null,
     val reopen: ReopenStep? = null,
     // Just approved: the celebration shows over the page, and the card leaves when it closes (user, 2026-11-21).
     val approved: ApprovedApplication? = null,
     val notice: String? = null,
     val error: String? = null
-)
+) {
+    /** The order shown: the one picked, else the tab's own. */
+    val shownOrder: ApplicationOrder get() = order ?: if (filter == ApplicationFilter.WAITING) ApplicationOrder.OLDEST else ApplicationOrder.NEWEST
+
+    /** How many Filters are on (for the button's badge). */
+    val activeFilters: Int get() = listOfNotNull(order?.takeIf { it != (if (filter == ApplicationFilter.WAITING) ApplicationOrder.OLDEST else ApplicationOrder.NEWEST) },
+        currency, timezone).size
+}
 
 /**
  * Super admins' review queue of public restaurant applications: the waiting ones oldest first (or the rejected ones),
@@ -107,7 +125,7 @@ class RestaurantApplicationsScreenModel(
         if (value) load() else {
             revision++
             loadJob?.cancel()
-            mutable.update { it.copy(loading = false, loadingMore = false) }
+            mutable.update { it.copy(loading = false, loadingMore = false, turning = false) }
         }
     }
 
@@ -120,20 +138,35 @@ class RestaurantApplicationsScreenModel(
         load()
     }
 
-    fun search(text: String) {
-        val query = text.take(100)
-        if (query == state.value.search) return
-        mutable.update { it.copy(search = query, items = emptyList(), page = 0, hasNext = false, total = 0, loaded = false, error = null) }
+    /** One of the Filters changed: the list starts again from its first page (its cards show as shapes meanwhile). */
+    private fun narrow(change: (ApplicationsState) -> ApplicationsState) {
+        mutable.update { change(it).copy(items = emptyList(), page = 0, hasNext = false, total = 0, loaded = false, error = null) }
         load()
     }
 
-    /** Another page (‹ ›); the list stays until it comes. */
+    fun order(order: ApplicationOrder) { if (order != state.value.shownOrder) narrow { it.copy(order = order) } }
+
+    fun currency(code: String?) { if (code != state.value.currency) narrow { it.copy(currency = code) } }
+
+    fun place(timezone: String?) { if (timezone != state.value.timezone) narrow { it.copy(timezone = timezone) } }
+
+    fun clearFilters() { if (state.value.activeFilters > 0 || state.value.order != null) narrow { it.copy(order = null, currency = null, timezone = null) } }
+
+    fun search(text: String) {
+        val query = text.take(100)
+        if (query == state.value.search) return
+        // The cards shown stay until the answer comes (as Users' search does), so typing never flashes the loading shapes.
+        mutable.update { it.copy(search = query, page = 0, error = null) }
+        load()
+    }
+
+    /** Another page (‹ ›); its cards show as loading shapes until it comes. */
     fun goToPage(page: Int) {
         val current = state.value
         val last = (((current.total - 1).coerceAtLeast(0)) / current.pageSize).toInt()
         val target = page.coerceIn(0, last)
         if (target == current.page || current.loading) return
-        mutable.update { it.copy(page = target) }
+        mutable.update { it.copy(page = target, turning = true) }
         load()
     }
 
@@ -146,12 +179,16 @@ class RestaurantApplicationsScreenModel(
             mutable.update { it.copy(loading = true) }
             try {
                 session.requireRestaurantAccess { it.read }
-                var result = repository.applications(current.filter.server, current.search, current.page, current.pageSize)
+                val order = current.order?.server
+                var result = repository.applications(current.filter.server, current.search, current.page, current.pageSize, order, current.currency,
+                    current.timezone)
                 // The page emptied (decided here or elsewhere): show the last page that still has some.
                 if (result.items.isEmpty() && current.page > 0 && result.totalElements > 0) {
                     result = repository.applications(current.filter.server, current.search, ((result.totalElements - 1) / current.pageSize).toInt(),
-                        current.pageSize)
+                        current.pageSize, order, current.currency, current.timezone)
                 }
+                // What the Filters can offer for this tab; the list works without it.
+                val choices = runCatching { repository.applicationFilters(current.filter.server) }.getOrNull()
                 // How many wait and how many were rejected, for the tabs; the list works without it.
                 val counts = runCatching {
                     repository.applications(ApplicationFilter.WAITING.server, "", 0, 1).totalElements to
@@ -161,14 +198,15 @@ class RestaurantApplicationsScreenModel(
                 mutable.update { state ->
                     state.copy(items = result.items.distinctBy { it.id }, page = result.page, hasNext = result.hasNext, total = result.totalElements,
                         loaded = true, error = null,
-                        waitingCount = counts?.first ?: state.waitingCount, rejectedCount = counts?.second ?: state.rejectedCount)
+                        waitingCount = counts?.first ?: state.waitingCount, rejectedCount = counts?.second ?: state.rejectedCount,
+                        choices = choices ?: state.choices)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 if (token == revision) mutable.update { it.copy(error = platformMessage(e, write = false)) }
             } finally {
-                if (token == revision) mutable.update { it.copy(loading = false, loadingMore = false) }
+                if (token == revision) mutable.update { it.copy(loading = false, loadingMore = false, turning = false) }
             }
         }
     }

@@ -217,7 +217,8 @@ class RestaurantListScreenModel(
         if (text == state.value.search) return
         if (state.value.reorder != null) return
         entryJob?.cancel()
-        mutable.update { it.copy(entering = null, search = text.take(100), cards = emptyList(), page = 0, hasNext = false, loaded = false, error = null) }
+        // The cards shown stay until the answer comes (as Users' search does), so typing never flashes the loading shapes.
+        mutable.update { it.copy(entering = null, search = text.take(100), page = 0, error = null) }
         load(reset = true)
     }
 

@@ -915,7 +915,7 @@ private fun InfoLine(icon: ImageVector, text: String, muted: String? = null) {
 
 @Composable
 private fun StatusChip(reservation: Reservation) {
-    val state = bookingState(reservation)
+    val state = shownBookingState(reservation)
     val label = state.text
     val color = state.color
     Row(

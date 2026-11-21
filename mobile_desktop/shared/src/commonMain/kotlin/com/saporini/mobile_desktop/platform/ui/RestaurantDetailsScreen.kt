@@ -251,7 +251,8 @@ internal fun RestaurantDetailsContent(
                 state.restaurantId == null -> PageState(PageStateKind.EMPTY, "No restaurant", "Open a restaurant first.")
                 !state.loaded && state.loading -> OverviewPageSkeleton(size)
                 !state.loaded && state.error != null -> PageState(PageStateKind.FAILED, action = { RetryText(onClick = model::refresh) })
-                restaurant == null -> PageState(PageStateKind.LOADING)
+                // Before its first answer the page shows its shapes too, never a spinner.
+                restaurant == null -> OverviewPageSkeleton(size)
                 shown == RestaurantTab.HOURS -> if (hoursModel != null && hoursState != null)
                     com.saporini.mobile_desktop.hours.ui.OpeningHoursTab(hoursState, hoursModel, size, Modifier.fillMaxWidth().weight(1f))
                 else -> Box(Modifier.fillMaxWidth().weight(1f)) {

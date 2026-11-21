@@ -252,6 +252,16 @@ internal fun bookingState(reservation: Reservation): BookingFlag {
     }
 }
 
+// Bookings that now fall when the branch is closed by its opening hours (user, 2026-11-21), by id; provided by Reservations
+// from the hours' closed-bookings list.
+internal val LocalClosedThen = androidx.compose.runtime.compositionLocalOf<Set<String>> { emptySet() }
+
+// The state a card or panel shows: "Branch closed then" (red) until the booking is moved or cancelled, else its usual one.
+@androidx.compose.runtime.Composable
+internal fun shownBookingState(reservation: Reservation): BookingFlag =
+    if (reservation.id in LocalClosedThen.current) BookingFlag("Branch closed then", com.saporini.mobile_desktop.hours.ui.ClosedThenRed)
+    else bookingState(reservation)
+
 // The restaurant's day runs from the service start (06:00) to the same time next morning.
 internal fun serviceDate(moment: Instant, policy: ReservationPolicy): LocalDate =
     (moment - policy.serviceDayStartHour.hours).toLocalDateTime(RestaurantTime.zone).date

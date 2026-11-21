@@ -179,7 +179,7 @@ private val appModule = module {
     single { com.saporini.mobile_desktop.notifications.NotificationApi(client = get()) }
     single { com.saporini.mobile_desktop.core.money.ExchangeRateApi(client = get()) }
     single { com.saporini.mobile_desktop.hours.OpeningHoursApi(client = get()) }
-    factory { com.saporini.mobile_desktop.hours.OpeningHoursModel(api = get(), session = get()) }
+    factory { com.saporini.mobile_desktop.hours.OpeningHoursModel(api = get(), session = get(), reservations = get()) }
     single { com.saporini.mobile_desktop.notifications.NotificationCenter(api = get(), sessionManager = get()) }
 
     single { MenuApi(client = get()) }

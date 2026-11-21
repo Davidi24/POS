@@ -13,8 +13,13 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
+import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
+import kotlinx.datetime.plus
+import kotlinx.datetime.toInstant
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.Serializable
@@ -68,6 +73,23 @@ data class OpeningHoursDto(
 data class CalendarDayDto(val date: String, val closed: Boolean = false, val spans: List<HoursSpanDto> = emptyList(), val special: Boolean = false,
                           val note: String? = null)
 
+/**
+ * A booking whose start falls when the branch is closed by its hours (user, 2026-11-21): listed after the hours change, to
+ * move or cancel, and marked "Branch closed then" in Reservations.
+ */
+@Serializable
+data class ClosedBookingDto(
+    val id: String,
+    val code: String? = null,
+    val start: String,
+    val end: String? = null,
+    val guests: Int = 0,
+    val name: String? = null,
+    val phone: String? = null,
+    val status: String = "",
+    val tables: List<String> = emptyList()
+)
+
 @Serializable
 data class WeekRequestDto(val days: List<HoursDayDto>)
 
@@ -110,6 +132,10 @@ class OpeningHoursApi(
         client.post(url(restaurantId, branchId, "/open-now")) { contentType(ContentType.Application.Json); setBody(OpenNowRequestDto(until)) }.body()
 
     suspend fun closeNow(restaurantId: String, branchId: String): OpenNowDto = client.delete(url(restaurantId, branchId, "/open-now")).body()
+
+    /** Bookings still to come whose start falls when the branch is closed by its hours. */
+    suspend fun closedBookings(restaurantId: String, branchId: String): List<ClosedBookingDto> =
+        client.get(url(restaurantId, branchId, "/closed-bookings")).body()
 }
 
 // ---- Reading times and dates ----
@@ -133,5 +159,36 @@ internal fun List<HoursSpanDto>.text(): String = if (isEmpty()) "Closed" else jo
 internal fun clockAt(text: String?, zone: TimeZone): LocalTime? = instantOrNull(text)?.toLocalDateTime(zone)?.time
 
 internal fun dateAt(text: String?, zone: TimeZone): LocalDate? = instantOrNull(text)?.toLocalDateTime(zone)?.date
+
+/**
+ * The times a booking of [lengthMinutes] can start on [date], every 15 minutes while open, the last leaving its length before
+ * closing (user, 2026-11-21, as the guest booking page). [days] are the calendar's [date] and the day before (a past-midnight
+ * opening of the day before counts). None when closed; times before [soonest] are left out.
+ */
+internal fun bookableTimes(days: List<CalendarDayDto>, date: LocalDate, lengthMinutes: Int, soonest: LocalDateTime? = null): List<LocalTime> {
+    val out = mutableSetOf<LocalTime>()
+    days.forEach { day ->
+        val on = dateOf(day.date) ?: return@forEach
+        if (day.closed) return@forEach
+        day.spans.forEach { span ->
+            val opens = timeOf(span.opens) ?: return@forEach
+            val closes = timeOf(span.closes) ?: return@forEach
+            val start = LocalDateTime(on, opens)
+            val end = LocalDateTime(if (closes <= opens) on.plus(DatePeriod(days = 1)) else on, closes)
+            val zone = TimeZone.UTC
+            val endAt = end.toInstant(zone)
+            var lastAt = endAt - lengthMinutes.minutes
+            val startAt = start.toInstant(zone)
+            if (lastAt < startAt) lastAt = startAt
+            var at = startAt
+            while (at <= lastAt) {
+                val local = at.toLocalDateTime(zone)
+                if (local.date == date && (soonest == null || local > soonest)) out.add(local.time)
+                at += 15.minutes
+            }
+        }
+    }
+    return out.sorted()
+}
 
 internal fun zoneOf(id: String?): TimeZone = id?.let { runCatching { TimeZone.of(it) }.getOrNull() } ?: TimeZone.currentSystemDefault()

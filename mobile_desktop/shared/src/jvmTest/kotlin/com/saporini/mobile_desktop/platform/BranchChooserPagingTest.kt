@@ -122,12 +122,13 @@ class BranchChooserPagingTest {
         assertNull(model.state.value.error)
     }
 
-    @Test fun searchGoesToTheServerAndClearsOldResultsAtOnce() {
+    @Test fun searchGoesToTheServerAndKeepsTheCardsUntilTheAnswer() {
         val model = chooser()
         model.loadMore(); scheduler.runCurrent()
+        val before = model.state.value.cards
         model.search("branch 1")
-        assertTrue(model.state.value.cards.isEmpty())
-        assertFalse(model.state.value.loaded)
+        assertEquals(before, model.state.value.cards)
+        assertTrue(model.state.value.loaded)
         scheduler.runCurrent()
         assertEquals(Triple("branch 1", 0, 24), pageCalls.last())
         assertEquals((10..19).map { "b$it" }.toSet(), model.state.value.cards.map { it.id }.toSet())

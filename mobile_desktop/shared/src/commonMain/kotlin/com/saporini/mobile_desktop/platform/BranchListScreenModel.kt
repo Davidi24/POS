@@ -113,13 +113,13 @@ class BranchListScreenModel(
     /** Reloads every page already shown, so the grid keeps its place. */
     fun refresh() = load(reset = true)
 
-    /** Searches the branches on the server; the old results go at once, and paging starts again. */
+    /** Searches the branches on the server; the old results stay until the new ones come, and paging starts again. */
     fun search(text: String) {
         val query = text.take(100)
         if (query == state.value.search) return
         entryJob?.cancel()
-        mutable.update { it.copy(search = query, cards = emptyList(), page = 0, hasNext = false, total = 0, loaded = false,
-            entering = null, error = null) }
+        // The cards shown stay until the answer comes, so typing never flashes the loading shapes.
+        mutable.update { it.copy(search = query, page = 0, entering = null, error = null) }
         load(reset = true)
     }
 

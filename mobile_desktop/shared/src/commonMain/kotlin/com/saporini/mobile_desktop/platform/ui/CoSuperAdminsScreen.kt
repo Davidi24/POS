@@ -35,6 +35,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import com.saporini.mobile_desktop.core.components.KitSwitch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,10 +60,15 @@ import androidx.compose.material.icons.outlined.LockReset
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.PersonOff
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.MarkEmailUnread
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.VerifiedUser
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.animation.core.tween
 import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -100,8 +107,6 @@ import com.saporini.mobile_desktop.core.components.PageState
 import com.saporini.mobile_desktop.core.components.PageStateKind
 import com.saporini.mobile_desktop.core.components.RefreshButton
 import com.saporini.mobile_desktop.core.components.RetryText
-import com.saporini.mobile_desktop.core.components.RowAction
-import com.saporini.mobile_desktop.core.components.RowActionsMenu
 import com.saporini.mobile_desktop.core.components.ScreenMessages
 import com.saporini.mobile_desktop.core.components.StatusChip
 import com.saporini.mobile_desktop.core.components.TableColumn
@@ -113,6 +118,9 @@ import com.saporini.mobile_desktop.core.components.ToolbarPrimaryButton
 import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.platform.CoSuperAdminsScreenModel
 import com.saporini.mobile_desktop.platform.CoSuperAdminsState
+import com.saporini.mobile_desktop.platform.ASSIGNED_EVERY
+import com.saporini.mobile_desktop.platform.ASSIGNED_NONE
+import com.saporini.mobile_desktop.platform.AdminStatus
 import com.saporini.mobile_desktop.platform.MAX_EMAIL_TEXT
 import com.saporini.mobile_desktop.platform.NewCoSuperAdminDraft
 import com.saporini.mobile_desktop.platform.PERMISSION_AREAS
@@ -158,6 +166,11 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
         val narrow = maxWidth < 760.dp
         val side = if (narrow) 16.dp else 36.dp
         ScreenMessages(state.error.takeIf { state.draft == null && state.ticks == null && state.loaded }, state.notice, model::clearMessages)
+        // Whether the "Add support admin" tile at the end of the cards is in view; the top button shows only while it isn't.
+        var addTileSeen by remember { mutableStateOf(false) }
+        // Shapes like the admin cards until the first answer, held a moment so a quick load doesn't flash them, then a fade.
+        val shapes = com.saporini.mobile_desktop.core.components.steadyLoading(
+            state.allowed && ((!state.loaded && state.error == null) || (state.loading && state.people.isEmpty())))
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             androidx.compose.foundation.lazy.LazyColumn(
                 Modifier.widthIn(max = 1180.dp).fillMaxSize(),
@@ -166,35 +179,38 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
             ) {
                 item(key = "title") {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        BackArrow("Back to the restaurants", onBack)
+                        PlainBackArrow("Back to the restaurants", onBack)
                         Column(Modifier.weight(1f)) {
                             Text("Admins", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (narrow) 18.sp else 21.sp, color = Kit.Ink)
                             Text("Support admins take care of the restaurants you give them", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted)
                         }
+                        if (state.allowed && state.people.isNotEmpty() && !shapes) AdminFiltersButton(state, model)
                         RefreshButton(state.loading, model::refresh)
-                        if (state.allowed && state.people.isNotEmpty()) {
+                        // Only while the "Add support admin" tile at the end of the cards is out of sight (user, 2026-11-21: "this button
+                        // appears only when the big one goes down and I need to scroll to see it").
+                        androidx.compose.animation.AnimatedVisibility(state.allowed && state.people.isNotEmpty() && !addTileSeen,
+                            enter = androidx.compose.animation.fadeIn(tween(160)), exit = androidx.compose.animation.fadeOut(tween(120))) {
                             KitButton(if (narrow) "Add" else "Add support admin", model::startAdd, icon = Icons.Outlined.PersonAdd, enabled = !state.saving)
                         }
                     }
                 }
-                // Only support admins here; a restaurant's own admins are seen inside it (user, 2026-11-20). The list narrows to one
-                // restaurant's: those given it, and those given every restaurant.
-                if (state.allowed && state.people.isNotEmpty()) item(key = "filter") {
-                    val all = com.saporini.mobile_desktop.platform.RestaurantRefDto("", "All restaurants")
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        com.saporini.mobile_desktop.core.components.SearchableSelect(
-                            state.restaurants.firstOrNull { it.id == state.restaurantFilter } ?: all, listOf(all) + state.restaurants, { it.name },
-                            { model.filterRestaurant(it.id.ifEmpty { null }) }, Modifier.widthIn(max = 340.dp).weight(1f, fill = false),
-                            icon = Icons.Outlined.Storefront, compact = narrow)
+                // With a filter on: how many it leaves and a way back to everyone.
+                if (state.allowed && state.people.isNotEmpty() && !shapes && activeFilters(state) > 0) item(key = "filter") {
+                    Row(Modifier.animateItem(fadeInSpec = CardFadeIn, placementSpec = null, fadeOutSpec = tween(90)),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(filterText(state), Modifier.weight(1f, fill = false), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                            color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${shownPeople(state).size} of ${state.people.size}", fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted)
+                        Text("Clear filters", Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = model::clearFilters).padding(horizontal = 6.dp, vertical = 3.dp),
+                            fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Kit.Green)
                     }
                 }
                 when {
                     !state.allowed -> item(key = "denied") {
                         PageState(PageStateKind.NO_ACCESS, "Only the Super Admin", "Only the Super Admin adds Co-Super-Admins and chooses what they can do.")
                     }
-                    !state.loaded && state.loading -> item(key = "loading") {
-                        Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Kit.Green) }
+                    shapes -> item(key = "shapes") {
+                        AdminGridShape(Modifier.animateItem(fadeInSpec = tween(160, delayMillis = 80), placementSpec = null, fadeOutSpec = tween(80)))
                     }
                     !state.loaded && state.error != null -> item(key = "failed") {
                         PageState(PageStateKind.FAILED, action = { RetryText(onClick = model::refresh) })
@@ -211,15 +227,15 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
                     }
                     shownPeople(state).isEmpty() -> item(key = "none-here") {
                         Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
-                            OverviewEmpty("Nobody takes care of this restaurant", "Give it to a support admin from their restaurants.",
-                                Icons.Outlined.AdminPanelSettings)
+                            OverviewEmpty("No support admin matches", "Try other filters, or give the restaurant to someone from their Restaurants.",
+                                Icons.Outlined.AdminPanelSettings, action = { RetryText("Clear filters", onClick = model::clearFilters) })
                         }
                     }
                     else -> {
                         // A card per support admin with the Users' admin figure (user, 2026-11-21: "put the icons of users"), three a row on a
                         // wide window, two on a tablet, one on a phone; a dashed tile at the end adds one more.
                         item(key = "people") {
-                            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            BoxWithConstraints(Modifier.animateItem(fadeInSpec = CardFadeIn, placementSpec = null, fadeOutSpec = tween(90)).fillMaxWidth()) {
                                 val columns = when {
                                     maxWidth >= 900.dp -> 3
                                     maxWidth >= 560.dp -> 2
@@ -233,8 +249,15 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
                                             row.forEach { person ->
                                                 val cell = Modifier.weight(1f).fillMaxHeight()
                                                 if (person != null) AdminCard(person, state, model, cell)
-                                                else AddTile("Add support admin", "They take care of the restaurants you give them", model::startAdd,
-                                                    height = 120.dp, modifier = cell)
+                                                else {
+                                                    // Whether at least half of it is in view (the list clips it as it scrolls away).
+                                                    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { addTileSeen = false } }
+                                                    AddTile("Add support admin", "They take care of the restaurants you give them", model::startAdd,
+                                                        height = 120.dp, modifier = cell.onGloballyPositioned { tile ->
+                                                            val full = tile.size.height
+                                                            addTileSeen = full > 0 && tile.boundsInWindow().height >= full * 0.5f
+                                                        })
+                                                }
                                             }
                                             repeat(columns - row.size) { Box(Modifier.weight(1f)) }
                                         }
@@ -255,12 +278,21 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
         }
     }
     state.draft?.let { AddDialog(it, state, model) }
+    state.editing?.let { id -> state.people.firstOrNull { it.id == id }?.let { AdminEditDialog(it, state, model) } }
     state.ticks?.let { PermissionsDialog(it, model) }
     state.access?.let { AccessDialog(it, model) }
     state.confirmRemove?.let { person ->
         ConfirmDialog("Remove ${person.displayName}?",
             "They can no longer sign in or take care of any restaurant. People and changes they made stay. To stop them for a while, switch them off instead.",
             "Remove", onConfirm = model::confirmRemove, onDismiss = model::dismissRemove, danger = true)
+    }
+    state.confirmSwitchOff?.let { person ->
+        ConfirmDialog("Switch off ${person.displayName}?", "They can't sign in until you switch them on again. Nothing they did is lost.",
+            "Switch off", onConfirm = model::confirmSwitchOff, onDismiss = model::dismissConfirm, danger = true)
+    }
+    state.confirmPassword?.let { person ->
+        ConfirmDialog("Send a password link?", "${person.displayName} gets an email at ${person.email} to choose a new password.",
+            "Send", onConfirm = model::confirmPassword, onDismiss = model::dismissConfirm)
     }
 }
 
@@ -323,14 +355,15 @@ private fun AdminCard(person: StaffUserDto, state: CoSuperAdminsState, model: Co
                             maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
                         Text(person.email, fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
                     }
-                    RowActionsMenu(listOf(
-                        RowAction("Restaurants", Icons.Outlined.Storefront) { model.openAccess(person) },
-                        RowAction("What they can do", Icons.Outlined.Tune) { model.openPermissions(person) },
-                        if (person.isActive) RowAction("Switch off", Icons.Outlined.PersonOff) { model.setPersonActive(person, false) }
-                        else RowAction("Switch on", Icons.Outlined.Person) { model.setPersonActive(person, true) },
-                        RowAction("Send password reset", Icons.Outlined.LockReset) { model.sendPasswordEmail(person) },
-                        RowAction("Remove", Icons.Outlined.Delete, danger = true) { model.askRemove(person) }
-                    ), person.id in state.busy)
+                    // Edit opens their window with every change (user, 2026-11-21: "an Edit button where you go inside", not a ⋮ menu).
+                    Surface(onClick = { model.openEdit(person) }, enabled = person.id !in state.busy, shape = RoundedCornerShape(50), color = Color.White,
+                        border = BorderStroke(1.dp, Kit.Border)) {
+                        Row(Modifier.padding(start = 10.dp, end = 12.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Icon(Icons.Outlined.Edit, null, Modifier.size(15.dp), tint = Kit.Ink)
+                            Text("Edit", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Kit.Ink, maxLines = 1)
+                        }
+                    }
                 }
                 // The restaurants they take care of.
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -366,10 +399,98 @@ private fun AdminCard(person: StaffUserDto, state: CoSuperAdminsState, model: Co
     }
 }
 
+/**
+ * A support admin's Edit window (user, 2026-11-21): who they are, then a line per change with its button: their restaurants,
+ * what they can do, a password link, switching them off or on, and removing them last. Each one that can't be undone asks
+ * "Are you sure?" first.
+ */
+@Composable
+private fun AdminEditDialog(person: StaffUserDto, state: CoSuperAdminsState, model: CoSuperAdminsScreenModel) {
+    val card = state.cards.firstOrNull { it.id == person.id }
+    val counts = state.allowedCounts[person.id]
+    val busy = person.id in state.busy
+    val accent = accentOf(person.id)
+    val (statusText, statusColor) = when (AdminStatus.of(person)) {
+        AdminStatus.OFF -> "Switched off" to Kit.Grey
+        AdminStatus.TO_CONFIRM -> "Email to confirm" to Kit.Amber
+        AdminStatus.ACTIVE -> "Active" to Kit.Green
+    }
+    AppDialog("Edit support admin", model::closeEdit, busy = busy, maxWidth = 600.dp,
+        buttons = { Box(Modifier.weight(1f)); KitButton("Done", model::closeEdit) }) {
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(accent.softer).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(48.dp).clip(CircleShape).background(accent.soft), contentAlignment = Alignment.Center) {
+                com.saporini.mobile_desktop.core.ui.RemoteImage(card?.photoUrl, null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(initialsOf(person.displayName), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = accent.strong, translate = false)
+                    }
+                }
+            }
+            Column(Modifier.weight(1f)) {
+                Text(person.displayName, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Kit.Ink, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, translate = false)
+                Text(person.email, fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+            }
+            Row(Modifier.clip(RoundedCornerShape(50)).background(Color.White).padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(statusColor))
+                Text(statusText, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = statusColor, maxLines = 1)
+            }
+        }
+        EditLine(Icons.Outlined.Storefront, "Restaurants", when {
+            card == null -> "…"
+            card.allRestaurants -> "All restaurants"
+            card.restaurants.isEmpty() -> "No restaurants yet"
+            else -> card.restaurants.joinToString(", ") { it.name }
+        }) { KitButton("Change", { model.openAccess(person) }, style = ButtonStyle.SECONDARY, enabled = !busy) }
+        EditLine(Icons.Outlined.Tune, "What they can do", when {
+            counts == null -> "…"
+            counts.first == counts.second -> "Can do everything"
+            else -> "${counts.second - counts.first} switched off"
+        }) { KitButton("Change", { model.openPermissions(person) }, style = ButtonStyle.SECONDARY, enabled = !busy) }
+        EditLine(Icons.Outlined.LockReset, "Password", "Email them a link to choose a new password") {
+            KitButton("Send link", { model.askPassword(person) }, style = ButtonStyle.SECONDARY, enabled = !busy)
+        }
+        if (person.isActive) {
+            EditLine(Icons.Outlined.PersonOff, "Sign-in", "They can sign in. Switch them off to stop them for a while.") {
+                KitButton("Switch off", { model.askSwitchOff(person) }, style = ButtonStyle.DANGER_OUTLINE, enabled = !busy)
+            }
+        } else {
+            EditLine(Icons.Outlined.Person, "Sign-in", "Switched off: they can't sign in.") {
+                KitButton("Switch on", { model.setPersonActive(person, true) }, style = ButtonStyle.SECONDARY, enabled = !busy)
+            }
+        }
+        KitDivider()
+        EditLine(Icons.Outlined.Delete, "Remove", "They can no longer sign in. What they did stays.", danger = true) {
+            KitButton("Remove", { model.askRemove(person) }, style = ButtonStyle.DANGER_OUTLINE, enabled = !busy)
+        }
+    }
+}
+
+/** One change in the Edit window: an icon, its name and what it is now, and its button at the end. */
+@Composable
+private fun EditLine(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String, danger: Boolean = false,
+                     action: @Composable () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(if (danger) Kit.Danger.copy(alpha = 0.08f) else Kit.Tint),
+            contentAlignment = Alignment.Center) {
+            Icon(icon, null, Modifier.size(18.dp), tint = if (danger) Kit.Danger else Kit.Ink)
+        }
+        Column(Modifier.weight(1f)) {
+            Text(title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = if (danger) Kit.Danger else Kit.Ink)
+            Text(detail, fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 17.sp, color = Kit.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        action()
+    }
+}
+
 @Composable
 private fun PlaceChip(text: String, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector?, translate: Boolean = true) {
+    // Its full width also when the row of cards measures itself (IntrinsicSize.Min): otherwise the chips' row counts too few lines,
+    // the card comes out too short and its buttons get squeezed (user, 2026-11-21, a card with three restaurants).
     Row(
-        Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.10f)).padding(start = if (icon != null) 7.dp else 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+        Modifier.width(androidx.compose.foundation.layout.IntrinsicSize.Max).clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.10f))
+            .padding(start = if (icon != null) 7.dp else 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)
     ) {
         icon?.let { Icon(it, null, Modifier.size(13.dp), tint = color) }
@@ -426,7 +547,7 @@ private fun PermissionsDialog(ticks: PermissionTicks, model: CoSuperAdminsScreen
     ) {
         ticks.error?.let { MessageBar(it, MessageKind.ERROR) }
         if (ticks.loading) {
-            Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Kit.Green) }
+            PermissionCardsShape()
             return@AppDialog
         }
         val byArea = ticks.permissions.groupBy { permissionArea(it.code) }
@@ -567,7 +688,7 @@ private fun AccessDialog(editor: com.saporini.mobile_desktop.platform.AdminAcces
     ) {
         editor.error?.let { MessageBar(it, MessageKind.ERROR) }
         if (editor.loading) {
-            Box(Modifier.fillMaxWidth().padding(24.dp), Alignment.Center) { CircularProgressIndicator(color = Kit.Green) }
+            SwitchLinesShape(6)
             return@AppDialog
         }
         com.saporini.mobile_desktop.core.components.SettingsRow("All restaurants", "Every restaurant, also the ones added later.", divider = false,
@@ -596,9 +717,80 @@ private fun AccessDialog(editor: com.saporini.mobile_desktop.platform.AdminAcces
 }
 
 /** The support admins shown: all, or those who take care of the restaurant picked (given it, or every restaurant). */
-private fun shownPeople(state: CoSuperAdminsState): List<StaffUserDto> {
-    val id = state.restaurantFilter ?: return state.people
-    return state.people.filter { person ->
-        state.cards.firstOrNull { it.id == person.id }?.let { card -> card.allRestaurants || card.restaurants.any { it.id == id } } == true
+private fun shownPeople(state: CoSuperAdminsState): List<StaffUserDto> =
+    state.people.filter { person -> assignedTo(state, person, state.restaurantFilter) && (state.statusFilter == null || AdminStatus.of(person) == state.statusFilter) }
+
+/** Whether [person] fits the "Assigned to" choice: a restaurant (given it, or every restaurant), every one, or none yet. */
+private fun assignedTo(state: CoSuperAdminsState, person: StaffUserDto, choice: String?): Boolean {
+    if (choice == null) return true
+    val card = state.cards.firstOrNull { it.id == person.id } ?: return false
+    return when (choice) {
+        ASSIGNED_EVERY -> card.allRestaurants
+        ASSIGNED_NONE -> !card.allRestaurants && card.restaurants.isEmpty()
+        else -> card.allRestaurants || card.restaurants.any { it.id == choice }
+    }
+}
+
+private fun activeFilters(state: CoSuperAdminsState) = listOfNotNull(state.restaurantFilter, state.statusFilter).size
+
+/** What the filters keep, in words: "Assigned to Local Demo Bistroo · Active". */
+private fun filterText(state: CoSuperAdminsState): String = listOfNotNull(
+    when (val choice = state.restaurantFilter) {
+        null -> null
+        ASSIGNED_EVERY -> "Assigned to every restaurant"
+        ASSIGNED_NONE -> "No restaurant yet"
+        else -> "Assigned to: ${state.restaurants.firstOrNull { it.id == choice }?.name ?: "a restaurant"}"
+    },
+    state.statusFilter?.label
+).joinToString(" · ")
+
+/**
+ * One Filters button (user, 2026-11-21: the restaurant list made admins look as if they belonged to a restaurant; "only a
+ * filter should make it: are assigned to a restaurant"): Assigned to (every restaurant, one restaurant, none yet) and Status,
+ * each with how many.
+ */
+@Composable
+private fun AdminFiltersButton(state: CoSuperAdminsState, model: CoSuperAdminsScreenModel) {
+    com.saporini.mobile_desktop.admin.inventory.ui.PhoneOptionsButton(Icons.Outlined.FilterList, "Filters", activeFilters(state), 44.dp) { close ->
+        val count: (String?) -> Int = { choice -> state.people.count { assignedTo(state, it, choice) } }
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionGroup("Assigned to")
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionLine("Any restaurant", state.restaurantFilter == null,
+            { model.filterRestaurant(null); close() }, icon = Icons.Outlined.AdminPanelSettings, count = state.people.size)
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionLine("Every restaurant", state.restaurantFilter == ASSIGNED_EVERY,
+            { model.filterRestaurant(ASSIGNED_EVERY); close() }, icon = Icons.Outlined.Public, count = count(ASSIGNED_EVERY))
+        state.restaurants.forEach { restaurant ->
+            com.saporini.mobile_desktop.admin.inventory.ui.OptionLine(restaurant.name, state.restaurantFilter == restaurant.id,
+                { model.filterRestaurant(restaurant.id); close() }, icon = Icons.Outlined.Storefront, count = count(restaurant.id))
+        }
+        val none = count(ASSIGNED_NONE)
+        if (none > 0 || state.restaurantFilter == ASSIGNED_NONE) {
+            com.saporini.mobile_desktop.admin.inventory.ui.OptionLine("No restaurant yet", state.restaurantFilter == ASSIGNED_NONE,
+                { model.filterRestaurant(ASSIGNED_NONE); close() }, icon = Icons.Outlined.Block, color = Kit.Muted, count = none)
+        }
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionGroup("Status")
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionLine("Any status", state.statusFilter == null, { model.filterStatus(null); close() },
+            icon = Icons.Outlined.Person, count = state.people.size)
+        AdminStatus.entries.forEach { status ->
+            com.saporini.mobile_desktop.admin.inventory.ui.OptionLine(status.label, state.statusFilter == status, { model.filterStatus(status); close() },
+                icon = when (status) {
+                    AdminStatus.ACTIVE -> Icons.Outlined.VerifiedUser
+                    AdminStatus.TO_CONFIRM -> Icons.Outlined.MarkEmailUnread
+                    AdminStatus.OFF -> Icons.Outlined.PersonOff
+                },
+                color = when (status) {
+                    AdminStatus.ACTIVE -> Kit.Green
+                    AdminStatus.TO_CONFIRM -> Kit.Amber
+                    AdminStatus.OFF -> Kit.Muted
+                },
+                count = state.people.count { AdminStatus.of(it) == status })
+        }
+        if (activeFilters(state) > 0) {
+            Text(
+                "Clear all filters",
+                Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp).clip(RoundedCornerShape(8.dp)).clickable { model.clearFilters(); close() }
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Danger
+            )
+        }
     }
 }

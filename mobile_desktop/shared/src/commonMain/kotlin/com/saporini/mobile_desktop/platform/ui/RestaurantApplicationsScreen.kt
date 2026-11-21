@@ -34,7 +34,6 @@ import com.saporini.mobile_desktop.core.components.OverviewTabs
 import mobile_desktop.shared.generated.resources.Res
 import mobile_desktop.shared.generated.resources.workspace_restaurants
 import org.jetbrains.compose.resources.painterResource
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Payments
@@ -54,6 +53,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AddBusiness
+import androidx.compose.material.icons.outlined.Business
+import com.saporini.mobile_desktop.platform.ApplicationOrder
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.NewReleases
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Inbox
@@ -62,7 +71,6 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Storefront
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import com.saporini.mobile_desktop.core.i18n.Text
@@ -158,10 +166,16 @@ internal fun RestaurantApplicationsContent(
         model.search(query.trim())
     }
     val grid = rememberLazyGridState()
+    // The application open in the big window, if any.
+    var openId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(state.search, state.filter) { grid.scrollToItem(0) }
     // A new page starts at its top.
     LaunchedEffect(state.page) { if (grid.firstVisibleItemIndex > 2) grid.scrollToItem(2) }
     val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
+    // Shapes like the application cards until the first answer, after a tab change and while another page comes; held a
+    // moment so a quick load doesn't flash them. A search keeps the cards until its answer.
+    val shapes = com.saporini.mobile_desktop.core.components.steadyLoading(
+        state.canRead && ((!state.loaded && state.error == null) || (state.loading && state.items.isEmpty()) || state.turning))
     Box(modifier, contentAlignment = Alignment.TopCenter) {
         LazyVerticalGrid(
             GridCells.Adaptive(if (narrow) 300.dp else 380.dp),
@@ -186,13 +200,17 @@ internal fun RestaurantApplicationsContent(
                             tabs(Modifier.weight(1f))
                             com.saporini.mobile_desktop.core.components.RefreshButton(state.loading, model::refresh, size = 40.dp)
                         }
-                        SearchField(query, { query = it.take(100) }, Modifier.fillMaxWidth(), placeholder = "Search by restaurant, email or owner", height = 44.dp)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            SearchField(query, { query = it.take(100) }, Modifier.weight(1f), placeholder = "Search by restaurant, email or owner", height = 44.dp)
+                            ApplicationFiltersButton(state, model, 44.dp)
+                        }
                         ApplicationsPager(state, model, Modifier.fillMaxWidth())
                     }
                 } else {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         tabs(Modifier.width(320.dp))
                         SearchField(query, { query = it.take(100) }, Modifier.width(320.dp), placeholder = "Search by restaurant, email or owner", height = 40.dp)
+                        ApplicationFiltersButton(state, model, 40.dp)
                         Spacer(Modifier.weight(1f))
                         ApplicationsPager(state, model)
                         com.saporini.mobile_desktop.core.components.RefreshButton(state.loading, model::refresh, size = 40.dp)
@@ -203,22 +221,22 @@ internal fun RestaurantApplicationsContent(
                 !state.canRead -> item(key = "denied", span = full) {
                     PageState(PageStateKind.NO_ACCESS, "Super admins only", "Only the Super Admin and Co-Super-Admins review restaurant applications.")
                 }
-                !state.loaded && state.loading -> item(key = "loading", span = full) {
-                    Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Kit.Green) }
-                }
+                shapes -> items(shapesFor(narrow), key = { "shape-$it" }) { ShapeCell { ApplicationCardShape() } }
                 !state.loaded && state.error != null -> item(key = "failed", span = full) {
                     PageState(PageStateKind.FAILED, action = { RetryText(onClick = model::refresh) })
                 }
                 state.items.isEmpty() -> item(key = "empty", span = full) {
                     Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
-                        if (state.search.isNotBlank()) OverviewEmpty("No application matches", "Try another restaurant name, email or owner.", Icons.Outlined.Search)
+                        if (state.currency != null || state.timezone != null) OverviewEmpty("No application matches", "Nothing here with these filters.",
+                            Icons.Outlined.FilterList, action = { RetryText("Clear the filters", onClick = model::clearFilters) })
+                        else if (state.search.isNotBlank()) OverviewEmpty("No application matches", "Try another restaurant name, email or owner.", Icons.Outlined.Search)
                         else if (state.filter == ApplicationFilter.WAITING) OverviewEmpty("Nothing to review", "New applications show up here, oldest first.", Icons.Outlined.Inbox)
                         else OverviewEmpty("No rejected applications", "Applications you reject stay here with their reason.", Icons.Outlined.Inbox)
                     }
                 }
                 else -> items(state.items, key = { it.id }) { application ->
-                    Box(Modifier.animateItem(fadeInSpec = tween(220), placementSpec = tween(360, easing = FastOutSlowInEasing), fadeOutSpec = tween(260))) {
-                        ApplicationCard(application, state, model)
+                    Box(Modifier.animateItem(fadeInSpec = CardFadeIn, placementSpec = CardPlacement, fadeOutSpec = tween(260))) {
+                        ApplicationCard(application, state) { openId = application.id }
                     }
                 }
             }
@@ -227,6 +245,8 @@ internal fun RestaurantApplicationsContent(
             }
         }
     }
+    // A card opens big with everything: the restaurant, its owner, and Reject / Approve (user, 2026-11-21).
+    state.items.firstOrNull { it.id == openId }?.let { ApplicationDialog(it, state, model) { openId = null } }
     state.review?.let { ReviewDialog(it, model) }
     state.reopen?.let { step ->
         ConfirmDialog(
@@ -240,9 +260,48 @@ internal fun RestaurantApplicationsContent(
     state.approved?.let { ApprovedCelebration(it, onDone = model::closeApproved) }
 }
 
+/**
+ * One Filters button for the list (the app's one-menu rule): the order, where the restaurant is (its time zone) and its
+ * currency, each place and currency with how many applications use it; Clear all filters when any is on.
+ */
+@Composable
+private fun ApplicationFiltersButton(state: ApplicationsState, model: RestaurantApplicationsScreenModel, size: androidx.compose.ui.unit.Dp) {
+    com.saporini.mobile_desktop.admin.inventory.ui.PhoneOptionsButton(Icons.Outlined.FilterList, "Filters", state.activeFilters, size) { close ->
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionGroup("Order")
+        ApplicationOrder.entries.forEach { order ->
+            com.saporini.mobile_desktop.admin.inventory.ui.OptionLine(order.label, state.shownOrder == order, { model.order(order); close() },
+                icon = if (order == ApplicationOrder.OLDEST) Icons.Outlined.HourglassEmpty else Icons.Outlined.NewReleases)
+        }
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionGroup("Where")
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionLine("Everywhere", state.timezone == null, { model.place(null); close() },
+            icon = Icons.Outlined.Public)
+        (state.choices.timezones.map { it.value to it.count } + listOfNotNull(state.timezone?.takeIf { zone -> state.choices.timezones.none { it.value == zone } }
+            ?.let { it to 0L })).forEach { (zone, count) ->
+            com.saporini.mobile_desktop.admin.inventory.ui.OptionLine(timeZoneLabel(zone), state.timezone == zone, { model.place(zone); close() },
+                icon = Icons.Outlined.Place, count = count.toInt())
+        }
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionGroup("Currency")
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionLine("Any currency", state.currency == null, { model.currency(null); close() },
+            icon = Icons.Outlined.Payments)
+        (state.choices.currencies.map { it.value to it.count } + listOfNotNull(state.currency?.takeIf { code -> state.choices.currencies.none { it.value == code } }
+            ?.let { it to 0L })).forEach { (code, count) ->
+            com.saporini.mobile_desktop.admin.inventory.ui.OptionLine("$code · ${currencyName(code)}", state.currency == code, { model.currency(code); close() },
+                icon = Icons.Outlined.Payments, count = count.toInt())
+        }
+        if (state.activeFilters > 0) {
+            Text(
+                "Clear all filters",
+                Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp).clip(RoundedCornerShape(8.dp)).clickable { model.clearFilters(); close() }
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Danger
+            )
+        }
+    }
+}
+
 /** The plain arrow back (no circle, user rule): leaves this page for the restaurant list. */
 @Composable
-private fun PlainBackArrow(description: String, onClick: () -> Unit) {
+internal fun PlainBackArrow(description: String, onClick: () -> Unit) {
     com.saporini.mobile_desktop.core.ui.HoverTooltip(description) {
         Icon(Icons.AutoMirrored.Filled.ArrowBack, description, Modifier.size(34.dp).clip(CircleShape).clickable(onClick = onClick).padding(5.dp), tint = Kit.Ink)
     }
@@ -287,7 +346,10 @@ private fun waitedText(submittedAt: String?, now: kotlin.time.Instant): String? 
 @Composable
 private fun ApplicationsBanner(state: ApplicationsState, model: RestaurantApplicationsScreenModel, narrow: Boolean, onBack: () -> Unit) {
     val now = remember { kotlin.time.Clock.System.now() }
-    val oldest = if (state.filter == ApplicationFilter.WAITING && state.search.isBlank()) waitedText(state.items.firstOrNull()?.submittedAt, now) else null
+    // The oldest wait, read off the first card only while the list is the plain waiting queue, oldest first.
+    val plainQueue = state.filter == ApplicationFilter.WAITING && state.search.isBlank() && state.currency == null && state.timezone == null &&
+        state.shownOrder == ApplicationOrder.OLDEST && state.page == 0
+    val oldest = if (plainQueue) waitedText(state.items.firstOrNull()?.submittedAt, now) else null
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border), shadowElevation = 3.dp) {
         Box(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Color.White, Color(0xFFF3F7F0), Color(0xFFE6EFE1))))) {
             Canvas(Modifier.matchParentSize()) {
@@ -313,13 +375,13 @@ private fun ApplicationsBanner(state: ApplicationsState, model: RestaurantApplic
                         Text("People who want to open a restaurant with you. Approve to open it and invite its owner, or reject it with a reason.",
                             fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.5.sp, lineHeight = 19.sp, color = Kit.Muted)
                         Row(Modifier.padding(top = 6.dp).height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
-                            BannerFigure(state.waitingCount?.toString() ?: "…", "waiting", if ((state.waitingCount ?: 0) > 0) Kit.Amber else Kit.Ink)
+                            BannerFigure(state.waitingCount?.toString(), "waiting", if ((state.waitingCount ?: 0) > 0) Kit.Amber else Kit.Ink, state.error == null)
                             if (oldest != null) {
                                 BannerLine()
-                                BannerFigure(oldest, "oldest wait", Kit.Ink)
+                                BannerFigure(oldest, "oldest wait", Kit.Ink, false)
                             }
                             BannerLine()
-                            BannerFigure(state.rejectedCount?.toString() ?: "…", "rejected", Kit.Ink)
+                            BannerFigure(state.rejectedCount?.toString(), "rejected", Kit.Ink, state.error == null)
                         }
                     }
                 }
@@ -332,9 +394,11 @@ private fun ApplicationsBanner(state: ApplicationsState, model: RestaurantApplic
 }
 
 @Composable
-private fun BannerFigure(value: String, label: String, color: Color) {
+private fun BannerFigure(value: String?, label: String, color: Color, coming: Boolean) {
     Column(Modifier.padding(end = 22.dp)) {
-        Text(value, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 22.sp, color = color, translate = false)
+        // While the figure is still coming, a block where it goes.
+        if (value == null && coming) FigureShape()
+        else Text(value ?: "–", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 22.sp, color = color, translate = false)
         Text(label, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, color = Kit.Muted)
     }
 }
@@ -347,10 +411,11 @@ private fun BannerLine() {
 /**
  * One application as the restaurant it would become (user, 2026-11-21: "I don't like this page, make it better"): its colour
  * band with how long it waited, the logo square on the edge, name and what it is, a strip of currency / time zone / wait, how
- * guests reach it, the future owner in their own box, and Reject / Approve across the foot.
+ * guests reach it. A click opens it big with everything, the owner and Reject / Approve (user, 2026-11-21: "you click and it
+ * opens big with all the info").
  */
 @Composable
-private fun ApplicationCard(application: RestaurantApplicationDto, state: ApplicationsState, model: RestaurantApplicationsScreenModel) {
+private fun ApplicationCard(application: RestaurantApplicationDto, state: ApplicationsState, onOpen: () -> Unit) {
     val zone = remember { TimeZone.currentSystemDefault() }
     val now = remember { kotlin.time.Clock.System.now() }
     val accent = accentOf(application.id)
@@ -364,7 +429,9 @@ private fun ApplicationCard(application: RestaurantApplicationDto, state: Applic
     val lift by animateDpAsState(if (hovered) 12.dp else 2.dp, label = "application-lift")
     val shape = RoundedCornerShape(18.dp)
     Surface(
-        Modifier.fillMaxWidth().hoverable(interaction).shadow(lift, shape, ambientColor = Color(0x16000000), spotColor = Color(0x1C000000)),
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth().shadow(lift, shape, ambientColor = Color(0x16000000), spotColor = Color(0x1C000000)),
+        interactionSource = interaction,
         shape = shape, color = Color.White,
         border = BorderStroke(if (approved) 2.dp else 1.dp, when {
             approved -> Kit.Green
@@ -374,8 +441,9 @@ private fun ApplicationCard(application: RestaurantApplicationDto, state: Applic
     ) {
         Box {
             Column {
-                Box(Modifier.fillMaxWidth().height(100.dp)) {
-                    CoverBackground(null, accent)
+                // A taller band (user, 2026-11-21): the applicant's own cover picture when they uploaded one.
+                Box(Modifier.fillMaxWidth().height(ApplicationBand)) {
+                    CoverBackground(application.coverUrl, accent)
                     if (approved) Box(Modifier.fillMaxSize().background(Kit.Green.copy(alpha = 0.18f)))
                     val (badge, badgeColor) = when {
                         approved -> "Approved" to Kit.Green
@@ -424,51 +492,220 @@ private fun ApplicationCard(application: RestaurantApplicationDto, state: Applic
                         FooterLine(Icons.Outlined.Phone, application.phone ?: "No phone")
                         FooterLine(Icons.Outlined.Language, application.website ?: "No website", if (application.website == null) Kit.Faint else Kit.Muted)
                     }
-                    application.owner?.let { owner ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(accent.softer).border(1.dp, accent.soft, RoundedCornerShape(12.dp))
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            com.saporini.mobile_desktop.core.components.InitialsAvatar(owner.displayName.ifBlank { owner.email ?: "?" }, color = accent.strong, size = 38.dp)
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(owner.displayName.ifBlank { "No name" }, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp,
-                                        color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
-                                    Text("OWNER", Modifier.clip(RoundedCornerShape(50)).background(accent.strong).padding(horizontal = 6.dp, vertical = 1.dp),
-                                        fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 9.sp, letterSpacing = 0.5.sp, color = Color.White)
-                                }
-                                Text(listOfNotNull(owner.username?.let { "@$it" }, owner.phone).joinToString(" · "), fontFamily = Inter(), fontSize = 11.5.sp,
-                                    color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
-                                owner.email?.let { Text(it, fontFamily = Inter(), fontSize = 11.5.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false) }
-                            }
-                        }
-                    }
                     application.rejectionReason?.takeIf { rejected }?.let { reason ->
                         MessageBar("Rejected: $reason", MessageKind.WARNING)
                     }
-                    if (rejected && state.canReview) {
-                        KitDivider()
-                        KitButton("Back to waiting", { model.startReopen(application) }, Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Outlined.Undo,
-                            style = ButtonStyle.SECONDARY)
-                    }
-                    if (waiting && state.canReview) {
-                        KitDivider()
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            KitButton("Reject", { model.startReject(application) }, Modifier.weight(1f), icon = Icons.Outlined.Close, style = ButtonStyle.DANGER_OUTLINE)
-                            KitButton("Approve", { model.startApprove(application) }, Modifier.weight(1f), icon = Icons.Outlined.Check)
+                    // The owner and the decision are inside: the foot only says what a click does.
+                    KitDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Spacer(Modifier.weight(1f))
+                        Row(
+                            Modifier.clip(RoundedCornerShape(50)).background(if (hovered) Kit.Green else Kit.GreenSoft).padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(if (waiting && state.canReview) "Review" else "Open", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                                color = if (hovered) Color.White else Kit.Green)
+                            Icon(Icons.AutoMirrored.Outlined.ArrowForward, null, Modifier.size(16.dp), tint = if (hovered) Color.White else Kit.Green)
                         }
                     }
                 }
             }
             // The logo square on the band's edge, as on the restaurant cards.
             Box(
-                Modifier.padding(start = 20.dp, top = 64.dp).size(64.dp).shadow(6.dp, RoundedCornerShape(18.dp))
+                Modifier.padding(start = 20.dp, top = ApplicationBand - 36.dp).size(64.dp).shadow(6.dp, RoundedCornerShape(18.dp))
                     .clip(RoundedCornerShape(18.dp)).background(Color.White).padding(3.dp)
             ) {
-                LogoTile(null, application.name, accent, Modifier.fillMaxSize().clip(RoundedCornerShape(15.dp)), 21)
+                ApplicantLogo(application.logoUrl, accent, Modifier.fillMaxSize().clip(RoundedCornerShape(15.dp)))
             }
         }
+    }
+}
+
+private val ApplicationBand = 150.dp
+
+/**
+ * The logo the applicant uploaded, or (until they do) a new-business sign on the card's colour instead of initials (user,
+ * 2026-11-21: "a special icon, and the image if they uploaded it").
+ */
+@Composable
+private fun ApplicantLogo(logoUrl: String?, accent: Accent, modifier: Modifier) {
+    com.saporini.mobile_desktop.core.ui.RemoteImage(logoUrl, "Logo", modifier, contentScale = ContentScale.Crop) {
+        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(accent.strong, accent.strong.copy(alpha = 0.78f)))),
+            contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.AddBusiness, null, Modifier.size(30.dp), tint = Color.White)
+        }
+    }
+}
+
+/**
+ * One application, big (user, 2026-11-21: "you click and it opens big with all the info"): the band with the applicant's
+ * pictures, the name, the full description, the restaurant's details beside the future owner's, the rejection reason when
+ * there is one, and Reject / Approve (or Back to waiting) at the foot. Starting a decision closes it; the usual question follows.
+ */
+@Composable
+private fun ApplicationDialog(application: RestaurantApplicationDto, state: ApplicationsState, model: RestaurantApplicationsScreenModel, onClose: () -> Unit) {
+    val zone = remember { TimeZone.currentSystemDefault() }
+    val now = remember { kotlin.time.Clock.System.now() }
+    val accent = accentOf(application.id)
+    val approved = state.approved?.application?.id == application.id
+    val rejected = application.status == "REJECTED"
+    val waiting = application.status == "PENDING" && !approved
+    val waited = waitedText(application.submittedAt, now)
+    AppDialog(
+        "Restaurant application", onClose,
+        subtitle = application.submittedAt?.let { "Applied ${com.saporini.mobile_desktop.core.format.agoText(it, now, zone)}" },
+        maxWidth = 980.dp,
+        buttons = {
+            KitButton("Close", onClose, style = ButtonStyle.SECONDARY)
+            Box(Modifier.weight(1f))
+            if (waiting && state.canReview) {
+                KitButton("Reject", { onClose(); model.startReject(application) }, icon = Icons.Outlined.Close, style = ButtonStyle.DANGER_OUTLINE)
+                KitButton("Approve", { onClose(); model.startApprove(application) }, icon = Icons.Outlined.Check)
+            } else if (rejected && state.canReview) {
+                KitButton("Back to waiting", { onClose(); model.startReopen(application) }, icon = Icons.AutoMirrored.Outlined.Undo, style = ButtonStyle.SECONDARY)
+            }
+        }
+    ) {
+        val narrow = com.saporini.mobile_desktop.core.components.LocalNarrowDialog.current
+        // The cover with the status on it and the logo on its edge; the name, what it is and the description under the logo
+        // (user, 2026-11-21: "why is the name next to the image, make it look better"), and its key facts as pills.
+        val band = if (narrow) 150.dp else 210.dp
+        val logo = if (narrow) 84.dp else 108.dp
+        val (badge, badgeColor) = when {
+            approved -> "Approved" to Kit.Green
+            rejected -> "Rejected" to Kit.Danger
+            waited != null -> "Waiting · $waited" to Kit.Amber
+            else -> "Waiting" to Kit.Amber
+        }
+        val facts: @Composable () -> Unit = {
+            application.currency.takeIf { it.isNotBlank() }?.let { FactPill(Icons.Outlined.Payments, "$it · ${currencyName(it)}") }
+            application.timezone.takeIf { it.isNotBlank() }?.let { FactPill(Icons.Outlined.Public, timeZoneLabel(it)) }
+            waited?.let { FactPill(Icons.Outlined.HourglassEmpty, if (rejected) "Waited $it" else "Waiting $it", if (rejected) Kit.Muted else Kit.Amber) }
+        }
+        Box(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth().height(band).clip(RoundedCornerShape(18.dp))) {
+                CoverBackground(application.coverUrl, accent)
+                Row(
+                    Modifier.align(Alignment.TopStart).padding(16.dp).shadow(2.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
+                        .background(Color.White).padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (approved) Icon(Icons.Outlined.Check, null, Modifier.size(14.dp), tint = badgeColor)
+                    else Box(Modifier.size(8.dp).clip(CircleShape).background(badgeColor))
+                    Text(badge, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = badgeColor, maxLines = 1)
+                }
+            }
+            Box(
+                Modifier.padding(start = 24.dp, top = band - logo / 2).size(logo).shadow(10.dp, RoundedCornerShape(26.dp))
+                    .clip(RoundedCornerShape(26.dp)).background(Color.White).padding(5.dp)
+            ) {
+                ApplicantLogo(application.logoUrl, accent, Modifier.fillMaxSize().clip(RoundedCornerShape(21.dp)))
+            }
+            // On a wide window the facts sit in the room beside the logo, under the cover.
+            if (!narrow) {
+                Row(Modifier.align(Alignment.BottomEnd).padding(end = 4.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { facts() }
+            }
+        }
+        Column(Modifier.padding(horizontal = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(application.name, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (narrow) 21.sp else 26.sp, letterSpacing = (-0.3).sp,
+                color = Kit.Ink, maxLines = 2, overflow = TextOverflow.Ellipsis, translate = false)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Outlined.Business, null, Modifier.size(15.dp), tint = Kit.Muted)
+                Text(application.legalName.takeIf { it.isNotBlank() && it != application.name } ?: "Same legal name", fontFamily = Inter(),
+                    fontSize = 13.5.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+            }
+            if (narrow) {
+                androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) { facts() }
+            }
+            Text(application.description?.takeIf { it.isNotBlank() } ?: "No description given.", Modifier.padding(top = 10.dp), fontFamily = Inter(),
+                fontSize = 14.5.sp, lineHeight = 22.sp, color = if (application.description.isNullOrBlank()) Kit.Faint else Kit.Ink,
+                translate = application.description.isNullOrBlank())
+        }
+        application.rejectionReason?.takeIf { rejected }?.let { reason -> MessageBar("Rejected: $reason", MessageKind.WARNING) }
+        val restaurant: @Composable (Modifier) -> Unit = { m ->
+            InfoSection("The restaurant", Icons.Outlined.Storefront, accent, m) {
+                InfoLine(Icons.Outlined.Mail, "Email", application.email ?: "No email", faint = application.email == null)
+                InfoLine(Icons.Outlined.Phone, "Phone", application.phone ?: "No phone", faint = application.phone == null)
+                InfoLine(Icons.Outlined.Language, "Website", application.website ?: "No website", faint = application.website == null)
+                InfoLine(Icons.Outlined.Event, "Applied", com.saporini.mobile_desktop.core.format.dateTimeText(application.submittedAt, zone))
+            }
+        }
+        val owner: @Composable (Modifier) -> Unit = { m ->
+            InfoSection("The owner", Icons.Outlined.Person, accent, m) {
+                val person = application.owner
+                if (person == null) {
+                    Text("No owner given.", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Faint)
+                } else {
+                    Row(Modifier.padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        com.saporini.mobile_desktop.core.components.InitialsAvatar(person.displayName.ifBlank { person.email ?: "?" }, color = accent.strong, size = 48.dp)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(person.displayName.ifBlank { "No name" }, Modifier.weight(1f, fill = false), fontFamily = Inter(), fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+                                Text("OWNER", Modifier.clip(RoundedCornerShape(50)).background(accent.strong).padding(horizontal = 6.dp, vertical = 1.dp),
+                                    fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 9.sp, letterSpacing = 0.5.sp, color = Color.White)
+                            }
+                            person.username?.let { Text("@$it", fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted, maxLines = 1, translate = false) }
+                        }
+                    }
+                    InfoLine(Icons.Outlined.Mail, "Email", person.email ?: "No email", faint = person.email == null)
+                    InfoLine(Icons.Outlined.Phone, "Phone", person.phone ?: "No phone", faint = person.phone == null)
+                    Text("Their account is made when you approve, and they get an email to set a password.", Modifier.padding(top = 4.dp),
+                        fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = Kit.Muted)
+                }
+            }
+        }
+        if (narrow) {
+            restaurant(Modifier.fillMaxWidth())
+            owner(Modifier.fillMaxWidth())
+        } else {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                restaurant(Modifier.weight(1.15f).fillMaxHeight())
+                owner(Modifier.weight(1f).fillMaxHeight())
+            }
+        }
+    }
+}
+
+/** One key fact under the cover: an icon and a few words in a soft pill. */
+@Composable
+private fun FactPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, tint: Color = Kit.Ink) {
+    Row(
+        Modifier.clip(RoundedCornerShape(50)).background(if (tint == Kit.Amber) Kit.Amber.copy(alpha = 0.10f) else Kit.Canvas)
+            .border(1.dp, if (tint == Kit.Amber) Kit.Amber.copy(alpha = 0.3f) else Kit.Border, RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(icon, null, Modifier.size(15.dp), tint = if (tint == Kit.Ink) Kit.Muted else tint)
+        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = tint, maxLines = 1)
+    }
+}
+
+/** A white box in the big window with its heading (icon in the card's colour) and lines under it. */
+@Composable
+private fun InfoSection(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, accent: Accent, modifier: Modifier,
+                        content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Surface(modifier, shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
+        Column {
+            Row(Modifier.fillMaxWidth().background(accent.softer).padding(horizontal = 16.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(icon, null, Modifier.size(18.dp), tint = accent.strong)
+                Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Kit.Ink)
+            }
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        }
+    }
+}
+
+/** One fact: its icon, what it is in grey, and the value. */
+@Composable
+private fun InfoLine(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String, faint: Boolean = false) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Icon(icon, null, Modifier.size(16.dp), tint = Kit.Muted)
+        Text(label, Modifier.width(84.dp), fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted, maxLines = 1)
+        Text(value, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.5.sp,
+            color = if (faint) Kit.Faint else Kit.Ink, maxLines = 2, overflow = TextOverflow.Ellipsis, translate = faint)
     }
 }
 

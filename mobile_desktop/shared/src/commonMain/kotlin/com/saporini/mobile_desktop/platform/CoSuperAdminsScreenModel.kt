@@ -26,6 +26,23 @@ import kotlinx.coroutines.launch
 
 const val CO_SUPER_ADMIN_ROLE = "CO_SUPER_ADMIN"
 
+/** The Admins page's "Assigned to" filter beside a restaurant's id: given every restaurant, or none yet. */
+const val ASSIGNED_EVERY = "*every*"
+const val ASSIGNED_NONE = "*none*"
+
+/** Where a support admin stands, for the Status filter. */
+enum class AdminStatus(val label: String) {
+    ACTIVE("Active"), TO_CONFIRM("Email to confirm"), OFF("Switched off");
+
+    companion object {
+        fun of(person: StaffUserDto): AdminStatus = when {
+            !person.isActive -> OFF
+            !person.emailVerified -> TO_CONFIRM
+            else -> ACTIVE
+        }
+    }
+}
+
 data class NewCoSuperAdminDraft(
     val firstName: String = "",
     val lastName: String = "",
@@ -76,8 +93,10 @@ data class AdminAccessEditor(
 data class CoSuperAdminsState(
     val allowed: Boolean = false,
     // Only the support admins (made by the Super Admin) are here; a restaurant's own admins are seen inside that restaurant
-    // (user, 2026-11-20). The list can be narrowed to the ones who take care of one restaurant (null = all).
+    // (user, 2026-11-20). One Filters button narrows the list (user, 2026-11-21: "a filter, not as if an admin belongs to a
+    // restaurant"): assigned to a restaurant (its id, ASSIGNED_EVERY or ASSIGNED_NONE; null = all) and their status.
     val restaurantFilter: String? = null,
+    val statusFilter: AdminStatus? = null,
     val restaurants: List<RestaurantRefDto> = emptyList(),
     val cards: List<AdminCardDto> = emptyList(),
     val access: AdminAccessEditor? = null,
@@ -91,6 +110,11 @@ data class CoSuperAdminsState(
     val saving: Boolean = false,
     val ticks: PermissionTicks? = null,
     val confirmRemove: StaffUserDto? = null,
+    // The support admin whose Edit window is open (user, 2026-11-21: "an Edit button where you go inside to do these actions"),
+    // and the "Are you sure?" for switching one off or emailing a password link from there.
+    val editing: String? = null,
+    val confirmSwitchOff: StaffUserDto? = null,
+    val confirmPassword: StaffUserDto? = null,
     // People being changed by a quick action (switch off, password email, remove).
     val busy: Set<String> = emptySet(),
     val notice: String? = null,
@@ -165,6 +189,10 @@ class CoSuperAdminsScreenModel(
     }
 
     fun filterRestaurant(restaurantId: String?) = mutable.update { it.copy(restaurantFilter = restaurantId) }
+
+    fun filterStatus(status: AdminStatus?) = mutable.update { it.copy(statusFilter = status) }
+
+    fun clearFilters() = mutable.update { it.copy(restaurantFilter = null, statusFilter = null) }
 
     // ---- A support admin's restaurants ----
 
@@ -341,11 +369,33 @@ class CoSuperAdminsScreenModel(
 
     fun askRemove(person: StaffUserDto) = mutable.update { it.copy(confirmRemove = person) }
 
+    fun openEdit(person: StaffUserDto) = mutable.update { it.copy(editing = person.id, notice = null, error = null) }
+
+    fun closeEdit() = mutable.update { it.copy(editing = null) }
+
+    fun askSwitchOff(person: StaffUserDto) = mutable.update { it.copy(confirmSwitchOff = person) }
+
+    fun askPassword(person: StaffUserDto) = mutable.update { it.copy(confirmPassword = person) }
+
+    fun dismissConfirm() = mutable.update { it.copy(confirmSwitchOff = null, confirmPassword = null) }
+
+    fun confirmSwitchOff() {
+        val person = state.value.confirmSwitchOff ?: return
+        mutable.update { it.copy(confirmSwitchOff = null) }
+        setPersonActive(person, false)
+    }
+
+    fun confirmPassword() {
+        val person = state.value.confirmPassword ?: return
+        mutable.update { it.copy(confirmPassword = null) }
+        sendPasswordEmail(person)
+    }
+
     fun dismissRemove() = mutable.update { it.copy(confirmRemove = null) }
 
     fun confirmRemove() {
         val person = state.value.confirmRemove ?: return
-        mutable.update { it.copy(confirmRemove = null) }
+        mutable.update { it.copy(confirmRemove = null, editing = null) }
         quick(person, "${person.displayName} was removed and can no longer sign in") {
             people.remove(person.id)
             mutable.update { state -> state.copy(people = state.people.filter { it.id != person.id }) }

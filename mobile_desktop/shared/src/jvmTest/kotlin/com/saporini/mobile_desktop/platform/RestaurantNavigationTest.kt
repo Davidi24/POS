@@ -72,9 +72,10 @@ class RestaurantNavigationTest {
         assertEquals(130,m.state.value.cards.size);assertFalse(m.state.value.hasNext)
         m.refresh();scheduler.runCurrent();assertEquals(listOf(0,1,2),calls.takeLast(3).map {it.second});assertEquals(130,m.state.value.cards.size)
     }
-    @Test fun searchAndFilterResetPagesAndClearOldResultsImmediately(){
+    @Test fun searchKeepsTheCardsUntilTheAnswerAndFilterClearsThem(){
         val m=list();m.loadMore();scheduler.runCurrent()
-        m.search("Restaurant 13");assertTrue(m.state.value.cards.isEmpty());scheduler.runCurrent()
+        val before=m.state.value.cards
+        m.search("Restaurant 13");assertEquals(before,m.state.value.cards);scheduler.runCurrent()
         assertEquals(listOf("r13","r130"),m.state.value.cards.map {it.id});assertEquals("Restaurant 13" to 0,calls.last())
         m.filter(RestaurantFilter.CLOSED);assertTrue(m.state.value.cards.isEmpty());scheduler.runCurrent();assertTrue(m.state.value.cards.isEmpty())
         m.search("x".repeat(150));scheduler.runCurrent();assertEquals(100,m.state.value.search.length)

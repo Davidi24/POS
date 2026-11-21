@@ -2,6 +2,7 @@ package com.saporini.mobile_desktop.platform.ui
 
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,6 +39,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -165,7 +168,13 @@ internal fun BranchListContent(
     LaunchedEffect(nearEnd, state.hasNext, state.loading, state.loadingMore, state.cards.size) {
         if (nearEnd && state.error == null) model.loadMore()
     }
-    Box(modifier, contentAlignment = Alignment.TopCenter) {
+    // Shapes like the branch cards until the first answer, held a moment so a quick load doesn't flash them; a search keeps
+    // the cards until its answer.
+    val shapes = com.saporini.mobile_desktop.core.components.steadyLoading(
+        state.canRead && ((!state.loaded && state.error == null) || (state.loading && state.cards.isEmpty())))
+    // Where the "Add branch" tab sits on the right edge (dragged up and down, like Add restaurant).
+    var addButtonPosition by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(.84f) }
+    BoxWithConstraints(modifier, contentAlignment = Alignment.TopCenter) {
         LazyVerticalGrid(
             GridCells.Adaptive(if (narrow) 300.dp else 460.dp),
             Modifier.widthIn(max = 1280.dp).fillMaxSize(),
@@ -175,22 +184,22 @@ internal fun BranchListContent(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
-                InsideRestaurantBand(state.restaurantName, logoUrl, coverUrl, place, state.restaurantId ?: state.restaurantName, narrow, onBack,
-                    refresh = { com.saporini.mobile_desktop.core.components.RefreshButton(state.loading, model::refresh) })
+                InsideRestaurantBand(state.restaurantName, logoUrl, coverUrl, place, state.restaurantId ?: state.restaurantName, narrow, onBack)
             }
             item(key = "heading", span = { GridItemSpan(maxLineSpan) }) {
                 Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Outlined.AccountTree, null, Modifier.size(20.dp), tint = Kit.Green)
                     Text("Its branches", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Kit.Ink)
+                    if (!state.loaded && state.error == null) FigureShape(28.dp)
                     if (state.loaded) {
                         Text("${state.allBranches}", Modifier.clip(RoundedCornerShape(50)).background(Kit.Tint).padding(horizontal = 10.dp, vertical = 3.dp),
                             fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Kit.Ink, translate = false)
                         Text(if (state.openBranches == 1L) "1 open" else "${state.openBranches} open", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted)
                     }
-                    if (!narrow) {
-                        Spacer(Modifier.weight(1f))
-                        Text("Choose the branch you work in", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted)
-                    }
+                    Spacer(Modifier.weight(1f))
+                    if (!narrow) Text("Choose the branch you work in", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted)
+                    // The reload at the right end of this row, not on the restaurant's picture (user, 2026-11-21).
+                    com.saporini.mobile_desktop.core.components.RefreshButton(state.loading, model::refresh)
                 }
             }
             // Searching makes sense once there is more than a handful; it stays while something is searched.
@@ -210,9 +219,7 @@ internal fun BranchListContent(
                 !state.canRead -> item(key = "denied", span = { GridItemSpan(maxLineSpan) }) {
                     OverviewEmpty("Access unavailable", "You do not have permission to view branches.", Icons.Outlined.Business)
                 }
-                !state.loaded && state.loading -> item(key = "loading", span = { GridItemSpan(maxLineSpan) }) {
-                    Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Kit.Green) }
-                }
+                shapes -> items(shapesFor(narrow), key = { "shape-$it" }) { ShapeCell { BranchCardShape(narrow) } }
                 !state.loaded && state.error != null -> item(key = "failed", span = { GridItemSpan(maxLineSpan) }) {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         OverviewEmpty("The branches couldn't be loaded", "Check the connection and try again.", Icons.Outlined.Business,
@@ -229,23 +236,37 @@ internal fun BranchListContent(
                         OverviewEmpty("No open branches", if (state.restaurantOpen) "The branches below are closed or inactive." else "This restaurant is closed or suspended.", Icons.Outlined.Business)
                     }
                     items(state.cards, key = { it.id }) { card ->
-                        BranchCard(card, state, model, state.restaurantId ?: state.restaurantName, narrow) { model.choose(card, onEntered) }
-                    }
-                    if (state.hasNext || state.loadingMore) item(key = "more", span = { GridItemSpan(maxLineSpan) }) {
-                        Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
-                            if (state.loadingMore) CircularProgressIndicator(Modifier.size(22.dp), color = Kit.Green, strokeWidth = 2.dp)
-                            else if (state.error != null) RetryText(onClick = model::loadMore)
-                            else com.saporini.mobile_desktop.core.components.KitButton("Show more branches", model::loadMore)
+                        Box(Modifier.animateItem(fadeInSpec = CardFadeIn, placementSpec = null, fadeOutSpec = tween(90))) {
+                            BranchCard(card, state, model, state.restaurantId ?: state.restaurantName, narrow) { model.choose(card, onEntered) }
                         }
                     }
-                    if (state.canChangeCover && !state.hasNext && state.search.isBlank()) item(key = "add", span = { GridItemSpan(maxLineSpan) }) {
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            AddTile("Add a branch", "It opens in the POS, kitchen and bookings", model::addBranch,
-                                modifier = Modifier.width(300.dp))
+                    // The next branches come in as card shapes at the end, then fade into their cards.
+                    if (state.loadingMore) items(if (narrow) 1 else 2, key = { "more-shape-$it" }) { ShapeCell { BranchCardShape(narrow) } }
+                    else if (state.hasNext) item(key = "more", span = { GridItemSpan(maxLineSpan) }) {
+                        Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+                            if (state.error != null) RetryText(onClick = model::loadMore)
+                            else com.saporini.mobile_desktop.core.components.KitButton("Show more branches", model::loadMore)
                         }
                     }
                 }
             }
+        }
+        // Add branch as the green tab on the right edge, the same as Add restaurant (user, 2026-11-21).
+        if (state.canChangeCover && state.canRead) {
+            val maxOffset = with(androidx.compose.ui.platform.LocalDensity.current) {
+                (maxHeight - com.saporini.mobile_desktop.core.components.edgeActionButtonHeight(narrow)).coerceAtLeast(0.dp).toPx()
+            }
+            com.saporini.mobile_desktop.core.components.RightEdgeActionButton(
+                "Add branch", model::addBranch, enabled = state.entering == null, width = if (narrow) 108.dp else 132.dp, compact = narrow,
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, kotlin.math.round(addButtonPosition * maxOffset).toInt()) }
+                    .draggable(
+                        orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                        state = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
+                            if (maxOffset > 0f) addButtonPosition = (addButtonPosition + delta / maxOffset).coerceIn(0f, 1f)
+                        }
+                    )
+            )
         }
     }
     state.branch?.let { step ->
@@ -267,8 +288,7 @@ private fun InsideRestaurantBand(
     place: String?,
     accentKey: String,
     narrow: Boolean,
-    onBack: () -> Unit,
-    refresh: @Composable () -> Unit
+    onBack: () -> Unit
 ) {
     val accent = accentOf(accentKey)
     val shape = RoundedCornerShape(20.dp)
@@ -285,7 +305,7 @@ private fun InsideRestaurantBand(
             }
             Row(Modifier.fillMaxSize().padding(start = 12.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(if (narrow) 10.dp else 14.dp)) {
-                BackArrow("Back to the restaurants", onBack)
+                PlainBackArrow("Back to the restaurants", onBack)
                 Box(Modifier.shadow(6.dp, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp)).background(Color.White).padding(3.dp)) {
                     RestaurantLogo(logoUrl, name, if (narrow) 52.dp else 66.dp)
                 }
@@ -316,7 +336,6 @@ private fun InsideRestaurantBand(
                         }
                     }
                 }
-                refresh()
             }
         }
     }

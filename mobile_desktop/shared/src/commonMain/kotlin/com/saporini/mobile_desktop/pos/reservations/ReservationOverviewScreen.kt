@@ -2017,7 +2017,7 @@ private fun LegendDot(color: Color, label: String) {
 // Narrow version of the reservation card for side lists: guest on top, table and status below.
 @Composable
 private fun CompactReservationCard(reservation: Reservation, relativeTo: Instant? = null, onClick: () -> Unit) {
-    val state = bookingState(reservation)
+    val state = shownBookingState(reservation)
     val label = state.text
     val statusColor = state.color
     val tables = reservation.tableAssignments.mapNotNull { it.tableNumber }
@@ -2091,7 +2091,7 @@ private fun ReservationCard(
     onClick: () -> Unit
 ) {
     // One state per booking: "Confirmed by app" until the guest confirms (user, 2026-11-02).
-    val state = bookingState(reservation)
+    val state = shownBookingState(reservation)
     val label = state.text
     val statusColor = state.color
     val tables = reservation.tableAssignments.mapNotNull { assignment ->

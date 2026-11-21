@@ -118,7 +118,7 @@ private val OpenGreen = Color(0xFF16A34A)
  */
 @Composable
 internal fun OpeningHoursTab(state: OpeningHoursState, model: OpeningHoursModel, size: ScreenSize, modifier: Modifier = Modifier) {
-    val dialogOpen = state.special != null || state.removing != null || state.opening
+    val dialogOpen = state.special != null || state.removing != null || state.opening || state.closedBookings != null
     Box(modifier.fillMaxWidth()) {
         ScrollColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             if (state.branches.size > 1) BranchChoice(state, model)
@@ -130,6 +130,7 @@ internal fun OpeningHoursTab(state: OpeningHoursState, model: OpeningHoursModel,
                 }
                 else -> {
                     NowCard(state, model, size)
+                    if (state.closedCount > 0) ClosedBookingsLine(state.closedCount, model::showClosedBookings)
                     if (state.hours?.set == true || state.changed) WeekCard(state, model, size)
                     SpecialDaysCard(state, model, size)
                 }
@@ -151,6 +152,22 @@ internal fun OpeningHoursTab(state: OpeningHoursState, model: OpeningHoursModel,
             onConfirm = model::removeSpecial, onDismiss = { model.askRemove(null) }, danger = true, busy = state.saving)
     }
     if (state.opening) OpenNowDialog(state.zone, state.saving, state.error, onDismiss = { model.askOpen(false) }, onOpen = model::openUntil)
+    ClosedBookingsDialog(state, model)
+}
+
+/** Bookings still in closed time (user, 2026-11-21): a red line on the page until they're moved or cancelled. */
+@Composable
+private fun ClosedBookingsLine(count: Int, onSee: () -> Unit) {
+    Surface(onClick = onSee, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = ClosedThenRed.copy(alpha = 0.07f),
+        border = BorderStroke(1.dp, ClosedThenRed.copy(alpha = 0.3f))) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Outlined.EventBusy, null, Modifier.size(18.dp), tint = ClosedThenRed)
+            Text(if (count == 1) "A booking falls when the branch is closed" else "$count bookings fall when the branch is closed",
+                Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = ClosedThenRed)
+            Text("See them", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ClosedThenRed)
+        }
+    }
 }
 
 // ---- Pieces of the page ----
@@ -610,7 +627,7 @@ private fun LoadingCards() {
 
 // ---- Dates in words ----
 
-private fun monthShort(date: LocalDate): String = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
+internal fun monthShort(date: LocalDate): String = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
 
 /** "Tue 24 Nov", with the year when it isn't this year. */
 internal fun shortDate(date: LocalDate, thisYear: Int = Clock.System.todayIn(TimeZone.currentSystemDefault()).year): String =
