@@ -76,4 +76,22 @@ public class AdminController {
     public AdminDtos.PlatformRequest decide(@PathVariable UUID requestId, @Valid @RequestBody AdminDtos.Decision decision, Authentication auth) {
         return adminService.decide(auth, requestId, decision);
     }
+
+    @PostMapping("/platform/requests/{requestId}/assign")
+    @Operation(summary = "Super Admin: give a waiting request to a support admin (adminId null takes it back)")
+    public AdminDtos.PlatformRequest assign(@PathVariable UUID requestId, @Valid @RequestBody AdminDtos.Assign assign, Authentication auth) {
+        return adminService.assign(auth, requestId, assign);
+    }
+
+    @PostMapping("/platform/requests/{requestId}/start")
+    @Operation(summary = "Start working on a waiting request (it shows In progress)")
+    public AdminDtos.PlatformRequest start(@PathVariable UUID requestId, Authentication auth) {
+        return adminService.start(auth, requestId);
+    }
+
+    @PostMapping("/platform/requests/{requestId}/solve")
+    @Operation(summary = "Close a waiting request as solved (the Super Admin, or the support admin it was given to)")
+    public AdminDtos.PlatformRequest solve(@PathVariable UUID requestId, @Valid @RequestBody AdminDtos.Solve solve, Authentication auth) {
+        return adminService.solve(auth, requestId, solve);
+    }
 }

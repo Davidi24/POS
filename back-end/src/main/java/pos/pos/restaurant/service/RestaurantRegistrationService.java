@@ -264,6 +264,36 @@ public class RestaurantRegistrationService {
                 approved.rejectionReason(), approved.submittedAt(), approved.reviewedAt(), approved.reviewedBy(), applicant);
     }
 
+    /**
+     * Brings a rejected application back to waiting (user, 2026-11-21: "I can return a rejected one if I want"): the reason
+     * goes, it waits again in its old place (by when it was sent) and can be approved or rejected anew. Refused while another
+     * application with the same owner email or username waits. Nothing is emailed; the applicant hears at the next decision.
+     */
+    @Transactional
+    public RestaurantApplicationResponse reopenRegistration(Authentication authentication, UUID restaurantId) {
+        restaurantScopeService.assertCanCreateRestaurant(authentication);
+        Restaurant restaurant = restaurantScopeService.requireExistingRestaurant(restaurantId);
+        if (restaurant.getStatus() != RestaurantStatus.REJECTED) {
+            throw new AuthException("Only a rejected application can go back to waiting", HttpStatus.CONFLICT);
+        }
+        if (restaurant.getPendingOwnerEmail() != null
+                && restaurantRepository.existsByStatusAndPendingOwnerEmailAndDeletedAtIsNull(RestaurantStatus.PENDING, restaurant.getPendingOwnerEmail())) {
+            throw new AuthException("Another application with this owner's email is already waiting", HttpStatus.CONFLICT);
+        }
+        if (restaurant.getPendingOwnerUsername() != null
+                && restaurantRepository.existsByStatusAndPendingOwnerUsernameAndDeletedAtIsNull(RestaurantStatus.PENDING, restaurant.getPendingOwnerUsername())) {
+            throw new AuthException("Another application with this owner's username is already waiting", HttpStatus.CONFLICT);
+        }
+        restaurant.setStatus(RestaurantStatus.PENDING);
+        restaurant.setActive(false);
+        restaurant.setRejectionReason(null);
+        restaurant.setReviewedAt(null);
+        restaurant.setReviewedBy(null);
+        restaurant.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        restaurantRepository.save(restaurant);
+        return toApplication(restaurant);
+    }
+
     private Branch firstBranch(Restaurant restaurant, UUID actorId) {
         Branch branch = new Branch();
         branch.setRestaurant(restaurant);
