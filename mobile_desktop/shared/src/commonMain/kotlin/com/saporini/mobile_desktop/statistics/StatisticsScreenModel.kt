@@ -142,6 +142,9 @@ data class StatisticsState(
     val restaurantName: String? = null,
     // The restaurant's first day (its first sale in the last year or the day it was added), for "All time".
     val openedOn: LocalDate? = null,
+    // The days closed by the opening hours, from a week before the period to the end of its month (null = no hours set:
+    // closed days are guessed from the sales).
+    val closedDays: Set<LocalDate>? = null,
     // Each branch's floors and their places, by branch id then floor name (empty when the tables can't be read), for Sales by floor.
     val floorPlaces: Map<String, Map<String, List<StatsPlace>>> = emptyMap(),
     // The order types the restaurant takes, from its settings (null = unknown: the figures decide).
@@ -260,6 +263,9 @@ class StatisticsScreenModel(
     private val restaurantNameOf: suspend (String) -> String? = { null },
     // The day the restaurant was added, for "All time".
     private val addedOn: suspend (String) -> LocalDate? = { null },
+    // The days it was (or will be) closed by its opening hours (restaurant, branch or null = every branch, from, to); null when
+    // no branch has opening hours yet, and the closed days are then guessed from the sales.
+    private val closedDaysOf: suspend (String, String?, LocalDate, LocalDate) -> Set<LocalDate>? = { _, _, _, _ -> null },
     // A day's orders (restaurant, branch or null = every branch, from, to) and one order's receipt, for the Day window.
     private val dayOrdersOf: suspend (String, String?, kotlin.time.Instant, kotlin.time.Instant) -> List<StatsOrder> = { _, _, _, _ -> emptyList() },
     private val receiptOf: suspend (String, String) -> com.saporini.mobile_desktop.pos.payment.data.ReceiptDto? = { _, _ -> null },
@@ -764,6 +770,12 @@ class StatisticsScreenModel(
                     val compareOverview = compared?.let { async { repository.overview(it) } }
                     val compareSales = compared?.let { async { repository.sales(it) } }
                     val compareMonth = wholeLastMonth?.let { async { try { repository.sales(it) } catch (e: CancellationException) { throw e } catch (_: Exception) { null } } }
+                    // From a week before (the calendar's changes) to the end of the month (the days to come), at most 400 days.
+                    val closed = async {
+                        val end = maxOf(to, LocalDate(to.year, to.month, 1).plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1)))
+                        val start = maxOf(from.minus(DatePeriod(days = 7)), end.minus(DatePeriod(days = 399)))
+                        try { closedDaysOf(restaurantId, shown.branchId, start, end) } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+                    }
                     // Each branch on its own, for the branch comparisons; one that fails is left out.
                     val branches = perBranch.map { branch ->
                         branch.id to async {
@@ -776,12 +788,13 @@ class StatisticsScreenModel(
                     val compareOverviewResult = compareOverview?.await()
                     val compareSalesResult = compareSales?.await()
                     val compareMonthResult = compareMonth?.await()
+                    val closedResult = closed.await()
                     val branchResults = branches.mapNotNull { (id, answer) -> answer.await()?.let { id to it } }.toMap()
                     if (token == revision) mutable.update {
                         it.copy(
                             overview = result, sales = salesResult, staff = staffResult,
                             compareOverview = compareOverviewResult, compareSales = compareSalesResult, compareWholeSales = compareMonthResult,
-                            branchOverviews = branchResults,
+                            branchOverviews = branchResults, closedDays = closedResult,
                             currencies = result.period.currencies, stale = false, error = null
                         )
                     }

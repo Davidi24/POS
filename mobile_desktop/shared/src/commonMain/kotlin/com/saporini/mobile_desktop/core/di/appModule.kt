@@ -127,6 +127,16 @@ private val appModule = module {
                 .mapNotNull { dish -> dish.imageUrl?.takeIf { it.isNotBlank() }?.let { url -> dish to url } }
                 .flatMap { (dish, url) -> listOf(dish.id to url, dish.name to url) }.toMap()
         }, restaurantNameOf = { restaurantId -> platform.restaurant(restaurantId).name },
+            closedDaysOf = { restaurantId, branchId, from, to ->
+                // Closed days from the opening hours (user, 2026-11-20): a day the restaurant was closed is one every branch with
+                // hours was closed (branches without hours left out); null when no branch has hours yet.
+                val hoursApi = get<com.saporini.mobile_desktop.hours.OpeningHoursApi>()
+                val ids = branchId?.let { listOf(it) } ?: platform.branches(restaurantId).filter { it.isActive }.map { it.id }
+                val calendars = ids.mapNotNull { id -> runCatching { hoursApi.calendar(restaurantId, id, from, to) }.getOrNull()?.takeIf { it.isNotEmpty() } }
+                if (calendars.isEmpty()) null
+                else calendars.map { days -> days.filter { it.closed }.mapNotNull { com.saporini.mobile_desktop.hours.dateOf(it.date) }.toSet() }
+                    .reduce { a, b -> a intersect b }
+            },
             addedOn = { restaurantId -> platform.restaurant(restaurantId).createdAt?.take(10)?.let { kotlinx.datetime.LocalDate.parse(it) } }, placesOf = { restaurantId ->
             // Every branch's tables by floor, grouped by the place they're in (Tables → Edit → Create places).
             val tablesApi = get<TableLayoutApi>()
@@ -164,10 +174,12 @@ private val appModule = module {
     factory { com.saporini.mobile_desktop.platform.BranchListScreenModel(repository = get(), session = get()) }
     factory { com.saporini.mobile_desktop.platform.RestaurantApplicationsScreenModel(repository = get(), session = get()) }
     factory { com.saporini.mobile_desktop.platform.CoSuperAdminsScreenModel(people = get(), platform = get(), session = get()) }
-    factory { com.saporini.mobile_desktop.platform.RestaurantDetailsScreenModel(repository = get(), people = get(), session = get()) }
+    factory { com.saporini.mobile_desktop.platform.RestaurantDetailsScreenModel(repository = get(), people = get(), session = get(), rates = get()) }
 
     single { com.saporini.mobile_desktop.notifications.NotificationApi(client = get()) }
     single { com.saporini.mobile_desktop.core.money.ExchangeRateApi(client = get()) }
+    single { com.saporini.mobile_desktop.hours.OpeningHoursApi(client = get()) }
+    factory { com.saporini.mobile_desktop.hours.OpeningHoursModel(api = get(), session = get()) }
     single { com.saporini.mobile_desktop.notifications.NotificationCenter(api = get(), sessionManager = get()) }
 
     single { MenuApi(client = get()) }

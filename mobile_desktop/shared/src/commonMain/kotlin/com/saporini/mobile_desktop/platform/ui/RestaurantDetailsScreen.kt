@@ -213,8 +213,21 @@ internal fun RestaurantDetailsContent(
     showTabs: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val tabs = if (state.superAdmin) RestaurantTab.entries else RestaurantTab.entries - RestaurantTab.MONEY
-    val shown = if (tab in tabs) tab else RestaurantTab.DETAILS
+    val tabs = when {
+        state.superAdmin -> RestaurantTab.entries
+        state.canEdit -> RestaurantTab.entries - RestaurantTab.MONEY
+        // Someone with only "Change opening hours" (a manager) sees just those.
+        else -> listOf(RestaurantTab.HOURS)
+    }
+    val shown = if (tab in tabs) tab else tabs.first()
+    // Opening hours have a model of their own, alive while this page is.
+    val hoursModel = remember { org.koin.mp.KoinPlatform.getKoinOrNull()?.getOrNull<com.saporini.mobile_desktop.hours.OpeningHoursModel>() }
+    androidx.compose.runtime.DisposableEffect(hoursModel) { onDispose { hoursModel?.close() } }
+    val hoursState = hoursModel?.state?.collectAsState()?.value
+    LaunchedEffect(shown == RestaurantTab.HOURS, state.restaurantId, state.branches) {
+        if (shown == RestaurantTab.HOURS) hoursModel?.setBranches(state.restaurantId,
+            state.branches.map { com.saporini.mobile_desktop.hours.HoursBranch(it.id, it.name) })
+    }
     // The Details tab is the form itself: it holds the saved details, ready to change in place (again after a save or Discard).
     LaunchedEffect(shown, state.details == null, state.restaurant?.version, state.canEdit) {
         if (shown == RestaurantTab.DETAILS && state.details == null && state.canEdit && state.restaurant != null) model.openDetailsForm()
@@ -230,7 +243,7 @@ internal fun RestaurantDetailsContent(
                 RefreshButton(state.loading, model::refresh, size = if (size.isPhone) 38.dp else com.saporini.mobile_desktop.core.components.PageControlHeight)
                 TabActions(shown, state, model, compact = size.isPhone)
             }
-            if (showTabs) RestaurantTabs(tabs, shown, onTab)
+            if (showTabs && tabs.size > 1) RestaurantTabs(tabs, shown, onTab)
             ScreenMessages(state.error.takeIf { !anyDialogOpen(state.copy(details = null)) && !(shown == RestaurantTab.DETAILS && detailsChanged(state)) },
                 state.notice, model::clearMessages)
             when {
@@ -239,12 +252,15 @@ internal fun RestaurantDetailsContent(
                 !state.loaded && state.loading -> OverviewPageSkeleton(size)
                 !state.loaded && state.error != null -> PageState(PageStateKind.FAILED, action = { RetryText(onClick = model::refresh) })
                 restaurant == null -> PageState(PageStateKind.LOADING)
+                shown == RestaurantTab.HOURS -> if (hoursModel != null && hoursState != null)
+                    com.saporini.mobile_desktop.hours.ui.OpeningHoursTab(hoursState, hoursModel, size, Modifier.fillMaxWidth().weight(1f))
                 else -> Box(Modifier.fillMaxWidth().weight(1f)) {
                     val unsaved = shown == RestaurantTab.DETAILS && detailsChanged(state)
                     com.saporini.mobile_desktop.core.components.ScrollColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         when (shown) {
                             RestaurantTab.DETAILS -> DetailsTab(state, model, size)
                             RestaurantTab.BRANCHES -> BranchesTab(state, model, size)
+                            RestaurantTab.HOURS -> {}
                             RestaurantTab.PLACES -> PlacesTab(state, model, size)
                             RestaurantTab.BRANDING -> BrandingTab(state, model, size)
                             RestaurantTab.LEGAL -> LegalTab(state, model)
@@ -400,6 +416,7 @@ private fun RestaurantTabs(tabs: List<RestaurantTab>, chosen: RestaurantTab, onT
 private fun tabIcon(tab: RestaurantTab) = when (tab) {
     RestaurantTab.DETAILS -> Icons.Outlined.Storefront
     RestaurantTab.BRANCHES -> Icons.Outlined.Business
+    RestaurantTab.HOURS -> Icons.Outlined.Schedule
     RestaurantTab.PLACES -> Icons.Outlined.Place
     RestaurantTab.BRANDING -> Icons.Outlined.Image
     RestaurantTab.LEGAL -> Icons.Outlined.Gavel
@@ -1179,7 +1196,8 @@ private fun CurrencyDialogRealMoney(flow: CurrencyFlow, state: RestaurantDetails
         val rate: @Composable (Modifier) -> Unit = { m ->
             TextInput(flow.rateText, { v -> model.changeCurrencyFlow { it.copy(rateText = v) } }, m,
                 label = "1 ${restaurant.currency} =", required = true, suffix = flow.newCurrency.ifBlank { null }, placeholder = "e.g. 100.5",
-                problem = if (flow.rateText.isNotBlank() && flow.rate == null) "A number above 0, up to 8 decimals" else null)
+                problem = if (flow.rateText.isNotBlank() && flow.rate == null) "A number above 0, up to 8 decimals" else null,
+                hint = if (flow.rateAuto) (flow.rateDate?.let { "Today's rate · $it. You can change it." } ?: "Today's rate. You can change it.") else null)
         }
         val rounding: @Composable (Modifier) -> Unit = { m ->
             SelectInput(flow.step, ROUNDING_STEPS, { "Round to $it" }, { s -> model.changeCurrencyFlow { it.copy(step = s) } }, m,

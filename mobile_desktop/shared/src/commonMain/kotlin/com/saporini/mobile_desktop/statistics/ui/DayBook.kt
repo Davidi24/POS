@@ -226,7 +226,7 @@ private fun DayCard(v: StatsView, d: DayPoint, tag: DayTag?, before: DayPoint?, 
     }
     val frame by androidx.compose.animation.animateColorAsState(if (flash) Kit.Green else Kit.Border, tween(400))
     val shape = RoundedCornerShape(14.dp)
-    val closed = d.sales == 0L && orders.isEmpty()
+    val closed = orders.isEmpty() && v.closedDay(d.date, d.sales, d.sales == 0L)
     Column(Modifier.fillMaxWidth().bringIntoViewRequester(requester).clip(shape).background(Color.White)
         .border(if (flash) 2.dp else 1.dp, frame, shape)) {
         // The day: its badge, its name and how it went.

@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
@@ -64,6 +66,7 @@ internal enum class WorkspacePage(val title: String, val workspace: Workspace) {
             when (tab) {
                 com.saporini.mobile_desktop.platform.RestaurantTab.DETAILS -> WorkspaceTab(tab.label, Icons.Outlined.Storefront, Icons.Filled.Storefront)
                 com.saporini.mobile_desktop.platform.RestaurantTab.BRANCHES -> WorkspaceTab(tab.label, Icons.Outlined.Business, Icons.Filled.Business)
+                com.saporini.mobile_desktop.platform.RestaurantTab.HOURS -> WorkspaceTab(tab.label, Icons.Outlined.Schedule, Icons.Filled.Schedule)
                 com.saporini.mobile_desktop.platform.RestaurantTab.PLACES -> WorkspaceTab(tab.label, Icons.Outlined.Place, Icons.Filled.Place)
                 com.saporini.mobile_desktop.platform.RestaurantTab.BRANDING -> WorkspaceTab(tab.label, Icons.Outlined.Palette, Icons.Filled.Palette)
                 com.saporini.mobile_desktop.platform.RestaurantTab.LEGAL -> WorkspaceTab(tab.label, Icons.Outlined.Gavel, Icons.Filled.Gavel)

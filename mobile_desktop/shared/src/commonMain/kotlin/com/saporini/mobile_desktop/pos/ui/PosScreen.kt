@@ -135,6 +135,11 @@ object PosScreen : Screen {
                         }
                     )
                 }
+                // Closed by its opening hours: a strip says so where guests are seated and orders started (user, 2026-11-20).
+                if (selected == PosSection.TABLES || selected == PosSection.ORDERS || selected == PosSection.RESERVATIONS) {
+                    com.saporini.mobile_desktop.hours.ui.BranchClosedStrip(currentUser?.restaurantId, currentUser?.defaultBranchId,
+                        currentUser?.permissions.orEmpty())
+                }
                 val payingFor = paymentOrderId
                 if (showPaymentScreen && payingFor != null) {
                     TakePaymentScreen(

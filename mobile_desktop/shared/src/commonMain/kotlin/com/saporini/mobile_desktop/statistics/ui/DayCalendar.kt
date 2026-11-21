@@ -260,7 +260,7 @@ private fun RowScope.DayCell(v: StatsView, date: LocalDate, point: DayPoint?, in
         }
         return
     }
-    val closed = point.sales == 0L
+    val closed = v.closedDay(point.date, point.sales, point.sales == 0L)
     val ring = when (tag) {
         DayTag.BEST -> DayTag.BEST.color
         DayTag.TODAY -> Kit.Blue

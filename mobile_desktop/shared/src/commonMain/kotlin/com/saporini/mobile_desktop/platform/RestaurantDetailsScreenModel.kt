@@ -28,6 +28,8 @@ import kotlinx.coroutines.sync.withLock
 enum class RestaurantTab(val label: String) {
     DETAILS("Details"),
     BRANCHES("Branches"),
+    // Each branch's week and special days (user, 2026-11-20, step 4).
+    HOURS("Opening hours"),
     PLACES("Address & contacts"),
     BRANDING("Logo & receipts"),
     LEGAL("Legal & tax"),
@@ -173,7 +175,10 @@ data class CurrencyFlow(
     val corrections: Map<String, String> = emptyMap(),
     val loading: Boolean = false,
     val saving: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    // The rate was filled in from today's rates (user, 2026-11-20: "today's rate, I can change it"), and their date.
+    val rateAuto: Boolean = false,
+    val rateDate: String? = null
 ) {
     val rate: OrderDecimal? get() = rateText.trim().replace(',', '.').takeIf { RATE.matches(it) && it.toDoubleOrNull()?.let { v -> v > 0 } == true }?.let(::OrderDecimal)
 
@@ -302,7 +307,9 @@ fun brandingDraftOf(branding: BrandingDto?) = BrandingDraft(
 class RestaurantDetailsScreenModel(
     private val repository: PlatformRepository,
     private val people: PeopleRepository,
-    private val session: SessionManager
+    private val session: SessionManager,
+    // Today's exchange rates, to fill in the currency change's rate.
+    private val rates: com.saporini.mobile_desktop.core.money.ExchangeRateApi? = null
 ) : ScreenModel {
 
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -924,11 +931,33 @@ class RestaurantDetailsScreenModel(
     fun changeCurrencyFlow(change: (CurrencyFlow) -> CurrencyFlow) = mutable.update { state ->
         val flow = state.currency ?: return@update state
         val changed = change(flow)
-        val next = if (changed.newCurrency != flow.newCurrency)
+        val picked = if (changed.newCurrency != flow.newCurrency)
             changed.copy(step = if (changed.newCurrency in ZERO_DECIMAL_CURRENCIES) "1" else "0.01") else changed
+        // A rate typed by the person is theirs; picking another currency fills in today's again.
+        val next = when {
+            picked.rateText != flow.rateText -> picked.copy(rateAuto = false, rateDate = null)
+            picked.newCurrency != flow.newCurrency && flow.rateAuto -> picked.copy(rateText = "", rateAuto = false, rateDate = null)
+            else -> picked
+        }
+        if (next.newCurrency != flow.newCurrency && next.newCurrency.isNotBlank() && (next.rateText.isBlank() || next.rateAuto)) fillRate(next.newCurrency)
         // A different currency, rate or rounding makes the preview out of date.
         val stale = next.newCurrency != flow.newCurrency || next.rateText != flow.rateText || next.step != flow.step
         state.copy(currency = if (stale) next.copy(preview = null, corrections = emptyMap(), error = null) else next)
+    }
+
+    /** Today's rate for 1 of the restaurant's currency in [to], filled in unless the person typed one meanwhile. */
+    private fun fillRate(to: String) {
+        val api = rates ?: return
+        val from = state.value.restaurant?.currency ?: return
+        actions.launch {
+            val answer = try { api.rates(to) } catch (e: CancellationException) { throw e } catch (_: Exception) { null } ?: return@launch
+            val rate = answer.rates[from]?.takeIf { it > 0 } ?: return@launch
+            mutable.update { s ->
+                val f = s.currency ?: return@update s
+                if (f.newCurrency != to || (f.rateText.isNotBlank() && !f.rateAuto)) return@update s
+                s.copy(currency = f.copy(rateText = rateText(rate), rateAuto = true, rateDate = answer.date, preview = null, corrections = emptyMap()))
+            }
+        }
     }
 
     fun cancelCurrencyChange() {
@@ -1087,4 +1116,12 @@ class RestaurantDetailsScreenModel(
         active = false
         work.cancel()
     }
+}
+
+/** A rate as the field takes it: at most 6 decimals, no trailing zeros ("98.12", "0.010203"). */
+internal fun rateText(rate: Double): String {
+    val micros = kotlin.math.round(rate * 1_000_000).toLong()
+    val whole = micros / 1_000_000
+    val part = (micros % 1_000_000).toString().padStart(6, '0').trimEnd('0')
+    return if (part.isEmpty()) "$whole" else "$whole.$part"
 }

@@ -109,6 +109,12 @@ internal class StatsView(val state: StatisticsState) {
     val filters: StatsFilters = state.filters
     val compareMode: CompareMode = state.compare
     val hasData: Boolean = overview != null
+    // The days closed by the branches' opening hours (user, 2026-11-20); null while no branch has hours, and then a day
+    // without sales stands in for a closed one.
+    val closedDays: Set<LocalDate>? = state.closedDays
+
+    /** Whether [date] counts as closed: by the opening hours (a closed day that still sold isn't), else by [guess]. */
+    fun closedDay(date: LocalDate, sales: Long, guess: Boolean): Boolean = closedDays?.let { date in it && sales == 0L } ?: guess
 
     // ---- The narrower filters (MOCK: shares of what's loaded) ----
 
