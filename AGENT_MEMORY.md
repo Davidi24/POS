@@ -1,3 +1,56 @@
+## 2026-11-21 — Requests as tickets; restaurant list buttons (Claude, `restaurant-and-branches-production`)
+- User: "only one: assign it and ask to put them in their restaurant"; "don't make it decline, just solved, and show the progress: open, in progress, assigned"; "Change position on the other side, Add restaurant on the right like our add button".
+- Server: `Assign.giveRestaurant` (adds the restaurant; NEED_ADMIN then APPROVED with "<name> takes care of you now."), V133 `started_at/by` + `POST /platform/requests/{id}/start`; reassigning clears the start.
+- App: Handle = Remove the owner / Assign to someone (+ Put them in?) / Mark as solved, Cancel instead of Decline; cards: stage pill, Open→Assigned→In progress→Solved steps, Start | Handle; tabs Open | Solved; banner counts per stage. Restaurant list: Add restaurant edge tab (right), Change position bottom-left, "Create a new restaurant" out of the banner.
+- Demo: Cafe request assigned to Marco, Pizza removal in progress, the old declined one SOLVED (also appended to the seed SQL). Backend (V133) and app restarted; not checked on screen by me.
+
+## 2026-11-21 — Requests: mark solved, assign to a support admin (Claude, `restaurant-and-branches-production`)
+- User: "I can handle it as solved if I want, or assign it to someone". V132 (status SOLVED; `assigned_to/by/at`, `assign_note`); `POST /platform/requests/{id}/solve` and `/assign` (`AdminService.solve/assign`, `requireSuperAdminOrAssignee`); support admins list only theirs and may decline / solve / remove an owner when allowed. App: Handle dialog with three tiles (do it, mark as solved, assign to someone + Take it back), cards show "Assigned to …", Solved chip; restaurant list shows Requests (N) to support admins with assigned ones.
+- Checked through the API (assign → Elira sees 1, her approve of NEED_ADMIN 403, her solve OK, solve of another 403), then put that request back by SQL. The demo seed SQL now leaves applications already approved (the user approved Trattoria Sole). 4 server-only messages not in the app table (the tool refuses rows not found in the app code). No notification/email to the assignee yet. Backend (V132) and app restarted.
+
+## 2026-11-21 — Requests: three a row, pages (Claude, `restaurant-and-branches-production`)
+- User: "make it 3 per row", "pagination". Grid cells from 340 dp (three a row at full width), pages of 12 on the device (all requests are loaded at once) with the Applications-style pager beside the reload and under the grid; each tab starts on page 1, an emptied page falls back. App rebuilt and restarted.
+
+## 2026-11-21 — Requests cards show the restaurant's picture (Claude, `restaurant-and-branches-production`)
+- User: "put the images here". `PlatformRequest` carries `restaurantCoverUrl` (server + app); each request card's band is now the restaurant's cover picture (`CoverBackground`) with a 4 dp strip of the kind's colour (red/blue) at its foot; kind and time pills are white so they read on photos. Backend and app rebuilt and restarted.
+
+## 2026-11-21 — Requests page redone (Claude, `restaurant-and-branches-production`)
+- User (screenshot): "the back arrow normal and make this page better". `RestaurantRequestsScreen` now has the top bar and page decorations, a banner like the Applications one (plain back arrow, figures, `users_owner`), Waiting (N) | Answered (N) + reload in one row, and cards in a `LazyVerticalGrid` like the application cards (kind band, logo on the edge, note, subject box, Decline | Handle or Your answer). Loads all requests once (`platformRequests(false)`). 16 translations. App rebuilt and restarted; not checked on screen by me.
+
+## 2026-11-21 — Applications: reload back, in the tabs row (Claude, `restaurant-and-branches-production`)
+- User asked why the reload went ("I don't like it" meant its place): it's back as the usual square `RefreshButton` at the far right of the tabs/search/pages row (beside the tabs on phones), not in the banner; the banner's spinner removed. App rebuilt and restarted.
+
+## 2026-11-21 — Applications: plain back, no refresh, pages, back to waiting (Claude, `restaurant-and-branches-production`)
+- User: "the back arrow is the normal one, I don't like the reload button, put pagination; and I can return a rejected one". Banner uses a plain `ArrowBack`, refresh button gone (a small spinner while a page loads), pages of 12 with ‹ Page n of m › beside the search and under the grid (model loads one page; `goToPage`; an emptied page falls back to the last one); tabs got a fixed width so the search shows again.
+- Server: `POST /restaurants/registrations/{id}/reopen` (rejected → waiting). App: "Back to waiting" on rejected cards with a confirm. Tested through the API (200, then 409), then reran the demo SQL, which also put the demo requests and Marco's restaurants back to their start.
+- `RestaurantApplicationsTest` paging test rewritten for pages of 12 (not run). Backend and app rebuilt and restarted.
+
+## 2026-11-21 — Applications page redone (Claude, `restaurant-and-branches-production`)
+- User (screenshot): "I don't like this page, make it better". `RestaurantApplicationsContent` is now a `LazyVerticalGrid`: banner like the restaurant list's (counts, oldest wait, picture), Waiting (N) | Rejected (N) tabs + search, application cards shaped like restaurant cards (band, logo on the edge, facts strip, contacts, owner box, Reject | Approve). Model loads both counts (size-1 calls; the test fake skips them in `calls`). 11 translations. App rebuilt and restarted; not checked on screen by me.
+
+## 2026-11-21 — Admins page as cards (Claude, `restaurant-and-branches-production`)
+- User (screenshot of the Admins list): "put the icons of users, make this good". Each support admin is now a card with the Users page's admin figure (`users_admin`), status, restaurants as chips, permissions line, Restaurants / What they can do buttons and ⋮; a dashed Add support admin tile ends the grid. `PersonRow` removed. 4 translations. App rebuilt and restarted; not checked on screen by me.
+
+## 2026-11-21 — Requests and applications demo data and handling, branch page (Claude, `restaurant-and-branches-production`)
+- User: "add some data for requests in both, make how I can handle them, an animation when I accept a restaurant; inside a restaurant with branches show at the top which restaurant I'm in, and branch cards different from restaurants".
+- Server: `AdminDtos.Decision` takes `supportAdminId` (approving NEED_ADMIN gives that support admin the restaurant, `AdminRepository.addRestaurant`); `PlatformRequest` carries the target's and the asker's email/phone and the restaurant's logo.
+- App: `RestaurantRequestsScreen` redone (cards with the restaurant's logo, kind pill, quote, Decline / Handle; `HandleRequestDialog` with steps; DoneBurst; animated leaving); `ApprovedCelebration.kt` (confetti + drawn tick) after approving an application, application cards show description, restaurant and owner columns; `BranchListScreen` band + new `BranchCard`; "Requests (N)" on the restaurant list; 58 translations.
+- Demo data SQL in the scratchpad (see AGENTS.md); approving/rejecting those applications emails plus addresses of the user's Gmail.
+- Not checked on screen by me; backend and app rebuilt and running. `RestaurantApplicationsTest` approval test updated to `approved`/`closeApproved` (not run).
+
+## 2026-11-20 (Claude, restaurant-and-branches-production, not committed) — Admins page: support admins only
+- User: the Super Admin's Admins page shows only the support admins he makes; restaurant admins are seen inside the restaurant; a filter by restaurant is enough. Removed the Support | Restaurant admins tabs and `RestaurantAdminRow`; added a restaurant select ("All restaurants" or one: those given it or all restaurants), `CoSuperAdminsState.restaurantFilter/restaurants`. `/platform/admins` still sends RESTAURANT cards (unused). App rebuilt and restarted.
+
+## 2026-11-20 (Claude, restaurant-and-branches-production, not committed) — Opening hours built (first version), demo pictures
+- User: "start building and we discuss it again after you finish this; put some good restaurant images so the page looks good". Covers (Unsplash) and monogram logos uploaded for every local restaurant and branch through the API.
+- Server: V131 + `pos.pos.hours` (service, controller with `@Transactional` methods: the branch check needs a session), HOURS_UPDATE / OPEN_OUTSIDE_HOURS (AppPermission, PermissionTree, Admin + Manager defaults), 409 guards (orders, table seating, booking and waitlist seating), online booking refusal, hours line on the guest page and in booking emails. `server.tsv` filled.
+- App: `hours/` (API, model, Restaurant info tab, POS closed strip, Open now dialog), `AdminSection.RESTAURANT_INFO` also with HOURS_UPDATE, staff booking warning, Statistics closed days from `/calendar`, currency rate from today's rates. `strings.tsv` +71 rows.
+- Demo hours: Main Branch and Durrës Seafront (see 04 file "Built"); Blloku left unset. Main Branch is closed between 23:30/01:00 and 11:00, so the POS there is blocked at night unless someone opens it (Open now).
+- Backend (V131) and app restarted. Not done: the guest booking form still lists 12:00–22:30 whatever the hours (the server refuses closed times). Next: go through it with the user, then the re-check of the finished pages and the other decisions.
+
+## 2026-11-20 (Claude, restaurant-and-branches-production) — Step 3 merged, step 4 branch
+- PR #103 merged by the user. New branch `restaurant-and-branches-production` from develop; README: step 3 merged, step 4 now. Step 4 decisions taken with the user (written in 04-restaurant-and-branches.md "Decisions"): opening hours per branch in Restaurant info, any number of openings a day, special days as dates or ranges, new permissions "Change opening hours" (owner, Admin, Manager by default) and "Open outside the hours" (Manager), the POS blocked while closed, hours used by Statistics, online and staff booking and shown to guests, today's rate in the currency change box. Next: re-check the finished pages together, then the screens.
+
 ## 2026-11-20 (Claude, users-and-roles-production) — Step 3 committed, PR #103
 - Full suite in a clean copy: 1,373 unit / 419 IT; 14 failures from the new rules fixed (MySales SALES_SELF, table layout TABLES_LAYOUT, menu prices, own pay SHIFT_PAY_SELF, role permission order by name, My Sales own only, close as unpaid / reopen for payment), Waiter gets ORDER_REOPEN_PAYMENT by default (waiters take the money when a guest comes back); `AbstractPosApiIntegrationTest.login` re-signs-in when a cached token was ended (order-dependent 401). App test sources compile.
 - Three commits (backend, app, docs) in the user's name, no Claude lines; pushed `users-and-roles-production`, PR #103 to develop. `res-closed.png` at the repo root is not ours, left untracked.

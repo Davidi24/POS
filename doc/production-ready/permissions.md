@@ -22,6 +22,7 @@ Columns: **Ow** Owner · **Co** Co-Owner · **Ad** Admin · **Ma** Manager · **
 | Tables | Change tables | Seat guests, set tables free or out of use, move guests and join tables | See tables | ✓ | ✓ | – | ✓ | ✓ | – | – | – | – |
 | Tables | Take payments | Request the bill and take the payment from a table | See tables | ✓ | ✓ | – | ✓ | ✓ | – | – | – | – |
 | Tables | Edit the floor plan | Add, move and remove tables, floors and places | See tables | ✓ | ✓ | – | ✓ | – | – | – | – | – |
+| Tables | Open outside the hours | Open the branch for now while it's closed: a late group, an event | See tables | ✓ | ✓ | – | ✓ | – | – | – | – | – |
 | Orders | See orders | The open orders and what's on them | Open POS | ✓ | ✓ | – | ✓ | ✓ | ✓ | – | – | ✓ |
 | Orders | Edit orders | Start orders, add and remove dishes, notes, send to the kitchen, serve, cancel unpaid-for orders | See orders | ✓ | ✓ | – | ✓ | ✓ | – | – | – | – |
 | Orders | Take payments | Request the bill and take the payment for an order | See orders | ✓ | ✓ | – | ✓ | ✓ | – | – | – | – |
@@ -117,6 +118,7 @@ Columns: **Ow** Owner · **Co** Co-Owner · **Ad** Admin · **Ma** Manager · **
 | Devices | Manage devices 🛡 | Add, connect and remove tills, tablets, printers and other devices | Open Admin Hub | ✓ | ✓ | – | – | – | – | – | – | – |
 | Restaurant info | See restaurant info | The restaurant's details, branches, logo and currency | Open Admin Hub | ✓ | ✓ | ✓ | ✓ | – | ✓ | – | – | – |
 | Restaurant info | Change restaurant info 🛡 | Description, phone, email, addresses, logo, colours and receipt texts | See restaurant info | ✓ | ✓ | – | – | – | – | – | – | – |
+| Restaurant info | Change opening hours | Each branch's week and its special days | See restaurant info | ✓ | ✓ | ✓ | ✓ | – | – | – | – | – |
 
 ## Statistics (to decide)
 

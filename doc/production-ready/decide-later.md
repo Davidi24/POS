@@ -60,7 +60,7 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
 
 ## Step 4 — Restaurant & branches
 
-1. **Today's exchange rate in the currency change.**
+1. ~~**Today's exchange rate in the currency change.**~~ Decided 2026-11-20: yes, filled in and can be changed (step 4).
    Today the person changing a restaurant's currency types the rate themselves. Frankfurter (`api.frankfurter.dev/v2/rates`,
    free, no key; it has the lek and the Dominican peso, among others) could fill it in: "Today's rate: 1 EUR = 90.29 ALL ·
    19 Nov".

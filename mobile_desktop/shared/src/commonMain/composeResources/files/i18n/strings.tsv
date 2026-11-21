@@ -2169,6 +2169,75 @@ Cash refunds a day	Rimborsi in contanti al giorno	Reembolsos en efectivo por dí
 Only someone who can change settings can switch checks on or off.	Solo chi può cambiare le impostazioni può attivare o disattivare i controlli.	Solo quien puede cambiar la configuración puede activar o desactivar los controles.	Vetëm dikush që mund të ndryshojë cilësimet mund t'i ndezë ose fikë kontrollet.
 {} risk	Rischio {}	Riesgo {}	Rrezik {}
 {} of {} on	{} di {} attivi	{} de {} activados	{} nga {} aktive
+Closed	Chiuso	Cerrado	I mbyllur
+At most {} openings a day	Al massimo {} aperture al giorno	Como máximo {} aperturas al día	Më së shumti {} hapje në ditë
+An opening can't close when it opens	Un'apertura non può chiudere quando apre	Una apertura no puede cerrar cuando abre	Një hapje nuk mund të mbyllet kur hapet
+Only the last opening of a day can run past midnight	Solo l'ultima apertura del giorno può andare oltre la mezzanotte	Solo la última apertura del día puede pasar de la medianoche	Vetëm hapja e fundit e ditës mund të shkojë pas mesnatës
+Openings in a day can't overlap	Le aperture di un giorno non possono sovrapporsi	Las aperturas de un día no pueden superponerse	Hapjet e një dite nuk mund të mbivendosen
+The last day comes after the first	L'ultimo giorno viene dopo il primo	El último día va después del primero	Dita e fundit vjen pas të parës
+Add when it opens and closes, or mark it closed	Aggiungi quando apre e chiude, oppure segnalo come chiuso	Agrega cuándo abre y cierra, o márcalo como cerrado	Shto kur hapet dhe mbyllet, ose shënoje të mbyllur
+Keep the note under {} characters	Tieni la nota sotto i {} caratteri	Mantén la nota por debajo de {} caracteres	Mbaje shënimin nën {} karaktere
+Opening hours saved	Orari di apertura salvato	Horario guardado	Orari i hapjes u ruajt
+Special day saved	Giorno speciale salvato	Día especial guardado	Dita e veçantë u ruajt
+Special day removed	Giorno speciale rimosso	Día especial eliminado	Dita e veçantë u hoq
+Open until {}	Aperto fino alle {}	Abierto hasta las {}	Hapur deri në {}
+Closed again	Di nuovo chiuso	Cerrado de nuevo	U mbyll përsëri
+Monday	Lunedì	Lunes	E hënë
+Tuesday	Martedì	Martes	E martë
+Wednesday	Mercoledì	Miércoles	E mërkurë
+Thursday	Giovedì	Jueves	E enjte
+Friday	Venerdì	Viernes	E premte
+Saturday	Sabato	Sábado	E shtunë
+Sunday	Domenica	Domingo	E diel
+Open outside the hours until {}	Aperto fuori orario fino alle {}	Abierto fuera de horario hasta las {}	Hapur jashtë orarit deri në {}
+Opened for now. Seating and new orders work until then.	Aperto per ora. Accomodare ospiti e nuovi ordini funzionano fino ad allora.	Abierto por ahora. Sentar comensales y nuevos pedidos funcionan hasta entonces.	Hapur për tani. Uljet dhe porositë e reja funksionojnë deri atëherë.
+Close again	Chiudi di nuovo	Cerrar de nuevo	Mbyll përsëri
+Closed now	Chiuso ora	Cerrado ahora	Mbyllur tani
+No opening in the next 30 days	Nessuna apertura nei prossimi 30 giorni	Sin aperturas en los próximos 30 días	Asnjë hapje në 30 ditët e ardhshme
+Seating guests and new orders wait until it opens. Open orders can still be paid.	Accomodare ospiti e nuovi ordini aspettano l'apertura. Gli ordini aperti si possono ancora pagare.	Sentar comensales y nuevos pedidos esperan a que abra. Los pedidos abiertos aún se pueden pagar.	Ulja e mysafirëve dhe porositë e reja presin hapjen. Porositë e hapura mund të paguhen ende.
+Open now	Apri ora	Abrir ahora	Hape tani
+No branches yet	Ancora nessuna sede	Todavía no hay sucursales	Ende pa pika
+Opening hours belong to a branch. Add one first.	L'orario di apertura appartiene a una sede. Aggiungine prima una.	El horario pertenece a una sucursal. Agrega una primero.	Orari i hapjes i përket një pike. Shto një fillimisht.
+Could not load the opening hours	Impossibile caricare l'orario di apertura	No se pudo cargar el horario	Orari i hapjes nuk u ngarkua
+You changed the opening hours	Hai modificato l'orario di apertura	Cambiaste el horario	Ndryshove orarin e hapjes
+Remove this special day?	Rimuovere questo giorno speciale?	¿Eliminar este día especial?	Ta heqësh këtë ditë të veçantë?
+{} goes back to the usual week.	{} torna alla solita settimana.	{} vuelve a la semana habitual.	{} kthehet te java e zakonshme.
+Set opening hours	Imposta l'orario di apertura	Configurar el horario	Vendos orarin e hapjes
+Opening hours aren't set yet	L'orario di apertura non è ancora impostato	El horario aún no está configurado	Orari i hapjes nuk është vendosur ende
+Until they are, this branch counts as always open: nothing is blocked.	Finché non lo è, questa sede conta come sempre aperta: nulla è bloccato.	Hasta entonces, esta sucursal cuenta como siempre abierta: nada se bloquea.	Deri atëherë, kjo pikë quhet gjithmonë e hapur: asgjë nuk bllokohet.
+Open outside the hours	Aperto fuori orario	Abierto fuera de horario	Hapur jashtë orarit
+Until {}	Fino alle {}	Hasta las {}	Deri në {}
+Opens at {}	Apre alle {}	Abre a las {}	Hapet në {}
+Opens tomorrow at {}	Apre domani alle {}	Abre mañana a las {}	Hapet nesër në {}
+Opens {} at {}	Apre {} alle {}	Abre el {} a las {}	Hapet {} në {}
+The week	La settimana	La semana	Java
+When guests can book and the POS seats guests and starts orders. A closing at or before the opening is the next day (19:00–01:00).	Quando gli ospiti possono prenotare e il POS accomoda ospiti e apre ordini. Una chiusura uguale o prima dell'apertura è il giorno dopo (19:00–01:00).	Cuándo los comensales pueden reservar y el POS sienta comensales y abre pedidos. Un cierre a la hora de apertura o antes es el día siguiente (19:00–01:00).	Kur mysafirët mund të rezervojnë dhe POS-i ul mysafirë e hap porosi. Një mbyllje në orën e hapjes ose para saj është ditën tjetër (19:00–01:00).
+Times in {}	Orari in {}	Horas en {}	Oraret në {}
+Closed all day	Chiuso tutto il giorno	Cerrado todo el día	Mbyllur gjithë ditën
+Add opening	Aggiungi apertura	Agregar apertura	Shto hapje
+next day	giorno dopo	día siguiente	ditën tjetër
+Remove this opening	Rimuovi questa apertura	Eliminar esta apertura	Hiq këtë hapje
+Copy {}'s hours	Copia l'orario di {}	Copiar el horario del {}	Kopjo orarin e {}
+Copy to every day	Copia su tutti i giorni	Copiar a todos los días	Kopjo në çdo ditë
+Copy to Monday – Friday	Copia da lunedì a venerdì	Copiar de lunes a viernes	Kopjo nga e hëna në të premte
+Copy to Saturday and Sunday	Copia su sabato e domenica	Copiar al sábado y domingo	Kopjo në të shtunë dhe të diel
+Special days	Giorni speciali	Días especiales	Ditë të veçanta
+Holidays, a private event, a day you open late. They win over the week.	Festività, un evento privato, un giorno in cui apri tardi. Valgono più della settimana.	Feriados, un evento privado, un día en que abres tarde. Tienen prioridad sobre la semana.	Festa, një event privat, një ditë që hap vonë. Kanë përparësi ndaj javës.
+Add special day	Aggiungi giorno speciale	Agregar día especial	Shto ditë të veçantë
+No special days coming up.	Nessun giorno speciale in arrivo.	No hay días especiales próximos.	Asnjë ditë e veçantë së shpejti.
+Special days count once the week's hours are set.	I giorni speciali contano quando l'orario della settimana è impostato.	Los días especiales cuentan cuando el horario de la semana está configurado.	Ditët e veçanta vlejnë pasi të vendoset orari i javës.
+Change special day	Modifica giorno speciale	Editar día especial	Ndrysho ditën e veçantë
+A date or a few days in a row: closed, or other hours.	Una data o alcuni giorni di fila: chiuso, o un altro orario.	Una fecha o varios días seguidos: cerrado, u otro horario.	Një datë ose disa ditë rresht: mbyllur, ose orar tjetër.
+Which days	Quali giorni	Qué días	Cilat ditë
+Those days	Quei giorni	Esos días	Ato ditë
+Other hours	Altro orario	Otro horario	Orar tjetër
+Christmas Eve, a private event…	Vigilia di Natale, un evento privato…	Nochebuena, un evento privado…	Nata e Krishtlindjes, një event privat…
+Guests see it on the booking page.	Gli ospiti la vedono nella pagina di prenotazione.	Los comensales la ven en la página de reservas.	Mysafirët e shohin në faqen e rezervimit.
+Guests can be seated and orders started until then.	Fino ad allora si possono accomodare ospiti e aprire ordini.	Hasta entonces se puede sentar a comensales y abrir pedidos.	Deri atëherë mund të ulen mysafirë dhe të hapen porosi.
+Until a time	Fino a un'ora	Hasta una hora	Deri në një orë
+Until	Fino a	Hasta	Deri
+Open until {} tomorrow	Aperto fino alle {} di domani	Abierto hasta mañana a las {}	Hapur deri nesër në {}
+Open it for at most 18 hours.	Aprilo per al massimo 18 ore.	Ábrelo como máximo 18 horas.	Hape për më së shumti 18 orë.
 menu:	menu:	menu:	menu:
 station:	station:	station:	station:
 Unexpected station in response	Postazione inattesa nella risposta	Estación inesperada en la respuesta	Stacion i papritur në përgjigje
@@ -2453,7 +2522,6 @@ Indonesian rupiah	Rupia indonesiana	Rupia indonesia	Rupi indoneziane
 Etc/	Etc/	Etc/	Etc/
 SystemV/	SystemV/	SystemV/	SystemV/
 Suspended	Sospeso	Suspendido	I pezulluar
-Closed	Chiuso	Cerrado	I mbyllur
 Closed for now	Chiuso per ora	Cerrado por ahora	I mbyllur për tani
 Where guests find it	Dove lo trovano gli ospiti	Dónde lo encuentran los clientes	Ku e gjejnë mysafirët
 Registered (legal) address	Sede legale	Domicilio fiscal	Adresa ligjore
@@ -2474,9 +2542,10 @@ Restaurant session changed	Sessione del ristorante cambiata	La sesión del resta
 You no longer have permission for this action.	Non hai più il permesso per questa azione.	Ya no tienes permiso para esta acción.	Nuk ke më leje për këtë veprim.
 Rejected	Rifiutato	Rechazado	Refuzuar
 the reason the applicant will see	il motivo che vedrà il richiedente	el motivo que verá el solicitante	arsyen që do të shohë aplikuesi
-{} is approved. {} got an email to set a password.	{} è approvato. {} ha ricevuto un'email per impostare una password.	{} está aprobado. {} recibió un correo para crear una contraseña.	{} u miratua. {} mori një email për të vendosur fjalëkalimin.
+{} is waiting again.	{} è di nuovo in attesa.	{} está otra vez en espera.	{} është sërish në pritje.
 {} was rejected. The applicant got an email with the reason.	{} è stato rifiutato. Il richiedente ha ricevuto un'email con il motivo.	{} fue rechazado. El solicitante recibió un correo con el motivo.	{} u refuzua. Aplikuesi mori një email me arsyen.
 Branches	Sedi	Sucursales	Pikat
+Opening hours	Orario di apertura	Horario	Orari i hapjes
 Address & contacts	Indirizzo e contatti	Dirección y contactos	Adresa dhe kontaktet
 Logo & receipts	Logo e scontrini	Logo y recibos	Logoja dhe faturat
 Legal & tax	Dati legali e fiscali	Legal e impuestos	Ligjore dhe tatimore
@@ -2536,9 +2605,16 @@ Manage restaurant	Gestisci ristorante	Gestionar restaurante	Menaxho restorantin
 Switch branch	Cambia sede	Cambiar sucursal	Ndrysho pikën
 Branches unavailable · Try again	Sedi non disponibili · Riprova	Sucursales no disponibles · Reintentar	Pikat nuk janë të disponueshme · Provo përsëri
 This restaurant is closed	Questo ristorante è chiuso	Este restaurante está cerrado	Ky restorant është i mbyllur
-No branches yet	Ancora nessuna sede	Todavía no hay sucursales	Ende pa pika
 Show more branches ({} more)	Mostra altre sedi (altre {})	Mostrar más sucursales ({} más)	Shfaq më shumë pika (edhe {})
 All restaurants	Tutti i ristoranti	Todos los restaurantes	Të gjitha restorantet
+The owner	Il titolare	El dueño	Pronari
+{} is approved	{} è approvato	{} está aprobado	{} u miratua
+{} got an email to set a password and becomes its owner.	{} ha ricevuto un'email per scegliere la password e ne diventa il titolare.	{} recibió un correo para crear su contraseña y pasa a ser el dueño.	{} mori një email për të vendosur fjalëkalimin dhe bëhet pronari i tij.
+Its first branch, Main, is ready to set up.	La sua prima sede, Main, è pronta da configurare.	Su primera sucursal, Main, está lista para configurar.	Dega e parë, Main, është gati për t'u ngritur.
+It's last on your restaurant list.	È l'ultimo nella tua lista di ristoranti.	Está al final de tu lista de restaurantes.	Është i fundit në listën e restoranteve.
+No more applications waiting.	Nessun'altra richiesta in attesa.	No quedan más solicitudes en espera.	Nuk ka më aplikime në pritje.
+1 more application is waiting.	C'è ancora 1 richiesta in attesa.	Queda 1 solicitud más en espera.	Edhe 1 aplikim është në pritje.
+{} more applications are waiting.	Ci sono ancora {} richieste in attesa.	Quedan {} solicitudes más en espera.	Edhe {} aplikime janë në pritje.
 e.g. Blloku	es. Blloku	p. ej. Blloku	p.sh. Blloku
 Made from the name when empty	Ricavato dal nome se vuoto	Se crea a partir del nombre si está vacío	Krijohet nga emri kur është bosh
 Printed on this branch's receipts	Stampato sugli scontrini di questa sede	Se imprime en los recibos de esta sucursal	Printohet në faturat e kësaj pike
@@ -2546,9 +2622,9 @@ Street	Via	Calle	Rruga
 Postal code	CAP	Código postal	Kodi postar
 City	Città	Ciudad	Qyteti
 Country	Paese	País	Shteti
-Back to the restaurants	Torna ai ristoranti	Volver a los restaurantes	Kthehu te restorantet
-Choose a branch	Scegli una sede	Elige una sucursal	Zgjidh një pikë
-{} · {} · {} open	{} · {} · {} aperte	{} · {} · {} abiertas	{} · {} · {} të hapura
+Its branches	Le sue sedi	Sus sucursales	Degët e tij
+1 open	1 aperta	1 abierta	1 e hapur
+Choose the branch you work in	Scegli la sede in cui lavori	Elige la sucursal en la que trabajas	Zgjidh degën ku punon
 Search by name, code, city or street	Cerca per nome, codice, città o via	Buscar por nombre, código, ciudad o calle	Kërko sipas emrit, kodit, qytetit ose rrugës
 1 branch found	1 sede trovata	1 sucursal encontrada	U gjet 1 pikë
 {} branches found	{} sedi trovate	{} sucursales encontradas	U gjetën {} pika
@@ -2567,30 +2643,31 @@ Add a branch	Aggiungi una sede	Añadir una sucursal	Shto një pikë
 It opens in the POS, kitchen and bookings	Si apre nel POS, in cucina e nelle prenotazioni	Se abre en el POS, la cocina y las reservas	Hapet në POS, kuzhinë dhe rezervime
 Add a branch to {}	Aggiungi una sede a {}	Añadir una sucursal a {}	Shto një pikë te {}
 Add branch	Aggiungi sede	Añadir sucursal	Shto pikë
-1 branch	1 sede	1 sucursal	1 pikë
-{} branches	{} sedi	{} sucursales	{} pika
+Back to the restaurants	Torna ai ristoranti	Volver a los restaurantes	Kthehu te restorantet
+YOU'RE INSIDE THIS RESTAURANT	SEI DENTRO QUESTO RISTORANTE	ESTÁS DENTRO DE ESTE RESTAURANTE	JE BRENDA KËTIJ RESTORANTI
+{} staff	{} persone	{} personas	{} punonjës
+Work here	Lavora qui	Trabajar aquí	Puno këtu
 Unavailable	Non disponibile	No disponible	E padisponueshme
-No phone yet	Ancora nessun telefono	Todavía sin teléfono	Ende pa telefon
-No email yet	Ancora nessuna email	Todavía sin correo	Ende pa email
 Admins	Amministratori	Administradores	Administratorë
 Support admins take care of the restaurants you give them	Gli admin di supporto si occupano dei ristoranti che gli dai	Los admins de soporte se encargan de los restaurantes que les das	Adminët e mbështetjes kujdesen për restorantet që u jep
-Restaurant admins are made by an owner and work only in that restaurant	Gli admin del ristorante li crea un proprietario e lavorano solo in quel ristorante	Los admins del restaurante los crea un dueño y trabajan solo en ese restaurante	Adminët e restorantit i krijon një pronar dhe punojnë vetëm në atë restorant
 Add support admin	Aggiungi admin di supporto	Agregar admin de soporte	Shto admin mbështetjeje
-Support admins · {}	Admin di supporto · {}	Admins de soporte · {}	Adminët e mbështetjes · {}
-Restaurant admins · {}	Admin del ristorante · {}	Admins del restaurante · {}	Adminët e restorantit · {}
+{} of {}	{} di {}	{} de {}	{} nga {}
 Only the Super Admin	Solo il Super Admin	Solo el Super Admin	Vetëm Super Admin
 Only the Super Admin adds Co-Super-Admins and chooses what they can do.	Solo il Super Admin aggiunge i Co-Super-Admin e sceglie cosa possono fare.	Solo el Super Admin añade Co-Super-Admins y elige lo que pueden hacer.	Vetëm Super Admin shton Co-Super-Admin dhe zgjedh çfarë mund të bëjnë.
-No restaurant admins	Nessun admin del ristorante	Sin admins del restaurante	Asnjë admin restoranti
-Owners add admins for their own restaurant in Admin Hub → Users.	I proprietari aggiungono gli admin del proprio ristorante in Admin Hub → Utenti.	Los dueños agregan admins para su restaurante en Admin Hub → Usuarios.	Pronarët shtojnë adminë për restorantin e tyre te Admin Hub → Përdoruesit.
 No support admins yet	Ancora nessun admin di supporto	Aún no hay admins de soporte	Ende asnjë admin mbështetjeje
 Add someone to take care of restaurants for you. They work only in the restaurants you give them.	Aggiungi qualcuno che si occupi dei ristoranti per te. Lavora solo nei ristoranti che gli dai.	Agrega a alguien que se encargue de restaurantes por ti. Trabaja solo en los restaurantes que le das.	Shto dikë që të kujdeset për restorantet për ty. Punon vetëm në restorantet që i jep.
+Nobody takes care of this restaurant	Nessuno si occupa di questo ristorante	Nadie se ocupa de este restaurante	Askush nuk kujdeset për këtë restorant
+Give it to a support admin from their restaurants.	Assegnalo a un admin di supporto dai suoi ristoranti.	Asígnalo a un admin de soporte desde sus restaurantes.	Jepja një admini mbështetës nga restorantet e tij.
+They take care of the restaurants you give them	Si occupano dei ristoranti che gli affidi	Se encargan de los restaurantes que les asignas	Kujdesen për restorantet që u jep
 They work only in the restaurants you give them and do only what you allow. They never see or change you, remove owners only when you allow it, and remove only people they added themselves.	Lavorano solo nei ristoranti che gli dai e fanno solo ciò che permetti. Non vedono né modificano mai te, rimuovono i proprietari solo se lo permetti e rimuovono solo persone che hanno aggiunto loro.	Trabajan solo en los restaurantes que les das y hacen solo lo que permites. Nunca te ven ni te cambian, quitan dueños solo si lo permites y quitan solo a personas que agregaron ellos.	Punojnë vetëm në restorantet që u jep dhe bëjnë vetëm atë që lejon. Nuk të shohin e nuk të ndryshojnë kurrë, heqin pronarë vetëm kur e lejon dhe heqin vetëm njerëz që i kanë shtuar vetë.
 They can no longer sign in or take care of any restaurant. People and changes they made stay. To stop them for a while, switch them off instead.	Non potrà più accedere né occuparsi di alcun ristorante. Le persone e le modifiche che ha fatto restano. Per fermarlo per un po', disattivalo invece.	Ya no podrá iniciar sesión ni encargarse de ningún restaurante. Las personas y cambios que hizo se quedan. Para detenerlo por un tiempo, desactívalo.	Nuk do të mund të hyjë më as të kujdeset për asnjë restorant. Njerëzit dhe ndryshimet që bëri mbeten. Për ta ndaluar për pak kohë, çaktivizoje.
 Email to confirm	Email da confermare	Correo por confirmar	Email për t'u konfirmuar
-No restaurants yet	Ancora nessun ristorante	Todavía no hay restaurantes	Ende pa restorante
-{} restaurants	{} ristoranti	{} restaurantes	{} restorante
-Can do everything	Può fare tutto	Puede hacer todo	Mund të bëjë gjithçka
+SUPPORT ADMIN	ADMIN DI SUPPORTO	ADMIN DE SOPORTE	ADMIN NDIHME
 Send password reset	Invia reimpostazione password	Enviar restablecimiento de contraseña	Dërgo rivendosjen e fjalëkalimit
+TAKES CARE OF	SI OCCUPA DI	SE ENCARGA DE	KUJDESET PËR
+No restaurants yet	Ancora nessun ristorante	Todavía no hay restaurantes	Ende pa restorante
+Can do everything	Può fare tutto	Puede hacer todo	Mund të bëjë gjithçka
+May remove owners	Può rimuovere i titolari	Puede quitar dueños	Mund të heqë pronarë
 Add a support admin	Aggiungi un admin di supporto	Agregar un admin de soporte	Shto një admin mbështetjeje
 They confirm their email, then sign in with this temporary password and choose their own.	Conferma l'email, poi accede con questa password temporanea e sceglie la propria.	Confirma su correo, luego inicia sesión con esta contraseña temporal y elige la suya.	Konfirmon email-in, pastaj hyn me këtë fjalëkalim të përkohshëm dhe zgjedh të vetin.
 Share it with them yourself; it isn't emailed	Comunicaglielo tu; non viene inviato via email	Compártela tú; no se envía por correo	Jepja vetë; nuk dërgohet me email
@@ -2602,7 +2679,6 @@ Find a permission (e.g. refund, menus, delete)	Trova un permesso (es. rimborso, 
 All on	Tutto attivo	Todo activado	Të gjitha aktive
 All off	Tutto disattivato	Todo desactivado	Të gjitha joaktive
 Without “View Restaurants” {} can't see the restaurant list, so they can't open any restaurant.	Senza “Vedere i ristoranti” {} non vede l'elenco dei ristoranti, quindi non può aprirne nessuno.	Sin “Ver restaurantes” {} no ve la lista de restaurantes, así que no puede abrir ninguno.	Pa “Shiko restorantet” {} nuk e sheh listën e restoranteve, ndaj nuk mund të hapë asnjë.
-Restaurant admin	Admin del ristorante	Admin del restaurante	Admin restoranti
 {}'s restaurants	Ristoranti di {}	Restaurantes de {}	Restorantet e {}
 They see and work only in these restaurants.	Vede e lavora solo in questi ristoranti.	Ve y trabaja solo en estos restaurantes.	Sheh dhe punon vetëm në këto restorante.
 Every restaurant, also the ones added later.	Ogni ristorante, anche quelli aggiunti dopo.	Todos los restaurantes, también los que se agreguen después.	Çdo restorant, edhe ata që shtohen më vonë.
@@ -2643,12 +2719,8 @@ Change the picture	Cambia l'immagine	Cambiar la imagen	Ndrysho foton
 Add a picture	Aggiungi un'immagine	Añadir una imagen	Shto një foto
 Choose another picture	Scegli un'altra immagine	Elegir otra imagen	Zgjidh një foto tjetër
 Remove the picture	Rimuovi l'immagine	Quitar la imagen	Hiq foton
-Restaurant applications	Domande dei ristoranti	Solicitudes de restaurantes	Aplikimet e restoranteve
-People who applied to open a restaurant	Persone che hanno chiesto di aprire un ristorante	Personas que solicitaron abrir un restaurante	Njerëz që aplikuan për të hapur një restorant
-1 application is waiting for review	1 domanda è in attesa di valutazione	1 solicitud espera revisión	1 aplikim pret shqyrtimin
-{} applications are waiting for review	{} domande sono in attesa di valutazione	{} solicitudes esperan revisión	{} aplikime presin shqyrtimin
-1 rejected application	1 domanda rifiutata	1 solicitud rechazada	1 aplikim i refuzuar
-{} rejected applications	{} domande rifiutate	{} solicitudes rechazadas	{} aplikime të refuzuara
+Waiting ({})	In attesa ({})	En espera ({})	Në pritje ({})
+Rejected ({})	Rifiutate ({})	Rechazadas ({})	Të refuzuara ({})
 Search by restaurant, email or owner	Cerca per ristorante, email o titolare	Buscar por restaurante, correo o propietario	Kërko sipas restorantit, email-it ose pronarit
 Super admins only	Solo super admin	Solo super administradores	Vetëm super administratorët
 Only the Super Admin and Co-Super-Admins review restaurant applications.	Solo il Super Admin e i Co-Super-Admin valutano le domande dei ristoranti.	Solo el Super Admin y los Co-Super-Admins revisan las solicitudes de restaurantes.	Vetëm Super Admin dhe Co-Super-Admin shqyrtojnë aplikimet e restoranteve.
@@ -2658,7 +2730,21 @@ Nothing to review	Niente da valutare	Nada que revisar	Asgjë për të shqyrtuar
 New applications show up here, oldest first.	Le nuove domande compaiono qui, dalla più vecchia.	Las nuevas solicitudes aparecen aquí, primero las más antiguas.	Aplikimet e reja shfaqen këtu, më i vjetri i pari.
 No rejected applications	Nessuna domanda rifiutata	No hay solicitudes rechazadas	Asnjë aplikim i refuzuar
 Applications you reject stay here with their reason.	Le domande che rifiuti restano qui con il motivo.	Las solicitudes que rechazas quedan aquí con su motivo.	Aplikimet që refuzon mbeten këtu me arsyen e tyre.
-applied {}	domanda {}	solicitó {}	aplikoi {}
+Bring {} back?	Riportare {} in attesa?	¿Volver a poner {} en espera?	Ta kthesh {} në pritje?
+It waits again with the others and can be approved or rejected anew. The reason you gave goes.	Torna in attesa con le altre e può essere approvata o rifiutata di nuovo. Il motivo che hai dato viene tolto.	Vuelve a esperar con las demás y se puede aprobar o rechazar de nuevo. El motivo que diste se quita.	Pret sërish me të tjerat dhe mund të miratohet ose refuzohet nga e para. Arsyeja që dhe hiqet.
+Back to waiting	Di nuovo in attesa	Volver a espera	Kthe në pritje
+NEW RESTAURANTS	NUOVI RISTORANTI	NUEVOS RESTAURANTES	RESTORANTE TË REJA
+Restaurant applications	Domande dei ristoranti	Solicitudes de restaurantes	Aplikimet e restoranteve
+People who want to open a restaurant with you. Approve to open it and invite its owner, or reject it with a reason.	Persone che vogliono aprire un ristorante con te. Approva per aprirlo e invitare il titolare, oppure rifiuta con un motivo.	Personas que quieren abrir un restaurante contigo. Aprueba para abrirlo e invitar a su dueño, o recházalo con un motivo.	Njerëz që duan të hapin një restorant me ty. Mirate për ta hapur dhe për të ftuar pronarin, ose refuzoje me një arsye.
+oldest wait	attesa più lunga	espera más larga	pritja më e gjatë
+Waiting · {}	In attesa · {}	En espera · {}	Në pritje · {}
+Applied {}	Richiesta {}	Solicitado {}	Aplikuar {}
+Same legal name	Stessa ragione sociale	Mismo nombre legal	I njëjti emër ligjor
+No description given.	Nessuna descrizione.	Sin descripción.	Pa përshkrim.
+time zone	fuso orario	zona horaria	zona kohore
+No email	Nessuna email	Sin correo	Pa email
+No website	Nessun sito web	Sin sitio web	Pa faqe interneti
+No name	Senza nome	Sin nombre	Pa emër
 Rejected: {}	Rifiutata: {}	Rechazada: {}	Refuzuar: {}
 Reject	Rifiuta	Rechazar	Refuzo
 The applicant	Il richiedente	El solicitante	Aplikuesi
@@ -2788,6 +2874,8 @@ Change to {}	Passa a {}	Cambiar a {}	Kalo te {}
 New currency	Nuova valuta	Nueva moneda	Monedha e re
 e.g. 100.5	es. 100.5	p. ej. 100.5	p.sh. 100.5
 A number above 0, up to 8 decimals	Un numero sopra 0, fino a 8 decimali	Un número mayor que 0, hasta 8 decimales	Një numër mbi 0, deri në 8 dhjetore
+Today's rate · {}. You can change it.	Tasso di oggi · {}. Puoi cambiarlo.	Tipo de cambio de hoy · {}. Puedes cambiarlo.	Kursi i sotëm · {}. Mund ta ndryshosh.
+Today's rate. You can change it.	Tasso di oggi. Puoi cambiarlo.	Tipo de cambio de hoy. Puedes cambiarlo.	Kursi i sotëm. Mund ta ndryshosh.
 Round to {}	Arrotonda a {}	Redondear a {}	Rrumbullako në {}
 Prices	Prezzi	Precios	Çmimet
 Stock costs keep 4 decimals	I costi di magazzino mantengono 4 decimali	Los costos de inventario mantienen 4 decimales	Kostot e stokut mbajnë 4 dhjetore
@@ -2852,12 +2940,14 @@ Create a new restaurant	Crea un nuovo ristorante	Crear un restaurante nuevo	Krij
 Its owner gets an email to set a password	Il titolare riceve un'email per impostare una password	Su propietario recibe un correo para crear una contraseña	Pronari merr një email për të vendosur fjalëkalimin
 Change position	Cambia posizione	Cambiar posición	Ndrysho pozicionin
 Save order	Salva ordine	Guardar orden	Ruaj renditjen
+Add restaurant	Aggiungi ristorante	Agregar restaurante	Shto restorant
 Drag to move	Trascina per spostare	Arrastra para mover	Tërhiq për të lëvizur
 SUPER ADMIN	SUPER ADMIN	SUPER ADMIN	SUPER ADMIN
 CO-SUPER-ADMIN	CO-SUPER-ADMIN	CO-SUPER-ADMIN	CO-SUPER-ADMIN
 Welcome back, {}	Bentornato, {}	Bienvenido de nuevo, {}	Mirë se u ktheve, {}
 Pick a restaurant to work in, or set up a new one.	Scegli un ristorante in cui lavorare o configurane uno nuovo.	Elige un restaurante para trabajar o configura uno nuevo.	Zgjidh një restorant për të punuar ose ngri një të ri.
 open now	aperto ora	abierto ahora	i hapur tani
+Requests ({})	Richieste ({})	Solicitudes ({})	Kërkesat ({})
 Requests	Richieste	Solicitudes	Kërkesat
 Applications ({})	Domande ({})	Solicitudes ({})	Aplikimet ({})
 Applications	Domande	Solicitudes	Aplikimet
@@ -2902,25 +2992,78 @@ the owner's details	i dati del titolare	los datos del propietario	të dhënat e 
 before going to the {}	prima di andare a {}	antes de ir a {}	para se të shkosh te {}
 before closing	prima di chiudere	antes de cerrar	para mbylljes
 You changed {}. Save them {}?	Hai modificato {}. Salvarli {}?	Cambiaste {}. ¿Guardarlos {}?	Ndryshove {}. T'i ruash {}?
-Couldn't load the requests.	Impossibile caricare le richieste.	No se pudieron cargar las solicitudes.	Kërkesat nuk u ngarkuan.
-What restaurants ask you	Cosa ti chiedono i ristoranti	Lo que te piden los restaurantes	Çfarë të kërkojnë restorantet
-No requests yet	Ancora nessuna richiesta	Aún no hay solicitudes	Ende asnjë kërkesë
+Open ({})	Aperte ({})	Abiertas ({})	Të hapura ({})
+Solved ({})	Risolte ({})	Resueltas ({})	Të zgjidhura ({})
+Solved	Risolta	Resuelta	E zgjidhur
+Nothing open	Niente di aperto	Nada abierto	Asgjë e hapur
+Nothing solved yet	Ancora niente di risolto	Aún nada resuelto	Ende asgjë e zgjidhur
 Owners ask here to remove another owner, or for a support admin.	Qui i proprietari chiedono di rimuovere un altro proprietario o un admin di supporto.	Aquí los dueños piden quitar a otro dueño o un admin de soporte.	Këtu pronarët kërkojnë të heqin një pronar tjetër ose një admin mbështetjeje.
-Decline this request?	Rifiutare questa richiesta?	¿Rechazar esta solicitud?	Ta refuzosh këtë kërkesë?
-Mark as done?	Segnare come fatto?	¿Marcar como hecho?	Ta shënosh si të kryer?
-The restaurant sees that you declined it.	Il ristorante vede che l'hai rifiutata.	El restaurante ve que la rechazaste.	Restoranti sheh që e refuzove.
-Check with {} first. They're removed from {} and signed out everywhere.	Verifica prima con {}. Viene rimosso da {} e disconnesso ovunque.	Confírmalo primero con {}. Se le quita de {} y se cierra su sesión en todas partes.	Verifiko fillimisht me {}. Hiqet nga {} dhe del nga të gjitha pajisjet.
-Give them a support admin on the Admins page (Restaurants).	Assegnagli un admin di supporto nella pagina Admin (Ristoranti).	Dales un admin de soporte en la página Admins (Restaurantes).	Jepu një admin mbështetjeje te faqja Adminët (Restorantet).
-Decline	Rifiuta	Rechazar	Refuzo
-Declined	Rifiutata	Rechazada	U refuzua
-Couldn't save the answer.	Impossibile salvare la risposta.	No se pudo guardar la respuesta.	Përgjigjja nuk u ruajt.
-Note for the restaurant	Nota per il ristorante	Nota para el restaurante	Shënim për restorantin
-Remove an owner: {}	Rimuovere un proprietario: {}	Quitar a un dueño: {}	Hiq një pronar: {}
+Marked as solved	Segnata come risolta	Marcada como resuelta	U shënua si e zgjidhur
+Taken back	Ripresa	Recuperada	U mor mbrapsht
+{} takes care of {} now	Ora {} si occupa di {}	Ahora {} se encarga de {}	Tani {} kujdeset për {}
+Given to {}	Affidata a {}	Asignada a {}	Iu dha {}
+OWNERS ASK	I TITOLARI CHIEDONO	LOS DUEÑOS PIDEN	PRONARËT KËRKOJNË
+What restaurant owners ask you: to remove one of their owners, or for a support admin to help them.	Cosa ti chiedono i titolari dei ristoranti: rimuovere uno dei loro titolari, o un admin di supporto che li aiuti.	Lo que te piden los dueños de restaurantes: quitar a uno de sus dueños, o un admin de soporte que los ayude.	Çfarë të kërkojnë pronarët e restoranteve: të heqësh një nga pronarët e tyre, ose një admin ndihme që t'i ndihmojë.
+What restaurant owners asked, given to you by the Super Admin.	Cosa hanno chiesto i titolari dei ristoranti, affidato a te dal Super Admin.	Lo que pidieron los dueños de restaurantes, asignado a ti por el Super Admin.	Çfarë kërkuan pronarët e restoranteve, të dhënë ty nga Super Admini.
+A restaurant	Un ristorante	Un restaurante	Një restorant
+Asked by {}	Chiesto da {}	Lo pidió {}	E kërkoi {}
+Asked by an owner	Chiesto da un titolare	Lo pidió un dueño	E kërkoi një pronar
+Assigned to {}	Affidata a {}	Asignada a {}	I caktuar {}
+No note.	Nessuna nota.	Sin nota.	Pa shënim.
+An owner	Un titolare	Un dueño	Një pronar
+Owner to remove	Titolare da rimuovere	Dueño a quitar	Pronari që do hiqet
+Nobody looks after them yet	Ancora nessuno si occupa di loro	Aún nadie se encarga de ellos	Ende askush nuk kujdeset për ta
+Looked after by {}	Seguiti da {}	Los atiende {}	I ndjek {}
+Looked after by {} support admins	Seguiti da {} admin di supporto	Los atienden {} admins de soporte	I ndjekin {} admin ndihme
+Pick someone when you handle it	Scegli qualcuno quando la gestisci	Elige a alguien al atenderla	Zgjidh dikë kur ta trajtosh
+You can give them someone else too	Puoi assegnare anche un'altra persona	También puedes asignarles a otra persona	Mund t'u japësh edhe dikë tjetër
+Handle	Gestisci	Resolver	Trajto
+HOW IT WAS SOLVED	COME È STATA RISOLTA	CÓMO SE RESOLVIÓ	SI U ZGJIDH
+Solved, without a note.	Risolta, senza nota.	Resuelta, sin nota.	U zgjidh, pa shënim.
+By {}	Da {}	Por {}	Nga {}
+Remove an owner	Rimuovere un titolare	Quitar a un dueño	Hiq një pronar
 Needs a support admin	Serve un admin di supporto	Necesita un admin de soporte	I duhet një admin mbështetjeje
+this owner	questo titolare	este dueño	këtë pronar
+the restaurant	il ristorante	el restaurante	restorantin
+Handle the request	Gestisci la richiesta	Atender la solicitud	Trajto kërkesën
 asked by {}	chiesto da {}	pedido por {}	kërkuar nga {}
-Your answer: {}	La tua risposta: {}	Tu respuesta: {}	Përgjigjja jote: {}
+Mark as solved	Segna come risolta	Marcar como resuelta	Shëno si të zgjidhur
+Assign to {}	Affida a {}	Asignar a {}	Jepja {}
+Assign	Affida	Asignar	Cakto
 Remove the owner	Rimuovi il proprietario	Quitar al dueño	Hiq pronarin
-Mark as done	Segna come fatto	Marcar como hecho	Shëno si të kryer
+Assign to someone	Affida a qualcuno	Asignar a alguien	Jepja dikujt
+Do it now, here	Fallo ora, qui	Hazlo ahora, aquí	Bëje tani, këtu
+A support admin takes it over	Se ne occupa un admin di supporto	Un admin de soporte se encarga	E merr përsipër një admin ndihme
+It was taken care of another way	È stata gestita in un altro modo	Se resolvió de otra forma	U trajtua në një mënyrë tjetër
+Check with them first	Prima parlane con loro	Primero confírmalo con ellos	Fillimisht flit me ta
+Owners never remove each other, so make sure it's right before you do it.	I titolari non si rimuovono tra loro, quindi assicurati che sia giusto prima di farlo.	Los dueños nunca se quitan entre sí, así que asegúrate de que sea correcto antes de hacerlo.	Pronarët nuk heqin njëri-tjetrin, ndaj sigurohu që është e drejtë para se ta bësh.
+The owner who asked	Il titolare che l'ha chiesto	El dueño que lo pidió	Pronari që e kërkoi
+Asked for it	L'ha chiesto	Lo pidió	E kërkoi
+Remove them	Rimuovilo	Quítalo	Hiqe
+I talked to {} and it's right	Ho parlato con {} ed è giusto	Hablé con {} y es correcto	Fola me {} dhe është e drejtë
+{} is removed from {} and signed out everywhere. What they did stays.	{} viene rimosso da {} e disconnesso ovunque. Ciò che ha fatto resta.	{} se quita de {} y se cierra su sesión en todas partes. Lo que hizo se conserva.	{} hiqet nga {} dhe del kudo. Ajo që ka bërë mbetet.
+Nothing changes in the app: the request closes as solved, and {} sees your note.	Nell'app non cambia nulla: la richiesta si chiude come risolta e {} vede la tua nota.	En la app no cambia nada: la solicitud se cierra como resuelta y {} ve tu nota.	Në aplikacion nuk ndryshon asgjë: kërkesa mbyllet si e zgjidhur dhe {} sheh shënimin tënd.
+Now with {}	Ora è con {}	Ahora la tiene {}	Tani e ka {}
+Take it back	Riprendila	Recuperarla	Merre mbrapsht
+Who takes it over?	Chi se ne occupa?	¿Quién se encarga?	Kush e merr përsipër?
+You have no support admins yet. Add one on the Admins page first.	Non hai ancora admin di supporto. Aggiungine uno prima nella pagina Admin.	Aún no tienes admins de soporte. Primero agrega uno en la página Admins.	Nuk ke ende admin ndihme. Shto një më parë te faqja Adminët.
+Has it now	Ce l'ha ora	La tiene ahora	E ka tani
+In {}	In {}	En {}	Në {}
+Put {} in {}?	Mettere {} in {}?	¿Poner a {} en {}?	Ta vendosësh {} te {}?
+{} already takes care of {}.	{} si occupa già di {}.	{} ya se encarga de {}.	{} kujdeset tashmë për {}.
+Yes, put them in	Sì, aggiungilo	Sí, agregarlo	Po, vendose
+No, only the request	No, solo la richiesta	No, solo la solicitud	Jo, vetëm kërkesën
+{} gets {} and takes care of it. That solves the request: the owner is told.	{} riceve {} e se ne occupa. Così la richiesta è risolta: il titolare viene avvisato.	{} recibe {} y se encarga. Así la solicitud queda resuelta: se le avisa al dueño.	{} merr {} dhe kujdeset për të. Kështu kërkesa zgjidhet: pronarit i njoftohet.
+{} gets {} and the request, and answers it from their Requests page.	{} riceve {} e la richiesta, e risponde dalla sua pagina Richieste.	{} recibe {} y la solicitud, y la responde desde su página de Solicitudes.	{} merr {} dhe kërkesën, dhe i përgjigjet nga faqja e Kërkesave.
+{} gets only the request and answers it from their Requests page.	{} riceve solo la richiesta e risponde dalla sua pagina Richieste.	{} recibe solo la solicitud y la responde desde su página de Solicitudes.	{} merr vetëm kërkesën dhe i përgjigjet nga faqja e Kërkesave.
+Note for them	Nota per loro	Nota para esa persona	Shënim për të
+What to check or do	Cosa controllare o fare	Qué revisar o hacer	Çfarë të kontrollojë ose të bëjë
+Note for the restaurant	Nota per il ristorante	Nota para el restaurante	Shënim për restorantin
+What was done	Cosa è stato fatto	Qué se hizo	Çfarë u bë
+Done, he's off the restaurant	Fatto, non è più nel ristorante	Listo, ya no está en el restaurante	U bë, nuk është më në restorant
+Takes care of every restaurant	Si occupa di tutti i ristoranti	Se encarga de todos los restaurantes	Kujdeset për të gjitha restorantet
+Takes care of {}	Si occupa di {}	Se encarga de {}	Kujdeset për {}
+Takes care of {} restaurants	Si occupa di {} ristoranti	Se encarga de {} restaurantes	Kujdeset për {} restorante
 Select a finished order status.	Seleziona uno stato di ordine concluso.	Selecciona un estado de pedido terminado.	Zgjidh një gjendje porosie të përfunduar.
 Search must be 200 characters or fewer.	La ricerca deve avere al massimo 200 caratteri.	La búsqueda debe tener 200 caracteres o menos.	Kërkimi duhet të ketë deri në 200 shkronja.
 Live updates disconnected. Retrying automatically.	Aggiornamenti in tempo reale disconnessi. Nuovo tentativo automatico.	Actualizaciones en vivo desconectadas. Se reintenta automáticamente.	Përditësimet e drejtpërdrejta u shkëputën. Po provohet përsëri automatikisht.
@@ -3760,7 +3903,6 @@ Back to orders	Torna agli ordini	Volver a los pedidos	Kthehu te porositë
 Reason (optional)	Motivo (facoltativo)	Motivo (opcional)	Arsyeja (opsionale)
 Booked for {}. The rest can be added when they arrive.	Prenotato per {}. Il resto si può aggiungere al loro arrivo.	Reservado para {}. El resto se puede añadir cuando lleguen.	E rezervuar për {}. Pjesa tjetër mund të shtohet kur të mbërrijnë.
 Fewer	Meno	Menos	Më pak
-{} of {}	{} di {}	{} de {}	{} nga {}
 Reason for the correction	Motivo della correzione	Motivo de la corrección	Arsyeja e korrigjimit
 Hold the table longer?	Tenere il tavolo più a lungo?	¿Guardar la mesa más tiempo?	Ta mbash tavolinën më gjatë?
 The table waits longer for {}. The booking still ends at {}.	Il tavolo aspetta {} più a lungo. La prenotazione finisce comunque alle {}.	La mesa espera más a {}. La reserva sigue terminando a las {}.	Tavolina pret më gjatë për {}. Rezervimi mbaron përsëri në {}.
@@ -3868,6 +4010,9 @@ Best fit	Più adatto	Mejor opción	Më e përshtatshmja
 Suggestion	Suggerimento	Sugerencia	Sugjerim
 Unassigned (no table yet)	Non assegnato (ancora senza tavolo)	Sin asignar (todavía sin mesa)	E pacaktuar (ende pa tavolinë)
 Could not create the reservation.	Impossibile creare la prenotazione.	No se pudo crear la reserva.	Rezervimi nuk u krijua dot.
+The branch is closed then	La sede è chiusa a quell'ora	La sucursal está cerrada a esa hora	Pika është e mbyllur atëherë
+It's closed at {} that day. Book anyway?	Quel giorno alle {} è chiuso. Prenotare comunque?	Ese día a las {} está cerrado. ¿Reservar de todos modos?	Atë ditë në {} është mbyllur. Ta rezervosh gjithsesi?
+Book anyway	Prenota comunque	Reservar de todos modos	Rezervo gjithsesi
 Table {} removed from your pick	Tavolo {} tolto dalla tua scelta	Mesa {} quitada de tu selección	Tavolina {} u hoq nga zgjedhja jote
 Table {} is already chosen	Il tavolo {} è già scelto	La mesa {} ya está elegida	Tavolina {} është zgjedhur tashmë
 Table {} is already reserved at this time	Il tavolo {} è già prenotato a quest'ora	La mesa {} ya está reservada a esta hora	Tavolina {} është e rezervuar tashmë në këtë orë
@@ -3879,6 +4024,7 @@ Other suggestion	Altro suggerimento	Otra sugerencia	Sugjerim tjetër
 Create reservation	Crea prenotazione	Crear reserva	Krijo rezervim
 Start time	Ora di inizio	Hora de inicio	Ora e fillimit
 End time	Ora di fine	Hora de fin	Ora e mbarimit
+The branch is closed then. You can still book it.	La sede è chiusa a quell'ora. Puoi comunque prenotare.	La sucursal está cerrada a esa hora. Aún puedes reservar.	Pika është e mbyllur atëherë. Mund ta rezervosh gjithsesi.
 Customer name	Nome del cliente	Nombre del cliente	Emri i klientit
 Full name (e.g. Isabella Conti)	Nome completo (es. Isabella Conti)	Nombre completo (p. ej. Isabella Conti)	Emri i plotë (p.sh. Isabella Conti)
 email@example.com	email@example.com	email@example.com	email@example.com
@@ -3926,6 +4072,7 @@ Outdoor seating	Tavolo all'aperto	Mesa al aire libre	Ulëse jashtë
 e.g. "Cake with 30 candles at dessert", "It's a surprise"	es. "Torta con 30 candeline al dolce", "È una sorpresa"	p. ej. "Pastel con 30 velas en el postre", "Es una sorpresa"	p.sh. "Tortë me 30 qirinj te ëmbëlsira", "Është surprizë"
 Accept this request?	Accettare questa richiesta?	¿Aceptar esta solicitud?	Ta pranosh këtë kërkesë?
 Accept	Accetta	Aceptar	Prano
+Decline this request?	Rifiutare questa richiesta?	¿Rechazar esta solicitud?	Ta refuzosh këtë kërkesë?
 The request from {} is declined and its table becomes free. The guest is told by email, and anything they paid goes back in full.	La richiesta di {} viene rifiutata e il tavolo si libera. L'ospite viene avvisato via email e tutto ciò che ha pagato viene rimborsato per intero.	Se rechaza la solicitud de {} y su mesa queda libre. Se avisa al cliente por correo y se le devuelve todo lo que pagó.	Kërkesa e {} refuzohet dhe tavolina lirohet. Mysafiri njoftohet me email dhe gjithçka që pagoi i kthehet plotësisht.
 Fully booked	Tutto prenotato	Completo	Plotësisht i rezervuar
 Closed that day	Chiuso quel giorno	Cerrado ese día	I mbyllur atë ditë
@@ -3976,7 +4123,6 @@ No notes yet.	Ancora nessuna nota.	Todavía no hay notas.	Ende pa shënime.
 Add note	Aggiungi nota	Añadir nota	Shto shënim
 Seat them, or cancel with a reason if they left.	Falli accomodare o annulla con un motivo se se ne sono andati.	Siéntalos o cancela con un motivo si se fueron.	Uli ose anuloje me arsye nëse ikën.
 Finish the visit if they've left.	Concludi la visita se se ne sono andati.	Termina la visita si ya se fueron.	Përfundo vizitën nëse ikën.
-No email	Nessuna email	Sin correo	Pa email
 Special request	Richiesta speciale	Petición especial	Kërkesë e veçantë
 Internal note	Nota interna	Nota interna	Shënim i brendshëm
 Primary	Principale	Principal	Kryesore
@@ -4108,13 +4254,6 @@ No reservations on {} match the filters on {}.	Nessuna prenotazione su {} corris
 No reservations match the filters on {}.	Nessuna prenotazione corrisponde ai filtri il {}.	Ninguna reserva coincide con los filtros el {}.	Asnjë rezervim nuk përputhet me filtrat më {}.
 No reservations on {} on {}.	Nessuna prenotazione su {} il {}.	No hay reservas en {} el {}.	Asnjë rezervim në {} më {}.
 No reservations on {}.	Nessuna prenotazione il {}.	No hay reservas el {}.	Asnjë rezervim më {}.
-Monday	Lunedì	Lunes	E hënë
-Tuesday	Martedì	Martes	E martë
-Wednesday	Mercoledì	Miércoles	E mërkurë
-Thursday	Giovedì	Jueves	E enjte
-Friday	Venerdì	Viernes	E premte
-Saturday	Sabato	Sábado	E shtunë
-Sunday	Domenica	Domingo	E diel
 January	Gennaio	Enero	Janar
 February	Febbraio	Febrero	Shkurt
 March	Marzo	Marzo	Mars
@@ -4453,7 +4592,6 @@ No more shifts this week	Nessun altro turno questa settimana	No hay más turnos 
 On shift	In turno	En turno	Në turn
 Next shift	Prossimo turno	Próximo turno	Turni tjetër
 Today {}	Oggi {}	Hoy {}	Sot {}
-Until {}	Fino alle {}	Hasta las {}	Deri në {}
 Started {}	Iniziato {}	Empezó {}	Filloi {}
 Nothing planned for 2 weeks	Niente in programma per 2 settimane	Nada planeado en 2 semanas	Asgjë e planifikuar për 2 javë
 Until {} · {}	Fino alle {} · {}	Hasta las {} · {}	Deri në {} · {}
@@ -4625,7 +4763,6 @@ Add for specific hours	Aggiungi per orari specifici	Agregar para horas específi
 {} {} · no usual shift	{} {} · nessun turno abituale	{} {} · sin turno habitual	{} {} · pa turn të zakonshëm
 Add {} · {}–{}	Aggiungi {} · {}–{}	Agregar {} · {}–{}	Shto {} · {}–{}
 Pick someone	Scegli qualcuno	Elige a alguien	Zgjidh dikë
-Until	Fino a	Hasta	Deri
 Planned	Previsto	Planeado	Planifikuar
 Not in yet	Non ancora arrivato	Aún no llega	Ende pa ardhur
 Worked	Lavorato	Trabajado	Punuar
@@ -4753,7 +4890,6 @@ Unmerge all of these tables, or only some?	Separare tutti questi tavoli o solo a
 These tables go back to being separate.	Questi tavoli tornano separati.	Estas mesas vuelven a estar separadas.	Këto tavolina kthehen të ndara.
 Which table keeps the guests and the order?	Quale tavolo tiene gli ospiti e l'ordine?	¿Qué mesa se queda con los comensales y el pedido?	Cila tavolinë i mban mysafirët dhe porosinë?
 Open the booking	Apri la prenotazione	Abrir la reserva	Hap rezervimin
-Handle	Gestisci	Resolver	Trajto
 Move the booking	Sposta la prenotazione	Mover la reserva	Zhvendos rezervimin
 Move these guests	Sposta questi ospiti	Mover a estos comensales	Zhvendos këta mysafirë
 Give more time	Dai più tempo	Dar más tiempo	Jep më shumë kohë
@@ -5460,7 +5596,6 @@ Nobody gave discounts, removed items or refunded in these days.	Nessuno ha fatto
 , compared with {}	, rispetto a {}	, comparado con {}	, krahasuar me {}
 No access to statistics	Nessun accesso alle statistiche	Sin acceso a estadísticas	Pa qasje te statistikat
 Your role needs “View reports” to see statistics.	Il tuo ruolo ha bisogno di “Vedere i report” per vedere le statistiche.	Tu rol necesita “Ver informes” para ver las estadísticas.	Roli yt ka nevojë për “Shiko raportet” për të parë statistikat.
-In {}	In {}	En {}	Në {}
 All types	Tutti i tipi	Todos los tipos	Të gjitha llojet
 How it was ordered	Come è stato ordinato	Cómo se pidió	Si u porosit
 Whole menu	Menù intero	Menú completo	I gjithë menuja
@@ -5555,6 +5690,7 @@ Your restaurant appearance and receipt changes have not been saved.	Le modifiche
 Discard and leave	Scarta ed esci	Descartar y salir	Hidhi dhe dil
 Choose what you ask for	Scegli cosa chiedi	Elige lo que pides	Zgjidh çfarë kërkon
 Invalid schema	Invalid schema	Invalid schema	Invalid schema
+{} takes care of you now.	Ora {} si occupa di voi.	Ahora {} se encarga de ustedes.	Tani {} kujdeset për ju.
 Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}
 SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding
 Super admin username is already used by another account: {}	Super admin username is already used by another account: {}	Super admin username is already used by another account: {}	Super admin username is already used by another account: {}
@@ -5648,6 +5784,9 @@ Assigned user must belong to the same restaurant as the device	L'utente assegnat
 Device assignment update violates a data constraint	L'aggiornamento dell'assegnazione viola un vincolo dei dati	La actualización de la asignación infringe una regla de datos	Përditësimi i caktimit shkel një rregull të të dhënave
 Device pairing token update violates a data constraint	L'aggiornamento del codice di associazione viola un vincolo dei dati	La actualización del código de vinculación infringe una regla de datos	Përditësimi i kodit të lidhjes shkel një rregull të të dhënave
 Pairing token is invalid or expired	Il codice di associazione non è valido o è scaduto	El código de vinculación no es válido o expiró	Kodi i lidhjes është i pavlefshëm ose ka skaduar
+Some of those days already have special hours	Alcuni di quei giorni hanno già un orario speciale	Algunos de esos días ya tienen un horario especial	Disa nga ato ditë kanë tashmë orar të veçantë
+Special day not found	Giorno speciale non trovato	Día especial no encontrado	Dita e veçantë nuk u gjet
+The branch is closed now. Someone who can open it outside the hours can open it.	La sede ora è chiusa. Può aprirla chi può aprire fuori orario.	La sucursal está cerrada ahora. Puede abrirla quien tenga permiso para abrir fuera de horario.	Pika tani është e mbyllur. Mund ta hapë kush ka leje ta hapë jashtë orarit.
 Give the place a name	Dai un nome al luogo	Ponle un nombre al lugar	Jepi një emër vendit
 Write the supplier's name	Scrivi il nome del fornitore	Escribe el nombre del proveedor	Shkruaj emrin e furnitorit
 A sale stock source requires its restaurant, branch, item, and location	Una fonte di magazzino per la vendita richiede ristorante, sede, articolo e luogo	Una fuente de inventario de venta necesita su restaurante, sucursal, artículo y lugar	Një burim stoku për shitje kërkon restorantin, pikën, artikullin dhe vendin
@@ -5966,6 +6105,9 @@ The owner has already set their password. They can reset it from the sign-in scr
 An application with this email is already waiting for review. Check it with your application code.	Una richiesta con questa email è già in attesa di revisione. Controllala con il tuo codice di richiesta.	Una solicitud con este correo ya está esperando revisión. Consúltala con tu código de solicitud.	Një aplikim me këtë email po pret tashmë shqyrtim. Kontrolloje me kodin e aplikimit.
 An application with this username is already waiting for review. Choose another username.	Una richiesta con questo nome utente è già in attesa di revisione. Scegli un altro nome utente.	Una solicitud con este usuario ya está esperando revisión. Elige otro usuario.	Një aplikim me këtë emër përdoruesi po pret tashmë shqyrtim. Zgjidh një emër tjetër.
 Give the applicant a reason for the rejection	Indica al richiedente un motivo per il rifiuto	Da al solicitante un motivo del rechazo	Jepi aplikantit një arsye për refuzimin
+Only a rejected application can go back to waiting	Solo una richiesta rifiutata può tornare in attesa	Solo una solicitud rechazada puede volver a espera	Vetëm një aplikim i refuzuar mund të kthehet në pritje
+Another application with this owner's email is already waiting	Un'altra richiesta con l'email di questo titolare è già in attesa	Ya hay otra solicitud en espera con el correo de este dueño	Një aplikim tjetër me email-in e këtij pronari është tashmë në pritje
+Another application with this owner's username is already waiting	Un'altra richiesta con il nome utente di questo titolare è già in attesa	Ya hay otra solicitud en espera con el usuario de este dueño	Një aplikim tjetër me emrin e përdoruesit të këtij pronari është tashmë në pritje
 Restaurant applications are closed. Ask us to set up your restaurant.	Le richieste di nuovi ristoranti sono chiuse. Chiedici di configurare il tuo ristorante.	Las solicitudes de restaurantes están cerradas. Pídenos que configuremos tu restaurante.	Aplikimet për restorante janë mbyllur. Na kërko të konfigurojmë restorantin tënd.
 Only the Super Admin and Co-Super-Admins review restaurant applications	Solo il Super Admin e i Co-Super-Admin esaminano le richieste dei ristoranti	Solo el Super Admin y los Co-Super-Admins revisan las solicitudes de restaurantes	Vetëm Super Admini dhe Co-Super-Adminët shqyrtojnë aplikimet e restoranteve
 Finish active orders, shifts and seated or arrived bookings before changing the time zone.	Concludi ordini attivi, turni e prenotazioni accomodate o arrivate prima di cambiare fuso orario.	Termina los pedidos activos, turnos y reservas sentadas o llegadas antes de cambiar la zona horaria.	Përfundo porositë aktive, turnet dhe rezervimet e ulura ose të ardhura para se të ndryshosh zonën kohore.
@@ -6015,6 +6157,7 @@ Take payments	Incassare	Cobrar	Merr pagesa
 Request the bill and take the payment from a table	Chiedere il conto e incassare da un tavolo	Pedir la cuenta y cobrar desde una mesa	Kërko faturën dhe merr pagesën nga një tavolinë
 Edit the floor plan	Modificare la pianta	Editar el plano	Ndrysho planin
 Add, move and remove tables, floors and places	Aggiungere, spostare e togliere tavoli, piani e zone	Agregar, mover y quitar mesas, pisos y zonas	Shto, lëviz dhe hiq tavolina, kate dhe zona
+Open the branch for now while it's closed: a late group, an event	Apri la sede per ora mentre è chiusa: un gruppo in ritardo, un evento	Abrir la sucursal por ahora mientras está cerrada: un grupo tarde, un evento	Hap pikën për tani kur është e mbyllur: një grup i vonuar, një event
 See orders	Vedere gli ordini	Ver los pedidos	Shiko porositë
 The open orders and what's on them	Gli ordini aperti e cosa contengono	Los pedidos abiertos y lo que llevan	Porositë e hapura dhe çfarë kanë
 Edit orders	Modificare gli ordini	Editar pedidos	Ndrysho porositë
@@ -6150,6 +6293,8 @@ See restaurant info	Vedere le informazioni del ristorante	Ver la información de
 The restaurant's details, branches, logo and currency	Dati del ristorante, sedi, logo e valuta	Los datos del restaurante, sucursales, logo y moneda	Të dhënat e restorantit, pikat, logoja dhe monedha
 Change restaurant info	Modificare le informazioni del ristorante	Cambiar la información del restaurante	Ndrysho informacionin e restorantit
 Description, phone, email, addresses, logo, colours and receipt texts	Descrizione, telefono, email, indirizzi, logo, colori e testi dello scontrino	Descripción, teléfono, correo, direcciones, logo, colores y textos del recibo	Përshkrimi, telefoni, email-i, adresat, logoja, ngjyrat dhe tekstet e faturës
+Change opening hours	Modificare l'orario di apertura	Cambiar el horario	Ndrysho orarin e hapjes
+Each branch's week and its special days	La settimana di ogni sede e i suoi giorni speciali	La semana de cada sucursal y sus días especiales	Java e çdo pike dhe ditët e saj të veçanta
 Sales, orders and guests at a glance	Vendite, ordini e ospiti in sintesi	Ventas, pedidos y comensales de un vistazo	Shitje, porosi dhe mysafirë me një shikim
 See Sales	Vedere Vendite	Ver Ventas	Shiko Shitjet
 Sales by day, hour, service and floor	Vendite per giorno, ora, servizio e piano	Ventas por día, hora, servicio y piso	Shitjet sipas ditës, orës, shërbimit dhe katit
@@ -6290,18 +6435,17 @@ Its menu "{}" stays in Menu, hidden in POS and no longer special.	Il suo menù "
 (optional)	(facoltativo)	(opcional)	(opsionale)
 {} rg	{} rg	{} rg	{} rg
 {} RG {} w	{} RG {} w	{} RG {} w	{} RG {} w
+· {} days	· {} giorni	· {} días	· {} ditë
 · in the kitchen	· in cucina	· en cocina	· në kuzhinë
 · to the kitchen at {}	· in cucina alle {}	· a cocina a las {}	· në kuzhinë në {}
 They got an email to set a password.	Ha ricevuto un'email per impostare una password.	Recibió un correo para configurar una contraseña.	Mori një email për të vendosur fjalëkalimin.
 {} was signed out and can no longer sign in.	{} è stato disconnesso e non può più accedere.	Se cerró la sesión de {} y ya no puede iniciar sesión.	{} doli dhe nuk mund të hyjë më.
-· may remove owners	· può rimuovere proprietari	· puede quitar dueños	· mund të heqë pronarë
 of {} allowed	di {} consentiti	de {} permitidos	nga {} të lejuara
 You can also add the owner later from the restaurant's card.	Puoi anche aggiungere il titolare dopo dalla scheda del ristorante.	También puedes agregar el propietario después desde la tarjeta del restaurante.	Mund ta shtosh pronarin edhe më vonë nga karta e restorantit.
 Next: its owner.	Poi: il suo titolare.	Siguiente: su propietario.	Më pas: pronari i tij.
 · {}% of the price	· {}% del prezzo	· {}% del precio	· {}% e çmimit
 Online section:	Sezione online:	Sección en línea:	Seksioni online:
 · uploads when you save	· si carica quando salvi	· se sube al guardar	· ngarkohet kur ruan
-· {} days	· {} giorni	· {} días	· {} ditë
 · Choose at least {}	· Scegline almeno {}	· Elige al menos {}	· Zgjidh të paktën {}
 · Optional	· Facoltativo	· Opcional	· Opsionale
 Refresh the bill to see if it went through.	Aggiorna il conto per vedere se è andato a buon fine.	Actualiza la cuenta para ver si se realizó.	Rifresko faturën për të parë nëse kaloi.
@@ -6327,3 +6471,65 @@ Each covers the days chosen at the top.	Ognuno copre i giorni scelti in alto.	Ca
 · Closed	· Chiuso	· Cerrado	· E mbyllur
 · No sales	· Nessuna vendita	· Sin ventas	· Pa shitje
 In	In	En	Në
+Answered ({})	Risposte ({})	Respondidas ({})	Të përgjigjura ({})
+Answered	Risposto	Respondida	U përgjigj
+Nothing answered yet	Ancora nessuna risposta	Aún no hay nada respondido	Ende asnjë përgjigje
+{} sees that you declined it, with your note.	{} vede che l'hai rifiutata, con la tua nota.	{} verá que la rechazaste, con tu nota.	{} sheh që e refuzove, me shënimin tënd.
+Decline	Rifiuta	Rechazar	Refuzo
+Why, or what they should do first	Perché, o cosa devono fare prima	Por qué, o qué deben hacer primero	Pse, ose çfarë duhet të bëjnë më parë
+remove an owner	rimuovere un titolare	quitar un dueño	hiq një pronar
+need an admin	serve un admin	necesitan un admin	duan një admin
+YOUR ANSWER	LA TUA RISPOSTA	TU RESPUESTA	PËRGJIGJJA JOTE
+Done, without a note.	Fatto, senza nota.	Hecho, sin nota.	U bë, pa shënim.
+Declined, without a note.	Rifiutata, senza nota.	Rechazada, sin nota.	U refuzua, pa shënim.
+Declined	Rifiutata	Rechazada	U refuzua
+Give {}	Dai {}	Asignar a {}	Jep {}
+Give a support admin	Dai un admin di supporto	Asignar un admin de soporte	Jep një admin ndihme
+Who takes care of {}?	Chi si occupa di {}?	¿Quién se encarga de {}?	Kush kujdeset për {}?
+Already theirs	Già suo	Ya es suyo	Tashmë i tij
+{} already takes care of {}. The owner is told.	{} si occupa già di {}. Il titolare viene avvisato.	{} ya se encarga de {}. Se le avisa al dueño.	{} kujdeset tashmë për {}. Pronarit i njoftohet.
+{} gets {} at once, and the owner is told.	{} riceve subito {} e il titolare viene avvisato.	{} recibe {} de inmediato y se le avisa al dueño.	{} merr {} menjëherë dhe pronarit i njoftohet.
+{} sees it on their Requests page and can answer it.	{} la vede nella sua pagina Richieste e può rispondere.	{} la ve en su página de Solicitudes y puede responderla.	{} e sheh te faqja e Kërkesave dhe mund t'i përgjigjet.
+Who will help them	Chi li aiuterà	Quién los ayudará	Kush do t'i ndihmojë
+Give {} a support admin	Dai a {} un admin di supporto	Dale a {} un admin de soporte	Jepi {} një admin ndihme
+{} asked for it	L'ha chiesto {}	Lo pidió {}	E kërkoi {}
+Pick who takes care of them	Scegli chi si occupa di loro	Elige quién se encarga de ellos	Zgjidh kush kujdeset për ta
+What restaurant owners ask you	Cosa ti chiedono i titolari dei ristoranti	Lo que te piden los dueños de restaurantes	Çfarë të kërkojnë pronarët e restoranteve
+What restaurant owners ask you · nothing waiting	Cosa ti chiedono i titolari dei ristoranti · niente in attesa	Lo que te piden los dueños de restaurantes · nada en espera	Çfarë të kërkojnë pronarët e restoranteve · asgjë në pritje
+What restaurant owners ask you · 1 waiting	Cosa ti chiedono i titolari dei ristoranti · 1 in attesa	Lo que te piden los dueños de restaurantes · 1 en espera	Çfarë të kërkojnë pronarët e restoranteve · 1 në pritje
+What restaurant owners ask you · {} waiting	Cosa ti chiedono i titolari dei ristoranti · {} in attesa	Lo que te piden los dueños de restaurantes · {} en espera	Çfarë të kërkojnë pronarët e restoranteve · {} në pritje
+No requests yet	Ancora nessuna richiesta	Aún no hay solicitudes	Ende asnjë kërkesë
+Your answer: {}	La tua risposta: {}	Tu respuesta: {}	Përgjigjja jote: {}
+Answered by {}	Risposto da {}	Respondió {}	U përgjigj {}
+People who applied to open a restaurant	Persone che hanno chiesto di aprire un ristorante	Personas que solicitaron abrir un restaurante	Njerëz që aplikuan për të hapur një restorant
+1 application is waiting for review	1 domanda è in attesa di valutazione	1 solicitud espera revisión	1 aplikim pret shqyrtimin
+{} applications are waiting for review	{} domande sono in attesa di valutazione	{} solicitudes esperan revisión	{} aplikime presin shqyrtimin
+1 rejected application	1 domanda rifiutata	1 solicitud rechazada	1 aplikim i refuzuar
+{} rejected applications	{} domande rifiutate	{} solicitudes rechazadas	{} aplikime të refuzuara
+applied {}	domanda {}	solicitó {}	aplikoi {}
+THE RESTAURANT	IL RISTORANTE	EL RESTAURANTE	RESTORANTI
+THE OWNER	IL TITOLARE	EL DUEÑO	PRONARI
+{} restaurants	{} ristoranti	{} restaurantes	{} restorante
+· may remove owners	· può rimuovere proprietari	· puede quitar dueños	· mund të heqë pronarë
+{} is approved. {} got an email to set a password.	{} è approvato. {} ha ricevuto un'email per impostare una password.	{} está aprobado. {} recibió un correo para crear una contraseña.	{} u miratua. {} mori një email për të vendosur fjalëkalimin.
+Choose a branch	Scegli una sede	Elige una sucursal	Zgjidh një pikë
+{} · {} · {} open	{} · {} · {} aperte	{} · {} · {} abiertas	{} · {} · {} të hapura
+1 branch	1 sede	1 sucursal	1 pikë
+{} branches	{} sedi	{} sucursales	{} pika
+No phone yet	Ancora nessun telefono	Todavía sin teléfono	Ende pa telefon
+No email yet	Ancora nessuna email	Todavía sin correo	Ende pa email
+Couldn't load the requests.	Impossibile caricare le richieste.	No se pudieron cargar las solicitudes.	Kërkesat nuk u ngarkuan.
+What restaurants ask you	Cosa ti chiedono i ristoranti	Lo que te piden los restaurantes	Çfarë të kërkojnë restorantet
+Mark as done?	Segnare come fatto?	¿Marcar como hecho?	Ta shënosh si të kryer?
+The restaurant sees that you declined it.	Il ristorante vede che l'hai rifiutata.	El restaurante ve que la rechazaste.	Restoranti sheh që e refuzove.
+Check with {} first. They're removed from {} and signed out everywhere.	Verifica prima con {}. Viene rimosso da {} e disconnesso ovunque.	Confírmalo primero con {}. Se le quita de {} y se cierra su sesión en todas partes.	Verifiko fillimisht me {}. Hiqet nga {} dhe del nga të gjitha pajisjet.
+Give them a support admin on the Admins page (Restaurants).	Assegnagli un admin di supporto nella pagina Admin (Ristoranti).	Dales un admin de soporte en la página Admins (Restaurantes).	Jepu një admin mbështetjeje te faqja Adminët (Restorantet).
+Couldn't save the answer.	Impossibile salvare la risposta.	No se pudo guardar la respuesta.	Përgjigjja nuk u ruajt.
+Remove an owner: {}	Rimuovere un proprietario: {}	Quitar a un dueño: {}	Hiq një pronar: {}
+Mark as done	Segna come fatto	Marcar como hecho	Shëno si të kryer
+Restaurant admins are made by an owner and work only in that restaurant	Gli admin del ristorante li crea un proprietario e lavorano solo in quel ristorante	Los admins del restaurante los crea un dueño y trabajan solo en ese restaurante	Adminët e restorantit i krijon një pronar dhe punojnë vetëm në atë restorant
+Support admins · {}	Admin di supporto · {}	Admins de soporte · {}	Adminët e mbështetjes · {}
+Restaurant admins · {}	Admin del ristorante · {}	Admins del restaurante · {}	Adminët e restorantit · {}
+No restaurant admins	Nessun admin del ristorante	Sin admins del restaurante	Asnjë admin restoranti
+Owners add admins for their own restaurant in Admin Hub → Users.	I proprietari aggiungono gli admin del proprio ristorante in Admin Hub → Utenti.	Los dueños agregan admins para su restaurante en Admin Hub → Usuarios.	Pronarët shtojnë adminë për restorantin e tyre te Admin Hub → Përdoruesit.
+Restaurant admin	Admin del ristorante	Admin del restaurante	Admin restoranti
