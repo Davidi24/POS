@@ -69,6 +69,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -118,6 +120,8 @@ import com.saporini.mobile_desktop.platform.PermissionTicks
 import com.saporini.mobile_desktop.platform.coSuperAdminProblems
 import com.saporini.mobile_desktop.platform.permissionArea
 import org.koin.compose.koinInject
+import mobile_desktop.shared.generated.resources.Res
+import mobile_desktop.shared.generated.resources.users_admin
 
 /** Super Admin only: the people who help run every restaurant, and what each of them may do. */
 object CoSuperAdminsScreen : Screen {
@@ -156,7 +160,7 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
         ScreenMessages(state.error.takeIf { state.draft == null && state.ticks == null && state.loaded }, state.notice, model::clearMessages)
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             androidx.compose.foundation.lazy.LazyColumn(
-                Modifier.widthIn(max = 920.dp).fillMaxSize(),
+                Modifier.widthIn(max = 1180.dp).fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(start = side, end = side, top = 4.dp, bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -165,28 +169,25 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
                         BackArrow("Back to the restaurants", onBack)
                         Column(Modifier.weight(1f)) {
                             Text("Admins", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (narrow) 18.sp else 21.sp, color = Kit.Ink)
-                            Text(
-                                if (state.view == "SUPPORT") "Support admins take care of the restaurants you give them"
-                                else "Restaurant admins are made by an owner and work only in that restaurant",
-                                fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted
-                            )
+                            Text("Support admins take care of the restaurants you give them", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted)
                         }
                         RefreshButton(state.loading, model::refresh)
-                        if (state.allowed && state.people.isNotEmpty() && state.view == "SUPPORT") {
+                        if (state.allowed && state.people.isNotEmpty()) {
                             KitButton(if (narrow) "Add" else "Add support admin", model::startAdd, icon = Icons.Outlined.PersonAdd, enabled = !state.saving)
                         }
                     }
                 }
-                // Support admins (made by you) | Restaurant admins (made by an owner), user 2026-11-19.
-                if (state.allowed) item(key = "views") {
-                    val restaurantAdmins = state.cards.count { it.kind == "RESTAURANT" }
-                    val support = "Support admins · ${state.people.size}"
-                    val restaurant = "Restaurant admins · $restaurantAdmins"
-                    com.saporini.mobile_desktop.core.components.OverviewTabs(
-                        listOf(support, restaurant),
-                        if (state.view == "SUPPORT") support else restaurant,
-                        { option -> model.showView(if (option == support) "SUPPORT" else "RESTAURANT") }
-                    )
+                // Only support admins here; a restaurant's own admins are seen inside it (user, 2026-11-20). The list narrows to one
+                // restaurant's: those given it, and those given every restaurant.
+                if (state.allowed && state.people.isNotEmpty()) item(key = "filter") {
+                    val all = com.saporini.mobile_desktop.platform.RestaurantRefDto("", "All restaurants")
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        com.saporini.mobile_desktop.core.components.SearchableSelect(
+                            state.restaurants.firstOrNull { it.id == state.restaurantFilter } ?: all, listOf(all) + state.restaurants, { it.name },
+                            { model.filterRestaurant(it.id.ifEmpty { null }) }, Modifier.widthIn(max = 340.dp).weight(1f, fill = false),
+                            icon = Icons.Outlined.Storefront, compact = narrow)
+                        Text("${shownPeople(state).size} of ${state.people.size}", fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted)
+                    }
                 }
                 when {
                     !state.allowed -> item(key = "denied") {
@@ -198,23 +199,6 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
                     !state.loaded && state.error != null -> item(key = "failed") {
                         PageState(PageStateKind.FAILED, action = { RetryText(onClick = model::refresh) })
                     }
-                    state.view == "RESTAURANT" -> {
-                        val list = state.cards.filter { it.kind == "RESTAURANT" }
-                        if (list.isEmpty()) item(key = "no-restaurant-admins") {
-                            Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
-                                OverviewEmpty("No restaurant admins", "Owners add admins for their own restaurant in Admin Hub → Users.", Icons.Outlined.AdminPanelSettings)
-                            }
-                        } else item(key = "restaurant-admins") {
-                            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
-                                Column {
-                                    list.forEachIndexed { index, admin ->
-                                        if (index > 0) KitDivider(Modifier.padding(horizontal = 18.dp))
-                                        RestaurantAdminRow(admin)
-                                    }
-                                }
-                            }
-                        }
-                    }
                     state.people.isEmpty() -> item(key = "empty") {
                         Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
                             OverviewEmpty(
@@ -225,13 +209,35 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
                             )
                         }
                     }
+                    shownPeople(state).isEmpty() -> item(key = "none-here") {
+                        Box(Modifier.fillMaxWidth().padding(top = 24.dp), contentAlignment = Alignment.Center) {
+                            OverviewEmpty("Nobody takes care of this restaurant", "Give it to a support admin from their restaurants.",
+                                Icons.Outlined.AdminPanelSettings)
+                        }
+                    }
                     else -> {
+                        // A card per support admin with the Users' admin figure (user, 2026-11-21: "put the icons of users"), three a row on a
+                        // wide window, two on a tablet, one on a phone; a dashed tile at the end adds one more.
                         item(key = "people") {
-                            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
-                                Column {
-                                    state.people.forEachIndexed { index, person ->
-                                        if (index > 0) KitDivider(Modifier.padding(horizontal = 18.dp))
-                                        PersonRow(person, state, model, narrow)
+                            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                val columns = when {
+                                    maxWidth >= 900.dp -> 3
+                                    maxWidth >= 560.dp -> 2
+                                    else -> 1
+                                }
+                                val gap = 18.dp
+                                val tiles: List<StaffUserDto?> = shownPeople(state) + listOf(null)
+                                Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                                    tiles.chunked(columns).forEach { row ->
+                                        Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                                            row.forEach { person ->
+                                                val cell = Modifier.weight(1f).fillMaxHeight()
+                                                if (person != null) AdminCard(person, state, model, cell)
+                                                else AddTile("Add support admin", "They take care of the restaurants you give them", model::startAdd,
+                                                    height = 120.dp, modifier = cell)
+                                            }
+                                            repeat(columns - row.size) { Box(Modifier.weight(1f)) }
+                                        }
                                     }
                                 }
                             }
@@ -258,9 +264,12 @@ internal fun CoSuperAdminsContent(state: CoSuperAdminsState, model: CoSuperAdmin
     }
 }
 
-/** One Co-Super-Admin: who they are, their status and how much they may do. Clicking opens "What they can do". */
+/**
+ * One support admin as a card: the admin figure on a band of their colour with their status, their face, name and email,
+ * the restaurants they take care of, what they may do, and Restaurants / What they can do. Clicking opens "What they can do".
+ */
 @Composable
-private fun PersonRow(person: StaffUserDto, state: CoSuperAdminsState, model: CoSuperAdminsScreenModel, narrow: Boolean) {
+private fun AdminCard(person: StaffUserDto, state: CoSuperAdminsState, model: CoSuperAdminsScreenModel, modifier: Modifier) {
     val accent = accentOf(person.id)
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -270,58 +279,102 @@ private fun PersonRow(person: StaffUserDto, state: CoSuperAdminsState, model: Co
         else -> "Active" to Kit.Green
     }
     val counts = state.allowedCounts[person.id]
-    Row(
-        Modifier.fillMaxWidth()
-            .background(if (hovered) Kit.Canvas else Color.White)
-            .hoverable(interaction)
-            .clickable { model.openPermissions(person) }
-            .padding(horizontal = 18.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    val card = state.cards.firstOrNull { it.id == person.id }
+    Surface(
+        onClick = { model.openPermissions(person) }, modifier = modifier, interactionSource = interaction,
+        shape = RoundedCornerShape(18.dp), color = Color.White,
+        border = BorderStroke(if (hovered) 1.5.dp else 1.dp, if (hovered) accent.strong.copy(alpha = 0.55f) else Kit.Border),
+        shadowElevation = if (hovered) 8.dp else 1.dp
     ) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(accent.soft), contentAlignment = Alignment.Center) {
-            Text(initialsOf(person.displayName), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = accent.strong)
+        Column(Modifier.fillMaxHeight().graphicsLayer { alpha = if (person.isActive) 1f else 0.62f }) {
+            Box(Modifier.fillMaxWidth().height(118.dp).background(androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(accent.softer, accent.soft)))) {
+                androidx.compose.foundation.Image(org.jetbrains.compose.resources.painterResource(Res.drawable.users_admin), null,
+                    Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, top = 8.dp).height(108.dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+                Row(
+                    Modifier.align(Alignment.TopStart).padding(12.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.94f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(Modifier.size(7.dp).clip(CircleShape).background(statusColor))
+                    Text(statusText, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = statusColor, maxLines = 1)
+                }
+                Row(
+                    Modifier.align(Alignment.BottomStart).padding(12.dp).clip(RoundedCornerShape(50)).background(accent.strong)
+                        .padding(horizontal = 9.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(Icons.Outlined.AdminPanelSettings, null, Modifier.size(12.dp), tint = Color.White)
+                    Text("SUPPORT ADMIN", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 9.5.sp, letterSpacing = 0.6.sp, color = Color.White, maxLines = 1)
+                }
+            }
+            Column(Modifier.weight(1f).padding(start = 16.dp, end = 10.dp, top = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.size(44.dp).clip(CircleShape).background(accent.soft), contentAlignment = Alignment.Center) {
+                        com.saporini.mobile_desktop.core.ui.RemoteImage(card?.photoUrl, null, Modifier.fillMaxSize(),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(initialsOf(person.displayName), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = accent.strong,
+                                    translate = false)
+                            }
+                        }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(person.displayName, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Kit.Ink,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+                        Text(person.email, fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+                    }
+                    RowActionsMenu(listOf(
+                        RowAction("Restaurants", Icons.Outlined.Storefront) { model.openAccess(person) },
+                        RowAction("What they can do", Icons.Outlined.Tune) { model.openPermissions(person) },
+                        if (person.isActive) RowAction("Switch off", Icons.Outlined.PersonOff) { model.setPersonActive(person, false) }
+                        else RowAction("Switch on", Icons.Outlined.Person) { model.setPersonActive(person, true) },
+                        RowAction("Send password reset", Icons.Outlined.LockReset) { model.sendPasswordEmail(person) },
+                        RowAction("Remove", Icons.Outlined.Delete, danger = true) { model.askRemove(person) }
+                    ), person.id in state.busy)
+                }
+                // The restaurants they take care of.
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("TAKES CARE OF", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 10.sp, letterSpacing = 0.8.sp, color = Kit.Faint)
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        when {
+                            card == null -> Text("…", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, translate = false)
+                            card.allRestaurants -> PlaceChip("All restaurants", Kit.Green, Icons.Outlined.Apps)
+                            card.restaurants.isEmpty() -> PlaceChip("No restaurants yet", Kit.Amber, Icons.Outlined.WarningAmber)
+                            else -> {
+                                card.restaurants.take(3).forEach { PlaceChip(it.name, Kit.Blue, Icons.Outlined.Storefront, translate = false) }
+                                if (card.restaurants.size > 3) PlaceChip("+${card.restaurants.size - 3}", Kit.Blue, null, translate = false)
+                            }
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    FooterLine(Icons.Outlined.Key, when {
+                        counts == null -> "…"
+                        counts.first == counts.second -> "Can do everything"
+                        else -> "${counts.second - counts.first} switched off"
+                    })
+                    if (card?.mayRemoveOwners == true) FooterLine(Icons.Outlined.VerifiedUser, "May remove owners", Kit.Danger)
+                }
+                Spacer(Modifier.weight(1f))
+                KitDivider()
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    KitButton("Restaurants", { model.openAccess(person) }, icon = Icons.Outlined.Storefront, style = ButtonStyle.SECONDARY)
+                    KitButton("What they can do", { model.openPermissions(person) }, icon = Icons.Outlined.Tune, style = ButtonStyle.SECONDARY)
+                }
+            }
         }
-        Column(Modifier.weight(1f)) {
-            Text(person.displayName, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Kit.Ink,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(person.email, fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            // Which restaurants they take care of.
-            val card = state.cards.firstOrNull { it.id == person.id }
-            Text(
-                when {
-                    card == null -> ""
-                    card.allRestaurants -> "All restaurants"
-                    card.restaurants.isEmpty() -> "No restaurants yet"
-                    card.restaurants.size <= 2 -> card.restaurants.joinToString(", ") { it.name }
-                    else -> "${card.restaurants.size} restaurants"
-                } + if (card?.mayRemoveOwners == true) " · may remove owners" else "",
-                fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp,
-                color = if (card != null && !card.allRestaurants && card.restaurants.isEmpty()) Kit.Amber else Kit.Blue, maxLines = 1, overflow = TextOverflow.Ellipsis
-            )
-        }
-        if (!narrow) {
-            Text(
-                when {
-                    counts == null -> ""
-                    counts.first == counts.second -> "Can do everything"
-                    else -> "${counts.second - counts.first} switched off"
-                },
-                Modifier.width(150.dp), fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted, maxLines = 1
-            )
-        }
-        Row(Modifier.width(if (narrow) 110.dp else 130.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(statusColor))
-            Text(statusText, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = Kit.Ink, maxLines = 1)
-        }
-        RowActionsMenu(listOf(
-            RowAction("Restaurants", Icons.Outlined.Storefront) { model.openAccess(person) },
-            RowAction("What they can do", Icons.Outlined.Tune) { model.openPermissions(person) },
-            if (person.isActive) RowAction("Switch off", Icons.Outlined.PersonOff) { model.setPersonActive(person, false) }
-            else RowAction("Switch on", Icons.Outlined.Person) { model.setPersonActive(person, true) },
-            RowAction("Send password reset", Icons.Outlined.LockReset) { model.sendPasswordEmail(person) },
-            RowAction("Remove", Icons.Outlined.Delete, danger = true) { model.askRemove(person) }
-        ), person.id in state.busy)
+    }
+}
+
+@Composable
+private fun PlaceChip(text: String, color: Color, icon: androidx.compose.ui.graphics.vector.ImageVector?, translate: Boolean = true) {
+    Row(
+        Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.10f)).padding(start = if (icon != null) 7.dp else 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        icon?.let { Icon(it, null, Modifier.size(13.dp), tint = color) }
+        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            translate = translate)
     }
 }
 
@@ -500,27 +553,6 @@ private fun areaIcon(area: String): androidx.compose.ui.graphics.vector.ImageVec
 }
 
 
-/** A restaurant's own admin (made by its owner): who, which restaurant, and whether they can sign in. View only. */
-@Composable
-private fun RestaurantAdminRow(admin: com.saporini.mobile_desktop.platform.AdminCardDto) {
-    val accent = accentOf(admin.id)
-    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Box(Modifier.size(40.dp).clip(CircleShape).background(accent.soft), contentAlignment = Alignment.Center) {
-            Text(initialsOf(admin.name), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = accent.strong)
-        }
-        Column(Modifier.weight(1f)) {
-            Text(admin.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(admin.email.orEmpty(), fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Column(horizontalAlignment = Alignment.End) {
-            com.saporini.mobile_desktop.core.components.StatusChip("Restaurant admin", Kit.Green)
-            Text(admin.restaurants.firstOrNull()?.name.orEmpty(), fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, maxLines = 1)
-        }
-        if (!admin.active) com.saporini.mobile_desktop.core.components.StatusChip("Switched off", Kit.Grey)
-    }
-}
-
 /** The restaurants a support admin takes care of: all of them, or the ones ticked; and whether they may remove owners. */
 @Composable
 private fun AccessDialog(editor: com.saporini.mobile_desktop.platform.AdminAccessEditor, model: CoSuperAdminsScreenModel) {
@@ -560,5 +592,13 @@ private fun AccessDialog(editor: com.saporini.mobile_desktop.platform.AdminAcces
                 }
             }
         }
+    }
+}
+
+/** The support admins shown: all, or those who take care of the restaurant picked (given it, or every restaurant). */
+private fun shownPeople(state: CoSuperAdminsState): List<StaffUserDto> {
+    val id = state.restaurantFilter ?: return state.people
+    return state.people.filter { person ->
+        state.cards.firstOrNull { it.id == person.id }?.let { card -> card.allRestaurants || card.restaurants.any { it.id == id } } == true
     }
 }

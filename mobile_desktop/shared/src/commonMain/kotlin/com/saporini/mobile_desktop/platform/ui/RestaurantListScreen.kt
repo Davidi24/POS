@@ -1,6 +1,9 @@
 package com.saporini.mobile_desktop.platform.ui
 
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.layout.offset
+import kotlin.math.roundToInt
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
@@ -187,7 +190,10 @@ object RestaurantListScreen : Screen {
                     // Entered without a branch (closed, or no open branch yet): straight to the restaurant's page, which the
                     // picker doesn't offer (user rule).
                     onEntered = { navigator.push(if (session.actingRestaurant.value?.branchId == null) RestaurantWorkspaceScreen else WorkspacePickerScreen) },
-                    onChooseBranch = { card -> navigator.push(BranchListScreen(card.id, card.name)) },
+                    onChooseBranch = { card ->
+                        navigator.push(BranchListScreen(card.id, card.name, card.logoUrl, card.coverUrl,
+                            listOfNotNull(card.city, card.country).joinToString(", ").ifBlank { null }))
+                    },
                     onCoSuperAdmins = { if (state.reorder != null) model.coverProblem("Save or cancel the restaurant order before leaving.") else navigator.push(CoSuperAdminsScreen) },
                     onApplications = { if (state.reorder != null) model.coverProblem("Save or cancel the restaurant order before leaving.") else navigator.push(RestaurantApplicationsScreen) },
                     modifier = Modifier.weight(1f).fillMaxWidth().nestedScroll(hideBar.connection)
@@ -240,7 +246,9 @@ internal fun RestaurantListContent(
     val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
     ScreenMessages(state.error.takeIf { state.draft == null && state.loaded }, state.notice, model::clearMessages)
     val reorder = state.reorder
-    Box(modifier, contentAlignment = Alignment.TopCenter) {
+    // Where the "Add restaurant" tab sits on the right edge (dragged up and down like Inventory's).
+    var addButtonPosition by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(.84f) }
+    BoxWithConstraints(modifier, contentAlignment = Alignment.TopCenter) {
         LazyVerticalGrid(
             GridCells.Adaptive(if (narrow) 280.dp else 340.dp),
             Modifier.widthIn(max = 1280.dp).fillMaxSize(),
@@ -304,9 +312,9 @@ internal fun RestaurantListContent(
                 }
             }
         }
-        // Bottom-right, like the menu items' "Change items position".
+        // Bottom-left (user, 2026-11-21: "change position on the other side"), so the right edge keeps Add restaurant.
         if (state.canManage && state.loaded && state.cards.size >= 2) {
-            Row(Modifier.align(Alignment.BottomEnd).padding(if (narrow) 12.dp else 22.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.align(Alignment.BottomStart).padding(if (narrow) 12.dp else 22.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (reorder == null) {
                     FloatingAction("Change position", Icons.Outlined.DragIndicator, Kit.Green, enabled = state.entering == null, onClick = model::startReorder)
                 } else {
@@ -314,6 +322,23 @@ internal fun RestaurantListContent(
                     FloatingAction("Save order", Icons.Outlined.Check, Kit.Ink, busy = state.savingOrder, onClick = model::saveOrder)
                 }
             }
+        }
+        // Add restaurant as the green tab on the right edge, like New item / New order (user, 2026-11-21).
+        if (state.canCreate && reorder == null) {
+            val maxOffset = with(androidx.compose.ui.platform.LocalDensity.current) {
+                (maxHeight - com.saporini.mobile_desktop.core.components.edgeActionButtonHeight(narrow)).coerceAtLeast(0.dp).toPx()
+            }
+            com.saporini.mobile_desktop.core.components.RightEdgeActionButton(
+                "Add restaurant", model::startCreate, enabled = state.entering == null, width = if (narrow) 108.dp else 132.dp, compact = narrow,
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, (addButtonPosition * maxOffset).roundToInt()) }
+                    .draggable(
+                        orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                        state = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
+                            if (maxOffset > 0f) addButtonPosition = (addButtonPosition + delta / maxOffset).coerceIn(0f, 1f)
+                        }
+                    )
+            )
         }
     }
 
@@ -423,10 +448,9 @@ private fun WelcomeBanner(
                         }
                     }
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (state.canCreate) KitButton("Create a new restaurant", model::startCreate, icon = Icons.Outlined.Add)
                         if (state.superAdmin) KitButton("Admins", onCoSuperAdmins, icon = Icons.Outlined.ManageAccounts, style = ButtonStyle.SECONDARY)
                         // What restaurants ask: remove one of their owners, or a support admin (user, 2026-11-19).
-                        if (state.superAdmin) KitButton("Requests", { requestsNavigator?.push(RestaurantRequestsScreen) }, icon = Icons.Outlined.MarkEmailUnread, style = ButtonStyle.SECONDARY)
+                        if (state.superAdmin || state.pendingRequests > 0) KitButton(if (state.pendingRequests > 0) "Requests (${state.pendingRequests})" else "Requests", { requestsNavigator?.push(RestaurantRequestsScreen) }, icon = Icons.Outlined.MarkEmailUnread, style = ButtonStyle.SECONDARY)
                         if (state.canRead) KitButton(
                             if (state.pendingApplications > 0) "Applications (${state.pendingApplications})" else "Applications",
                             onApplications, icon = Icons.Outlined.Inbox, style = ButtonStyle.SECONDARY

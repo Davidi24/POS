@@ -103,7 +103,22 @@ data class PlatformRequestDto(
     val createdAt: String? = null,
     val decidedByName: String? = null,
     val decidedAt: String? = null,
-    val decisionNote: String? = null
+    val decisionNote: String? = null,
+    // How to reach the owner it's about and the person who asked, to check with them first; the restaurant's logo.
+    val targetEmail: String? = null,
+    val targetPhone: String? = null,
+    val createdByEmail: String? = null,
+    val createdByPhone: String? = null,
+    val restaurantLogoUrl: String? = null,
+    val restaurantCoverUrl: String? = null,
+    // Given to a support admin by the Super Admin (user, 2026-11-21), with a note for them.
+    val assignedToId: String? = null,
+    val assignedToName: String? = null,
+    val assignedAt: String? = null,
+    val assignNote: String? = null,
+    // Someone started on it: "In progress" (user, 2026-11-21).
+    val startedAt: String? = null,
+    val startedByName: String? = null
 )
 
 @Serializable

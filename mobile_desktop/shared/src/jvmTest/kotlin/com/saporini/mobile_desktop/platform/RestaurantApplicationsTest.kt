@@ -40,7 +40,8 @@ class RestaurantApplicationsTest {
                 val search = args[1] as String
                 val page = args[2] as Int
                 val size = args[3] as Int
-                calls += listOf(status, search, page, size)
+                // Size 1 = the counts for the tabs, not a page of the list.
+                if (size != 1) calls += listOf(status, search, page, size)
                 val source = if (status == "PENDING") waiting else rejected
                 val matching = source.filter { search.isBlank() || it.name.contains(search, true) }
                 PageDto(matching.drop(page * size).take(size), page, size, matching.size.toLong(), (matching.size + size - 1) / size, (page + 1) * size < matching.size)
@@ -76,18 +77,18 @@ class RestaurantApplicationsTest {
             scheduler.runCurrent()
         }
 
-    @Test fun waitingApplicationsLoadAPageAtATimeAndRefreshKeepsThePlace() {
+    @Test fun waitingApplicationsComeAPageAtATimeAndRefreshKeepsThePage() {
         val model = model()
-        assertEquals(20, model.state.value.items.size)
+        assertEquals(12, model.state.value.items.size)
         assertEquals(45, model.state.value.total)
-        assertEquals(listOf<Any?>("PENDING", "", 0, 20), calls.single())
-        model.loadMore(); scheduler.runCurrent()
-        model.loadMore(); scheduler.runCurrent()
-        assertEquals(45, model.state.value.items.size)
+        assertEquals(listOf<Any?>("PENDING", "", 0, 12), calls.single())
+        model.goToPage(3); scheduler.runCurrent()
+        assertEquals(3, model.state.value.page)
+        assertEquals(9, model.state.value.items.size)
         assertFalse(model.state.value.hasNext)
         calls.clear()
         model.refresh(); scheduler.runCurrent()
-        assertEquals(listOf(0, 1, 2), calls.map { it[2] })
+        assertEquals(listOf(3), calls.map { it[2] })
     }
 
     @Test fun filterAndSearchStartOverOnTheServer() {
@@ -99,7 +100,7 @@ class RestaurantApplicationsTest {
         assertEquals("REJECTED", calls.last()[0])
         model.filter(ApplicationFilter.WAITING); scheduler.runCurrent()
         model.search("Bistro 4"); scheduler.runCurrent()
-        assertEquals(listOf<Any?>("PENDING", "Bistro 4", 0, 20), calls.last())
+        assertEquals(listOf<Any?>("PENDING", "Bistro 4", 0, 12), calls.last())
         assertEquals(setOf("Bistro 4", "Bistro 40", "Bistro 41", "Bistro 42", "Bistro 43", "Bistro 44", "Bistro 45"), model.state.value.items.map { it.name }.toSet())
     }
 
@@ -111,9 +112,10 @@ class RestaurantApplicationsTest {
         model.confirmReview(); scheduler.runCurrent()
         assertEquals(first.id to ReviewApplicationRequestDto("APPROVE"), reviews.single())
         assertNull(model.state.value.review)
-        assertTrue(model.state.value.items.none { it.id == first.id })
+        assertEquals(first.id, model.state.value.approved?.application?.id)
         assertEquals(44, model.state.value.total)
-        assertTrue(model.state.value.notice.orEmpty().contains("is approved"), model.state.value.notice)
+        model.closeApproved()
+        assertTrue(model.state.value.items.none { it.id == first.id })
     }
 
     @Test fun rejectingNeedsAReasonThatIsSentTrimmed() {

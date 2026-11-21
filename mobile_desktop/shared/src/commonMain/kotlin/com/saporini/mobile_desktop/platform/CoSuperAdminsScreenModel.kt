@@ -75,8 +75,10 @@ data class AdminAccessEditor(
 
 data class CoSuperAdminsState(
     val allowed: Boolean = false,
-    // Support admins (made by the Super Admin) or restaurant admins (made by an owner) on the Admins page (user, 2026-11-19).
-    val view: String = "SUPPORT",
+    // Only the support admins (made by the Super Admin) are here; a restaurant's own admins are seen inside that restaurant
+    // (user, 2026-11-20). The list can be narrowed to the ones who take care of one restaurant (null = all).
+    val restaurantFilter: String? = null,
+    val restaurants: List<RestaurantRefDto> = emptyList(),
     val cards: List<AdminCardDto> = emptyList(),
     val access: AdminAccessEditor? = null,
     val people: List<StaffUserDto> = emptyList(),
@@ -149,6 +151,9 @@ class CoSuperAdminsScreenModel(
                 if (token == revision) mutable.update { it.copy(allowedCounts = counts) }
                 val cards = runCatching { platform.admins() }.getOrNull()
                 if (token == revision && cards != null) mutable.update { it.copy(cards = cards) }
+                // Every restaurant, for the filter.
+                val restaurants = runCatching { platform.cards("", null, 0, 100).items.map { RestaurantRefDto(it.id, it.name) } }.getOrNull()
+                if (token == revision && restaurants != null) mutable.update { it.copy(restaurants = restaurants.sortedBy { r -> r.name.lowercase() }) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -159,7 +164,7 @@ class CoSuperAdminsScreenModel(
         }
     }
 
-    fun showView(view: String) = mutable.update { it.copy(view = view) }
+    fun filterRestaurant(restaurantId: String?) = mutable.update { it.copy(restaurantFilter = restaurantId) }
 
     // ---- A support admin's restaurants ----
 

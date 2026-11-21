@@ -155,6 +155,8 @@ data class RestaurantListState(
     val savingOrder: Boolean = false,
     // Restaurant applications waiting for review (shown on the welcome banner).
     val pendingApplications: Long = 0,
+    // What restaurant owners asked and nobody answered yet (a support admin: the ones given to them).
+    val pendingRequests: Long = 0,
     val notice: String? = null,
     val error: String? = null
 )
@@ -255,6 +257,8 @@ class RestaurantListScreenModel(
                 }
                 // How many applications wait for review; the list works without it.
                 val pending = if (reset) runCatching { repository.applications("PENDING", "", 0, 1).totalElements }.getOrNull() else null
+                // Waiting requests: every one for the Super Admin, the ones given to them for a support admin.
+                val asked = if (reset) runCatching { repository.platformRequests(true).size.toLong() }.getOrNull() else null
                 if (token != revision) return@launch
                 mutable.update { state ->
                     val cards = if (reset) loaded else (state.cards + loaded).distinctBy { it.id }
@@ -265,7 +269,7 @@ class RestaurantListScreenModel(
                         ListSummary(total, cards.count { it.open }, cards.sumOf { it.branches }, cards.sumOf { it.staff }, hasNext)
                     } else state.summary
                     state.copy(cards = cards, summary = summary, total = total, page = last?.page ?: 0, hasNext = hasNext, loaded = true, error = null,
-                        pendingApplications = pending ?: state.pendingApplications)
+                        pendingApplications = pending ?: state.pendingApplications, pendingRequests = asked ?: state.pendingRequests)
                 }
             } catch (e: CancellationException) {
                 throw e

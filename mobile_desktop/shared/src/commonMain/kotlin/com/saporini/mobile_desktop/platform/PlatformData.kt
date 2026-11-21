@@ -600,7 +600,16 @@ interface PlatformRepository {
         throw UnsupportedOperationException("Not available")
     /** What restaurants asked the Super Admin (waiting ones first). */
     suspend fun platformRequests(pendingOnly: Boolean): List<com.saporini.mobile_desktop.admin.people.PlatformRequestDto> = emptyList()
-    suspend fun decideRequest(requestId: String, approve: Boolean, note: String?): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+    suspend fun decideRequest(requestId: String, approve: Boolean, note: String?, supportAdminId: String? = null): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+        throw UnsupportedOperationException("Not available")
+    /** Gives a waiting request to a support admin, or takes it back (null); [giveRestaurant] also puts them in its restaurant. */
+    suspend fun assignRequest(requestId: String, adminId: String?, note: String?, giveRestaurant: Boolean = false): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+        throw UnsupportedOperationException("Not available")
+    /** Someone starts working on a waiting request: In progress. */
+    suspend fun startRequest(requestId: String): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+        throw UnsupportedOperationException("Not available")
+    /** Closes a waiting request as solved. */
+    suspend fun solveRequest(requestId: String, note: String?): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
         throw UnsupportedOperationException("Not available")
 
     /** Active staff of the restaurant who could become its owner. */
@@ -612,6 +621,8 @@ interface PlatformRepository {
     /** Restaurant applications: [status] PENDING (oldest first), REJECTED or ALL. */
     suspend fun applications(status: String, search: String, page: Int, size: Int): PageDto<RestaurantApplicationDto>
     suspend fun reviewApplication(applicationId: String, request: ReviewApplicationRequestDto): RestaurantApplicationDto
+    /** A rejected application back to waiting. */
+    suspend fun reopenApplication(applicationId: String): RestaurantApplicationDto = throw UnsupportedOperationException("Not available")
 }
 
 class PlatformApi(
@@ -834,6 +845,9 @@ class PlatformApi(
             contentType(ContentType.Application.Json); setBody(request)
         }.body()
 
+    override suspend fun reopenApplication(applicationId: String): RestaurantApplicationDto =
+        client.post(url("/restaurants/registrations/${id(applicationId)}/reopen")).body()
+
     override suspend fun admins(): List<AdminCardDto> = client.get(url("/platform/admins")).body()
 
     override suspend fun supportAdminAccess(userId: String): SupportAdminAccessDto =
@@ -845,9 +859,22 @@ class PlatformApi(
     override suspend fun platformRequests(pendingOnly: Boolean): List<com.saporini.mobile_desktop.admin.people.PlatformRequestDto> =
         client.get(url("/platform/requests")) { parameter("pendingOnly", pendingOnly) }.body()
 
-    override suspend fun decideRequest(requestId: String, approve: Boolean, note: String?): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+    override suspend fun decideRequest(requestId: String, approve: Boolean, note: String?, supportAdminId: String?): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
         client.post(url("/platform/requests/${id(requestId)}/decide")) {
-            contentType(ContentType.Application.Json); setBody(DecisionRequestDto(approve, note))
+            contentType(ContentType.Application.Json); setBody(DecisionRequestDto(approve, note, supportAdminId))
+        }.body()
+
+    override suspend fun assignRequest(requestId: String, adminId: String?, note: String?, giveRestaurant: Boolean): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+        client.post(url("/platform/requests/${id(requestId)}/assign")) {
+            contentType(ContentType.Application.Json); setBody(AssignRequestDto(adminId, note, giveRestaurant))
+        }.body()
+
+    override suspend fun startRequest(requestId: String): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+        client.post(url("/platform/requests/${id(requestId)}/start")).body()
+
+    override suspend fun solveRequest(requestId: String, note: String?): com.saporini.mobile_desktop.admin.people.PlatformRequestDto =
+        client.post(url("/platform/requests/${id(requestId)}/solve")) {
+            contentType(ContentType.Application.Json); setBody(SolveRequestDto(note))
         }.body()
 }
 
@@ -876,4 +903,11 @@ data class SupportAdminAccessDto(val allRestaurants: Boolean = false, val mayRem
 data class UpdateSupportAdminAccessDto(val allRestaurants: Boolean, val mayRemoveOwners: Boolean, val restaurantIds: List<String>)
 
 @Serializable
-data class DecisionRequestDto(val approve: Boolean, val note: String? = null)
+data class DecisionRequestDto(val approve: Boolean, val note: String? = null, val supportAdminId: String? = null)
+
+// adminId is always sent: null takes the request back.
+@Serializable
+data class AssignRequestDto(val adminId: String?, val note: String? = null, val giveRestaurant: Boolean)
+
+@Serializable
+data class SolveRequestDto(val note: String? = null)
