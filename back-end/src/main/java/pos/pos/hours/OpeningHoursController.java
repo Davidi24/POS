@@ -39,6 +39,10 @@ public class OpeningHoursController {
     private final OpeningHoursService hours;
     private final RestaurantScopeService scope;
 
+    // Bookings left in closed time after a change (user, 2026-11-21); from the reservation module, absent in unit tests.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ClosedTimeBookings closedTime;
+
     public record WeekRequest(@NotNull @Size(max = 7) List<OpeningHoursService.Day> days) {
     }
 
@@ -92,7 +96,30 @@ public class OpeningHoursController {
     public OpeningHoursService.Hours saveWeek(Authentication auth, @PathVariable UUID restaurantId, @PathVariable UUID branchId,
                                               @Valid @RequestBody WeekRequest request) {
         scope.requireAccessibleBranch(auth, restaurantId, branchId);
-        return hours.saveWeek(branchId, request.days());
+        return afterChange(auth, branchId, () -> hours.saveWeek(branchId, request.days()));
+    }
+
+    /**
+     * The bookings that fall when the branch is closed (user, 2026-11-21): the app lists them after the hours are saved, to
+     * move or cancel each one, and Reservations marks them.
+     */
+    @GetMapping("/closed-bookings")
+    @Transactional(readOnly = true)
+    @PreAuthorize("isAuthenticated()")
+    public List<ClosedTimeBookings.Booking> closedBookings(Authentication auth, @PathVariable UUID restaurantId, @PathVariable UUID branchId) {
+        scope.requireAccessibleBranch(auth, restaurantId, branchId);
+        return closedTime == null ? List.of() : closedTime.inClosedTime(branchId);
+    }
+
+    /** Saves the change, then tells the people told about bookings of bookings it left in closed time (only new ones). */
+    private <T> T afterChange(Authentication auth, UUID branchId, java.util.function.Supplier<T> change) {
+        if (closedTime == null) return change.get();
+        java.util.Set<UUID> before = closedTime.inClosedTime(branchId).stream().map(ClosedTimeBookings.Booking::id)
+                .collect(java.util.stream.Collectors.toSet());
+        T result = change.get();
+        List<ClosedTimeBookings.Booking> added = closedTime.inClosedTime(branchId).stream().filter(b -> !before.contains(b.id())).toList();
+        if (!added.isEmpty()) closedTime.alert(branchId, added, scope.currentUserId(auth));
+        return result;
     }
 
     @PostMapping("/special-days")
@@ -101,8 +128,8 @@ public class OpeningHoursController {
     public OpeningHoursService.SpecialDay addSpecialDay(Authentication auth, @PathVariable UUID restaurantId, @PathVariable UUID branchId,
                                                         @Valid @RequestBody SpecialDayRequest request) {
         scope.requireAccessibleBranch(auth, restaurantId, branchId);
-        return hours.saveSpecialDay(branchId, null, request.startsOn(), request.endsOn(), request.closed(), request.spans(), request.note(),
-                scope.currentUserId(auth));
+        return afterChange(auth, branchId, () -> hours.saveSpecialDay(branchId, null, request.startsOn(), request.endsOn(), request.closed(),
+                request.spans(), request.note(), scope.currentUserId(auth)));
     }
 
     @PutMapping("/special-days/{dayId}")
@@ -111,8 +138,8 @@ public class OpeningHoursController {
     public OpeningHoursService.SpecialDay changeSpecialDay(Authentication auth, @PathVariable UUID restaurantId, @PathVariable UUID branchId,
                                                            @PathVariable UUID dayId, @Valid @RequestBody SpecialDayRequest request) {
         scope.requireAccessibleBranch(auth, restaurantId, branchId);
-        return hours.saveSpecialDay(branchId, dayId, request.startsOn(), request.endsOn(), request.closed(), request.spans(), request.note(),
-                scope.currentUserId(auth));
+        return afterChange(auth, branchId, () -> hours.saveSpecialDay(branchId, dayId, request.startsOn(), request.endsOn(), request.closed(),
+                request.spans(), request.note(), scope.currentUserId(auth)));
     }
 
     @DeleteMapping("/special-days/{dayId}")
@@ -121,7 +148,10 @@ public class OpeningHoursController {
     public ResponseEntity<Void> deleteSpecialDay(Authentication auth, @PathVariable UUID restaurantId, @PathVariable UUID branchId,
                                                  @PathVariable UUID dayId) {
         scope.requireAccessibleBranch(auth, restaurantId, branchId);
-        hours.deleteSpecialDay(branchId, dayId);
+        afterChange(auth, branchId, () -> {
+            hours.deleteSpecialDay(branchId, dayId);
+            return null;
+        });
         return ResponseEntity.noContent().build();
     }
 

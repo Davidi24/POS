@@ -418,7 +418,7 @@ class RestaurantRegistrationServiceTest {
     void shouldListWaitingApplicationsOldestFirst() {
         Authentication authentication = authentication();
         given(actorScopeService.resolve(authentication)).willReturn(scope(true));
-        given(restaurantRepository.searchApplications(eq(List.of(RestaurantStatus.PENDING)), eq("%burger%"), any(Pageable.class)))
+        given(restaurantRepository.searchApplications(eq(List.of(RestaurantStatus.PENDING)), eq("%burger%"), any(), any(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(pendingRestaurant())));
 
         var page = restaurantRegistrationService.getApplications(authentication, null, "Burger", 0, 20);
@@ -426,7 +426,7 @@ class RestaurantRegistrationServiceTest {
         assertThat(page.getItems()).extracting(RestaurantApplicationResponse::name).containsExactly("Burger House");
         assertThat(page.getItems().get(0).owner().username()).isEqualTo("burger.owner");
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(restaurantRepository).searchApplications(any(), any(), pageable.capture());
+        verify(restaurantRepository).searchApplications(any(), any(), any(), any(), pageable.capture());
         assertThat(pageable.getValue().getSort().getOrderFor("createdAt").getDirection()).isEqualTo(Sort.Direction.ASC);
     }
 
@@ -443,7 +443,7 @@ class RestaurantRegistrationServiceTest {
         assertThatThrownBy(() -> restaurantRegistrationService.getApplications(authentication, "ACTIVE", null, 0, 20))
                 .extracting(ex -> ((AuthException) ex).getStatus())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
-        verify(restaurantRepository, never()).searchApplications(any(), any(), any());
+        verify(restaurantRepository, never()).searchApplications(any(), any(), any(), any(), any());
     }
 
     @Test

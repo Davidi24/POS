@@ -200,6 +200,6 @@ class RestaurantRegistrationControllerTest {
         return new RestaurantApplicationResponse(RESTAURANT_ID, "Burger House", "Burger House LLC", null, "hello@burger.house",
                 "+1234567890", null, "USD", "America/New_York", status, null, OffsetDateTime.parse("2026-10-24T10:00:00Z"),
                 OffsetDateTime.parse("2026-10-25T10:00:00Z"), ACTOR_ID,
-                new RestaurantApplicationResponse.Applicant("Burger", "Owner", "owner@burger.house", "burger.owner", null));
+                new RestaurantApplicationResponse.Applicant("Burger", "Owner", "owner@burger.house", "burger.owner", null), null, null);
     }
 }

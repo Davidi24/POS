@@ -37,12 +37,25 @@ public class RestaurantApplicationAdminController {
     public ResponseEntity<PageResponse<RestaurantApplicationResponse>> getApplications(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @Size(max = 100, message = "search must be at most 100 characters") String search,
+            @RequestParam(required = false) @Size(max = 10, message = "order must be at most 10 characters") String order,
+            @RequestParam(required = false) @Size(max = 3, message = "currency must be at most 3 characters") String currency,
+            @RequestParam(required = false) @Size(max = 100, message = "timezone must be at most 100 characters") String timezone,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page must be at least 0") Integer page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "size must be at least 1")
             @Max(value = 100, message = "size must be at most 100") Integer size,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(restaurantRegistrationService.getApplications(authentication, status, search, page, size));
+        return ResponseEntity.ok(restaurantRegistrationService.getApplications(authentication, status, search, order, currency, timezone, page, size));
+    }
+
+    @GetMapping("/filters")
+    @PreAuthorize("hasAuthority('RESTAURANTS_READ')")
+    @Operation(summary = "Super admins: the places (time zones) and currencies the applications of a status use, with counts, for the Filters")
+    public ResponseEntity<RestaurantRegistrationService.ApplicationFilters> getApplicationFilters(
+            @RequestParam(required = false) String status,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(restaurantRegistrationService.getApplicationFilters(authentication, status));
     }
 
     @GetMapping("/{restaurantId}")

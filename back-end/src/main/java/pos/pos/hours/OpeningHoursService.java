@@ -15,6 +15,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -106,6 +107,67 @@ public class OpeningHoursService {
     public boolean isOpenAt(UUID branchId, OffsetDateTime at) {
         if (!isSet(branchId)) return true;
         return windowAt(branchId, zoneOf(branchId), at) != null;
+    }
+
+    /**
+     * The start times guests may book on each date from [from] to [to] (user, 2026-11-21): every [stepMinutes] while the
+     * branch is open, the last one leaving [lengthMinutes] (the usual booking length) before it closes; an opening shorter
+     * than that still offers its first minute. A closed date has none. Null while the hours were never set.
+     */
+    @Transactional(readOnly = true)
+    public Map<LocalDate, List<LocalTime>> bookableTimes(UUID branchId, LocalDate from, LocalDate to, int lengthMinutes, int stepMinutes) {
+        if (from == null || to == null || to.isBefore(from)) throw bad("Choose a date range");
+        if (ChronoUnit.DAYS.between(from, to) >= MAX_CALENDAR_DAYS) throw bad("Choose at most " + MAX_CALENDAR_DAYS + " days");
+        if (!isSet(branchId)) return null;
+        ZoneId zone = zoneOf(branchId);
+        Map<Integer, List<Span>> week = weekMap(branchId);
+        List<SpecialDay> specials = specialDays(branchId, from.minusDays(1), to);
+        Map<LocalDate, java.util.TreeSet<LocalTime>> times = new LinkedHashMap<>();
+        for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) times.put(d, new java.util.TreeSet<>());
+        int step = Math.max(5, stepMinutes);
+        for (LocalDate d = from.minusDays(1); !d.isAfter(to); d = d.plusDays(1)) {
+            for (Window w : windowsOf(d, week, specials, zone)) {
+                ZonedDateTime first = w.start.atZoneSameInstant(zone);
+                ZonedDateTime last = w.end.atZoneSameInstant(zone).minusMinutes(Math.max(0, lengthMinutes));
+                if (last.isBefore(first)) last = first;
+                for (ZonedDateTime t = first; !t.isAfter(last); t = t.plusMinutes(step)) {
+                    java.util.TreeSet<LocalTime> day = times.get(t.toLocalDate());
+                    if (day != null) day.add(t.toLocalTime());
+                }
+            }
+        }
+        Map<LocalDate, List<LocalTime>> out = new LinkedHashMap<>();
+        times.forEach((date, set) -> out.put(date, List.copyOf(set)));
+        return out;
+    }
+
+    /**
+     * Whether a guest may book [start]: the branch is open then and the usual booking length still fits before it closes
+     * (or [start] is the first minute of an opening shorter than that). Always true while the hours were never set.
+     */
+    @Transactional(readOnly = true)
+    public boolean bookableAt(UUID branchId, OffsetDateTime start, int lengthMinutes) {
+        if (!isSet(branchId)) return true;
+        Window w = windowAt(branchId, zoneOf(branchId), start);
+        if (w == null) return false;
+        return !start.plusMinutes(Math.max(0, lengthMinutes)).isAfter(w.end) || start.isEqual(w.start);
+    }
+
+    /**
+     * Which of [moments] fall when the branch is closed by its hours (bookings made before the hours changed, user
+     * 2026-11-21), read in one go. None while the hours were never set.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Set<OffsetDateTime> closedAt(UUID branchId, java.util.Collection<OffsetDateTime> moments) {
+        if (moments == null || moments.isEmpty() || !isSet(branchId)) return java.util.Set.of();
+        ZoneId zone = zoneOf(branchId);
+        LocalDate first = moments.stream().map(m -> m.atZoneSameInstant(zone).toLocalDate()).min(Comparator.naturalOrder()).orElseThrow();
+        LocalDate last = moments.stream().map(m -> m.atZoneSameInstant(zone).toLocalDate()).max(Comparator.naturalOrder()).orElseThrow();
+        Map<Integer, List<Span>> week = weekMap(branchId);
+        List<SpecialDay> specials = specialDays(branchId, first.minusDays(1), last);
+        java.util.Set<OffsetDateTime> closed = new java.util.HashSet<>();
+        for (OffsetDateTime at : moments) if (windowAt(zone, at, week, specials) == null) closed.add(at);
+        return closed;
     }
 
     /** Each date from [from] to [to] as it is. A branch whose hours were never set has an empty calendar. */
@@ -370,8 +432,11 @@ public class OpeningHoursService {
 
     private Window windowAt(UUID branchId, ZoneId zone, OffsetDateTime at) {
         LocalDate date = at.atZoneSameInstant(zone).toLocalDate();
-        Map<Integer, List<Span>> week = weekMap(branchId);
-        List<SpecialDay> specials = specialDays(branchId, date.minusDays(1), date);
+        return windowAt(zone, at, weekMap(branchId), specialDays(branchId, date.minusDays(1), date));
+    }
+
+    private Window windowAt(ZoneId zone, OffsetDateTime at, Map<Integer, List<Span>> week, List<SpecialDay> specials) {
+        LocalDate date = at.atZoneSameInstant(zone).toLocalDate();
         for (LocalDate d : List.of(date.minusDays(1), date)) {
             for (Window w : windowsOf(d, week, specials, zone)) {
                 if (!at.isBefore(w.start) && at.isBefore(w.end)) return w;

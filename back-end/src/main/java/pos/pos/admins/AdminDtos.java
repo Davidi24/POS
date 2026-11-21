@@ -31,7 +31,11 @@ public final class AdminDtos {
     /** A support admin a restaurant can write to for help. */
     public record SupportContact(UUID id, String name, String email, String phone, String photoUrl) { }
 
-    public record CreateRequest(@NotBlank @Pattern(regexp = "REMOVE_OWNER|NEED_ADMIN", message = "Choose what you ask for") String kind,
+    /** A ticket the Super Admin (or someone who gives requests out) opens themselves, for a restaurant (user, 2026-11-21). */
+    public record OpenTicket(@jakarta.validation.constraints.NotNull(message = "Choose a restaurant.") UUID restaurantId,
+                             @NotBlank(message = "Write what the problem is.") @Size(max = 2000) String note) { }
+
+    public record CreateRequest(@NotBlank @Pattern(regexp = "REMOVE_OWNER|NEED_ADMIN|PROBLEM", message = "Choose what you ask for") String kind,
                                 UUID targetUserId, @Size(max = 2000) String note) { }
 
     /**
@@ -44,6 +48,9 @@ public final class AdminDtos {
      * A request, with how to reach the owner it's about and the person who asked (to check with them first), and the
      * restaurant's logo and cover picture for the card.
      */
+    /** One thing that happened to a request, for its history: who did it, to whom, and their note. */
+    public record RequestEvent(String kind, OffsetDateTime at, String byName, String toName, String note) { }
+
     public record PlatformRequest(UUID id, UUID restaurantId, String restaurantName, String kind, UUID targetUserId, String targetName,
                                   String note, String status, UUID createdBy, String createdByName, OffsetDateTime createdAt,
                                   String decidedByName, OffsetDateTime decidedAt, String decisionNote,

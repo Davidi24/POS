@@ -208,11 +208,30 @@ public class GuestBookingPageController {
         List<ReservationOccasionDto> occasions = reservationOccasionService.activeOccasions(branch.getRestaurant().getId());
         ZoneId zone = reservationSupport.restaurantZone(branch.getRestaurant());
         String today = LocalDate.now(zone).toString();
-        StringBuilder times = new StringBuilder();
-        for (LocalTime slot = LocalTime.of(12, 0); !slot.isAfter(LocalTime.of(22, 30)); slot = slot.plusMinutes(15)) {
-            String value = slot.toString();
-            times.append("<option").append(value.equals(values.time() == null ? "19:00" : values.time()) ? " selected" : "").append(">").append(value).append("</option>");
+        // Only times the branch is open, date by date (user, 2026-11-21); 12:00–22:30 while its hours were never set.
+        java.util.Map<LocalDate, List<LocalTime>> open = guestBookingService.bookingTimes(branch);
+        String day = or(values.date(), today);
+        List<String> shown = new java.util.ArrayList<>();
+        String max = null;
+        String script = "";
+        if (open == null) {
+            for (LocalTime slot = LocalTime.of(12, 0); !slot.isAfter(LocalTime.of(22, 30)); slot = slot.plusMinutes(15)) shown.add(slot.toString());
+        } else {
+            // No day asked for and nothing left today: start on the next open day.
+            if (values.date() == null && open.getOrDefault(LocalDate.parse(today), List.of()).isEmpty()) {
+                day = open.entrySet().stream().filter(e -> !e.getValue().isEmpty()).map(e -> e.getKey().toString()).findFirst().orElse(today);
+            }
+            LocalDate chosen = parseDate(day);
+            if (chosen != null) open.getOrDefault(chosen, List.of()).forEach(time -> shown.add(time.toString()));
+            max = open.keySet().stream().reduce((a, b) -> b).map(LocalDate::toString).orElse(null);
+            script = timesScript(open, l);
         }
+        String picked = values.time() != null && shown.contains(values.time()) ? values.time() : shown.contains("19:00") ? "19:00" : null;
+        StringBuilder times = new StringBuilder();
+        for (String value : shown) {
+            times.append("<option").append(value.equals(picked) ? " selected" : "").append(">").append(value).append("</option>");
+        }
+        boolean closedDay = shown.isEmpty();
         StringBuilder occasionOptions = new StringBuilder("<option value=''>" + Words.t(l, "None") + "</option>");
         occasions.forEach(occasion -> occasionOptions.append("<option value='").append(esc(occasion.getCode())).append("'")
                 .append(occasion.getCode().equals(values.occasion()) ? " selected" : "").append(">")
@@ -221,20 +240,78 @@ public class GuestBookingPageController {
                 + (problem == null ? "" : "<p class='error'>" + esc(problem) + "</p>")
                 + "<form method='post'>"
                 + "<input type='hidden' name='lang' value='" + l + "'>"
-                + "<label>" + Words.t(l, "Day") + "<input type='date' name='date' required min='" + today + "' value='" + esc(or(values.date(), today)) + "'></label>"
-                + "<label>" + Words.t(l, "Time") + "<select name='time'>" + times + "</select></label>"
+                + "<label>" + Words.t(l, "Day") + "<input type='date' id='day' name='date' required min='" + today + "'"
+                + (max == null ? "" : " max='" + max + "'") + " value='" + esc(day) + "'></label>"
+                + "<label id='time-label'" + (closedDay ? " style='display:none'" : "") + ">" + Words.t(l, "Time") + "<select id='time' name='time'>" + times + "</select></label>"
+                + "<p id='closed' class='error'" + (closedDay ? "" : " style='display:none'") + ">" + Words.t(l, "Closed that day.")
+                + " <a href='#' id='next-open' style='color:#4f7942'></a></p>"
                 + "<label>" + Words.t(l, "Guests") + "<input type='number' name='guests' min='1' max='500' required value='" + esc(or(values.guests(), "2")) + "'></label>"
                 + "<label>" + Words.t(l, "Name") + "<input name='name' required maxlength='150' value='" + esc(or(values.name(), "")) + "'></label>"
                 + "<label>" + Words.t(l, "Email") + "<input type='email' name='email' required maxlength='150' value='" + esc(or(values.email(), "")) + "'></label>"
                 + "<label>" + Words.t(l, "Phone (optional)") + "<input name='phone' maxlength='50' value='" + esc(or(values.phone(), "")) + "'></label>"
                 + (occasions.isEmpty() ? "" : "<label>" + Words.t(l, "Occasion (optional)") + "<select name='occasion'>" + occasionOptions + "</select></label>")
                 + "<label>" + Words.t(l, "Note (optional)") + "<textarea name='note' maxlength='2000'>" + esc(or(values.note(), "")) + "</textarea></label>"
-                + "<button>" + Words.t(l, "Book") + "</button></form>"
+                + "<button id='book'" + (closedDay ? " disabled style='opacity:.5'" : "") + ">" + Words.t(l, "Book") + "</button></form>"
+                + script
                 + "<p class='muted'>" + Words.t(l, "If no table is free we send your request to the restaurant and email you their answer. Cancelling is always free.") + "</p>"
                 + contact(branch.getPhone() != null ? branch.getPhone() : branch.getRestaurant().getPhone(),
                         branch.getEmail() != null ? branch.getEmail() : branch.getRestaurant().getEmail(), l)
                 + hoursLine(branch.getId(), l);
         return shell(l, code -> "/public/book/" + restaurantSlug + "/" + branchCode + "?lang=" + code, Words.t(l, "Book a table"), body);
+    }
+
+    private static LocalDate parseDate(String value) {
+        try {
+            return value == null ? null : LocalDate.parse(value);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * The times for every date, so changing the day changes the times without a reload: each different list of times once
+     * ("p"), each date pointing at its list ("d"). A day with none says "Closed that day." with a link to the next open day.
+     */
+    private static String timesScript(java.util.Map<LocalDate, List<LocalTime>> open, String l) {
+        List<List<LocalTime>> patterns = new java.util.ArrayList<>();
+        StringBuilder dates = new StringBuilder("{");
+        open.forEach((date, list) -> {
+            int index = patterns.indexOf(list);
+            if (index < 0) {
+                patterns.add(list);
+                index = patterns.size() - 1;
+            }
+            if (dates.length() > 1) dates.append(',');
+            dates.append('"').append(date).append("\":").append(index);
+        });
+        dates.append('}');
+        StringBuilder lists = new StringBuilder("[");
+        for (int i = 0; i < patterns.size(); i++) {
+            if (i > 0) lists.append(',');
+            lists.append('[');
+            List<LocalTime> list = patterns.get(i);
+            for (int j = 0; j < list.size(); j++) lists.append(j > 0 ? "," : "").append('"').append(list.get(j)).append('"');
+            lists.append(']');
+        }
+        lists.append(']');
+        return "<script>(function(){var P=" + lists + ",D=" + dates + ",lang='" + l + "',nextText=" + js(Words.t(l, "Next open: {}")) + ";"
+                + "var day=document.getElementById('day'),sel=document.getElementById('time'),label=document.getElementById('time-label'),"
+                + "closed=document.getElementById('closed'),next=document.getElementById('next-open'),book=document.getElementById('book');"
+                + "function timesOf(d){var i=D[d];return i===undefined?[]:P[i];}"
+                + "function nextOpen(d){var keys=Object.keys(D).sort();for(var i=0;i<keys.length;i++){if(keys[i]>d&&P[D[keys[i]]].length)return keys[i];}return null;}"
+                + "function fill(){var list=timesOf(day.value),cur=sel.value;sel.innerHTML='';"
+                + "list.forEach(function(t){var o=document.createElement('option');o.textContent=t;sel.appendChild(o);});"
+                + "if(list.indexOf(cur)>=0)sel.value=cur;else if(list.indexOf('19:00')>=0)sel.value='19:00';"
+                + "var none=list.length===0;label.style.display=none?'none':'';closed.style.display=none?'':'none';book.disabled=none;book.style.opacity=none?'.5':'';"
+                + "var n=none?nextOpen(day.value):null;next.style.display=n?'':'none';"
+                + "if(n){var dt=new Date(n+'T12:00:00');var text;try{text=dt.toLocaleDateString(lang,{weekday:'short',day:'numeric',month:'short'});}catch(e){text=n;}"
+                + "next.textContent=nextText.replace('{}',text);next.onclick=function(e){e.preventDefault();day.value=n;fill();};}}"
+                + "day.addEventListener('change',fill);day.addEventListener('input',fill);fill();})();</script>";
+    }
+
+    /** A text as a JavaScript string inside the page. */
+    private static String js(String text) {
+        return "'" + text.replace("\\", "\\\\").replace("'", "\\'").replace("<", "\\u003c").replace("\n", " ") + "'";
     }
 
     private String bookingHtml(GuestBookingView booking, String notice, String problem, String l) {

@@ -132,7 +132,10 @@ public enum AppPermission {
     SETTINGS_EXPORT("Export settings", "Export a restaurant's settings"),
     SETTINGS_IMPORT("Import settings", "Import a restaurant's settings"),
     SETTINGS_TEMPLATE_MANAGE("Manage settings templates", "Create, change and delete settings templates"),
-    SETTINGS_TEMPLATE_APPLY("Apply settings templates", "Apply settings templates to restaurants");
+    SETTINGS_TEMPLATE_APPLY("Apply settings templates", "Apply settings templates to restaurants"),
+    // Who gives restaurants' requests to the admins (user, 2026-11-21: "I set in a person's permissions who can assign to
+    // the other admins"): the Super Admin always; a support admin only when ticked (off for them to start with, V135).
+    REQUESTS_ASSIGN("Assign requests", "See every request, give it to an admin (or themselves) and take it back");
 
 
     private final String displayName;

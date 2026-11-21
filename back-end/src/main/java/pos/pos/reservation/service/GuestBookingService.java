@@ -75,6 +75,28 @@ public class GuestBookingService {
     @Value("${app.payments.provider:disabled}")
     private String paymentProvider;
 
+    /**
+     * The times a guest can pick on the booking page, date by date (user, 2026-11-21): only while the branch is open, the last
+     * one leaving the usual booking length before closing, today's from 15 minutes on, as far ahead as online booking goes
+     * (at most 180 days). Null while the branch's hours were never set (the page then offers 12:00–22:30).
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<LocalDate, List<java.time.LocalTime>> bookingTimes(Branch branch) {
+        if (openingHours == null) return null;
+        ZoneId zone = reservationSupport.restaurantZone(branch.getRestaurant());
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        SettingsReservationRule rule = reservationRuleResolver.activeRule(branch, now).orElse(null);
+        int days = rule != null && rule.getAdvanceBookingDays() > 0 ? Math.min(rule.getAdvanceBookingDays(), 180) : 180;
+        LocalDate today = LocalDate.now(zone);
+        java.util.Map<LocalDate, List<java.time.LocalTime>> times = openingHours.bookableTimes(branch.getId(), today, today.plusDays(days),
+                reservationRuleResolver.durationMinutes(branch, now), 15);
+        if (times == null) return null;
+        OffsetDateTime soonest = now.plusMinutes(15);
+        times.computeIfPresent(today, (date, list) -> list.stream()
+                .filter(time -> date.atTime(time).atZone(zone).toOffsetDateTime().isAfter(soonest)).toList());
+        return times;
+    }
+
     @Transactional
     public GuestBookingView book(String restaurantSlug, String branchCode, OnlineBookingRequest request) {
         Branch branch = reservationSupport.requirePublicBranch(restaurantSlug, branchCode);
@@ -97,9 +119,13 @@ public class GuestBookingService {
                 throw bad("You can book up to " + rule.getAdvanceBookingDays() + " days ahead");
             }
         }
-        // Guests book only when the branch is open (user, 2026-11-20).
+        // Guests book only when the branch is open (user, 2026-11-20), and early enough that the usual booking length fits
+        // before it closes (user, 2026-11-21), as the booking page offers.
         if (openingHours != null && !openingHours.isOpenAt(branch.getId(), start)) {
             throw bad("We're closed at that time. Please pick another time");
+        }
+        if (openingHours != null && !openingHours.bookableAt(branch.getId(), start, reservationRuleResolver.durationMinutes(branch, start))) {
+            throw bad("That's too close to closing time. Please pick an earlier time");
         }
         OffsetDateTime end = start.plus(reservationPolicy.bookingLength(branch, start, guests));
 

@@ -39,6 +39,7 @@ public class AuthRegisterService {
     private final UserIdentityService userIdentityService;
     private final pos.pos.restaurant.repository.RestaurantRepository restaurantRepository;
     private final pos.pos.restaurant.repository.BranchRepository branchRepository;
+    private final pos.pos.role.repository.UserPermissionDenialRepository permissionDenialRepository;
 
     @Transactional
     public UserResponse register(CreateUserRequest request, Authentication authentication) {
@@ -90,6 +91,14 @@ public class AuthRegisterService {
                 .build();
 
         userRoleRepository.save(userRole);
+        // A new support admin starts without giving requests out; the Super Admin ticks it when they want (user, 2026-11-21).
+        if (platformRole && permissionDenialRepository != null) {
+            pos.pos.role.entity.UserPermissionDenial denial = new pos.pos.role.entity.UserPermissionDenial();
+            denial.setUserId(user.getId());
+            denial.setPermissionCode(pos.pos.security.rbac.AppPermission.REQUESTS_ASSIGN.name());
+            denial.setCreatedBy(createdByUserId);
+            permissionDenialRepository.save(denial);
+        }
 
         emailVerificationService.issueVerificationForUser(user, request.getClientTarget());
 

@@ -105,6 +105,13 @@ public class AdminRepository {
                 + " values (:id, :restaurant, :kind, :target, :note, 'PENDING', :by, :at)", p);
     }
 
+    /** How many problems this person reported that aren't solved yet. */
+    public int openProblems(UUID createdBy) {
+        Integer count = jdbc.queryForObject("select count(*) from " + schema + "platform_requests where created_by = :by and kind = 'PROBLEM'"
+                + " and status = 'PENDING'", Map.of("by", createdBy), Integer.class);
+        return count == null ? 0 : count;
+    }
+
     public boolean pendingExists(UUID restaurantId, String kind, UUID targetUserId) {
         Map<String, Object> p = new HashMap<>();
         p.put("restaurant", restaurantId);
@@ -182,11 +189,36 @@ public class AdminRepository {
         p.put("by", adminId == null ? null : actorId);
         p.put("at", adminId == null ? null : at);
         p.put("note", adminId == null ? null : note);
-        // Given to someone else (or taken back), it isn't in progress any more until they start.
+        // Given to someone else, or taken back (even one started by nobody's holder), it isn't in progress any more until someone starts.
         return jdbc.update("update " + schema + "platform_requests set assigned_to = cast(:admin as uuid), assigned_by = cast(:by as uuid), assigned_at = :at, assign_note = :note,"
-                + " started_at = case when assigned_to is not distinct from cast(:admin as uuid) then started_at end,"
-                + " started_by = case when assigned_to is not distinct from cast(:admin as uuid) then started_by end"
+                + " started_at = case when cast(:admin as uuid) is not null and assigned_to is not distinct from cast(:admin as uuid) then started_at end,"
+                + " started_by = case when cast(:admin as uuid) is not null and assigned_to is not distinct from cast(:admin as uuid) then started_by end"
                 + " where id = :id and status = 'PENDING'", p);
+    }
+
+    /** Writes down one thing that happened to a request (its history). */
+    public void event(UUID requestId, String kind, UUID actorId, UUID targetUserId, String note, OffsetDateTime at) {
+        Map<String, Object> p = new HashMap<>();
+        p.put("id", UUID.randomUUID());
+        p.put("request", requestId);
+        p.put("kind", kind);
+        p.put("actor", actorId);
+        p.put("target", targetUserId);
+        p.put("note", note);
+        p.put("at", at);
+        jdbc.update("insert into " + schema + "platform_request_events (id, request_id, kind, actor_id, target_user_id, note, created_at)"
+                + " values (:id, :request, :kind, cast(:actor as uuid), cast(:target as uuid), :note, :at)", p);
+    }
+
+    /** A request's history, oldest first, with who did each thing and to whom. */
+    public List<AdminDtos.RequestEvent> events(UUID requestId) {
+        return jdbc.query("select e.kind, e.created_at, e.note,"
+                + " (select " + NAME + " from " + schema + "users u where u.id = e.actor_id) as by_name,"
+                + " (select " + NAME + " from " + schema + "users u where u.id = e.target_user_id) as to_name"
+                + " from " + schema + "platform_request_events e where e.request_id = :id order by e.created_at, e.seq",
+                Map.of("id", requestId),
+                (row, n) -> new AdminDtos.RequestEvent(row.getString("kind"), row.getObject("created_at", OffsetDateTime.class),
+                        blankToNull(row.getString("by_name")), blankToNull(row.getString("to_name")), row.getString("note")));
     }
 
     /** Someone started working on a waiting request. */
@@ -195,7 +227,10 @@ public class AdminRepository {
         p.put("id", id);
         p.put("by", actorId);
         p.put("at", at);
-        return jdbc.update("update " + schema + "platform_requests set started_at = :at, started_by = :by where id = :id and status = 'PENDING'", p);
+        // Starting one nobody has makes it yours (user, 2026-11-21: "I can do it myself, I don't have to assign it to someone").
+        return jdbc.update("update " + schema + "platform_requests set started_at = :at, started_by = :by,"
+                + " assigned_to = coalesce(assigned_to, :by), assigned_by = coalesce(assigned_by, :by), assigned_at = coalesce(assigned_at, :at)"
+                + " where id = :id and status = 'PENDING'", p);
     }
 
     /** Closes a waiting request as solved. */

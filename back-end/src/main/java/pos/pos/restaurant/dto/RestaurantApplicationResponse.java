@@ -19,7 +19,10 @@ public record RestaurantApplicationResponse(
         OffsetDateTime submittedAt,
         OffsetDateTime reviewedAt,
         UUID reviewedBy,
-        Applicant owner
+        Applicant owner,
+        // The pictures the applicant uploaded, when they did (user, 2026-11-21: "show the image if they have uploaded it").
+        String logoUrl,
+        String coverUrl
 ) {
     /** The person who applied and will own the restaurant (their account is created on approval). */
     public record Applicant(String firstName, String lastName, String email, String username, String phone) {

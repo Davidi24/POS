@@ -69,10 +69,26 @@ public class AdminService {
         return admins.supportAdminsOf(restaurantId);
     }
 
+    /** How many unsolved problems one person may have at a time. */
+    private static final int MAX_OPEN_PROBLEMS = 5;
+
     @Transactional
     public AdminDtos.PlatformRequest ask(Authentication auth, UUID restaurantId, AdminDtos.CreateRequest request) {
         requireRestaurant(auth, restaurantId);
         UUID actorId = roleHierarchyService.currentUserId(auth);
+        // A problem: anyone working in the restaurant writes what's wrong (user, 2026-11-21); a few open ones at a time each.
+        if ("PROBLEM".equals(request.kind())) {
+            String message = request.note() == null ? "" : request.note().trim();
+            if (message.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Write what the problem is.");
+            if (admins.openProblems(actorId) >= MAX_OPEN_PROBLEMS) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "You have 5 problems waiting for an answer. Wait for one before you send more.");
+            }
+            UUID id = UUID.randomUUID();
+            OffsetDateTime at = OffsetDateTime.now(ZoneOffset.UTC);
+            admins.insertRequest(id, restaurantId, "PROBLEM", null, message, actorId, at);
+            admins.event(id, "CREATED", actorId, null, null, at);
+            return admins.request(id);
+        }
         if (!roleHierarchyService.hasRole(auth, "OWNER") && !roleHierarchyService.hasRole(auth, "CO_OWNER")) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the restaurant's owners can ask the Super Admin.");
         }
@@ -92,7 +108,30 @@ public class AdminService {
         }
         UUID id = UUID.randomUUID();
         String note = request.note() == null || request.note().isBlank() ? null : request.note().trim();
-        admins.insertRequest(id, restaurantId, request.kind(), target, note, actorId, OffsetDateTime.now(ZoneOffset.UTC));
+        OffsetDateTime at = OffsetDateTime.now(ZoneOffset.UTC);
+        admins.insertRequest(id, restaurantId, request.kind(), target, note, actorId, at);
+        admins.event(id, "CREATED", actorId, target, null, at);
+        return admins.request(id);
+    }
+
+    /**
+     * A ticket opened from the Requests board itself (user, 2026-11-21: "make here that I can open a ticket myself"): a
+     * problem for a restaurant, written by the Super Admin or a support admin who gives requests out; it starts Open.
+     */
+    @Transactional
+    public AdminDtos.PlatformRequest openTicket(Authentication auth, AdminDtos.OpenTicket ticket) {
+        if (!canAssign(auth)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the Super Admin does this.");
+        String message = ticket.note() == null ? "" : ticket.note().trim();
+        if (message.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Write what the problem is.");
+        var restaurant = restaurantRepository.findByIdAndDeletedAtIsNull(ticket.restaurantId())
+                .filter(r -> r.getStatus() != pos.pos.restaurant.enums.RestaurantStatus.PENDING
+                        && r.getStatus() != pos.pos.restaurant.enums.RestaurantStatus.REJECTED)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose a restaurant."));
+        UUID actorId = roleHierarchyService.currentUserId(auth);
+        UUID id = UUID.randomUUID();
+        OffsetDateTime at = OffsetDateTime.now(ZoneOffset.UTC);
+        admins.insertRequest(id, restaurant.getId(), "PROBLEM", null, message, actorId, at);
+        admins.event(id, "CREATED", actorId, null, null, at);
         return admins.request(id);
     }
 
@@ -105,7 +144,8 @@ public class AdminService {
     /** The Super Admin sees every request; a support admin only the ones given to them (user, 2026-11-21). */
     @Transactional(readOnly = true)
     public List<AdminDtos.PlatformRequest> allRequests(Authentication auth, boolean pendingOnly) {
-        if (roleHierarchyService.isSuperAdmin(auth)) return admins.requests(null, pendingOnly);
+        // Someone who gives requests out sees them all.
+        if (roleHierarchyService.isSuperAdmin(auth) || canAssign(auth)) return admins.requests(null, pendingOnly);
         if (roleHierarchyService.isCoSuperAdmin(auth)) return admins.requests(null, pendingOnly, roleHierarchyService.currentUserId(auth));
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the Super Admin does this.");
     }
@@ -113,26 +153,41 @@ public class AdminService {
     /** The Super Admin gives a waiting request to a support admin, or takes it back. */
     @Transactional
     public AdminDtos.PlatformRequest assign(Authentication auth, UUID requestId, AdminDtos.Assign assign) {
-        requireSuperAdmin(auth);
+        if (!roleHierarchyService.isSuperAdmin(auth) && !canAssign(auth)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You may not give requests to others. Ask the Super Admin.");
+        }
         AdminDtos.PlatformRequest request = admins.request(requestId);
         if (request == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This request doesn't exist any more.");
-        if (assign.adminId() != null) {
+        UUID actorId = roleHierarchyService.currentUserId(auth);
+        // Yourself, or a support admin who's switched on.
+        boolean self = actorId.equals(assign.adminId());
+        if (assign.adminId() != null && !self) {
             User admin = supportAdmin(assign.adminId());
             if (!admin.isActive()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This support admin is switched off.");
         }
+        // Giving a restaurant to a support admin stays the Super Admin's.
+        if (assign.giveRestaurant() && !self && assign.adminId() != null && !roleHierarchyService.isSuperAdmin(auth)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the Super Admin gives restaurants to support admins.");
+        }
         String note = assign.note() == null || assign.note().isBlank() ? null : assign.note().trim();
-        UUID actorId = roleHierarchyService.currentUserId(auth);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         if (admins.assign(requestId, assign.adminId(), actorId, note, now) == 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This request was already answered.");
         }
-        if (assign.adminId() != null && assign.giveRestaurant()) {
+        if (assign.adminId() == null) admins.event(requestId, "TAKEN_BACK", actorId, request.assignedToId(), null, now);
+        else admins.event(requestId, self ? "TAKEN" : "ASSIGNED", actorId, assign.adminId(), note, now);
+        if (assign.adminId() != null && !self && assign.giveRestaurant()) {
             User admin = supportAdmin(assign.adminId());
-            if (!admin.isAdminAllRestaurants()) admins.addRestaurant(admin.getId(), request.restaurantId(), actorId);
+            if (!admin.isAdminAllRestaurants()) {
+                admins.addRestaurant(admin.getId(), request.restaurantId(), actorId);
+                admins.event(requestId, "RESTAURANT_GIVEN", actorId, admin.getId(), null, now);
+            }
             // They asked for a support admin and now have one.
             if ("NEED_ADMIN".equals(request.kind())) {
                 String name = (admin.getFirstName() + " " + admin.getLastName()).trim();
-                admins.decide(requestId, true, actorId, pos.pos.i18n.Words.en("{} takes care of you now.", name), now);
+                String answer = pos.pos.i18n.Words.en("{} takes care of you now.", name);
+                admins.decide(requestId, true, actorId, answer, now);
+                admins.event(requestId, "SOLVED", actorId, null, answer, now);
             }
         }
         return admins.request(requestId);
@@ -143,10 +198,15 @@ public class AdminService {
     public AdminDtos.PlatformRequest start(Authentication auth, UUID requestId) {
         AdminDtos.PlatformRequest request = admins.request(requestId);
         if (request == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This request doesn't exist any more.");
-        requireSuperAdminOrAssignee(auth, request);
-        if (admins.start(requestId, roleHierarchyService.currentUserId(auth), OffsetDateTime.now(ZoneOffset.UTC)) == 0) {
+        // The Super Admin, the one it was given to, or (when nobody has it) someone who gives requests out, who then has it.
+        if (!(request.assignedToId() == null && canAssign(auth))) requireSuperAdminOrAssignee(auth, request);
+        UUID actorId = roleHierarchyService.currentUserId(auth);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (admins.start(requestId, actorId, now) == 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This request was already solved.");
         }
+        if (request.assignedToId() == null) admins.event(requestId, "TAKEN", actorId, actorId, null, now);
+        admins.event(requestId, "STARTED", actorId, null, null, now);
         return admins.request(requestId);
     }
 
@@ -157,9 +217,11 @@ public class AdminService {
         if (request == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This request doesn't exist any more.");
         requireSuperAdminOrAssignee(auth, request);
         String note = solve.note() == null || solve.note().isBlank() ? null : solve.note().trim();
-        if (admins.solve(requestId, roleHierarchyService.currentUserId(auth), note, OffsetDateTime.now(ZoneOffset.UTC)) == 0) {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (admins.solve(requestId, roleHierarchyService.currentUserId(auth), note, now) == 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This request was already answered.");
         }
+        admins.event(requestId, "SOLVED", roleHierarchyService.currentUserId(auth), null, note, now);
         return admins.request(requestId);
     }
 
@@ -186,9 +248,14 @@ public class AdminService {
         // Checked before answering, so a wrong person leaves the request waiting.
         User helper = decision.approve() && "NEED_ADMIN".equals(request.kind()) && decision.supportAdminId() != null
                 ? supportAdmin(decision.supportAdminId()) : null;
-        if (admins.decide(requestId, decision.approve(), actorId, note, OffsetDateTime.now(ZoneOffset.UTC)) == 0) {
+        OffsetDateTime decidedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        if (admins.decide(requestId, decision.approve(), actorId, note, decidedAt) == 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This request was already answered.");
         }
+        boolean removal = decision.approve() && "REMOVE_OWNER".equals(request.kind());
+        admins.event(requestId, removal ? "OWNER_REMOVED" : decision.approve() ? "APPROVED" : "DECLINED", actorId,
+                removal ? request.targetUserId() : null, note, decidedAt);
+        if (helper != null && !helper.isAdminAllRestaurants()) admins.event(requestId, "RESTAURANT_GIVEN", actorId, helper.getId(), null, decidedAt);
         if (decision.approve() && "REMOVE_OWNER".equals(request.kind()) && request.targetUserId() != null
                 && userRepository.findByIdAndDeletedAtIsNull(request.targetUserId()).isPresent()) {
             userAdminService.removeApprovedBySuperAdmin(request.targetUserId(), actorId);
@@ -216,6 +283,22 @@ public class AdminService {
         if (roleHierarchyService.isSuperAdmin(auth)) return;
         if (roleHierarchyService.isCoSuperAdmin(auth) && roleHierarchyService.currentUserId(auth).equals(request.assignedToId())) return;
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the Super Admin, or the support admin it was given to, answers this.");
+    }
+
+    /** What happened to a request, oldest first: for whoever may see it. */
+    @Transactional(readOnly = true)
+    public List<AdminDtos.RequestEvent> history(Authentication auth, UUID requestId) {
+        AdminDtos.PlatformRequest request = admins.request(requestId);
+        if (request == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This request doesn't exist any more.");
+        if (!canAssign(auth)) requireSuperAdminOrAssignee(auth, request);
+        return admins.events(requestId);
+    }
+
+    /** A support admin the Super Admin lets give requests out ("Assign requests"); the Super Admin always may. */
+    private boolean canAssign(Authentication auth) {
+        if (roleHierarchyService.isSuperAdmin(auth)) return true;
+        return roleHierarchyService.isCoSuperAdmin(auth) && auth.getAuthorities().stream()
+                .anyMatch(authority -> pos.pos.security.rbac.AppPermission.REQUESTS_ASSIGN.name().equals(authority.getAuthority()));
     }
 
     private void requireSuperAdmin(Authentication auth) {

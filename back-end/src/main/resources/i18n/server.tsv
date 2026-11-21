@@ -1,4 +1,5 @@
 en	it	es	sq
+{} takes care of you now.	Ora {} si occupa di voi.	Ahora {} se encarga de ustedes.	Tani {} kujdeset për ju.
 Email confirmed	Email confermata	Correo confirmado	Email-i u konfirmua
 You can close this page.	Puoi chiudere questa pagina.	Puedes cerrar esta página.	Mund ta mbyllësh këtë faqe.
 there	a te	a ti	mik
@@ -87,6 +88,7 @@ None	Nessuno	Ninguno	Asnjë
 Book a table	Prenota un tavolo	Reservar una mesa	Rezervo një tavolinë
 Day	Giorno	Día	Dita
 Time	Ora	Hora	Ora
+Closed that day.	Chiuso quel giorno.	Cerrado ese día.	E mbyllur atë ditë.
 Guests	Ospiti	Comensales	Mysafirët
 Name	Nome	Nombre	Emri
 Email	Email	Correo	Email
@@ -95,6 +97,7 @@ Occasion (optional)	Occasione (facoltativa)	Ocasión (opcional)	Rasti (opsional)
 Note (optional)	Nota (facoltativa)	Nota (opcional)	Shënim (opsional)
 Book	Prenota	Reservar	Rezervo
 If no table is free we send your request to the restaurant and email you their answer. Cancelling is always free.	Se nessun tavolo è libero inviamo la tua richiesta al ristorante e ti mandiamo la risposta via email. Annullare è sempre gratuito.	Si no hay mesa libre enviamos tu solicitud al restaurante y te mandamos su respuesta por correo. Cancelar siempre es gratis.	Nëse nuk ka tavolinë të lirë, ia dërgojmë kërkesën restorantit dhe të dërgojmë përgjigjen me email. Anulimi është gjithmonë falas.
+Next open: {}	Prossima apertura: {}	Próxima apertura: {}	Hapet sërish: {}
 1 guest	1 ospite	1 comensal	1 mysafir
 {} guests	{} ospiti	{} comensales	{} mysafirë
 Booking code {}	Codice prenotazione {}	Código de reserva {}	Kodi i rezervimit {}
@@ -168,6 +171,7 @@ Phone: {}	Telefono: {}	Teléfono: {}	Telefoni: {}
 Email: {}	Email: {}	Correo: {}	Email: {}
 {} was removed from the staff and signed out everywhere	{} è stato rimosso dal personale e disconnesso ovunque	{} fue eliminado del personal y se cerró su sesión en todas partes	{} u hoq nga stafi dhe doli nga të gjitha pajisjet
 {} (removed)	{} (rimosso)	{} (eliminado)	{} (i hequr)
+Choose a restaurant.	Scegli un ristorante.	Elige un restaurante.	Zgjidh një restorant.
 Choose what you ask for	Scegli cosa chiedi	Elige lo que pides	Zgjidh çfarë kërkon
 Invalid schema	Invalid schema	Invalid schema	Invalid schema
 Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}
@@ -780,9 +784,10 @@ Manage settings templates	Gestire modelli di impostazioni	Gestionar plantillas d
 Create, change and delete settings templates	Creare, modificare ed eliminare modelli di impostazioni	Crear, cambiar y eliminar plantillas de configuración	Krijo, ndrysho dhe fshi modele cilësimesh
 Apply settings templates	Applicare modelli di impostazioni	Aplicar plantillas de configuración	Zbato modelet e cilësimeve
 Apply settings templates to restaurants	Applicare modelli di impostazioni ai ristoranti	Aplicar plantillas de ajustes a los restaurantes	Zbato shabllone cilësimesh te restorantet
+Assign requests	Assegnare le richieste	Asignar solicitudes	Caktimi i kërkesave
+See every request, give it to an admin (or themselves) and take it back	Vedere ogni richiesta, darla a un admin (o a sé) e riprenderla	Ver cada solicitud, dársela a un admin (o a sí mismo) y retirarla	Shikon çdo kërkesë, ia jep një admini (ose vetes) dhe e merr mbrapsht
 Super Admin	Super Admin	Super Admin	Super Admin
 System-level control across all tenants	Controllo di tutto il sistema, per ogni cliente	Control de todo el sistema, para cada cliente	Kontroll i gjithë sistemit, për çdo klient
-Support admin	Admin di supporto	Admin de soporte	Admin mbështetjeje
 Takes care of the restaurants the Super Admin gives them	Si occupa dei ristoranti che gli assegna il Super Admin	Se encarga de los restaurantes que le asigna el Super Admin	Kujdeset për restorantet që i jep Super Admini
 Business owner - full control over the restaurant	Titolare: pieno controllo del ristorante	Dueño del negocio: control total del restaurante	Pronari i biznesit: kontroll i plotë mbi restorantin
 Shares ownership with limited restrictions	Condivide la proprietà con poche restrizioni	Comparte la propiedad con pocas restricciones	Ndan pronësinë me pak kufizime
