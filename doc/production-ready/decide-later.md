@@ -67,6 +67,16 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    Suggestion: the server asks for it (once a day, kept), the app shows it filled in and the person can still change it. If the
    service doesn't answer, the field stays empty and they type it, as today.
 
+2. **The person who reported a problem sees its answer.** (2026-11-21) → Decided 2026-11-21: in step 7 (Notifications).
+   Anyone in a restaurant can now send "Report a problem" from the profile menu, and it goes on the Super Admin's Requests board.
+   They can't see it again yet: not where it stands, who has it, or how it was solved.
+   Suggestion: "My problems" under the same menu item, a short list with the stage (Open, Assigned, In progress, Solved) and the
+   answer; a notification when it's solved.
+
+3. **Tell the support admin when a request is given to them.** (2026-11-21) → Decided 2026-11-21: in step 7 (Notifications).
+   Assigning a request to a support admin changes nothing for them until they open Requests.
+   Suggestion: a notification (and an email) "<restaurant>: a problem was given to you", opening the ticket.
+
 ## Step 20 — Statistics
 
 1. ~~**See the sales in a currency you know**~~ Built in step 2 (user, 2026-11-19: "do it now"), for the whole app, chosen beside

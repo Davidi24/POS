@@ -15,7 +15,7 @@ Read the step's file before working on it, keep its sections and "Done" up to da
 
 ## Where we are
 
-**Now: step 4, [Restaurant & branches](04-restaurant-and-branches.md): decisions taken, opening hours built (first version), to look at together.** Keep this list up to date as each part is finished (user, 2026-11-18:
+**Now: step 4, [Restaurant & branches](04-restaurant-and-branches.md): built, hard testing list written, PR #104 open (to merge).** Keep this list up to date as each part is finished (user, 2026-11-18:
 "check boxes so I know what I have left and where I am").
 
 - [x] 1. [Sign-in & accounts](01-sign-in-and-accounts.md): built and merged (#100, #101); its hard testing list is written.
@@ -41,10 +41,10 @@ Read the step's file before working on it, keep its sections and "Done" up to da
   - [x] Merged (PR #103, 2026-11-20)
   - [ ] Hard testing (later, when you say)
 - [ ] 4. [Restaurant & branches (plus opening hours)](04-restaurant-and-branches.md) ← **now**
-  - [ ] Decisions
-  - [ ] Screens
-  - [ ] Development
-  - [ ] Hard testing list written
+  - [x] Decisions
+  - [x] Screens (Super Admin pages gone through; opening hours and the restaurant page: you look later)
+  - [x] Development
+  - [x] Hard testing list written
   - [ ] Merged
   - [ ] Hard testing (later, when you say)
 - [ ] 5. [Settings](05-settings.md)
