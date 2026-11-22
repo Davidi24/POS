@@ -1,6 +1,9 @@
 package com.saporini.mobile_desktop.platform.ui
 
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.layout.offset
+import kotlin.math.roundToInt
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
@@ -21,6 +24,7 @@ import io.github.vinceglb.filekit.readBytes
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.decodeToImageBitmap
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -76,6 +80,9 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -107,7 +114,6 @@ import com.saporini.mobile_desktop.core.components.AppDialog
 import com.saporini.mobile_desktop.core.components.BindToLifecycle
 import com.saporini.mobile_desktop.core.components.ButtonStyle
 import com.saporini.mobile_desktop.core.components.FieldPair
-import com.saporini.mobile_desktop.core.components.FilterPills
 import com.saporini.mobile_desktop.core.components.GroupLabel
 import com.saporini.mobile_desktop.core.components.InitialsAvatar
 import com.saporini.mobile_desktop.core.components.Kit
@@ -187,7 +193,10 @@ object RestaurantListScreen : Screen {
                     // Entered without a branch (closed, or no open branch yet): straight to the restaurant's page, which the
                     // picker doesn't offer (user rule).
                     onEntered = { navigator.push(if (session.actingRestaurant.value?.branchId == null) RestaurantWorkspaceScreen else WorkspacePickerScreen) },
-                    onChooseBranch = { card -> navigator.push(BranchListScreen(card.id, card.name)) },
+                    onChooseBranch = { card ->
+                        navigator.push(BranchListScreen(card.id, card.name, card.logoUrl, card.coverUrl,
+                            listOfNotNull(card.city, card.country).joinToString(", ").ifBlank { null }))
+                    },
                     onCoSuperAdmins = { if (state.reorder != null) model.coverProblem("Save or cancel the restaurant order before leaving.") else navigator.push(CoSuperAdminsScreen) },
                     onApplications = { if (state.reorder != null) model.coverProblem("Save or cancel the restaurant order before leaving.") else navigator.push(RestaurantApplicationsScreen) },
                     modifier = Modifier.weight(1f).fillMaxWidth().nestedScroll(hideBar.connection)
@@ -240,7 +249,13 @@ internal fun RestaurantListContent(
     val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
     ScreenMessages(state.error.takeIf { state.draft == null && state.loaded }, state.notice, model::clearMessages)
     val reorder = state.reorder
-    Box(modifier, contentAlignment = Alignment.TopCenter) {
+    // Where the "Add restaurant" tab sits on the right edge (dragged up and down like Inventory's).
+    var addButtonPosition by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(.84f) }
+    // Shapes like the restaurant cards until the first answer (and after a filter change), held a moment so a quick load
+    // doesn't flash them; a search keeps the cards until its answer.
+    val shapes = com.saporini.mobile_desktop.core.components.steadyLoading(
+        state.canRead && ((!state.loaded && state.error == null) || (state.loading && state.cards.isEmpty())))
+    BoxWithConstraints(modifier, contentAlignment = Alignment.TopCenter) {
         LazyVerticalGrid(
             GridCells.Adaptive(if (narrow) 280.dp else 340.dp),
             Modifier.widthIn(max = 1280.dp).fillMaxSize(),
@@ -255,9 +270,7 @@ internal fun RestaurantListContent(
                 !state.canRead -> item(key = "denied", span = full) {
                     OverviewEmpty("Access unavailable", "You do not have permission to view restaurants.", Icons.Outlined.Storefront)
                 }
-                !state.loaded && state.loading -> item(key = "loading", span = full) {
-                    Box(Modifier.fillMaxWidth().padding(top = 60.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Kit.Green) }
-                }
+                shapes -> items(shapesFor(narrow), key = { "shape-$it" }) { ShapeCell { RestaurantCardShape() } }
                 !state.loaded && state.error != null -> item(key = "failed", span = full) {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         OverviewEmpty("Restaurants couldn't be loaded", "Check the connection and try again.", Icons.Outlined.Storefront,
@@ -281,32 +294,28 @@ internal fun RestaurantListContent(
                 }
                 else -> {
                     items(state.cards, key = { it.id }) { card ->
-                        RestaurantCard(card, state, model) { model.enter(card, onEntered, onChooseBranch) }
-                    }
-                    if (state.canCreate && !state.hasNext && state.search.isBlank()) {
-                        // A small tile on its own line, in the middle.
-                        item(key = "add", span = full) {
-                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                AddTile("Create a new restaurant", "Its owner gets an email to set a password", model::startCreate,
-                                    modifier = Modifier.width(300.dp))
-                            }
+                        Box(Modifier.animateItem(fadeInSpec = CardFadeIn, placementSpec = null, fadeOutSpec = tween(90))) {
+                            RestaurantCard(card, state, model) { model.enter(card, onEntered, onChooseBranch) }
                         }
                     }
+                    // No add tile at the end: the green Add restaurant tab on the right edge is enough (user, 2026-11-21).
                 }
             }
-            if (state.hasNext || state.loadingMore) {
+            // The next restaurants come in as card shapes at the end of the grid, then fade into their cards.
+            if (!shapes && state.loadingMore) {
+                items(if (narrow) 1 else 3, key = { "more-shape-$it" }) { ShapeCell { RestaurantCardShape() } }
+            } else if (!shapes && state.hasNext) {
                 item(key = "more", span = full) {
                     Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
-                        if (state.loadingMore) CircularProgressIndicator(Modifier.size(22.dp), color = Kit.Green, strokeWidth = 2.dp)
-                        else if (state.error != null) RetryText(onClick = model::loadMore)
+                        if (state.error != null) RetryText(onClick = model::loadMore)
                         else KitButton("Load more", model::loadMore)
                     }
                 }
             }
         }
-        // Bottom-right, like the menu items' "Change items position".
+        // Bottom-left (user, 2026-11-21: "change position on the other side"), so the right edge keeps Add restaurant.
         if (state.canManage && state.loaded && state.cards.size >= 2) {
-            Row(Modifier.align(Alignment.BottomEnd).padding(if (narrow) 12.dp else 22.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.align(Alignment.BottomStart).padding(if (narrow) 12.dp else 22.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (reorder == null) {
                     FloatingAction("Change position", Icons.Outlined.DragIndicator, Kit.Green, enabled = state.entering == null, onClick = model::startReorder)
                 } else {
@@ -314,6 +323,23 @@ internal fun RestaurantListContent(
                     FloatingAction("Save order", Icons.Outlined.Check, Kit.Ink, busy = state.savingOrder, onClick = model::saveOrder)
                 }
             }
+        }
+        // Add restaurant as the green tab on the right edge, like New item / New order (user, 2026-11-21).
+        if (state.canCreate && reorder == null) {
+            val maxOffset = with(androidx.compose.ui.platform.LocalDensity.current) {
+                (maxHeight - com.saporini.mobile_desktop.core.components.edgeActionButtonHeight(narrow)).coerceAtLeast(0.dp).toPx()
+            }
+            com.saporini.mobile_desktop.core.components.RightEdgeActionButton(
+                "Add restaurant", model::startCreate, enabled = state.entering == null, width = if (narrow) 108.dp else 132.dp, compact = narrow,
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, (addButtonPosition * maxOffset).roundToInt()) }
+                    .draggable(
+                        orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                        state = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
+                            if (maxOffset > 0f) addButtonPosition = (addButtonPosition + delta / maxOffset).coerceIn(0f, 1f)
+                        }
+                    )
+            )
         }
     }
 
@@ -410,7 +436,8 @@ private fun WelcomeBanner(
                         fontWeight = FontWeight.Bold, fontSize = if (narrow) 18.sp else 21.sp, color = Kit.Ink)
                     Text("Pick a restaurant to work in, or set up a new one.", fontFamily = Inter(), fontWeight = FontWeight.Medium,
                         fontSize = 14.sp, color = Kit.Muted)
-                    state.summary?.let { summary ->
+                    val summary = state.summary
+                    if (summary != null) {
                         Row(Modifier.padding(top = 6.dp).height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
                             val plus = if (summary.partial) "+" else ""
                             BannerStat("${summary.restaurants}", if (summary.restaurants == 1L) "restaurant" else "restaurants")
@@ -421,12 +448,22 @@ private fun WelcomeBanner(
                             BannerDivider()
                             BannerStat("${summary.staff}$plus", "staff")
                         }
+                    } else if (state.canRead && state.error == null) {
+                        // The figures' places while the first answer comes, so the banner doesn't grow when they arrive.
+                        Row(Modifier.padding(top = 6.dp).height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+                            BannerStat(null, "restaurants")
+                            BannerDivider()
+                            BannerStat(null, "open now")
+                            BannerDivider()
+                            BannerStat(null, "branches")
+                            BannerDivider()
+                            BannerStat(null, "staff")
+                        }
                     }
                     Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (state.canCreate) KitButton("Create a new restaurant", model::startCreate, icon = Icons.Outlined.Add)
                         if (state.superAdmin) KitButton("Admins", onCoSuperAdmins, icon = Icons.Outlined.ManageAccounts, style = ButtonStyle.SECONDARY)
                         // What restaurants ask: remove one of their owners, or a support admin (user, 2026-11-19).
-                        if (state.superAdmin) KitButton("Requests", { requestsNavigator?.push(RestaurantRequestsScreen) }, icon = Icons.Outlined.MarkEmailUnread, style = ButtonStyle.SECONDARY)
+                        if (state.superAdmin || state.pendingRequests > 0) KitButton(if (state.pendingRequests > 0) "Requests (${state.pendingRequests})" else "Requests", { requestsNavigator?.push(RestaurantRequestsScreen) }, icon = Icons.Outlined.MarkEmailUnread, style = ButtonStyle.SECONDARY)
                         if (state.canRead) KitButton(
                             if (state.pendingApplications > 0) "Applications (${state.pendingApplications})" else "Applications",
                             onApplications, icon = Icons.Outlined.Inbox, style = ButtonStyle.SECONDARY
@@ -442,9 +479,9 @@ private fun WelcomeBanner(
 }
 
 @Composable
-private fun BannerStat(value: String, label: String) {
+private fun BannerStat(value: String?, label: String) {
     Column(Modifier.padding(end = 22.dp)) {
-        Text(value, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Kit.Ink)
+        if (value == null) FigureShape() else Text(value, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Kit.Ink)
         Text(label, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 12.sp, color = Kit.Muted)
     }
 }
@@ -461,17 +498,15 @@ private fun ListToolbar(query: String, onQuery: (String) -> Unit, state: Restaur
         return
     }
     val search: @Composable (Modifier) -> Unit = { m -> SearchField(query, onQuery, m, placeholder = "Search by name, code or city", height = 46.dp) }
-    val pills: @Composable () -> Unit = {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterPills(RestaurantFilter.entries.map { it to it.label }, state.filter, model::filter,
-                modifier = if (narrow) Modifier.weight(1f) else Modifier)
-            if (state.reorder == null) com.saporini.mobile_desktop.core.components.RefreshButton(state.loading, model::refresh)
-        }
+    // Open / closed is one Filters button, not a row of pills (user, 2026-11-21: "this I don't like").
+    val tools: @Composable () -> Unit = {
+        RestaurantFiltersButton(state, model)
+        com.saporini.mobile_desktop.core.components.RefreshButton(state.loading, model::refresh, size = 46.dp)
     }
     if (narrow) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            search(Modifier.fillMaxWidth())
-            pills()
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            search(Modifier.weight(1f))
+            tools()
         }
     } else {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -479,8 +514,41 @@ private fun ListToolbar(query: String, onQuery: (String) -> Unit, state: Restaur
             if (state.loaded) Text("${state.total}", Modifier.clip(RoundedCornerShape(50)).background(Kit.Tint).padding(horizontal = 10.dp, vertical = 3.dp),
                 fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Kit.Ink)
             Spacer(Modifier.weight(1f))
-            pills()
             search(Modifier.width(340.dp))
+            tools()
+        }
+    }
+}
+
+/** Filters: which restaurants show, open or closed, with how many of each when the whole list is known. */
+@Composable
+private fun RestaurantFiltersButton(state: RestaurantListState, model: RestaurantListScreenModel) {
+    val summary = state.summary?.takeIf { !it.partial }
+    com.saporini.mobile_desktop.admin.inventory.ui.PhoneOptionsButton(Icons.Outlined.FilterList, "Filters",
+        if (state.filter != RestaurantFilter.ALL) 1 else 0, 46.dp) { close ->
+        com.saporini.mobile_desktop.admin.inventory.ui.OptionGroup("Show")
+        RestaurantFilter.entries.forEach { filter ->
+            val count = summary?.let {
+                when (filter) {
+                    RestaurantFilter.ALL -> it.restaurants.toInt()
+                    RestaurantFilter.OPEN -> it.open
+                    RestaurantFilter.CLOSED -> (it.restaurants - it.open).toInt().coerceAtLeast(0)
+                }
+            }
+            com.saporini.mobile_desktop.admin.inventory.ui.OptionLine(
+                if (filter == RestaurantFilter.ALL) "All restaurants" else filter.label, state.filter == filter, { model.filter(filter); close() },
+                icon = when (filter) {
+                    RestaurantFilter.ALL -> Icons.Outlined.Storefront
+                    RestaurantFilter.OPEN -> Icons.Outlined.CheckCircle
+                    RestaurantFilter.CLOSED -> Icons.Outlined.Block
+                },
+                color = when (filter) {
+                    RestaurantFilter.ALL -> Kit.Green
+                    RestaurantFilter.OPEN -> Kit.Green
+                    RestaurantFilter.CLOSED -> Kit.Muted
+                },
+                count = count
+            )
         }
     }
 }
@@ -711,7 +779,7 @@ private fun EditRestaurantDialog(step: com.saporini.mobile_desktop.platform.Edit
             Modifier.fillMaxWidth())
         step.error?.let { MessageBar(it, MessageKind.ERROR) }
         if (step.loading) {
-            Box(Modifier.fillMaxWidth().padding(36.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Kit.Green) }
+            FormShape(if (ownerTab) 4 else 6, cover = !ownerTab)
             return@AppDialog
         }
         if (step.restaurant == null) return@AppDialog

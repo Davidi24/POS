@@ -37,6 +37,7 @@ public class ReservationNotifications {
     public static final String TABLE_FREED = "RESERVATION_TABLE_FREED";
     public static final String RUNNING_LATE = "RESERVATION_RUNNING_LATE";
     public static final String NEEDS_REVIEW = "RESERVATION_NEEDS_REVIEW";
+    public static final String CLOSED_TIME = "RESERVATION_CLOSED_TIME";
 
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.ENGLISH);
 
@@ -94,6 +95,29 @@ public class ReservationNotifications {
         String at = freed.getReservationStart() == null ? "" : " at " + WHEN.format(freed.getReservationStart().atZoneSameInstant(zone));
         send(freed, TABLE_FREED, "A table is free" + at,
                 requestsWaiting + (requestsWaiting == 1 ? " request is" : " requests are") + " waiting around that time", null, null);
+    }
+
+    // The opening hours changed and these bookings now fall when the branch is closed (user, 2026-11-21): one notification
+    // to the people told about bookings (not whoever changed the hours), to move or cancel them in Reservations.
+    public void closedTime(Collection<Reservation> reservations, UUID actorId) {
+        List<Reservation> list = reservations.stream().filter(r -> r.getBranch() != null && r.getRestaurant() != null).toList();
+        if (list.isEmpty()) {
+            return;
+        }
+        Reservation first = list.getFirst();
+        var roles = reservationPolicy.bookingAlertRoles(first.getRestaurant());
+        if (roles.isEmpty()) {
+            return;
+        }
+        boolean single = list.size() == 1;
+        String subject = single ? "A booking falls when the branch is closed" : list.size() + " bookings fall when the branch is closed";
+        String body = (single ? summary(first)
+                : list.stream().map(this::guestName).limit(4).collect(Collectors.joining(", ")) + (list.size() > 4 ? " and " + (list.size() - 4) + " more" : ""))
+                + " · Move or cancel them in Reservations";
+        UUID restaurantId = first.getRestaurant().getId();
+        UUID branchId = first.getBranch().getId();
+        deliver(userRepository.findActiveStaffIdsWithRoles(restaurantId, branchId, roles), restaurantId, branchId, CLOSED_TIME, subject, body,
+                single ? first.getId() : null, actorId);
     }
 
     // One notification per branch for a batch of automatic no-shows, so a busy evening doesn't flood the list.

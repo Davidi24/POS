@@ -196,13 +196,14 @@ internal fun DayLinePanel(v: StatsView, size: ScreenSize, today: LocalDate, meas
         val running = periodEnd != null && v.to == today && today < periodEnd
         // Closed days (user, 2026-11-14): no drop to 0. A finished day without sales gets a light band and no point (the
         // line goes straight over it); a weekday that's always been closed is expected closed in the days to come too.
-        // MOCK: worked out from the sales; the branches' opening hours and special days come with the connection.
+        // From the branches' opening hours and special days when they're set (user, 2026-11-20), else worked out from the sales.
         val closedWeekdays = remember(days, v.axisCompareDays, v.yearCompareDays) {
             val seen = (days.filter { it.date != today } + (if (v.yearAxis) v.yearCompareDays else v.axisCompareDays).orEmpty()).groupBy { it.date.dayOfWeek }
             seen.filter { (_, list) -> list.isNotEmpty() && list.all { it.sales == 0L } }.keys
         }
-        val noSales = days.indices.filter { days[it].sales == 0L && days[it].date != today }.toSet()
-        val closedAhead = if (running && v.monthAxis) axis.indices.filter { axis[it] > today && axis[it].dayOfWeek in closedWeekdays }.toSet() else emptySet()
+        val noSales = days.indices.filter { v.closedDay(days[it].date, days[it].sales, days[it].sales == 0L && days[it].date != today) }.toSet()
+        val closedAhead = if (running && v.monthAxis) axis.indices.filter { axis[it] > today &&
+            (v.closedDays?.contains(axis[it]) ?: (axis[it].dayOfWeek in closedWeekdays)) }.toSet() else emptySet()
         // The line ends at the last day with sales (today counts once it has some).
         val lastReal = if (days.lastOrNull()?.let { it.date == today && it.sales == 0L } == true) days.lastIndex - 1 else days.lastIndex
         val actual: List<Float?> = days.mapIndexed { i, d -> if (i > lastReal || i in noSales) null else value(d) }
@@ -216,7 +217,7 @@ internal fun DayLinePanel(v: StatsView, size: ScreenSize, today: LocalDate, meas
             var date = days.getOrNull(lastReal)?.date?.plus(DatePeriod(days = 1)) ?: v.from
             var ahead = 0.0
             while (date <= periodEnd!!) {
-                if (date.dayOfWeek !in closedWeekdays) ahead += byWeekday[date.dayOfWeek] ?: pace
+                if (!(v.closedDays?.contains(date) ?: (date.dayOfWeek in closedWeekdays))) ahead += byWeekday[date.dayOfWeek] ?: pace
                 date = date.plus(DatePeriod(days = 1))
             }
             if (money) (days.sumOf { it.sales } + (ahead * 100).toLong()) / 100 * 100 else days.sumOf { it.orders } + ahead.toLong()
@@ -298,7 +299,7 @@ internal fun DayLinePanel(v: StatsView, size: ScreenSize, today: LocalDate, meas
             titleOf = { i ->
                 val date = axis[i]
                 weekdayDate(date) + when {
-                    i in noSales || i in closedAhead -> if (date.dayOfWeek in closedWeekdays) " · Closed" else " · No sales"
+                    i in noSales || i in closedAhead -> if (v.closedDays != null || date.dayOfWeek in closedWeekdays) " · Closed" else " · No sales"
                     else -> ""
                 }
             },
@@ -420,13 +421,13 @@ private fun WeekdaysPanel(v: StatsView, today: LocalDate, onWeek: (LocalDate?) -
 private class WeekdayAverage(val day: kotlinx.datetime.DayOfWeek, val average: Long, val open: Int, val closed: Int, val sales: Long, val orders: Long)
 
 /**
- * Each weekday's average open day, worked out here from the day figures (the server's average counts every day). A day with
- * no sales stands in for a closed one until the branches' opening hours and special days are read (MOCK, like the day graph's
- * bands); today doesn't count while it's still going.
+ * Each weekday's average open day, worked out here from the day figures (the server's average counts every day). Closed days
+ * come from the branches' opening hours; while none are set, a day with no sales stands in for a closed one. Today doesn't
+ * count while it's still going.
  */
 private fun weekdayAverages(v: StatsView, today: LocalDate): List<WeekdayAverage> = kotlinx.datetime.DayOfWeek.entries.map { weekday ->
     val all = v.days.filter { it.date.dayOfWeek == weekday && it.date != today }
-    val open = all.filter { it.sales > 0 }
+    val open = all.filterNot { v.closedDay(it.date, it.sales, it.sales == 0L) }
     WeekdayAverage(weekday, if (open.isEmpty()) 0L else open.sumOf { it.sales } / open.size, open.size, all.size - open.size,
         v.days.filter { it.date.dayOfWeek == weekday }.sumOf { it.sales }, v.days.filter { it.date.dayOfWeek == weekday }.sumOf { it.orders })
 }

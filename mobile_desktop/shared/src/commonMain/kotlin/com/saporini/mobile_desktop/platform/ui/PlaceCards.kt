@@ -273,7 +273,7 @@ internal fun rememberPicturePicker(onPicked: (PickedPicture) -> Unit, onProblem:
 
 /** The round button on the cover: add a picture, or change/remove it. */
 @Composable
-private fun CoverButton(
+internal fun CoverButton(
     hasCover: Boolean,
     busy: Boolean,
     onCover: (PickedPicture) -> Unit,

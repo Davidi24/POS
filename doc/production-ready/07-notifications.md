@@ -13,6 +13,8 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 ## This step
 - [ ] The notification system itself: the list, read and unread, the settings respected.
 - [ ] Each later step checks its own notifications.
+- [ ] From step 4 (user, 2026-11-21): "My problems" for whoever sent "Report a problem" (where it stands, who has it, the
+  answer; told when it's solved), and the support admin told when a ticket is given to them (decide-later step 4 #2, #3).
 
 ## Decisions to take
 - [ ] Phone notifications (push) or only inside the app? **(your call)**

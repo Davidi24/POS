@@ -45,6 +45,10 @@ public class WaitlistService {
     private final ReservationRepository reservationRepository;
     private final ReservationRuleResolver reservationRuleResolver;
 
+    // While the branch is closed nobody seats guests (user, 2026-11-20); not in the constructor (unit tests).
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pos.pos.hours.OpeningHoursService openingHours;
+
     @Transactional(readOnly = true)
     public List<WaitlistEntryResponse> getWaiting(Authentication authentication, UUID restaurantId, UUID branchId) {
         Branch branch = restaurantScopeService.requireAccessibleBranch(authentication, restaurantId, branchId);
@@ -79,6 +83,7 @@ public class WaitlistService {
     @Transactional
     public WaitlistEntryResponse seat(Authentication authentication, UUID restaurantId, UUID branchId, UUID entryId, UUID tableId) {
         restaurantScopeService.requireManageableBranch(authentication, restaurantId, branchId);
+        if (openingHours != null) openingHours.assertOpenNow(branchId);
         WaitlistEntry entry = requireWaiting(restaurantId, branchId, entryId);
         RestaurantTable table = restaurantTableRepository.findByIdAndBranchIdForUpdate(tableId, branchId)
                 .orElseThrow(() -> new AuthException("Table not found", HttpStatus.NOT_FOUND));

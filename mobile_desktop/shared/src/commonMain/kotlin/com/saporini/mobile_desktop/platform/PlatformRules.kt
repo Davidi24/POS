@@ -204,6 +204,7 @@ fun contactTypeLabel(type: String): String = when (type) {
 fun permissionArea(code: String): String = when {
     code.endsWith("_ACCESS") -> "Apps they can open"
     code.startsWith("RESTAURANTS_") -> "Restaurants"
+    code.startsWith("REQUESTS_") -> "Requests"
     code.startsWith("USERS_") || code.startsWith("ROLES_") || code == "SESSIONS_MANAGE" -> "Staff and roles"
     code.startsWith("SHIFT_") -> "Shifts and pay"
     code.startsWith("MENUS_") -> "Menus"
@@ -217,7 +218,7 @@ fun permissionArea(code: String): String = when {
 }
 
 val PERMISSION_AREAS = listOf(
-    "Restaurants", "Apps they can open", "Staff and roles", "Settings", "Menus", "Orders", "Payments and refunds",
+    "Restaurants", "Requests", "Apps they can open", "Staff and roles", "Settings", "Menus", "Orders", "Payments and refunds",
     "Bookings", "Kitchen display", "Shifts and pay", "Statistics and fraud", "Other"
 )
 

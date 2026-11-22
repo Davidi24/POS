@@ -85,7 +85,7 @@ private fun summaryItem(v: StatsView, info: ReportInfo, tags: Map<LocalDate, Day
     // The best and lowest days and the closed ones, in words.
     val best = tags.entries.firstOrNull { it.value == DayTag.BEST }?.key
     val lowest = tags.entries.firstOrNull { it.value == DayTag.LOWEST }?.key
-    val closed = v.days.count { it.sales == 0L && it.date < today }
+    val closed = v.days.count { it.date < today && v.closedDay(it.date, it.sales, it.sales == 0L) }
     val byDate = v.days.associateBy { it.date }
     val words = listOfNotNull(
         best?.let { "Best day: ${weekdayDate(it)}, ${v.money(byDate[it]?.sales ?: 0)}" },

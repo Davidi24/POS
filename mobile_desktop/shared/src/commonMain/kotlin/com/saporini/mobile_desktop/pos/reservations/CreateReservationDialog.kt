@@ -275,6 +275,14 @@ internal fun CreateReservationDialog(
 
     val startIso = start.at(date).toInstant(zone).toString()
     val endIso = end.at(date).toInstant(zone).toString()
+    // Whether the branch is closed at that time by its opening hours: a note in the first step, a question before booking.
+    val hoursApi = remember { org.koin.mp.KoinPlatform.getKoinOrNull()?.getOrNull<com.saporini.mobile_desktop.hours.OpeningHoursApi>() }
+    var closedThen by remember { mutableStateOf(false) }
+    var askClosed by remember { mutableStateOf(false) }
+    LaunchedEffect(startIso, modelState.scope) {
+        val where = modelState.scope ?: return@LaunchedEffect
+        closedThen = hoursApi?.let { api -> runCatching { !api.openAt(where.restaurantId, where.branchId, startIso) }.getOrDefault(false) } ?: false
+    }
     val timesValid = end > start
     val nowInstant = Clock.System.now()
     val startsInPast = start.at(date).toInstant(zone) < nowInstant
@@ -364,9 +372,15 @@ internal fun CreateReservationDialog(
         step = target.coerceIn(STEP_WHEN, STEP_REVIEW)
     }
 
-    fun submit() {
+    fun submit(anyway: Boolean = false) {
         attempted = true
         if (nameError != null || phoneError != null || emailError != null || timeError != null || saving) return
+        // The branch is closed then (user, 2026-11-20): staff may still book it, after saying so.
+        if (closedThen && !anyway) {
+            askClosed = true
+            return
+        }
+        askClosed = false
         saving = true
         saveError = null
         scope.launch {
@@ -391,6 +405,10 @@ internal fun CreateReservationDialog(
             saving = false
         }
     }
+
+    if (askClosed) com.saporini.mobile_desktop.core.components.ConfirmDialog(
+        "The branch is closed then", "It's closed at ${start.label()} that day. Book anyway?",
+        "Book anyway", onConfirm = { submit(anyway = true) }, onDismiss = { askClosed = false })
 
     // The floor plan picker, shown beside the form on wide screens and inside it on narrow ones.
     val tablePicker: @Composable (Modifier) -> Unit = { outer ->
@@ -550,6 +568,7 @@ internal fun CreateReservationDialog(
                                         }
                                     }
                                     if (attempted && timeError != null) ErrorText(timeError)
+                                    if (closedThen) RuleWarning("The branch is closed then. You can still book it.")
                                     ruleWarnings(rules, guests, date, nowInstant.toLocalDateTime(zone).date).forEach { RuleWarning(it) }
                                 }
                                 STEP_GUEST -> {

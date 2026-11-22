@@ -1,4 +1,5 @@
 en	it	es	sq
+{} takes care of you now.	Ora {} si occupa di voi.	Ahora {} se encarga de ustedes.	Tani {} kujdeset për ju.
 Email confirmed	Email confermata	Correo confirmado	Email-i u konfirmua
 You can close this page.	Puoi chiudere questa pagina.	Puedes cerrar esta página.	Mund ta mbyllësh këtë faqe.
 there	a te	a ti	mik
@@ -69,6 +70,7 @@ The password can't start or end with a space.	La password non può iniziare o fi
 Add an uppercase letter.	Aggiungi una lettera maiuscola.	Agrega una letra mayúscula.	Shto një shkronjë të madhe.
 Add a number.	Aggiungi un numero.	Agrega un número.	Shto një numër.
 Add a special character, like ! or #.	Aggiungi un carattere speciale, come ! o #.	Agrega un carácter especial, como ! o #.	Shto një karakter të veçantë, si ! ose #.
+closed	chiuso	cerrado	mbyllur
 Write your name	Scrivi il tuo nome	Escribe tu nombre	Shkruaj emrin tënd
 Write a valid email, so we can confirm the booking	Scrivi un'email valida, così possiamo confermare la prenotazione	Escribe un correo válido para que podamos confirmar la reserva	Shkruaj një email të vlefshëm, që të konfirmojmë rezervimin
 Say how many guests	Indica quanti ospiti	Indica cuántos comensales	Thuaj sa mysafirë
@@ -86,6 +88,7 @@ None	Nessuno	Ninguno	Asnjë
 Book a table	Prenota un tavolo	Reservar una mesa	Rezervo një tavolinë
 Day	Giorno	Día	Dita
 Time	Ora	Hora	Ora
+Closed that day.	Chiuso quel giorno.	Cerrado ese día.	E mbyllur atë ditë.
 Guests	Ospiti	Comensales	Mysafirët
 Name	Nome	Nombre	Emri
 Email	Email	Correo	Email
@@ -94,6 +97,7 @@ Occasion (optional)	Occasione (facoltativa)	Ocasión (opcional)	Rasti (opsional)
 Note (optional)	Nota (facoltativa)	Nota (opcional)	Shënim (opsional)
 Book	Prenota	Reservar	Rezervo
 If no table is free we send your request to the restaurant and email you their answer. Cancelling is always free.	Se nessun tavolo è libero inviamo la tua richiesta al ristorante e ti mandiamo la risposta via email. Annullare è sempre gratuito.	Si no hay mesa libre enviamos tu solicitud al restaurante y te mandamos su respuesta por correo. Cancelar siempre es gratis.	Nëse nuk ka tavolinë të lirë, ia dërgojmë kërkesën restorantit dhe të dërgojmë përgjigjen me email. Anulimi është gjithmonë falas.
+Next open: {}	Prossima apertura: {}	Próxima apertura: {}	Hapet sërish: {}
 1 guest	1 ospite	1 comensal	1 mysafir
 {} guests	{} ospiti	{} comensales	{} mysafirë
 Booking code {}	Codice prenotazione {}	Código de reserva {}	Kodi i rezervimit {}
@@ -104,6 +108,7 @@ Running late? We'll keep your table a little longer (your booking still ends at 
 Payments	Pagamenti	Pagos	Pagesat
 Pay {}	Paga {}	Pagar a {}	Paguaj {}
 Test mode: no card is charged.	Modalità di prova: nessuna carta viene addebitata.	Modo de prueba: no se cobra ninguna tarjeta.	Modalitet prove: asnjë kartë nuk tarifohet.
+Opening hours: {}	Orari di apertura: {}	Horario: {}	Orari i hapjes: {}
 Call {}	Chiama {}	Llama al {}	Telefono {}
 Write to {}	Scrivi a {}	Escribe a {}	Shkruaj te {}
 Questions? {}	Domande? {}	¿Preguntas? {}	Pyetje? {}
@@ -166,6 +171,7 @@ Phone: {}	Telefono: {}	Teléfono: {}	Telefoni: {}
 Email: {}	Email: {}	Correo: {}	Email: {}
 {} was removed from the staff and signed out everywhere	{} è stato rimosso dal personale e disconnesso ovunque	{} fue eliminado del personal y se cerró su sesión en todas partes	{} u hoq nga stafi dhe doli nga të gjitha pajisjet
 {} (removed)	{} (rimosso)	{} (eliminado)	{} (i hequr)
+Choose a restaurant.	Scegli un ristorante.	Elige un restaurante.	Zgjidh një restorant.
 Choose what you ask for	Scegli cosa chiedi	Elige lo que pides	Zgjidh çfarë kërkon
 Invalid schema	Invalid schema	Invalid schema	Invalid schema
 Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}
@@ -245,6 +251,9 @@ Assigned user must belong to the same restaurant as the device	L'utente assegnat
 Device assignment update violates a data constraint	L'aggiornamento dell'assegnazione viola un vincolo dei dati	La actualización de la asignación infringe una regla de datos	Përditësimi i caktimit shkel një rregull të të dhënave
 Device pairing token update violates a data constraint	L'aggiornamento del codice di associazione viola un vincolo dei dati	La actualización del código de vinculación infringe una regla de datos	Përditësimi i kodit të lidhjes shkel një rregull të të dhënave
 Pairing token is invalid or expired	Il codice di associazione non è valido o è scaduto	El código de vinculación no es válido o expiró	Kodi i lidhjes është i pavlefshëm ose ka skaduar
+Some of those days already have special hours	Alcuni di quei giorni hanno già un orario speciale	Algunos de esos días ya tienen un horario especial	Disa nga ato ditë kanë tashmë orar të veçantë
+Special day not found	Giorno speciale non trovato	Día especial no encontrado	Dita e veçantë nuk u gjet
+The branch is closed now. Someone who can open it outside the hours can open it.	La sede ora è chiusa. Può aprirla chi può aprire fuori orario.	La sucursal está cerrada ahora. Puede abrirla quien tenga permiso para abrir fuera de horario.	Pika tani është e mbyllur. Mund ta hapë kush ka leje ta hapë jashtë orarit.
 Give the place a name	Dai un nome al luogo	Ponle un nombre al lugar	Jepi një emër vendit
 Write the supplier's name	Scrivi il nome del fornitore	Escribe el nombre del proveedor	Shkruaj emrin e furnitorit
 A sale stock source requires its restaurant, branch, item, and location	Una fonte di magazzino per la vendita richiede ristorante, sede, articolo e luogo	Una fuente de inventario de venta necesita su restaurante, sucursal, artículo y lugar	Një burim stoku për shitje kërkon restorantin, pikën, artikullin dhe vendin
@@ -542,6 +551,9 @@ The owner has already set their password. They can reset it from the sign-in scr
 An application with this email is already waiting for review. Check it with your application code.	Una richiesta con questa email è già in attesa di revisione. Controllala con il tuo codice di richiesta.	Una solicitud con este correo ya está esperando revisión. Consúltala con tu código de solicitud.	Një aplikim me këtë email po pret tashmë shqyrtim. Kontrolloje me kodin e aplikimit.
 An application with this username is already waiting for review. Choose another username.	Una richiesta con questo nome utente è già in attesa di revisione. Scegli un altro nome utente.	Una solicitud con este usuario ya está esperando revisión. Elige otro usuario.	Një aplikim me këtë emër përdoruesi po pret tashmë shqyrtim. Zgjidh një emër tjetër.
 Give the applicant a reason for the rejection	Indica al richiedente un motivo per il rifiuto	Da al solicitante un motivo del rechazo	Jepi aplikantit një arsye për refuzimin
+Only a rejected application can go back to waiting	Solo una richiesta rifiutata può tornare in attesa	Solo una solicitud rechazada puede volver a espera	Vetëm një aplikim i refuzuar mund të kthehet në pritje
+Another application with this owner's email is already waiting	Un'altra richiesta con l'email di questo titolare è già in attesa	Ya hay otra solicitud en espera con el correo de este dueño	Një aplikim tjetër me email-in e këtij pronari është tashmë në pritje
+Another application with this owner's username is already waiting	Un'altra richiesta con il nome utente di questo titolare è già in attesa	Ya hay otra solicitud en espera con el usuario de este dueño	Një aplikim tjetër me emrin e përdoruesit të këtij pronari është tashmë në pritje
 Restaurant applications are closed. Ask us to set up your restaurant.	Le richieste di nuovi ristoranti sono chiuse. Chiedici di configurare il tuo ristorante.	Las solicitudes de restaurantes están cerradas. Pídenos que configuremos tu restaurante.	Aplikimet për restorante janë mbyllur. Na kërko të konfigurojmë restorantin tënd.
 Only the Super Admin and Co-Super-Admins review restaurant applications	Solo il Super Admin e i Co-Super-Admin esaminano le richieste dei ristoranti	Solo el Super Admin y los Co-Super-Admins revisan las solicitudes de restaurantes	Vetëm Super Admini dhe Co-Super-Adminët shqyrtojnë aplikimet e restoranteve
 Finish active orders, shifts and seated or arrived bookings before changing the time zone.	Concludi ordini attivi, turni e prenotazioni accomodate o arrivate prima di cambiare fuso orario.	Termina los pedidos activos, turnos y reservas sentadas o llegadas antes de cambiar la zona horaria.	Përfundo porositë aktive, turnet dhe rezervimet e ulura ose të ardhura para se të ndryshosh zonën kohore.
@@ -591,6 +603,7 @@ Take payments	Incassare	Cobrar	Merr pagesa
 Request the bill and take the payment from a table	Chiedere il conto e incassare da un tavolo	Pedir la cuenta y cobrar desde una mesa	Kërko faturën dhe merr pagesën nga një tavolinë
 Edit the floor plan	Modificare la pianta	Editar el plano	Ndrysho planin
 Add, move and remove tables, floors and places	Aggiungere, spostare e togliere tavoli, piani e zone	Agregar, mover y quitar mesas, pisos y zonas	Shto, lëviz dhe hiq tavolina, kate dhe zona
+Open the branch for now while it's closed: a late group, an event	Apri la sede per ora mentre è chiusa: un gruppo in ritardo, un evento	Abrir la sucursal por ahora mientras está cerrada: un grupo tarde, un evento	Hap pikën për tani kur është e mbyllur: një grup i vonuar, një event
 See orders	Vedere gli ordini	Ver los pedidos	Shiko porositë
 The open orders and what's on them	Gli ordini aperti e cosa contengono	Los pedidos abiertos y lo que llevan	Porositë e hapura dhe çfarë kanë
 Edit orders	Modificare gli ordini	Editar pedidos	Ndrysho porositë
@@ -607,7 +620,8 @@ Move orders to another table	Spostare ordini su un altro tavolo	Mover pedidos a 
 Move an order to another table	Spostare un ordine su un altro tavolo	Mover un pedido a otra mesa	Lëviz një porosi në një tavolinë tjetër
 Give discounts	Fare sconti	Dar descuentos	Bëj zbritje
 Take money off a dish or a whole order	Togliere soldi da un piatto o da tutto l'ordine	Descontar dinero de un plato o de todo el pedido	Ul çmimin e një pjate ose të gjithë porosisë
-Where every order is in the kitchen	A che punto è ogni ordine in cucina	En qué punto está cada pedido en la cocina	Ku është çdo porosi në kuzhinë
+See an order's kitchen status	Vedere lo stato in cucina di un ordine	Ver el estado en cocina de un pedido	Shiko gjendjen në kuzhinë të një porosie
+The food status of an order and of its dishes	Lo stato del cibo di un ordine e dei suoi piatti	El estado de la comida de un pedido y de sus platos	Gjendja e ushqimit të një porosie dhe e pjatave të saj
 See reservations	Vedere le prenotazioni	Ver las reservas	Shiko rezervimet
 Bookings, the overview and free tables for walk-ins	Prenotazioni, panoramica e tavoli liberi per chi arriva senza prenotazione	Reservas, el resumen y mesas libres para clientes sin reserva	Rezervime, përmbledhja dhe tavolina të lira për ata pa rezervim
 Make and change bookings	Fare e modificare prenotazioni	Hacer y cambiar reservas	Bëj dhe ndrysho rezervime
@@ -632,6 +646,8 @@ Change prices	Modificare i prezzi	Cambiar precios	Ndrysho çmimet
 Change the price of dishes, variants and options	Modificare il prezzo di piatti, varianti e opzioni	Cambiar el precio de platos, variantes y opciones	Ndrysho çmimin e pjatave, varianteve dhe opsioneve
 Delete dishes and menus	Eliminare piatti e menù	Eliminar platos y menús	Fshi pjata dhe menu
 Delete menus, sections, dishes, variants and options	Eliminare menù, sezioni, piatti, varianti e opzioni	Eliminar menús, secciones, platos, variantes y opciones	Fshi menu, seksione, pjata, variante dhe opsione
+See Kitchen Status	Vedere Stato cucina	Ver Estado de cocina	Shiko Gjendjen e kuzhinës
+The whole kitchen board: where every order is	Tutta la bacheca della cucina: a che punto è ogni ordine	Todo el tablero de cocina: en qué punto está cada pedido	E gjithë tabela e kuzhinës: ku është çdo porosi
 See My Sales	Vedere Le mie vendite	Ver Mis ventas	Shiko Shitjet e mia
 Their own sales and tips	Le proprie vendite e mance	Sus propias ventas y propinas	Shitjet dhe bakshishet e veta
 See history	Vedere lo storico	Ver el historial	Shiko historikun
@@ -723,6 +739,8 @@ See restaurant info	Vedere le informazioni del ristorante	Ver la información de
 The restaurant's details, branches, logo and currency	Dati del ristorante, sedi, logo e valuta	Los datos del restaurante, sucursales, logo y moneda	Të dhënat e restorantit, pikat, logoja dhe monedha
 Change restaurant info	Modificare le informazioni del ristorante	Cambiar la información del restaurante	Ndrysho informacionin e restorantit
 Description, phone, email, addresses, logo, colours and receipt texts	Descrizione, telefono, email, indirizzi, logo, colori e testi dello scontrino	Descripción, teléfono, correo, direcciones, logo, colores y textos del recibo	Përshkrimi, telefoni, email-i, adresat, logoja, ngjyrat dhe tekstet e faturës
+Change opening hours	Modificare l'orario di apertura	Cambiar el horario	Ndrysho orarin e hapjes
+Each branch's week and its special days	La settimana di ogni sede e i suoi giorni speciali	La semana de cada sucursal y sus días especiales	Java e çdo pike dhe ditët e saj të veçanta
 Sales, orders and guests at a glance	Vendite, ordini e ospiti in sintesi	Ventas, pedidos y comensales de un vistazo	Shitje, porosi dhe mysafirë me një shikim
 See Sales	Vedere Vendite	Ver Ventas	Shiko Shitjet
 Sales by day, hour, service and floor	Vendite per giorno, ora, servizio e piano	Ventas por día, hora, servicio y piso	Shitjet sipas ditës, orës, shërbimit dhe katit
@@ -766,9 +784,10 @@ Manage settings templates	Gestire modelli di impostazioni	Gestionar plantillas d
 Create, change and delete settings templates	Creare, modificare ed eliminare modelli di impostazioni	Crear, cambiar y eliminar plantillas de configuración	Krijo, ndrysho dhe fshi modele cilësimesh
 Apply settings templates	Applicare modelli di impostazioni	Aplicar plantillas de configuración	Zbato modelet e cilësimeve
 Apply settings templates to restaurants	Applicare modelli di impostazioni ai ristoranti	Aplicar plantillas de ajustes a los restaurantes	Zbato shabllone cilësimesh te restorantet
+Assign requests	Assegnare le richieste	Asignar solicitudes	Caktimi i kërkesave
+See every request, give it to an admin (or themselves) and take it back	Vedere ogni richiesta, darla a un admin (o a sé) e riprenderla	Ver cada solicitud, dársela a un admin (o a sí mismo) y retirarla	Shikon çdo kërkesë, ia jep një admini (ose vetes) dhe e merr mbrapsht
 Super Admin	Super Admin	Super Admin	Super Admin
 System-level control across all tenants	Controllo di tutto il sistema, per ogni cliente	Control de todo el sistema, para cada cliente	Kontroll i gjithë sistemit, për çdo klient
-Support admin	Admin di supporto	Admin de soporte	Admin mbështetjeje
 Takes care of the restaurants the Super Admin gives them	Si occupa dei ristoranti che gli assegna il Super Admin	Se encarga de los restaurantes que le asigna el Super Admin	Kujdeset për restorantet që i jep Super Admini
 Business owner - full control over the restaurant	Titolare: pieno controllo del ristorante	Dueño del negocio: control total del restaurante	Pronari i biznesit: kontroll i plotë mbi restorantin
 Shares ownership with limited restrictions	Condivide la proprietà con poche restrizioni	Comparte la propiedad con pocas restricciones	Ndan pronësinë me pak kufizime

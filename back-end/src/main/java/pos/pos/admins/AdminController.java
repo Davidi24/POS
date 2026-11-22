@@ -52,8 +52,8 @@ public class AdminController {
     }
 
     @PostMapping("/restaurants/{restaurantId}/requests")
-    @PreAuthorize("hasAuthority('USERS_READ')")
-    @Operation(summary = "Owners ask the Super Admin: remove another owner, or a support admin")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Ask the Super Admin: owners to remove another owner or for a support admin; anyone working there about a problem")
     public AdminDtos.PlatformRequest ask(@PathVariable UUID restaurantId, @Valid @RequestBody AdminDtos.CreateRequest request, Authentication auth) {
         return adminService.ask(auth, restaurantId, request);
     }
@@ -71,9 +71,39 @@ public class AdminController {
         return adminService.allRequests(auth, pendingOnly);
     }
 
+    @PostMapping("/platform/requests")
+    @Operation(summary = "Open a ticket for a restaurant from the Requests board (the Super Admin, or a support admin who gives requests out)")
+    public AdminDtos.PlatformRequest openTicket(@Valid @RequestBody AdminDtos.OpenTicket ticket, Authentication auth) {
+        return adminService.openTicket(auth, ticket);
+    }
+
     @PostMapping("/platform/requests/{requestId}/decide")
     @Operation(summary = "Super Admin: approve or decline a request (approving a removal removes that owner)")
     public AdminDtos.PlatformRequest decide(@PathVariable UUID requestId, @Valid @RequestBody AdminDtos.Decision decision, Authentication auth) {
         return adminService.decide(auth, requestId, decision);
+    }
+
+    @PostMapping("/platform/requests/{requestId}/assign")
+    @Operation(summary = "Super Admin: give a waiting request to a support admin (adminId null takes it back)")
+    public AdminDtos.PlatformRequest assign(@PathVariable UUID requestId, @Valid @RequestBody AdminDtos.Assign assign, Authentication auth) {
+        return adminService.assign(auth, requestId, assign);
+    }
+
+    @GetMapping("/platform/requests/{requestId}/history")
+    @Operation(summary = "Everything that happened to a request, oldest first")
+    public List<AdminDtos.RequestEvent> requestHistory(@PathVariable UUID requestId, Authentication auth) {
+        return adminService.history(auth, requestId);
+    }
+
+    @PostMapping("/platform/requests/{requestId}/start")
+    @Operation(summary = "Start working on a waiting request (it shows In progress)")
+    public AdminDtos.PlatformRequest start(@PathVariable UUID requestId, Authentication auth) {
+        return adminService.start(auth, requestId);
+    }
+
+    @PostMapping("/platform/requests/{requestId}/solve")
+    @Operation(summary = "Close a waiting request as solved (the Super Admin, or the support admin it was given to)")
+    public AdminDtos.PlatformRequest solve(@PathVariable UUID requestId, @Valid @RequestBody AdminDtos.Solve solve, Authentication auth) {
+        return adminService.solve(auth, requestId, solve);
     }
 }

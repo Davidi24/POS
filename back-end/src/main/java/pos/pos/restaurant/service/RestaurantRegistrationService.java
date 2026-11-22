@@ -181,21 +181,68 @@ public class RestaurantRegistrationService {
             Integer page,
             Integer size
     ) {
+        return getApplications(authentication, status, search, null, null, null, page, size);
+    }
+
+    /**
+     * The same, narrowed by the Filters (user, 2026-11-21: "pagination with filters"): [order] OLDEST or NEWEST (else waiting
+     * ones oldest first, rejected newest first), and one [currency] or [timezone] (the restaurant's place).
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<RestaurantApplicationResponse> getApplications(
+            Authentication authentication,
+            String status,
+            String search,
+            String order,
+            String currency,
+            String timezone,
+            Integer page,
+            Integer size
+    ) {
         assertPlatformAdmin(authentication);
+        List<RestaurantStatus> statuses = applicationStatuses(status);
+        String normalizedOrder = NormalizationUtils.normalizeUpper(order);
+        Sort.Direction direction = switch (normalizedOrder == null ? "" : normalizedOrder) {
+            case "OLDEST" -> Sort.Direction.ASC;
+            case "NEWEST" -> Sort.Direction.DESC;
+            case "" -> statuses.size() == 1 && statuses.get(0) == RestaurantStatus.PENDING ? Sort.Direction.ASC : Sort.Direction.DESC;
+            default -> throw new AuthException("order must be OLDEST or NEWEST", HttpStatus.BAD_REQUEST);
+        };
+        var pageable = PageableUtils.create(page, size, direction.name(), "createdAt", 20);
+        Page<Restaurant> found = restaurantRepository.searchApplications(statuses, NormalizationUtils.normalizeLowerLike(search),
+                NormalizationUtils.normalizeUpper(currency), NormalizationUtils.normalize(timezone), pageable);
+        List<RestaurantApplicationResponse> items = found.getContent().stream().map(this::toApplication).toList();
+        return PageResponse.from(new PageImpl<>(items, pageable, found.getTotalElements()));
+    }
+
+    /** What the Filters can offer for these applications: each place (time zone) and currency in use, with how many. */
+    @Transactional(readOnly = true)
+    public ApplicationFilters getApplicationFilters(Authentication authentication, String status) {
+        assertPlatformAdmin(authentication);
+        List<RestaurantStatus> statuses = applicationStatuses(status);
+        return new ApplicationFilters(
+                choices(restaurantRepository.countApplicationsByTimezone(statuses)),
+                choices(restaurantRepository.countApplicationsByCurrency(statuses)));
+    }
+
+    public record ApplicationFilters(List<FilterChoice> timezones, List<FilterChoice> currencies) {
+    }
+
+    public record FilterChoice(String value, long count) {
+    }
+
+    private static List<FilterChoice> choices(List<Object[]> rows) {
+        return rows.stream().filter(row -> row[0] != null).map(row -> new FilterChoice((String) row[0], ((Number) row[1]).longValue())).toList();
+    }
+
+    private static List<RestaurantStatus> applicationStatuses(String status) {
         String normalized = NormalizationUtils.normalizeUpper(status);
-        List<RestaurantStatus> statuses = switch (normalized == null ? "PENDING" : normalized) {
+        return switch (normalized == null ? "PENDING" : normalized) {
             case "PENDING" -> List.of(RestaurantStatus.PENDING);
             case "REJECTED" -> List.of(RestaurantStatus.REJECTED);
             case "ALL" -> List.of(RestaurantStatus.PENDING, RestaurantStatus.REJECTED);
             default -> throw new AuthException("status must be PENDING, REJECTED or ALL", HttpStatus.BAD_REQUEST);
         };
-        Sort.Direction direction = statuses.size() == 1 && statuses.get(0) == RestaurantStatus.PENDING
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
-        var pageable = PageableUtils.create(page, size, direction.name(), "createdAt", 20);
-        Page<Restaurant> found = restaurantRepository.searchApplications(statuses, NormalizationUtils.normalizeLowerLike(search), pageable);
-        List<RestaurantApplicationResponse> items = found.getContent().stream().map(this::toApplication).toList();
-        return PageResponse.from(new PageImpl<>(items, pageable, found.getTotalElements()));
     }
 
     @Transactional(readOnly = true)
@@ -261,7 +308,38 @@ public class RestaurantRegistrationService {
         // The applicant's details were the account's; keep showing them on the answer.
         return new RestaurantApplicationResponse(approved.id(), approved.name(), approved.legalName(), approved.description(),
                 approved.email(), approved.phone(), approved.website(), approved.currency(), approved.timezone(), approved.status(),
-                approved.rejectionReason(), approved.submittedAt(), approved.reviewedAt(), approved.reviewedBy(), applicant);
+                approved.rejectionReason(), approved.submittedAt(), approved.reviewedAt(), approved.reviewedBy(), applicant,
+                approved.logoUrl(), approved.coverUrl());
+    }
+
+    /**
+     * Brings a rejected application back to waiting (user, 2026-11-21: "I can return a rejected one if I want"): the reason
+     * goes, it waits again in its old place (by when it was sent) and can be approved or rejected anew. Refused while another
+     * application with the same owner email or username waits. Nothing is emailed; the applicant hears at the next decision.
+     */
+    @Transactional
+    public RestaurantApplicationResponse reopenRegistration(Authentication authentication, UUID restaurantId) {
+        restaurantScopeService.assertCanCreateRestaurant(authentication);
+        Restaurant restaurant = restaurantScopeService.requireExistingRestaurant(restaurantId);
+        if (restaurant.getStatus() != RestaurantStatus.REJECTED) {
+            throw new AuthException("Only a rejected application can go back to waiting", HttpStatus.CONFLICT);
+        }
+        if (restaurant.getPendingOwnerEmail() != null
+                && restaurantRepository.existsByStatusAndPendingOwnerEmailAndDeletedAtIsNull(RestaurantStatus.PENDING, restaurant.getPendingOwnerEmail())) {
+            throw new AuthException("Another application with this owner's email is already waiting", HttpStatus.CONFLICT);
+        }
+        if (restaurant.getPendingOwnerUsername() != null
+                && restaurantRepository.existsByStatusAndPendingOwnerUsernameAndDeletedAtIsNull(RestaurantStatus.PENDING, restaurant.getPendingOwnerUsername())) {
+            throw new AuthException("Another application with this owner's username is already waiting", HttpStatus.CONFLICT);
+        }
+        restaurant.setStatus(RestaurantStatus.PENDING);
+        restaurant.setActive(false);
+        restaurant.setRejectionReason(null);
+        restaurant.setReviewedAt(null);
+        restaurant.setReviewedBy(null);
+        restaurant.setUpdatedBy(restaurantScopeService.currentUserId(authentication));
+        restaurantRepository.save(restaurant);
+        return toApplication(restaurant);
     }
 
     private Branch firstBranch(Restaurant restaurant, UUID actorId) {
@@ -292,7 +370,9 @@ public class RestaurantRegistrationService {
                 submittedAt(restaurant),
                 restaurant.getReviewedAt(),
                 restaurant.getReviewedBy(),
-                applicant(restaurant)
+                applicant(restaurant),
+                restaurantRepository.findLogoUrl(restaurant.getId()).orElse(null),
+                restaurant.getCoverUrl()
         );
     }
 

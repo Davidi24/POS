@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import pos.pos.restaurant.entity.Restaurant;
 import pos.pos.restaurant.enums.RestaurantStatus;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,6 +60,8 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
                     OR lower(r.pendingOwnerEmail) LIKE :searchLike
                     OR lower(concat(coalesce(r.pendingOwnerFirstName, ''), ' ', coalesce(r.pendingOwnerLastName, ''))) LIKE :searchLike
               )
+              AND (:currency IS NULL OR r.currency = :currency)
+              AND (:timezone IS NULL OR r.timezone = :timezone)
             """,
             countQuery = """
             SELECT COUNT(r)
@@ -73,9 +76,24 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
                     OR lower(r.pendingOwnerEmail) LIKE :searchLike
                     OR lower(concat(coalesce(r.pendingOwnerFirstName, ''), ' ', coalesce(r.pendingOwnerLastName, ''))) LIKE :searchLike
               )
+              AND (:currency IS NULL OR r.currency = :currency)
+              AND (:timezone IS NULL OR r.timezone = :timezone)
             """
     )
-    Page<Restaurant> searchApplications(java.util.Collection<RestaurantStatus> statuses, String searchLike, Pageable pageable);
+    Page<Restaurant> searchApplications(java.util.Collection<RestaurantStatus> statuses, String searchLike, String currency, String timezone,
+                                        Pageable pageable);
+
+    /** How many applications of these statuses use each time zone (the Filters' "Where"), most first. */
+    @Query("SELECT r.timezone, COUNT(r) FROM Restaurant r WHERE r.deletedAt IS NULL AND r.status IN :statuses GROUP BY r.timezone ORDER BY COUNT(r) DESC")
+    List<Object[]> countApplicationsByTimezone(java.util.Collection<RestaurantStatus> statuses);
+
+    /** How many applications of these statuses use each currency, most first. */
+    @Query("SELECT r.currency, COUNT(r) FROM Restaurant r WHERE r.deletedAt IS NULL AND r.status IN :statuses GROUP BY r.currency ORDER BY COUNT(r) DESC")
+    List<Object[]> countApplicationsByCurrency(java.util.Collection<RestaurantStatus> statuses);
+
+    /** The logo a restaurant (or an application) has uploaded, if any. */
+    @Query("SELECT b.logoUrl FROM RestaurantBranding b WHERE b.restaurant.id = :restaurantId AND b.deletedAt IS NULL")
+    java.util.Optional<String> findLogoUrl(UUID restaurantId);
 
     @Query(
             value = """

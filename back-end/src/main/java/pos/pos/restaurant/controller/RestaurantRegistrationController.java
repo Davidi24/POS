@@ -67,4 +67,11 @@ public class RestaurantRegistrationController {
                 restaurantRegistrationService.reviewRegistration(authentication, restaurantId, request)
         );
     }
+
+    @PostMapping("/{restaurantId}/reopen")
+    @PreAuthorize("hasAuthority('RESTAURANTS_CREATE')")
+    @Operation(summary = "Bring a rejected application back to waiting, to review it again")
+    public ResponseEntity<RestaurantApplicationResponse> reopenRegistration(@PathVariable UUID restaurantId, Authentication authentication) {
+        return ResponseEntity.ok(restaurantRegistrationService.reopenRegistration(authentication, restaurantId));
+    }
 }
