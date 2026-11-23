@@ -56,6 +56,27 @@ public class UpdateRestaurantRequest {
     @pos.pos.restaurant.validation.HttpWebsite
     private String website;
 
+    // Where guests find it online (user, 2026-11-23). Left out = kept as it is, "" = taken off.
+    @Size(max = 200, message = "instagram must be at most 200 characters")
+    @Pattern(regexp = "^\\S*$", message = "instagram must be a link or a name without spaces")
+    private String instagram;
+
+    @Size(max = 200, message = "facebook must be at most 200 characters")
+    @Pattern(regexp = "^\\S*$", message = "facebook must be a link without spaces")
+    private String facebook;
+
+    @Size(max = 200, message = "tiktok must be at most 200 characters")
+    @Pattern(regexp = "^\\S*$", message = "tiktok must be a link or a name without spaces")
+    private String tiktok;
+
+    @Size(max = 200, message = "whatsapp must be at most 200 characters")
+    @Pattern(regexp = "^[0-9+()\\-\\s./:A-Za-z]*$", message = "whatsapp must be a phone number or a wa.me link")
+    private String whatsapp;
+
+    @Size(max = 200, message = "mapsLink must be at most 200 characters")
+    @Pattern(regexp = "^\\S*$", message = "mapsLink must be a link without spaces")
+    private String mapsLink;
+
     @NotBlank(message = "currency is required")
     @Size(min = 3, max = 3, message = "currency must be exactly 3 characters")
     private String currency;

@@ -25,6 +25,11 @@ public class CurrentUserMapper {
         return restaurants.findByIdAndDeletedAtIsNull(restaurantId).map(pos.pos.restaurant.entity.Restaurant::getName).orElse(null);
     }
 
+    private String restaurantLogo(java.util.UUID restaurantId) {
+        if (restaurantId == null || restaurants == null) return null;
+        return restaurants.findLogoUrl(restaurantId).orElse(null);
+    }
+
     private String branchName(java.util.UUID restaurantId, java.util.UUID branchId) {
         if (restaurantId == null || branchId == null) return null;
         return branches.findByIdAndRestaurantIdAndDeletedAtIsNull(branchId, restaurantId).map(pos.pos.restaurant.entity.Branch::getName).orElse(null);
@@ -58,6 +63,7 @@ public class CurrentUserMapper {
                 .roles(normalizeCodes(roles))
                 .permissions(normalizeCodes(permissions))
                 .restaurantName(restaurantName(user.getRestaurantId()))
+                .restaurantLogoUrl(restaurantLogo(user.getRestaurantId()))
                 .photoUrl(user.getAvatarUrl())
                 .language(user.getLanguage())
                 .branchName(branchName(user.getRestaurantId(), availableBranch(user.getRestaurantId(), user.getDefaultBranchId())))
@@ -88,6 +94,7 @@ public class CurrentUserMapper {
                 .roles(normalizeCodes(roles))
                 .permissions(normalizeCodes(permissions))
                 .restaurantName(restaurantName(user.getRestaurantId()))
+                .restaurantLogoUrl(restaurantLogo(user.getRestaurantId()))
                 .photoUrl(user.getPhotoUrl())
                 .language(user.getLanguage())
                 .branchName(branchName(user.getRestaurantId(), availableBranch(user.getRestaurantId(), user.getDefaultBranchId())))

@@ -18,8 +18,6 @@ public class RestaurantBrandingResponse {
 
     private UUID id;
     private String logoUrl;
-    private String primaryColor;
-    private String secondaryColor;
     private String receiptHeader;
     private String receiptFooter;
     private OffsetDateTime createdAt;

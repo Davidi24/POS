@@ -39,4 +39,18 @@ public class UpsertAddressRequest {
     private String streetLine2;
 
     private Boolean isPrimary;
+
+    // A branch's exact spot (both or neither); restaurant addresses don't keep it.
+    @jakarta.validation.constraints.DecimalMin(value = "-90", message = "latitude must be between -90 and 90")
+    @jakarta.validation.constraints.DecimalMax(value = "90", message = "latitude must be between -90 and 90")
+    private java.math.BigDecimal latitude;
+
+    @jakarta.validation.constraints.DecimalMin(value = "-180", message = "longitude must be between -180 and 180")
+    @jakarta.validation.constraints.DecimalMax(value = "180", message = "longitude must be between -180 and 180")
+    private java.math.BigDecimal longitude;
+
+    @jakarta.validation.constraints.AssertTrue(message = "latitude and longitude go together")
+    private boolean isCoordinatesTogether() {
+        return (latitude == null) == (longitude == null);
+    }
 }

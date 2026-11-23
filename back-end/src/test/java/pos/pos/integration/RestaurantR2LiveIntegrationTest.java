@@ -73,7 +73,7 @@ class RestaurantR2LiveIntegrationTest extends AbstractPosApiIntegrationTest {
   var menu=menu(w,"R2 menu");var item=item(w,menu,"R2 dish","12");String imagePath="/menus/"+menu.get("menuId")+"/sections/"+menu.get("sectionId")+"/items/"+item+"/image";
   String dish=upload(imagePath,w.ownerToken(),first,"image/png",200).get("imageUrl").asText();assertThat(storage.load(key(dish))).isPresent();
   delete(imagePath).as(w.ownerToken()).expect(200);assertThat(storage.load(key(dish))).isEmpty();
-  put(root+"/branding").as(w.ownerToken()).body(Map.of("logoUrl","","primaryColor","#112233")).expect(200);assertThat(storage.load(key(replaced))).isEmpty();
+  put(root+"/branding").as(w.ownerToken()).body(Map.of("logoUrl","","receiptHeader","Welcome")).expect(200);assertThat(storage.load(key(replaced))).isEmpty();
   String last=upload(root+"/branding/logo",w.ownerToken(),first,"image/png",200).get("logoUrl").asText();
   delete(root+"/branding/logo").as(w.ownerToken()).expect(200);assertThat(storage.load(key(last))).isEmpty();
  }

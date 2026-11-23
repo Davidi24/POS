@@ -35,6 +35,12 @@ public class StoredImageCleanup {
                 +"stored_image_cleanup (object_key,image_url,next_attempt_at) values (?,?,now()+interval '10 minutes') "
                 +"on conflict (object_key) do nothing",key,storage.urlFor(key)));
     }
+    /** A picture stored on its own (a receipt's), kept a day for something to start using it; removed then if nothing does. */
+    public void trackUnclaimed(String key) {
+        independent.executeWithoutResult(tx -> jdbc.update("insert into "+schema
+                +"stored_image_cleanup (object_key,image_url,next_attempt_at) values (?,?,now()+interval '24 hours') "
+                +"on conflict (object_key) do nothing",key,storage.urlFor(key)));
+    }
     public long references(String url) {
         String key=storage.keyOf(url).orElse(null);
         String backend=key==null?url:MenuImageStorage.backendUrl(key);
@@ -48,8 +54,10 @@ public class StoredImageCleanup {
                 +"+(select count(*) from "+schema+"inventory_locations where image_url"+condition+")"
                 +"+(select count(*) from "+schema+"recipes where image_url"+condition+")"
                 +"+(select count(*) from "+schema+"order_receipt_identities where identity_json->>'logoUrl'"+condition+")"
-                +"+(select count(*) from "+schema+"users where avatar_url"+condition+")",
-                Long.class,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current);
+                +"+(select count(*) from "+schema+"users where avatar_url"+condition+")"
+                // Receipt designs keep their pictures' links inside the design.
+                +"+(select count(*) from "+schema+"restaurant_receipt_designs where strpos(design,?)>0 or strpos(design,?)>0 or strpos(design,?)>0)",
+                Long.class,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current,url,backend,current);
         return count==null?0:count;
     }
     /** Post-commit cleanup must never turn a committed save into an HTTP failure. */

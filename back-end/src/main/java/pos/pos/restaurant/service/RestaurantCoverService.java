@@ -18,12 +18,14 @@ import java.util.UUID;
 /**
  * The cover pictures on the restaurant and branch cards of the super admins' lists. Kept in the same picture storage
  * as dish photos (in the restaurant's folder); a new picture replaces the old one, which is deleted once saved.
+ * The restaurant's own cover is changed by whoever manages the restaurant, like its logo (user, 2026-11-23: "the banner
+ * should be editable"); branch covers stay the Super Admin's.
  */
 @Service
 @RequiredArgsConstructor
 public class RestaurantCoverService {
 
-    private static final String ONLY_SUPER_ADMIN = "Only the Super Admin can change the cover pictures";
+    private static final String ONLY_SUPER_ADMIN = "Only the Super Admin can change a branch's cover picture";
 
     private final RestaurantScopeService restaurantScopeService;
     private final RestaurantRepository restaurantRepository;
@@ -36,7 +38,7 @@ public class RestaurantCoverService {
 
     @Transactional
     public CoverResponse uploadRestaurantCover(Authentication authentication, UUID restaurantId, MultipartFile file) {
-        Restaurant restaurant = restaurantScopeService.requirePlatformManagedRestaurant(authentication, restaurantId, ONLY_SUPER_ADMIN);
+        Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         String previous = restaurant.getCoverUrl();
         restaurant.setCoverUrl(store(restaurantId, file));
         restaurantRepository.save(restaurant);
@@ -46,7 +48,7 @@ public class RestaurantCoverService {
 
     @Transactional
     public CoverResponse removeRestaurantCover(Authentication authentication, UUID restaurantId) {
-        Restaurant restaurant = restaurantScopeService.requirePlatformManagedRestaurant(authentication, restaurantId, ONLY_SUPER_ADMIN);
+        Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
         String previous = restaurant.getCoverUrl();
         restaurant.setCoverUrl(null);
         restaurantRepository.save(restaurant);

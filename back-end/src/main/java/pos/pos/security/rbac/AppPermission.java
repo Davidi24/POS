@@ -103,6 +103,9 @@ public enum AppPermission {
     RESTAURANTS_READ("See restaurant info", "The restaurant's details, branches, logo and currency"),
     RESTAURANTS_UPDATE("Change restaurant info", "Description, phone, email, addresses, logo, colours and receipt texts"),
     HOURS_UPDATE("Change opening hours", "Each branch's week and its special days"),
+    // A restaurant with several branches (user, 2026-11-23): choose the branch to work in after signing in and switch between
+    // them. Owner, co-owner and admin by default; without it someone works only in their own branch.
+    BRANCHES_ALL("Work in every branch", "Choose the branch to work in and switch between the restaurant's branches"),
 
     // Statistics → Overview, Sales, Finance, Orders, Dishes, Stock, Tables, Team
     REPORTS_READ("See the overview", "Sales, orders and guests at a glance"),
