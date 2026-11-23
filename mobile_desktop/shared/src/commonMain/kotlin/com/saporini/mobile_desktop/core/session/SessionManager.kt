@@ -15,6 +15,13 @@ data class ActingRestaurant(
     val branchCount: Int = 1
 )
 
+/**
+ * Another branch of their own restaurant an owner, co-owner or admin is working in (user, 2026-11-23: each workspace at
+ * branch level or for the whole restaurant). MOCK until the server takes it as the branch they act in: path-based calls
+ * follow it already (any branch of one's restaurant is open to them), the few that use the person's default branch don't.
+ */
+data class WorkingBranch(val restaurantId: String, val branchId: String, val branchName: String)
+
 /** The Super Admin and Co-Super-Admins belong to no restaurant; they work inside the one they enter. */
 fun isPlatformAdmin(user: CurrentUserResponse?): Boolean =
     user?.roles.orEmpty().any { it.equals("SUPER_ADMIN", ignoreCase = true) || it.equals("CO_SUPER_ADMIN", ignoreCase = true) }
@@ -65,6 +72,24 @@ class SessionManager {
 
     private val _actingRestaurant = MutableStateFlow<ActingRestaurant?>(null)
     val actingRestaurant: StateFlow<ActingRestaurant?> = _actingRestaurant.asStateFlow()
+
+    private val _workingBranch = MutableStateFlow<WorkingBranch?>(null)
+    val workingBranch: StateFlow<WorkingBranch?> = _workingBranch.asStateFlow()
+
+    /** The branch the person belongs to (their default one); for a super admin the one they entered. */
+    val homeBranchId: String? get() = signedIn.value?.let { if (isPlatformAdmin(it)) _actingRestaurant.value?.branchId else it.defaultBranchId }
+
+    /**
+     * Work in another branch of the same restaurant (the switcher in every workspace's bar): a super admin switches the
+     * branch they entered; anyone else gets it as their working branch until they pick their own again or sign out.
+     */
+    fun workIn(branchId: String, branchName: String) {
+        val user = signedIn.value ?: return
+        if (isPlatformAdmin(user)) { switchBranch(branchId, branchName); return }
+        val restaurantId = user.restaurantId ?: return
+        _workingBranch.value = if (branchId == user.defaultBranchId) null else WorkingBranch(restaurantId, branchId, branchName)
+        publish()
+    }
     private val _contextError = MutableStateFlow<String?>(null)
     val contextError: StateFlow<String?> = _contextError.asStateFlow()
     fun clearContextError() { _contextError.value = null }
@@ -95,6 +120,7 @@ class SessionManager {
         signedIn.value = user
         // A fresh sign-in as someone else (or without super admin rights) starts outside any restaurant.
         if (previous?.id != user.id || !isPlatformAdmin(user)) _actingRestaurant.value = null
+        if (previous?.id != user.id) _workingBranch.value = null
         if (isPlatformAdmin(user) && "RESTAURANTS_READ" !in user.permissions && _actingRestaurant.value != null) {
             _contextError.value = "Your restaurant access changed. Choose a restaurant again when access is restored."
             _actingRestaurant.value = null
@@ -168,6 +194,7 @@ class SessionManager {
         identityRevision++
         signedIn.value = null
         _actingRestaurant.value = null
+        _workingBranch.value = null
         _contextError.value = null
         _currentUser.value = null
         _isAuthenticated.value = false
@@ -179,7 +206,8 @@ class SessionManager {
         val acting = _actingRestaurant.value
         _currentUser.value = when {
             user == null -> null
-            !isPlatformAdmin(user) -> user
+            !isPlatformAdmin(user) -> _workingBranch.value?.takeIf { it.restaurantId == user.restaurantId }
+                ?.let { user.copy(defaultBranchId = it.branchId) } ?: user
             else -> user.copy(restaurantId = acting?.restaurantId, defaultBranchId = acting?.branchId)
         }
     }

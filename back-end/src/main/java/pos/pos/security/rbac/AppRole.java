@@ -69,6 +69,7 @@ public enum AppRole {
                     SETTINGS_READ, SETTINGS_UPDATE, SETTINGS_AUDIT,
                     SHIFT_READ, SHIFT_MANAGE,
                     HOURS_UPDATE,
+                    BRANCHES_ALL,
                     ADMIN_ACCESS,
                     // Statistics without Finance (wages and money out are the owner's).
                     STATISTICS_ACCESS, REPORTS_READ, STATS_SALES_READ, STATS_ORDERS_READ, STATS_DISHES_READ, STATS_STOCK_READ,

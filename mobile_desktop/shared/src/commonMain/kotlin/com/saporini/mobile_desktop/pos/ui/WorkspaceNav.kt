@@ -34,7 +34,9 @@ private val NavInk = Color(0xFF202426)
 
 @Composable
 private fun WorkspaceLogo() {
-    Image(painterResource(Res.drawable.pos_simple_logo), "Saporini", Modifier.size(82.dp), contentScale = ContentScale.Fit)
+    com.saporini.mobile_desktop.core.ui.BarLogo(82.dp) {
+        Image(painterResource(Res.drawable.pos_simple_logo), "Saporini", Modifier.size(82.dp), contentScale = ContentScale.Fit)
+    }
 }
 
 /**
@@ -50,7 +52,9 @@ internal fun <K> WorkspaceNavTopBar(
     onSelect: (K) -> Unit,
     onLogout: () -> Unit,
     onBackToWorkspaces: (() -> Unit)? = null,
-    logo: @Composable () -> Unit = { WorkspaceLogo() }
+    logo: @Composable () -> Unit = { WorkspaceLogo() },
+    // The workspace whose branch switcher shows in the bar (branch level or all branches, step 25); null = none.
+    scope: com.saporini.mobile_desktop.core.session.Workspace? = null
 ) {
     val head = entries.take(fixed)
     val rotating = entries.drop(fixed)
@@ -62,7 +66,7 @@ internal fun <K> WorkspaceNavTopBar(
     // More keeps its order; the first entry steps into the spot of the one now in the bar.
     val more = if (slotEntry == null) emptyList() else rotating.drop(1).map { if (it.key == slotEntry.key) rotating.first() else it }
 
-    WorkspaceTopBar(onLogout = onLogout, logo = logo, onBackToWorkspaces = onBackToWorkspaces) {
+    WorkspaceTopBar(onLogout = onLogout, logo = logo, onBackToWorkspaces = onBackToWorkspaces, scope = scope) {
         head.forEach { entry -> TopBarNavItem(entry.label, entry.icon, selected == entry.key, { onSelect(entry.key) }) }
         slotEntry?.let { entry -> TopBarNavItem(entry.label, entry.icon, selected == entry.key, { onSelect(entry.key) }) }
         if (more.isNotEmpty()) {

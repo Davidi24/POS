@@ -76,6 +76,13 @@ public class BranchAddress extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "is_primary", nullable = false)
     private boolean isPrimary = false;
 
+    // The exact spot, if set (user, 2026-11-23: "I can put the exact coordinates if I want").
+    @Column(name = "latitude", precision = 9, scale = 6)
+    private java.math.BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 9, scale = 6)
+    private java.math.BigDecimal longitude;
+
     @Override
     protected void normalizeFields() {
         country = NormalizationUtils.normalize(country);

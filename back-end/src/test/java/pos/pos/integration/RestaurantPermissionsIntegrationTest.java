@@ -38,7 +38,7 @@ class RestaurantPermissionsIntegrationTest extends AbstractPosApiIntegrationTest
 
     private List<Request> routes(World w, String admin) throws Exception {
         String r="/restaurants/"+w.restaurantId(), b=r+"/branches/"+w.branchId();
-        put(r+"/branding").as(admin).body(Map.of("primaryColor","#123456")).expect(200);
+        put(r+"/branding").as(admin).body(Map.of("receiptHeader","Welcome")).expect(200);
         String ra=post(r+"/addresses").as(admin).body(address()).expect(201).get("id").asText();
         String rc=post(r+"/contacts").as(admin).body(contact()).expect(201).get("id").asText();
         String rt=post(r+"/tax-profiles").as(admin).body(tax()).expect(201).get("id").asText();
@@ -64,7 +64,7 @@ class RestaurantPermissionsIntegrationTest extends AbstractPosApiIntegrationTest
         list.add(new Request("PUT",r+"/owner",Map.of("firstName","Owner","lastName","Tester","email",w.owner().getEmail())));
         list.add(new Request("POST",r+"/owner/invite",null));
         list.add(new Request("POST",r+"/owner/transfer",Map.of("newOwnerUserId",w.owner().getId(),"expectedVersion",0)));
-        list.add(new Request("PUT",r+"/branding",Map.of("primaryColor","#123456")));
+        list.add(new Request("PUT",r+"/branding",Map.of("receiptHeader","Welcome")));
         for(String suffix: List.of("currency/preview","currency/change")) list.add(new Request("POST",r+"/"+suffix,Map.of("newCurrency","USD","rate",1.1,"roundingStep",0.01)));
         list.add(new Request("POST",r+"/timezone/preview",Map.of("timezone","Europe/Berlin")));
         list.add(new Request("POST",r+"/timezone/change",Map.of("timezone","Europe/Berlin","confirmed",true,"keepBookingTimes",true)));
@@ -135,7 +135,7 @@ class RestaurantPermissionsIntegrationTest extends AbstractPosApiIntegrationTest
             boolean platform=request.path().contains("/tax-profiles")&&!request.method().equals("GET")
                     || request.path().contains("/currency/")&&request.method().equals("POST")
                     || request.path().contains("/timezone/") || request.path().contains("/owner")
-                    || request.path().endsWith("/status") || request.path().endsWith("/cover")
+                    || request.path().endsWith("/status") || request.path().endsWith("/cover")&&request.path().contains("/branches/")
                     || request.path().endsWith("/branches")&&request.method().equals("POST")
                     || request.method().equals("DELETE")&&(request.path().equals(r)||request.path().equals(r+"/branches/"+w.branchId()));
             if(platform) assertThat(invoke(request,w.ownerToken(),Map.of())).as(request.toString()).isEqualTo(403);

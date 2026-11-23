@@ -15,7 +15,7 @@ Read the step's file before working on it, keep its sections and "Done" up to da
 
 ## Where we are
 
-**Now: step 4, [Restaurant & branches](04-restaurant-and-branches.md): built, hard testing list written, PR #104 open (to merge).** Keep this list up to date as each part is finished (user, 2026-11-18:
+**Now: step 4 ([Restaurant & branches](04-restaurant-and-branches.md)): its second PR (Restaurant info redone, the receipt designer with the preliminary bill and the fiscal invoice, Finance & taxation's first screens, choosing the branch to work in) is ready to merge; then step 5 ([Settings](05-settings.md)). Every branch together comes after the first launch (step 25).** Keep this list up to date as each part is finished (user, 2026-11-18:
 "check boxes so I know what I have left and where I am").
 
 - [x] 1. [Sign-in & accounts](01-sign-in-and-accounts.md): built and merged (#100, #101); its hard testing list is written.
@@ -45,7 +45,9 @@ Read the step's file before working on it, keep its sections and "Done" up to da
   - [x] Screens (Super Admin pages gone through; opening hours and the restaurant page: you look later)
   - [x] Development
   - [x] Hard testing list written
-  - [ ] Merged
+  - [x] Merged (PR #104, 2026-11-22)
+  - [x] Restaurant info (opening hours and the restaurant's page) looked at together (2026-11-22 – 23)
+  - [ ] Second PR merged (Restaurant info round, receipt designer, Finance first screens, branch choice)
   - [ ] Hard testing (later, when you say)
 - [ ] 5. [Settings](05-settings.md)
   - [ ] Decisions
@@ -83,11 +85,30 @@ Read the step's file before working on it, keep its sections and "Done" up to da
 - [ ] 20. [Statistics](20-statistics.md)
 - [ ] 21. [Fraud detection & Audit log](21-fraud-and-audit-log.md)
 - [ ] 22. [Onboarding](22-onboarding.md)
-- [ ] 23. [Web](23-web.md)
+- [ ] 23. [Finance & taxation](23-finance-and-taxation.md): added 2026-11-23 (user: "one more app, finance and taxation"); first screens built on MOCK figures
+  - [ ] Decisions
+  - [x] Screens (first version, for the user to look at)
+  - [ ] Development
+  - [ ] Hard testing list written
+  - [ ] Merged
+  - [ ] Hard testing (later, when you say)
+- [ ] 24. [Web](24-web.md): last before the first launch, once the app is finished (user, 2026-11-23)
+- [ ] 25. [Branches and the whole restaurant](25-branches-and-whole-restaurant.md): after the first launch (user, 2026-11-23: "right now we work as if there is one branch; after the first launch we update it for multiple branches"); choosing the branch to work in is on (the restaurant's home, the switcher); every branch together is "Coming soon" (`ALL_BRANCHES_ON`)
+  - [ ] Decisions
+  - [x] Screens (first round, for you to check)
+  - [ ] Development
+  - [ ] Hard testing list written
+  - [ ] Merged
+  - [ ] Hard testing (later, when you say)
 
 Added 2026-11-17 (user: "offline, multi-language and onboarding"): Languages right after sign-in, so every later screen is
 translated as it's finished; Offline after Payments, once the service flows work online (steps 12–16 already give new orders,
 dishes and payments their own id and an idempotency key); Onboarding last, since it walks through screens from almost every step.
+
+Added 2026-11-23 (user: "one more app, finance and taxation"; "make finance and taxation before the web; the web is the last
+thing we'll do, after the app is finished"): Finance & taxation is step 23 and Web step 24. The same day "Branches and the whole
+restaurant" was added as step 5, then moved after the first launch as step 25 (user: "right now we work as if there is one
+branch; after the first launch we update it for multiple branches; we add it completely in the end").
 
 Rules for every step
 - Settings: check that the step's own settings are actually used.

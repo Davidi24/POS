@@ -81,12 +81,14 @@ fun PosPhoneTopBar(initials: String) {
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Image(
-                painter = painterResource(Res.drawable.pos_simple_logo),
-                contentDescription = "Saporini",
-                modifier = Modifier.size(width = 24.dp, height = 40.dp),
-                contentScale = ContentScale.Fit
-            )
+            com.saporini.mobile_desktop.core.ui.BarLogo(40.dp) {
+                Image(
+                    painter = painterResource(Res.drawable.pos_simple_logo),
+                    contentDescription = "Saporini",
+                    modifier = Modifier.size(width = 24.dp, height = 40.dp),
+                    contentScale = ContentScale.Fit
+                )
+            }
             Spacer(Modifier.weight(1f))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -131,7 +133,7 @@ fun PosTopBar(
 ) {
     // Tables, Orders and Reservations always show; the fourth place is Menu or whatever was picked last from More.
     WorkspaceNavTopBar(posNavEntries(), fixed = 3, selected = selected, onSelect = onSelect, onLogout = onLogout,
-        onBackToWorkspaces = onBackToWorkspaces, logo = logo)
+        onBackToWorkspaces = onBackToWorkspaces, logo = logo, scope = com.saporini.mobile_desktop.core.session.Workspace.POS)
 }
 
 /**
@@ -150,6 +152,7 @@ internal fun WorkspaceTopBar(
     onLogout: () -> Unit,
     logo: @Composable () -> Unit,
     onBackToWorkspaces: (() -> Unit)? = null,
+    scope: com.saporini.mobile_desktop.core.session.Workspace? = null,
     navItems: @Composable () -> Unit,
 ) {
     androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -202,6 +205,7 @@ internal fun WorkspaceTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(if (tier == TopBarTier.COMPACT) 4.dp else 8.dp)
             ) {
+                scope?.let { com.saporini.mobile_desktop.workspace.ui.BranchScopeButton(it, compact = tier == TopBarTier.COMPACT) }
                 OnlineStatus(showLabel = tier == TopBarTier.FULL)
                 // A small tablet (600–900 wide) needs the room for the places, so the language moves out of the bar there.
                 if (tier != TopBarTier.COMPACT) LanguageSelector()

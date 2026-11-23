@@ -34,7 +34,7 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    waiter could type a wrong address and the till would stop working.
    Suggestion: only in test copies.
 
-6. **A "not a robot" check on the restaurant application** (now a web page, step 23).
+6. **A "not a robot" check on the restaurant application** (now a web page, step 24).
    Applications are already limited to 5 an hour per network address and 3 a day per email, and each one waits for your
    review. Suggestion: add the check only if fake applications start coming in.
 
@@ -56,7 +56,7 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
 
 4. **Restaurant applications' emails.**
    The application emails go out in English: whoever applies has no account or language yet.
-   Suggestion: when the web form is built (step 23), it sends the page's language and the emails follow it.
+   Suggestion: when the web form is built (step 24), it sends the page's language and the emails follow it.
 
 ## Step 4 — Restaurant & branches
 
@@ -76,6 +76,39 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
 3. **Tell the support admin when a request is given to them.** (2026-11-21) → Decided 2026-11-21: in step 7 (Notifications).
    Assigning a request to a support admin changes nothing for them until they open Requests.
    Suggestion: a notification (and an email) "<restaurant>: a problem was given to you", opening the ticket.
+
+4. ~~Social links kept by the server.~~ Decided 2026-11-23: done in step 4's second PR. (2026-11-23)
+   Restaurant info → Details now has Instagram, Facebook, TikTok, WhatsApp and Google Maps, but they're kept only on the device
+   that typed them, and the booking website doesn't show them yet.
+   Suggestion: five optional fields on the restaurant (`PUT /restaurants/{r}`), shown as small icons on the booking website and
+   at the end of booking emails.
+
+5. ~~People to contact.~~ Decided 2026-11-23: they stay hidden (the server keeps them). (2026-11-23)
+   Restaurant info no longer shows "People to contact" (accounting, support, a manager); the server still keeps them.
+   Suggestion: leave them out for good, or bring them back under Finance & taxation (the accountant) if the user wants them.
+
+6. ~~A branch's exact location kept by the server.~~ Decided 2026-11-23: done in step 4's second PR. (2026-11-23)
+   The address can now take an exact location (latitude, longitude), but it's kept only on the device that typed it.
+   Suggestion: two optional columns on the branch's address (`latitude`, `longitude`), sent with the address; later the booking
+   website can show a map pin and "Get directions".
+
+7. **Which map to use in production.** (2026-11-23)
+   Restaurant info → Details → Map shows OpenStreetMap's own tiles (free, light use only, credit on the map). Many restaurants
+   opening it every day would be too much for their server.
+   Suggestion: a map service with a key (MapTiler, Mapbox or Google Maps) through our server, decided with the website (step 24),
+   which will show the same map to guests.
+
+8. ~~The restaurant's colours.~~ Decided 2026-11-23: done in step 4's second PR. (2026-11-23)
+   The Colours card was taken out of Logo & receipts (user: "useless"). The two colours already saved stay on the server, and
+   the guest booking page may still tint itself with the main one.
+   Suggestion: drop them on the server too (and from the booking page), or bring them back with the website (step 24) if the
+   website wants a brand colour.
+
+9. ~~Keep the receipt design on the server.~~ Decided 2026-11-23: done in step 4's second PR. (2026-11-23)
+   Logo & receipts now has a receipt designer (a picture behind with its opacity and place, the line style, logo, barcode, QR
+   code and its line), but it's kept only on the device that made it, and nothing prints yet.
+   Suggestion: save it with the restaurant's branding (the picture in the same storage as the logo), and have the printers
+   (Devices) print it when printing is built.
 
 ## Step 20 — Statistics
 

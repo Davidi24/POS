@@ -11,6 +11,8 @@ enum class Workspace {
     ADMIN,
     // Opened with STATISTICS_ACCESS (Owner, Co-Owner, Admin).
     STATISTICS,
+    // Taxes: VAT, expenses, payroll, deadlines and returns (user, 2026-11-23: "one more app, finance and taxation").
+    FINANCE,
     FRAUD_DETECTION,
     // The restaurant's own details (currency, time zone, branches, legal details). Super admins only, and never a card in
     // the picker (user rule, 2026-10-29): it opens from the restaurant list for a closed or branch-less restaurant, and
@@ -54,6 +56,10 @@ fun accessibleWorkspaces(user: CurrentUserResponse): Set<Workspace> {
     if ("STATISTICS_ACCESS" in user.permissions &&
         com.saporini.mobile_desktop.statistics.StatsTab.entries.any { it.permission in user.permissions }) {
         workspaces.add(Workspace.STATISTICS)
+    }
+    // MOCK until the server has its own FINANCE_ACCESS: whoever handles the restaurant's money settings (owners by default).
+    if ("FINANCE_ACCESS" in user.permissions || "SETTINGS_MONEY" in user.permissions) {
+        workspaces.add(Workspace.FINANCE)
     }
     // Older servers don't send FRAUD_ACCESS yet; owners and co-owners always had Fraud Detection.
     if ("FRAUD_ACCESS" in user.permissions ||

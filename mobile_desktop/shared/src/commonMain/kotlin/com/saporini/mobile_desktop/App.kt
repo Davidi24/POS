@@ -49,6 +49,21 @@ fun App() {
         }
     }
 
+    // The restaurant's logo in the bars (user, 2026-11-23): what sign-in says, else (super admins inside a restaurant) its
+    // branding; outside a restaurant the app's own.
+    val platformData = org.koin.compose.getKoin().getOrNull<com.saporini.mobile_desktop.platform.PlatformRepository>()
+    LaunchedEffect(isAuthenticated, user?.id, user?.restaurantId, user?.restaurantLogoUrl) {
+        val brand = com.saporini.mobile_desktop.core.session.RestaurantBrand
+        val restaurantId = user?.restaurantId?.takeIf { isAuthenticated }
+        if (restaurantId == null) return@LaunchedEffect brand.set(null, null)
+        if (brand.restaurantId != restaurantId || user?.restaurantLogoUrl != null) brand.set(restaurantId, user?.restaurantLogoUrl)
+        if (user?.restaurantLogoUrl == null && "RESTAURANTS_READ" in user?.permissions.orEmpty()) {
+            try { brand.changed(restaurantId, platformData?.branding(restaurantId)?.logoUrl) }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { /* The app's own logo stays. */ }
+        }
+    }
+
     // Amounts also in the currency chosen on this device (user, 2026-11-19: only to see; payments stay in the restaurant's
     // currency): the restaurant's currency and today's rates after sign-in, on a change of restaurant or currency, then
     // every 6 hours. Signed out, nothing is known about a restaurant.
@@ -159,7 +174,7 @@ fun App() {
                         }
                         if ((required != null && required !in allowed) ||
                             (navigator.lastItem == com.saporini.mobile_desktop.workspace.ui.NoAccessScreen && allowed.isNotEmpty())) {
-                            navigator.replaceAll(resolveStartScreen(current))
+                            navigator.replaceAll(com.saporini.mobile_desktop.workspace.ui.workspaceStart(current))
                         }
                     }
                     LaunchedEffect(contextError) {

@@ -118,14 +118,12 @@ class RestaurantResourcesApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "logoUrl", "https://cdn.pos.example/logo.png",
-                                "primaryColor", "#112233",
-                                "secondaryColor", "#445566",
                                 "receiptHeader", "Welcome to POS",
                                 "receiptFooter", "Thanks for visiting"
                         ))))
                 .andExpect(status().isOk())
                 .andReturn());
-        assertThat(branding.get("primaryColor").asText()).isEqualTo("#112233");
+        assertThat(branding.get("receiptHeader").asText()).isEqualTo("Welcome to POS");
 
         JsonNode fetchedBranding = bodyOf(mockMvc.perform(get("/restaurants/{restaurantId}/branding", context.restaurantId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(context.ownerAccessToken())))

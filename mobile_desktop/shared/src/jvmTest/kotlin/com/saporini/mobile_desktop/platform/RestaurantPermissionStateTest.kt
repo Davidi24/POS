@@ -89,7 +89,7 @@ class RestaurantPermissionStateTest {
         model.editDetails();model.newBranch();model.editBranch(branch);model.askStatus(false,"INACTIVE");model.askRemoveRestaurant()
         model.newAddress();model.newContact();model.newTax();model.startCurrencyChange();model.startTimezoneChange();model.startAddOwner()
         model.askRemoveBranch(branch);model.askBranchStatus(branch,"INACTIVE");model.askRemoveTax(TaxProfileDto("tax"))
-        model.uploadLogo(byteArrayOf(1),"photo.png","image/png");model.removeLogo();model.saveBranding();model.resendOwnerInvite();model.confirm()
+        model.uploadLogo(byteArrayOf(1),"photo.png","image/png");model.removeLogo();model.saveReceipt();model.resendOwnerInvite();model.confirm()
         scheduler.runCurrent()
         val s=model.state.value
         assertNull(s.details);assertNull(s.branch);assertNull(s.address);assertNull(s.contact);assertNull(s.tax);assertNull(s.currency);assertNull(s.timezone);assertNull(s.ownerStep);assertNull(s.confirm)
@@ -172,7 +172,6 @@ class RestaurantPermissionStateTest {
             model.tab(RestaurantTab.MONEY);render(scene)
             assertFalse(clickLabels(scene).contains("Change currency"));assertFalse(clickLabels(scene).contains("Change time zone"))
             model.tab(RestaurantTab.BRANCHES);render(scene);assertFalse(clickLabels(scene).contains("Add branch"))
-            model.tab(RestaurantTab.LEGAL);render(scene);assertFalse(clickLabels(scene).contains("Add tax details"))
         } finally {scene.close()}
     }
     @Test fun branchScreenHidesAddAndPhotoActionsFromReadOnlyUser() {

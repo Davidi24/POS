@@ -34,6 +34,7 @@ internal data class WorkspaceTab(val label: String, val icon: ImageVector, val f
 internal enum class WorkspacePage(val title: String, val workspace: Workspace) {
     INVENTORY("Inventory", Workspace.INVENTORY),
     STATISTICS("Statistics", Workspace.STATISTICS),
+    FINANCE("Finance & taxation", Workspace.FINANCE),
     FRAUD_DETECTION("Fraud Detection", Workspace.FRAUD_DETECTION),
     RESTAURANT("Restaurant", Workspace.RESTAURANT);
 
@@ -56,6 +57,17 @@ internal enum class WorkspacePage(val title: String, val workspace: Workspace) {
                 com.saporini.mobile_desktop.statistics.StatsTab.TEAM -> WorkspaceTab(tab.title, Icons.Outlined.Groups, Icons.Filled.Groups)
             }
         }
+        FINANCE -> com.saporini.mobile_desktop.finance.FinanceTab.entries.map { tab ->
+            when (tab) {
+                com.saporini.mobile_desktop.finance.FinanceTab.OVERVIEW -> WorkspaceTab(tab.title, Icons.Outlined.Dashboard, Icons.Filled.Dashboard)
+                com.saporini.mobile_desktop.finance.FinanceTab.VAT -> WorkspaceTab(tab.title, Icons.Outlined.Percent, Icons.Filled.Percent)
+                com.saporini.mobile_desktop.finance.FinanceTab.EXPENSES -> WorkspaceTab(tab.title, Icons.AutoMirrored.Outlined.ReceiptLong, Icons.AutoMirrored.Filled.ReceiptLong)
+                com.saporini.mobile_desktop.finance.FinanceTab.PAYROLL -> WorkspaceTab(tab.title, Icons.Outlined.Groups, Icons.Filled.Groups)
+                com.saporini.mobile_desktop.finance.FinanceTab.DEADLINES -> WorkspaceTab(tab.title, Icons.Outlined.Event, Icons.Filled.Event)
+                com.saporini.mobile_desktop.finance.FinanceTab.FILING -> WorkspaceTab(tab.title, Icons.Outlined.Description, Icons.Filled.Description)
+                com.saporini.mobile_desktop.finance.FinanceTab.SETUP -> WorkspaceTab(tab.title, Icons.Outlined.Tune, Icons.Filled.Tune)
+            }
+        }
         FRAUD_DETECTION -> listOf(
             WorkspaceTab("Overview", Icons.Outlined.Security, Icons.Filled.Security),
             WorkspaceTab("Alerts", Icons.Outlined.WarningAmber, Icons.Filled.Warning),
@@ -66,10 +78,8 @@ internal enum class WorkspacePage(val title: String, val workspace: Workspace) {
             when (tab) {
                 com.saporini.mobile_desktop.platform.RestaurantTab.DETAILS -> WorkspaceTab(tab.label, Icons.Outlined.Storefront, Icons.Filled.Storefront)
                 com.saporini.mobile_desktop.platform.RestaurantTab.BRANCHES -> WorkspaceTab(tab.label, Icons.Outlined.Business, Icons.Filled.Business)
-                com.saporini.mobile_desktop.platform.RestaurantTab.HOURS -> WorkspaceTab(tab.label, Icons.Outlined.Schedule, Icons.Filled.Schedule)
-                com.saporini.mobile_desktop.platform.RestaurantTab.PLACES -> WorkspaceTab(tab.label, Icons.Outlined.Place, Icons.Filled.Place)
                 com.saporini.mobile_desktop.platform.RestaurantTab.BRANDING -> WorkspaceTab(tab.label, Icons.Outlined.Palette, Icons.Filled.Palette)
-                com.saporini.mobile_desktop.platform.RestaurantTab.LEGAL -> WorkspaceTab(tab.label, Icons.Outlined.Gavel, Icons.Filled.Gavel)
+                com.saporini.mobile_desktop.platform.RestaurantTab.HOURS -> WorkspaceTab(tab.label, Icons.Outlined.Schedule, Icons.Filled.Schedule)
                 com.saporini.mobile_desktop.platform.RestaurantTab.MONEY -> WorkspaceTab(tab.label, Icons.Outlined.CurrencyExchange, Icons.Filled.CurrencyExchange)
             }
         }
@@ -81,7 +91,9 @@ internal fun WorkspacePage.allows(index: Int, permissions: Collection<String>): 
     WorkspacePage.INVENTORY -> if (index == 0) com.saporini.mobile_desktop.admin.inventory.InventoryRights.of(permissions).sees
         else "SUPPLIERS_READ" in permissions
     WorkspacePage.STATISTICS -> com.saporini.mobile_desktop.statistics.StatsTab.entries[index].permission in permissions
-    WorkspacePage.FRAUD_DETECTION, WorkspacePage.RESTAURANT -> true
+    // The Restaurant app is outside any branch: opening hours are on each branch's page there.
+    WorkspacePage.RESTAURANT -> index != com.saporini.mobile_desktop.platform.RestaurantTab.HOURS.ordinal
+    WorkspacePage.FINANCE, WorkspacePage.FRAUD_DETECTION -> true
 }
 
 /** The workspace navigation and, under it, the content of the chosen tab. */
@@ -92,7 +104,7 @@ internal fun WorkspaceSections(page: WorkspacePage) {
     val navigator = LocalNavigator.current
     val allowed = user?.let { accessibleWorkspaces(it) }.orEmpty()
     if (page.workspace !in allowed) {
-        LaunchedEffect(user) { user?.let { navigator?.replaceAll(resolveStartScreen(it)) } }
+        LaunchedEffect(user) { user?.let { navigator?.replaceAll(workspaceStart(it)) } }
         return
     }
     var selectedIndex by rememberSaveable(page) { mutableStateOf(0) }
@@ -136,10 +148,11 @@ internal fun WorkspaceSections(page: WorkspacePage) {
     Column(Modifier.fillMaxSize().background(Color.White).then(if (phone) Modifier.safeDrawingPadding() else Modifier)) {
         if (!phone) {
             WorkspaceNavTopBar(entries, fixed = 3, selected = selectedIndex, onSelect = { selectedIndex = it }, onLogout = logout,
-                onBackToWorkspaces = back)
+                onBackToWorkspaces = back,
+                scope = page.workspace.takeIf { it != Workspace.RESTAURANT })
         } else if (phoneTopBar) {
             com.saporini.mobile_desktop.core.components.HideOnScrollBar(hideBar) {
-                PickerTopBar(user, loggingOut = false, onLogout = logout, compact = true, onBack = back)
+                PickerTopBar(user, loggingOut = false, onLogout = logout, compact = true, onBack = back, scope = page.workspace)
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(hideBar.connection), contentAlignment = Alignment.Center) {
@@ -150,6 +163,8 @@ internal fun WorkspaceSections(page: WorkspacePage) {
                 }
                 WorkspacePage.STATISTICS -> com.saporini.mobile_desktop.statistics.ui.StatisticsWorkspace(
                     com.saporini.mobile_desktop.statistics.StatsTab.entries[selectedIndex], { selectedIndex = it.ordinal }, Modifier.fillMaxSize())
+                WorkspacePage.FINANCE -> com.saporini.mobile_desktop.finance.ui.FinanceWorkspace(
+                    com.saporini.mobile_desktop.finance.FinanceTab.entries[selectedIndex], { selectedIndex = it.ordinal }, Modifier.fillMaxSize())
                 WorkspacePage.FRAUD_DETECTION -> com.saporini.mobile_desktop.fraud.ui.FraudWorkspace(
                     com.saporini.mobile_desktop.fraud.FraudTab.entries[selectedIndex], { selectedIndex = it.ordinal }, Modifier.fillMaxSize())
                 WorkspacePage.RESTAURANT -> com.saporini.mobile_desktop.platform.ui.RestaurantDetailsScreen(

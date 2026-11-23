@@ -216,7 +216,6 @@ Bar cash drawer	Cassetto contanti del bar	Cajón de efectivo del bar	Sirtari i p
 Plugged into the Bar printer.	Collegato alla stampante del bar.	Conectado a la impresora del bar.	Lidhur me printerin e barit.
 Scanner	Scanner	Escáner	Skaner
 Cash drawer	Cassetto contanti	Cajón de efectivo	Sirtar parash
-^[0-9A-Fa-f:.]*$	^[0-9A-Fa-f:.]*$	^[0-9A-Fa-f:.]*$	^[0-9A-Fa-f:.]*$
 Enter a short code (e.g. TILL-1)	Inserisci un codice breve (es. TILL-1)	Escribe un código corto (p. ej. TILL-1)	Shkruaj një kod të shkurtër (p.sh. TILL-1)
 The code can be at most {} characters	Il codice può avere al massimo {} caratteri	El código puede tener como máximo {} caracteres	Kodi mund të ketë deri në {} shkronja
 Enter a name	Inserisci un nome	Escribe un nombre	Shkruaj një emër
@@ -786,7 +785,7 @@ This change may already be saved. Retry it exactly as it is; it won't be counted
 Scan an item	Scansiona un articolo	Escanear un artículo	Skano një artikull
 Its stock change is filled in here.	La sua modifica di magazzino viene compilata qui.	Su cambio de inventario se completa aquí.	Ndryshimi i stokut të tij plotësohet këtu.
 From	Da	Desde	Nga
-{} there now	{} lì ora	{} allí ahora	{} atje tani
+{} there now	{} lì adesso	{} allá ahora	{} atje tani
 To	A	A	Te
 Change by (+ or -)	Varia di (+ o -)	Cambiar en (+ o -)	Ndrysho me (+ ose -)
 Quantity	Quantità	Cantidad	Sasia
@@ -1020,6 +1019,12 @@ What it's worth	Quanto vale	Cuánto vale	Sa vlen
 Your stock's value at cost, by kind and by item.	Il valore del magazzino al costo, per tipo e per articolo.	El valor de tu inventario al costo, por tipo y por artículo.	Vlera e stokut me kosto, sipas llojit dhe artikullit.
 Deliveries, moves, waste and counts as they happen.	Consegne, spostamenti, scarti e inventari mentre avvengono.	Entregas, traslados, mermas y conteos a medida que ocurren.	Dorëzimet, zhvendosjet, humbjet dhe numërimet ndërsa ndodhin.
 Someone who can change stock does this.	Lo fa chi può modificare il magazzino.	Lo hace alguien que puede cambiar el inventario.	Këtë e bën dikush që mund të ndryshojë stokun.
+Not at a branch	Non in una sede	Fuera de una sucursal	Jo në një pikë
+Stock in every branch	Magazzino in ogni sede	Inventario en cada sucursal	Stoku në çdo pikë
+Pick one to work with its stock	Scegline una per lavorare con il suo magazzino	Elige una para trabajar con su inventario	Zgjidh një për të punuar me stokun e saj
+{} places · {} items	{} luoghi · {} articoli	{} lugares · {} artículos	{} vende · {} artikuj
+Nothing running low	Niente in esaurimento	Nada por agotarse	Asgjë që po mbaron
+{} running low	{} in esaurimento	{} por agotarse	{} po mbarojnë
 Each line is saved as its own stock change.	Ogni riga viene salvata come movimento di magazzino a sé.	Cada línea se guarda como su propio cambio de inventario.	Çdo rresht ruhet si ndryshim stoku më vete.
 Move them all to	Spostali tutti in	Trasladarlos todos a	Zhvendosi të gjitha te
 A line can't move to the place it's already in.	Una riga non può spostarsi nel luogo in cui si trova già.	Una línea no puede trasladarse al lugar donde ya está.	Një rresht nuk mund të zhvendoset te vendi ku ndodhet tashmë.
@@ -1341,8 +1346,6 @@ PIN reset isn't available here	La reimpostazione del PIN non è disponibile qui	
 Personal permissions are unavailable	I permessi personali non sono disponibili	Los permisos personales no están disponibles	Lejet personale nuk janë të disponueshme
 Role pay is unavailable	La retribuzione del ruolo non è disponibile	El pago del rol no está disponible	Pagesa e rolit nuk është e disponueshme
 Requests are unavailable	Le richieste non sono disponibili	Las solicitudes no están disponibles	Kërkesat nuk janë të disponueshme
-^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$	^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$	^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$	^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$
-^[A-Za-z0-9._-]+$	^[A-Za-z0-9._-]+$	^[A-Za-z0-9._-]+$	^[A-Za-z0-9._-]+$
 Enter an email	Inserisci un'email	Escribe un correo	Shkruaj një email
 This isn't an email address	Questo non è un indirizzo email	Esta no es una dirección de correo	Kjo nuk është adresë email-i
 At least {} characters	Almeno {} caratteri	Al menos {} caracteres	Të paktën {} shkronja
@@ -1519,6 +1522,8 @@ Owners	Titolari	Propietarios	Pronarët
 The owner and the co-owners who run the restaurant	Il titolare e i contitolari che gestiscono il ristorante	El propietario y los copropietarios que dirigen el restaurante	Pronari dhe bashkëpronarët që drejtojnë restorantin
 People	Persone	Personas	Njerëzit
 What they can do	Cosa possono fare	Qué pueden hacer	Çfarë mund të bëjnë
+{}'s staff	Il personale di {}	El personal de {}	Stafi i {}
+the people who work here · All branches shows everyone with their roles	le persone che lavorano qui · Tutte le sedi mostra tutti con i loro ruoli	las personas que trabajan aquí · Todas las sucursales muestra a todos con sus roles	njerëzit që punojnë këtu · Të gjitha pikat shfaq të gjithë me rolet e tyre
 No access to users	Nessun accesso agli utenti	Sin acceso a los usuarios	Pa qasje te përdoruesit
 Your role needs “View users” to see staff accounts.	Il tuo ruolo deve avere “Vedere gli utenti” per vedere gli account del personale.	Tu rol necesita “Ver usuarios” para ver las cuentas del personal.	Roli yt duhet të ketë “Shiko përdoruesit” për të parë llogaritë e stafit.
 They leave the staff list and can't sign in any more.	Esce dalla lista del personale e non può più accedere.	Sale de la lista del personal y ya no puede iniciar sesión.	Del nga lista e stafit dhe nuk mund të hyjë më.
@@ -1851,6 +1856,8 @@ Valuable stock must start between 0 and 1,000,000.	La merce di valore deve parti
 Count frequency must be between 1 and 24.	La frequenza degli inventari deve essere tra 1 e 24.	La frecuencia de conteo debe estar entre 1 y 24.	Shpeshtësia e numërimit duhet të jetë ndërmjet 1 dhe 24.
 A weekly schedule can have up to 7 counts per place.	Una pianificazione settimanale può avere fino a 7 inventari per luogo.	Una programación semanal puede tener hasta 7 conteos por lugar.	Një plan javor mund të ketë deri në 7 numërime për vend.
 The refund amount must be between 0 and 1,000,000.	L'importo del rimborso deve essere tra 0 e 1.000.000.	El importe del reembolso debe estar entre 0 y 1.000.000.	Shuma e rimbursimit duhet të jetë ndërmjet 0 dhe 1.000.000.
+Staff	Personale	Personal	Stafi
+Branches	Sedi	Sucursales	Pikat
 X-Device-Id	X-Device-Id	X-Device-Id	X-Device-Id
 X-Device-Name	X-Device-Name	X-Device-Name	X-Device-Name
 No backend URL candidates configured	No backend URL candidates configured	No backend URL candidates configured	No backend URL candidates configured
@@ -2074,8 +2081,348 @@ Something went wrong. Please try again.	Qualcosa è andato storto. Riprova.	Algo
 X-POS-Context-Invalid	X-POS-Context-Invalid	X-POS-Context-Invalid	X-POS-Context-Invalid
 X-Restaurant-Id	X-Restaurant-Id	X-Restaurant-Id	X-Restaurant-Id
 X-Branch-Id	X-Branch-Id	X-Branch-Id	X-Branch-Id
+Every branch's stock together	Il magazzino di tutte le sedi insieme	El inventario de todas las sucursales juntas	Stoku i të gjitha pikave bashkë
+Users, roles and branches	Utenti, ruoli e sedi	Usuarios, roles y sucursales	Përdoruesit, rolet dhe pikat
+Every branch combined	Tutte le sedi insieme	Todas las sucursales juntas	Të gjitha pikat bashkë
+Consolidated: every branch together	Consolidato: tutte le sedi insieme	Consolidado: todas las sucursales juntas	E konsoliduar: të gjitha pikat bashkë
+Alerts across every branch	Avvisi di tutte le sedi	Alertas de todas las sucursales	Sinjalizimet në të gjitha pikat
+Its orders and payments	I suoi ordini e pagamenti	Sus pedidos y pagos	Porositë dhe pagesat e saj
+Its kitchen	La sua cucina	Su cocina	Kuzhina e saj
+Its own stock	Il suo magazzino	Su propio inventario	Stoku i vet
+Its staff, devices and shifts	Il suo personale, dispositivi e turni	Su personal, dispositivos y turnos	Stafi, pajisjet dhe turnet e saj
+Its own figures	I suoi numeri	Sus propias cifras	Shifrat e veta
+Its own records	I suoi registri	Sus propios registros	Regjistrat e vet
+Its own alerts	I suoi avvisi	Sus propias alertas	Sinjalizimet e veta
 Your restaurant access changed. Choose a restaurant again when access is restored.	Il tuo accesso al ristorante è cambiato. Scegli di nuovo un ristorante quando l'accesso sarà ripristinato.	Tu acceso al restaurante cambió. Elige un restaurante de nuevo cuando se restablezca el acceso.	Qasja jote në restorant ndryshoi. Zgjidh përsëri një restorant kur të rikthehet qasja.
 Saporini	Saporini	Saporini	Saporini
+Logo	Logo	Logo	Logoja
+POS-app/1.0 (restaurant point of sale)	POS-app/1.0 (restaurant point of sale)	POS-app/1.0 (restaurant point of sale)	POS-app/1.0 (restaurant point of sale)
+© OpenStreetMap	© OpenStreetMap	© OpenStreetMap	© OpenStreetMap
+Europe/Rome	Europe/Rome	Europe/Rome	Europe/Rome
+Europe/Madrid	Europe/Madrid	Europe/Madrid	Europe/Madrid
+Europe/London	Europe/London	Europe/London	Europe/London
+America/New_York	America/New_York	America/New_York	America/New_York
+America/Santo_Domingo	America/Santo_Domingo	America/Santo_Domingo	America/Santo_Domingo
+Expenses	Spese	Gastos	Shpenzime
+Payroll	Paghe	Nómina	Listëpagesa
+Deadlines	Scadenze	Vencimientos	Afatet
+Tax returns	Dichiarazioni	Declaraciones	Deklaratat
+Tax setup	Regole fiscali	Configuración fiscal	Rregullat tatimore
+Albania	Albania	Albania	Shqipëri
+Food and drink	Cibo e bevande	Comida y bebida	Ushqim dhe pije
+Rent	Affitto	Alquiler	Qira
+Electricity and water	Luce e acqua	Luz y agua	Drita dhe uji
+Gas	Gas	Gas	Gaz
+Internet and phone	Internet e telefono	Internet y teléfono	Internet dhe telefon
+Repairs	Riparazioni	Reparaciones	Riparime
+Marketing	Marketing	Marketing	Marketing
+Bank and card fees	Commissioni banca e carte	Comisiones de banco y tarjetas	Tarifa bankare dhe kartash
+Accountant and legal	Commercialista e legale	Contador y legal	Kontabilist dhe ligjore
+Month still running	Mese in corso	Mes en curso	Muaji vazhdon
+Ready to file	Pronta da presentare	Lista para presentar	Gati për t'u dorëzuar
+Filed, to pay	Presentata, da pagare	Presentada, por pagar	Dorëzuar, për t'u paguar
+Filed and paid	Presentata e pagata	Presentada y pagada	Dorëzuar dhe paguar
+1 invoice without the supplier's VAT number	1 fattura senza la partita IVA del fornitore	1 factura sin el número de IVA del proveedor	1 faturë pa NIPT-in e furnitorit
+{} invoices without the supplier's VAT number	{} fatture senza la partita IVA del fornitore	{} facturas sin el número de IVA del proveedor	{} fatura pa NIPT-in e furnitorit
+Without it the VAT on them can't be taken back: {}	Senza, l'IVA non si può detrarre: {}	Sin él, el IVA no se puede recuperar: {}	Pa të, TVSH-ja nuk mund të zbritet: {}
+1 expense without a receipt	1 spesa senza ricevuta	1 gasto sin recibo	1 shpenzim pa faturë
+{} expenses without a receipt	{} spese senza ricevuta	{} gastos sin recibo	{} shpenzime pa faturë
+Add a photo of each, so they count as costs	Aggiungi una foto di ciascuna, così contano come costi	Agrega una foto de cada uno para que cuenten como costos	Shto një foto të secilës, që të llogariten si kosto
+{} has no personal number	{} non ha il codice personale	{} no tiene número personal	{} nuk ka numër personal
+{} people have no personal number	{} persone non hanno il codice personale	{} personas no tienen número personal	{} persona nuk kanë numër personal
+The payroll list can't be sent without it	Senza, la lista paghe non si può inviare	Sin él no se puede enviar la nómina	Pa të listëpagesa nuk mund të dërgohet
+4 dishes have no VAT rate	4 piatti non hanno l'aliquota IVA	4 platos no tienen tasa de IVA	4 pjata nuk kanë normë TVSH-je
+They're counted at the standard rate until you choose	Contano all'aliquota ordinaria finché non scegli	Cuentan a la tasa general hasta que elijas	Llogariten me normën standarde derisa të zgjedhësh
+Agro Fresh Tirana	Agro Fresh Tirana	Agro Fresh Tirana	Agro Fresh Tirana
+Meat House Durrës	Meat House Durrës	Meat House Durrës	Meat House Durrës
+Olive Grove Berat	Olive Grove Berat	Olive Grove Berat	Olive Grove Berat
+Dairy Korça	Dairy Korça	Dairy Korça	Dairy Korça
+Mokka Roasters Tirana	Mokka Roasters Tirana	Mokka Roasters Tirana	Mokka Roasters Tirana
+Drinks Wholesale Shqipëria	Drinks Wholesale Shqipëria	Drinks Wholesale Shqipëria	Drinks Wholesale Shqipëria
+Ilir Marku	Ilir Marku	Ilir Marku	Ilir Marku
+Arben Hoxha	Arben Hoxha	Arben Hoxha	Arben Hoxha
+Mira Leka	Mira Leka	Mira Leka	Mira Leka
+Dritan Gjoka	Dritan Gjoka	Dritan Gjoka	Dritan Gjoka
+Sara Basha	Sara Basha	Sara Basha	Sara Basha
+Klea Dervishi	Klea Dervishi	Klea Dervishi	Klea Dervishi
+Erion Kapllani	Erion Kapllani	Erion Kapllani	Erion Kapllani
+Besa Muça	Besa Muça	Besa Muça	Besa Muça
+Anisa Çela	Anisa Çela	Anisa Çela	Anisa Çela
+Mimoza Daci	Mimoza Daci	Mimoza Daci	Mimoza Daci
+Standard	Standard	Estándar	Standard
+Reduced	Ridotta	Reducida	E reduktuar
+No VAT (gift cards, deposits)	Senza IVA (buoni regalo, caparre)	Sin IVA (tarjetas de regalo, depósitos)	Pa TVSH (karta dhuratë, depozita)
+Rruga e Kavajës Properties	Rruga e Kavajës Properties	Rruga e Kavajës Properties	Rruga e Kavajës Properties
+City Power	City Power	City Power	City Power
+Tirana Water	Tirana Water	Tirana Water	Tirana Water
+Gas Albania	Gas Albania	Gas Albania	Gas Albania
+Net Albania	Net Albania	Net Albania	Net Albania
+Clean Pro	Clean Pro	Clean Pro	Clean Pro
+Fix It Tirana	Fix It Tirana	Fix It Tirana	Fix It Tirana
+Social media ads	Pubblicità sui social	Anuncios en redes sociales	Reklama në rrjete sociale
+Card terminal fees	Commissioni POS carte	Comisiones de la terminal	Tarifat e terminalit të kartave
+Accountant	Commercialista	Contador	Kontabilisti
+VAT return and payment	Dichiarazione e pagamento IVA	Declaración y pago del IVA	Deklarata dhe pagesa e TVSH-së
+Payroll list, contributions and income tax	Lista paghe, contributi e imposte sui redditi	Nómina, aportes e impuesto sobre la renta	Listëpagesa, kontributet dhe tatimi mbi të ardhurat
+Profit tax advance	Acconto imposta sul reddito	Anticipo del impuesto sobre la renta	Paradhënie e tatimit mbi fitimin
+Quarter {} {}	Trimestre {} {}	Trimestre {} {}	Tremujori {} {}
+Yearly profit tax return and accounts	Dichiarazione annuale dei redditi e bilancio	Declaración anual de renta y estados financieros	Deklarata vjetore e tatimit mbi fitimin dhe pasqyrat
+What to file and pay, and by when · you're reminded {} days before	Cosa presentare e pagare, ed entro quando · te lo ricordiamo {} giorni prima	Qué presentar y pagar, y para cuándo · te avisamos {} días antes	Çfarë të dorëzosh e të paguash, dhe deri kur · të kujtojmë {} ditë përpara
+{} to pay	{} da pagare	{} por pagar	{} për të paguar
+{} filed and paid	{} presentate e pagate	{} presentadas y pagadas	{} të dorëzuara dhe paguara
+The last three months, all on time.	Gli ultimi tre mesi, tutto in tempo.	Los últimos tres meses, todo a tiempo.	Tre muajt e fundit, gjithçka në kohë.
+Filed	Presentata	Presentada	Dorëzuar
+Mark as filed	Segna come presentata	Marcar como presentada	Shëno si të dorëzuar
+Marked as filed	Segnata come presentata	Marcada como presentada	U shënua si e dorëzuar
+Paid	Pagato	Pagado	E paguar
+Mark as paid	Segna come pagato	Marcar como pagado	Shëno si të paguar
+Marked as paid	Segnata come pagata	Marcada como pagada	U shënua si e paguar
+{} · everything to file, ready	{} · tutto da presentare, pronto	{} · todo para presentar, listo	{} · gjithçka për t'u dorëzuar, gati
+Numbers for the VAT return	Numeri per la dichiarazione IVA	Números para la declaración de IVA	Shifrat për deklaratën e TVSH-së
+Sales at {}, without VAT	Vendite al {}, senza IVA	Ventas al {}, sin IVA	Shitje me {}, pa TVSH
+VAT on them	IVA su di esse	IVA sobre ellas	TVSH-ja mbi to
+Sales without VAT	Vendite senza IVA	Ventas sin IVA	Shitje pa TVSH
+Purchases with VAT, without it	Acquisti con IVA, senza l'IVA	Compras con IVA, sin el IVA	Blerje me TVSH, pa TVSH-në
+VAT on purchases	IVA sugli acquisti	IVA en compras	TVSH-ja e blerjeve
+VAT to pay	IVA da pagare	IVA por pagar	TVSH për të paguar
+VAT to get back	IVA a credito	IVA a favor	TVSH për t'u rimbursuar
+Numbers for the payroll list	Numeri per la lista paghe	Números para la nómina	Shifrat për listëpagesën
+People paid	Persone pagate	Personas pagadas	Persona të paguara
+Wages before anything is taken	Stipendi lordi	Salarios antes de descuentos	Pagat bruto
+Their contributions ({})	Contributi a loro carico ({})	Sus aportes ({})	Kontributet e tyre ({})
+The restaurant's contributions ({})	Contributi a carico del ristorante ({})	Aportes del restaurante ({})	Kontributet e restorantit ({})
+Income tax held back	Imposte trattenute	Impuesto sobre la renta retenido	Tatimi i mbajtur
+To pay together	Da pagare in tutto	Por pagar en total	Për t'u paguar gjithsej
+Documents	Documenti	Documentos	Dokumentet
+Download them or send them to your accountant	Scaricali o inviali al tuo commercialista	Descárgalos o envíalos a tu contador	Shkarkoji ose dërgoja kontabilistit
+Send to accountant	Invia al commercialista	Enviar al contador	Dërgoja kontabilistit
+Add your accountant's email in Tax setup first.	Prima aggiungi l'email del commercialista in Regole fiscali.	Primero agrega el email de tu contador en Configuración fiscal.	Shto më parë emailin e kontabilistit te Rregullat tatimore.
+Sending comes with the production pass.	L'invio arriva con il passaggio in produzione.	El envío llega con la puesta en producción.	Dërgimi vjen me kalimin në prodhim.
+VAT return	Dichiarazione IVA	Declaración de IVA	Deklarata e TVSH-së
+The numbers above, as one page	I numeri qui sopra, in una pagina	Los números de arriba, en una página	Shifrat më lart, në një faqe
+Sales book	Registro vendite	Libro de ventas	Libri i shitjeve
+A line a day, as the tax office asks	Una riga al giorno, come chiede il fisco	Una línea por día, como pide la oficina de impuestos	Një rresht në ditë, siç kërkon tatimi
+Purchase book	Registro acquisti	Libro de compras	Libri i blerjeve
+Every invoice with VAT	Ogni fattura con IVA	Cada factura con IVA	Çdo faturë me TVSH
+Payroll list	Lista paghe	Nómina	Listëpagesa
+Each person's wage and what's held back	Lo stipendio di ognuno e le trattenute	El salario de cada uno y lo retenido	Paga e secilit dhe çfarë mbahet
+Profit and loss	Conto economico	Pérdidas y ganancias	Fitimi dhe humbja
+The month's sales, costs and profit	Vendite, costi e utile del mese	Ventas, costos y ganancia del mes	Shitjet, kostot dhe fitimi i muajit
+Month ends	Il mese finisce	Termina el mes	Mbaron muaji
+Check the list	Controlla la lista	Revisa la lista	Kontrollo listën
+File the return	Presenta la dichiarazione	Presenta la declaración	Dorëzo deklaratën
+{}: downloads come with the production pass.	{}: i download arrivano con il passaggio in produzione.	{}: las descargas llegan con la puesta en producción.	{}: shkarkimet vijnë me kalimin në prodhim.
+Download {}	Scarica {}	Descargar {}	Shkarko {}
+The year {}	L'anno {}	El año {}	Viti {}
+Profit tax return by {}	Dichiarazione dei redditi entro il {}	Declaración de renta hasta el {}	Deklarata e tatimit mbi fitimin deri më {}
+Profit so far	Utile finora	Ganancia hasta ahora	Fitimi deri tani
+{} months: sales less costs, wages and contributions	{} mesi: vendite meno costi, stipendi e contributi	{} meses: ventas menos costos, salarios y aportes	{} muaj: shitjet minus kostot, pagat dhe kontributet
+Profit tax at {}	Imposta sul reddito al {}	Impuesto sobre la renta al {}	Tatimi mbi fitimin me {}
+A small business pays none	Una piccola impresa non ne paga	Una pequeña empresa no paga	Një biznes i vogël nuk paguan
+Less the advances already paid	Meno gli acconti già versati	Menos los anticipos ya pagados	Minus paradhëniet e paguara
+Change the rules in Tax setup	Cambia le regole in Regole fiscali	Cambia las reglas en Configuración fiscal	Ndrysho rregullat te Rregullat tatimore
+{} · {} expenses	{} · {} spese	{} · {} gastos	{} · {} shpenzime
+Without VAT, this month	Senza IVA, questo mese	Sin IVA, este mes	Pa TVSH, këtë muaj
+VAT taken back	IVA detratta	IVA recuperada	TVSH e zbritur
+Lowers the VAT you pay	Riduce l'IVA da pagare	Reduce el IVA que pagas	Ul TVSH-në që paguan
+Without a receipt	Senza ricevuta	Sin recibo	Pa faturë
+All have one	Ce l'hanno tutte	Todos tienen uno	Të gjitha e kanë
+Add a photo of each	Aggiungi una foto di ciascuna	Agrega una foto de cada uno	Shto një foto të secilës
+Biggest cost	Costo più grande	Mayor costo	Kosto më e madhe
+Where the money went	Dove sono andati i soldi	A dónde fue el dinero	Ku shkuan paratë
+Before you file	Prima di presentare	Antes de presentar	Para se të dorëzosh
+Every expense has its receipt and VAT number.	Ogni spesa ha la sua ricevuta e partita IVA.	Cada gasto tiene su recibo y número de IVA.	Çdo shpenzim ka faturën dhe NIPT-in.
+Food and drink come by themselves from Inventory → deliveries. Add bills like rent and electricity with Add expense.	Cibo e bevande arrivano da sole da Magazzino → consegne. Aggiungi bollette come affitto e luce con Aggiungi spesa.	La comida y la bebida llegan solas desde Inventario → entregas. Agrega facturas como alquiler y luz con Agregar gasto.	Ushqimi dhe pijet vijnë vetë nga Stoku → dorëzimet. Shto fatura si qiraja dhe drita me Shto shpenzim.
+Every expense	Ogni spesa	Todos los gastos	Çdo shpenzim
+{} · {} with VAT	{} · {} con IVA	{} · {} con IVA	{} · {} me TVSH
+invoice {}	fattura {}	factura {}	fatura {}
+from Inventory	da Magazzino	de Inventario	nga Stoku
+No VAT number	Senza partita IVA	Sin número de IVA	Pa NIPT
+No receipt	Senza ricevuta	Sin recibo	Pa faturë
+Receipt	Scontrino	Recibo	Fatura
+Add receipt	Aggiungi ricevuta	Agregar recibo	Shto faturën
+Receipt added for {}	Ricevuta aggiunta per {}	Recibo agregado para {}	Fatura u shtua për {}
+VAT {}	P.IVA {}	IVA {}	NIPT {}
+No VAT	Senza IVA	Sin IVA	Pa TVSH
+Add expense	Aggiungi spesa	Agregar gasto	Shto shpenzim
+Who was it paid to?	A chi è stato pagato?	¿A quién se pagó?	Kujt iu pagua?
+The amount with VAT, e.g. 120.00	L'importo con IVA, es. 120.00	El monto con IVA, p. ej. 120.00	Shuma me TVSH, p.sh. 120.00
+A day of {}, not after today	Un giorno di {}, non dopo oggi	Un día de {}, no después de hoy	Një ditë e {}, jo pas sot
+Add an expense	Aggiungi una spesa	Agregar un gasto	Shto një shpenzim
+{} · it counts in this month's VAT and costs	{} · conta nell'IVA e nei costi di questo mese	{} · cuenta en el IVA y los costos de este mes	{} · llogaritet në TVSH-në dhe kostot e këtij muaji
+Paid to	Pagato a	Pagado a	Paguar te
+What it was	Cos'era	Qué fue	Çfarë ishte
+Amount with VAT	Importo con IVA	Monto con IVA	Shuma me TVSH
+VAT on it	IVA applicata	IVA aplicada	TVSH-ja mbi të
+{} + VAT {}	{} + IVA {}	{} + IVA {}	{} + TVSH {}
+Invoice number	Numero fattura	Número de factura	Numri i faturës
+Day of the month	Giorno del mese	Día del mes	Dita e muajit
+I have the receipt	Ho la ricevuta	Tengo el recibo	E kam faturën
+Taking its photo comes with the production pass.	La foto arriva con il passaggio in produzione.	La foto llega con la puesta en producción.	Fotoja vjen me kalimin në prodhim.
+Food and drink from suppliers come by themselves from Inventory; add them there.	Cibo e bevande dai fornitori arrivano da soli da Magazzino; aggiungili lì.	La comida y bebida de proveedores llegan solas desde Inventario; agrégalas allí.	Ushqimi dhe pijet nga furnitorët vijnë vetë nga Stoku; shtoji atje.
+Month before	Mese prima	Mes anterior	Muaji para
+Month after	Mese dopo	Mes siguiente	Muaji pas
+in {} days	tra {} giorni	en {} días	pas {} ditësh
+{} days ago	{} giorni fa	hace {} días	{} ditë më parë
+Finance and taxes	Finanza e tasse	Finanzas e impuestos	Financat dhe taksat
+VAT every month	IVA ogni mese	IVA cada mes	TVSH çdo muaj
+VAT every quarter	IVA ogni trimestre	IVA cada trimestre	TVSH çdo tremujor
+On sales less on purchases	Sulle vendite meno sugli acquisti	En ventas menos en compras	Mbi shitjet minus mbi blerjet
+Payroll taxes	Tasse sulle paghe	Impuestos de nómina	Taksat mbi pagat
+{} people · by the {}th	{} persone · entro il {}	{} personas · hasta el {}	{} persona · deri më {}
+Profit tax this year	Imposta sul reddito quest'anno	Impuesto sobre la renta este año	Tatimi mbi fitimin këtë vit
+Small business: 0%	Piccola impresa: 0%	Pequeña empresa: 0%	Biznes i vogël: 0%
+So far, at {}	Finora, al {}	Hasta ahora, al {}	Deri tani, me {}
+Keep aside	Da mettere da parte	Apartar	Lër mënjanë
+{}% of this month's sales	{}% delle vendite di questo mese	{}% de las ventas de este mes	{}% e shitjeve të këtij muaji
+The app works it out	L'app fa i conti	La app hace las cuentas	Aplikacioni i llogarit
+From your sales, purchases and wages	Dalle vendite, dagli acquisti e dagli stipendi	De tus ventas, compras y salarios	Nga shitjet, blerjet dhe pagat
+You check the list	Controlli la lista	Revisas la lista	Ti kontrollon listën
+What it found missing or odd	Cosa manca o non torna	Lo que falta o no cuadra	Çfarë mungon ose nuk shkon
+You file the return	Presenti la dichiarazione	Presentas la declaración	Ti dorëzon deklaratën
+The numbers to type in, ready	I numeri da inserire, pronti	Los números para ingresar, listos	Shifrat për t'u futur, gati
+You pay and mark it	Paghi e lo segni	Pagas y lo marcas	Ti paguan dhe e shënon
+Reminded before every deadline	Promemoria prima di ogni scadenza	Aviso antes de cada vencimiento	Kujtesë para çdo afati
+NEXT TO PAY	PROSSIMO DA PAGARE	PRÓXIMO PAGO	PAGESA E RADHËS
+By {}	Da {}	Por {}	Nga {}
+Everything due in {}	Tutto in scadenza a {}	Todo lo que vence en {}	Gjithçka që skadon në {}
+Together	In tutto	En total	Gjithsej
+See the return	Vedi la dichiarazione	Ver la declaración	Shiko deklaratën
+All deadlines	Tutte le scadenze	Todos los vencimientos	Të gjitha afatet
+Coming up	In arrivo	Próximamente	Në vijim
+Nothing to file or pay right now.	Niente da presentare o pagare ora.	Nada que presentar o pagar ahora.	Asgjë për t'u dorëzuar ose paguar tani.
+Return only	Solo dichiarazione	Solo declaración	Vetëm deklaratë
+All good: nothing missing this month.	Tutto a posto: non manca nulla questo mese.	Todo bien: no falta nada este mes.	Gjithçka në rregull: nuk mungon asgjë këtë muaj.
+Fix	Sistema	Corregir	Rregullo
+How {} adds up	Come torna {}	Cómo cuadra {}	Si del {}
+VAT on sales	IVA sulle vendite	IVA en ventas	TVSH-ja e shitjeve
+Collected for the state, at {}	Incassata per lo Stato, al {}	Cobrado para el Estado, al {}	E mbledhur për shtetin, me {}
+Paid to suppliers, taken back	Pagata ai fornitori, detratta	Pagado a proveedores, recuperado	E paguar furnitorëve, e zbritur
+Wages	Paghe	Salarios por hora	Pagat
+Contributions and income tax	Contributi e imposte sui redditi	Aportes e impuesto sobre la renta	Kontributet dhe tatimi mbi të ardhurat
+To the tax office	Al fisco	A la oficina de impuestos	Te tatimet
+Profit before tax	Utile prima delle imposte	Ganancia antes de impuestos	Fitimi para tatimit
+Sales less costs, wages and contributions	Vendite meno costi, stipendi e contributi	Ventas menos costos, salarios y aportes	Shitjet minus kostot, pagat dhe kontributet
+The month is still running: these grow until its last day.	Il mese è in corso: questi crescono fino all'ultimo giorno.	El mes sigue en curso: estos crecen hasta el último día.	Muaji vazhdon: këto rriten deri në ditën e fundit.
+Taxes month by month	Tasse mese per mese	Impuestos mes a mes	Taksat muaj pas muaji
+VAT and payroll	IVA e paghe	IVA y nómina	TVSH dhe paga
+{}'s own records. Taxes are filed and paid once, for the whole restaurant: pick All branches to see them together.	I registri di {}. Le tasse si presentano e si pagano una volta, per tutto il ristorante: scegli Tutte le sedi per vederle insieme.	Los registros de {}. Los impuestos se presentan y pagan una vez, para todo el restaurante: elige Todas las sucursales para verlos juntos.	Regjistrat e {}. Taksat dorëzohen dhe paguhen një herë, për gjithë restorantin: zgjidh Të gjitha pikat për t'i parë bashkë.
+Every branch in {}	Tutte le sedi a {}	Todas las sucursales en {}	Të gjitha pikat në {}
+Together they make the figures below	Insieme fanno i numeri qui sotto	Juntas forman las cifras de abajo	Bashkë bëjnë shifrat më poshtë
+{} · list and payment by {}	{} · lista e pagamento entro il {}	{} · nómina y pago hasta el {}	{} · lista dhe pagesa deri më {}
+{} people, before anything is taken	{} persone, al lordo	{} personas, antes de descuentos	{} persona, bruto
+Held back from wages	Trattenute sugli stipendi	Retenido de los salarios	E mbajtur nga pagat
+Their contributions and income tax	I loro contributi e le imposte	Sus aportes e impuesto sobre la renta	Kontributet e tyre dhe tatimi
+Paid by the restaurant	Pagato dal ristorante	Pagado por el restaurante	E paguar nga restoranti
+Contributions on top of wages	Contributi oltre agli stipendi	Aportes además de los salarios	Kontribute mbi pagat
+Marked as filed. Pay it by {}.	Segnata come presentata. Pagala entro il {}.	Marcada como presentada. Págala hasta el {}.	U shënua si e dorëzuar. Paguaje deri më {}.
+Add it in Admin Hub → Users; the payroll list can't be sent without it	Aggiungilo in Admin Hub → Utenti; senza, la lista paghe non si può inviare	Agrégalo en Admin Hub → Usuarios; sin él no se puede enviar la nómina	Shtoje te Admin Hub → Përdoruesit; pa të listëpagesa nuk dërgohet
+Personal numbers are added in Admin Hub → Users (production pass).	I codici personali si aggiungono in Admin Hub → Utenti (passaggio in produzione).	Los números personales se agregan en Admin Hub → Usuarios (puesta en producción).	Numrat personalë shtohen te Admin Hub → Përdoruesit (kalimi në prodhim).
+Each person	Ogni persona	Cada persona	Çdo person
+Wages come from Salary	Gli stipendi arrivano da Stipendi	Los salarios vienen de Salario	Pagat vijnë nga Rroga
+How it's worked out	Come si calcola	Cómo se calcula	Si llogaritet
+Change in Tax setup	Cambia in Regole fiscali	Cambiar en Configuración fiscal	Ndrysho te Rregullat tatimore
+Their contributions	I loro contributi	Sus aportes	Kontributet e tyre
+Social {} and health {} of the wage	Previdenza {} e sanità {} dello stipendio	Seguridad social {} y salud {} del salario	Shoqërore {} dhe shëndetësore {} e pagës
+The restaurant's contributions	I contributi del ristorante	Los aportes del restaurante	Kontributet e restorantit
+Social {} and health {} on top	Previdenza {} e sanità {} in più	Seguridad social {} y salud {} adicionales	Shoqërore {} dhe shëndetësore {} sipër
+Income tax	Imposta sui redditi	Impuesto sobre la renta	Tatimi mbi të ardhurat
+Nothing up to {} a month, {} up to {}, {} above	Niente fino a {} al mese, {} fino a {}, {} oltre	Nada hasta {} al mes, {} hasta {}, {} por encima	Asgjë deri në {} në muaj, {} deri në {}, {} mbi të
+Person	Persona	Persona	Personi
+Wage	Paga	Pago por hora	Paga
+Paid to them	Pagato a loro	Pagado a ellos	E paguar atyre
+Restaurant pays	Paga il ristorante	Paga el restaurante	Paguan restoranti
+No personal number	Senza codice personale	Sin número personal	Pa numër personal
+Held back	Trattenuto	Retenido	E mbajtur
+Italy	Italia	Italia	Itali
+Spain	Spagna	España	Spanjë
+United Kingdom	Regno Unito	Reino Unido	Mbretëria e Bashkuar
+United States	Stati Uniti	Estados Unidos	Shtetet e Bashkuara
+Dominican Republic	Repubblica Dominicana	República Dominicana	Republika Dominikane
+The rules every amount here comes from	Le regole da cui vengono tutti gli importi	Las reglas de donde salen todos los montos	Rregullat nga vijnë të gjitha shumat
+These rules decide every amount in Finance	Queste regole decidono ogni importo in Finanza	Estas reglas deciden cada monto en Finanzas	Këto rregulla vendosin çdo shumë te Financat
+The ones filled in are Albania's as the app knows them. Check them once with the tax office or an accountant; they rarely change.	Quelle inserite sono dell'Albania, come le conosce l'app. Controllale una volta con il fisco o un commercialista; cambiano di rado.	Las que ya están son las de Albania, como la app las conoce. Revísalas una vez con la oficina de impuestos o un contador; cambian poco.	Ato të plotësuara janë të Shqipërisë, siç i njeh aplikacioni. Kontrolloji një herë me tatimet ose një kontabilist; ndryshojnë rrallë.
+Tax setup saved	Regole fiscali salvate	Configuración fiscal guardada	Rregullat tatimore u ruajtën
+You changed the tax rules	Hai modificato le regole fiscali	Cambiaste las reglas fiscales	Ndryshove rregullat tatimore
+Where you pay taxes	Dove paghi le tasse	Dónde pagas impuestos	Ku paguan taksat
+The country decides the rules below.	Il paese decide le regole qui sotto.	El país decide las reglas de abajo.	Shteti vendos rregullat më poshtë.
+Country	Paese	País	Shteti
+Ready-made rules for {} aren't in the app yet: check every rate below yourself.	Le regole pronte per {} non sono ancora nell'app: controlla tu ogni aliquota qui sotto.	Las reglas listas para {} aún no están en la app: revisa tú cada tasa de abajo.	Rregullat e gatshme për {} ende nuk janë në aplikacion: kontrollo vetë çdo normë më poshtë.
+Registered for VAT	Registrato ai fini IVA	Registrado para el IVA	I regjistruar për TVSH
+Off for a small business under the VAT limit: no VAT on sales, none taken back.	Spento per una piccola impresa sotto la soglia IVA: niente IVA sulle vendite né detrazioni.	Apagado para una pequeña empresa bajo el límite del IVA: sin IVA en ventas ni recuperación.	Fikur për një biznes të vogël nën kufirin e TVSH-së: pa TVSH në shitje, pa zbritje.
+VAT return every	Dichiarazione IVA ogni	Declaración de IVA cada	Deklarata e TVSH-së çdo
+Month	Mese	Mes	Muaji
+Quarter	Trimestre	Trimestre	Tremujor
+The tax number (NIPT) is under Tax numbers.	Il codice fiscale (NIPT) è in Codici fiscali.	El número fiscal (NIPT) está en Números fiscales.	Numri i taksave (NIPT) është te Numrat tatimorë.
+Tax numbers	Numeri fiscali	Números fiscales	Numrat tatimorë
+Printed on receipts and invoices.	Stampati su scontrini e fatture.	Impresos en recibos y facturas.	Printohen në fatura.
+Add tax details	Aggiungi dati fiscali	Añadir datos fiscales	Shto të dhënat tatimore
+Set by the Super Admin	Impostato dal Super Admin	Lo define el Super Admin	Vendoset nga Super Admin
+No tax numbers yet.	Ancora nessun numero fiscale.	Aún no hay números fiscales.	Ende pa numra tatimorë.
+Tax no. {}	Cod. fiscale {}	N.º fiscal {}	Nr. tatimor {}
+Fiscal code {}	Codice fiscale {}	Código fiscal {}	Kodi fiskal {}
+On receipts	Sugli scontrini	En los recibos	Në fatura
+Company addresses	Indirizzi dell'azienda	Direcciones de la empresa	Adresat e kompanisë
+Where the company is registered, billed and run from. Printed on invoices.	Dove l'azienda è registrata, fatturata e gestita. Stampati sulle fatture.	Dónde está registrada la empresa, a dónde se factura y desde dónde se dirige. Se imprimen en las facturas.	Ku është e regjistruar kompania, ku faturohet dhe nga drejtohet. Shtypen në fatura.
+Add address	Aggiungi indirizzo	Añadir dirección	Shto adresë
+No address yet. Receipts print the branch's address.	Ancora nessun indirizzo. Gli scontrini stampano l'indirizzo della sede.	Aún no hay dirección. Los recibos imprimen la dirección de la sucursal.	Ende pa adresë. Faturat shtypin adresën e degës.
+Main	Principale	Principal	Kryesore
+VAT rates	Aliquote IVA	Tasas de IVA	Normat e TVSH-së
+What's added to the price of what you sell.	Cosa si aggiunge al prezzo di ciò che vendi.	Lo que se suma al precio de lo que vendes.	Çfarë i shtohet çmimit të asaj që shet.
+Standard rate	Aliquota ordinaria	Tasa general	Norma standarde
+Reduced rate	Aliquota ridotta	Tasa reducida	Norma e reduktuar
+Every dish counts at the standard rate unless its menu section says otherwise (Menu → a section → VAT).	Ogni piatto conta all'aliquota ordinaria salvo diversa indicazione della sezione (Menù → una sezione → IVA).	Cada plato cuenta a la tasa general salvo que su sección diga otra cosa (Menú → una sección → IVA).	Çdo pjatë llogaritet me normën standarde, përveç kur seksioni i saj thotë ndryshe (Menu → një seksion → TVSH).
+Due days and reminders	Scadenze e promemoria	Vencimientos y avisos	Afatet dhe kujtesat
+By which day of the next month each is filed and paid.	Entro quale giorno del mese dopo si presenta e si paga ciascuna.	Hasta qué día del mes siguiente se presenta y paga cada una.	Deri në cilën ditë të muajit pasardhës dorëzohet dhe paguhet secila.
+VAT by the	IVA entro il	IVA hasta el	TVSH deri më
+Payroll by the	Paghe entro il	Nómina hasta el	Pagat deri më
+Remind me	Ricordamelo	Avísame	Më kujto
+days before	giorni prima	días antes	ditë përpara
+Contributions and income tax on what people earn.	Contributi e imposte su quanto guadagnano le persone.	Aportes e impuesto sobre lo que gana cada persona.	Kontributet dhe tatimi mbi atë që fitojnë njerëzit.
+Held back from the wage	Trattenuto dallo stipendio	Retenido del salario	E mbajtur nga paga
+Social	Previdenza	Seguridad social	Shoqërore
+Health	Sanità	Salud	Shëndetësore
+Paid by the restaurant on top	Pagato dal ristorante in più	Pagado por el restaurante además	E paguar nga restoranti sipër
+Income tax a month	Imposta sui redditi al mese	Impuesto sobre la renta al mes	Tatimi mbi të ardhurat në muaj
+Nothing up to	Niente fino a	Nada hasta	Asgjë deri në
+Middle rate up to	Aliquota media fino a	Tasa media hasta	Norma e mesme deri në
+Middle rate	Aliquota media	Tasa media	Norma e mesme
+Top rate	Aliquota massima	Tasa máxima	Norma më e lartë
+Profit tax	Imposta sul reddito	Impuesto sobre la renta	Tatimi mbi fitimin
+On what's left after costs, once a year, with advances.	Su ciò che resta dopo i costi, una volta l'anno, con acconti.	Sobre lo que queda después de los costos, una vez al año, con anticipos.	Mbi atë që mbetet pas kostove, një herë në vit, me paradhënie.
+Rate	Aliquota	Tasa	Norma
+Small business	Piccola impresa	Pequeña empresa	Biznes i vogël
+Under the small business limit no profit tax is paid.	Sotto la soglia della piccola impresa non si paga imposta sul reddito.	Bajo el límite de pequeña empresa no se paga impuesto sobre la renta.	Nën kufirin e biznesit të vogël nuk paguhet tatim mbi fitimin.
+Keep aside and your accountant	Da mettere da parte e il tuo commercialista	Apartar y tu contador	Lër mënjanë dhe kontabilisti yt
+So the money is there when the taxes are due.	Così i soldi ci sono quando scadono le tasse.	Así el dinero está cuando vencen los impuestos.	Që paratë të jenë kur skadojnë taksat.
+Accountant's email	Email del commercialista	Email del contador	Emaili i kontabilistit
+accountant@studio.al	accountant@studio.al	accountant@studio.al	accountant@studio.al
+If you have one: the returns and books can be sent to them.	Se ne hai uno: dichiarazioni e registri si possono inviare a lui.	Si tienes uno: las declaraciones y los libros se le pueden enviar.	Nëse ke një: deklaratat dhe librat mund t'i dërgohen.
+0 to 100	Da 0 a 100	De 0 a 100	Nga 0 në 100
+{} to {}	Da {} a {}	De {} a {}	Nga {} në {}
+{} · return and payment by {}	{} · dichiarazione e pagamento entro il {}	{} · declaración y pago hasta el {}	{} · deklarata dhe pagesa deri më {}
+Download	Scarica	Descargar	Shkarko
+The VAT books are ready to download once the app is connected (production pass).	I registri IVA si potranno scaricare quando l'app sarà collegata (passaggio in produzione).	Los libros de IVA se podrán descargar cuando la app esté conectada (puesta en producción).	Librat e TVSH-së shkarkohen kur aplikacioni të lidhet (kalimi në prodhim).
+On {} of sales	Su {} di vendite	Sobre {} de ventas	Mbi {} shitje
+{} invoices with VAT	{} fatture con IVA	{} facturas con IVA	{} fatura me TVSH
+So far this month	Finora questo mese	Hasta ahora este mes	Deri tani këtë muaj
+Due {} · {}	Scade il {} · {}	Vence el {} · {}	Skadon më {} · {}
+The month is over: this return can be filed	Il mese è finito: questa dichiarazione si può presentare	El mes terminó: esta declaración se puede presentar	Muaji mbaroi: kjo deklaratë mund të dorëzohet
+Filed. Now it's to pay	Presentata. Ora va pagata	Presentada. Ahora hay que pagarla	E dorëzuar. Tani duhet paguar
+Type the numbers from Tax returns into e-Filing, then mark it here.	Inserisci i numeri di Dichiarazioni in e-Filing, poi segnalo qui.	Ingresa los números de Declaraciones en e-Filing y márcalo aquí.	Fut shifrat nga Deklaratat në e-Filing, pastaj shënoje këtu.
+Mark it once the money left the bank.	Segnalo quando i soldi sono usciti dalla banca.	Márcalo cuando el dinero salga del banco.	Shënoje kur paratë të kenë dalë nga banka.
+VAT on sales by rate	IVA sulle vendite per aliquota	IVA en ventas por tasa	TVSH-ja e shitjeve sipas normës
+{} suppliers	{} fornitori	{} proveedores	{} furnitorë
+Without VAT	Senza IVA	Sin IVA	Pa TVSH
+No VAT number on one invoice	Senza partita IVA su una fattura	Sin número de IVA en una factura	Pa NIPT në një faturë
+1 invoice	1 fattura	1 factura	1 faturë
+{} invoices	{} fatture	{} facturas	{} fatura
+And {} more in the purchase book below	E altri {} nel registro acquisti qui sotto	Y {} más en el libro de compras abajo	Dhe {} të tjerë në librin e blerjeve më poshtë
+The books	I registri	Los libros	Librat
+Bills	Conti	Cuentas	Fatura
+Invoice	Fattura	Factura	Fatura
+Show fewer	Mostra meno	Mostrar menos	Shfaq më pak
+Show all {}	Mostra tutti ({})	Mostrar todos ({})	Shfaq të gjitha ({})
 The end can't be before the start	La fine non può essere prima dell'inizio	El final no puede ser antes del inicio	Fundi nuk mund të jetë para fillimit
 Choose at most {} days	Scegli al massimo {} giorni	Elige como máximo {} días	Zgjidh më së shumti {} ditë
 The start can't be in the future	L'inizio non può essere nel futuro	El inicio no puede estar en el futuro	Fillimi nuk mund të jetë në të ardhmen
@@ -2186,10 +2533,9 @@ The last day comes after the first	L'ultimo giorno viene dopo il primo	El últim
 Add when it opens and closes, or mark it closed	Aggiungi quando apre e chiude, oppure segnalo come chiuso	Agrega cuándo abre y cierra, o márcalo como cerrado	Shto kur hapet dhe mbyllet, ose shënoje të mbyllur
 Keep the note under {} characters	Tieni la nota sotto i {} caratteri	Mantén la nota por debajo de {} caracteres	Mbaje shënimin nën {} karaktere
 Opening hours saved	Orari di apertura salvato	Horario guardado	Orari i hapjes u ruajt
+Back to the usual hours	Tornato all'orario solito	De vuelta al horario habitual	U kthye te orari i zakonshëm
 Special day saved	Giorno speciale salvato	Día especial guardado	Dita e veçantë u ruajt
 Special day removed	Giorno speciale rimosso	Día especial eliminado	Dita e veçantë u hoq
-{} moved to {} {} at {}	{} spostata a {} {} alle {}	{} movida a {} {} a las {}	{} u zhvendos në {} {} në {}
-{} cancelled	{} annullate	{} canceladas	{} të anuluara
 Open until {}	Aperto fino alle {}	Abierto hasta las {}	Hapur deri në {}
 Closed again	Di nuovo chiuso	Cerrado de nuevo	U mbyll përsëri
 Monday	Lunedì	Lunes	E hënë
@@ -2202,23 +2548,14 @@ Sunday	Domenica	Domingo	E diel
 All handled	Tutto sistemato	Todo resuelto	Të gjitha u trajtuan
 A booking falls when the branch is closed	Una prenotazione cade quando la sede è chiusa	Una reserva cae cuando la sucursal está cerrada	Një rezervim bie kur dega është e mbyllur
 {} bookings fall when the branch is closed	{} prenotazioni cadono quando la sede è chiusa	{} reservas caen cuando la sucursal está cerrada	{} rezervime bien kur dega është e mbyllur
-The hours are saved. Call the guests first, then move or cancel each one.	Gli orari sono salvati. Chiama prima gli ospiti, poi sposta o annulla ognuna.	Los horarios están guardados. Llama primero a los clientes y luego mueve o cancela cada una.	Oraret u ruajtën. Telefono fillimisht mysafirët, pastaj zhvendos ose anulo secilin.
+The hours are saved. Handle them in Reservations: call the guests, then change the time or cancel.	Gli orari sono salvati. Gestiscile in Prenotazioni: chiama gli ospiti, poi cambia l'orario o annulla.	El horario está guardado. Gestiónalas en Reservas: llama a los comensales y luego cambia la hora o cancela.	Orari u ruajt. Trajtoji te Rezervimet: telefono mysafirët, pastaj ndrysho orën ose anulo.
+Go to Reservations	Vai a Prenotazioni	Ir a Reservas	Shko te Rezervimet
 Every booking is at an open time now.	Ogni prenotazione ora è in un orario di apertura.	Ahora todas las reservas están en horario abierto.	Çdo rezervim tani është në një orë kur është hapur.
-Ask someone who manages bookings to move or cancel them.	Chiedi a chi gestisce le prenotazioni di spostarle o annullarle.	Pide a quien gestiona las reservas que las mueva o cancele.	Kërkoji dikujt që menaxhon rezervimet t'i zhvendosë ose t'i anulojë.
-Change time	Cambia orario	Cambiar hora	Ndrysho orën
+Ask someone who handles bookings to move or cancel them.	Chiedi a chi gestisce le prenotazioni di spostarle o annullarle.	Pide a quien gestiona las reservas que las mueva o las cancele.	Kërkoji dikujt që merret me rezervimet t'i zhvendosë ose t'i anulojë.
 Guest	Ospite	Cliente	Mysafir
 1 guest	1 ospite	1 comensal	1 mysafir
 {} guests	{} ospiti	{} comensales	{} mysafirë
 Request	Richiesta	Solicitud	Kërkesë
-{} · now {}	{} · ora {}	{} · ahora {}	{} · tani {}
-Pick a time	Scegli un orario	Elige una hora	Zgjidh një orë
-Move to {}	Sposta in {}	Mover a {}	Zhvendos te {}
-Loading the open times…	Caricamento degli orari di apertura…	Cargando los horarios abiertos…	Po ngarkohen oraret e hapura…
-Closed that day, or no time left. Pick another day.	Chiuso quel giorno, o nessun orario rimasto. Scegli un altro giorno.	Cerrado ese día o sin horas libres. Elige otro día.	E mbyllur atë ditë, ose s'ka më orë. Zgjidh një ditë tjetër.
-Branch closed then	Sede chiusa a quell'ora	Sucursal cerrada a esa hora	Dega e mbyllur atëherë
-Cancel this booking?	Annullare questa prenotazione?	¿Cancelar esta reserva?	Ta anulosh këtë rezervim?
-Cancel booking	Annulla prenotazione	Cancelar reserva	Anulo rezervimin
-Why	Perché	Por qué	Pse
 Open outside the hours until {}	Aperto fuori orario fino alle {}	Abierto fuera de horario hasta las {}	Hapur jashtë orarit deri në {}
 Opened for now. Seating and new orders work until then.	Aperto per ora. Accomodare ospiti e nuovi ordini funzionano fino ad allora.	Abierto por ahora. Sentar comensales y nuevos pedidos funcionan hasta entonces.	Hapur për tani. Uljet dhe porositë e reja funksionojnë deri atëherë.
 Close again	Chiudi di nuovo	Cerrar de nuevo	Mbyll përsëri
@@ -2241,9 +2578,6 @@ Until {}	Fino alle {}	Hasta las {}	Deri në {}
 Opens at {}	Apre alle {}	Abre a las {}	Hapet në {}
 Opens tomorrow at {}	Apre domani alle {}	Abre mañana a las {}	Hapet nesër në {}
 Opens {} at {}	Apre {} alle {}	Abre el {} a las {}	Hapet {} në {}
-The week	La settimana	La semana	Java
-When guests can book and the POS seats guests and starts orders. A closing at or before the opening is the next day (19:00–01:00).	Quando gli ospiti possono prenotare e il POS accomoda ospiti e apre ordini. Una chiusura uguale o prima dell'apertura è il giorno dopo (19:00–01:00).	Cuándo los comensales pueden reservar y el POS sienta comensales y abre pedidos. Un cierre a la hora de apertura o antes es el día siguiente (19:00–01:00).	Kur mysafirët mund të rezervojnë dhe POS-i ul mysafirë e hap porosi. Një mbyllje në orën e hapjes ose para saj është ditën tjetër (19:00–01:00).
-Times in {}	Orari in {}	Horas en {}	Oraret në {}
 Closed all day	Chiuso tutto il giorno	Cerrado todo el día	Mbyllur gjithë ditën
 Add opening	Aggiungi apertura	Agregar apertura	Shto hapje
 next day	giorno dopo	día siguiente	ditën tjetër
@@ -2252,16 +2586,32 @@ Copy {}'s hours	Copia l'orario di {}	Copiar el horario del {}	Kopjo orarin e {}
 Copy to every day	Copia su tutti i giorni	Copiar a todos los días	Kopjo në çdo ditë
 Copy to Monday – Friday	Copia da lunedì a venerdì	Copiar de lunes a viernes	Kopjo nga e hëna në të premte
 Copy to Saturday and Sunday	Copia su sabato e domenica	Copiar al sábado y domingo	Kopjo në të shtunë dhe të diel
-Special days	Giorni speciali	Días especiales	Ditë të veçanta
+Times in {}	Orari in {}	Horas en {}	Oraret në {}
+Click a day to close it or give it other hours. In its window you can pick several days.	Clicca un giorno per chiuderlo o dargli altri orari. Nella sua finestra puoi scegliere più giorni.	Haz clic en un día para cerrarlo o darle otro horario. En su ventana puedes elegir varios días.	Kliko një ditë për ta mbyllur ose për t'i dhënë orar tjetër. Në dritaren e saj mund të zgjedhësh disa ditë.
+Special day: closed	Giorno speciale: chiuso	Día especial: cerrado	Ditë e veçantë: mbyllur
+Special day: other hours	Giorno speciale: altri orari	Día especial: otro horario	Ditë e veçantë: orar tjetër
++{} more	+{} altri	+{} más	+{} të tjera
+Always open	Sempre aperto	Siempre abierto	Gjithmonë hapur
+Usual week	Settimana solita	Semana habitual	Java e zakonshme
+Every week, unless a special day says otherwise.	Ogni settimana, salvo un giorno speciale.	Cada semana, salvo que un día especial diga otra cosa.	Çdo javë, përveç kur një ditë e veçantë thotë ndryshe.
+Not set yet: until it is, the branch counts as always open.	Non ancora impostata: fino ad allora la sede conta come sempre aperta.	Aún sin definir: hasta entonces, la sucursal cuenta como siempre abierta.	Ende e pavendosur: deri atëherë dega llogaritet gjithmonë e hapur.
+Set the week	Imposta la settimana	Definir la semana	Vendos javën
+Special days coming up	Prossimi giorni speciali	Próximos días especiales	Ditët e veçanta që vijnë
 Holidays, a private event, a day you open late. They win over the week.	Festività, un evento privato, un giorno in cui apri tardi. Valgono più della settimana.	Feriados, un evento privado, un día en que abres tarde. Tienen prioridad sobre la semana.	Festa, një event privat, një ditë që hap vonë. Kanë përparësi ndaj javës.
-Add special day	Aggiungi giorno speciale	Agregar día especial	Shto ditë të veçantë
-No special days coming up.	Nessun giorno speciale in arrivo.	No hay días especiales próximos.	Asnjë ditë e veçantë së shpejti.
-Special days count once the week's hours are set.	I giorni speciali contano quando l'orario della settimana è impostato.	Los días especiales cuentan cuando el horario de la semana está configurado.	Ditët e veçanta vlejnë pasi të vendoset orari i javës.
-Change special day	Modifica giorno speciale	Editar día especial	Ndrysho ditën e veçantë
-A date or a few days in a row: closed, or other hours.	Una data o alcuni giorni di fila: chiuso, o un altro orario.	Una fecha o varios días seguidos: cerrado, u otro horario.	Një datë ose disa ditë rresht: mbyllur, ose orar tjetër.
-Which days	Quali giorni	Qué días	Cilat ditë
-Those days	Quei giorni	Esos días	Ato ditë
+None yet. Click a day on the calendar to add one.	Ancora nessuno. Clicca un giorno sul calendario per aggiungerne uno.	Aún ninguno. Haz clic en un día del calendario para agregar uno.	Ende asnjë. Kliko një ditë në kalendar për të shtuar një.
+None coming up.	Nessuno in arrivo.	No hay próximos.	Asnjë së shpejti.
+When guests can book and the POS seats guests and starts orders. A closing at or before the opening is the next day (19:00–01:00).	Quando gli ospiti possono prenotare e il POS accomoda ospiti e apre ordini. Una chiusura uguale o prima dell'apertura è il giorno dopo (19:00–01:00).	Cuándo los comensales pueden reservar y el POS sienta comensales y abre pedidos. Un cierre a la hora de apertura o antes es el día siguiente (19:00–01:00).	Kur mysafirët mund të rezervojnë dhe POS-i ul mysafirë e hap porosi. Një mbyllje në orën e hapjes ose para saj është ditën tjetër (19:00–01:00).
+Always open: the usual week isn't set yet	Sempre aperto: la settimana solita non è ancora impostata	Siempre abierto: la semana habitual aún no está definida	Gjithmonë hapur: java e zakonshme ende s'është vendosur
+As the usual week says	Come dice la settimana solita	Como dice la semana habitual	Siç thotë java e zakonshme
+{}: closed	{}: chiuso	{}: cerrado	{}: mbyllur
+How these days open. Pick more days on the calendar for a few in a row.	Come aprono questi giorni. Scegli altri giorni sul calendario per più giorni di fila.	Cómo abren estos días. Elige más días en el calendario para varios seguidos.	Si hapen këto ditë. Zgjidh më shumë ditë në kalendar për disa radhazi.
+A special day: change it, or put it back to the usual hours.	Un giorno speciale: cambialo o riportalo all'orario solito.	Un día especial: cámbialo o devuélvelo al horario habitual.	Një ditë e veçantë: ndryshoje ose ktheje te orari i zakonshëm.
+Back to usual hours	Torna all'orario solito	Volver al horario habitual	Kthe te orari i zakonshëm
+These days are	Questi giorni sono	Estos días están	Këto ditë janë
+Usual hours	Orario solito	Horario habitual	Orari i zakonshëm
+No bookings, and the POS doesn't seat guests or start orders.	Niente prenotazioni, e il POS non fa accomodare ospiti né apre ordini.	Sin reservas, y el POS no sienta comensales ni abre pedidos.	Pa rezervime, dhe POS-i nuk ul mysafirë as nis porosi.
 Other hours	Altro orario	Otro horario	Orar tjetër
+Open, but at other times.	Aperto, ma in altri orari.	Abierto, pero en otro horario.	Hapur, por në orë të tjera.
 Christmas Eve, a private event…	Vigilia di Natale, un evento privato…	Nochebuena, un evento privado…	Nata e Krishtlindjes, një event privat…
 Guests see it on the booking page.	Gli ospiti la vedono nella pagina di prenotazione.	Los comensales la ven en la página de reservas.	Mysafirët e shohin në faqen e rezervimit.
 Guests can be seated and orders started until then.	Fino ad allora si possono accomodare ospiti e aprire ordini.	Hasta entonces se puede sentar a comensales y abrir pedidos.	Deri atëherë mund të ulen mysafirë dhe të hapen porosi.
@@ -2481,7 +2831,6 @@ No notifications	Nessuna notifica	Sin notificaciones	Asnjë njoftim
 New reservations will show up here.	Le nuove prenotazioni compariranno qui.	Las nuevas reservas aparecerán aquí.	Rezervimet e reja do të shfaqen këtu.
 Dismiss notification	Chiudi notifica	Descartar notificación	Mbyll njoftimin
 Just now	Proprio ora	Justo ahora	Tani
-{} days ago	{} giorni fa	hace {} días	{} ditë më parë
 Notification	Notifica	Notificación	Njoftim
 This restaurant or branch is no longer open. Choose another branch or refresh the list.	Questo ristorante o sede non è più aperto. Scegli un'altra sede o aggiorna l'elenco.	Este restaurante o sucursal ya no está abierto. Elige otra sucursal o actualiza la lista.	Ky restorant ose pikë nuk është më e hapur. Zgjidh një pikë tjetër ose rifresko listën.
 {} has a new picture	{} ha una nuova immagine	{} tiene una nueva imagen	{} ka një foto të re
@@ -2498,8 +2847,6 @@ The Co-Super-Admin role isn't available. Refresh and try again.	Il ruolo Co-Supe
 {} can't sign in until you switch them on	{} non può accedere finché non lo attivi	{} no puede iniciar sesión hasta que lo actives	{} nuk mund të hyjë derisa ta aktivizosh
 {} was removed and can no longer sign in	{} è stato rimosso e non può più accedere	{} se eliminó y ya no puede iniciar sesión	{} u hoq dhe nuk mund të hyjë më
 Not available	Non disponibile	No disponible	Nuk është i disponueshëm
-^#([0-9a-fA-F]{3}){1,2}$	^#([0-9a-fA-F]{3}){1,2}$	^#([0-9a-fA-F]{3}){1,2}$	^#([0-9a-fA-F]{3}){1,2}$
-^[A-Za-z0-9._-]{3,50}$	^[A-Za-z0-9._-]{3,50}$	^[A-Za-z0-9._-]{3,50}$	^[A-Za-z0-9._-]{3,50}$
 Use digits, spaces and + ( ) - only (7 or more)	Usa solo cifre, spazi e + ( ) - (7 o più)	Usa solo dígitos, espacios y + ( ) - (7 o más)	Përdor vetëm shifra, hapësira dhe + ( ) - (7 ose më shumë)
 Use a colour like #4F7942	Usa un colore come #4F7942	Usa un color como #4F7942	Përdor një ngjyrë si #4F7942
 Enter a username	Inserisci un nome utente	Escribe un usuario	Shkruaj një emër përdoruesi
@@ -2569,6 +2916,44 @@ Payments and refunds	Pagamenti e rimborsi	Pagos y reembolsos	Pagesat dhe rimburs
 Bookings	Prenotazioni	Reservas	Rezervimet
 Statistics and fraud	Statistiche e frodi	Estadísticas y fraude	Statistika dhe mashtrimi
 Enter a valid website address without login details	Inserisci un indirizzo web valido senza dati di accesso	Escribe una dirección web válida sin datos de acceso	Shkruaj një adresë të vlefshme interneti pa të dhëna hyrjeje
+Dashes	Trattini	Guiones	Viza
+Dots	Puntini	Puntos	Pika
+Line	Riga	Línea	Rreshti
+Double	Doppia	Doble	E dyfishtë
+Stars	Stelle	Estrellas	Yje
+Equals	Uguali	Iguales	Barazime
+Website	Sito web	Sitio web	Faqja e internetit
+Instagram	Instagram	Instagram	Instagram
+Facebook	Facebook	Facebook	Facebook
+Google Maps	Google Maps	Google Maps	Google Maps
+Your own link	Il tuo link	Tu propio enlace	Lidhja jote
+Preliminary bill	Preconto	Precuenta	Parafaturë
+Fiscal invoice	Fattura fiscale	Factura fiscal	Faturë tatimore
+Consumer (E32)	Consumatore (E32)	Consumo (E32)	Konsumator (E32)
+FACTURA DE CONSUMO ELECTRÓNICA	FACTURA DE CONSUMO ELECTRÓNICA	FACTURA DE CONSUMO ELECTRÓNICA	FACTURA DE CONSUMO ELECTRÓNICA
+Tax credit (E31)	Credito fiscale (E31)	Crédito fiscal (E31)	Kredi tatimore (E31)
+FACTURA DE CRÉDITO FISCAL ELECTRÓNICA	FACTURA DE CRÉDITO FISCAL ELECTRÓNICA	FACTURA DE CRÉDITO FISCAL ELECTRÓNICA	FACTURA DE CRÉDITO FISCAL ELECTRÓNICA
+Text	Testo	Texto	Tekst
+QR code	Codice QR	Código QR	Kodi QR
+Space	Spazio	Espacio	Hapësirë
+Restaurant details	Dati del ristorante	Datos del restaurante	Të dhënat e restorantit
+Top text	Testo in alto	Texto de arriba	Teksti lart
+Order details	Dettagli ordini	Detalle de pedidos	Detajet e porosive
+Subtotal	Subtotale	Subtotal	Nëntotali
+Payment	Pagamento	Pago	Pagesa
+Bottom text	Testo in basso	Texto de abajo	Teksti poshtë
+Thank you	Grazie	Gracias	Faleminderit
+Not a fiscal receipt	Non è uno scontrino fiscale	No es un comprobante fiscal	Nuk është faturë tatimore
+Fiscal details (e-NCF)	Dati fiscali (e-NCF)	Datos fiscales (e-NCF)	Të dhëna tatimore (e-NCF)
+DGII QR code	Codice QR DGII	Código QR de la DGII	Kodi QR i DGII
+Left	Sinistra	Izquierda	Majtas
+Centre	Centro	Centro	Qendër
+Right	Destra	Derecha	Djathtas
+Your text	Il tuo testo	Tu texto	Teksti yt
+Scan me	Scansionami	Escanéame	Më skano
+Thank you, see you soon!	Grazie, a presto!	¡Gracias, hasta pronto!	Faleminderit, shihemi së shpejti!
+&RncComprador={}	&RncComprador={}	&RncComprador={}	&RncComprador={}
+&ENCF={}&FechaEmision={}&MontoTotal={}&FechaFirma={}&CodigoSeguridad={}	&ENCF={}&FechaEmision={}&MontoTotal={}&FechaFirma={}&CodigoSeguridad={}	&ENCF={}&FechaEmision={}&MontoTotal={}&FechaFirma={}&CodigoSeguridad={}	&ENCF={}&FechaEmision={}&MontoTotal={}&FechaFirma={}&CodigoSeguridad={}
 Restaurant session changed	Sessione del ristorante cambiata	La sesión del restaurante cambió	Seanca e restorantit ndryshoi
 You no longer have permission for this action.	Non hai più il permesso per questa azione.	Ya no tienes permiso para esta acción.	Nuk ke më leje për këtë veprim.
 Rejected	Rifiutato	Rechazado	Refuzuar
@@ -2577,18 +2962,21 @@ Newest first	Prima i più recenti	Más recientes primero	Më të rejat së pari
 the reason the applicant will see	il motivo che vedrà il richiedente	el motivo que verá el solicitante	arsyen që do të shohë aplikuesi
 {} is waiting again.	{} è di nuovo in attesa.	{} está otra vez en espera.	{} është sërish në pritje.
 {} was rejected. The applicant got an email with the reason.	{} è stato rifiutato. Il richiedente ha ricevuto un'email con il motivo.	{} fue rechazado. El solicitante recibió un correo con el motivo.	{} u refuzua. Aplikuesi mori një email me arsyen.
-Branches	Sedi	Sucursales	Pikat
 Opening hours	Orario di apertura	Horario	Orari i hapjes
-Address & contacts	Indirizzo e contatti	Dirección y contactos	Adresa dhe kontaktet
-Logo & receipts	Logo e scontrini	Logo y recibos	Logoja dhe faturat
-Legal & tax	Dati legali e fiscali	Legal e impuestos	Ligjore dhe tatimore
 Currency & time zone	Valuta e fuso orario	Moneda y zona horaria	Monedha dhe zona kohore
 the name	il nome	el nombre	emrin
 a code	un codice	un código	një kod
+Write instagram.com/yourname or @yourname	Scrivi instagram.com/iltuonome o @iltuonome	Escribe instagram.com/tunombre o @tunombre	Shkruaj instagram.com/emri_yt ose @emri_yt
+Write facebook.com/yourpage	Scrivi facebook.com/latuapagina	Escribe facebook.com/tupagina	Shkruaj facebook.com/faqja_jote
+Write tiktok.com/@yourname or @yourname	Scrivi tiktok.com/@iltuonome o @iltuonome	Escribe tiktok.com/@tunombre o @tunombre	Shkruaj tiktok.com/@emri_yt ose @emri_yt
+Write the WhatsApp number, e.g. +355 69 123 4567	Scrivi il numero WhatsApp, es. +355 69 123 4567	Escribe el número de WhatsApp, p. ej. +355 69 123 4567	Shkruaj numrin e WhatsApp, p.sh. +355 69 123 4567
+Paste the link from Google Maps (Share, then Copy link)	Incolla il link da Google Maps (Condividi, poi Copia link)	Pega el enlace de Google Maps (Compartir, luego Copiar enlace)	Ngjit lidhjen nga Google Maps (Ndaj, pastaj Kopjo lidhjen)
 a name	un nome	un nombre	një emër
 the street	la via	la calle	rrugën
 the city	la città	la ciudad	qytetin
 the country	il paese	el país	shtetin
+Write them as latitude, longitude, e.g. 41.32750, 19.81870	Scrivile come latitudine, longitudine, es. 41.32750, 19.81870	Escríbelas como latitud, longitud, p. ej. 41.32750, 19.81870	Shkruaji si gjerësi, gjatësi, p.sh. 41.32750, 19.81870
+Add the address first: the exact location is kept with it	Aggiungi prima l'indirizzo: la posizione esatta si salva con esso	Agrega primero la dirección: la ubicación exacta se guarda con ella	Shto fillimisht adresën: vendndodhja e saktë ruhet bashkë me të
 At most 50 characters	Al massimo 50 caratteri	Como máximo 50 caracteres	Deri në 50 shkronja
 Enter an email or a phone	Inserisci un'email o un telefono	Escribe un correo o un teléfono	Shkruaj një email ose telefon
 Enter a date and time with an offset, e.g. 2026-10-13T00:00:00+02:00	Inserisci data e ora con fuso, es. 2026-10-13T00:00:00+02:00	Escribe fecha y hora con desfase, p. ej. 2026-10-13T00:00:00+02:00	Shkruaj datën dhe orën me zhvendosje, p.sh. 2026-10-13T00:00:00+02:00
@@ -2598,6 +2986,8 @@ Enter at least the VAT or tax number	Inserisci almeno la partita IVA o il codice
 Choose who gets the restaurant	Scegli chi riceve il ristorante	Elige quién recibe el restaurante	Zgjidh kush e merr restorantin
 invite.{}	invite.{}	invite.{}	invite.{}
 Type the restaurant's name exactly as shown	Digita il nome del ristorante esattamente come mostrato	Escribe el nombre del restaurante tal como aparece	Shkruaj emrin e restorantit saktësisht siç shfaqet
+The picture was saved	L'immagine è stata salvata	La imagen se guardó	Fotografia u ruajt
+The picture was removed	L'immagine è stata rimossa	La imagen se quitó	Fotografia u hoq
 The details were saved	I dati sono stati salvati	Los datos se guardaron	Të dhënat u ruajtën
 The restaurant is open again	Il ristorante è di nuovo aperto	El restaurante vuelve a estar abierto	Restoranti është i hapur përsëri
 The restaurant is {}. Its staff are signed out.	Il ristorante è {}. Il personale è stato disconnesso.	El restaurante está {}. Se cerró la sesión de su personal.	Restoranti është {}. Stafi i tij u nxor jashtë.
@@ -2611,19 +3001,17 @@ A new invitation is on its way to the owner	Un nuovo invito sta arrivando al tit
 {} owns {} now.	{} ora è titolare di {}.	{} es ahora propietario de {}.	{} tani zotëron {}.
 This branch was removed. Cancel this edit and refresh the list.	Questa sede è stata rimossa. Annulla questa modifica e aggiorna l'elenco.	Esta sucursal se eliminó. Cancela esta edición y actualiza la lista.	Kjo pikë u hoq. Anulo këtë ndryshim dhe rifresko listën.
 The address was saved	L'indirizzo è stato salvato	La dirección se guardó	Adresa u ruajt
-Logo and receipt texts were saved	Logo e testi dello scontrino sono stati salvati	Se guardaron el logo y los textos del recibo	Logoja dhe tekstet e faturës u ruajtën
+The receipt was saved	Lo scontrino è stato salvato	El recibo se guardó	Fatura u ruajt
 The logo was saved	Il logo è stato salvato	El logo se guardó	Logoja u ruajt
 The logo was removed	Il logo è stato rimosso	Se quitó el logo	Logoja u hoq
 The tax details were saved	I dati fiscali sono stati salvati	Se guardaron los datos fiscales	Të dhënat tatimore u ruajtën
 Choose the new currency	Scegli la nuova valuta	Elige la nueva moneda	Zgjidh monedhën e re
 Enter how much 1 {} is in {} (e.g. 100.5)	Inserisci quanto vale 1 {} in {} (es. 100.5)	Escribe cuánto es 1 {} en {} (p. ej. 100.5)	Shkruaj sa është 1 {} në {} (p.sh. 100.5)
-^-?\\d{1,13}(\\.\\d{1,4})?$	^-?\\d{1,13}(\\.\\d{1,4})?$	^-?\\d{1,13}(\\.\\d{1,4})?$	^-?\\d{1,13}(\\.\\d{1,4})?$
 {}: "{}" isn't an amount	{}: "{}" non è un importo	{}: "{}" no es un importe	{}: "{}" nuk është shumë
 The restaurant now uses {}. {} amounts were converted; past sales keep {}.	Il ristorante ora usa {}. {} importi sono stati convertiti; le vendite passate restano in {}.	El restaurante ahora usa {}. Se convirtieron {} importes; las ventas anteriores siguen en {}.	Restoranti tani përdor {}. {} shuma u konvertuan; shitjet e kaluara mbeten në {}.
 Tick that you read what moves	Spunta di aver letto cosa cambia	Marca que leíste lo que cambia	Shëno që e lexove çfarë ndryshon
 The restaurant now runs on {} time	Il ristorante ora segue l'ora di {}	El restaurante ahora usa la hora de {}	Restoranti tani punon me orën e {}
 Closed or suspended	Chiuso o sospeso	Cerrado o suspendido	I mbyllur ose i pezulluar
-Main	Principale	Principal	Kryesore
 owner.{}	owner.{}	owner.{}	owner.{}
 {} was created, but its picture couldn't be saved. Add it from its card.	{} è stato creato, ma l'immagine non è stata salvata. Aggiungila dalla sua scheda.	{} se creó, pero no se pudo guardar su imagen. Añádela desde su tarjeta.	{} u krijua, por fotoja nuk u ruajt dot. Shtoje nga karta e tij.
 The owner's details were saved	I dati del titolare sono stati salvati	Se guardaron los datos del propietario	Të dhënat e pronarit u ruajtën
@@ -2654,7 +3042,6 @@ Printed on this branch's receipts	Stampato sugli scontrini di questa sede	Se imp
 Street	Via	Calle	Rruga
 Postal code	CAP	Código postal	Kodi postar
 City	Città	Ciudad	Qyteti
-Country	Paese	País	Shteti
 Its branches	Le sue sedi	Sus sucursales	Degët e tij
 1 open	1 aperta	1 abierta	1 e hapur
 Choose the branch you work in	Scegli la sede in cui lavori	Elige la sucursal en la que trabajas	Zgjidh degën ku punon
@@ -2675,10 +3062,56 @@ Show more branches	Mostra altre sedi	Mostrar más sucursales	Shfaq më shumë pi
 Add branch	Aggiungi sede	Añadir sucursal	Shto pikë
 Add a branch to {}	Aggiungi una sede a {}	Añadir una sucursal a {}	Shto një pikë te {}
 Back to the restaurants	Torna ai ristoranti	Volver a los restaurantes	Kthehu te restorantet
+WELCOME, {}	BENVENUTO, {}	BIENVENIDO, {}	MIRË SE ERDHE, {}
 YOU'RE INSIDE THIS RESTAURANT	SEI DENTRO QUESTO RISTORANTE	ESTÁS DENTRO DE ESTE RESTAURANTE	JE BRENDA KËTIJ RESTORANTI
 {} staff	{} persone	{} personas	{} punonjës
 Work here	Lavora qui	Trabajar aquí	Puno këtu
 Unavailable	Non disponibile	No disponible	E padisponueshme
+{} of {} open	{} di {} aperte	{} de {} abiertas	{} nga {} të hapura
+Each branch keeps its own address, phone, email and opening hours. Open one to see or change them.	Ogni sede ha il suo indirizzo, telefono, email e orari di apertura. Aprine una per vederli o modificarli.	Cada sucursal tiene su propia dirección, teléfono, email y horario. Abre una para verlos o cambiarlos.	Çdo pikë ka adresën, telefonin, emailin dhe orarin e vet. Hape një për t'i parë ose ndryshuar.
+Open a branch to change its opening hours.	Apri una sede per modificare i suoi orari di apertura.	Abre una sucursal para cambiar su horario.	Hap një pikë për të ndryshuar orarin e saj.
+Add the first branch so the POS, kitchen and bookings can be used.	Aggiungi la prima sede per poter usare POS, cucina e prenotazioni.	Añade la primera sucursal para poder usar el POS, la cocina y las reservas.	Shto pikën e parë që të përdoren POS, kuzhina dhe rezervimet.
+The Super Admin adds the restaurant's branches.	Le sedi del ristorante le aggiunge il Super Admin.	El Super Admin agrega las sucursales del restaurante.	Pikat e restorantit i shton Super Admini.
+Opening hours not set	Orari non impostato	Horario sin definir	Orari nuk është vendosur
+Open outside the hours · until {}	Aperto fuori orario · fino alle {}	Abierto fuera de horario · hasta las {}	Hapur jashtë orarit · deri në {}
+Open now · until {}	Aperto ora · fino alle {}	Abierto ahora · hasta las {}	Hapur tani · deri në {}
+You're here	Sei qui	Estás aquí	Je këtu
+The restaurant's phone	Il telefono del ristorante	El teléfono del restaurante	Telefoni i restorantit
+The restaurant's email	L'email del ristorante	El email del restaurante	Emaili i restorantit
+Manage	Gestisci	Gestionar	Menaxho
+Back to the branches	Torna alle sedi	Volver a las sucursales	Kthehu te pikat
+Close for now	Chiudi per ora	Cerrar por ahora	Mbyll për tani
+Open or closed	Aperto o chiuso	Abierto o cerrado	I hapur ose i mbyllur
+Closing keeps its staff, devices and past sales.	Chiudendola restano il personale, i dispositivi e le vendite passate.	Al cerrarla se conservan el personal, los dispositivos y las ventas pasadas.	Kur mbyllet, mbeten stafi, pajisjet dhe shitjet e kaluara.
+Remove the branch	Rimuovi la sede	Quitar la sucursal	Hiq pikën
+Only when nothing uses it any more: no open orders, bookings to come, people clocked in, staff or devices. Its sales are kept.	Solo quando nulla la usa più: niente ordini aperti, prenotazioni future, persone in turno, personale o dispositivi. Le sue vendite restano.	Solo cuando ya nada la usa: sin pedidos abiertos, reservas por venir, personas en turno, personal ni dispositivos. Sus ventas se conservan.	Vetëm kur nuk e përdor më asgjë: pa porosi të hapura, rezervime që vijnë, njerëz në turn, staf apo pajisje. Shitjet e saj ruhen.
+Remove branch	Rimuovi sede	Eliminar sucursal	Hiq pikën
+The branch	La sede	La sucursal	Pika
+Its name on receipts and the booking page, and a few words about it.	Il suo nome sugli scontrini e sulla pagina di prenotazione, e due parole su di lei.	Su nombre en los recibos y en la página de reservas, y unas palabras sobre ella.	Emri i saj në fatura dhe në faqen e rezervimeve, dhe pak fjalë për të.
+Name and code: set by the Super Admin	Nome e codice: li imposta il Super Admin	Nombre y código: los define el Super Admin	Emri dhe kodi: i vendos Super Admini
+A short name the system uses, e.g. MAIN	Un nome breve che usa il sistema, es. MAIN	Un nombre corto que usa el sistema, p. ej. MAIN	Një emër i shkurtër që përdor sistemi, p.sh. MAIN
+By the sea, with a terrace for the summer.	Sul mare, con una terrazza per l'estate.	Junto al mar, con una terraza para el verano.	Buzë detit, me një tarracë për verën.
+How guests reach this branch	Come gli ospiti contattano questa sede	Cómo contactan los clientes a esta sucursal	Si e kontaktojnë mysafirët këtë pikë
+The same as the restaurant's contact: a change here changes it in Restaurant info → Details too.	Uguali ai contatti del ristorante: una modifica qui li cambia anche in Info ristorante → Dettagli.	Igual que el contacto del restaurante: un cambio aquí también lo cambia en Información del restaurante → Detalles.	Njësoj si kontakti i restorantit: një ndryshim këtu e ndryshon edhe te Info e restorantit → Detajet.
+branch@restaurant.al	branch@restaurant.al	branch@restaurant.al	branch@restaurant.al
+The address guests find it at, printed on its receipts.	L'indirizzo dove gli ospiti la trovano, stampato sui suoi scontrini.	La dirección donde los clientes la encuentran, impresa en sus recibos.	Adresa ku e gjejnë mysafirët, e printuar në faturat e saj.
+Rruga e Durrësit 12	Rruga e Durrësit 12	Rruga e Durrësit 12	Rruga e Durrësit 12
+Exact location	Posizione esatta	Ubicación exacta	Vendndodhja e saktë
+Latitude, longitude. In Google Maps, right-click the place and click the numbers to copy them.	Latitudine, longitudine. In Google Maps, fai clic destro sul posto e clicca i numeri per copiarli.	Latitud, longitud. En Google Maps, haz clic derecho en el lugar y haz clic en los números para copiarlos.	Gjerësi, gjatësi. Në Google Maps, kliko me të djathtën mbi vendin dhe kliko numrat për t'i kopjuar.
+Check it on the map ›	Controlla sulla mappa ›	Revísala en el mapa ›	Kontrolloje në hartë ›
+Your branch	La tua sede	Tu sucursal	Pika jote
+How guests see it	Come lo vedono gli ospiti	Cómo lo ven los clientes	Si e shohin mysafirët
+The top of its booking page, as you type.	La parte alta della sua pagina di prenotazione, mentre scrivi.	La parte superior de su página de reservas, mientras escribes.	Pjesa e sipërme e faqes së saj të rezervimeve, ndërsa shkruan.
+Add the address so guests find it	Aggiungi l'indirizzo perché gli ospiti la trovino	Agrega la dirección para que los clientes la encuentren	Shto adresën që mysafirët ta gjejnë
+No phone yet	Ancora nessun telefono	Todavía sin teléfono	Ende pa telefon
+No email yet	Ancora nessuna email	Todavía sin correo	Ende pa email
+Book a table	Prenota un tavolo	Reservar una mesa	Rezervo një tavolinë
+Its week and special days.	La sua settimana e i giorni speciali.	Su semana y sus días especiales.	Java e saj dhe ditët e veçanta.
+Set them	Impostali	Defínelos	Vendosi
+Loading…	Caricamento…	Cargando…	Duke ngarkuar…
+Not set yet: until they are, the branch counts as always open.	Non ancora impostato: finché non lo è, la sede conta come sempre aperta.	Aún sin definir: mientras tanto, la sucursal cuenta como siempre abierta.	Ende pa vendosur: deri atëherë, pika llogaritet gjithmonë e hapur.
+1 special day ahead	1 giorno speciale in arrivo	1 día especial por venir	1 ditë e veçantë përpara
+{} special days ahead	{} giorni speciali in arrivo	{} días especiales por venir	{} ditë të veçanta përpara
 Admins	Amministratori	Administradores	Administratorë
 Support admins take care of the restaurants you give them	Gli admin di supporto si occupano dei ristoranti che gli dai	Los admins de soporte se encargan de los restaurantes que les das	Adminët e mbështetjes kujdesen për restorantet që u jep
 Add support admin	Aggiungi admin di supporto	Agregar admin de soporte	Shto admin mbështetjeje
@@ -2732,6 +3165,13 @@ Any restaurant	Qualsiasi ristorante	Cualquier restaurante	Çdo restorant
 Every restaurant	Tutti i ristoranti	Todos los restaurantes	Të gjitha restorantet
 Any status	Qualsiasi stato	Cualquier estado	Çdo gjendje
 Clear all filters	Cancella tutti i filtri	Borrar todos los filtros	Pastro të gjithë filtrat
+Place your logo	Posiziona il tuo logo	Coloca tu logo	Vendos logon tënde
+Zoom in if you want and drag it into place. What's inside the square is your logo.	Ingrandisci se vuoi e trascinalo al suo posto. Quello che è dentro il quadrato è il tuo logo.	Acerca si quieres y arrástralo a su lugar. Lo que queda dentro del cuadrado es tu logo.	Zmadhoje nëse do dhe tërhiqe në vend. Ajo që është brenda katrorit është logoja jote.
+Use this logo	Usa questo logo	Usar este logo	Përdor këtë logo
+Zoom out	Riduci	Alejar	Zvogëlo
+Zoom in	Ingrandisci	Acercar	Zmadho
+Drag the picture to move it.	Trascina l'immagine per spostarla.	Arrastra la imagen para moverla.	Tërhiq foton për ta lëvizur.
+The whole picture	Tutta l'immagine	La imagen completa	E gjithë fotoja
 Add the owner of {}	Aggiungi il titolare di {}	Añadir el propietario de {}	Shto pronarin e {}
 They get an email with a link to set their password.	Riceve un'email con un link per impostare la password.	Recibe un correo con un enlace para crear su contraseña.	Merr një email me lidhje për të vendosur fjalëkalimin.
 Add owner and send the invitation	Aggiungi titolare e invia l'invito	Añadir propietario y enviar la invitación	Shto pronarin dhe dërgo ftesën
@@ -2766,6 +3206,115 @@ Change the picture	Cambia l'immagine	Cambiar la imagen	Ndrysho foton
 Add a picture	Aggiungi un'immagine	Añadir una imagen	Shto një foto
 Choose another picture	Scegli un'altra immagine	Elegir otra imagen	Zgjidh një foto tjetër
 Remove the picture	Rimuovi l'immagine	Quitar la imagen	Hiq foton
+Add what you want, click it to change it, drag it to move it, right-click it to copy or paste. The top and bottom texts are saved with the bar; the rest stays on this device for now.	Aggiungi quello che vuoi, cliccalo per cambiarlo, trascinalo per spostarlo, tasto destro per copiare o incollare. I testi in alto e in basso si salvano con la barra; il resto per ora resta su questo dispositivo.	Agrega lo que quieras, haz clic para cambiarlo, arrástralo para moverlo, clic derecho para copiar o pegar. Los textos de arriba y abajo se guardan con la barra; el resto por ahora se queda en este dispositivo.	Shto çfarë të duash, kliko për ta ndryshuar, tërhiqe për ta lëvizur, kliko djathtas për të kopjuar ose ngjitur. Tekstet lart dhe poshtë ruhen me shiritin; pjesa tjetër për tani mbetet në këtë pajisje.
+Paste	Incolla	Pegar	Ngjit
+Ctrl+V	Ctrl+V	Ctrl+V	Ctrl+V
+Copy	Copia	Copiar	Kopjo
+Ctrl+C	Ctrl+C	Ctrl+C	Ctrl+C
+Paste below	Incolla sotto	Pegar debajo	Ngjit poshtë
+Duplicate	Duplica	Duplicar	Dyfisho
+Ctrl+D	Ctrl+D	Ctrl+D	Ctrl+D
+Move up	Sposta su	Subir	Lëviz lart
+Move down	Sposta giù	Bajar	Lëviz poshtë
+Add to the receipt	Aggiungi allo scontrino	Agregar al recibo	Shto në faturë
+Picture behind	Immagine dietro	Imagen detrás	Foto pas
+Built in	Già pronti	Integrados	Të gatshme
+Filled in by the till for each order	Compilati dalla cassa per ogni ordine	Los completa la caja en cada pedido	I plotëson arka për çdo porosi
+Start again	Ricomincia	Empezar de nuevo	Fillo nga e para
+Required by DGII: it can be moved, not removed	Richiesto dalla DGII: si può spostare, non togliere	Lo exige la DGII: se puede mover, no quitar	E kërkon DGII: mund të lëvizet, jo të hiqet
+Drag it on the receipt to put it anywhere.	Trascinala sullo scontrino per metterla dove vuoi.	Arrástrala en el recibo para ponerla donde quieras.	Tërhiqe në faturë për ta vendosur kudo.
+Size	Taglia	Tamaño	Madhësia
+Opacity	Opacità	Opacidad	Tejdukshmëria
+Click something on the receipt to change it, or drag it to move it.	Clicca qualcosa sullo scontrino per cambiarlo, o trascinalo per spostarlo.	Haz clic en algo del recibo para cambiarlo, o arrástralo para moverlo.	Kliko diçka në faturë për ta ndryshuar, ose tërhiqe për ta lëvizur.
+Pictures behind	Immagini dietro	Imágenes detrás	Fotot pas
+Align	Allinea	Alinear	Rreshto
+Bold	Grassetto	Negrita	I trashë
+Top of the receipt	In alto sullo scontrino	Parte superior del recibo	Në krye të faturës
+Bottom of the receipt	In fondo allo scontrino	Parte inferior del recibo	Në fund të faturës
+e.g. Thank you for dining with us	es. Grazie per aver cenato con noi	p. ej. Gracias por comer con nosotros	p.sh. Faleminderit që hëngrët me ne
+e.g. Wi-Fi: Saporini · see you soon	es. Wi-Fi: Saporini · a presto	p. ej. Wi-Fi: Saporini · hasta pronto	p.sh. Wi-Fi: Saporini · shihemi së shpejti
+Saved with the bar at the bottom.	Si salva con la barra in basso.	Se guarda con la barra de abajo.	Ruhet me shiritin poshtë.
+Style	Stile	Estilo	Stili
+It holds	Contiene	Contiene	Përmban
+The receipt's number	Il numero dello scontrino	El número del recibo	Numri i faturës
+Your own code	Il tuo codice	Tu propio código	Kodi yt
+e.g. WIFI-2026	es. WIFI-2026	p. ej. WIFI-2026	p.sh. WIFI-2026
+Letters, numbers and signs; no accents.	Lettere, numeri e segni; senza accenti.	Letras, números y signos; sin acentos.	Shkronja, numra dhe shenja; pa theks.
+A real barcode of the receipt's number, so the receipt can be found again by scanning it.	Un vero codice a barre del numero dello scontrino, per ritrovarlo scansionandolo.	Un código de barras real del número del recibo, para encontrarlo escaneándolo.	Një barkod i vërtetë i numrit të faturës, për ta gjetur sërish duke e skanuar.
+Fill in from Details	Compila dai Dettagli	Completar desde Detalles	Plotëso nga Detajet
+Any link: your website, a menu, a review page, Wi-Fi…	Qualsiasi link: il tuo sito, un menu, una pagina di recensioni, il Wi-Fi…	Cualquier enlace: tu sitio, un menú, una página de reseñas, el Wi-Fi…	Çdo lidhje: faqja jote, një menu, një faqe vlerësimesh, Wi-Fi…
+There's no {} link in Details yet: write the link here.	Non c'è ancora un link di {} in Dettagli: scrivilo qui.	Aún no hay un enlace de {} en Detalles: escríbelo aquí.	Ende nuk ka lidhje të {} te Detajet: shkruaje këtu.
+Under it	Sotto	Debajo	Poshtë tij
+Height	Altezza	Altura	Lartësia
+{} px	{} px	{} px	{} px
+The logo is changed at the top of this page.	Il logo si cambia in cima a questa pagina.	El logo se cambia arriba de esta página.	Logoja ndryshohet në krye të kësaj faqeje.
+Each dish of the order, as the till prints it. Here with sample dishes.	Ogni piatto dell'ordine, come lo stampa la cassa. Qui con piatti di esempio.	Cada plato del pedido, como lo imprime la caja. Aquí con platos de ejemplo.	Çdo pjatë e porosisë, siç e shtyp arka. Këtu me pjata shembull.
+A heading above the dishes	Un titolo sopra i piatti	Un título sobre los platos	Një titull mbi pjatat
+e.g. Your order	es. Il tuo ordine	p. ej. Tu pedido	p.sh. Porosia jote
+Prices	Prezzi	Precios	Çmimet
+Options (extra cheese, no onions)	Opzioni (formaggio extra, senza cipolla)	Opciones (queso extra, sin cebolla)	Opsione (djathë shtesë, pa qepë)
+Ingredients	Ingredienti	Ingredientes	Përbërësit
+Printed on every preliminary bill: it has no fiscal number and isn't sent to DGII. The order can still change after it. Its words are DGII's and stay; you can add a line under them.	Stampato su ogni preconto: non ha numero fiscale e non va alla DGII. L'ordine si può ancora cambiare dopo. Le sue parole sono della DGII e restano; puoi aggiungere una riga sotto.	Se imprime en cada precuenta: no tiene número fiscal y no se envía a la DGII. El pedido aún puede cambiar después. Sus palabras son de la DGII y se quedan; puedes agregar una línea debajo.	Shtypet në çdo parafaturë: nuk ka numër tatimor dhe nuk dërgohet te DGII. Porosia mund të ndryshojë ende më pas. Fjalët e saj janë të DGII dhe mbeten; mund të shtosh një rresht poshtë.
+A line under it	Una riga sotto	Una línea debajo	Një rresht poshtë
+e.g. Ask for your fiscal invoice when you pay	es. Chiedi la fattura fiscale quando paghi	p. ej. Pide tu factura fiscal al pagar	p.sh. Kërko faturën tatimore kur paguan
+The e-CF's details on the fiscal invoice: its type (E32 for a consumer, E31 for a business with its RNC), the e-NCF, the restaurant's RNC and the date. DGII isn't connected yet, so the numbers are test ones.	I dati dell'e-CF sulla fattura fiscale: il tipo (E32 per un consumatore, E31 per un'azienda con il suo RNC), l'e-NCF, l'RNC del ristorante e la data. La DGII non è ancora collegata, quindi i numeri sono di prova.	Los datos del e-CF en la factura fiscal: su tipo (E32 para un consumidor, E31 para una empresa con su RNC), el e-NCF, el RNC del restaurante y la fecha. La DGII aún no está conectada, así que los números son de prueba.	Të dhënat e e-CF në faturën tatimore: lloji (E32 për konsumator, E31 për një biznes me RNC-në e vet), e-NCF, RNC-ja e restorantit dhe data. DGII nuk është lidhur ende, ndaj numrat janë provë.
+DGII's verification QR code, with the security code and the signing date. Guests scan it to check the invoice.	Il codice QR di verifica della DGII, con il codice di sicurezza e la data di firma. Gli ospiti lo scansionano per verificare la fattura.	El código QR de verificación de la DGII, con el código de seguridad y la fecha de firma. Los comensales lo escanean para verificar la factura.	Kodi QR i verifikimit të DGII, me kodin e sigurisë dhe datën e nënshkrimit. Mysafirët e skanojnë për të verifikuar faturën.
+Name, address, phone and VAT number, from the restaurant's details. Change the words if you want; the first line prints bigger.	Nome, indirizzo, telefono e partita IVA, dai dati del ristorante. Cambia le parole se vuoi; la prima riga si stampa più grande.	Nombre, dirección, teléfono y número de IVA, de los datos del restaurante. Cambia las palabras si quieres; la primera línea se imprime más grande.	Emri, adresa, telefoni dhe numri i TVSH-së, nga të dhënat e restorantit. Ndrysho fjalët nëse do; rreshti i parë shtypet më i madh.
+Use the restaurant's details again	Usa di nuovo i dati del ristorante	Usar de nuevo los datos del restaurante	Përdor sërish të dhënat e restorantit
+The receipt's number and time, the table, the guests and the waiter, filled in by the till. The words before them are yours to change.	Numero e ora dello scontrino, tavolo, ospiti e cameriere, compilati dalla cassa. Le parole prima sono tue da cambiare.	El número y la hora del recibo, la mesa, los comensales y el mesero, los completa la caja. Las palabras de antes las puedes cambiar.	Numri dhe ora e faturës, tavolina, mysafirët dhe kamarieri, i plotëson arka. Fjalët para tyre mund t'i ndryshosh.
+The amount is filled in by the till; the words before it are yours to change.	L'importo lo compila la cassa; le parole prima sono tue da cambiare.	El importe lo completa la caja; las palabras de antes las puedes cambiar.	Shumën e plotëson arka; fjalët para saj mund t'i ndryshosh.
+Words	Parole	Palabras	Fjalët
+How it was paid, filled in by the till (card, cash or both when split).	Come è stato pagato, compilato dalla cassa (carta, contanti o entrambi se diviso).	Cómo se pagó, lo completa la caja (tarjeta, efectivo o ambos si se divide).	Si u pagua, e plotëson arka (kartë, para në dorë ose të dyja kur ndahet).
+Words for the change	Parole per il resto	Palabras para el cambio	Fjalët për kusurin
+Filled in by the till for each order.	Compilato dalla cassa per ogni ordine.	Lo completa la caja en cada pedido.	E plotëson arka për çdo porosi.
+Table	Tavolo	Mesa	Tavolina
+Waiter:	Waiter:	Waiter:	Waiter:
+Before the receipt's number	Prima del numero dello scontrino	Antes del número del recibo	Para numrit të faturës
+Before the table	Prima del tavolo	Antes de la mesa	Para tavolinës
+After the guests	Dopo gli ospiti	Después de los comensales	Pas mysafirëve
+Before the waiter	Prima del cameriere	Antes del mesero	Para kamarierit
+of which VAT 20%	di cui IVA 20%	de lo cual IVA 20%	nga të cilat TVSH 20%
+TOTAL {}	TOTAL {}	TOTAL {}	TOTAL {}
+Tel. {}	Tel. {}	Tel. {}	Tel. {}
+Options	Opzioni	Opciones	Opsionet
+Layers	Livelli	Capas	Shtresat
+BEHIND EVERYTHING	DIETRO A TUTTO	DETRÁS DE TODO	PAS GJITHÇKAJE
+Smaller	Più piccolo	Más pequeño	Më e vogël
+Bigger	Più grande	Más grande	Më e madhe
+Fit	Adatta	Ajustar	Përshtat
+DGII isn't connected yet: test numbers	La DGII non è ancora collegata: numeri di prova	La DGII aún no está conectada: números de prueba	DGII nuk është lidhur ende: numra provë
+No fiscal number · can be printed again · the order can still change	Nessun numero fiscale · si può ristampare · l'ordine si può ancora cambiare	Sin número fiscal · se puede reimprimir · el pedido aún puede cambiar	Pa numër tatimor · mund të ristampohet · porosia mund të ndryshojë ende
+Click to pick · drag to move · right-click to copy or paste · the wheel looks around	Clicca per scegliere · trascina per spostare · tasto destro per copiare o incollare · la rotella per guardarti intorno	Clic para elegir · arrastra para mover · clic derecho para copiar o pegar · la rueda para mirar	Kliko për të zgjedhur · tërhiq për të lëvizur · kliko djathtas për të kopjuar ose ngjitur · rrota për të parë përreth
+Add something from the left.	Aggiungi qualcosa da sinistra.	Agrega algo desde la izquierda.	Shto diçka nga e majta.
+(top text: write it on the left)	(top text: write it on the left)	(top text: write it on the left)	(top text: write it on the left)
+(bottom text: write it on the left)	(bottom text: write it on the left)	(bottom text: write it on the left)	(bottom text: write it on the left)
+(choose a picture)	(choose a picture)	(choose a picture)	(choose a picture)
+(write the code on the left)	(write the code on the left)	(write the code on the left)	(write the code on the left)
+(this code can't be a barcode)	(this code can't be a barcode)	(this code can't be a barcode)	(this code can't be a barcode)
+(write the link on the left)	(write the link on the left)	(write the link on the left)	(write the link on the left)
+(no logo yet)	(no logo yet)	(no logo yet)	(no logo yet)
+(no address yet)	(ancora nessun indirizzo)	(todavía sin dirección)	(ende pa adresë)
+(no VAT number yet)	(ancora nessuna partita IVA)	(todavía sin número de IVA)	(ende pa NIPT)
+23 Nov 21:14	23 Nov 21:14	23 Nov 21:14	23 Nov 21:14
+{} Sara	{} Sara	{} Sara	{} Sara
+NO VÁLIDA PARA FINES FISCALES	NO VÁLIDA PARA FINES FISCALES	NO VÁLIDA PARA FINES FISCALES	NO VÁLIDA PARA FINES FISCALES
+e-NCF	e-NCF	e-NCF	e-NCF
+Fecha de emisión	Fecha de emisión	Fecha de emisión	Fecha de emisión
+RNC comprador	RNC comprador	RNC comprador	RNC comprador
+Razón social	Razón social	Razón social	Razón social
+Empresa Ejemplo SRL	Empresa Ejemplo SRL	Empresa Ejemplo SRL	Empresa Ejemplo SRL
+Código de seguridad: AB12CD	Código de seguridad: AB12CD	Código de seguridad: AB12CD	Código de seguridad: AB12CD
+Fecha de firma: 23-11-2026 21:14:05	Fecha de firma: 23-11-2026 21:14:05	Fecha de firma: 23-11-2026 21:14:05	Fecha de firma: 23-11-2026 21:14:05
+Card	Carta	Tarjeta	Kartë
+Margherita	Margherita	Margherita	Margherita
++ extra mozzarella	+ extra mozzarella	+ extra mozzarella	+ extra mozzarella
+tomato, mozzarella, basil	tomato, mozzarella, basil	tomato, mozzarella, basil	tomato, mozzarella, basil
+Tagliatelle ragù	Tagliatelle ragù	Tagliatelle ragù	Tagliatelle ragù
+no parmesan	no parmesan	no parmesan	no parmesan
+egg pasta, beef ragù, parmesan	egg pasta, beef ragù, parmesan	egg pasta, beef ragù, parmesan	egg pasta, beef ragù, parmesan
+Espresso	Espresso	Espresso	Espresso
+Tiramisu	Tiramisu	Tiramisu	Tiramisu
+mascarpone, coffee, cocoa, ladyfingers	mascarpone, coffee, cocoa, ladyfingers	mascarpone, coffee, cocoa, ladyfingers	mascarpone, coffee, cocoa, ladyfingers
 Waiting ({})	In attesa ({})	En espera ({})	Në pritje ({})
 Rejected ({})	Rifiutate ({})	Rechazadas ({})	Të refuzuara ({})
 Search by restaurant, email or owner	Cerca per ristorante, email o titolare	Buscar por restaurante, correo o propietario	Kërko sipas restorantit, email-it ose pronarit
@@ -2795,12 +3344,10 @@ time zone	fuso orario	zona horaria	zona kohore
 No email	Nessuna email	Sin correo	Pa email
 No website	Nessun sito web	Sin sitio web	Pa faqe interneti
 Rejected: {}	Rifiutata: {}	Rechazada: {}	Refuzuar: {}
-Logo	Logo	Logo	Logoja
 Restaurant application	Richiesta di ristorante	Solicitud de restaurante	Aplikim për restorant
 Reject	Rifiuta	Rechazar	Refuzo
 Waited {}	Ha atteso {}	Esperó {}	Priti {}
 Waiting {}	In attesa da {}	Esperando desde hace {}	Në pritje prej {}
-Website	Sito web	Sitio web	Faqja e internetit
 Applied	Inviata	Enviada	Aplikuar
 No owner given.	Nessun proprietario indicato.	No se indicó propietario.	Nuk është dhënë pronar.
 No name	Senza nome	Sin nombre	Pa emër
@@ -2814,88 +3361,66 @@ What's missing or why it can't be approved	Cosa manca o perché non può essere 
 You do not have permission to view restaurant details.	Non hai il permesso di vedere i dati del ristorante.	No tienes permiso para ver los datos del restaurante.	Nuk ke leje të shohësh të dhënat e restorantit.
 No restaurant	Nessun ristorante	Sin restaurante	Pa restorant
 Open a restaurant first.	Apri prima un ristorante.	Primero abre un restaurante.	Hap fillimisht një restorant.
-You changed the restaurant's details	Hai modificato i dati del ristorante	Cambiaste los datos del restaurante	Ndryshove të dhënat e restorantit
-Add contact	Aggiungi contatto	Añadir contacto	Shto kontakt
-Add address	Aggiungi indirizzo	Añadir dirección	Shto adresë
-Add tax details	Aggiungi dati fiscali	Añadir datos fiscales	Shto të dhënat tatimore
+You changed the branch	Hai modificato la sede	Cambiaste la sucursal	Ndryshove pikën
+You changed the receipt	Hai cambiato lo scontrino	Cambiaste el recibo	Ndryshove faturën
+You changed the details	Hai modificato i dettagli	Cambiaste los detalles	Ndryshove të dhënat
+You changed the receipt and didn't save it.	Hai cambiato lo scontrino e non l'hai salvato.	Cambiaste el recibo y no lo guardaste.	Ndryshove faturën dhe nuk e ruajte.
+the branch you work in · each branch has its own	la sede in cui lavori · ogni sede ha i suoi	la sucursal donde trabajas · cada sucursal tiene los suyos	pika ku punon · çdo pikë ka të vetat
+the branch you work in	la sede in cui lavori	la sucursal donde trabajas	pika ku punon
+Change cover	Cambia copertina	Cambiar portada	Ndrysho kopertinën
+Add a cover	Aggiungi una copertina	Agregar una portada	Shto një kopertinë
+{} · {} branches	{} · {} sedi	{} · {} sucursales	{} · {} pika
+1 branch	1 sede	1 sucursal	1 pikë
+{} branches	{} sedi	{} sucursales	{} pika
 {} branches · {} open	{} sedi · {} aperte	{} sucursales · {} abiertas	{} pika · {} të hapura
-Who the restaurant is	Chi è il ristorante	Quién es el restaurante	Kush është restoranti
-Its name on receipts, the booking website and every email.	Il suo nome sugli scontrini, sul sito di prenotazione e in ogni email.	Su nombre en los recibos, el sitio de reservas y cada correo.	Emri i tij në fatura, në faqen e rezervimeve dhe në çdo email.
-Set by the Super Admin	Impostato dal Super Admin	Lo define el Super Admin	Vendoset nga Super Admin
-As registered, e.g. on invoices	Come registrato, es. sulle fatture	Tal como está registrado, p. ej. en las facturas	Siç është regjistruar, p.sh. në fatura
-A short name the system uses, e.g. SAPORINI_TIRANA	Un nome breve usato dal sistema, es. SAPORINI_TIRANA	Un nombre corto que usa el sistema, p. ej. SAPORINI_TIRANA	Një emër i shkurtër që përdor sistemi, p.sh. SAPORINI_TIRANA
-About the restaurant	Sul ristorante	Sobre el restaurante	Rreth restorantit
-A few words guests read on the booking website.	Poche parole che gli ospiti leggono sul sito di prenotazione.	Unas palabras que los clientes leen en el sitio de reservas.	Disa fjalë që mysafirët lexojnë në faqen e rezervimeve.
-A family trattoria in the heart of Tirana: fresh pasta every day and a garden for the summer.	Una trattoria di famiglia nel cuore di Tirana: pasta fresca ogni giorno e un giardino per l'estate.	Una trattoria familiar en el corazón de Tirana: pasta fresca cada día y un jardín para el verano.	Një trattoria familjare në zemër të Tiranës: pasta e freskët çdo ditë dhe një kopsht për verën.
-How guests reach you	Come ti raggiungono gli ospiti	Cómo te contactan los clientes	Si të kontaktojnë mysafirët
-Shown on the booking website and in every booking email; receipts print the phone. A branch's own phone and email come first.	Mostrati sul sito delle prenotazioni e in ogni email di prenotazione; gli scontrini stampano il telefono. Telefono ed email propri di una sede hanno la precedenza.	Se muestran en el sitio de reservas y en cada correo de reserva; los recibos imprimen el teléfono. El teléfono y correo propios de una sucursal van primero.	Shfaqen në faqen e rezervimeve dhe në çdo email rezervimi; faturat printojnë telefonin. Telefoni dhe emaili i vetë pikës vijnë të parët.
-hello@restaurant.al	hello@restaurant.al	hello@restaurant.al	hello@restaurant.al
-Your restaurant	Il tuo ristorante	Tu restaurante	Restoranti yt
-Add a description so guests know what to expect.	Aggiungi una descrizione così gli ospiti sanno cosa aspettarsi.	Añade una descripción para que los clientes sepan qué esperar.	Shto një përshkrim që mysafirët të dinë çfarë të presin.
-Book a table	Prenota un tavolo	Reservar una mesa	Rezervo një tavolinë
-End of a booking email	Fine di un'email di prenotazione	Final de un correo de reserva	Fundi i një email-i rezervimi
-Call {}	Chiama {}	Llama al {}	Telefono {}
-write to {}	scrivi a {}	escribe a {}	shkruaj te {}
-Add a phone and an email	Aggiungi un telefono e un'email	Añade un teléfono y un correo	Shto një telefon dhe një email
-Questions? {}	Domande? {}	¿Preguntas? {}	Pyetje? {}
-How guests see it	Come lo vedono gli ospiti	Cómo lo ven los clientes	Si e shohin mysafirët
-The booking website and booking emails, as you type.	Il sito di prenotazione e le email di prenotazione, mentre scrivi.	El sitio de reservas y los correos de reserva, mientras escribes.	Faqja e rezervimeve dhe email-et e rezervimeve, ndërsa shkruan.
+Change the logo	Cambia il logo	Cambiar el logo	Ndrysho logon
+Add a logo	Aggiungi un logo	Agregar un logo	Shto një logo
+Remove the logo	Rimuovi il logo	Quitar el logo	Hiq logon
+Careful: changing this affects the whole restaurant	Attenzione: modificarlo riguarda tutto il ristorante	Cuidado: cambiarlo afecta a todo el restaurante	Kujdes: ndryshimi prek gjithë restorantin
 Remove the restaurant	Rimuovi il ristorante	Eliminar el restaurante	Hiq restorantin
 It disappears everywhere and its staff are signed out. Its sales and records are kept.	Scompare ovunque e il personale viene disconnesso. Vendite e registri vengono conservati.	Desaparece de todas partes y se cierra la sesión de su personal. Sus ventas y registros se conservan.	Zhduket kudo dhe stafi nxirret jashtë. Shitjet dhe regjistrat ruhen.
 Remove restaurant	Rimuovi ristorante	Eliminar restaurante	Hiq restorantin
+Who you are	Chi sei	Quién eres	Kush jeni
+Your name, and a few words guests read about you.	Il tuo nome e due parole che gli ospiti leggono su di te.	Tu nombre y unas palabras que los comensales leen sobre ti.	Emri yt dhe disa fjalë që mysafirët lexojnë për ty.
+Name: set by the Super Admin	Nome: deciso dal Super Admin	Nombre: lo define el Super Admin	Emri: e vendos Super Admini
+As registered, e.g. on invoices	Come registrato, es. sulle fatture	Tal como está registrado, p. ej. en las facturas	Siç është regjistruar, p.sh. në fatura
+A short name the system uses inside, e.g. SAPORINI_TIRANA. Guests never see it.	Un nome breve che il sistema usa al suo interno, es. SAPORINI_TIRANA. Gli ospiti non lo vedono mai.	Un nombre corto que el sistema usa por dentro, p. ej. SAPORINI_TIRANA. Los clientes nunca lo ven.	Një emër i shkurtër që sistemi përdor brenda, p.sh. SAPORINI_TIRANA. Mysafirët nuk e shohin kurrë.
+A family trattoria in the heart of Tirana: fresh pasta every day and a garden for the summer.	Una trattoria di famiglia nel cuore di Tirana: pasta fresca ogni giorno e un giardino per l'estate.	Una trattoria familiar en el corazón de Tirana: pasta fresca cada día y un jardín para el verano.	Një trattoria familjare në zemër të Tiranës: pasta e freskët çdo ditë dhe një kopsht për verën.
+Social links	Social	Redes sociales	Rrjetet sociale
+Where guests find you online.	Dove gli ospiti ti trovano online.	Dónde te encuentran los comensales en internet.	Ku të gjejnë mysafirët në internet.
+On the booking website and in booking emails. Receipts print the phone and the address.	Sul sito delle prenotazioni e nelle email di prenotazione. Gli scontrini stampano il telefono e l'indirizzo.	En el sitio de reservas y en los correos de reserva. Los recibos imprimen el teléfono y la dirección.	Në faqen e rezervimeve dhe në emailet e rezervimit. Faturat shtypin telefonin dhe adresën.
+hello@restaurant.al	hello@restaurant.al	hello@restaurant.al	hello@restaurant.al
+Address · {}	Indirizzo · {}	Dirección · {}	Adresa · {}
+Map	Mappa	Mapa	Harta
+Click on the map to put the pin there, or paste the exact location.	Clicca sulla mappa per mettere lì il segnaposto, o incolla la posizione esatta.	Haz clic en el mapa para poner ahí el marcador, o pega la ubicación exacta.	Kliko në hartë për ta vënë shenjën aty, ose ngjit vendndodhjen e saktë.
+Your pin, at the exact location.	Il tuo segnaposto, nella posizione esatta.	Tu marcador, en la ubicación exacta.	Shenja jote, në vendndodhjen e saktë.
+No pin yet	Ancora nessun segnaposto	Aún sin marcador	Ende pa shenjë
+Open it in Google Maps ›	Aprilo in Google Maps ›	Ábrelo en Google Maps ›	Hape në Google Maps ›
+No pin yet. Use Edit to put it on the map.	Ancora nessun segnaposto. Usa Modifica per metterlo sulla mappa.	Aún sin marcador. Usa Editar para ponerlo en el mapa.	Ende pa shenjë. Përdor Ndrysho për ta vënë në hartë.
+TikTok	TikTok	TikTok	TikTok
+@yourrestaurant	@iltuoristorante	@turestaurante	@restoranti_yt
+WhatsApp	WhatsApp	WhatsApp	WhatsApp
+maps.app.goo.gl/…	maps.app.goo.gl/…	maps.app.goo.gl/…	maps.app.goo.gl/…
+Who owns the restaurant and runs it in the POS.	Chi è titolare del ristorante e lo gestisce nel POS.	Quién es el propietario del restaurante y lo maneja en el POS.	Kush e ka restorantin dhe e drejton në POS.
 No owner yet. Add the person who owns the restaurant; they get an email to set a password.	Ancora nessun titolare. Aggiungi chi possiede il ristorante; riceverà un'email per impostare una password.	Todavía sin propietario. Añade a la persona dueña del restaurante; recibirá un correo para crear una contraseña.	Ende pa pronar. Shto personin që zotëron restorantin; do të marrë një email për të vendosur fjalëkalimin.
 The owner's account couldn't be found.	Impossibile trovare l'account del titolare.	No se encontró la cuenta del propietario.	Llogaria e pronarit nuk u gjet.
 Add the owner	Aggiungi il titolare	Añadir el propietario	Shto pronarin
-Send the invitation again	Invia di nuovo l'invito	Enviar la invitación de nuevo	Dërgo ftesën përsëri
 Signed up	Registrato	Registrado	I regjistruar
-Open or closed	Aperto o chiuso	Abierto o cerrado	I hapur ose i mbyllur
-Open: its staff sign in and work as usual.	Aperto: il personale accede e lavora come sempre.	Abierto: su personal inicia sesión y trabaja como siempre.	I hapur: stafi hyn dhe punon si zakonisht.
-{}: its staff can't sign in. Data stays.	{}: il personale non può accedere. I dati restano.	{}: su personal no puede iniciar sesión. Los datos se mantienen.	{}: stafi nuk mund të hyjë. Të dhënat mbeten.
+Not signed up yet	Non ancora registrato	Aún no se registró	Ende pa u regjistruar
+Send the invitation again	Invia di nuovo l'invito	Enviar la invitación de nuevo	Dërgo ftesën përsëri
+Closing signs its staff out at once. Nothing is deleted.	Chiudendolo, il personale viene disconnesso subito. Non si cancella nulla.	Al cerrarlo, el personal sale de inmediato. No se borra nada.	Kur mbyllet, stafi del menjëherë. Nuk fshihet asgjë.
+Its staff sign in and work as usual.	Il personale accede e lavora come sempre.	El personal inicia sesión y trabaja como siempre.	Stafi hyn dhe punon si zakonisht.
+Its staff can't sign in until it opens again.	Il personale non può accedere finché non riapre.	El personal no puede iniciar sesión hasta que vuelva a abrir.	Stafi nuk mund të hyjë derisa të hapet përsëri.
 Suspend	Sospendi	Suspender	Pezullo
-Add the first branch so the POS, kitchen and bookings can be used.	Aggiungi la prima sede per poter usare POS, cucina e prenotazioni.	Añade la primera sucursal para poder usar el POS, la cocina y las reservas.	Shto pikën e parë që të përdoren POS, kuzhina dhe rezervimet.
-Close for now	Chiudi per ora	Cerrar por ahora	Mbyll për tani
-You're here	Sei qui	Estás aquí	Je këtu
-A branch that's still in use (open orders, bookings to come, people clocked in, staff or devices) can't be removed. Close it instead, or move those first.	Una sede ancora in uso (ordini aperti, prenotazioni future, persone in turno, personale o dispositivi) non può essere rimossa. Chiudila invece, o sposta prima queste cose.	Una sucursal que todavía se usa (pedidos abiertos, reservas futuras, personas fichadas, personal o dispositivos) no se puede eliminar. Mejor ciérrala o mueve eso primero.	Një pikë që ende përdoret (porosi të hapura, rezervime që vijnë, njerëz në turn, staf ose pajisje) nuk mund të hiqet. Më mirë mbylle ose zhvendos fillimisht ato.
-The owner keeps each branch's phone, email and address up to date. Adding, closing or removing branches is for the Super Admin.	Il titolare tiene aggiornati telefono, email e indirizzo di ogni sede. Aggiungere, chiudere o rimuovere sedi spetta al Super Admin.	El propietario mantiene al día el teléfono, correo y dirección de cada sucursal. Añadir, cerrar o eliminar sucursales es cosa del Super Admin.	Pronari mban të përditësuar telefonin, email-in dhe adresën e çdo pike. Shtimi, mbyllja ose heqja e pikave i takon Super Admin.
-Addresses	Indirizzi	Direcciones	Adresat
-No address yet. Receipts print the address guests find the restaurant at.	Ancora nessun indirizzo. Gli scontrini stampano l'indirizzo dove gli ospiti trovano il ristorante.	Todavía sin dirección. Los recibos imprimen la dirección donde los clientes encuentran el restaurante.	Ende pa adresë. Faturat printojnë adresën ku mysafirët e gjejnë restorantin.
-Contacts	Contatti	Contactos	Kontaktet
-No contact people yet (accounting, a manager, support).	Ancora nessuna persona di contatto (contabilità, un responsabile, assistenza).	Todavía no hay personas de contacto (contabilidad, un gerente, soporte).	Ende pa persona kontakti (kontabilitet, një menaxher, ndihmë).
-Use a PNG, JPEG or WebP picture for the logo.	Usa un'immagine PNG, JPEG o WebP per il logo.	Usa una imagen PNG, JPEG o WebP para el logo.	Përdor një foto PNG, JPEG ose WebP për logon.
-The logo is too big. Use a picture under 5 MB.	Il logo è troppo grande. Usa un'immagine sotto i 5 MB.	El logo es demasiado grande. Usa una imagen de menos de 5 MB.	Logoja është shumë e madhe. Përdor një foto nën 5 MB.
-PNG, JPEG or WebP, up to 5 MB. A square picture looks best.	PNG, JPEG o WebP, fino a 5 MB. Un'immagine quadrata rende meglio.	PNG, JPEG o WebP, hasta 5 MB. Una imagen cuadrada se ve mejor.	PNG, JPEG ose WebP, deri në 5 MB. Një foto katrore duket më mirë.
-Upload logo	Carica logo	Subir logo	Ngarko logon
-Replace logo	Sostituisci logo	Reemplazar logo	Zëvendëso logon
-Remove logo	Rimuovi logo	Quitar logo	Hiq logon
-Colours	Colori	Colores	Ngjyrat
-Main colour	Colore principale	Color principal	Ngjyra kryesore
-Second colour	Secondo colore	Segundo color	Ngjyra e dytë
-Receipt texts	Testi dello scontrino	Textos del recibo	Tekstet e faturës
-Top of the receipt	In alto sullo scontrino	Parte superior del recibo	Në krye të faturës
-e.g. Thank you for dining with us	es. Grazie per aver cenato con noi	p. ej. Gracias por comer con nosotros	p.sh. Faleminderit që hëngrët me ne
-Bottom of the receipt	In fondo allo scontrino	Parte inferior del recibo	Në fund të faturës
-e.g. Wi-Fi: Saporini · see you soon	es. Wi-Fi: Saporini · a presto	p. ej. Wi-Fi: Saporini · hasta pronto	p.sh. Wi-Fi: Saporini · shihemi së shpejti
-Undo	Annulla	Deshacer	Zhbëj
-How a receipt starts	Come inizia uno scontrino	Cómo empieza un recibo	Si nis një faturë
-(no address yet)	(ancora nessun indirizzo)	(todavía sin dirección)	(ende pa adresë)
-Tel. {}	Tel. {}	Tel. {}	Tel. {}
-VAT {}	P.IVA {}	IVA {}	NIPT {}
-(no VAT number yet)	(ancora nessuna partita IVA)	(todavía sin número de IVA)	(ende pa NIPT)
-1 × Espresso ........ {} 1.50	1 × Espresso ........ {} 1.50	1 × Espresso ........ {} 1.50	1 × Espresso ........ {} 1.50
-Legal identity	Identità legale	Identidad legal	Identiteti ligjor
-Registered address	Sede legale	Domicilio fiscal	Adresa e regjistruar
-Same as the main address	Uguale all'indirizzo principale	Igual que la dirección principal	E njëjtë me adresën kryesore
-Tax and VAT	Tasse e IVA	Impuestos e IVA	Taksat dhe TVSH
-No tax details yet. Receipts print the VAT and tax numbers of the main tax details.	Ancora nessun dato fiscale. Gli scontrini stampano partita IVA e codice fiscale dei dati fiscali principali.	Todavía sin datos fiscales. Los recibos imprimen los números de IVA y fiscal de los datos fiscales principales.	Ende pa të dhëna tatimore. Faturat printojnë NIPT-in dhe numrin tatimor të të dhënave kryesore.
-Tax no. {}	Cod. fiscale {}	N.º fiscal {}	Nr. tatimor {}
-Fiscal code {}	Codice fiscale {}	Código fiscal {}	Kodi fiskal {}
-On receipts	Sugli scontrini	En los recibos	Në fatura
-Tax and VAT details are the restaurant's legal identity. Ask the Super Admin to change them.	I dati fiscali e IVA sono l'identità legale del ristorante. Chiedi al Super Admin di cambiarli.	Los datos fiscales y de IVA son la identidad legal del restaurante. Pide al Super Admin que los cambie.	Të dhënat tatimore dhe TVSH janë identiteti ligjor i restorantit. Kërkoji Super Admin t'i ndryshojë.
-Changing it converts every price, wage, cost and fixed fee at the rate you enter. You see every amount first and can correct any of them. Past sales keep their own currency; Statistics shows each currency separately.	Cambiarla converte ogni prezzo, paga, costo e tariffa fissa al tasso che inserisci. Vedi prima ogni importo e puoi correggerne qualsiasi. Le vendite passate mantengono la loro valuta; le Statistiche mostrano ogni valuta separatamente.	Cambiarla convierte cada precio, sueldo, costo y cargo fijo a la tasa que ingreses. Ves primero cada monto y puedes corregir cualquiera. Las ventas pasadas mantienen su moneda; Estadísticas muestra cada moneda por separado.	Ndryshimi i saj konverton çdo çmim, pagë, kosto dhe tarifë fikse me kursin që shkruan. I sheh së pari të gjitha shumat dhe mund të korrigjosh secilën. Shitjet e kaluara mbajnë monedhën e tyre; Statistikat e shfaqin çdo monedhë veçmas.
+Careful: these change the whole restaurant	Attenzione: cambiano tutto il ristorante	Cuidado: cambian todo el restaurante	Kujdes: këto ndryshojnë gjithë restorantin
+A new currency converts every price, wage and cost; a new time zone moves bookings, opening hours and reports. Each one shows you everything first.	Una nuova valuta converte ogni prezzo, paga e costo; un nuovo fuso orario sposta prenotazioni, orari e report. Ognuno ti mostra tutto prima.	Una nueva moneda convierte cada precio, salario y costo; una nueva zona horaria mueve reservas, horarios e informes. Cada uno te muestra todo antes.	Një monedhë e re konverton çdo çmim, pagë dhe kosto; një zonë e re orare lëviz rezervimet, oraret dhe raportet. Secila të tregon gjithçka më parë.
+Every price, wage, cost and fee is in it.	Ogni prezzo, paga, costo e tariffa è in questa valuta.	Cada precio, salario, costo y tarifa está en ella.	Çdo çmim, pagë, kosto dhe tarifë është në të.
+Changing it converts every amount at the rate you enter, and you see each one first. Past sales keep their own currency.	Cambiarla converte ogni importo al tasso che inserisci, e li vedi tutti prima. Le vendite passate mantengono la loro valuta.	Cambiarla convierte cada monto al tipo de cambio que ingreses, y los ves todos antes. Las ventas pasadas mantienen su moneda.	Ndryshimi konverton çdo shumë me kursin që fut, dhe i sheh të gjitha më parë. Shitjet e kaluara mbajnë monedhën e tyre.
 Change currency	Cambia valuta	Cambiar moneda	Ndrysho monedhën
 Earlier changes	Modifiche precedenti	Cambios anteriores	Ndryshimet e mëparshme
 {} amounts	{} importi	{} importes	{} shuma
-Opening hours, menu hours, bookings and reports follow it. Before changing it you see what moves.	Orari di apertura, orari dei menù, prenotazioni e report lo seguono. Prima di cambiarlo vedi cosa si sposta.	Horarios de apertura, horarios de menús, reservas e informes lo siguen. Antes de cambiarlo ves lo que se mueve.	Orari i hapjes, oraret e menuve, rezervimet dhe raportet e ndjekin. Para se ta ndryshosh sheh çfarë lëviz.
+Opening hours, bookings and reports follow it.	Orari, prenotazioni e report lo seguono.	Los horarios, las reservas y los informes lo siguen.	Oraret, rezervimet dhe raportet e ndjekin.
+Before changing it you see which bookings and times move.	Prima di cambiarlo vedi quali prenotazioni e orari si spostano.	Antes de cambiarla ves qué reservas y horarios se mueven.	Para se ta ndryshosh sheh cilat rezervime dhe orare lëvizin.
 Change time zone	Cambia fuso orario	Cambiar zona horaria	Ndrysho zonën kohore
 Edit details	Modifica dati	Editar datos	Ndrysho të dhënat
 The name, legal name and code are changed by the Super Admin	Nome, ragione sociale e codice li cambia il Super Admin	El nombre, la razón social y el código los cambia el Super Admin	Emrin, emrin ligjor dhe kodin i ndryshon Super Admin
@@ -2934,7 +3459,6 @@ A number above 0, up to 8 decimals	Un numero sopra 0, fino a 8 decimali	Un núme
 Today's rate · {}. You can change it.	Tasso di oggi · {}. Puoi cambiarlo.	Tipo de cambio de hoy · {}. Puedes cambiarlo.	Kursi i sotëm · {}. Mund ta ndryshosh.
 Today's rate. You can change it.	Tasso di oggi. Puoi cambiarlo.	Tipo de cambio de hoy. Puedes cambiarlo.	Kursi i sotëm. Mund ta ndryshosh.
 Round to {}	Arrotonda a {}	Redondear a {}	Rrumbullako në {}
-Prices	Prezzi	Precios	Çmimet
 Stock costs keep 4 decimals	I costi di magazzino mantengono 4 decimali	Los costos de inventario mantienen 4 decimales	Kostot e stokut mbajnë 4 dhjetore
 Enter the rate you want, not a live one: 1 {} is worth how much in the new currency. Next you see every amount converted and can correct any of them before anything changes.	Inserisci il tasso che vuoi, non uno in tempo reale: quanto vale 1 {} nella nuova valuta. Poi vedi ogni importo convertito e puoi correggerne qualsiasi prima che cambi qualcosa.	Ingresa la tasa que quieras, no una en vivo: cuánto vale 1 {} en la nueva moneda. Luego ves cada monto convertido y puedes corregir cualquiera antes de que cambie algo.	Shkruaj kursin që do, jo një të drejtpërdrejtë: sa vlen 1 {} në monedhën e re. Pastaj sheh çdo shumë të konvertuar dhe mund të korrigjosh secilën para se të ndryshojë diçka.
 Settle these first (they're priced in {})	Sistema prima queste (sono in {})	Resuelve esto primero (tiene precios en {})	Zgjidh fillimisht këto (janë në {})
@@ -2958,7 +3482,6 @@ Suspend {}?	Sospendere {}?	¿Suspender {}?	Ta pezullosh {}?
 Close {}?	Chiudere {}?	¿Cerrar {}?	Ta mbyllësh {}?
 Its staff can sign in and work again.	Il personale può accedere e lavorare di nuovo.	Su personal puede iniciar sesión y trabajar de nuevo.	Stafi mund të hyjë dhe të punojë përsëri.
 Its staff are signed out at once and can't sign in until you open it again. Nothing is deleted.	Il personale viene disconnesso subito e non può accedere finché non lo riapri. Niente viene eliminato.	Su personal sale de inmediato y no puede iniciar sesión hasta que lo vuelvas a abrir. No se elimina nada.	Stafi nxirret menjëherë dhe nuk mund të hyjë derisa ta hapësh përsëri. Asgjë nuk fshihet.
-Remove branch	Rimuovi sede	Eliminar sucursal	Hiq pikën
 Review again	Rivedi	Revisar de nuevo	Rishiko
 Removal options could not be loaded. Update the server and try again.	Impossibile caricare le opzioni di rimozione. Aggiorna il server e riprova.	No se pudieron cargar las opciones de eliminación. Actualiza el servidor e inténtalo de nuevo.	Opsionet e heqjes nuk u ngarkuan dot. Përditëso serverin dhe provo përsëri.
 The branch disappears from the lists. Its sales, payments and historical records stay. Shared menus and stock items stay with the restaurant.	La sede scompare dagli elenchi. Vendite, pagamenti e registri storici restano. Menù e articoli condivisi restano al ristorante.	La sucursal desaparece de las listas. Sus ventas, pagos y registros históricos se mantienen. Los menús y artículos compartidos se quedan con el restaurante.	Pika zhduket nga listat. Shitjet, pagesat dhe regjistrat historikë mbeten. Menutë dhe artikujt e përbashkët mbeten te restoranti.
@@ -3007,7 +3530,6 @@ Applications ({})	Domande ({})	Solicitudes ({})	Aplikimet ({})
 Applications	Domande	Solicitudes	Aplikimet
 Save or cancel the new order to return to search and filters.	Salva o annulla il nuovo ordine per tornare a ricerca e filtri.	Guarda o cancela el nuevo orden para volver a la búsqueda y los filtros.	Ruaj ose anulo renditjen e re për t'u kthyer te kërkimi dhe filtrat.
 Search by name, code or city	Cerca per nome, codice o città	Buscar por nombre, código o ciudad	Kërko sipas emrit, kodit ose qytetit
-Manage	Gestisci	Gestionar	Menaxho
 No owner yet	Ancora nessun titolare	Todavía sin propietario	Ende pa pronar
 Add owner	Aggiungi titolare	Añadir propietario	Shto pronar
 Invitation expired	Invito scaduto	Invitación vencida	Ftesa skadoi
@@ -3096,7 +3618,6 @@ Assigned {}	Assegnata {}	Asignada {}	Caktuar {}
 Started {}	Iniziato {}	Empezó {}	Filloi {}
 HOW IT WAS SOLVED	COME È STATA RISOLTA	CÓMO SE RESOLVIÓ	SI U ZGJIDH
 Solved, without a note.	Risolta, senza nota.	Resuelta, sin nota.	U zgjidh, pa shënim.
-By {}	Da {}	Por {}	Nga {}
 Sent by {}	Inviata da {}	Enviada por {}	Dërguar nga {}
 {} gave it to {}	{} l'ha data a {}	{} se la dio a {}	{} ia dha {}
 {} gave it to someone	{} l'ha data a qualcuno	{} se la dio a alguien	{} ia dha dikujt
@@ -3346,7 +3867,6 @@ Are you sure you want to delete this variant?	Vuoi davvero eliminare questa vari
 Could not delete this variant.	Impossibile eliminare questa variante.	No se pudo eliminar esta variante.	Ky variant nuk u fshi dot.
 Are you sure you want to delete this option group?	Vuoi davvero eliminare questo gruppo di opzioni?	¿Seguro que quieres eliminar este grupo de opciones?	Je i sigurt që do ta fshish këtë grup opsionesh?
 Could not delete this option group.	Impossibile eliminare questo gruppo di opzioni.	No se pudo eliminar este grupo de opciones.	Ky grup opsionesh nuk u fshi dot.
-Options	Opzioni	Opciones	Opsionet
 No option groups yet. Add a group of choices below, like sauces or sides.	Ancora nessun gruppo di opzioni. Aggiungi un gruppo di scelte qui sotto, come salse o contorni.	Todavía no hay grupos de opciones. Añade un grupo de opciones abajo, como salsas o acompañamientos.	Ende pa grupe opsionesh. Shto një grup zgjedhjesh më poshtë, si salca ose garnitura.
 Required	Obbligatorio	Obligatorio	I detyrueshëm
 Optional	Facoltativo	Opcional	Opsional
@@ -3377,9 +3897,7 @@ Linked preparation unavailable · select or clear	Preparazione collegata non dis
 No preparation	Nessuna preparazione	Sin preparación	Pa përgatitje
 No active preparations (Admin Hub → Inventory → Preparations)	Nessuna preparazione attiva (Admin Hub → Magazzino → Preparazioni)	No hay preparaciones activas (Admin Hub → Inventario → Preparaciones)	Asnjë përgatitje aktive (Admin Hub → Inventari → Përgatitjet)
 Usage ({})	Utilizzo ({})	Uso ({})	Përdorimi ({})
-^\\d+(\\.\\d{1,2})?$	^\\d+(\\.\\d{1,2})?$	^\\d+(\\.\\d{1,2})?$	^\\d+(\\.\\d{1,2})?$
 \\d+(\\.\\d{1,2})?	\\d+(\\.\\d{1,2})?	\\d+(\\.\\d{1,2})?	\\d+(\\.\\d{1,2})?
-^[+-]?\\d+(\\.\\d{1,2})?$	^[+-]?\\d+(\\.\\d{1,2})?$	^[+-]?\\d+(\\.\\d{1,2})?$	^[+-]?\\d+(\\.\\d{1,2})?$
 Occasion extra	Extra per occasioni	Extra para ocasiones	Shtesë për raste
 Order at least … hours ahead (empty: any time)	Ordina almeno … ore prima (vuoto: in qualsiasi momento)	Pedir al menos … horas antes (vacío: en cualquier momento)	Porosit të paktën … orë përpara (bosh: në çdo kohë)
 e.g. 48 for a cake	es. 48 per una torta	p. ej. 48 para un pastel	p.sh. 48 për një tortë
@@ -3494,8 +4012,6 @@ Available from	Disponibile dalle	Disponible desde	E disponueshme nga
 Available until	Disponibile fino alle	Disponible hasta	E disponueshme deri
 Use 24-hour time in HH:mm format, for example 17:00.	Usa l'orario a 24 ore nel formato HH:mm, per esempio 17:00.	Usa el formato de 24 horas HH:mm, por ejemplo 17:00.	Përdor orën 24-orëshe në formatin HH:mm, për shembull 17:00.
 Add any notes about when or how this menu is used	Aggiungi note su quando o come si usa questo menù	Añade notas sobre cuándo o cómo se usa este menú	Shto shënime për kur ose si përdoret kjo menu
-^(\\d{4})-(\\d{2})-(\\d{2})$	^(\\d{4})-(\\d{2})-(\\d{2})$	^(\\d{4})-(\\d{2})-(\\d{2})$	^(\\d{4})-(\\d{2})-(\\d{2})$
-^#[0-9A-Fa-f]{6}$	^#[0-9A-Fa-f]{6}$	^#[0-9A-Fa-f]{6}$	^#[0-9A-Fa-f]{6}$
 Try Again	Riprova	Reintentar	Provo përsëri
 Close editor	Chiudi editor	Cerrar editor	Mbyll redaktuesin
 Saporini Italiano	Saporini Italiano	Saporini Italiano	Saporini Italiano
@@ -3672,7 +4188,6 @@ Try a different search or filter.	Prova un'altra ricerca o filtro.	Prueba otra b
 Select an order to see its details	Seleziona un ordine per vederne i dettagli	Selecciona un pedido para ver sus detalles	Zgjidh një porosi për të parë detajet
 Choose an order from the list to view items,\nstatus and more.	Scegli un ordine dall'elenco per vedere piatti,\nstato e altro.	Elige un pedido de la lista para ver productos,\nestado y más.	Zgjidh një porosi nga lista për të parë artikujt,\ngjendjen dhe më shumë.
 drawable:order_empty_dining	drawable:order_empty_dining	drawable:order_empty_dining	drawable:order_empty_dining
-Loading…	Caricamento…	Cargando…	Duke ngarkuar…
 Copied	Copiato	Copiado	U kopjua
 {} of {} not sent	{} di {} non inviati	{} de {} sin enviar	{} nga {} pa dërguar
 Opened at {}	Aperto alle {}	Abierto a las {}	Hapur në {}
@@ -3682,9 +4197,7 @@ Edit order	Modifica ordine	Editar pedido	Ndrysho porosinë
 Items ({})	Piatti ({})	Productos ({})	Artikujt ({})
 Order type	Tipo di ordine	Tipo de pedido	Lloji i porosisë
 Source	Origine	Origen	Burimi
-Payment	Pagamento	Pago	Pagesa
 Created	Creato	Creado	Krijuar
-Subtotal	Subtotale	Subtotal	Nëntotali
 Service charge (0%)	Coperto (0%)	Cargo por servicio (0%)	Tarifa e shërbimit (0%)
 Print	Stampa	Imprimir	Printo
 Request bill	Chiedi il conto	Pedir la cuenta	Kërko faturën
@@ -3749,7 +4262,6 @@ Choose items from the menu to start.	Scegli i piatti dal menù per iniziare.	Eli
 Customize	Personalizza	Personalizar	Personalizo
 Remove / void	Togli / storna	Quitar / anular	Hiq / storno
 Changes are saved to this order as you make them.	Le modifiche vengono salvate in questo ordine mentre le fai.	Los cambios se guardan en este pedido mientras los haces.	Ndryshimet ruhen në këtë porosi ndërsa i bën.
-Standard	Standard	Estándar	Standard
 Choose {}–{}	Scegli {}–{}	Elige {}–{}	Zgjidh {}–{}
 Item notes	Note del piatto	Notas del producto	Shënimet e artikullit
 Order note	Nota dell'ordine	Nota del pedido	Shënimi i porosisë
@@ -3771,7 +4283,6 @@ Tax (included)	Tasse (incluse)	Impuestos (incluidos)	Taksa (e përfshirë)
 Send pending items to kitchen	Invia i piatti in sospeso in cucina	Enviar productos pendientes a cocina	Dërgo artikujt në pritje në kuzhinë
 View full order  →	Vedi ordine completo  →	Ver pedido completo  →	Shiko porosinë e plotë  →
 Start an order	Avvia un ordine	Empezar un pedido	Nis një porosi
-Table	Tavolo	Mesa	Tavolina
 Choose a table	Scegli un tavolo	Elige una mesa	Zgjidh një tavolinë
 {} · {} seats · {}	{} · {} posti · {}	{} · {} lugares · {}	{} · {} vende · {}
 Customer	Cliente	Cliente	Klienti
@@ -3848,7 +4359,6 @@ Order status	Stato dell'ordine	Estado del pedido	Gjendja e porosisë
 Food status	Stato del cibo	Estado de la comida	Gjendja e ushqimit
 Provide both date boundaries	Indica entrambe le date	Indica ambas fechas	Jep të dyja kufijtë e datave
 Cash	Contanti	Efectivo	Para në dorë
-Card	Carta	Tarjeta	Kartë
 Contactless	Contactless	Sin contacto	Pa kontakt
 Phone wallet	Wallet del telefono	Billetera del teléfono	Portofol telefoni
 Gift card	Carta regalo	Tarjeta de regalo	Kartë dhuratë
@@ -3909,7 +4419,6 @@ Hold card or device near the reader, insert the chip, or swipe the magnetic stri
 Margherita Pizza	Pizza Margherita	Pizza Margarita	Pica Margarita
 Fettuccine Alfredo	Fettuccine Alfredo	Fettuccine Alfredo	Fettuccine Alfredo
 Insalata Caprese	Insalata Caprese	Insalata Caprese	Insalata Caprese
-Tiramisu	Tiramisu	Tiramisu	Tiramisu
 The server answered for another order	Il server ha risposto per un altro ordine	El servidor respondió por otro pedido	Serveri u përgjigj për një porosi tjetër
 You can't take payments	Non puoi incassare pagamenti	No puedes cobrar	Nuk mund të marrësh pagesa
 Only a manager can cancel a payment, on the day it was taken, before any refund	Solo un responsabile può annullare un pagamento, nel giorno in cui è stato preso, prima di qualsiasi rimborso	Solo un gerente puede cancelar un pago, el mismo día que se cobró, antes de cualquier reembolso	Vetëm një menaxher mund të anulojë një pagesë, në ditën që u mor, para çdo rimbursimi
@@ -3929,7 +4438,6 @@ opened {}	aperto {}	abierto {}	hapur {}
 Loading the dishes…	Caricamento dei piatti…	Cargando los platos…	Duke ngarkuar pjatat…
 The dishes couldn't be loaded.	Impossibile caricare i piatti.	No se pudieron cargar los platos.	Pjatat nuk u ngarkuan dot.
 {} items	{} piatti	{} productos	{} artikuj
-Paid	Pagato	Pagado	E paguar
 {} of {} paid	{} di {} pagati	{} de {} pagados	{} nga {} të paguara
 Service	Coperto	Servicio	Shërbimi
 Tax {}%{}	Tasse {}%{}	Impuestos {}%{}	Taksa {}%{}
@@ -3944,7 +4452,6 @@ Amount to give back	Importo da restituire	Importe a devolver	Shuma për t'u kthy
 Up to {}	Fino a {}	Hasta {}	Deri në {}
 Charged the wrong table	Addebitato al tavolo sbagliato	Se cobró a la mesa equivocada	U ngarkua tavolina e gabuar
 Dish sent back	Piatto rimandato indietro	Plato devuelto	Pjata u kthye mbrapa
-Receipt	Scontrino	Recibo	Fatura
 Served by	Servito da	Atendido por	Shërbyer nga
 Date	Data	Fecha	Data
 Left to pay	Resta da pagare	Queda por pagar	Mbetet për të paguar
@@ -4020,7 +4527,6 @@ Less than {}: a goodwill refund is never all of it	Meno di {}: un rimborso di co
 Add the guest's email to send a payment link	Aggiungi l'email dell'ospite per inviare un link di pagamento	Añade el correo del cliente para enviar un enlace de pago	Shto email-in e mysafirit për të dërguar lidhjen e pagesës
 Too late: order {} h ahead	Troppo tardi: ordina {} h prima	Demasiado tarde: pide con {} h de antelación	Shumë vonë: porosit {} orë përpara
 Too late to order	Troppo tardi per ordinare	Demasiado tarde para pedir	Shumë vonë për të porositur
-{} to pay	{} da pagare	{} por pagar	{} për të paguar
 Couldn't load the booking's money.	Impossibile caricare i soldi della prenotazione.	No se pudo cargar el dinero de la reserva.	Paratë e rezervimit nuk u ngarkuan dot.
 Money	Denaro	Dinero	Paratë
 Nothing paid for this booking.	Niente pagato per questa prenotazione.	No se pagó nada por esta reserva.	Asgjë e paguar për këtë rezervim.
@@ -4057,6 +4563,7 @@ Finish visit	Concludi visita	Terminar visita	Përfundo vizitën
 Left without ordering	Andati via senza ordinare	Se fueron sin pedir	Ikën pa porositur
 Hold table longer	Tieni il tavolo più a lungo	Guardar la mesa más tiempo	Mbaje tavolinën më gjatë
 Mark as no show	Segna come mancato arrivo	Marcar como no presentado	Shëno si mosparaqitje
+Cancel booking	Annulla prenotazione	Cancelar reserva	Anulo rezervimin
 Left before being seated	Andati via prima di sedersi	Se fueron antes de sentarse	Ikën para se të uleshin
 From an earlier day: give a reason	Di un giorno precedente: indica un motivo	De un día anterior: indica un motivo	Nga një ditë më parë: jep një arsye
 More than {} since it was {}: give a reason	Più di {} da quando era {}: indica un motivo	Más de {} desde que estaba {}: indica un motivo	Më shumë se {} që kur ishte {}: jep një arsye
@@ -4081,6 +4588,7 @@ No show	Mancato arrivo	No presentado	Mosparaqitje
 Request expired	Richiesta scaduta	Solicitud vencida	Kërkesa skadoi
 Guest confirmed	Ospite confermato	Cliente confirmó	Mysafiri konfirmoi
 Confirmed by app	Confermato dall'app	Confirmado por la app	Konfirmuar nga aplikacioni
+Branch closed then	Sede chiusa a quell'ora	Sucursal cerrada a esa hora	Dega e mbyllur atëherë
 Change table	Cambia tavolo	Cambiar mesa	Ndrysho tavolinën
 Use this table	Usa questo tavolo	Usar esta mesa	Përdor këtë tavolinë
 {} guests · {}	{} ospiti · {}	{} comensales · {}	{} mysafirë · {}
@@ -4198,6 +4706,7 @@ Phone switched off	Telefono spento	Teléfono apagado	Telefoni i fikur
 Mark as no show?	Segnare come mancato arrivo?	¿Marcar como no presentado?	Ta shënosh si mosparaqitje?
 {} didn't come. The table becomes free, and it counts in the guest's history.	{} non è venuto. Il tavolo si libera e viene contato nello storico dell'ospite.	{} no vino. La mesa queda libre y cuenta en el historial del cliente.	{} nuk erdhi. Tavolina lirohet dhe llogaritet në historikun e mysafirit.
 Mark no show	Segna mancato arrivo	Marcar no presentado	Shëno mosparaqitje
+Cancel this booking?	Annullare questa prenotazione?	¿Cancelar esta reserva?	Ta anulosh këtë rezervim?
 The booking for {} is cancelled and its table becomes free. You can reopen it later.	La prenotazione di {} viene annullata e il tavolo si libera. Puoi riaprirla più tardi.	Se cancela la reserva de {} y su mesa queda libre. Puedes reabrirla después.	Rezervimi i {} anulohet dhe tavolina lirohet. Mund ta rihapësh më vonë.
 Guest called to cancel	L'ospite ha chiamato per annullare	El cliente llamó para cancelar	Mysafiri telefonoi për ta anuluar
 Booked twice	Prenotato due volte	Reservado dos veces	Rezervuar dy herë
@@ -4208,6 +4717,7 @@ Reopen this booking?	Riaprire questa prenotazione?	¿Reabrir esta reserva?	Ta ri
 The booking for {} is back on. A table given to someone else meanwhile isn't taken back.	La prenotazione di {} è di nuovo attiva. Un tavolo dato nel frattempo a qualcun altro non viene ripreso.	La reserva de {} vuelve a estar activa. Una mesa dada a otra persona mientras tanto no se recupera.	Rezervimi i {} është përsëri aktiv. Një tavolinë e dhënë dikujt tjetër ndërkohë nuk merret mbrapsht.
 Could not load this reservation.	Impossibile caricare questa prenotazione.	No se pudo cargar esta reserva.	Ky rezervim nuk u ngarkua dot.
 Unassigned	Non assegnato	Sin asignar	E pacaktuar
+Call {}	Chiama {}	Llama al {}	Telefono {}
 tel:{}	tel:{}	tel:{}	tel:{}
 Email {}	Email {}	Correo {}	Email {}
 Back to details	Torna ai dettagli	Volver a los detalles	Kthehu te detajet
@@ -4268,6 +4778,7 @@ Booking areas	Aree di prenotazione	Áreas de reserva	Zonat e rezervimit
 Loading day bookings	Caricamento prenotazioni del giorno	Cargando reservas del día	Duke ngarkuar rezervimet e ditës
 {} confirmed	{} confermate	{} confirmadas	{} të konfirmuara
 {} pending	{} in attesa	{} pendientes	{} në pritje
+{} cancelled	{} annullate	{} canceladas	{} të anuluara
 Guests expected	Ospiti attesi	Comensales esperados	Mysafirë të pritur
 No bookings yet	Ancora nessuna prenotazione	Todavía no hay reservas	Ende pa rezervime
 Biggest booking: {} guests	Prenotazione più grande: {} ospiti	Reserva más grande: {} comensales	Rezervimi më i madh: {} mysafirë
@@ -4366,12 +4877,12 @@ Expand	Espandi	Expandir	Hap
 Coming	In arrivo	Por llegar	Po vjen
 Nothing matches "{}".	Nessun risultato per "{}".	Nada coincide con "{}".	Asgjë nuk përputhet me "{}".
 Timeline	Cronologia	Línea de tiempo	Kronologjia
-Map	Mappa	Mapa	Harta
 Back to overview	Torna alla panoramica	Volver al resumen	Kthehu te përmbledhja
 Table / Area	Tavolo / Area	Mesa / Área	Tavolina / Zona
 Only booked	Solo prenotati	Solo reservadas	Vetëm të rezervuara
 Show {}	Mostra {}	Mostrar {}	Shfaq {}
 Hide {}	Nascondi {}	Ocultar {}	Fshih {}
+Pick a time	Scegli un orario	Elige una hora	Zgjidh një orë
 Couldn't load the waitlist	Impossibile caricare la lista d'attesa	No se pudo cargar la lista de espera	Lista e pritjes nuk u ngarkua dot
 Couldn't save the change	Impossibile salvare la modifica	No se pudo guardar el cambio	Ndryshimi nuk u ruajt dot
 Waitlist	Lista d'attesa	Lista de espera	Lista e pritjes
@@ -4443,7 +4954,6 @@ Serve the starters as soon as they sit down	Servi gli antipasti appena si siedon
 About	Circa	Aprox.	Rreth
 Tax and service are added when it's saved.	Tasse e coperto vengono aggiunti al salvataggio.	Los impuestos y el servicio se añaden al guardar.	Taksa dhe shërbimi shtohen kur ruhet.
 Couldn't load this dish's choices.	Impossibile caricare le scelte di questo piatto.	No se pudieron cargar las opciones de este plato.	Zgjedhjet e kësaj pjate nuk u ngarkuan dot.
-Size	Taglia	Tamaño	Madhësia
 choose {}	scegli {}	elige {}	zgjidh {}
 at least {}	almeno {}	al menos {}	të paktën {}
 up to {}	fino a {}	hasta {}	deri në {}
@@ -4526,7 +5036,6 @@ It shows here once you work shifts with the “My Shifts” permission.	Compare 
 Hours worked	Ore lavorate	Horas trabajadas	Orë të punuara
 Hourly wage	Paga oraria	Pago por hora	Paga për orë
 Not set yet	Non ancora impostata	Todavía sin definir	Ende e pavendosur
-Wages	Paghe	Salarios por hora	Pagat
 Week so far	Settimana finora	Semana hasta ahora	Java deri tani
 Month so far	Mese finora	Mes hasta ahora	Muaji deri tani
 Hours without a wage aren't paid here yet. Your manager sets wages in Admin Hub.	Le ore senza paga non vengono ancora pagate qui. Il tuo responsabile imposta le paghe in Admin Hub.	Las horas sin pago por hora todavía no se pagan aquí. Tu gerente define los pagos en Admin Hub.	Orët pa pagë nuk paguhen ende këtu. Menaxheri yt i vendos pagat te Admin Hub.
@@ -4547,10 +5056,8 @@ Part refunded	Rimborsato in parte	Reembolsado en parte	Pjesërisht e rimbursuar
 You can view only your own sales.	Puoi vedere solo le tue vendite.	Solo puedes ver tus propias ventas.	Mund të shohësh vetëm shitjet e tua.
 You do not have permission to view these sales.	Non hai il permesso di vedere queste vendite.	No tienes permiso para ver estas ventas.	Nuk ke leje t'i shohësh këto shitje.
 Could not load sales. Check your connection and refresh.	Impossibile caricare le vendite. Controlla la connessione e aggiorna.	No se pudieron cargar las ventas. Revisa tu conexión y actualiza.	Shitjet nuk u ngarkuan dot. Kontrollo lidhjen dhe rifresko.
-Month	Mese	Mes	Muaji
 Team	Squadra	Equipo	Ekipi
 Staff member	Membro del personale	Miembro del personal	Anëtar i stafit
-Staff	Personale	Personal	Stafi
 Still to pay	Ancora da pagare	Por pagar	Ende për të paguar
 By the hour	A ore	Por hora	Me orë
 Monthly salary	Stipendio mensile	Salario mensual	Rroga mujore
@@ -4604,6 +5111,7 @@ Pay {}	Paga {}	Pagar a {}	Paguaj {}
 no hours	nessuna ora	sin horas	pa orë
 Set pay first	Imposta prima la paga	Define primero el pago	Vendos fillimisht pagesën
 Mark as not paid	Segna come non pagato	Marcar como no pagado	Shëno si të papaguar
+Move to {}	Sposta in {}	Mover a {}	Zhvendos te {}
 Set up pay	Imposta la paga	Definir pago	Vendos pagesën
 Nothing yet	Ancora niente	Todavía nada	Ende asgjë
 Enter how much you pay.	Inserisci quanto paghi.	Escribe cuánto pagas.	Shkruaj sa paguan.
@@ -4622,7 +5130,6 @@ How, and a note	Come, e una nota	Cómo, y una nota	Si, dhe një shënim
 Paid so far	Pagato finora	Pagado hasta ahora	Paguar deri tani
 This records the payment. No money is sent from the app.	Questo registra il pagamento. Nessun denaro viene inviato dall'app.	Esto registra el pago. La app no envía dinero.	Kjo regjistron pagesën. Aplikacioni nuk dërgon para.
 With the team	Con la squadra	Con el equipo	Me ekipin
-Mark as paid	Segna come pagato	Marcar como pagado	Shëno si të paguar
 Mark {} as paid	Segna {} come pagato	Marcar {} como pagado	Shëno {} si të paguar
 This records that you paid them. No money is sent from the app.	Questo registra che li hai pagati. Nessun denaro viene inviato dall'app.	Esto registra que les pagaste. La app no envía dinero.	Kjo regjistron që i pagove. Aplikacioni nuk dërgon para.
 Everyone here is already paid.	Qui sono già tutti pagati.	Aquí ya están todos pagados.	Të gjithë këtu janë paguar tashmë.
@@ -4643,7 +5150,6 @@ Not paid per shift	Non pagato per turno	No se paga por turno	Nuk paguhet për tu
 No amounts until pay is set	Nessun importo finché la paga non è impostata	Sin importes hasta definir el pago	Pa shuma derisa të vendoset pagesa
 No shifts worked {}.	Nessun turno lavorato {}.	Ningún turno trabajado {}.	Asnjë turn i punuar {}.
 No wage	Nessuna paga	Sin pago por hora	Pa pagë
-Show fewer	Mostra meno	Mostrar menos	Shfaq më pak
 Show all {} shifts	Mostra tutti i {} turni	Mostrar los {} turnos	Shfaq të gjitha {} turnet
 Some shifts were worked before a wage was set, so they aren't paid here yet.	Alcuni turni sono stati lavorati prima che fosse impostata una paga, quindi non sono ancora pagati qui.	Algunos turnos se trabajaron antes de definir un pago por hora, así que todavía no se pagan aquí.	Disa turne u punuan para se të vendosej paga, ndaj nuk paguhen ende këtu.
 Enter the salary, like 1400.	Inserisci lo stipendio, come 1400.	Escribe el salario, como 1400.	Shkruaj rrogën, si 1400.
@@ -4651,7 +5157,6 @@ Enter the wage, like 12.50.	Inserisci la paga, come 12.50.	Escribe el pago por h
 That's too high. Check the amount.	È troppo alto. Controlla l'importo.	Es demasiado alto. Revisa el importe.	Është shumë e lartë. Kontrollo shumën.
 Paid for the hours they work	Pagato per le ore lavorate	Se paga por las horas que trabaja	Paguhet për orët që punon
 The same amount each month	Lo stesso importo ogni mese	El mismo importe cada mes	E njëjta shumë çdo muaj
-Wage	Paga	Pago por hora	Paga
 a month	al mese	al mes	në muaj
 an hour	all'ora	por hora	në orë
 The same every month, however many hours they work. Their hours are still counted.	Lo stesso ogni mese, qualunque siano le ore lavorate. Le ore vengono comunque contate.	Lo mismo cada mes, sin importar cuántas horas trabaje. Sus horas se siguen contando.	E njëjta çdo muaj, sado orë të punojë. Orët e tij numërohen gjithsesi.
@@ -4714,7 +5219,6 @@ Shift details	Dettagli turno	Detalles del turno	Detajet e turnit
 Day off	Giorno libero	Día libre	Ditë pushimi
 On duty · {}	In servizio · {}	De servicio · {}	Në detyrë · {}
 {} planned	{} previsto	{} planeado	{} planifikuar
-Coming up	In arrivo	Próximamente	Në vijim
 Nothing planned	Niente in programma	Nada planeado	Asgjë e planifikuar
 New shifts show up here when your manager plans them.	I nuovi turni compaiono qui quando il tuo responsabile li pianifica.	Los nuevos turnos aparecen aquí cuando tu gerente los planea.	Turnet e reja shfaqen këtu kur menaxheri i planifikon.
 Clock in now	Timbra ora	Fichar ahora	Shëno hyrjen tani
@@ -5168,8 +5672,6 @@ No tables · the only floor can't be removed	Nessun tavolo · l'unico piano non 
 No tables	Nessun tavolo	Sin mesas	Pa tavolina
 You can have up to 3 floors.	Puoi avere fino a 3 piani.	Puedes tener hasta 3 pisos.	Mund të kesh deri në 3 kate.
 Use two fingers to zoom the plan, then one finger to move it.	Usa due dita per ingrandire la pianta, poi un dito per spostarla.	Usa dos dedos para hacer zoom en el plano y luego un dedo para moverlo.	Përdor dy gishta për të zmadhuar planin, pastaj një gisht për ta lëvizur.
-Zoom out	Riduci	Alejar	Zvogëlo
-Zoom in	Ingrandisci	Acercar	Zmadho
 Fit the plan	Adatta la pianta	Ajustar el plano	Përshtat planin
 Could not load the table layout	Impossibile caricare la disposizione dei tavoli	No se pudo cargar la distribución de mesas	Planimetria e tavolinave nuk u ngarkua
 Could not save the table layout	Impossibile salvare la disposizione dei tavoli	No se pudo guardar la distribución de mesas	Planimetria e tavolinave nuk u ruajt
@@ -5330,7 +5832,6 @@ Money in and out	Entrate e uscite	Entradas y salidas	Hyrje dhe dalje parash
 balance in {} {}	saldo in {} {}	saldo en {} {}	bilanci në {} {}
 {} · balance {}{}	{} · saldo {}{}	{} · saldo {}{}	{} · bilanci {}{}
 Where the money came from	Da dove sono arrivati i soldi	De dónde vino el dinero	Nga erdhën paratë
-Where the money went	Dove sono andati i soldi	A dónde fue el dinero	Ku shkuan paratë
 came in	entrato	entró	hyri
 went out	uscito	salió	doli
 Money in by day	Entrate per giorno	Entradas por día	Hyrje sipas ditës
@@ -5397,7 +5898,6 @@ Popularity and margin	Popolarità e margine	Popularidad y margen	Popullariteti d
 each dot a dish	ogni punto un piatto	cada punto un plato	çdo pikë një pjatë
 {} sold · {} margin · {} profit	{} venduti · {} margine · {} profitto	{} vendidos · {} margen · {} ganancia	{} të shitura · {} marzh · {} fitim
 Puzzles	Enigmi	Enigmas	Enigma
-Stars	Stelle	Estrellas	Yje
 Dogs	Cani	Perros	Qen
 Workhorses	Cavalli da lavoro	Caballos de batalla	Kuaj pune
 Stars sell a lot and earn well; workhorses sell but earn less; puzzles earn well but sell little. Margins use estimated ingredient costs.	Le stelle vendono molto e rendono bene; i cavalli da lavoro vendono ma rendono meno; gli enigmi rendono bene ma vendono poco. I margini usano costi stimati degli ingredienti.	Las estrellas se venden mucho y dejan buena ganancia; los caballos de batalla se venden pero dejan menos; los enigmas dejan buena ganancia pero se venden poco. Los márgenes usan costos estimados de ingredientes.	Yjet shiten shumë dhe fitojnë mirë; kuajt e punës shiten por fitojnë më pak; enigmat fitojnë mirë por shiten pak. Marzhet përdorin kosto të vlerësuara të përbërësve.
@@ -5515,7 +6015,6 @@ Sales, orders and guests for every day	Vendite, ordini e ospiti per ogni giorno	
 Sales by hour and weekday	Vendite per ora e giorno della settimana	Ventas por hora y día de la semana	Shitje sipas orës dhe ditës së javës
 Sales and orders for each hour of the day and each weekday	Vendite e ordini per ogni ora del giorno e ogni giorno della settimana	Ventas y pedidos de cada hora del día y cada día de la semana	Shitjet dhe porositë për çdo orë të ditës dhe çdo ditë të javës
 {} and 7 weekdays	{} e 7 giorni della settimana	{} y 7 días de la semana	{} dhe 7 ditët e javës
-Order details	Dettagli ordini	Detalle de pedidos	Detajet e porosive
 Every order with its time, table, person, items and payments	Ogni ordine con ora, tavolo, persona, articoli e pagamenti	Cada pedido con su hora, mesa, persona, artículos y pagos	Çdo porosi me orën, tavolinën, personin, artikujt dhe pagesat
 Dishes & stock	Piatti e magazzino	Platos e inventario	Pjata dhe stok
 Every dish sold, how many and for how much	Ogni piatto venduto, quanti e per quanto	Cada plato vendido, cuántos y por cuánto	Çdo pjatë e shitur, sa copë dhe për sa
@@ -5542,13 +6041,11 @@ Download a spreadsheet	Scarica un foglio di calcolo	Descargar una hoja de cálcu
 They open in Excel, Numbers or Google Sheets.	Si aprono in Excel, Numbers o Google Sheets.	Se abren en Excel, Numbers o Google Sheets.	Hapen në Excel, Numbers ose Google Sheets.
 CSV · {}	CSV · {}	CSV · {}	CSV · {}
 Preparing…	Preparazione…	Preparando…	Po përgatitet…
-Download	Scarica	Descargar	Shkarko
 Hour	Ora	Hora	Ora
 Weekday	Giorno della settimana	Día de la semana	Dita e javës
 Sales on an average day	Vendite in un giorno medio	Ventas en un día promedio	Shitje në një ditë mesatare
 Menu section	Sezione del menù	Sección del menú	Seksioni i menusë
 Share of sales	Quota delle vendite	Parte de las ventas	Pjesa e shitjeve
-Person	Persona	Persona	Personi
 Removed value	Valore tolto	Valor quitado	Vlera e hequr
 Voided orders	Ordini stornati	Pedidos anulados	Porosi të stornuara
 In all	In totale	En total	Gjithsej
@@ -5559,7 +6056,6 @@ Sales per hour	Vendite per ora	Ventas por hora	Shitje për orë
 Labour cost of sales	Costo del lavoro sulle vendite	Costo laboral sobre ventas	Kostoja e punës ndaj shitjeve
 Deposits taken	Caparre prese	Depósitos cobrados	Depozita të marra
 Deposits refunded	Caparre rimborsate	Depósitos reembolsados	Depozita të rimbursuara
-Line	Riga	Línea	Rreshti
 VAT {}% in the sales	IVA {}% nelle vendite	IVA {}% en las ventas	TVSH {}% në shitje
 Payment method	Metodo di pagamento	Método de pago	Mënyra e pagesës
 Wasted item	Articolo sprecato	Artículo desechado	Artikull i humbur
@@ -5590,7 +6086,6 @@ No online orders yet: every sale was taken by staff	Ancora nessun ordine online:
 Under {}	Sotto {}	Menos de {}	Nën {}
 {} and more	{} e oltre	{} o más	{} e më shumë
 Bill sizes	Importi dei conti	Tamaños de cuenta	Madhësitë e faturave
-Bills	Conti	Cuentas	Fatura
 Number of bills	Numero di conti	Número de cuentas	Numri i faturave
 Share of bills	Quota dei conti	Parte de las cuentas	Pjesa e faturave
 Bills of {} are {} of the bills but {} of the sales	I conti di {} sono il {} dei conti ma il {} delle vendite	Las cuentas de {} son el {} de las cuentas pero el {} de las ventas	Faturat {} janë {} e faturave por {} e shitjeve
@@ -5754,12 +6249,24 @@ Left out	Escluso	Excluido	Lënë jashtë
 {}.csv · {} lines	{}.csv · {} righe	{}.csv · {} líneas	{}.csv · {} rreshta
 No printer is set up on this computer: the pages opened in your PDF viewer, print them from there	Nessuna stampante configurata su questo computer: le pagine si sono aperte nel lettore PDF, stampale da lì	No hay impresora configurada en esta computadora: las páginas se abrieron en tu visor de PDF, imprímelas desde ahí	Asnjë printer i konfiguruar në këtë kompjuter: faqet u hapën në lexuesin PDF, printoji prej andej
 Couldn't print: printing was cancelled or isn't possible here	Impossibile stampare: la stampa è stata annullata o non è possibile qui	No se pudo imprimir: la impresión se canceló o no es posible aquí	Printimi dështoi: u anulua ose nuk është i mundur këtu
+Choose a branch	Scegli una sede	Elige una sucursal	Zgjidh një pikë
+WHERE YOU'RE LOOKING	DOVE STAI GUARDANDO	DÓNDE ESTÁS MIRANDO	KU PO SHIKON
+Its orders and payments, branch by branch. Menus, prices and settings are set once for every branch.	I suoi ordini e pagamenti, sede per sede. Menù, prezzi e impostazioni valgono per tutte le sedi.	Sus pedidos y pagos, sucursal por sucursal. Menús, precios y configuración se definen una vez para todas.	Porositë dhe pagesat, pikë pas pike. Menutë, çmimet dhe cilësimet vendosen një herë për të gjitha pikat.
+Each branch has its own kitchen: pick the branch to see it.	Ogni sede ha la sua cucina: scegli la sede per vederla.	Cada sucursal tiene su cocina: elige la sucursal para verla.	Çdo pikë ka kuzhinën e vet: zgjidh pikën për ta parë.
+One branch, or all of them together.	Una sede, o tutte insieme.	Una sucursal, o todas juntas.	Një pikë, ose të gjitha bashkë.
+Your branch · {}	La tua sede · {}	Tu sucursal · {}	Pika jote · {}
 {} - coming soon	{} - in arrivo	{} - próximamente	{} - së shpejti
 No open branch assigned	Nessuna sede aperta assegnata	Ninguna sucursal abierta asignada	Asnjë pikë e hapur e caktuar
 No access assigned	Nessun accesso assegnato	Ningún acceso asignado	Asnjë qasje e caktuar
 Your branch is unavailable. Ask your administrator to assign an open branch, then try again.	La tua sede non è disponibile. Chiedi al tuo amministratore di assegnarti una sede aperta, poi riprova.	Tu sucursal no está disponible. Pide a tu administrador que te asigne una sucursal abierta y vuelve a intentarlo.	Pika jote nuk është e disponueshme. Kërkoji administratorit të të caktojë një pikë të hapur, pastaj provo përsëri.
 Your account has no workspace access yet.\nPlease contact your administrator.	Il tuo account non ha ancora accesso a un'area di lavoro.\nContatta il tuo amministratore.	Tu cuenta aún no tiene acceso a un espacio de trabajo.\nContacta a tu administrador.	Llogaria jote nuk ka ende qasje në një hapësirë pune.\nKontakto administratorin.
-Back to the branches	Torna alle sedi	Volver a las sucursales	Kthehu te pikat
+Work in a branch	Lavora in una sede	Trabaja en una sucursal	Puno në një pikë
+Its orders, kitchen, stock, staff and shifts	I suoi ordini, cucina, magazzino, personale e turni	Sus pedidos, cocina, inventario, personal y turnos	Porositë, kuzhina, stoku, stafi dhe turnet e saj
+All {} branches together	Tutte le {} sedi insieme	Las {} sucursales juntas	Të {} pikat bashkë
+Every branch together	Tutte le sedi insieme	Todas las sucursales juntas	Të gjitha pikat bashkë
+Every branch together · coming soon	Tutte le sedi insieme · in arrivo	Todas las sucursales juntas · muy pronto	Të gjitha pikat bashkë · së shpejti
+Every branch together comes soon. For now, work in one branch at a time.	Tutte le sedi insieme arriva presto. Per ora lavora in una sede alla volta.	Todas las sucursales juntas llega pronto. Por ahora, trabaja en una sucursal a la vez.	Të gjitha pikat bashkë vjen së shpejti. Për tani puno në një pikë në një kohë.
+All open	Tutte aperte	Todas abiertas	Të gjitha të hapura
 Welcome	Benvenuto	Bienvenido	Mirë se vjen
 Welcome, {}	Benvenuto, {}	Bienvenido, {}	Mirë se vjen, {}
 Choose your workspace	Scegli la tua area di lavoro	Elige tu espacio de trabajo	Zgjidh hapësirën e punës
@@ -5769,6 +6276,8 @@ Kitchen Display System	Schermo di cucina	Pantalla de cocina	Ekrani i kuzhinës
 Shifts, salary, users, devices and settings	Turni, stipendi, utenti, dispositivi e impostazioni	Turnos, salarios, usuarios, dispositivos y configuración	Turne, rroga, përdorues, pajisje dhe cilësime
 Stock, items, counts and suppliers	Magazzino, articoli, inventari e fornitori	Inventario, artículos, conteos y proveedores	Stok, artikuj, numërime dhe furnitorë
 Sales, performance and reports	Vendite, rendimento e report	Ventas, desempeño e informes	Shitje, performancë dhe raporte
+Finance & taxation	Finanza e fisco	Finanzas e impuestos	Financat dhe tatimet
+Taxes, VAT, expenses and payroll	Tasse, IVA, spese e paghe	Impuestos, IVA, gastos y nómina	Taksat, TVSH, shpenzimet dhe pagat
 Suspicious activity and alerts	Attività sospette e avvisi	Actividad sospechosa y alertas	Aktivitet i dyshimtë dhe njoftime
 Details, branches, currency and time zone	Dettagli, sedi, valuta e fuso orario	Detalles, sucursales, moneda y zona horaria	Detaje, pika, monedha dhe zona kohore
 PosTerminal	PosTerminal	PosTerminal	PosTerminal
@@ -6144,6 +6653,10 @@ Something changed since the preview ({}). Look at the preview again.	Qualcosa è
 Unknown currency {}. Use a 3-letter code such as EUR, ALL or USD.	Valuta sconosciuta {}. Usa un codice di 3 lettere come EUR, ALL o USD.	Moneda desconocida {}. Usa un código de 3 letras como EUR, ALL o USD.	Monedhë e panjohur {}. Përdor një kod me 3 shkronja si EUR, ALL ose USD.
 The restaurant already uses {}	Il ristorante usa già {}	El restaurante ya usa {}	Restoranti përdor tashmë {}
 Choose a rounding step that fits {} ({} decimal places)	Scegli un passo di arrotondamento adatto a {} ({} decimali)	Elige un paso de redondeo que encaje con {} ({} decimales)	Zgjidh një hap rrumbullakimi që i përshtatet {} ({} shifra dhjetore)
+The receipt's design must be an object	Il disegno dello scontrino deve essere un oggetto	El diseño del recibo debe ser un objeto	Dizajni i faturës duhet të jetë një objekt
+The receipt's design is too big	Il disegno dello scontrino è troppo grande	El diseño del recibo es demasiado grande	Dizajni i faturës është shumë i madh
+The receipt was changed meanwhile. Reload it and try again.	Lo scontrino è stato cambiato nel frattempo. Ricaricalo e riprova.	El recibo se cambió mientras tanto. Recárgalo e inténtalo de nuevo.	Fatura u ndryshua ndërkohë. Ringarkoje dhe provo sërish.
+The receipt's design couldn't be read	Non è stato possibile leggere il disegno dello scontrino	No se pudo leer el diseño del recibo	Dizajni i faturës nuk mund të lexohej
 Only the Super Admin can change a branch's {}	Solo il Super Admin può cambiare {} di una sede	Solo el Super Admin puede cambiar {} de una sucursal	Vetëm Super Admini mund të ndryshojë {} e një pike
 These details have changed, or the edit version is missing. Refresh and review your changes before saving.	Questi dati sono cambiati o manca la versione della modifica. Aggiorna e rivedi le modifiche prima di salvare.	Estos datos cambiaron o falta la versión de edición. Actualiza y revisa tus cambios antes de guardar.	Këto të dhëna kanë ndryshuar ose mungon versioni i ndryshimit. Rifresko dhe rishiko ndryshimet para ruajtjes.
 This branch is still in use: {}. Move or finish these first, or close the branch instead.	Questa sede è ancora in uso: {}. Prima sposta o concludi questi, oppure chiudi la sede.	Esta sucursal aún está en uso: {}. Mueve o termina esto primero, o mejor cierra la sucursal.	Kjo pikë është ende në përdorim: {}. Zhvendosi ose përfundoji këto së pari, ose mbyll pikën.
@@ -6385,6 +6898,8 @@ Change restaurant info	Modificare le informazioni del ristorante	Cambiar la info
 Description, phone, email, addresses, logo, colours and receipt texts	Descrizione, telefono, email, indirizzi, logo, colori e testi dello scontrino	Descripción, teléfono, correo, direcciones, logo, colores y textos del recibo	Përshkrimi, telefoni, email-i, adresat, logoja, ngjyrat dhe tekstet e faturës
 Change opening hours	Modificare l'orario di apertura	Cambiar el horario	Ndrysho orarin e hapjes
 Each branch's week and its special days	La settimana di ogni sede e i suoi giorni speciali	La semana de cada sucursal y sus días especiales	Java e çdo pike dhe ditët e saj të veçanta
+Work in every branch	Lavora in ogni sede	Trabaja en todas las sucursales	Puno në çdo pikë
+Choose the branch to work in and switch between the restaurant's branches	Scegli la sede in cui lavorare e passa da una sede all'altra	Elige la sucursal donde trabajar y cambia entre las sucursales del restaurante	Zgjidh pikën ku punon dhe kalo nga një pikë te tjetra
 Sales, orders and guests at a glance	Vendite, ordini e ospiti in sintesi	Ventas, pedidos y comensales de un vistazo	Shitje, porosi dhe mysafirë me një shikim
 See Sales	Vedere Vendite	Ver Ventas	Shiko Shitjet
 Sales by day, hour, service and floor	Vendite per giorno, ora, servizio e piano	Ventas por día, hora, servicio y piso	Shitjet sipas ditës, orës, shërbimit dhe katit
@@ -6562,6 +7077,177 @@ Each covers the days chosen at the top.	Ognuno copre i giorni scelti in alto.	Ca
 · Closed	· Chiuso	· Cerrado	· E mbyllur
 · No sales	· Nessuna vendita	· Sin ventas	· Pa shitje
 In	In	En	Në
+Add what you want, click it to change it, drag it to move it. The top and bottom texts are saved with the bar; the rest stays on this device for now.	Aggiungi quello che vuoi, cliccalo per cambiarlo, trascinalo per spostarlo. I testi in alto e in basso si salvano con la barra; il resto per ora resta su questo dispositivo.	Agrega lo que quieras, haz clic para cambiarlo, arrástralo para moverlo. Los textos de arriba y abajo se guardan con la barra; el resto por ahora se queda en este dispositivo.	Shto çfarë të duash, kliko për ta ndryshuar, tërhiqe për ta lëvizur. Tekstet lart dhe poshtë ruhen me shiritin; pjesa tjetër për tani mbetet në këtë pajisje.
+Paste: {}	Incolla: {}	Pegar: {}	Ngjit: {}
+Goes after the part picked, or at the end	Va dopo la parte scelta, o alla fine	Va después de la parte elegida, o al final	Shkon pas pjesës së zgjedhur, ose në fund
+It can't go on the preliminary bill	Non può andare sul preconto	No puede ir en la precuenta	Nuk mund të shkojë në parafaturë
+It can't go on the fiscal invoice	Non può andare sulla fattura fiscale	No puede ir en la factura fiscal	Nuk mund të shkojë në faturën tatimore
+Copy, to paste here or on the other receipt	Copia, per incollarlo qui o sull'altro scontrino	Copiar, para pegarlo aquí o en el otro recibo	Kopjo, për ta ngjitur këtu ose në faturën tjetër
+Click to pick · drag to move · drag the board or use the wheel to look around	Clicca per scegliere · trascina per spostare · trascina il piano o usa la rotella per guardarti intorno	Haz clic para elegir · arrastra para mover · arrastra el tablero o usa la rueda para mirar	Kliko për të zgjedhur · tërhiq për të lëvizur · tërhiq tabelën ose përdor rrotën për të parë përreth
+Both	Entrambi	Ambos	Të dyja
+Preliminary bill only	Solo preconto	Solo precuenta	Vetëm parafaturë
+Fiscal invoice only	Solo fattura fiscale	Solo factura fiscal	Vetëm faturë tatimore
+Prints on	Si stampa su	Se imprime en	Shtypet në
+Printed on every preliminary bill: it has no fiscal number and isn't sent to DGII. The order can still change after it.	Stampato su ogni preconto: non ha numero fiscale e non va alla DGII. L'ordine si può ancora cambiare dopo.	Se imprime en cada precuenta: no tiene número fiscal y no se envía a la DGII. El pedido aún puede cambiar después.	Shtypet në çdo parafaturë: nuk ka numër tatimor dhe nuk dërgohet te DGII. Porosia mund të ndryshojë ende më pas.
+Name, address, phone and VAT number, from the restaurant's details.	Nome, indirizzo, telefono e partita IVA, dai dati del ristorante.	Nombre, dirección, teléfono y número de IVA, de los datos del restaurante.	Emri, adresa, telefoni dhe numri i TVSH-së, nga të dhënat e restorantit.
+Receipt R1042	Receipt R1042	Receipt R1042	Receipt R1042
+Table T07 · 4 guests	Table T07 · 4 guests	Table T07 · 4 guests	Table T07 · 4 guests
+Waiter: Sara	Cameriere: Sara	Mesero: Sara	Kamarier: Sara
+Opens	Apre	Abre	Hap
+Any link: a menu, a review page, a Wi-Fi code…	Qualsiasi link: un menu, una pagina di recensioni, un codice Wi-Fi…	Cualquier enlace: un menú, una página de reseñas, un código de Wi-Fi…	Çdo lidhje: një menu, një faqe vlerësimesh, një kod Wi-Fi…
+Add the {} link in Details first, or choose Your own link.	Aggiungi prima il link di {} in Dettagli, o scegli Il tuo link.	Agrega primero el enlace de {} en Detalles, o elige Tu propio enlace.	Shto fillimisht lidhjen e {} te Detajet, ose zgjidh Lidhja jote.
+({}: add the link in Details)	({}: aggiungi il link in Dettagli)	({}: agrega el enlace en Detalles)	({}: shto lidhjen te Detajet)
+Logo and receipt texts were saved	Logo e testi dello scontrino sono stati salvati	Se guardaron el logo y los textos del recibo	Logoja dhe tekstet e faturës u ruajtën
+A real barcode of the receipt's number, so it can be found again by scanning it.	Un vero codice a barre del numero dello scontrino, per ritrovarlo scansionandolo.	Un código de barras real del número del recibo, para encontrarlo escaneándolo.	Një barkod i vërtetë i numrit të faturës, për ta gjetur duke e skanuar.
+Add the {} link in Details first.	Aggiungi prima il link di {} in Dettagli.	Agrega primero el enlace de {} en Detalles.	Shto fillimisht lidhjen e {} te Detajet.
+Click to pick · drag to move · drag the board to look around	Clicca per scegliere · trascina per spostare · trascina il piano per guardarti intorno	Haz clic para elegir · arrastra para mover · arrastra el tablero para mirar	Kliko për të zgjedhur · tërhiq për të lëvizur · tërhiq tabelën për të parë përreth
+You changed the receipt texts	Hai cambiato i testi dello scontrino	Cambiaste los textos del recibo	Ndryshove tekstet e faturës
+Fill it	Riempi	Rellenar	Mbushe
+In the middle	Al centro	En el centro	Në mes
+At the top	In alto	Arriba	Lart
+Logo & receipts	Logo e scontrini	Logo y recibos	Logoja dhe faturat
+Design your receipt: a picture behind, the lines, a barcode or a QR code. It shows as you change it.	Disegna il tuo scontrino: un'immagine dietro, le linee, un codice a barre o un codice QR. Si vede mentre lo cambi.	Diseña tu recibo: una imagen detrás, las líneas, un código de barras o un código QR. Se ve mientras lo cambias.	Dizajno faturën tënde: një foto pas, vijat, një barkod ose një kod QR. Shfaqet ndërsa e ndryshon.
+Lines	Linee	Líneas	Vijat
+On the receipt	Sullo scontrino	En el recibo	Në faturë
+The receipt's number, to find it again	Il numero dello scontrino, per ritrovarlo	El número del recibo, para encontrarlo de nuevo	Numri i faturës, për ta gjetur sërish
+Guests scan it to open a link	Gli ospiti lo scansionano per aprire un link	Los comensales lo escanean para abrir un enlace	Mysafirët e skanojnë për të hapur një lidhje
+Under the QR code	Sotto il codice QR	Debajo del código QR	Nën kodin QR
+The design is kept on this device for now.	Per ora il disegno resta su questo dispositivo.	Por ahora el diseño se guarda en este dispositivo.	Për tani dizajni ruhet në këtë pajisje.
+Drag to move it	Trascina per spostarlo	Arrastra para moverlo	Tërhiqe për ta lëvizur
+Receipt 1042	Scontrino 1042	Recibo 1042	Fatura 1042
+Table T07	Tavolo T07	Mesa T07	Tavolina T07
+2 × Margherita	2 × Margherita	2 × Margherita	2 × Margherita
+1 × Tagliatelle	1 × Tagliatelle	1 × Tagliatelle	1 × Tagliatelle
+2 × Espresso	2 × Espresso	2 × Espresso	2 × Espresso
+1 × Tiramisu	1 × Tiramisu	1 × Tiramisu	1 × Tiramisu
+Use a PNG, JPEG or WebP picture for the logo.	Usa un'immagine PNG, JPEG o WebP per il logo.	Usa una imagen PNG, JPEG o WebP para el logo.	Përdor një foto PNG, JPEG ose WebP për logon.
+The logo is too big. Use a picture under 5 MB.	Il logo è troppo grande. Usa un'immagine sotto i 5 MB.	El logo es demasiado grande. Usa una imagen de menos de 5 MB.	Logoja është shumë e madhe. Përdor një foto nën 5 MB.
+On receipts, the booking page and every email. You place it in its square before it's saved.	Sugli scontrini, sulla pagina delle prenotazioni e in ogni email. Lo posizioni nel suo quadrato prima di salvarlo.	En los recibos, la página de reservas y cada correo. Lo colocas en su cuadrado antes de guardarlo.	Në fatura, në faqen e rezervimeve dhe në çdo email. E vendos në katrorin e saj para se të ruhet.
+Upload logo	Carica logo	Subir logo	Ngarko logon
+Replace logo	Sostituisci logo	Reemplazar logo	Zëvendëso logon
+Remove logo	Rimuovi logo	Quitar logo	Hiq logon
+Receipt texts	Testi dello scontrino	Textos del recibo	Tekstet e faturës
+Printed at the top and the bottom of every receipt.	Stampati in alto e in fondo a ogni scontrino.	Impresos arriba y abajo de cada recibo.	Printohen lart dhe poshtë çdo fature.
+On receipts, the booking page and every email. A square picture looks best.	Sugli scontrini, sulla pagina di prenotazione e in ogni email. Un'immagine quadrata rende meglio.	En los recibos, la página de reservas y cada email. Una imagen cuadrada se ve mejor.	Në fatura, në faqen e rezervimeve dhe në çdo email. Një foto katrore duket më mirë.
+How a receipt looks	Come appare uno scontrino	Cómo se ve un recibo	Si duket një faturë
+As you type, with {}'s address.	Mentre scrivi, con l'indirizzo di {}.	Mientras escribes, con la dirección de {}.	Ndërsa shkruan, me adresën e {}.
+You changed the colours or receipt texts	Hai modificato i colori o i testi dello scontrino	Cambiaste los colores o los textos del recibo	Ndryshove ngjyrat ose tekstet e faturës
+Colours	Colori	Colores	Ngjyrat
+The main colour tints the booking page and the top of this page.	Il colore principale tinge la pagina di prenotazione e la parte alta di questa pagina.	El color principal tiñe la página de reservas y la parte superior de esta página.	Ngjyra kryesore ngjyros faqen e rezervimeve dhe krye të kësaj faqeje.
+Main colour	Colore principale	Color principal	Ngjyra kryesore
+Second colour	Secondo colore	Segundo color	Ngjyra e dytë
+1 × Espresso	1 × Espresso	1 × Espresso	1 × Espresso
+{} moved to {} {} at {}	{} spostata a {} {} alle {}	{} movida a {} {} a las {}	{} u zhvendos në {} {} në {}
+The hours are saved. Call the guests first, then move or cancel each one.	Gli orari sono salvati. Chiama prima gli ospiti, poi sposta o annulla ognuna.	Los horarios están guardados. Llama primero a los clientes y luego mueve o cancela cada una.	Oraret u ruajtën. Telefono fillimisht mysafirët, pastaj zhvendos ose anulo secilin.
+Ask someone who manages bookings to move or cancel them.	Chiedi a chi gestisce le prenotazioni di spostarle o annullarle.	Pide a quien gestiona las reservas que las mueva o cancele.	Kërkoji dikujt që menaxhon rezervimet t'i zhvendosë ose t'i anulojë.
+Change time	Cambia orario	Cambiar hora	Ndrysho orën
+{} · now {}	{} · ora {}	{} · ahora {}	{} · tani {}
+Loading the open times…	Caricamento degli orari di apertura…	Cargando los horarios abiertos…	Po ngarkohen oraret e hapura…
+Closed that day, or no time left. Pick another day.	Chiuso quel giorno, o nessun orario rimasto. Scegli un altro giorno.	Cerrado ese día o sin horas libres. Elige otro día.	E mbyllur atë ditë, ose s'ka më orë. Zgjidh një ditë tjetër.
+Why	Perché	Por qué	Pse
+The week	La settimana	La semana	Java
+Special days	Giorni speciali	Días especiales	Ditë të veçanta
+Add special day	Aggiungi giorno speciale	Agregar día especial	Shto ditë të veçantë
+No special days coming up.	Nessun giorno speciale in arrivo.	No hay días especiales próximos.	Asnjë ditë e veçantë së shpejti.
+Special days count once the week's hours are set.	I giorni speciali contano quando l'orario della settimana è impostato.	Los días especiales cuentan cuando el horario de la semana está configurado.	Ditët e veçanta vlejnë pasi të vendoset orari i javës.
+Change special day	Modifica giorno speciale	Editar día especial	Ndrysho ditën e veçantë
+A date or a few days in a row: closed, or other hours.	Una data o alcuni giorni di fila: chiuso, o un altro orario.	Una fecha o varios días seguidos: cerrado, u otro horario.	Një datë ose disa ditë rresht: mbyllur, ose orar tjetër.
+Which days	Quali giorni	Qué días	Cilat ditë
+Those days	Quei giorni	Esos días	Ato ditë
+No links yet.	Ancora nessun link.	Aún no hay enlaces.	Ende pa lidhje.
+Your pin, from the exact location.	Il tuo segnaposto, dalla posizione esatta.	Tu marcador, a partir de la ubicación exacta.	Shenja jote, nga vendndodhja e saktë.
+No exact location yet. Add it with Edit.	Ancora nessuna posizione esatta. Aggiungila con Modifica.	Aún no hay ubicación exacta. Agrégala con Editar.	Ende pa vendndodhje të saktë. Shtoje me Ndrysho.
+Editing the details	Stai modificando i dettagli	Editando los detalles	Po ndryshon detajet
+Your details	I tuoi dettagli	Tus detalles	Detajet e tua
+Change what you need, then save. Cancel puts everything back.	Cambia quello che serve, poi salva. Annulla rimette tutto com'era.	Cambia lo que necesites y guarda. Cancelar deja todo como estaba.	Ndrysho atë që të duhet, pastaj ruaj. Anulo i kthen të gjitha si ishin.
+What guests see in emails and on receipts.	Quello che gli ospiti vedono nelle email e sugli scontrini.	Lo que los comensales ven en los correos y en los recibos.	Çfarë shohin mysafirët në emaile dhe në fatura.
+Not added yet	Non ancora aggiunto	Aún no agregado	Ende pa shtuar
+^[0-9A-Fa-f:.]*$	^[0-9A-Fa-f:.]*$	^[0-9A-Fa-f:.]*$	^[0-9A-Fa-f:.]*$
+^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$	^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$	^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$	^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$
+^[A-Za-z0-9._-]+$	^[A-Za-z0-9._-]+$	^[A-Za-z0-9._-]+$	^[A-Za-z0-9._-]+$
+^#([0-9a-fA-F]{3}){1,2}$	^#([0-9a-fA-F]{3}){1,2}$	^#([0-9a-fA-F]{3}){1,2}$	^#([0-9a-fA-F]{3}){1,2}$
+^[A-Za-z0-9._-]{3,50}$	^[A-Za-z0-9._-]{3,50}$	^[A-Za-z0-9._-]{3,50}$	^[A-Za-z0-9._-]{3,50}$
+A link or a name without spaces	Un link o un nome senza spazi	Un enlace o un nombre sin espacios	Një lidhje ose një emër pa hapësira
+^-?\\d{1,13}(\\.\\d{1,4})?$	^-?\\d{1,13}(\\.\\d{1,4})?$	^-?\\d{1,13}(\\.\\d{1,4})?$	^-?\\d{1,13}(\\.\\d{1,4})?$
+On its booking page and in its booking emails. Left empty, guests see the restaurant's.	Sulla sua pagina di prenotazione e nelle email di prenotazione. Se vuoto, gli ospiti vedono quelli del ristorante.	En su página de reservas y en sus emails de reserva. Si lo dejas vacío, los clientes ven los del restaurante.	Në faqen e saj të rezervimeve dhe në emailet e rezervimeve. Bosh, mysafirët shohin ato të restorantit.
+The name on receipts, the booking website and every email.	Il nome sugli scontrini, sul sito delle prenotazioni e in ogni email.	El nombre en los recibos, en el sitio de reservas y en cada correo.	Emri në fatura, në faqen e rezervimeve dhe në çdo email.
+About the restaurant	Sul ristorante	Sobre el restaurante	Rreth restorantit
+A few words guests read on the booking website.	Poche parole che gli ospiti leggono sul sito di prenotazione.	Unas palabras que los clientes leen en el sitio de reservas.	Disa fjalë që mysafirët lexojnë në faqen e rezervimeve.
+Where guests find you online. Leave empty what you don't use.	Dove gli ospiti ti trovano online. Lascia vuoto quello che non usi.	Dónde te encuentran los comensales en internet. Deja vacío lo que no uses.	Ku të gjejnë mysafirët në internet. Lëre bosh atë që nuk përdor.
+{} shows its guests its own: {}	{} mostra ai suoi ospiti i propri: {}	{} muestra a sus clientes los suyos: {}	{} u tregon mysafirëve të vetët: {}
+Use the ones above	Usa quelli sopra	Usar los de arriba	Përdor ato më sipër
+^\\d+(\\.\\d{1,2})?$	^\\d+(\\.\\d{1,2})?$	^\\d+(\\.\\d{1,2})?$	^\\d+(\\.\\d{1,2})?$
+^[+-]?\\d+(\\.\\d{1,2})?$	^[+-]?\\d+(\\.\\d{1,2})?$	^[+-]?\\d+(\\.\\d{1,2})?$	^[+-]?\\d+(\\.\\d{1,2})?$
+^(\\d{4})-(\\d{2})-(\\d{2})$	^(\\d{4})-(\\d{2})-(\\d{2})$	^(\\d{4})-(\\d{2})-(\\d{2})$	^(\\d{4})-(\\d{2})-(\\d{2})$
+^#[0-9A-Fa-f]{6}$	^#[0-9A-Fa-f]{6}$	^#[0-9A-Fa-f]{6}$	^#[0-9A-Fa-f]{6}$
+Only the Super Admin changes these	Solo il Super Admin li cambia	Solo el Super Admin los cambia	Vetëm Super Admini i ndryshon
+Where guests find you online, shown on the booking website. Leave empty what you don't use.	Dove gli ospiti ti trovano online, sul sito delle prenotazioni. Lascia vuoto quello che non usi.	Dónde te encuentran los clientes en internet, en el sitio de reservas. Deja vacío lo que no uses.	Ku të gjejnë mysafirët në internet, në faqen e rezervimeve. Lëre bosh atë që nuk përdor.
+Your restaurant	Il tuo ristorante	Tu restaurante	Restoranti yt
+The booking website, as you type.	Il sito delle prenotazioni, mentre scrivi.	El sitio de reservas, mientras escribes.	Faqja e rezervimeve, ndërsa shkruan.
+Booking website	Sito delle prenotazioni	Sitio de reservas	Faqja e rezervimeve
+Add a few words so guests know what to expect.	Aggiungi due parole così gli ospiti sanno cosa aspettarsi.	Agrega unas palabras para que los clientes sepan qué esperar.	Shto disa fjalë që mysafirët të dinë çfarë t'i presë.
+End of a booking email	Fine di un'email di prenotazione	Final de un correo de reserva	Fundi i një email-i rezervimi
+write to {}	scrivi a {}	escribe a {}	shkruaj te {}
+Add a phone and an email	Aggiungi un telefono e un'email	Añade un teléfono y un correo	Shto një telefon dhe një email
+Questions? {}	Domande? {}	¿Preguntas? {}	Pyetje? {}
+The tax number (NIPT) is in Restaurant info → Legal & tax.	Il numero fiscale (NIPT) è in Info ristorante → Legale e tasse.	El número fiscal (NIPT) está en Información del restaurante → Legal e impuestos.	Numri tatimor (NIPT) është te Info e restorantit → Ligjore dhe tatime.
+The restaurant as a company	Il ristorante come azienda	El restaurante como empresa	Restoranti si kompani
+Who the restaurant is	Chi è il ristorante	Quién es el restaurante	Kush është restoranti
+Its name on receipts, the booking website and every email.	Il suo nome sugli scontrini, sul sito di prenotazione e in ogni email.	Su nombre en los recibos, el sitio de reservas y cada correo.	Emri i tij në fatura, në faqen e rezervimeve dhe në çdo email.
+A short name the system uses, e.g. SAPORINI_TIRANA	Un nome breve usato dal sistema, es. SAPORINI_TIRANA	Un nombre corto que usa el sistema, p. ej. SAPORINI_TIRANA	Një emër i shkurtër që përdor sistemi, p.sh. SAPORINI_TIRANA
+How guests reach you	Come ti raggiungono gli ospiti	Cómo te contactan los clientes	Si të kontaktojnë mysafirët
+On the booking website and in every booking email; receipts print the phone. A branch's own come first.	Sul sito di prenotazione e in ogni email di prenotazione; gli scontrini stampano il telefono. Quelli della sede vengono prima.	En el sitio de reservas y en cada email de reserva; los recibos imprimen el teléfono. Los de la sucursal van primero.	Në faqen e rezervimeve dhe në çdo email rezervimi; faturat printojnë telefonin. Ato të pikës vijnë të parat.
+Add a description so guests know what to expect.	Aggiungi una descrizione così gli ospiti sanno cosa aspettarsi.	Añade una descripción para que los clientes sepan qué esperar.	Shto një përshkrim që mysafirët të dinë çfarë të presin.
+The booking website and booking emails, as you type.	Il sito di prenotazione e le email di prenotazione, mentre scrivi.	El sitio de reservas y los correos de reserva, mientras escribes.	Faqja e rezervimeve dhe email-et e rezervimeve, ndërsa shkruan.
+Addresses	Indirizzi	Direcciones	Adresat
+Where the company is registered, billed and run from.	Dove l'azienda è registrata, fatturata e gestita.	Dónde está registrada, se factura y se dirige la empresa.	Ku është e regjistruar, faturohet dhe drejtohet kompania.
+No address yet. Receipts of branches without their own print the main one.	Nessun indirizzo ancora. Gli scontrini delle sedi senza un proprio indirizzo stampano quello principale.	Aún no hay dirección. Los recibos de las sucursales sin dirección propia imprimen la principal.	Ende pa adresë. Faturat e pikave pa adresën e tyre printojnë atë kryesore.
+People to contact	Persone da contattare	Personas de contacto	Njerëz për t'u kontaktuar
+Who to call about the restaurant: accounting, support, a manager.	Chi chiamare per il ristorante: contabilità, assistenza, un responsabile.	A quién llamar por el restaurante: contabilidad, soporte, un gerente.	Kë të telefonosh për restorantin: kontabilitet, mbështetje, një menaxher.
+Add contact	Aggiungi contatto	Añadir contacto	Shto kontakt
+No contact people yet.	Ancora nessuna persona da contattare.	Aún no hay personas de contacto.	Ende pa njerëz kontakti.
+Watch every kitchen	Guarda ogni cucina	Mira cada cocina	Shiko çdo kuzhinë
+Every kitchen	Ogni cucina	Cada cocina	Çdo kuzhinë
+Only watching: open a branch's kitchen to work in it · updated every 30 seconds	Solo da guardare: apri la cucina di una sede per lavorarci · aggiornato ogni 30 secondi	Solo para mirar: abre la cocina de una sucursal para trabajar en ella · se actualiza cada 30 segundos	Vetëm për të parë: hap kuzhinën e një pike për të punuar në të · rifreskohet çdo 30 sekonda
+Looking…	Sto guardando…	Mirando…	Po shikoj…
+1 station	1 postazione	1 estación	1 stacion
+{} stations	{} postazioni	{} estaciones	{} stacione
+1 ticket late	1 comanda in ritardo	1 comanda atrasada	1 porosi me vonesë
+{} tickets late	{} comande in ritardo	{} comandas atrasadas	{} porosi me vonesë
+On time	In orario	A tiempo	Në kohë
+Longest wait {} min	Attesa più lunga {} min	Espera más larga {} min	Pritja më e gjatë {} min
+Open its kitchen	Apri la sua cucina	Abrir su cocina	Hap kuzhinën e saj
+Contacts	Contatti	Contactos	Kontaktet
+You changed the restaurant's details	Hai modificato i dati del ristorante	Cambiaste los datos del restaurante	Ndryshove të dhënat e restorantit
+The restaurant as a company. Each branch's own address, phone and email are on its page under Branches.	Il ristorante come azienda. Indirizzo, telefono ed email di ogni sede sono nella sua pagina, in Sedi.	El restaurante como empresa. La dirección, el teléfono y el email de cada sucursal están en su página, en Sucursales.	Restoranti si kompani. Adresa, telefoni dhe emaili i çdo pike janë në faqen e saj, te Pikat.
+Legal & tax	Dati legali e fiscali	Legal e impuestos	Ligjore dhe tatimore
+The restaurant as a company. Each branch's own address, phone and email are inside the branch.	Il ristorante come azienda. Indirizzo, telefono ed email di ogni sede sono dentro la sede.	El restaurante como empresa. La dirección, el teléfono y el email de cada sucursal están dentro de la sucursal.	Restoranti si kompani. Adresa, telefoni dhe emaili i çdo pike janë brenda pikës.
+Go to the branches	Vai alle sedi	Ir a las sucursales	Shko te pikat
+Careful: the restaurant's legal identity	Attenzione: l'identità legale del ristorante	Cuidado: la identidad legal del restaurante	Kujdes: identiteti ligjor i restorantit
+Printed on receipts and invoices. Only the Super Admin changes it.	Stampata su scontrini e fatture. La modifica solo il Super Admin.	Se imprime en recibos y facturas. Solo el Super Admin la cambia.	Printohet në fatura. E ndryshon vetëm Super Admini.
+Legal identity	Identità legale	Identidad legal	Identiteti ligjor
+The company behind the restaurant.	L'azienda dietro il ristorante.	La empresa detrás del restaurante.	Kompania pas restorantit.
+Registered address	Sede legale	Domicilio fiscal	Adresa e regjistruar
+Same as the main address	Uguale all'indirizzo principale	Igual que la dirección principal	E njëjtë me adresën kryesore
+Tax and VAT	Tasse e IVA	Impuestos e IVA	Taksat dhe TVSH
+Receipts print the VAT and tax numbers of the details marked for receipts.	Gli scontrini stampano la partita IVA e i numeri fiscali dei dati segnati per gli scontrini.	Los recibos imprimen el IVA y los números fiscales de los datos marcados para recibos.	Faturat printojnë NIPT-in dhe numrat tatimorë të të dhënave të shënuara për fatura.
+No tax details yet.	Ancora nessun dato fiscale.	Aún no hay datos fiscales.	Ende pa të dhëna tatimore.
+Address & contacts	Indirizzo e contatti	Dirección y contactos	Adresa dhe kontaktet
+Shown on the booking website and in every booking email; receipts print the phone. A branch's own phone and email come first.	Mostrati sul sito delle prenotazioni e in ogni email di prenotazione; gli scontrini stampano il telefono. Telefono ed email propri di una sede hanno la precedenza.	Se muestran en el sitio de reservas y en cada correo de reserva; los recibos imprimen el teléfono. El teléfono y correo propios de una sucursal van primero.	Shfaqen në faqen e rezervimeve dhe në çdo email rezervimi; faturat printojnë telefonin. Telefoni dhe emaili i vetë pikës vijnë të parët.
+Open: its staff sign in and work as usual.	Aperto: il personale accede e lavora come sempre.	Abierto: su personal inicia sesión y trabaja como siempre.	I hapur: stafi hyn dhe punon si zakonisht.
+{}: its staff can't sign in. Data stays.	{}: il personale non può accedere. I dati restano.	{}: su personal no puede iniciar sesión. Los datos se mantienen.	{}: stafi nuk mund të hyjë. Të dhënat mbeten.
+A branch that's still in use (open orders, bookings to come, people clocked in, staff or devices) can't be removed. Close it instead, or move those first.	Una sede ancora in uso (ordini aperti, prenotazioni future, persone in turno, personale o dispositivi) non può essere rimossa. Chiudila invece, o sposta prima queste cose.	Una sucursal que todavía se usa (pedidos abiertos, reservas futuras, personas fichadas, personal o dispositivos) no se puede eliminar. Mejor ciérrala o mueve eso primero.	Një pikë që ende përdoret (porosi të hapura, rezervime që vijnë, njerëz në turn, staf ose pajisje) nuk mund të hiqet. Më mirë mbylle ose zhvendos fillimisht ato.
+The owner keeps each branch's phone, email and address up to date. Adding, closing or removing branches is for the Super Admin.	Il titolare tiene aggiornati telefono, email e indirizzo di ogni sede. Aggiungere, chiudere o rimuovere sedi spetta al Super Admin.	El propietario mantiene al día el teléfono, correo y dirección de cada sucursal. Añadir, cerrar o eliminar sucursales es cosa del Super Admin.	Pronari mban të përditësuar telefonin, email-in dhe adresën e çdo pike. Shtimi, mbyllja ose heqja e pikave i takon Super Admin.
+No address yet. Receipts print the address guests find the restaurant at.	Ancora nessun indirizzo. Gli scontrini stampano l'indirizzo dove gli ospiti trovano il ristorante.	Todavía sin dirección. Los recibos imprimen la dirección donde los clientes encuentran el restaurante.	Ende pa adresë. Faturat printojnë adresën ku mysafirët e gjejnë restorantin.
+No contact people yet (accounting, a manager, support).	Ancora nessuna persona di contatto (contabilità, un responsabile, assistenza).	Todavía no hay personas de contacto (contabilidad, un gerente, soporte).	Ende pa persona kontakti (kontabilitet, një menaxher, ndihmë).
+PNG, JPEG or WebP, up to 5 MB. A square picture looks best.	PNG, JPEG o WebP, fino a 5 MB. Un'immagine quadrata rende meglio.	PNG, JPEG o WebP, hasta 5 MB. Una imagen cuadrada se ve mejor.	PNG, JPEG ose WebP, deri në 5 MB. Një foto katrore duket më mirë.
+Undo	Annulla	Deshacer	Zhbëj
+How a receipt starts	Come inizia uno scontrino	Cómo empieza un recibo	Si nis një faturë
+1 × Espresso ........ {} 1.50	1 × Espresso ........ {} 1.50	1 × Espresso ........ {} 1.50	1 × Espresso ........ {} 1.50
+No tax details yet. Receipts print the VAT and tax numbers of the main tax details.	Ancora nessun dato fiscale. Gli scontrini stampano partita IVA e codice fiscale dei dati fiscali principali.	Todavía sin datos fiscales. Los recibos imprimen los números de IVA y fiscal de los datos fiscales principales.	Ende pa të dhëna tatimore. Faturat printojnë NIPT-in dhe numrin tatimor të të dhënave kryesore.
+Tax and VAT details are the restaurant's legal identity. Ask the Super Admin to change them.	I dati fiscali e IVA sono l'identità legale del ristorante. Chiedi al Super Admin di cambiarli.	Los datos fiscales y de IVA son la identidad legal del restaurante. Pide al Super Admin que los cambie.	Të dhënat tatimore dhe TVSH janë identiteti ligjor i restorantit. Kërkoji Super Admin t'i ndryshojë.
+Changing it converts every price, wage, cost and fixed fee at the rate you enter. You see every amount first and can correct any of them. Past sales keep their own currency; Statistics shows each currency separately.	Cambiarla converte ogni prezzo, paga, costo e tariffa fissa al tasso che inserisci. Vedi prima ogni importo e puoi correggerne qualsiasi. Le vendite passate mantengono la loro valuta; le Statistiche mostrano ogni valuta separatamente.	Cambiarla convierte cada precio, sueldo, costo y cargo fijo a la tasa que ingreses. Ves primero cada monto y puedes corregir cualquiera. Las ventas pasadas mantienen su moneda; Estadísticas muestra cada moneda por separado.	Ndryshimi i saj konverton çdo çmim, pagë, kosto dhe tarifë fikse me kursin që shkruan. I sheh së pari të gjitha shumat dhe mund të korrigjosh secilën. Shitjet e kaluara mbajnë monedhën e tyre; Statistikat e shfaqin çdo monedhë veçmas.
+Opening hours, menu hours, bookings and reports follow it. Before changing it you see what moves.	Orari di apertura, orari dei menù, prenotazioni e report lo seguono. Prima di cambiarlo vedi cosa si sposta.	Horarios de apertura, horarios de menús, reservas e informes lo siguen. Antes de cambiarlo ves lo que se mueve.	Orari i hapjes, oraret e menuve, rezervimet dhe raportet e ndjekin. Para se ta ndryshosh sheh çfarë lëviz.
 Send password reset	Invia reimpostazione password	Enviar restablecimiento de contraseña	Dërgo rivendosjen e fjalëkalimit
 It opens in the POS, kitchen and bookings	Si apre nel POS, in cucina e nelle prenotazioni	Se abre en el POS, la cocina y las reservas	Hapet në POS, kuzhinë dhe rezervime
 Nobody takes care of this restaurant	Nessuno si occupa di questo ristorante	Nadie se ocupa de este restaurante	Askush nuk kujdeset për këtë restorant
@@ -6626,12 +7312,7 @@ THE OWNER	IL TITOLARE	EL DUEÑO	PRONARI
 {} restaurants	{} ristoranti	{} restaurantes	{} restorante
 · may remove owners	· può rimuovere proprietari	· puede quitar dueños	· mund të heqë pronarë
 {} is approved. {} got an email to set a password.	{} è approvato. {} ha ricevuto un'email per impostare una password.	{} está aprobado. {} recibió un correo para crear una contraseña.	{} u miratua. {} mori një email për të vendosur fjalëkalimin.
-Choose a branch	Scegli una sede	Elige una sucursal	Zgjidh një pikë
 {} · {} · {} open	{} · {} · {} aperte	{} · {} · {} abiertas	{} · {} · {} të hapura
-1 branch	1 sede	1 sucursal	1 pikë
-{} branches	{} sedi	{} sucursales	{} pika
-No phone yet	Ancora nessun telefono	Todavía sin teléfono	Ende pa telefon
-No email yet	Ancora nessuna email	Todavía sin correo	Ende pa email
 Couldn't load the requests.	Impossibile caricare le richieste.	No se pudieron cargar las solicitudes.	Kërkesat nuk u ngarkuan.
 Mark as done?	Segnare come fatto?	¿Marcar como hecho?	Ta shënosh si të kryer?
 The restaurant sees that you declined it.	Il ristorante vede che l'hai rifiutata.	El restaurante ve que la rechazaste.	Restoranti sheh që e refuzove.

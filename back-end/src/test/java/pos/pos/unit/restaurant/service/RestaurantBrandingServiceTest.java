@@ -60,7 +60,7 @@ class RestaurantBrandingServiceTest {
         existing.setId(UUID.fromString("00000000-0000-0000-0000-000000000020"));
         existing.setRestaurant(restaurant);
         existing.setLogoUrl("https://cdn.pos.local/logo.png");
-        existing.setPrimaryColor("#112233");
+        existing.setReceiptHeader("Welcome");
 
         given(restaurantScopeService.requireAccessibleRestaurant(authentication, RESTAURANT_ID)).willReturn(restaurant);
         given(restaurantBrandingRepository.findByRestaurantIdAndDeletedAtIsNull(RESTAURANT_ID))
@@ -70,7 +70,7 @@ class RestaurantBrandingServiceTest {
 
         assertThat(response.getId()).isEqualTo(existing.getId());
         assertThat(response.getLogoUrl()).isEqualTo("https://cdn.pos.local/logo.png");
-        assertThat(response.getPrimaryColor()).isEqualTo("#112233");
+        assertThat(response.getReceiptHeader()).isEqualTo("Welcome");
     }
 
     @Test
@@ -93,8 +93,6 @@ class RestaurantBrandingServiceTest {
         Restaurant restaurant = restaurant();
         UpsertRestaurantBrandingRequest request = UpsertRestaurantBrandingRequest.builder()
                 .logoUrl("https://cdn.pos.local/logo.png")
-                .primaryColor("#112233")
-                .secondaryColor("#445566")
                 .receiptHeader("Hello")
                 .receiptFooter("Thanks")
                 .build();
@@ -111,7 +109,7 @@ class RestaurantBrandingServiceTest {
         RestaurantBrandingResponse response = restaurantBrandingService.upsertBranding(authentication, RESTAURANT_ID, request);
 
         assertThat(response.getId()).isNotNull();
-        assertThat(response.getPrimaryColor()).isEqualTo("#112233");
+        assertThat(response.getReceiptHeader()).isEqualTo("Hello");
         verify(restaurantBrandingRepository).save(any(RestaurantBranding.class));
     }
 
@@ -124,13 +122,10 @@ class RestaurantBrandingServiceTest {
         existing.setId(UUID.fromString("00000000-0000-0000-0000-000000000020"));
         existing.setRestaurant(restaurant);
         existing.setLogoUrl("https://cdn.pos.local/old-logo.png");
-        existing.setPrimaryColor("#000000");
-        existing.setSecondaryColor("#111111");
+        existing.setReceiptHeader("Old");
 
         UpsertRestaurantBrandingRequest request = UpsertRestaurantBrandingRequest.builder()
                 .logoUrl("https://cdn.pos.local/new-logo.png")
-                .primaryColor("#112233")
-                .secondaryColor("#445566")
                 .receiptHeader("Updated")
                 .receiptFooter("See you again")
                 .build();
@@ -144,8 +139,7 @@ class RestaurantBrandingServiceTest {
 
         verify(imageReleaser).releaseAfterCommit("https://cdn.pos.local/old-logo.png");
         assertThat(existing.getLogoUrl()).isEqualTo("https://cdn.pos.local/new-logo.png");
-        assertThat(existing.getPrimaryColor()).isEqualTo("#112233");
-        assertThat(existing.getSecondaryColor()).isEqualTo("#445566");
+        assertThat(existing.getReceiptHeader()).isEqualTo("Updated");
         assertThat(response.getId()).isEqualTo(existing.getId());
         verify(restaurantBrandingRepository).save(existing);
     }

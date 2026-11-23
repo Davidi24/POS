@@ -1,6 +1,8 @@
-# 23. Web
+# 24. Web
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
+
+The last step (user, 2026-11-23: "the web is the last thing we'll do; after the app is finished, then the web").
 
 Why last (user, 2026-11-17: "add 23 which is web, we will do it in the end"): the web pages show what the app and the server
 already do, so they're built once everything else is final.

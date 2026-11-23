@@ -19,8 +19,6 @@ public class RestaurantBrandingMapper {
         return RestaurantBrandingResponse.builder()
                 .id(branding.getId())
                 .logoUrl(branding.getLogoUrl())
-                .primaryColor(branding.getPrimaryColor())
-                .secondaryColor(branding.getSecondaryColor())
                 .receiptHeader(branding.getReceiptHeader())
                 .receiptFooter(branding.getReceiptFooter())
                 .createdAt(branding.getCreatedAt())
@@ -47,8 +45,6 @@ public class RestaurantBrandingMapper {
         if (request.getLogoUrl() != null) {
             branding.setLogoUrl(request.getLogoUrl().isBlank() ? null : request.getLogoUrl().trim());
         }
-        branding.setPrimaryColor(request.getPrimaryColor());
-        branding.setSecondaryColor(request.getSecondaryColor());
         branding.setReceiptHeader(request.getReceiptHeader());
         branding.setReceiptFooter(request.getReceiptFooter());
     }

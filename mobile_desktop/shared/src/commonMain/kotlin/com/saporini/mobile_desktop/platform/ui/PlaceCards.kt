@@ -279,12 +279,24 @@ internal fun CoverButton(
     onCover: (PickedPicture) -> Unit,
     onRemove: () -> Unit,
     onProblem: (String) -> Unit,
-    modifier: Modifier
+    modifier: Modifier,
+    // A pill with words instead of the round icon (the restaurant's page, where it's the way to change the banner).
+    label: String? = null
 ) {
     var open by remember { mutableStateOf(false) }
     val picker = rememberPicturePicker(onCover, onProblem)
     Box(modifier) {
-        HoverTooltip(if (hasCover) "Change the picture" else "Add a picture") {
+        if (label != null) {
+            Row(
+                Modifier.height(34.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.94f))
+                    .clickable(enabled = !busy) { if (hasCover) open = true else picker() }.padding(start = 11.dp, end = 13.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                if (busy) CircularProgressIndicator(Modifier.size(16.dp), color = Kit.Green, strokeWidth = 2.dp)
+                else Icon(Icons.Outlined.AddPhotoAlternate, null, Modifier.size(17.dp), tint = Kit.Ink)
+                Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Kit.Ink, maxLines = 1)
+            }
+        } else HoverTooltip(if (hasCover) "Change the picture" else "Add a picture") {
             Box(
                 Modifier.size(34.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.92f))
                     .clickable(enabled = !busy) { if (hasCover) open = true else picker() },

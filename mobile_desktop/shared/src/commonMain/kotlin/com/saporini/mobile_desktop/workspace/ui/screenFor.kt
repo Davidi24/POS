@@ -15,6 +15,7 @@ fun screenFor(workspace: Workspace): Screen = when (workspace) {
     Workspace.ADMIN -> AdminScreen
     Workspace.INVENTORY -> InventoryWorkspaceScreen
     Workspace.STATISTICS -> StatisticsWorkspaceScreen
+    Workspace.FINANCE -> FinanceWorkspaceScreen
     Workspace.FRAUD_DETECTION -> FraudDetectionWorkspaceScreen
     Workspace.RESTAURANT -> com.saporini.mobile_desktop.platform.ui.RestaurantWorkspaceScreen
 }
@@ -22,6 +23,17 @@ fun screenFor(workspace: Workspace): Screen = when (workspace) {
 fun resolveStartScreen(user: CurrentUserResponse): Screen {
     // Super admins start on the restaurant list and enter a restaurant from there.
     if (isPlatformAdmin(user)) return com.saporini.mobile_desktop.platform.ui.RestaurantListScreen
+    // Owners, co-owners and admins choose the branch they work in first (user, 2026-11-23: "I just log in, I can't choose a
+    // branch to enter"); with one branch the page goes straight on to the workspaces.
+    val restaurantId = user.restaurantId
+    if (restaurantId != null && com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user)) {
+        return RestaurantHomeScreen(restaurantId)
+    }
+    return workspaceStart(user)
+}
+
+/** The workspace picker, the only workspace someone has, or No access. */
+fun workspaceStart(user: CurrentUserResponse): Screen {
     val workspaces = accessibleWorkspaces(user)
     return when {
         workspaces.isEmpty() -> NoAccessScreen

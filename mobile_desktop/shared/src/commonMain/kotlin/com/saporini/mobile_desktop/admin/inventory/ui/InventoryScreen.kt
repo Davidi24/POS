@@ -129,7 +129,36 @@ internal fun InventoryScreen(modifier: Modifier = Modifier) {
     LaunchedEffect(view) { recipes.setActive(view == InventoryView.ITEMS) }
     val state by model.state.collectAsState()
     val recipeState by recipes.state.collectAsState()
-    InventoryContent(state, model, recipeState, recipes, view, { view = it }, modifier)
+    // Branch level or every branch (step 25): at a branch, only its places and what's in them; for every branch, all of it
+    // with each branch side by side on the overview.
+    val branchId = com.saporini.mobile_desktop.workspace.ui.scopedBranchId(com.saporini.mobile_desktop.core.session.Workspace.INVENTORY)
+    val everyBranch = com.saporini.mobile_desktop.workspace.ui.usesBranchScope() &&
+        com.saporini.mobile_desktop.core.session.BranchScope.isAll(com.saporini.mobile_desktop.core.session.Workspace.INVENTORY)
+    val shown = remember(state, branchId) { state.scopedTo(branchId) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalBranchStock provides everyBranch) {
+        InventoryContent(shown, model, recipeState, recipes, view, { view = it }, modifier)
+    }
+}
+
+/** True while Inventory shows every branch: the overview then has each branch side by side. */
+internal val LocalBranchStock = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** Only [branchId]'s places and what's in them, counted and moved there (null: everything). */
+internal fun InventoryState.scopedTo(branchId: String?): InventoryState {
+    if (branchId == null) return this
+    val places = locations.filter { it.branchId == branchId }
+    val ids = places.map { it.id }.toSet()
+    return copy(
+        locations = places,
+        levels = levels.filter { it.locationId in ids },
+        lowStock = lowStock.filter { it.locationId in ids },
+        recentMovements = recentMovements.filter { it.locationId == null || it.locationId in ids },
+        movements = movements.filter { it.locationId == null || it.locationId in ids },
+        counts = counts.filter { it.locationId in ids },
+        historyCounts = historyCounts.filter { it.locationId in ids },
+        saleSources = saleSources.filter { it.branchId == branchId },
+        levelLocationId = levelLocationId?.takeIf { it in ids }
+    )
 }
 
 @Composable

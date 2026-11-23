@@ -91,7 +91,7 @@ public final class PermissionTree {
         part("ADMIN", "Settings", "ADMIN_ACCESS", "SETTINGS_READ", "SETTINGS_UPDATE", "SETTINGS_MONEY");
         part("ADMIN", "Audit log", "ADMIN_ACCESS", "SETTINGS_AUDIT");
         part("ADMIN", "Devices", "ADMIN_ACCESS", "DEVICES_MANAGE");
-        part("ADMIN", "Restaurant info", "ADMIN_ACCESS", "RESTAURANTS_READ", "RESTAURANTS_UPDATE", "HOURS_UPDATE");
+        part("ADMIN", "Restaurant info", "ADMIN_ACCESS", "RESTAURANTS_READ", "RESTAURANTS_UPDATE", "HOURS_UPDATE", "BRANCHES_ALL");
         // Statistics: one place for each page.
         part("STATISTICS", null, null, "STATISTICS_ACCESS");
         part("STATISTICS", "Overview", "STATISTICS_ACCESS", "REPORTS_READ");

@@ -112,6 +112,22 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "website", length = 255)
     private String website;
 
+    // Where guests find the restaurant online (user, 2026-11-23).
+    @Column(name = "instagram", length = 200)
+    private String instagram;
+
+    @Column(name = "facebook", length = 200)
+    private String facebook;
+
+    @Column(name = "tiktok", length = 200)
+    private String tiktok;
+
+    @Column(name = "whatsapp", length = 200)
+    private String whatsapp;
+
+    @Column(name = "maps_link", length = 200)
+    private String mapsLink;
+
     // The picture on the restaurant's card in the super admins' restaurant list.
     @Column(name = "cover_url", length = 2048)
     private String coverUrl;
@@ -257,6 +273,11 @@ public class Restaurant extends AbstractAuditedSoftDeleteEntity {
         email = NormalizationUtils.normalizeLower(email);
         phone = NormalizationUtils.normalize(phone);
         website = NormalizationUtils.normalize(website);
+        instagram = NormalizationUtils.normalize(instagram);
+        facebook = NormalizationUtils.normalize(facebook);
+        tiktok = NormalizationUtils.normalize(tiktok);
+        whatsapp = NormalizationUtils.normalize(whatsapp);
+        mapsLink = NormalizationUtils.normalize(mapsLink);
         currency = NormalizationUtils.normalizeUpper(currency);
         timezone = RestaurantFieldNormalizer.normalizeTimezone(timezone);
         pendingOwnerEmail = NormalizationUtils.normalizeLower(pendingOwnerEmail);

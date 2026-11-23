@@ -25,6 +25,8 @@ public class AddressResponse {
     private String streetLine1;
     private String streetLine2;
     private Boolean isPrimary;
+    private java.math.BigDecimal latitude;
+    private java.math.BigDecimal longitude;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

@@ -34,4 +34,6 @@ public class CurrentUserResponse {
     private String photoUrl;
     // The language the person picked in Profile (en, it, es, sq), or null for English.
     private String language;
+    // Their restaurant's logo, shown in the app's bars instead of the app's own (user, 2026-11-23), or null.
+    private String restaurantLogoUrl;
 }

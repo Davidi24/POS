@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Devices
@@ -87,6 +88,7 @@ import mobile_desktop.shared.generated.resources.workspace_pos
 import mobile_desktop.shared.generated.resources.workspace_statistics
 import mobile_desktop.shared.generated.resources.workspace_fraud
 import mobile_desktop.shared.generated.resources.workspace_restaurants
+import mobile_desktop.shared.generated.resources.role_finance
 import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 
@@ -158,6 +160,13 @@ object WorkspacePickerScreen : Screen {
                         ) { if (!navigator.pop()) navigator.replaceAll(com.saporini.mobile_desktop.platform.ui.RestaurantListScreen) }
                         Spacer(Modifier.width(if (narrow) 6.dp else 10.dp))
                     }
+                    // An owner, co-owner or admin back to their restaurant's branches and the whole restaurant (step 25).
+                    else if (user?.restaurantId != null && com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user) && navigator.canPop) {
+                        androidx.compose.material3.IconButton(onClick = { navigator.pop() }, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to the branches", Modifier.size(24.dp), tint = TitleInk)
+                        }
+                        Spacer(Modifier.width(if (narrow) 6.dp else 10.dp))
+                    }
                     Text(
                         if (firstName.isBlank()) "Welcome" else "Welcome, $firstName",
                         fontFamily = Inter(), fontWeight = FontWeight.Bold,
@@ -178,6 +187,16 @@ object WorkspacePickerScreen : Screen {
                     com.saporini.mobile_desktop.platform.ui.ActingRestaurantBar(
                         restaurant,
                         onAllRestaurants = { navigator.replaceAll(com.saporini.mobile_desktop.platform.ui.RestaurantListScreen) }
+                    )
+                }
+                // Owners, co-owners and admins: the restaurant and the branch they work in, with the other branches to switch to
+                // (step 25); nothing shows with one branch.
+                val ownRestaurant = user?.restaurantId
+                if (acting == null && ownRestaurant != null && com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user)) {
+                    Spacer(Modifier.height(if (narrow) 10.dp else 14.dp))
+                    com.saporini.mobile_desktop.platform.ui.ActingRestaurantBar(
+                        com.saporini.mobile_desktop.core.session.ActingRestaurant(ownRestaurant, "", user?.defaultBranchId, null, 0),
+                        onAllRestaurants = null
                     )
                 }
                 Spacer(Modifier.height(if (narrow || twoRows) 24.dp else 44.dp))
@@ -309,7 +328,9 @@ internal fun PickerTopBar(
     user: CurrentUserResponse?, loggingOut: Boolean, onLogout: () -> Unit, compact: Boolean,
     // Inside a workspace on a phone: back to "Choose your workspace" instead of the logo and smaller controls (user,
     // 2026-10-30); the page under it keeps some room instead of a line.
-    onBack: (() -> Unit)? = null
+    onBack: (() -> Unit)? = null,
+    // Inside a workspace: its branch switcher (step 25).
+    scope: Workspace? = null
 ) {
     val slim = onBack != null
     Column(Modifier.fillMaxWidth()) {
@@ -318,12 +339,14 @@ internal fun PickerTopBar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (onBack != null) com.saporini.mobile_desktop.platform.ui.BackArrow("Back to workspaces", onBack)
-        else Image(
-            painter = painterResource(Res.drawable.pos_simple_logo),
-            contentDescription = "Saporini",
-            modifier = Modifier.size(width = if (compact) 30.dp else 40.dp, height = if (compact) 40.dp else 54.dp),
-            contentScale = ContentScale.Fit
-        )
+        else com.saporini.mobile_desktop.core.ui.BarLogo(if (compact) 40.dp else 54.dp) {
+            Image(
+                painter = painterResource(Res.drawable.pos_simple_logo),
+                contentDescription = "Saporini",
+                modifier = Modifier.size(width = if (compact) 30.dp else 40.dp, height = if (compact) 40.dp else 54.dp),
+                contentScale = ContentScale.Fit
+            )
+        }
         Spacer(Modifier.weight(1f))
         // Status, language, notifications and profile, ending just before the corner decoration.
         Row(
@@ -331,6 +354,7 @@ internal fun PickerTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 10.dp)
         ) {
+            scope?.let { BranchScopeButton(it, compact = true) }
             com.saporini.mobile_desktop.pos.ui.shell.OnlineStatus(textColor = Ink, showLabel = !compact)
             if (!compact) com.saporini.mobile_desktop.pos.ui.shell.LanguageSelector()
             val navigator = LocalNavigator.currentOrThrow
@@ -368,22 +392,28 @@ internal fun PickerTopBar(
 }
 
 @Composable
-private fun WorkspaceCard(workspace: Workspace, modifier: Modifier, compact: Boolean, dense: Boolean = false, smallFive: Boolean = false, onOpen: () -> Unit) {
-    val (title, subtitle) = when (workspace) {
+internal fun WorkspaceCard(workspace: Workspace, modifier: Modifier, compact: Boolean, dense: Boolean = false, smallFive: Boolean = false,
+                           // Another line under the name (the restaurant's home: what the workspace shows for every branch).
+                           line: String? = null, onOpen: () -> Unit) {
+    val (title, usual) = when (workspace) {
         Workspace.POS -> "POS" to "Point of Sale \u2014 orders, tables and payments"
         Workspace.KDS -> "KDS" to "Kitchen Display System"
         Workspace.ADMIN -> "Admin Hub" to "Shifts, salary, users, devices and settings"
         Workspace.INVENTORY -> "Inventory" to "Stock, items, counts and suppliers"
         Workspace.STATISTICS -> "Statistics" to "Sales, performance and reports"
+        Workspace.FINANCE -> "Finance & taxation" to "Taxes, VAT, expenses and payroll"
         Workspace.FRAUD_DETECTION -> "Fraud Detection" to "Suspicious activity and alerts"
         Workspace.RESTAURANT -> "Restaurant" to "Details, branches, currency and time zone"
     }
+    val subtitle = line ?: usual
     val illustration = when (workspace) {
         Workspace.POS -> Res.drawable.workspace_pos
         Workspace.KDS -> Res.drawable.workspace_kds
         Workspace.ADMIN -> Res.drawable.workspace_admin
         Workspace.INVENTORY -> Res.drawable.workspace_inventory
         Workspace.STATISTICS -> Res.drawable.workspace_statistics
+        // MOCK picture until the user's own for this workspace.
+        Workspace.FINANCE -> Res.drawable.role_finance
         Workspace.FRAUD_DETECTION -> Res.drawable.workspace_fraud
         Workspace.RESTAURANT -> Res.drawable.workspace_restaurants
     }

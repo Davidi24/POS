@@ -103,7 +103,7 @@ internal fun BranchClosedStrip(restaurantId: String?, branchId: String?, permiss
         )
     } else {
         Strip(
-            color = Color(0xFFDC2626), tint = Color(0xFFFEF2F2), icon = Icons.Outlined.EventBusy,
+            color = Kit.Danger, tint = Kit.Danger.copy(alpha = 0.07f), icon = Icons.Outlined.EventBusy,
             title = listOfNotNull("Closed now", nextOpenText(now.nextOpen, zone) ?: "No opening in the next 30 days", now.note?.takeIf { it.isNotBlank() })
                 .joinToString(" · "),
             line = "Seating guests and new orders wait until it opens. Open orders can still be paid.",

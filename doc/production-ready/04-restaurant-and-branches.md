@@ -95,7 +95,36 @@ Status: Hard testing list ready (Not started → Screens → Development → Har
 
 ## 1. Screens
 - [x] The Super Admin pages gone through one by one with the user (2026-11-21, above).
-- [ ] Opening hours and the restaurant's own page: the user looks at them later (2026-11-21).
+- [ ] Opening hours and the restaurant's own page (Admin Hub → Restaurant info): looked at together after the merge (2026-11-22).
+  - [x] First round (user, 2026-11-22: "the pages are so bad, make them look much better; every branch can have them different, so
+    you go inside a branch to do these; legal and currency at the end of the bar, we need to discuss them, dangerous to change"):
+    the whole page redone (cover picture on top, sections with pictures); Branches are cards that open each branch's own page
+    (its details, address, phone, email and opening hours); Address & contacts became Contacts (the company's); Legal & tax and
+    Currency & time zone sit apart at the end with an amber "Careful".
+  - [x] Second round (user, 2026-11-23: "remove legal, everything for taxation goes to Finance; a user who comes here is inside
+    a branch, so leave only things like opening hours, logo"): no Legal & tax (legal name and tax numbers moved to Finance &
+    taxation → Tax setup); inside a branch the tabs are Details, Opening hours (that branch), Contacts (this branch + the
+    company), Logo & receipts (+ Currency & time zone for the Super Admin); the Branches list stays only in the Super Admin's
+    Restaurant app, outside any branch.
+  - [x] Third round (user, 2026-11-23: "merge details and contacts; the green in Open now I don't like"): one Details page (the
+    restaurant, this branch, the restaurant as a company, one Save); "open" in the app's own green.
+  - [x] Fourth round (user, 2026-11-23: "this page looks terrible, and it repeats how guests reach you: just contact; it can
+    add things like the Instagram link"; the list agreed first): Details is one form, each thing once: Who you are (name,
+    legal name; the code only for the Super Admin), About, Contact (phone, email, website, the address of the branch you're
+    in), Social links (Instagram, Facebook, TikTok, WhatsApp, Google Maps; kept on the device until the server has them),
+    beside how guests see it; the Super Admin's owner, open or closed and remove at the end. The company's addresses moved to
+    Finance & taxation → Tax setup; "People to contact" is no longer shown.
+    Then: no booking-website preview (the website isn't built yet), the four parts as cards two a row, and an optional exact
+    location (latitude, longitude) for the address.
+    Then: an Edit mode (the details show as text until Edit), Who you are (with the description) and Social links on the left,
+    Contact and a Map (a pin at the exact location; the real map comes later) on the right, social links checked, and one phone
+    and email for the restaurant and the branch (changed in either place, both change).
+    Then: Edit on every card (one at a time, Cancel / Save in the card), a real map (OpenStreetMap) where a click in Edit puts
+    the pin, and every social network shown with "Not set" when empty.
+  - [x] Opening hours as a calendar (user, 2026-11-23): a month calendar, each day with its hours; click a day to close it,
+    give it other hours or put it back to the usual hours (several days in its window); the usual week as text with Change.
+  - [ ] Currency & time zone: talk through how it should work (who changes it, what's asked first).
+  - [ ] The user looks at the new pages.
 
 ## 2. Development (the feature complete, no tests)
 - [x] Opening hours (server, POS closed strip, Restaurant info tab, bookings, Statistics), the currency rate, the Super Admin
@@ -166,6 +195,48 @@ Super Admin pages
     with several restaurants keep their buttons whole; Edit opens the window with Restaurants / What they can do / Password
     link / Switch off-on / Remove, each that can't be undone asking first; the top Add support admin only while the dashed
     tile is out of sight.
-
+27. Restaurant info → Details: each card shows what's saved ("Not set" when empty) and changes only after its Edit; one card at a
+    time (the others' Edit fades); Cancel puts it back, Save saves; owners can't change the name, legal name or code (locked)
+    and never see the code; the Super Admin can.
+28. Social links: Instagram / TikTok accept their link or an @name, Facebook its link, WhatsApp a number or wa.me, Google Maps a
+    share link; anything else is refused with the message under the field (app) and 400 from `PUT /restaurants/{r}` (spaces,
+    over 200 characters); saved ones come back after a restart; "" takes one off; the restaurant list's quick edit leaves them.
+29. Contact: the phone and email are the restaurant's and the branch's together: changed in Details, the branch page shows them;
+    changed on the branch page (Super Admin), Details shows them.
+30. Map: the real map shows the pin; in Edit a click puts the pin there and fills the exact location; typed coordinates move the
+    map; wrong numbers get a message; coordinates without a street are refused ("Add the address first"); they're saved with
+    the branch's address (latitude/longitude, 400 out of range or one without the other) and come back after a restart; "Open it
+    in Google Maps" opens the spot; the map's credit shows.
+31. Logo: the camera button on the top card picks a picture, the placing window zooms (100–400 %) and drags it, Use this logo
+    saves the square as a PNG; Remove the logo; the restaurant's logo replaces the app's in every top bar (Admin Hub, POS desktop
+    and phone, the workspace picker) for every role, plain with no tile; without a logo the app's own shows.
+32. Banner: the owner changes and removes the restaurant's cover ("Change cover"); the owner can't change a branch's cover (403);
+    the Super Admin can.
+33. Opening hours as a calendar: the month shows each day's hours, closed days and special days (red closed, blue other hours)
+    with their notes; past days can't be clicked; a day opens its window (Usual hours / Closed / Other hours, the range calendar
+    for several days, openings, a note); Usual hours on a special day removes it; the usual week changes in its own window and
+    saves; overlapping special days are refused (409); bookings that fall in closed time open the window that lists them and
+    Go to Reservations opens Reservations.
+34. Receipt (Restaurant info → Receipt): the Preliminary bill and the Fiscal invoice are designed on their own; the preliminary
+    bill always has "PRECUENTA – NO VÁLIDA PARA FINES FISCALES" and never the fiscal blocks or Payment; the fiscal invoice
+    always has the e-NCF details and DGII's QR code (E32 / E31 switch, test numbers, the amber note); required blocks can be
+    moved, not removed or copied.
+35. Receipt editing: add text, line, picture, barcode, QR code, space and pictures behind; built-in blocks; click picks, drag
+    moves up and down (also past hidden ones), pictures behind drag anywhere; Layers picks, moves and hides; right-click menus
+    (Copy, Paste below, Duplicate, Move, Hide, Remove) on the paper and in Layers, Paste on the board, also onto the other
+    receipt; Ctrl+C / Ctrl+V / Ctrl+D / Delete once something is picked; the wheel moves the paper and Fit shows it whole.
+36. Receipt words and codes: built-in blocks' own words (restaurant lines, order words, subtotal / VAT / total, change, dish
+    heading, a line under the precuenta notice) print as typed and "Use the restaurant's details again" puts them back; the QR
+    code's link is always editable and the chips fill it in from Details; the barcode holds the receipt number or your own
+    code (accents refused); both scan.
+37. Receipt saving: nothing applies until Save; the bar saves the texts (branding) and the design (`PUT …/receipt-design`)
+    together; leaving with changes (another tab, another Admin Hub place, the back arrow) asks Save / Discard / stay; a design
+    saved from another device meanwhile gives 409 and the message; a design that's not an object or over 256 KB is a 400; it
+    comes back the same after a restart; reading it needs RESTAURANTS_READ, saving RESTAURANTS_UPDATE and the restaurant.
+38. Receipt pictures: uploaded at once (PNG/JPEG/WebP ≤ 5 MB); a picture taken off and saved is deleted (unless something else
+    uses it); a picture uploaded but never saved is deleted after a day; a saved one stays.
+39. Colours: Logo & receipts has no colours and the branding API neither answers nor takes them.
+40. Finance & taxation (screens, test data) and choosing the branch to work in: they open and look right; every branch
+    together shows "Coming soon".
 ## Done
 - Nothing yet.

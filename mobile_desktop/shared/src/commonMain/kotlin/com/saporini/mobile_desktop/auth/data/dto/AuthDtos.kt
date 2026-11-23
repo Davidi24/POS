@@ -47,7 +47,9 @@ data class CurrentUserResponse(
     // The person's own photo, or null for their initials.
     val photoUrl: String? = null,
     // The language the person picked in Profile (en, it, es, sq), or null.
-    val language: String? = null
+    val language: String? = null,
+    // Their restaurant's logo, for the app's bars (user, 2026-11-23), or null.
+    val restaurantLogoUrl: String? = null
 )
 
 /** Profile → My details as the server keeps them; [pendingEmail] = a new address waiting for its link. */

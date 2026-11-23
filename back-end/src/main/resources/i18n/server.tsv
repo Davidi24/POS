@@ -500,6 +500,10 @@ Something changed since the preview ({}). Look at the preview again.	Qualcosa è
 Unknown currency {}. Use a 3-letter code such as EUR, ALL or USD.	Valuta sconosciuta {}. Usa un codice di 3 lettere come EUR, ALL o USD.	Moneda desconocida {}. Usa un código de 3 letras como EUR, ALL o USD.	Monedhë e panjohur {}. Përdor një kod me 3 shkronja si EUR, ALL ose USD.
 The restaurant already uses {}	Il ristorante usa già {}	El restaurante ya usa {}	Restoranti përdor tashmë {}
 Choose a rounding step that fits {} ({} decimal places)	Scegli un passo di arrotondamento adatto a {} ({} decimali)	Elige un paso de redondeo que encaje con {} ({} decimales)	Zgjidh një hap rrumbullakimi që i përshtatet {} ({} shifra dhjetore)
+The receipt's design must be an object	Il disegno dello scontrino deve essere un oggetto	El diseño del recibo debe ser un objeto	Dizajni i faturës duhet të jetë një objekt
+The receipt's design is too big	Il disegno dello scontrino è troppo grande	El diseño del recibo es demasiado grande	Dizajni i faturës është shumë i madh
+The receipt was changed meanwhile. Reload it and try again.	Lo scontrino è stato cambiato nel frattempo. Ricaricalo e riprova.	El recibo se cambió mientras tanto. Recárgalo e inténtalo de nuevo.	Fatura u ndryshua ndërkohë. Ringarkoje dhe provo sërish.
+The receipt's design couldn't be read	Non è stato possibile leggere il disegno dello scontrino	No se pudo leer el diseño del recibo	Dizajni i faturës nuk mund të lexohej
 Only the Super Admin can change a branch's {}	Solo il Super Admin può cambiare {} di una sede	Solo el Super Admin puede cambiar {} de una sucursal	Vetëm Super Admini mund të ndryshojë {} e një pike
 These details have changed, or the edit version is missing. Refresh and review your changes before saving.	Questi dati sono cambiati o manca la versione della modifica. Aggiorna e rivedi le modifiche prima di salvare.	Estos datos cambiaron o falta la versión de edición. Actualiza y revisa tus cambios antes de guardar.	Këto të dhëna kanë ndryshuar ose mungon versioni i ndryshimit. Rifresko dhe rishiko ndryshimet para ruajtjes.
 This branch is still in use: {}. Move or finish these first, or close the branch instead.	Questa sede è ancora in uso: {}. Prima sposta o concludi questi, oppure chiudi la sede.	Esta sucursal aún está en uso: {}. Mueve o termina esto primero, o mejor cierra la sucursal.	Kjo pikë është ende në përdorim: {}. Zhvendosi ose përfundoji këto së pari, ose mbyll pikën.
@@ -741,6 +745,8 @@ Change restaurant info	Modificare le informazioni del ristorante	Cambiar la info
 Description, phone, email, addresses, logo, colours and receipt texts	Descrizione, telefono, email, indirizzi, logo, colori e testi dello scontrino	Descripción, teléfono, correo, direcciones, logo, colores y textos del recibo	Përshkrimi, telefoni, email-i, adresat, logoja, ngjyrat dhe tekstet e faturës
 Change opening hours	Modificare l'orario di apertura	Cambiar el horario	Ndrysho orarin e hapjes
 Each branch's week and its special days	La settimana di ogni sede e i suoi giorni speciali	La semana de cada sucursal y sus días especiales	Java e çdo pike dhe ditët e saj të veçanta
+Work in every branch	Lavora in ogni sede	Trabaja en todas las sucursales	Puno në çdo pikë
+Choose the branch to work in and switch between the restaurant's branches	Scegli la sede in cui lavorare e passa da una sede all'altra	Elige la sucursal donde trabajar y cambia entre las sucursales del restaurante	Zgjidh pikën ku punon dhe kalo nga një pikë te tjetra
 Sales, orders and guests at a glance	Vendite, ordini e ospiti in sintesi	Ventas, pedidos y comensales de un vistazo	Shitje, porosi dhe mysafirë me një shikim
 See Sales	Vedere Vendite	Ver Ventas	Shiko Shitjet
 Sales by day, hour, service and floor	Vendite per giorno, ora, servizio e piano	Ventas por día, hora, servicio y piso	Shitjet sipas ditës, orës, shërbimit dhe katit

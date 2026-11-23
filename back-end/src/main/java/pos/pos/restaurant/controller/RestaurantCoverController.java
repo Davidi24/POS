@@ -29,7 +29,7 @@ public class RestaurantCoverController {
 
     @PutMapping(value = "/cover", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('RESTAURANTS_UPDATE')")
-    @Operation(summary = "Super admins: the restaurant card's cover picture (PNG, JPEG or WebP, up to 5 MB)")
+    @Operation(summary = "The restaurant's cover picture (PNG, JPEG or WebP, up to 5 MB): whoever manages the restaurant, like its logo")
     public ResponseEntity<CoverResponse> uploadRestaurantCover(@PathVariable UUID restaurantId, @RequestPart("file") MultipartFile file,
                                                                Authentication authentication) {
         return ResponseEntity.ok(coverService.uploadRestaurantCover(authentication, restaurantId, file));
@@ -37,7 +37,7 @@ public class RestaurantCoverController {
 
     @DeleteMapping("/cover")
     @PreAuthorize("hasAuthority('RESTAURANTS_UPDATE')")
-    @Operation(summary = "Super admins: remove the restaurant card's cover picture")
+    @Operation(summary = "Remove the restaurant's cover picture: whoever manages the restaurant")
     public ResponseEntity<CoverResponse> removeRestaurantCover(@PathVariable UUID restaurantId, Authentication authentication) {
         return ResponseEntity.ok(coverService.removeRestaurantCover(authentication, restaurantId));
     }

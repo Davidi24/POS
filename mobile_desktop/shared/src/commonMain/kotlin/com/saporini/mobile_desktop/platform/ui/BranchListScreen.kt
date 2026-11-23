@@ -100,7 +100,10 @@ data class BranchListScreen(
     val restaurantName: String,
     val logoUrl: String? = null,
     val coverUrl: String? = null,
-    val place: String? = null
+    val place: String? = null,
+    // An owner, co-owner or admin choosing the branch they work in after signing in (step 25): no way back to a restaurant
+    // list, a welcome instead, and straight on to the workspaces when the restaurant has one branch.
+    val ownBranches: Boolean = false
 ) : Screen {
     @Composable
     override fun Content() {
@@ -116,7 +119,14 @@ data class BranchListScreen(
         val workspaceState by workspaceModel.state.collectAsState()
         LaunchedEffect(authenticated, workspaceState.loggedOut) { if (!authenticated || workspaceState.loggedOut) navigator.replaceAll(LoginScreen) }
         // Back here from the six apps: no branch is entered until one is chosen again.
-        LaunchedEffect(Unit) { session.leaveRestaurant() }
+        LaunchedEffect(Unit) { if (!ownBranches) session.leaveRestaurant() }
+        // One branch (or no right to see them): nothing to choose.
+        LaunchedEffect(ownBranches, state.loaded, state.allBranches, state.canRead, user?.id) {
+            val person = user ?: return@LaunchedEffect
+            if (ownBranches && (!state.canRead || (state.loaded && state.allBranches <= 1))) {
+                navigator.replaceAll(com.saporini.mobile_desktop.workspace.ui.workspaceStart(person))
+            }
+        }
 
         BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFFFCFCFB))) {
             val narrow = maxWidth < 760.dp
@@ -128,7 +138,8 @@ data class BranchListScreen(
                 }
                 BranchListContent(
                     state, model, narrow,
-                    onBack = { if (!navigator.pop()) navigator.replaceAll(RestaurantListScreen) },
+                    onBack = if (ownBranches) null else ({ if (!navigator.pop()) navigator.replaceAll(RestaurantListScreen) }),
+                    welcome = if (ownBranches) user?.firstName?.trim()?.ifBlank { null } ?: user?.username else null,
                     onEntered = { navigator.push(WorkspacePickerScreen) },
                     modifier = Modifier.weight(1f).fillMaxWidth().nestedScroll(hideBar.connection),
                     logoUrl = logoUrl, coverUrl = coverUrl, place = place
@@ -143,9 +154,11 @@ internal fun BranchListContent(
     state: BranchListState,
     model: BranchListScreenModel,
     narrow: Boolean,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onEntered: () -> Unit,
     modifier: Modifier = Modifier,
+    // An owner choosing their branch: "Welcome, <name>" instead of the way back to the restaurants.
+    welcome: String? = null,
     logoUrl: String? = null,
     coverUrl: String? = null,
     place: String? = null
@@ -184,7 +197,7 @@ internal fun BranchListContent(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
-                InsideRestaurantBand(state.restaurantName, logoUrl, coverUrl, place, state.restaurantId ?: state.restaurantName, narrow, onBack)
+                InsideRestaurantBand(state.restaurantName, logoUrl, coverUrl ?: state.restaurantCoverUrl, place, state.restaurantId ?: state.restaurantName, narrow, onBack, welcome)
             }
             item(key = "heading", span = { GridItemSpan(maxLineSpan) }) {
                 Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -288,7 +301,8 @@ private fun InsideRestaurantBand(
     place: String?,
     accentKey: String,
     narrow: Boolean,
-    onBack: () -> Unit
+    onBack: (() -> Unit)?,
+    welcome: String? = null
 ) {
     val accent = accentOf(accentKey)
     val shape = RoundedCornerShape(20.dp)
@@ -305,7 +319,7 @@ private fun InsideRestaurantBand(
             }
             Row(Modifier.fillMaxSize().padding(start = 12.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(if (narrow) 10.dp else 14.dp)) {
-                PlainBackArrow("Back to the restaurants", onBack)
+                onBack?.let { PlainBackArrow("Back to the restaurants", it) }
                 Box(Modifier.shadow(6.dp, RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp)).background(Color.White).padding(3.dp)) {
                     RestaurantLogo(logoUrl, name, if (narrow) 52.dp else 66.dp)
                 }
@@ -315,12 +329,13 @@ private fun InsideRestaurantBand(
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Icon(Icons.Outlined.Storefront, null, Modifier.size(12.dp), tint = Color.White)
-                        Text("YOU'RE INSIDE THIS RESTAURANT", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 9.5.sp, letterSpacing = 0.6.sp,
-                            color = Color.White, maxLines = 1)
+                        Text(if (welcome != null) "WELCOME, ${welcome.uppercase()}" else "YOU'RE INSIDE THIS RESTAURANT", fontFamily = Inter(),
+                            fontWeight = FontWeight.Bold, fontSize = 9.5.sp, letterSpacing = 0.6.sp, color = Color.White, maxLines = 1)
                     }
                     Text(name, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (narrow) 19.sp else 23.sp, color = Kit.Ink,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (onBack == null) Text("Choose the branch you work in", fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted)
+                    else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Restaurants", Modifier.clip(RoundedCornerShape(4.dp)).clickable(onClick = onBack), fontFamily = Inter(),
                             fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Green)
                         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, Modifier.size(14.dp), tint = Kit.Faint)

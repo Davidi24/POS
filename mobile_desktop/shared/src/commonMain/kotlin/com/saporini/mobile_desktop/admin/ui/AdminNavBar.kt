@@ -19,6 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material.icons.filled.Business
 import com.saporini.mobile_desktop.core.session.SessionManager
 import com.saporini.mobile_desktop.pos.ui.shell.NavEntry
 import com.saporini.mobile_desktop.pos.ui.shell.WorkspaceNavBottomBar
@@ -36,8 +38,8 @@ fun AdminTopBar(
     onBackToWorkspaces: (() -> Unit)? = null,
 ) {
     val entries = adminNavEntries()
-    WorkspaceNavTopBar(entries, fixed = entries.indexOfFirst { it.key == AdminSection.USERS } + 1, selected = selected,
-        onSelect = onSelect, onLogout = onLogout, onBackToWorkspaces = onBackToWorkspaces)
+    WorkspaceNavTopBar(entries, fixed = 3.coerceAtMost(entries.size), selected = selected,
+        onSelect = onSelect, onLogout = onLogout, onBackToWorkspaces = onBackToWorkspaces, scope = com.saporini.mobile_desktop.core.session.Workspace.ADMIN)
 }
 
 @Composable
@@ -54,8 +56,11 @@ fun AdminBottomBar(
 @Composable
 private fun adminNavEntries(): List<NavEntry<AdminSection>> {
     val user by koinInject<SessionManager>().currentUser.collectAsState()
-    return AdminSection.allowed(user?.permissions.orEmpty())
-        .map { NavEntry(it, it.label, it.icon(), it.filledIcon()) }
+    val scoped = com.saporini.mobile_desktop.workspace.ui.usesBranchScope()
+    val all = scoped && com.saporini.mobile_desktop.core.session.BranchScope.isAll(com.saporini.mobile_desktop.core.session.Workspace.ADMIN)
+    return AdminSection.shown(user?.permissions.orEmpty(), scoped, all)
+        // At a branch, Users are its staff (step 25).
+        .map { NavEntry(it, if (it == AdminSection.USERS && scoped && !all) "Staff" else it.label, it.icon(), it.filledIcon()) }
 }
 
 private fun AdminSection.icon(): ImageVector = when (this) {
@@ -66,6 +71,7 @@ private fun AdminSection.icon(): ImageVector = when (this) {
     AdminSection.USERS -> Icons.Outlined.People
     AdminSection.AUDIT_LOGS -> Icons.Outlined.History
     AdminSection.RESTAURANT_INFO -> Icons.Outlined.Storefront
+    AdminSection.BRANCHES -> Icons.Outlined.Business
 }
 
 private fun AdminSection.filledIcon(): ImageVector = when (this) {
@@ -76,4 +82,5 @@ private fun AdminSection.filledIcon(): ImageVector = when (this) {
     AdminSection.USERS -> Icons.Filled.People
     AdminSection.AUDIT_LOGS -> Icons.Filled.History
     AdminSection.RESTAURANT_INFO -> Icons.Filled.Storefront
+    AdminSection.BRANCHES -> Icons.Filled.Business
 }
