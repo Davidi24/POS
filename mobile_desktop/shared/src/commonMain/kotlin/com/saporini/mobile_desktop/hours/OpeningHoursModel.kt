@@ -18,6 +18,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
+import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.minus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
@@ -34,7 +35,10 @@ data class SpanDraft(val opens: LocalTime, val closes: LocalTime) {
 /** A weekday (1 = Monday … 7 = Sunday) and its openings; none = closed. */
 data class DayDraft(val day: Int, val spans: List<SpanDraft>)
 
-/** A special day being added ([id] null) or changed: a date or a range, closed or its own openings, and a note. */
+/**
+ * A special day being added ([id] null) or changed: a date or a range, closed or its own openings, and a note. [usual]: the
+ * days go back to the usual week (an existing special day is removed).
+ */
 data class SpecialDraft(
     val id: String? = null,
     val from: LocalDate,
@@ -42,7 +46,8 @@ data class SpecialDraft(
     val closed: Boolean = true,
     val spans: List<SpanDraft> = listOf(SpanDraft(LocalTime(12, 0), LocalTime(23, 0))),
     val note: String = "",
-    val showProblems: Boolean = false
+    val showProblems: Boolean = false,
+    val usual: Boolean = false
 )
 
 data class HoursBranch(val id: String, val name: String)
@@ -72,24 +77,12 @@ data class OpeningHoursState(
     val closedBookings: List<ClosedBookingDto>? = null,
     // How many bookings fall in closed time now (the page's red line with "See them").
     val closedCount: Int = 0,
-    val move: BookingMove? = null,
-    val cancelling: ClosedBookingDto? = null,
-    val bookingBusy: Boolean = false,
-    val bookingError: String? = null,
-    val canMoveBookings: Boolean = false,
-    val canCancelBookings: Boolean = false
+    // The usual week's window is open (user, 2026-11-23: the page is a calendar now; the week is changed in its own window).
+    val editingWeek: Boolean = false
 ) {
     val changed: Boolean get() = week != saved
     val zone: TimeZone get() = zoneOf(hours?.timezone)
 }
-
-/** Moving one booking to an open time: the day picked, its open times, the time picked. */
-data class BookingMove(
-    val booking: ClosedBookingDto,
-    val day: LocalDate,
-    val times: List<LocalTime>? = null,
-    val time: LocalTime? = null
-)
 
 const val MAX_OPENINGS_A_DAY = 6
 const val MAX_HOURS_NOTE = 255
@@ -107,6 +100,7 @@ fun spansProblem(spans: List<SpanDraft>): String? {
 }
 
 fun specialProblem(draft: SpecialDraft): String? = when {
+    draft.usual -> null
     draft.to < draft.from -> "The last day comes after the first"
     !draft.closed && draft.spans.isEmpty() -> "Add when it opens and closes, or mark it closed"
     !draft.closed -> spansProblem(draft.spans)
@@ -126,6 +120,17 @@ internal fun weekOf(hours: OpeningHoursDto?): List<DayDraft> = (1..7).map { day 
     DayDraft(day, hours?.week?.firstOrNull { it.day == day }?.spans.orEmpty().mapNotNull { it.draft() })
 }
 
+/** The special day that covers [date], if any. */
+internal fun List<SpecialDayDto>.covering(date: LocalDate): SpecialDayDto? = firstOrNull { day ->
+    val from = dateOf(day.startsOn) ?: return@firstOrNull false
+    date >= from && date <= (dateOf(day.endsOn) ?: from)
+}
+
+/** "12:00–23:00 · 19:00–01:00". */
+internal fun List<SpanDraft>.hoursText(): String = joinToString(" · ") { "${it.opens.hm()}–${it.closes.hm()}" }
+
+internal fun specialSpans(day: SpecialDayDto): List<SpanDraft> = day.spans.mapNotNull { it.draft() }
+
 internal fun specialDraftOf(day: SpecialDayDto): SpecialDraft? {
     val from = dateOf(day.startsOn) ?: return null
     return SpecialDraft(day.id, from, dateOf(day.endsOn) ?: from, day.closed,
@@ -138,8 +143,7 @@ internal fun specialDraftOf(day: SpecialDayDto): SpecialDraft? {
  */
 class OpeningHoursModel(
     private val api: OpeningHoursApi,
-    private val session: SessionManager,
-    private val reservations: com.saporini.mobile_desktop.pos.reservations.data.api.ReservationApi? = null
+    private val session: SessionManager
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -159,9 +163,7 @@ class OpeningHoursModel(
         val chosen = keep ?: session.currentUser.value?.defaultBranchId?.takeIf { id -> branches.any { it.id == id } } ?: branches.firstOrNull()?.id
         mutable.update {
             it.copy(restaurantId = restaurantId, branches = branches, branchId = chosen,
-                canChange = "HOURS_UPDATE" in permissions, canOpen = "OPEN_OUTSIDE_HOURS" in permissions,
-                canMoveBookings = reservations != null && "RESERVATION_MANAGE" in permissions,
-                canCancelBookings = reservations != null && "RESERVATION_CANCEL" in permissions)
+                canChange = "HOURS_UPDATE" in permissions, canOpen = "OPEN_OUTSIDE_HOURS" in permissions)
         }
         if (chosen != current.branchId || restaurantId != current.restaurantId || !current.loaded) load()
     }
@@ -246,6 +248,16 @@ class OpeningHoursModel(
 
     fun discardWeek() = mutable.update { it.copy(week = it.saved) }
 
+    /** The usual week's window: opens on the saved week (or, never set, every day 12:00–23:00). */
+    fun openWeek() {
+        if (!state.value.canChange) return
+        if (state.value.hours?.set != true && state.value.week.all { it.spans.isEmpty() }) startWeek()
+        mutable.update { it.copy(editingWeek = true, error = null) }
+    }
+
+    /** Closing the week's window puts back what was saved. */
+    fun closeWeek() = mutable.update { it.copy(week = it.saved, editingWeek = false, error = null) }
+
     val weekProblem: String? get() = state.value.week.firstNotNullOfOrNull { day -> spansProblem(day.spans)?.let { "${dayName(day.day)}: $it" } }
 
     fun saveWeek() {
@@ -258,7 +270,7 @@ class OpeningHoursModel(
             try {
                 val hours = api.saveWeek(restaurantId, branchId, s.week.map { day -> HoursDayDto(day.day, day.spans.sortedBy { it.opens }.map { it.dto() }) })
                 val week = weekOf(hours)
-                mutable.update { it.copy(hours = hours, saved = week, week = week, done = DoneMark(++marks, "Opening hours saved")) }
+                mutable.update { it.copy(hours = hours, saved = week, week = week, editingWeek = false, done = DoneMark(++marks, "Opening hours saved")) }
                 checkClosedBookings()
             } catch (e: CancellationException) {
                 throw e
@@ -279,6 +291,19 @@ class OpeningHoursModel(
         mutable.update { it.copy(special = draft, savedSpecial = null, error = null) }
     }
 
+    /**
+     * A day clicked on the calendar (user, 2026-11-23: "choose a day to make it a special day or a closed day"): its special
+     * day when it has one, else a new one for that date, closed when it's usually open and with other hours when it isn't.
+     */
+    fun pickDay(date: LocalDate) {
+        val s = state.value
+        if (!s.canChange) return
+        s.hours?.specialDays.orEmpty().covering(date)?.let { return editSpecial(it) }
+        val usuallyOpen = s.hours?.set != true || s.saved.firstOrNull { it.day == date.dayOfWeek.isoDayNumber }?.spans?.isNotEmpty() == true
+        val draft = SpecialDraft(from = date, to = date, closed = usuallyOpen)
+        mutable.update { it.copy(special = draft, savedSpecial = null, error = null) }
+    }
+
     fun editSpecial(day: SpecialDayDto) {
         if (!state.value.canChange) return
         val draft = specialDraftOf(day) ?: return
@@ -296,6 +321,26 @@ class OpeningHoursModel(
         val branchId = s.branchId ?: return
         if (specialProblem(draft) != null) {
             mutable.update { it.copy(special = draft.copy(showProblems = true)) }
+            return
+        }
+        // Back to the usual hours: an existing special day goes, a new one is never made.
+        if (draft.usual) {
+            val id = draft.id ?: return cancelSpecial()
+            scope.launch {
+                mutable.update { it.copy(saving = true, error = null) }
+                try {
+                    api.removeSpecialDay(restaurantId, branchId, id)
+                    mutable.update { it.copy(special = null, savedSpecial = null, done = DoneMark(++marks, "Back to the usual hours")) }
+                    load()
+                    checkClosedBookings()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    mutable.update { it.copy(error = platformMessage(e, write = true)) }
+                } finally {
+                    mutable.update { it.copy(saving = false) }
+                }
+            }
             return
         }
         scope.launch {
@@ -350,7 +395,7 @@ class OpeningHoursModel(
         val branchId = state.value.branchId ?: return
         val list = runCatching { api.closedBookings(restaurantId, branchId) }.getOrNull() ?: return
         mutable.update { it.copy(closedCount = list.size) }
-        if (list.isNotEmpty()) mutable.update { it.copy(closedBookings = list, bookingError = null) }
+        if (list.isNotEmpty()) mutable.update { it.copy(closedBookings = list) }
     }
 
     /** "See them" from the page: the list as it is now. */
@@ -360,7 +405,7 @@ class OpeningHoursModel(
             val branchId = state.value.branchId ?: return@launch
             try {
                 val list = api.closedBookings(restaurantId, branchId)
-                mutable.update { it.copy(closedBookings = list, closedCount = list.size, bookingError = null) }
+                mutable.update { it.copy(closedBookings = list, closedCount = list.size) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -369,101 +414,7 @@ class OpeningHoursModel(
         }
     }
 
-    fun closeClosedBookings() = mutable.update { it.copy(closedBookings = null, move = null, cancelling = null, bookingError = null) }
-
-    /** Change time: starts on the booking's own day (closed now), so the next step is picking another day or time. */
-    fun startMove(booking: ClosedBookingDto) {
-        if (!state.value.canMoveBookings) return
-        val day = dateAt(booking.start, state.value.zone) ?: return
-        mutable.update { it.copy(move = BookingMove(booking, day), bookingError = null) }
-        moveDay(day)
-    }
-
-    fun moveDay(day: LocalDate) {
-        val s = state.value
-        val move = s.move ?: return
-        val restaurantId = s.restaurantId ?: return
-        val branchId = s.branchId ?: return
-        mutable.update { it.copy(move = move.copy(day = day, times = null, time = null)) }
-        scope.launch {
-            try {
-                val days = api.calendar(restaurantId, branchId, day.minus(kotlinx.datetime.DatePeriod(days = 1)), day)
-                val length = lengthOf(move.booking)
-                val now = (Clock.System.now() + 15.minutes).toLocalDateTime(s.zone)
-                // Hours never set: the calendar is empty and any time is open.
-                val times = if (days.isEmpty()) (0 until 96).map { LocalTime(it / 4, (it % 4) * 15) }.filter { time -> day > now.date || time > now.time }
-                else bookableTimes(days, day, length, now)
-                mutable.update { st -> st.copy(move = st.move?.takeIf { it.day == day && it.booking.id == move.booking.id }?.copy(times = times) ?: st.move) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                mutable.update { it.copy(bookingError = platformMessage(e, write = false)) }
-            }
-        }
-    }
-
-    fun pickMoveTime(time: LocalTime) = mutable.update { s -> s.copy(move = s.move?.copy(time = time)) }
-
-    fun cancelMove() = mutable.update { it.copy(move = null, bookingError = null) }
-
-    fun saveMove() {
-        val s = state.value
-        val move = s.move ?: return
-        val time = move.time ?: return
-        val restaurantId = s.restaurantId ?: return
-        val api = reservations ?: return
-        if (s.bookingBusy) return
-        val start = kotlinx.datetime.LocalDateTime(move.day, time).toInstant(s.zone)
-        val end = start + lengthOf(move.booking).minutes
-        scope.launch {
-            mutable.update { it.copy(bookingBusy = true, bookingError = null) }
-            try {
-                api.patchReservation(restaurantId, move.booking.id,
-                    com.saporini.mobile_desktop.pos.reservations.data.dto.UpdateReservationRequestDto(reservationStart = start.toString(), reservationEnd = end.toString()))
-                mutable.update { st ->
-                    st.copy(move = null, closedBookings = st.closedBookings?.filter { it.id != move.booking.id }, closedCount = (st.closedCount - 1).coerceAtLeast(0),
-                        done = DoneMark(++marks, "${move.booking.name ?: "The booking"} moved to ${shortDayName(move.day.dayOfWeek.ordinal + 1)} ${move.day.day} at ${time.hm()}"))
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                mutable.update { it.copy(bookingError = platformMessage(e, write = true)) }
-            } finally {
-                mutable.update { it.copy(bookingBusy = false) }
-            }
-        }
-    }
-
-    fun startCancel(booking: ClosedBookingDto) {
-        if (state.value.canCancelBookings) mutable.update { it.copy(cancelling = booking, bookingError = null) }
-    }
-
-    fun closeCancel() = mutable.update { it.copy(cancelling = null, bookingError = null) }
-
-    fun confirmCancel(reason: String) {
-        val s = state.value
-        val booking = s.cancelling ?: return
-        val restaurantId = s.restaurantId ?: return
-        val api = reservations ?: return
-        if (s.bookingBusy) return
-        scope.launch {
-            mutable.update { it.copy(bookingBusy = true, bookingError = null) }
-            try {
-                api.cancelReservation(restaurantId, booking.id,
-                    com.saporini.mobile_desktop.pos.reservations.data.dto.ReservationActionRequestDto(reason = reason.trim().ifBlank { null }))
-                mutable.update { st ->
-                    st.copy(cancelling = null, closedBookings = st.closedBookings?.filter { it.id != booking.id }, closedCount = (st.closedCount - 1).coerceAtLeast(0),
-                        done = DoneMark(++marks, "${booking.name ?: "The booking"} cancelled"))
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                mutable.update { it.copy(bookingError = platformMessage(e, write = true)) }
-            } finally {
-                mutable.update { it.copy(bookingBusy = false) }
-            }
-        }
-    }
+    fun closeClosedBookings() = mutable.update { it.copy(closedBookings = null) }
 
     // ---- Open outside the hours ----
 
@@ -517,10 +468,3 @@ internal fun dayName(day: Int): String = when (day) {
 }
 
 internal fun shortDayName(day: Int): String = dayName(day).take(3)
-
-/** A booking's length in minutes (2 hours when it can't be read). */
-internal fun lengthOf(booking: ClosedBookingDto): Int {
-    val start = com.saporini.mobile_desktop.core.format.instantOrNull(booking.start)
-    val end = com.saporini.mobile_desktop.core.format.instantOrNull(booking.end)
-    return if (start != null && end != null && end > start) (end - start).inWholeMinutes.toInt() else 120
-}

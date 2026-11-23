@@ -158,7 +158,7 @@ class RestaurantReadinessGalleryTest {
                 RestaurantDetailsContent(state, model, RestaurantTab.DETAILS, {}, showTabs = true)
             }
         }
-        listOf(RestaurantTab.BRANDING to "branding", RestaurantTab.PLACES to "places", RestaurantTab.MONEY to "money").forEach { (tab, name) ->
+        listOf(RestaurantTab.BRANDING to "branding", RestaurantTab.MONEY to "money").forEach { (tab, name) ->
             render("size-restaurant-$name-360", 360, 1300) {
                 val state by model.state.collectAsState()
                 RestaurantDetailsContent(state, model, tab, {}, showTabs = true)

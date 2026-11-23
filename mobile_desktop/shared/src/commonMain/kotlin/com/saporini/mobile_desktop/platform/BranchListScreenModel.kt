@@ -23,6 +23,8 @@ data class BranchListState(
     val restaurantId: String? = null,
     val restaurantName: String = "",
     val restaurantOpen: Boolean = true,
+    // The restaurant's own picture (for an owner's "choose your branch", which isn't opened from a restaurant card).
+    val restaurantCoverUrl: String? = null,
     val canRead: Boolean = false,
     val canChangeCover: Boolean = false,
     val cards: List<BranchCardDto> = emptyList(),
@@ -74,12 +76,14 @@ class BranchListScreenModel(
                 revision++
                 val access = restaurantAccess(user)
                 val current = state.value
-                val keepContext = previousUser == user?.id && isPlatformAdmin(user) && access.read
+                // Super admins, and owners, co-owners and admins choosing the branch they work in (step 25).
+                val chooses = isPlatformAdmin(user) || com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user)
+                val keepContext = previousUser == user?.id && chooses && access.read
                 previousUser = user?.id
                 mutable.value = BranchListState(
                     restaurantId = current.restaurantId.takeIf { keepContext },
                     restaurantName = if (keepContext) current.restaurantName else "",
-                    canRead = isPlatformAdmin(user) && access.read,
+                    canRead = chooses && access.read,
                     canChangeCover = access.manage
                 )
                 if (active) load(reset = true)
@@ -163,6 +167,7 @@ class BranchListScreenModel(
                         openBranches = last?.openBranches ?: state.openBranches,
                         restaurantName = restaurant?.name ?: state.restaurantName,
                         restaurantOpen = restaurant?.open ?: state.restaurantOpen,
+                        restaurantCoverUrl = restaurant?.coverUrl ?: state.restaurantCoverUrl,
                         loaded = true,
                         error = null
                     )
@@ -206,7 +211,9 @@ class BranchListScreenModel(
                     return@launch
                 }
                 val branches = state.value.allBranches.takeIf { it > 0 }?.toInt() ?: state.value.cards.size
-                session.enterRestaurant(ActingRestaurant(restaurantId, restaurant.name, branch.id, branch.name, branches))
+                // A super admin enters the restaurant at that branch; anyone else works in that branch of their own restaurant.
+                if (isPlatformAdmin(session.currentUser.value)) session.enterRestaurant(ActingRestaurant(restaurantId, restaurant.name, branch.id, branch.name, branches))
+                else session.workIn(branch.id, branch.name)
                 onEntered()
             } catch (e: CancellationException) {
                 throw e

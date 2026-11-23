@@ -14,6 +14,9 @@ import com.saporini.mobile_desktop.core.i18n.tr
 /** The picture as JPEG bytes (white where it was see-through). */
 expect fun encodeJpeg(image: ImageBitmap, quality: Int = 92): ByteArray
 
+/** The picture as PNG bytes, see-through parts kept (a logo placed in its square). */
+expect fun encodePng(image: ImageBitmap): ByteArray
+
 /** What became of a print. */
 enum class PrintOutcome { PRINTED, OPENED_IN_VIEWER, NOT_PRINTED }
 

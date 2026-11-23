@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -135,6 +136,7 @@ internal fun OverviewTab(
     }
     ScrollColumn(modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SummaryCardRow(size, cards)
+        if (LocalBranchStock.current) BranchStockPanel(state, size)
         PanelRow(size,
             1.7f to { m -> ActivityPanel(state, model, m, compact = size.isPhone) },
             1f to { m -> HealthPanel(state, m) })
@@ -693,3 +695,46 @@ private fun ItemPicture(state: InventoryState, itemId: String?) {
 }
 
 private fun cents(value: OrderDecimal): Long = (value.asDouble() * 100).roundToLong()
+
+/**
+ * Every branch's stock side by side (Inventory looking at all branches, step 25): its places, items, what it's worth and
+ * what's running low; a click works in that branch. Places that belong to no branch (a central warehouse) come last.
+ */
+@Composable
+private fun BranchStockPanel(state: InventoryState, size: ScreenSize) {
+    val session = org.koin.compose.koinInject<com.saporini.mobile_desktop.core.session.SessionManager>()
+    val branches = com.saporini.mobile_desktop.core.session.BranchScope.branches
+    val groups = branches.map { it.id to it.name } + listOfNotNull((null as String? to "Not at a branch").takeIf { state.locations.any { l -> l.branchId == null } })
+    OverviewPanel(androidx.compose.material.icons.Icons.Outlined.Storefront, "Stock in every branch", Modifier.fillMaxWidth(),
+        titleExtra = "Pick one to work with its stock") {
+        val cells: List<@Composable (Modifier) -> Unit> = groups.map { (id, name) ->
+            { m ->
+                val places = state.locations.filter { it.branchId == id }
+                val ids = places.map { it.id }.toSet()
+                val levels = state.levels.filter { it.locationId in ids }
+                val low = levels.count { it.lowStock }
+                val worth = stockValueCents(state, levels)
+                val clickable = id != null
+                Column(m.clip(RoundedCornerShape(12.dp)).border(1.dp, Kit.Border, RoundedCornerShape(12.dp))
+                    .then(if (clickable) Modifier.clickable {
+                        com.saporini.mobile_desktop.core.session.BranchScope.showAll(com.saporini.mobile_desktop.core.session.Workspace.INVENTORY, false)
+                        session.workIn(id!!, name)
+                    } else Modifier).padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(name, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Kit.Ink, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, translate = id == null)
+                    Text("${places.size} places · ${levels.map { it.inventoryItemId }.distinct().size} items", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
+                    Text(moneyText(worth, "EUR"), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Kit.Ink)
+                    Text(if (low == 0) "Nothing running low" else "$low running low", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                        color = if (low == 0) Kit.Green else Kit.Amber)
+                }
+            }
+        }
+        val perRow = if (size.isPhone) 1 else if (size.isDesktop) 4 else 2
+        cells.chunked(perRow).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { it(Modifier.weight(1f)) }
+                repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+    }
+}

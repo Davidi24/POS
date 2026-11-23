@@ -25,16 +25,40 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-enum class RestaurantTab(val label: String) {
+/**
+ * Restaurant info's parts. Someone working inside a branch (Admin Hub) sees that branch's own things here: its opening
+ * hours, and its address, phone and email in Details, which also holds the restaurant's contacts (user, 2026-11-23: "a user
+ * who comes here is inside a branch"; "merge details and contacts").
+ * Branches (a card per branch, each with its own page) is only for the Super Admin's Restaurant app, outside any branch.
+ * Legal and tax details moved to Finance & taxation → Tax setup (user, 2026-11-23). [careful] parts sit apart at the end
+ * of the bar.
+ */
+enum class RestaurantTab(val label: String, val careful: Boolean = false) {
     DETAILS("Details"),
     BRANCHES("Branches"),
-    // Each branch's week and special days (user, 2026-11-20, step 4).
     HOURS("Opening hours"),
-    PLACES("Address & contacts"),
-    BRANDING("Logo & receipts"),
-    LEGAL("Legal & tax"),
-    MONEY("Currency & time zone")
+    BRANDING("Receipt"),
+    MONEY("Currency & time zone", careful = true)
 }
+
+/** Inside a branch: its details (with its address) and its opening hours. */
+enum class BranchView(val label: String) { DETAILS("Details"), HOURS("Opening hours") }
+
+/** Where guests find the restaurant online (user, 2026-11-23: "it can add things like the Instagram link"). */
+data class SocialLinks(
+    val instagram: String = "",
+    val facebook: String = "",
+    val tiktok: String = "",
+    val whatsapp: String = "",
+    val maps: String = ""
+) {
+    val any: Boolean get() = listOf(instagram, facebook, tiktok, whatsapp, maps).any { it.isNotBlank() }
+}
+
+fun socialOf(restaurant: RestaurantDto?): SocialLinks = SocialLinks(restaurant?.instagram.orEmpty(), restaurant?.facebook.orEmpty(),
+    restaurant?.tiktok.orEmpty(), restaurant?.whatsapp.orEmpty(), restaurant?.mapsLink.orEmpty())
+
+const val MAX_SOCIAL_LINK = 200
 
 data class DetailsDraft(
     val name: String,
@@ -45,7 +69,8 @@ data class DetailsDraft(
     val phone: String,
     val website: String,
     val showProblems: Boolean = false,
-    val expectedVersion: Long = 0
+    val expectedVersion: Long = 0,
+    val social: SocialLinks = SocialLinks()
 )
 
 fun detailsProblems(draft: DetailsDraft): Map<String, String> = buildMap {
@@ -57,6 +82,38 @@ fun detailsProblems(draft: DetailsDraft): Map<String, String> = buildMap {
     emailProblem(draft.email, required = true)?.let { put("email", it) }
     (if (draft.phone.isBlank()) "Enter a phone number" else phoneProblem(draft.phone))?.let { put("phone", it) }
     websiteProblem(draft.website)?.let { put("website", it) }
+    listOf("instagram" to draft.social.instagram, "facebook" to draft.social.facebook, "tiktok" to draft.social.tiktok,
+        "whatsapp" to draft.social.whatsapp, "maps" to draft.social.maps).forEach { (key, value) ->
+        socialProblem(key, value)?.let { put(key, it) }
+    }
+}
+
+/**
+ * Whether a social link really is one (user, 2026-11-23: "validate if they are valid links"): a link to that site (with or
+ * without https://), or an @name where the site has them, or a phone number for WhatsApp.
+ */
+fun socialProblem(key: String, value: String): String? {
+    val text = value.trim()
+    if (text.isEmpty()) return null
+    if (text.length > MAX_SOCIAL_LINK) return "At most $MAX_SOCIAL_LINK characters"
+    val url = if (text.any { it.isWhitespace() }) null
+        else runCatching { io.ktor.http.Url(if (Regex("(?i)^https?://").containsMatchIn(text)) text else "https://$text") }.getOrNull()
+    val host = url?.host?.lowercase()?.removePrefix("www.")?.removePrefix("m.").orEmpty()
+    val path = url?.encodedPath?.trim('/').orEmpty()
+    val handle = Regex("^@[A-Za-z0-9._]{1,30}$")
+    fun on(vararg hosts: String) = host in hosts && path.isNotEmpty()
+    return when (key) {
+        "instagram" -> if (on("instagram.com") || handle.matches(text)) null else "Write instagram.com/yourname or @yourname"
+        "facebook" -> if (on("facebook.com", "fb.com", "fb.me")) null else "Write facebook.com/yourpage"
+        "tiktok" -> if ((on("tiktok.com") && path.startsWith("@")) || on("vm.tiktok.com") || handle.matches(text)) null
+            else "Write tiktok.com/@yourname or @yourname"
+        "whatsapp" -> if (on("wa.me") || (phoneProblem(text) == null && text.count { it.isDigit() } >= 7)) null
+            else "Write the WhatsApp number, e.g. +355 69 123 4567"
+        "maps" -> if (on("maps.app.goo.gl", "maps.google.com") || (host == "goo.gl" && path.startsWith("maps")) ||
+            (Regex("^google\\.[a-z.]{2,6}$").matches(host) && path.startsWith("maps"))) null
+            else "Paste the link from Google Maps (Share, then Copy link)"
+        else -> null
+    }
 }
 
 /** A branch being added ([id] null) or changed, with the address guests find it at. */
@@ -73,8 +130,28 @@ data class BranchDraft(
     val country: String = "",
     val addressId: String? = null,
     val showProblems: Boolean = false,
-    val expectedVersion: Long = 0
+    val expectedVersion: Long = 0,
+    // The exact spot, "41.32750, 19.81870", if the person wants it (user, 2026-11-23); kept on the branch's address.
+    val coordinates: String = ""
 )
+
+/** A branch's exact spot as latitude and longitude, or null when [text] isn't one ("41.3275, 19.8187", spaces or ; too). */
+fun parseCoordinates(text: String): Pair<Double, Double>? {
+    val parts = text.trim().split(Regex("[,;\\s]+")).filter { it.isNotEmpty() }
+    if (parts.size != 2) return null
+    val lat = parts[0].toDoubleOrNull() ?: return null
+    val lng = parts[1].toDoubleOrNull() ?: return null
+    return if (lat in -90.0..90.0 && lng in -180.0..180.0) lat to lng else null
+}
+
+/** "41.32750, 19.81870": five decimals, about a metre. */
+fun coordinatesText(point: Pair<Double, Double>): String {
+    fun five(v: Double): String {
+        val scaled = kotlin.math.round(kotlin.math.abs(v) * 100000).toLong()
+        return (if (v < 0 && scaled != 0L) "-" else "") + "${scaled / 100000}." + (scaled % 100000).toString().padStart(5, '0')
+    }
+    return "${five(point.first)}, ${five(point.second)}"
+}
 
 fun branchProblems(draft: BranchDraft): Map<String, String> = buildMap {
     lengthProblem(draft.name, MAX_BRANCH_NAME, true, "a name")?.let { put("name", it) }
@@ -89,6 +166,11 @@ fun branchProblems(draft: BranchDraft): Map<String, String> = buildMap {
         lengthProblem(draft.city, MAX_CITY, true, "the city")?.let { put("city", it) }
         lengthProblem(draft.country, MAX_CITY, true, "the country")?.let { put("country", it) }
         lengthProblem(draft.postalCode, MAX_POSTAL)?.let { put("postalCode", it) }
+    }
+    if (draft.coordinates.isNotBlank() && parseCoordinates(draft.coordinates) == null) {
+        put("coordinates", "Write them as latitude, longitude, e.g. 41.32750, 19.81870")
+    } else if (draft.coordinates.isNotBlank() && draft.street.isBlank()) {
+        put("coordinates", "Add the address first: the exact location is kept with it")
     }
 }
 
@@ -159,8 +241,6 @@ fun taxProblems(draft: TaxDraft): Map<String, String> = buildMap {
 }
 
 data class BrandingDraft(
-    val primaryColor: String = "",
-    val secondaryColor: String = "",
     val receiptHeader: String = "",
     val receiptFooter: String = ""
 )
@@ -249,12 +329,22 @@ sealed interface RestaurantConfirm {
 
 data class RestaurantDetailsState(
     val restaurantId: String? = null,
+    // The branch the person works in (for a super admin, the one entered); null outside any branch.
+    val branchId: String? = null,
     val superAdmin: Boolean = false,
     val canRead: Boolean = false,
     val canEdit: Boolean = false,
     val canManage: Boolean = false,
     val canDelete: Boolean = false,
     val tab: RestaurantTab = RestaurantTab.DETAILS,
+    // The branch whose own page is open (Branches → a branch), and which part of it.
+    val openBranchId: String? = null,
+    val branchView: BranchView = BranchView.DETAILS,
+    // Restaurant info → Details shows the details; a card changes them only after its own Edit (user, 2026-11-23: "the
+    // edit button should be in every card"): "who", "social", "contact" or "map", one at a time.
+    val editingCard: String? = null,
+    // Cover pictures being uploaded or removed: "restaurant" or a branch's id.
+    val coverBusy: Set<String> = emptySet(),
     val restaurant: RestaurantDto? = null,
     val owner: StaffUserDto? = null,
     // How the owner's invitation is doing (only while they haven't set a password).
@@ -293,10 +383,18 @@ data class RestaurantDetailsState(
 ) {
     val brandingChanged: Boolean
         get() = brandingDraft != brandingDraftOf(branding)
+
+    val openBranch: BranchDto? get() = openBranchId?.let { id -> branches.firstOrNull { it.id == id } }
 }
 
+/** The saved branch as its form (with its first address). */
+fun branchDraftOf(branch: BranchDto, address: AddressDto?) = BranchDraft(branch.id, branch.name, branch.code, branch.description.orEmpty(),
+    branch.email.orEmpty(), branch.phone.orEmpty(), address?.streetLine1.orEmpty(), address?.city.orEmpty(), address?.postalCode.orEmpty(),
+    address?.country.orEmpty(), address?.id, expectedVersion = branch.version,
+    coordinates = address?.latitude?.let { lat -> address.longitude?.let { lng -> coordinatesText(lat to lng) } }.orEmpty())
+
 fun brandingDraftOf(branding: BrandingDto?) = BrandingDraft(
-    branding?.primaryColor.orEmpty(), branding?.secondaryColor.orEmpty(), branding?.receiptHeader.orEmpty(), branding?.receiptFooter.orEmpty()
+    branding?.receiptHeader.orEmpty(), branding?.receiptFooter.orEmpty()
 )
 
 /**
@@ -335,6 +433,7 @@ class RestaurantDetailsScreenModel(
                 val platform = isPlatformAdmin(user)
                 mutable.value = RestaurantDetailsState(
                     restaurantId = user?.restaurantId,
+                    branchId = user?.defaultBranchId,
                     superAdmin = platform,
                     canRead = access.read,
                     canEdit = access.edit,
@@ -359,7 +458,63 @@ class RestaurantDetailsScreenModel(
 
     fun refresh() = load()
 
-    fun tab(tab: RestaurantTab) = mutable.update { it.copy(tab = tab) }
+    fun tab(tab: RestaurantTab) = mutable.update { it.copy(tab = tab, openBranchId = null, branch = it.branch?.takeIf { d -> d.id == null }) }
+
+    // ---- A branch's own page ----
+
+    fun openBranch(branchId: String, view: BranchView = BranchView.DETAILS) = mutable.update {
+        it.copy(openBranchId = branchId, branchView = if (it.canEdit) view else BranchView.HOURS, branch = null, notice = null, error = null)
+    }
+
+    fun leaveBranch() = mutable.update { it.copy(openBranchId = null, branch = it.branch?.takeIf { d -> d.id == null }) }
+
+    fun branchView(view: BranchView) = mutable.update { it.copy(branchView = view) }
+
+    /** A branch's form ([branchId], else the open branch page's): the saved branch, ready to change in place (again after a save or Discard). */
+    fun openBranchForm(branchId: String? = null) {
+        val current = state.value
+        val branch = (branchId?.let { id -> current.branches.firstOrNull { it.id == id } } ?: current.openBranch) ?: return
+        if (!current.canEdit) return
+        mutable.update { it.copy(branch = branchDraftOf(branch, it.branchAddresses[branch.id].orEmpty().firstOrNull())) }
+    }
+
+    // ---- Cover pictures (super admins) ----
+
+    /** [branchId] null: the restaurant's own cover. */
+    fun uploadCover(branchId: String?, picture: PickedPicture) = changeCover(branchId, "The picture was saved") { restaurantId ->
+        repository.uploadCover(restaurantId, branchId, picture.bytes, picture.fileName, picture.contentType)
+    }
+
+    fun removeCover(branchId: String?) = changeCover(branchId, "The picture was removed") { restaurantId -> repository.removeCover(restaurantId, branchId) }
+
+    fun coverProblem(message: String) = mutable.update { it.copy(error = message, notice = null) }
+
+    private fun changeCover(branchId: String?, notice: String, call: suspend (String) -> CoverDto) {
+        val current = state.value
+        val restaurantId = current.restaurantId ?: return
+        val key = branchId ?: "restaurant"
+        // The restaurant's cover: whoever changes its details, like the logo (user, 2026-11-23); a branch's: the Super Admin.
+        val allowed = if (branchId == null) current.canEdit else current.superAdmin
+        if (!allowed || key in current.coverBusy) return
+        val token = signIn
+        mutable.update { it.copy(coverBusy = it.coverBusy + key, error = null, notice = null) }
+        actions.launch {
+            try {
+                val saved = call(restaurantId)
+                if (token != signIn) return@launch
+                mutable.update { state ->
+                    if (branchId == null) state.copy(restaurant = state.restaurant?.copy(coverUrl = saved.coverUrl), notice = notice)
+                    else state.copy(branches = state.branches.map { if (it.id == branchId) it.copy(coverUrl = saved.coverUrl) else it }, notice = notice)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (token == signIn) mutable.update { it.copy(error = platformMessage(e, write = true)) }
+            } finally {
+                mutable.update { it.copy(coverBusy = it.coverBusy - key) }
+            }
+        }
+    }
 
     private fun load(preserveError: Boolean = false) {
         val restaurantId = state.value.restaurantId ?: return
@@ -377,6 +532,7 @@ class RestaurantDetailsScreenModel(
                     val addresses = async { repository.addresses(restaurantId) }
                     val contacts = async { repository.contacts(restaurantId) }
                     val branding = async { repository.branding(restaurantId) }
+                    val receipt = async { runCatching { repository.receiptDesign(restaurantId) }.getOrNull() }
                     val taxes = async { repository.taxProfiles(restaurantId) }
                     val changes = async { runCatching { repository.currencyChanges(restaurantId) }.getOrDefault(emptyList()) }
                     val transfers = async { if (platform) runCatching { repository.ownerTransfers(restaurantId) }.getOrDefault(emptyList()) else emptyList() }
@@ -389,8 +545,10 @@ class RestaurantDetailsScreenModel(
                     val owner = if (platform) loadedRestaurant.ownerUserId?.let { id -> runCatching { people.person(id) }.getOrNull() } else null
                     val invite = if (owner != null && !owner.emailVerified) runCatching { repository.ownerInvite(restaurantId) }.getOrNull() else null
                     val loadedBranding = branding.await()
+                    receipt.await()?.let { saved -> ReceiptLooks.loaded(restaurantId, receiptLookOf(saved.design), saved.version) }
                     if (token != revision) return@coroutineScope
                     session.renameActingRestaurant(loadedRestaurant.id, loadedRestaurant.name)
+                    com.saporini.mobile_desktop.core.session.RestaurantBrand.changed(loadedRestaurant.id, loadedBranding?.logoUrl)
                     mutable.update { state ->
                         state.copy(
                             restaurant = loadedRestaurant, owner = owner, invite = invite, branches = loadedBranches.sortedWith(compareByDescending<BranchDto> { it.open }.thenBy { it.name.lowercase() }),
@@ -419,8 +577,7 @@ class RestaurantDetailsScreenModel(
         val restaurant = state.value.restaurant ?: return
         if (!state.value.canEdit) return
         mutable.update {
-            it.copy(details = DetailsDraft(restaurant.name, restaurant.legalName, restaurant.code, restaurant.description.orEmpty(),
-                restaurant.email.orEmpty(), restaurant.phone.orEmpty(), restaurant.website.orEmpty(), expectedVersion = restaurant.version), notice = null)
+            it.copy(details = detailsDraftOf(restaurant), notice = null)
         }
     }
 
@@ -429,8 +586,7 @@ class RestaurantDetailsScreenModel(
         val restaurant = state.value.restaurant ?: return
         if (!state.value.canEdit) return
         mutable.update {
-            it.copy(details = DetailsDraft(restaurant.name, restaurant.legalName, restaurant.code, restaurant.description.orEmpty(),
-                restaurant.email.orEmpty(), restaurant.phone.orEmpty(), restaurant.website.orEmpty(), expectedVersion = restaurant.version))
+            it.copy(details = detailsDraftOf(restaurant))
         }
     }
 
@@ -442,13 +598,65 @@ class RestaurantDetailsScreenModel(
         if (!state.value.canEdit) return
         val current = state.value
         val draft = current.details ?: return
-        val restaurant = current.restaurant ?: return
         if (detailsProblems(draft).isNotEmpty()) {
             mutable.update { it.copy(details = draft.copy(showProblems = true)) }
             return
         }
-        // The owner can't change who the restaurant is; their form leaves those as they are.
-        val request = UpdateRestaurantRequestDto(
+        val request = detailsRequest(current, draft) ?: return
+        write("The details were saved") { restaurantId ->
+            sendDetails(restaurantId, request)
+            mutable.update { it.copy(editingCard = null) }
+        }
+    }
+
+    /**
+     * Details inside a branch (user, 2026-11-23: "merge details and contacts"): the restaurant's details and the branch's,
+     * in one save. Either alone goes through its own save.
+     */
+    fun saveDetailsAndBranch() {
+        val current = state.value
+        if (!current.canEdit) return
+        val details = current.details
+        val branch = current.branch
+        val existing = branch?.id?.let { id -> current.branches.firstOrNull { it.id == id } }
+        val detailsChanged = details != null && current.restaurant?.let { detailsDraftOf(it) != details.copy(showProblems = false) } == true
+        val branchChanged = branch != null && existing != null &&
+            branchDraftOf(existing, current.branchAddresses[existing.id].orEmpty().firstOrNull()) != branch.copy(showProblems = false)
+        when {
+            detailsChanged && !branchChanged -> return saveDetails()
+            branchChanged && !detailsChanged -> return saveBranch()
+            // Nothing changed: Save just closes the card's editing.
+            !detailsChanged -> return mutable.update { it.copy(editingCard = null) }
+        }
+        val badDetails = detailsProblems(details!!).isNotEmpty()
+        val badBranch = branchProblems(branch!!).isNotEmpty()
+        if (badDetails || badBranch) {
+            mutable.update { it.copy(details = if (badDetails) details.copy(showProblems = true) else it.details,
+                branch = if (badBranch) branch.copy(showProblems = true) else it.branch) }
+            return
+        }
+        val request = detailsRequest(current, details) ?: return
+        write("The details were saved") { restaurantId ->
+            sendDetails(restaurantId, request)
+            sendBranch(restaurantId, current, branch, existing)
+            mutable.update { it.copy(editingCard = null) }
+        }
+    }
+
+    private fun detailsDraftOf(restaurant: RestaurantDto) = DetailsDraft(restaurant.name, restaurant.legalName, restaurant.code,
+        restaurant.description.orEmpty(), restaurant.email.orEmpty(), restaurant.phone.orEmpty(), restaurant.website.orEmpty(),
+        expectedVersion = restaurant.version, social = socialOf(restaurant))
+
+    private suspend fun sendDetails(restaurantId: String, request: UpdateRestaurantRequestDto) {
+        val saved = repository.updateRestaurant(restaurantId, request)
+        session.renameActingRestaurant(saved.id, saved.name)
+        mutable.update { it.copy(restaurant = saved, details = null) }
+    }
+
+    /** The owner can't change who the restaurant is; their form leaves those as they are. */
+    private fun detailsRequest(current: RestaurantDetailsState, draft: DetailsDraft): UpdateRestaurantRequestDto? {
+        val restaurant = current.restaurant ?: return null
+        return UpdateRestaurantRequestDto(
             name = if (current.superAdmin) draft.name.trim() else restaurant.name,
             legalName = if (current.superAdmin) draft.legalName.trim() else restaurant.legalName,
             code = if (current.superAdmin) draft.code.trim() else restaurant.code,
@@ -457,6 +665,11 @@ class RestaurantDetailsScreenModel(
             email = draft.email.trim().ifBlank { null },
             phone = draft.phone.trim().ifBlank { null },
             website = draft.website.trim().ifBlank { null },
+            instagram = draft.social.instagram.trim(),
+            facebook = draft.social.facebook.trim(),
+            tiktok = draft.social.tiktok.trim(),
+            whatsapp = draft.social.whatsapp.trim(),
+            mapsLink = draft.social.maps.trim(),
             currency = restaurant.currency,
             timezone = restaurant.timezone,
             ownerUserId = restaurant.ownerUserId,
@@ -464,11 +677,6 @@ class RestaurantDetailsScreenModel(
             status = restaurant.status,
             expectedVersion = draft.expectedVersion
         )
-        write("The details were saved") { restaurantId ->
-            val saved = repository.updateRestaurant(restaurantId, request)
-            session.renameActingRestaurant(saved.id, saved.name)
-            mutable.update { it.copy(restaurant = saved, details = null) }
-        }
     }
 
     // ---- Opening, closing and removing ----
@@ -497,7 +705,8 @@ class RestaurantDetailsScreenModel(
                 write("${confirm.branch.name} was removed. Sales and payment history were kept.", { it.manage }) { restaurantId ->
                     repository.removeBranch(restaurantId, confirm.branch.id,
                         BranchRemovalRequestDto(action, plan.expectedVersion, confirm.confirmedName.trim(), plan.previewToken))
-                    mutable.update { state -> state.copy(confirm = null, branches = state.branches.filter { it.id != confirm.branch.id }) }
+                    mutable.update { state -> state.copy(confirm = null, branches = state.branches.filter { it.id != confirm.branch.id },
+                        openBranchId = state.openBranchId.takeIf { it != confirm.branch.id }, branch = null) }
                     val acting = session.actingRestaurant.value
                     if (acting?.restaurantId == restaurantId && acting.branchId == confirm.branch.id) {
                         session.enterRestaurant(acting.copy(branchId = null, branchName = null, branchCount = state.value.branches.size))
@@ -689,10 +898,7 @@ class RestaurantDetailsScreenModel(
     fun editBranch(branch: BranchDto) {
         if (!state.value.canEdit) return
         val address = state.value.branchAddresses[branch.id].orEmpty().firstOrNull()
-        mutable.update {
-            it.copy(branch = BranchDraft(branch.id, branch.name, branch.code, branch.description.orEmpty(), branch.email.orEmpty(), branch.phone.orEmpty(),
-                address?.streetLine1.orEmpty(), address?.city.orEmpty(), address?.postalCode.orEmpty(), address?.country.orEmpty(), address?.id, expectedVersion = branch.version), notice = null)
-        }
+        mutable.update { it.copy(branch = branchDraftOf(branch, address), notice = null) }
     }
 
     fun changeBranch(change: (BranchDraft) -> BranchDraft) = mutable.update { state -> state.branch?.let { state.copy(branch = change(it)) } ?: state }
@@ -713,6 +919,29 @@ class RestaurantDetailsScreenModel(
             return
         }
         write("${draft.name.trim()} was saved", { if (existing == null) it.manage else it.edit }) { restaurantId ->
+            sendBranch(restaurantId, current, draft, existing)
+            syncRestaurantContact(restaurantId, current, draft, existing)
+            mutable.update { it.copy(editingCard = null) }
+        }
+    }
+
+    /**
+     * A branch's phone and email are the restaurant's (user, 2026-11-23: "you can change it in two places; change it there and
+     * it changes here as well"): a new one typed on the branch's page goes to the restaurant too. Details changes both itself.
+     */
+    private suspend fun syncRestaurantContact(restaurantId: String, current: RestaurantDetailsState, draft: BranchDraft, existing: BranchDto?) {
+        existing ?: return
+        val restaurant = current.restaurant ?: return
+        val phone = draft.phone.trim().takeIf { it.isNotEmpty() && it != existing.phone.orEmpty() && it != restaurant.phone.orEmpty() }
+        val email = draft.email.trim().takeIf { it.isNotEmpty() && it != existing.email.orEmpty() && it != restaurant.email.orEmpty() }
+        if (phone == null && email == null) return
+        val request = detailsRequest(current, detailsDraftOf(restaurant).copy(phone = phone ?: restaurant.phone.orEmpty(),
+            email = email ?: restaurant.email.orEmpty())) ?: return
+        sendDetails(restaurantId, request)
+    }
+
+    /** Adds the branch ([existing] null) or saves its changes, then its address. */
+    private suspend fun sendBranch(restaurantId: String, current: RestaurantDetailsState, draft: BranchDraft, existing: BranchDto?) {
             val saved = if (existing == null) {
                 repository.createBranch(restaurantId, CreateBranchRequestDto(draft.name.trim(), draft.code.trim().ifBlank { null },
                     draft.description.trim().ifBlank { null }, draft.email.trim().ifBlank { null }, draft.phone.trim().ifBlank { null }))
@@ -727,8 +956,9 @@ class RestaurantDetailsScreenModel(
             // The branch's address: added, changed, or left alone when the form had none.
             var addresses = current.branchAddresses[saved.id].orEmpty()
             if (draft.street.isNotBlank()) {
+                val point = parseCoordinates(draft.coordinates)
                 val request = AddressRequestDto("PHYSICAL", draft.country.trim(), draft.city.trim(), draft.postalCode.trim().ifBlank { null },
-                    draft.street.trim(), null, true)
+                    draft.street.trim(), null, true, point?.first, point?.second)
                 val address = repository.saveAddress(restaurantId, saved.id, draft.addressId, request)
                 addresses = listOf(address) + addresses.filter { it.id != address.id }
             }
@@ -736,7 +966,15 @@ class RestaurantDetailsScreenModel(
                 val branches = if (state.branches.any { it.id == saved.id }) state.branches.map { if (it.id == saved.id) saved else it } else state.branches + saved
                 state.copy(branch = null, branches = branches, branchAddresses = state.branchAddresses + (saved.id to addresses))
             }
-        }
+    }
+
+    /** Details inside a branch: Discard puts both back. */
+    fun discardDetailsAndBranch() = mutable.update { it.copy(details = null, branch = null, editingCard = null) }
+
+    /** A Details card's Edit ([card]) or its Cancel (null, which puts back what was saved). */
+    fun editCard(card: String?) {
+        if (card != null) { if (state.value.canEdit && state.value.editingCard == null) mutable.update { it.copy(editingCard = card) } }
+        else discardDetailsAndBranch()
     }
 
     fun changeBranchRemoval(staffAction: String? = null, confirmedName: String? = null) {
@@ -839,19 +1077,59 @@ class RestaurantDetailsScreenModel(
 
     fun resetBranding() = mutable.update { it.copy(brandingDraft = brandingDraftOf(it.branding)) }
 
-    fun saveBranding() {
-        if (!state.value.canEdit) return
-        val draft = state.value.brandingDraft
-        val problem = colorProblem(draft.primaryColor) ?: colorProblem(draft.secondaryColor)
-            ?: lengthProblem(draft.receiptHeader, MAX_RECEIPT_TEXT) ?: lengthProblem(draft.receiptFooter, MAX_RECEIPT_TEXT)
+    /**
+     * Saves the receipt (Restaurant info → Receipt): its top and bottom texts (the branding) and both receipts' design, each
+     * only when changed, in one go (user, 2026-11-23: "everything I do here needs Save changes").
+     */
+    fun saveReceipt() {
+        val current = state.value
+        if (!current.canEdit) return
+        val restaurantId = current.restaurantId ?: return
+        val draft = current.brandingDraft
+        val textsChanged = current.brandingChanged
+        val designChanged = ReceiptLooks.changed(restaurantId)
+        if (!textsChanged && !designChanged) return
+        val problem = lengthProblem(draft.receiptHeader, MAX_RECEIPT_TEXT) ?: lengthProblem(draft.receiptFooter, MAX_RECEIPT_TEXT)
         if (problem != null) {
             mutable.update { it.copy(error = problem) }
             return
         }
-        write("Logo and receipt texts were saved") { restaurantId ->
-            val saved = repository.saveBranding(restaurantId, BrandingRequestDto(draft.primaryColor.trim().ifBlank { null },
-                draft.secondaryColor.trim().ifBlank { null }, draft.receiptHeader.trim().ifBlank { null }, draft.receiptFooter.trim().ifBlank { null }))
-            mutable.update { it.copy(branding = saved, brandingDraft = brandingDraftOf(saved)) }
+        write("The receipt was saved") { id ->
+            if (textsChanged) {
+                val saved = repository.saveBranding(id, BrandingRequestDto(draft.receiptHeader.trim().ifBlank { null }, draft.receiptFooter.trim().ifBlank { null }))
+                mutable.update { it.copy(branding = saved, brandingDraft = brandingDraftOf(saved)) }
+            }
+            if (designChanged) {
+                val look = ReceiptLooks.of(id)
+                val saved = repository.saveReceiptDesign(id, SaveReceiptDesignRequestDto(look.toJson(), ReceiptLooks.version(id)))
+                ReceiptLooks.markSaved(id, look, saved.version)
+            }
+        }
+    }
+
+    /** Puts the receipt back as it was saved. */
+    fun discardReceipt() {
+        state.value.restaurantId?.let { ReceiptLooks.discard(it) }
+        resetBranding()
+    }
+
+    /** A picture for the receipt, uploaded at once (the design that uses it is saved later); [onDone] gets its link. */
+    fun uploadReceiptPicture(bytes: ByteArray, fileName: String, contentType: String, onDone: (String) -> Unit) {
+        val current = state.value
+        val restaurantId = current.restaurantId ?: return
+        if (!current.canEdit || current.uploadingLogo) return
+        mutable.update { it.copy(uploadingLogo = true, error = null, notice = null) }
+        actions.launch {
+            try {
+                val url = repository.uploadReceiptPicture(restaurantId, bytes, fileName, contentType)
+                if (url.isNotBlank()) onDone(url)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                mutable.update { it.copy(error = platformMessage(e, write = true)) }
+            } finally {
+                mutable.update { it.copy(uploadingLogo = false) }
+            }
         }
     }
 
@@ -866,6 +1144,7 @@ class RestaurantDetailsScreenModel(
                 session.requireRestaurantAccess { it.edit }
                 val saved = repository.uploadLogo(restaurantId, bytes, fileName, contentType)
                 if (token == signIn) mutable.update { it.copy(branding = saved, notice = "The logo was saved") }
+                com.saporini.mobile_desktop.core.session.RestaurantBrand.changed(restaurantId, saved.logoUrl)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -879,6 +1158,7 @@ class RestaurantDetailsScreenModel(
     fun removeLogo() = write("The logo was removed") { restaurantId ->
         val saved = repository.removeLogo(restaurantId)
         mutable.update { it.copy(branding = saved) }
+        com.saporini.mobile_desktop.core.session.RestaurantBrand.changed(restaurantId, saved.logoUrl)
     }
 
     fun logoProblem(message: String) = mutable.update { it.copy(error = message) }

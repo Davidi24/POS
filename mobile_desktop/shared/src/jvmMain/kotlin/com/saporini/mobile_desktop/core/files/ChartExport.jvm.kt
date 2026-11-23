@@ -22,6 +22,9 @@ import java.awt.print.PrinterJob
 actual fun encodeJpeg(image: ImageBitmap, quality: Int): ByteArray =
     Image.makeFromBitmap(image.asSkiaBitmap()).encodeToData(EncodedImageFormat.JPEG, quality)?.bytes ?: error("Couldn't make the picture")
 
+actual fun encodePng(image: ImageBitmap): ByteArray =
+    Image.makeFromBitmap(image.asSkiaBitmap()).encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("Couldn't make the picture")
+
 /** The computer prints the pages with Java's printing (the system print window, A4), drawing them as the PDF does. */
 actual suspend fun printDocument(title: String, pages: List<DocPage>): PrintOutcome = withContext(Dispatchers.IO) {
     // No printer set up (common on a fresh computer): open the PDF in the system's viewer, which has its own Print.

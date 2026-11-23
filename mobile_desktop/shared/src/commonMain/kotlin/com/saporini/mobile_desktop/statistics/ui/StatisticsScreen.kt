@@ -75,6 +75,8 @@ internal fun StatisticsWorkspace(tab: StatsTab, onTab: (StatsTab) -> Unit, modif
     remember(model) { model.tab(tab); true }
     BindToLifecycle(model::setActive, model::onDispose)
     LaunchedEffect(tab) { model.tab(tab) }
+    // The branch switcher in the bar decides: the branch looked at, or every branch combined (step 25).
+    com.saporini.mobile_desktop.workspace.ui.FollowBranchScope(com.saporini.mobile_desktop.core.session.Workspace.STATISTICS) { model.branch(it) }
     val state by model.state.collectAsState()
     StatisticsContent(state, model, onTab, modifier)
 }
@@ -125,7 +127,9 @@ internal fun StatisticsContent(state: StatisticsState, model: StatisticsScreenMo
                     } else null
                 ) {
                     // With more than one branch, which one (or all) is picked first, at the top (user, 2026-11-14).
-                    if (state.branches.size > 1) StatsBranchButton(state.branchId, state.branches, { view.branchColor(it) }, model::branch)
+                    // Whoever has the bar's branch switcher picks there (step 25); the page's own picker stays for the others.
+                    if (state.branches.size > 1 && !com.saporini.mobile_desktop.workspace.ui.usesBranchScope())
+                        StatsBranchButton(state.branchId, state.branches, { view.branchColor(it) }, model::branch)
                     PeriodControls(state, model, size)
                     FiltersButton(state, model, view)
                     // The page's own reports (agreed 2026-11-13: a Download button per page instead of a Reports place).

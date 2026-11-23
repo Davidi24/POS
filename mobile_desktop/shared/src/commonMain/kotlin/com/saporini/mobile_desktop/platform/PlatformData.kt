@@ -96,6 +96,13 @@ data class RestaurantDto(
     val email: String? = null,
     val phone: String? = null,
     val website: String? = null,
+    // Where guests find it online (user, 2026-11-23).
+    val instagram: String? = null,
+    val facebook: String? = null,
+    val tiktok: String? = null,
+    val whatsapp: String? = null,
+    val mapsLink: String? = null,
+    val coverUrl: String? = null,
     val currency: String = "",
     val timezone: String = "",
     val isActive: Boolean = true,
@@ -119,6 +126,12 @@ data class UpdateRestaurantRequestDto(
     val email: String? = null,
     val phone: String? = null,
     val website: String? = null,
+    // Left out keeps them (the restaurant list's quick edit); Restaurant info sends them all ("" takes one off).
+    val instagram: String? = null,
+    val facebook: String? = null,
+    val tiktok: String? = null,
+    val whatsapp: String? = null,
+    val mapsLink: String? = null,
     val currency: String,
     val timezone: String,
     val ownerUserId: String? = null,
@@ -365,7 +378,10 @@ data class AddressDto(
     val postalCode: String? = null,
     val streetLine1: String = "",
     val streetLine2: String? = null,
-    val isPrimary: Boolean = false
+    val isPrimary: Boolean = false,
+    // A branch's exact spot, if set.
+    val latitude: Double? = null,
+    val longitude: Double? = null
 ) {
     val oneLine: String
         get() = listOfNotNull(streetLine1.takeIf { it.isNotBlank() }, streetLine2?.takeIf { it.isNotBlank() },
@@ -381,7 +397,9 @@ data class AddressRequestDto(
     val postalCode: String? = null,
     val streetLine1: String,
     val streetLine2: String? = null,
-    val isPrimary: Boolean
+    val isPrimary: Boolean,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 @Serializable
@@ -409,8 +427,6 @@ data class ContactRequestDto(
 data class BrandingDto(
     val id: String? = null,
     val logoUrl: String? = null,
-    val primaryColor: String? = null,
-    val secondaryColor: String? = null,
     val receiptHeader: String? = null,
     val receiptFooter: String? = null
 )
@@ -418,11 +434,19 @@ data class BrandingDto(
 /** The logo is uploaded on its own; leaving it out here keeps it. */
 @Serializable
 data class BrandingRequestDto(
-    val primaryColor: String? = null,
-    val secondaryColor: String? = null,
     val receiptHeader: String? = null,
     val receiptFooter: String? = null
 )
+
+/** The receipts' design as the server keeps it (the app's own JSON, see `ReceiptLook.kt`). */
+@Serializable
+data class ReceiptDesignResponseDto(val design: kotlinx.serialization.json.JsonElement? = null, val version: Long = 0)
+
+@Serializable
+data class SaveReceiptDesignRequestDto(val design: kotlinx.serialization.json.JsonElement, val expectedVersion: Long? = null)
+
+@Serializable
+data class ReceiptPictureDto(val url: String = "")
 
 @Serializable
 data class TaxProfileDto(
@@ -585,6 +609,13 @@ interface PlatformRepository {
     suspend fun saveBranding(restaurantId: String, request: BrandingRequestDto): BrandingDto
     suspend fun uploadLogo(restaurantId: String, bytes: ByteArray, fileName: String, contentType: String): BrandingDto
     suspend fun removeLogo(restaurantId: String): BrandingDto
+
+    /** The receipts' design (user, 2026-11-23); design null = never saved. */
+    suspend fun receiptDesign(restaurantId: String): ReceiptDesignResponseDto = ReceiptDesignResponseDto()
+    suspend fun saveReceiptDesign(restaurantId: String, request: SaveReceiptDesignRequestDto): ReceiptDesignResponseDto =
+        ReceiptDesignResponseDto(request.design, (request.expectedVersion ?: 0) + 1)
+    /** A picture for the receipt; answers its link. */
+    suspend fun uploadReceiptPicture(restaurantId: String, bytes: ByteArray, fileName: String, contentType: String): String = ""
 
     suspend fun taxProfiles(restaurantId: String): List<TaxProfileDto>
     suspend fun saveTaxProfile(restaurantId: String, taxProfileId: String?, request: TaxProfileRequestDto): TaxProfileDto
@@ -781,6 +812,21 @@ class PlatformApi(
         }.body()
 
     override suspend fun removeLogo(restaurantId: String): BrandingDto = client.delete("${restaurantUrl(restaurantId)}/branding/logo").body()
+
+    override suspend fun receiptDesign(restaurantId: String): ReceiptDesignResponseDto = client.get("${restaurantUrl(restaurantId)}/receipt-design").body()
+
+    override suspend fun saveReceiptDesign(restaurantId: String, request: SaveReceiptDesignRequestDto): ReceiptDesignResponseDto =
+        client.put("${restaurantUrl(restaurantId)}/receipt-design") { contentType(ContentType.Application.Json); setBody(request) }.body()
+
+    override suspend fun uploadReceiptPicture(restaurantId: String, bytes: ByteArray, fileName: String, contentType: String): String =
+        client.post("${restaurantUrl(restaurantId)}/receipt-design/pictures") {
+            setBody(MultiPartFormDataContent(formData {
+                append(key = "file", value = bytes, headers = Headers.build {
+                    append(HttpHeaders.ContentType, contentType)
+                    append(HttpHeaders.ContentDisposition, "filename=\"${fileName.replace("\"", "")}\"")
+                })
+            }))
+        }.body<ReceiptPictureDto>().url
 
     override suspend fun taxProfiles(restaurantId: String): List<TaxProfileDto> = client.get("${restaurantUrl(restaurantId)}/tax-profiles").body()
 

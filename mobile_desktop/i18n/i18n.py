@@ -89,7 +89,7 @@ def kotlin_literals(src):
         i += 1
     return out
 
-CODEY = re.compile(r"^[A-Z0-9_]+$|^[a-z][A-Za-z0-9]*$|^[a-z0-9_.\-/]+$|^#|://|^/|\.(png|jpg|jpeg|kt|csv|pdf|svg|xml|json|tsv|txt)$|^%|^[A-Za-z]+\.[A-Za-z]+\(|^\{\}[-_/]|[-_/]\{\}$")
+CODEY = re.compile(r"^[A-Z0-9_]+$|^[a-z][A-Za-z0-9]*$|^[a-z0-9_.\-/]+$|^#|^\^|://|^/|\.(png|jpg|jpeg|kt|csv|pdf|svg|xml|json|tsv|txt)$|^%|^[A-Za-z]+\.[A-Za-z]+\(|^\{\}[-_/]|[-_/]\{\}$")
 
 def wanted(raw):
     key = raw.replace('\x00', '{}')

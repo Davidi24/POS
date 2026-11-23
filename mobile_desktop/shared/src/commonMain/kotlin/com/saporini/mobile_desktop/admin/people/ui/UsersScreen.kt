@@ -169,14 +169,30 @@ private enum class RoleTab(val label: String, val icon: ImageVector) { PEOPLE("P
 
 /** Admin Hub → Users: the restaurant's people by role. */
 @Composable
-internal fun UsersScreen(modifier: Modifier = Modifier) {
+internal fun UsersScreen(modifier: Modifier = Modifier, branch: com.saporini.mobile_desktop.core.session.ScopeBranch? = null) {
     val staff = koinInject<StaffScreenModel>()
     val roles = koinInject<RolesScreenModel>()
     BindToLifecycle(staff::setActive, staff::onDispose)
     BindToLifecycle(roles::setActive, roles::onDispose)
     val staffState by staff.state.collectAsState()
     val rolesState by roles.state.collectAsState()
-    UsersContent(staffState, staff, rolesState, roles, modifier)
+    if (branch == null) {
+        UsersContent(staffState, staff, rolesState, roles, modifier)
+        return
+    }
+    // At a branch (step 25): its staff, the people who work there (and those who work everywhere). MOCK: filtered on the
+    // device until the server lists people by branch, so the role cards still count everyone.
+    val shown = staffState.copy(people = staffState.people.filter { it.defaultBranchId == null || it.defaultBranchId == branch.id })
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(androidx.compose.material.icons.Icons.Outlined.Place, null, Modifier.size(17.dp), tint = Kit.Green)
+            Text("${branch.name}'s staff", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = Kit.Ink)
+            Text("the people who work here · All branches shows everyone with their roles", fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        UsersContent(shown, staff, rolesState, roles, Modifier.fillMaxWidth().weight(1f))
+    }
 }
 
 @Composable

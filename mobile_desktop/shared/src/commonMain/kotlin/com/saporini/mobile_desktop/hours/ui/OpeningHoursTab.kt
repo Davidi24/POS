@@ -26,6 +26,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.ui.draw.alpha
+import kotlinx.datetime.minus
+import com.saporini.mobile_desktop.hours.covering
+import com.saporini.mobile_desktop.hours.hoursText
+import com.saporini.mobile_desktop.hours.specialSpans
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DateRange
@@ -109,8 +119,10 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
-private val ClosedRed = Color(0xFFDC2626)
-private val OpenGreen = Color(0xFF16A34A)
+// The app's own red (user, 2026-11-23: "don't use colours never seen in the other pages").
+private val ClosedRed = Kit.Danger
+// The app's own green (user, 2026-11-23: "the green you use in open now, I don't like it").
+private val OpenGreen = Kit.Green
 
 /**
  * Admin Hub → Restaurant info → Opening hours (user, 2026-11-20): the branch (when there are several), whether it's open
@@ -118,35 +130,56 @@ private val OpenGreen = Color(0xFF16A34A)
  */
 @Composable
 internal fun OpeningHoursTab(state: OpeningHoursState, model: OpeningHoursModel, size: ScreenSize, modifier: Modifier = Modifier) {
-    val dialogOpen = state.special != null || state.removing != null || state.opening || state.closedBookings != null
     Box(modifier.fillMaxWidth()) {
         ScrollColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (state.branches.size > 1) BranchChoice(state, model)
-            when {
-                state.branchId == null -> EmptyNote("No branches yet", "Opening hours belong to a branch. Add one first.")
-                !state.loaded && state.loading -> LoadingCards()
-                !state.loaded -> EmptyNote("Could not load the opening hours", state.error ?: "Check the connection and try again.") {
-                    KitButton("Try again", model::refresh, style = ButtonStyle.SECONDARY)
-                }
-                else -> {
-                    NowCard(state, model, size)
-                    if (state.closedCount > 0) ClosedBookingsLine(state.closedCount, model::showClosedBookings)
-                    if (state.hours?.set == true || state.changed) WeekCard(state, model, size)
-                    SpecialDaysCard(state, model, size)
-                }
-            }
+            OpeningHoursItems(state, model, size)
             Spacer(Modifier.height(if (state.changed) 96.dp else 12.dp))
         }
-        if (state.changed) UnsavedChangesBar(
-            saving = state.saving, problem = model.weekProblem, error = state.error.takeIf { !dialogOpen },
-            onDiscard = model::discardWeek, onSave = model::saveWeek,
-            message = if (size.isPhone) "Unsaved changes" else "You changed the opening hours",
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
-        )
+        OpeningHoursBar(state, model, size, Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
     }
-    ScreenMessages(state.error.takeIf { !dialogOpen && !state.changed && state.loaded }, state.notice, model::clearMessages)
+    OpeningHoursExtras(state, model)
+}
+
+/** The page's parts, for a column that scrolls (this tab's own, or Restaurant info's, user 2026-11-23). */
+@Composable
+internal fun OpeningHoursItems(state: OpeningHoursState, model: OpeningHoursModel, size: ScreenSize) {
+    if (state.branches.size > 1) BranchChoice(state, model)
+    when {
+        state.branchId == null -> EmptyNote("No branches yet", "Opening hours belong to a branch. Add one first.")
+        !state.loaded && state.loading -> LoadingCards()
+        !state.loaded -> EmptyNote("Could not load the opening hours", state.error ?: "Check the connection and try again.") {
+            KitButton("Try again", model::refresh, style = ButtonStyle.SECONDARY)
+        }
+        else -> {
+            NowCard(state, model, size)
+            if (state.closedCount > 0) ClosedBookingsLine(state.closedCount, model::showClosedBookings)
+            CalendarPart(state, model, size)
+        }
+    }
+}
+
+private fun dialogOpen(state: OpeningHoursState) = state.special != null || state.removing != null || state.opening || state.closedBookings != null ||
+    state.editingWeek
+
+/** The floating bar that saves a changed week. */
+@Composable
+internal fun OpeningHoursBar(state: OpeningHoursState, model: OpeningHoursModel, size: ScreenSize, modifier: Modifier) {
+    // The week is changed in its own window now; the bar stays for a change left outside it.
+    if (state.changed && !state.editingWeek) UnsavedChangesBar(
+        saving = state.saving, problem = model.weekProblem, error = state.error.takeIf { !dialogOpen(state) },
+        onDiscard = model::discardWeek, onSave = model::saveWeek,
+        message = if (size.isPhone) "Unsaved changes" else "You changed the opening hours",
+        modifier = modifier
+    )
+}
+
+/** Messages, the done tick and the windows (special day, open now, bookings in closed time). */
+@Composable
+internal fun OpeningHoursExtras(state: OpeningHoursState, model: OpeningHoursModel) {
+    ScreenMessages(state.error.takeIf { !dialogOpen(state) && !state.changed && state.loaded }, state.notice, model::clearMessages)
     DoneBurst(state.done)
     state.special?.let { SpecialDayDialog(it, state, model) }
+    if (state.editingWeek) WeekDialog(state, model)
     state.removing?.let { day ->
         ConfirmDialog("Remove this special day?", "${specialDates(day)} goes back to the usual week.", "Remove",
             onConfirm = model::removeSpecial, onDismiss = { model.askRemove(null) }, danger = true, busy = state.saving)
@@ -192,7 +225,7 @@ private fun NowCard(state: OpeningHoursState, model: OpeningHoursModel, size: Sc
     val now = hours.now
     val look = nowLook(now, hours.set, state.zone)
     val action: (@Composable () -> Unit)? = when {
-        !hours.set && !state.changed && state.canChange -> ({ KitButton("Set opening hours", model::startWeek, icon = Icons.Outlined.Schedule) })
+        !hours.set && !state.changed && state.canChange -> ({ KitButton("Set opening hours", model::openWeek, icon = Icons.Outlined.Schedule) })
         now.why == "OPENED" && state.canOpen -> ({ KitButton("Close again", model::closeAgain, style = ButtonStyle.DANGER_OUTLINE, loading = state.saving) })
         hours.set && !now.open && state.canOpen -> ({ KitButton("Open now", { model.askOpen(true) }, icon = Icons.Outlined.LockOpen) })
         else -> null
@@ -236,9 +269,9 @@ private fun nowLook(now: OpenNowDto, set: Boolean, zone: TimeZone): NowLook {
         now.why == "OPENED" -> NowLook("Open outside the hours", listOfNotNull("Until ${clockAt(now.openedUntil ?: now.until, zone)?.hm().orEmpty()}", note)
             .joinToString(" · "), Kit.Amber, Color(0xFFFFF7E8), Icons.Outlined.LockOpen)
         now.open -> NowLook("Open now", listOfNotNull("Until ${clockAt(now.until, zone)?.hm().orEmpty()}", note).joinToString(" · "),
-            OpenGreen, Color(0xFFF0FAF3), Icons.Outlined.Storefront)
+            OpenGreen, Kit.GreenSoft, Icons.Outlined.Storefront)
         else -> NowLook("Closed now", listOfNotNull(nextOpenText(now.nextOpen, zone) ?: "No opening in the next 30 days", note).joinToString(" · "),
-            ClosedRed, Color(0xFFFEF2F2), Icons.Outlined.EventBusy)
+            ClosedRed, Kit.Danger.copy(alpha = 0.07f), Icons.Outlined.EventBusy)
     }
 }
 
@@ -251,20 +284,6 @@ internal fun nextOpenText(nextOpen: String?, zone: TimeZone): String? {
         0 -> "Opens at ${time.hm()}"
         1 -> "Opens tomorrow at ${time.hm()}"
         else -> "Opens ${shortDate(date)} at ${time.hm()}"
-    }
-}
-
-/** The week: a line per day, open or closed and its openings. */
-@Composable
-private fun WeekCard(state: OpeningHoursState, model: OpeningHoursModel, size: ScreenSize) {
-    HoursCard(Icons.Outlined.Schedule, "The week",
-        "When guests can book and the POS seats guests and starts orders. A closing at or before the opening is the next day (19:00–01:00).",
-        compact = size.isPhone,
-        trailing = { Text("Times in ${state.hours?.timezone.orEmpty()}", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Faint, maxLines = 1) }) {
-        state.week.forEachIndexed { index, day ->
-            DayLine(day, state, model, size.isPhone)
-            if (index < state.week.lastIndex) Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.RowBorder))
-        }
     }
 }
 
@@ -398,28 +417,6 @@ private fun CopyMenu(day: Int, model: OpeningHoursModel) {
     }
 }
 
-/** Special days: upcoming ones as lines with a date leaf, closed in red, other hours in blue. */
-@Composable
-private fun SpecialDaysCard(state: OpeningHoursState, model: OpeningHoursModel, size: ScreenSize) {
-    val today = Clock.System.todayIn(state.zone)
-    val days = state.hours?.specialDays.orEmpty().filter { (dateOf(it.endsOn) ?: dateOf(it.startsOn) ?: today) >= today }
-        .sortedBy { it.startsOn }
-    HoursCard(Icons.Outlined.DateRange, "Special days", "Holidays, a private event, a day you open late. They win over the week.",
-        compact = size.isPhone,
-        trailing = if (state.canChange) ({ KitButton("Add special day", model::newSpecial, icon = Icons.Outlined.Add, enabled = !state.saving) }) else null) {
-        if (days.isEmpty()) {
-            Text("No special days coming up.", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Faint)
-        }
-        days.forEachIndexed { index, day ->
-            SpecialLine(day, state.canChange && !state.saving, onEdit = { model.editSpecial(day) }, onRemove = { model.askRemove(day) })
-            if (index < days.lastIndex) Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.RowBorder))
-        }
-        if (state.hours?.set != true && days.isNotEmpty()) {
-            Text("Special days count once the week's hours are set.", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Amber)
-        }
-    }
-}
-
 @Composable
 private fun SpecialLine(day: SpecialDayDto, editable: Boolean, onEdit: () -> Unit, onRemove: () -> Unit) {
     val from = dateOf(day.startsOn) ?: return
@@ -454,18 +451,289 @@ private fun SpecialLine(day: SpecialDayDto, editable: Boolean, onEdit: () -> Uni
     }
 }
 
+// ---- The calendar (user, 2026-11-23: "make it more like a calendar; you choose a day to make it a special day, or a closed day") ----
+
+private enum class DayKind { OPEN, CLOSED, SPECIAL_CLOSED, SPECIAL_OPEN, NOT_SET }
+
+private class DayInfo(val kind: DayKind, val spans: List<SpanDraft>, val note: String?)
+
+/** What a date is: a special day's closed or other hours, else the usual week's day (never set = always open). */
+private fun dayInfo(date: LocalDate, state: OpeningHoursState): DayInfo {
+    state.hours?.specialDays.orEmpty().covering(date)?.let { special ->
+        val note = special.note?.takeIf { it.isNotBlank() }
+        return if (special.closed) DayInfo(DayKind.SPECIAL_CLOSED, emptyList(), note) else DayInfo(DayKind.SPECIAL_OPEN, specialSpans(special), note)
+    }
+    if (state.hours?.set != true) return DayInfo(DayKind.NOT_SET, emptyList(), null)
+    val spans = state.saved.firstOrNull { it.day == date.dayOfWeek.isoDayNumber }?.spans.orEmpty()
+    return if (spans.isEmpty()) DayInfo(DayKind.CLOSED, emptyList(), null) else DayInfo(DayKind.OPEN, spans, null)
+}
+
+private fun kindColor(kind: DayKind): Color = when (kind) {
+    DayKind.OPEN -> OpenGreen
+    DayKind.CLOSED -> Kit.Grey
+    DayKind.SPECIAL_CLOSED -> ClosedRed
+    DayKind.SPECIAL_OPEN -> Kit.Blue
+    DayKind.NOT_SET -> Kit.Faint
+}
+
+/** The page: the month's calendar, and beside it (under it on narrow windows) the usual week and the special days coming up. */
+@Composable
+private fun CalendarPart(state: OpeningHoursState, model: OpeningHoursModel, size: ScreenSize) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val wide = maxWidth >= 980.dp
+        if (wide) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+            HoursCalendar(state, model, size, Modifier.weight(1f))
+            Column(Modifier.width(340.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                UsualWeekCard(state, model, compact = true)
+                ComingUpCard(state, model, compact = true)
+            }
+        } else Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            HoursCalendar(state, model, size, Modifier.fillMaxWidth())
+            UsualWeekCard(state, model, compact = size.isPhone)
+            ComingUpCard(state, model, compact = size.isPhone)
+        }
+    }
+}
+
+/** A month at a time; each day says how it opens, special days in their colour; a click on a day to come changes it. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HoursCalendar(state: OpeningHoursState, model: OpeningHoursModel, size: ScreenSize, modifier: Modifier) {
+    val zone = state.zone
+    val today = Clock.System.todayIn(zone)
+    val thisMonth = LocalDate(today.year, today.month, 1)
+    var month by remember(state.branchId) { mutableStateOf(thisMonth) }
+    val phone = size.isPhone
+    val editable = state.canChange && !state.saving
+    val lead = month.dayOfWeek.isoDayNumber - 1
+    val gridStart = month.minus(DatePeriod(days = lead))
+    val last = month.plus(DatePeriod(months = 1)).minus(DatePeriod(days = 1))
+    val weeks = (lead + last.day + 6) / 7
+    Surface(modifier, shape = RoundedCornerShape(16.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border), shadowElevation = 1.dp) {
+        Column(Modifier.padding(if (phone) 12.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MonthArrow(Icons.Outlined.ChevronLeft, "Month before", month > thisMonth.minus(DatePeriod(months = 12))) { month = month.minus(DatePeriod(months = 1)) }
+                Text("${monthName(month)} ${month.year}", Modifier.widthIn(min = if (phone) 0.dp else 170.dp), fontFamily = Inter(), fontWeight = FontWeight.Bold,
+                    fontSize = if (phone) 17.sp else 19.sp, color = Kit.Ink, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                MonthArrow(Icons.Outlined.ChevronRight, "Next month", month < thisMonth.plus(DatePeriod(months = 24))) { month = month.plus(DatePeriod(months = 1)) }
+                if (month != thisMonth) TextLink("Today", Icons.Outlined.Today) { month = thisMonth }
+                Spacer(Modifier.weight(1f))
+                if (!phone) Text("Times in ${state.hours?.timezone.orEmpty()}", fontFamily = Inter(), fontSize = 11.5.sp, color = Kit.Faint, maxLines = 1)
+            }
+            if (state.canChange) Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Kit.Canvas).padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.TouchApp, null, Modifier.size(16.dp), tint = Kit.Muted)
+                Text("Click a day to close it or give it other hours. In its window you can pick several days.", fontFamily = Inter(), fontSize = 12.5.sp,
+                    color = Kit.Muted)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(if (phone) 4.dp else 6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(if (phone) 4.dp else 6.dp)) {
+                    (1..7).forEach { d ->
+                        Text(if (phone) shortDayName(d).take(2) else shortDayName(d), Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp, letterSpacing = 0.4.sp, color = if (d == today.dayOfWeek.isoDayNumber && month == thisMonth) OpenGreen else Kit.Muted,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                }
+                repeat(weeks) { w ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(if (phone) 4.dp else 6.dp)) {
+                        (0 until 7).forEach { d ->
+                            val date = gridStart.plus(DatePeriod(days = w * 7 + d))
+                            DayCell(date, dayInfo(date, state), inMonth = date.month == month.month, today = today, phone = phone,
+                                clickable = editable && date >= today, modifier = Modifier.weight(1f)) { model.pickDay(date) }
+                        }
+                    }
+                }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (state.hours?.set == true) {
+                    LegendDot(OpenGreen, "Open")
+                    LegendDot(Kit.Grey, "Closed")
+                }
+                LegendDot(ClosedRed, "Special day: closed")
+                LegendDot(Kit.Blue, "Special day: other hours")
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonthArrow(icon: ImageVector, label: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(Modifier.size(34.dp).clip(CircleShape).border(1.dp, Kit.Border, CircleShape).clickable(enabled = enabled, onClick = onClick), Alignment.Center) {
+        Icon(icon, label, Modifier.size(20.dp), tint = if (enabled) Kit.Ink else Kit.Faint)
+    }
+}
+
+@Composable
+private fun LegendDot(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.size(9.dp).clip(CircleShape).background(color))
+        Text(label, fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
+    }
+}
+
+/** One day: its number (today in a green circle) and how it opens; special days tinted; days gone by faded. */
+@Composable
+private fun DayCell(date: LocalDate, info: DayInfo, inMonth: Boolean, today: LocalDate, phone: Boolean, clickable: Boolean, modifier: Modifier,
+                    onClick: () -> Unit) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val color = kindColor(info.kind)
+    val special = info.kind == DayKind.SPECIAL_CLOSED || info.kind == DayKind.SPECIAL_OPEN
+    val background = when (info.kind) {
+        DayKind.SPECIAL_CLOSED, DayKind.SPECIAL_OPEN -> color.copy(alpha = 0.08f)
+        DayKind.CLOSED -> Kit.Canvas
+        else -> Color.White
+    }
+    val border = when {
+        hovered && clickable -> Kit.Green
+        special -> color.copy(alpha = 0.35f)
+        else -> Kit.RowBorder
+    }
+    Column(
+        modifier.height(if (phone) 54.dp else 96.dp).alpha(if (date < today) 0.45f else if (!inMonth) 0.55f else 1f)
+            .clip(RoundedCornerShape(10.dp)).background(background).border(if (hovered && clickable) 1.5.dp else 1.dp, border, RoundedCornerShape(10.dp))
+            .clickable(enabled = clickable, interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(if (phone) 4.dp else 8.dp),
+        verticalArrangement = Arrangement.spacedBy(if (phone) 3.dp else 4.dp),
+        horizontalAlignment = if (phone) Alignment.CenterHorizontally else Alignment.Start
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val isToday = date == today
+            Box(Modifier.size(if (phone) 22.dp else 24.dp).clip(CircleShape).background(if (isToday) OpenGreen else Color.Transparent), Alignment.Center) {
+                Text("${date.day}", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (phone) 11.5.sp else 12.5.sp,
+                    color = if (isToday) Color.White else Kit.Ink, translate = false)
+            }
+            if (!phone) {
+                Spacer(Modifier.weight(1f))
+                if (special) Icon(if (info.kind == DayKind.SPECIAL_CLOSED) Icons.Outlined.EventBusy else Icons.Outlined.Schedule, null,
+                    Modifier.size(14.dp), tint = color)
+            }
+        }
+        if (phone) {
+            if (info.kind != DayKind.NOT_SET) Box(Modifier.size(7.dp).clip(CircleShape).background(color))
+        } else when (info.kind) {
+            DayKind.OPEN, DayKind.SPECIAL_OPEN -> {
+                info.spans.take(2).forEach { span ->
+                    Text("${span.opens.hm()}–${span.closes.hm()}", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp,
+                        color = if (special) color else Kit.Ink, maxLines = 1, softWrap = false, translate = false)
+                }
+                if (info.spans.size > 2) Text("+${info.spans.size - 2} more", fontFamily = Inter(), fontSize = 10.5.sp, color = Kit.Muted)
+            }
+            DayKind.CLOSED -> Text("Closed", fontFamily = Inter(), fontSize = 11.5.sp, color = Kit.Muted)
+            DayKind.SPECIAL_CLOSED -> Text("Closed", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 11.5.sp, color = color)
+            DayKind.NOT_SET -> Text("Always open", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Faint, maxLines = 1)
+        }
+        if (!phone && info.note != null && info.spans.size < 2) Text(info.note, fontFamily = Inter(), fontSize = 10.5.sp, lineHeight = 13.sp,
+            color = color.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis, translate = false)
+    }
+}
+
+/** The usual week as text, with Change (its own window). */
+@Composable
+private fun UsualWeekCard(state: OpeningHoursState, model: OpeningHoursModel, compact: Boolean) {
+    val set = state.hours?.set == true
+    val today = Clock.System.todayIn(state.zone).dayOfWeek.isoDayNumber
+    HoursCard(Icons.Outlined.Schedule, "Usual week",
+        if (set) "Every week, unless a special day says otherwise." else "Not set yet: until it is, the branch counts as always open.",
+        compact = compact,
+        trailing = if (state.canChange) ({ KitButton(if (set) "Change" else "Set the week", model::openWeek, icon = Icons.Outlined.Edit,
+            style = if (set) ButtonStyle.SECONDARY else ButtonStyle.PRIMARY, enabled = !state.saving) }) else null) {
+        if (set) (1..7).forEach { d ->
+            val spans = state.saved.firstOrNull { it.day == d }?.spans.orEmpty()
+            val on = d == today
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(if (on) Kit.GreenSoft else Color.Transparent)
+                .padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(dayName(d), Modifier.width(98.dp), fontFamily = Inter(), fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, fontSize = 13.sp,
+                    color = if (on) OpenGreen else Kit.Ink)
+                Text(if (spans.isEmpty()) "Closed" else spans.hoursText(), Modifier.weight(1f), fontFamily = Inter(),
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, fontSize = 13.sp, color = if (spans.isEmpty()) Kit.Muted else Kit.Ink,
+                    translate = spans.isEmpty())
+            }
+        }
+    }
+}
+
+/** Special days still to come, a line each (a click changes it). */
+@Composable
+private fun ComingUpCard(state: OpeningHoursState, model: OpeningHoursModel, compact: Boolean) {
+    val today = Clock.System.todayIn(state.zone)
+    val days = state.hours?.specialDays.orEmpty().filter { (dateOf(it.endsOn) ?: dateOf(it.startsOn) ?: today) >= today }.sortedBy { it.startsOn }
+    HoursCard(Icons.Outlined.DateRange, "Special days coming up", "Holidays, a private event, a day you open late. They win over the week.",
+        compact = compact) {
+        if (days.isEmpty()) Text(if (state.canChange) "None yet. Click a day on the calendar to add one." else "None coming up.", fontFamily = Inter(),
+            fontSize = 13.sp, color = Kit.Faint)
+        days.forEachIndexed { index, day ->
+            SpecialLine(day, state.canChange && !state.saving, onEdit = { model.editSpecial(day) }, onRemove = { model.askRemove(day) })
+            if (index < days.lastIndex) Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.RowBorder))
+        }
+    }
+}
+
+/** The usual week's window: a line per day, saved together. */
+@Composable
+private fun WeekDialog(state: OpeningHoursState, model: OpeningHoursModel) {
+    val problem = model.weekProblem
+    AppDialog("Usual week", model::closeWeek, busy = state.saving, maxWidth = 860.dp,
+        subtitle = "When guests can book and the POS seats guests and starts orders. A closing at or before the opening is the next day (19:00–01:00).",
+        buttons = {
+            KitButton("Cancel", model::closeWeek, style = ButtonStyle.SECONDARY, enabled = !state.saving)
+            KitButton("Save", model::saveWeek, loading = state.saving, enabled = (state.changed || state.hours?.set != true) && problem == null)
+        }) {
+        val narrow = LocalNarrowDialog.current
+        state.week.forEachIndexed { index, day ->
+            DayLine(day, state, model, narrow)
+            if (index < state.week.lastIndex) Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.RowBorder))
+        }
+        state.error?.let { Text(it, fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Danger) }
+    }
+}
+
+/** A choice in the day's window: an icon in its colour, a name and a line; the chosen one framed. */
+@Composable
+private fun ChoiceTile(icon: ImageVector, title: String, line: String, color: Color, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (selected) color.copy(alpha = 0.07f) else Color.White)
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) color.copy(alpha = 0.7f) else Kit.Border, RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.12f)), Alignment.Center) {
+            Icon(icon, null, Modifier.size(18.dp), tint = color)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = Kit.Ink)
+            Text(line, fontFamily = Inter(), fontSize = 12.sp, lineHeight = 16.sp, color = Kit.Muted)
+        }
+        Box(Modifier.size(18.dp).clip(CircleShape).border(if (selected) 5.dp else 1.5.dp, if (selected) color else Kit.Border, CircleShape))
+    }
+}
+
 // ---- Dialogs ----
 
+/**
+ * A day (or a few in a row) picked on the calendar: the usual hours, closed, or other hours, with a note. The calendar on
+ * the left picks more days; an existing special day can go back to the usual hours.
+ */
 @Composable
 private fun SpecialDayDialog(draft: SpecialDraft, state: OpeningHoursState, model: OpeningHoursModel) {
     val today = Clock.System.todayIn(state.zone)
     val problem = if (draft.showProblems) specialProblem(draft) else null
     val changed = state.savedSpecial == null || draft.copy(showProblems = false) != state.savedSpecial
-    AppDialog(if (draft.id == null) "Add special day" else "Change special day", model::cancelSpecial, busy = state.saving, maxWidth = 700.dp,
-        subtitle = "A date or a few days in a row: closed, or other hours.",
+    val weekday = draft.from.dayOfWeek.isoDayNumber
+    val usualSpans = state.saved.firstOrNull { it.day == weekday }?.spans.orEmpty()
+    val usualLine = when {
+        state.hours?.set != true -> "Always open: the usual week isn't set yet"
+        draft.from != draft.to -> "As the usual week says"
+        usualSpans.isEmpty() -> "${dayName(weekday)}: closed"
+        else -> "${dayName(weekday)}: ${usualSpans.hoursText()}"
+    }
+    val editable = !state.saving
+    AppDialog(rangeText(draft.from, draft.to), model::cancelSpecial, busy = state.saving, maxWidth = 780.dp,
+        subtitle = if (draft.id == null) "How these days open. Pick more days on the calendar for a few in a row." else "A special day: change it, or put it back to the usual hours.",
         buttons = {
             KitButton("Cancel", model::cancelSpecial, style = ButtonStyle.SECONDARY, enabled = !state.saving)
-            KitButton("Save", model::saveSpecial, loading = state.saving, enabled = changed)
+            KitButton(if (draft.usual && draft.id != null) "Back to usual hours" else "Save", model::saveSpecial, loading = state.saving,
+                enabled = changed && !(draft.usual && draft.id == null))
         }) {
         val narrow = LocalNarrowDialog.current
         val calendar: @Composable () -> Unit = {
@@ -476,21 +744,21 @@ private fun SpecialDayDialog(draft: SpecialDraft, state: OpeningHoursState, mode
             }
         }
         val form: @Composable ColumnScope.() -> Unit = {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Which days", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted)
-                Text(rangeText(draft.from, draft.to), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Kit.Ink)
-            }
+            Text("These days are", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Those days", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SmallToggle("Closed", draft.closed, icon = Icons.Outlined.EventBusy) { model.changeSpecial { it.copy(closed = true) } }
-                    SmallToggle("Other hours", !draft.closed, icon = Icons.Outlined.Schedule) { model.changeSpecial { it.copy(closed = false) } }
+                ChoiceTile(Icons.Outlined.Storefront, "Usual hours", usualLine, OpenGreen, draft.usual, editable) {
+                    model.changeSpecial { it.copy(usual = true) }
+                }
+                ChoiceTile(Icons.Outlined.EventBusy, "Closed", "No bookings, and the POS doesn't seat guests or start orders.", ClosedRed,
+                    !draft.usual && draft.closed, editable) { model.changeSpecial { it.copy(usual = false, closed = true) } }
+                ChoiceTile(Icons.Outlined.Schedule, "Other hours", "Open, but at other times.", Kit.Blue, !draft.usual && !draft.closed, editable) {
+                    model.changeSpecial { it.copy(usual = false, closed = false) }
                 }
             }
-            if (!draft.closed) {
+            if (!draft.usual && !draft.closed) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     draft.spans.forEachIndexed { i, span ->
-                        SpanEditor(span, !state.saving, onChange = { changed -> model.changeSpecial { d -> d.copy(spans = d.spans.mapIndexed { j, s -> if (j == i) changed else s }) } },
+                        SpanEditor(span, editable, onChange = { changed -> model.changeSpecial { d -> d.copy(spans = d.spans.mapIndexed { j, s -> if (j == i) changed else s }) } },
                             onRemove = if (draft.spans.size > 1) ({ model.changeSpecial { d -> d.copy(spans = d.spans.filterIndexed { j, _ -> j != i }) } }) else null)
                     }
                     if (draft.spans.size < MAX_OPENINGS_A_DAY) TextLink("Add opening", Icons.Outlined.Add) {
@@ -502,18 +770,18 @@ private fun SpecialDayDialog(draft: SpecialDraft, state: OpeningHoursState, mode
                     }
                 }
             }
-            TextInput(draft.note, { v -> model.changeSpecial { it.copy(note = v) } }, Modifier.fillMaxWidth(), label = "Note", optional = true,
-                placeholder = "Christmas Eve, a private event…", maxLength = MAX_HOURS_NOTE, enabled = !state.saving,
+            if (!draft.usual) TextInput(draft.note, { v -> model.changeSpecial { it.copy(note = v) } }, Modifier.fillMaxWidth(), label = "Note", optional = true,
+                placeholder = "Christmas Eve, a private event…", maxLength = MAX_HOURS_NOTE, enabled = editable,
                 hint = "Guests see it on the booking page.")
             (problem ?: state.error)?.let { Text(it, fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Danger) }
         }
         if (narrow) {
             Box(Modifier.fillMaxWidth(), Alignment.Center) { calendar() }
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp), content = form)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = form)
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 calendar()
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp), content = form)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp), content = form)
             }
         }
     }
@@ -626,6 +894,8 @@ private fun LoadingCards() {
 }
 
 // ---- Dates in words ----
+
+internal fun monthName(date: LocalDate): String = date.month.name.lowercase().replaceFirstChar { it.uppercase() }
 
 internal fun monthShort(date: LocalDate): String = date.month.name.take(3).lowercase().replaceFirstChar { it.uppercase() }
 

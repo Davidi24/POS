@@ -54,7 +54,7 @@ import org.koin.compose.koinInject
  * way back to every restaurant.
  */
 @Composable
-internal fun ActingRestaurantBar(acting: ActingRestaurant, onAllRestaurants: () -> Unit) {
+internal fun ActingRestaurantBar(acting: ActingRestaurant, onAllRestaurants: (() -> Unit)?) {
     val session = koinInject<SessionManager>()
     val repository = koinInject<PlatformRepository>()
     val model = remember(repository, session) { com.saporini.mobile_desktop.platform.BranchListScreenModel(repository, session) }
@@ -62,13 +62,17 @@ internal fun ActingRestaurantBar(acting: ActingRestaurant, onAllRestaurants: () 
     androidx.compose.runtime.LaunchedEffect(acting.restaurantId) { model.show(acting.restaurantId, acting.restaurantName) }
     val state by model.state.collectAsState()
     var open by remember { mutableStateOf(false) }
+    // An owner's own restaurant (no restaurant list to go back to): only worth showing with more than one branch.
+    if (onAllRestaurants == null && (!state.loaded || state.allBranches < 2)) return
+    val restaurantName = acting.restaurantName.ifBlank { state.restaurantName }
+    val branchName = acting.branchName ?: state.cards.firstOrNull { it.id == acting.branchId }?.name
 
     Surface(shape = RoundedCornerShape(50), color = Color.White, border = BorderStroke(1.dp, Kit.Border), shadowElevation = 2.dp) {
         Row(Modifier.height(44.dp).padding(start = 6.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(32.dp).clip(RoundedCornerShape(50)).background(Kit.GreenSoft), contentAlignment = Alignment.Center) {
                 Icon(Icons.Outlined.Storefront, null, Modifier.size(18.dp), tint = Kit.Green)
             }
-            Text(acting.restaurantName, Modifier.padding(start = 10.dp).widthIn(max = 260.dp), fontFamily = Inter(), fontWeight = FontWeight.Bold,
+            Text(restaurantName, Modifier.padding(start = 10.dp).widthIn(max = 260.dp), fontFamily = Inter(), fontWeight = FontWeight.Bold,
                 fontSize = 14.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Box {
                 Row(
@@ -81,7 +85,7 @@ internal fun ActingRestaurantBar(acting: ActingRestaurant, onAllRestaurants: () 
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(Icons.Outlined.Business, null, Modifier.size(15.dp), tint = Kit.Muted)
-                    Text(acting.branchName ?: "Manage restaurant", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
+                    Text(branchName ?: "Manage restaurant", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp,
                         color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Icon(Icons.Outlined.ExpandMore, "Switch branch", Modifier.size(16.dp), tint = Kit.Muted)
                 }
@@ -120,8 +124,8 @@ internal fun ActingRestaurantBar(acting: ActingRestaurant, onAllRestaurants: () 
                     }
                 }
             }
-            Box(Modifier.padding(horizontal = 6.dp).width(1.dp).height(22.dp).background(Kit.Border))
-            Row(
+            if (onAllRestaurants != null) Box(Modifier.padding(horizontal = 6.dp).width(1.dp).height(22.dp).background(Kit.Border))
+            if (onAllRestaurants != null) Row(
                 Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onAllRestaurants).padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {

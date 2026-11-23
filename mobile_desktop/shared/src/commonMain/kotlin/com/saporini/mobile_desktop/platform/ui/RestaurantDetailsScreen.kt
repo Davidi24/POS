@@ -1,8 +1,36 @@
 package com.saporini.mobile_desktop.platform.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material.icons.outlined.Palette
+import com.saporini.mobile_desktop.hours.HoursBranch
+import com.saporini.mobile_desktop.hours.OpeningHoursModel
+import com.saporini.mobile_desktop.platform.BranchView
+import kotlinx.datetime.toLocalDateTime
+import mobile_desktop.shared.generated.resources.Res
+import mobile_desktop.shared.generated.resources.inventory_stock_value
+import mobile_desktop.shared.generated.resources.order_empty_dining
+import mobile_desktop.shared.generated.resources.overview_guests
+import mobile_desktop.shared.generated.resources.overview_next_hours
+import mobile_desktop.shared.generated.resources.overview_reservations
+import mobile_desktop.shared.generated.resources.role_finance
+import mobile_desktop.shared.generated.resources.settings_payments
+import mobile_desktop.shared.generated.resources.settings_reservations
+import mobile_desktop.shared.generated.resources.supplier_place
+import mobile_desktop.shared.generated.resources.users_owner
+import mobile_desktop.shared.generated.resources.workspace_restaurants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,6 +38,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,6 +65,12 @@ import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.filled.LocationOn
+import mobile_desktop.shared.generated.resources.inventory_places
+import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Mail
@@ -55,6 +90,7 @@ import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,6 +102,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -197,13 +234,27 @@ internal fun RestaurantDetailsScreen(tab: RestaurantTab, onTab: (RestaurantTab) 
 
 /** Admin Hub → Restaurant info: what the owner keeps up to date (the rest is shown, changed by the Super Admin). */
 @Composable
-internal fun RestaurantInfoScreen(modifier: Modifier = Modifier) {
+internal fun RestaurantInfoScreen(modifier: Modifier = Modifier, global: Boolean = false) {
     val model = koinInject<RestaurantDetailsScreenModel>()
     BindToLifecycle(model::setActive, model::onDispose)
     val state by model.state.collectAsState()
-    RestaurantDetailsContent(state, model, state.tab, model::tab, showTabs = true, modifier = modifier)
+    RestaurantDetailsContent(state, model, state.tab, model::tab, showTabs = true, modifier = modifier, global = global)
 }
 
+/** Admin Hub → Branches (looking at every branch, step 25): the branch cards, each opening its own page. */
+@Composable
+internal fun RestaurantBranchesScreen(modifier: Modifier = Modifier) {
+    val model = koinInject<RestaurantDetailsScreenModel>()
+    BindToLifecycle(model::setActive, model::onDispose)
+    val state by model.state.collectAsState()
+    RestaurantDetailsContent(state, model, RestaurantTab.BRANCHES, {}, showTabs = false, modifier = modifier)
+}
+
+/**
+ * Restaurant info (redone 2026-11-22, user: "make them look much better; every branch can have them different, so you go
+ * inside a branch"): the restaurant on its picture, then its parts. A branch's own page (Branches → a branch) has its
+ * details, address and opening hours. Legal & tax and Currency & time zone sit apart at the end: dangerous to change.
+ */
 @Composable
 internal fun RestaurantDetailsContent(
     state: RestaurantDetailsState,
@@ -211,163 +262,290 @@ internal fun RestaurantDetailsContent(
     tab: RestaurantTab,
     onTab: (RestaurantTab) -> Unit,
     showTabs: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Admin Hub looking at every branch (step 25): the restaurant only, no branch's own parts; branches have their own place.
+    global: Boolean = false
 ) {
+    // Admin Hub is entered inside a branch (user, 2026-11-23): that branch's hours and contacts show here and there's no
+    // list of branches. The Super Admin's Restaurant app is outside any branch: it has Branches, each with its own page.
+    val inBranch = showTabs && !global && state.branchId != null
+    val here = state.branchId?.takeIf { inBranch }?.let { id -> state.branches.firstOrNull { it.id == id } }
     val tabs = when {
-        state.superAdmin -> RestaurantTab.entries
-        state.canEdit -> RestaurantTab.entries - RestaurantTab.MONEY
-        // Someone with only "Change opening hours" (a manager) sees just those.
-        else -> listOf(RestaurantTab.HOURS)
+        // Someone with only "Change opening hours" (a manager) sees just those of their branch.
+        !state.canEdit -> listOf(if (inBranch) RestaurantTab.HOURS else RestaurantTab.BRANCHES)
+        else -> RestaurantTab.entries.filter { t ->
+            when (t) {
+                RestaurantTab.BRANCHES -> !inBranch && !global
+                RestaurantTab.HOURS -> inBranch
+                RestaurantTab.MONEY -> state.superAdmin
+                else -> true
+            }
+        }
     }
     val shown = if (tab in tabs) tab else tabs.first()
     // Opening hours have a model of their own, alive while this page is.
-    val hoursModel = remember { org.koin.mp.KoinPlatform.getKoinOrNull()?.getOrNull<com.saporini.mobile_desktop.hours.OpeningHoursModel>() }
+    val hoursModel = remember { org.koin.mp.KoinPlatform.getKoinOrNull()?.getOrNull<OpeningHoursModel>() }
     androidx.compose.runtime.DisposableEffect(hoursModel) { onDispose { hoursModel?.close() } }
     val hoursState = hoursModel?.state?.collectAsState()?.value
-    LaunchedEffect(shown == RestaurantTab.HOURS, state.restaurantId, state.branches) {
-        if (shown == RestaurantTab.HOURS) hoursModel?.setBranches(state.restaurantId,
-            state.branches.map { com.saporini.mobile_desktop.hours.HoursBranch(it.id, it.name) })
+    val branch = state.openBranch?.takeIf { shown == RestaurantTab.BRANCHES }
+    // A branch's page brings its own opening hours; inside a branch, its hours are the Opening hours tab.
+    val hoursOf = branch ?: here?.takeIf { shown == RestaurantTab.HOURS }
+    LaunchedEffect(hoursOf?.id, state.restaurantId) {
+        if (hoursOf != null) hoursModel?.setBranches(state.restaurantId, listOf(HoursBranch(hoursOf.id, hoursOf.name)))
     }
+    // Another part picked in the bar leaves the branch's page.
+    LaunchedEffect(shown) { if (shown != RestaurantTab.BRANCHES && state.openBranchId != null) model.leaveBranch() }
     // The Details tab is the form itself: it holds the saved details, ready to change in place (again after a save or Discard).
     LaunchedEffect(shown, state.details == null, state.restaurant?.version, state.canEdit) {
         if (shown == RestaurantTab.DETAILS && state.details == null && state.canEdit && state.restaurant != null) model.openDetailsForm()
     }
+    // So is a branch's page, and inside a branch Details' "This branch".
+    val formOf = branch ?: here?.takeIf { shown == RestaurantTab.DETAILS }
+    LaunchedEffect(formOf?.id, formOf?.version, state.branch == null, state.canEdit, formOf?.let { state.branchAddresses[it.id] }) {
+        if (formOf != null && state.branch == null && state.canEdit) model.openBranchForm(formOf.id)
+    }
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val size = screenSizeFor(maxWidth)
-        Column(
-            Modifier.fillMaxSize().padding(horizontal = if (size.isPhone) 14.dp else 22.dp, vertical = if (size.isPhone) 12.dp else 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            val restaurant = state.restaurant
-            RestaurantHero(state, size) {
-                RefreshButton(state.loading, model::refresh, size = if (size.isPhone) 38.dp else com.saporini.mobile_desktop.core.components.PageControlHeight)
-                TabActions(shown, state, model, compact = size.isPhone)
-            }
-            if (showTabs && tabs.size > 1) RestaurantTabs(tabs, shown, onTab)
-            ScreenMessages(state.error.takeIf { !anyDialogOpen(state.copy(details = null)) && !(shown == RestaurantTab.DETAILS && detailsChanged(state)) },
-                state.notice, model::clearMessages)
+        val wide = maxWidth >= 900.dp
+        val side = if (size.isPhone) 14.dp else 22.dp
+        val contentWidth = maxWidth - side * 2
+        val hoursChanged = shown == RestaurantTab.HOURS && hoursState?.changed == true
+        val unsaved = when {
+            branch != null -> state.branchView == BranchView.DETAILS && branchChanged(state)
+            // Details' cards save themselves (Cancel / Save at their foot).
+            shown == RestaurantTab.DETAILS -> false
+            shown == RestaurantTab.BRANDING -> state.canEdit && (state.brandingChanged || com.saporini.mobile_desktop.platform.ReceiptLooks.changed(state.restaurantId))
+            else -> false
+        }
+        Column(Modifier.fillMaxSize().padding(horizontal = side, vertical = if (size.isPhone) 12.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ScreenMessages(state.error.takeIf { !anyDialogOpen(state) && !unsaved }, state.notice, model::clearMessages)
             when {
                 !state.canRead -> PageState(PageStateKind.EMPTY, "Access unavailable", "You do not have permission to view restaurant details.")
                 state.restaurantId == null -> PageState(PageStateKind.EMPTY, "No restaurant", "Open a restaurant first.")
                 !state.loaded && state.loading -> OverviewPageSkeleton(size)
                 !state.loaded && state.error != null -> PageState(PageStateKind.FAILED, action = { RetryText(onClick = model::refresh) })
                 // Before its first answer the page shows its shapes too, never a spinner.
-                restaurant == null -> OverviewPageSkeleton(size)
-                shown == RestaurantTab.HOURS -> if (hoursModel != null && hoursState != null)
+                state.restaurant == null -> OverviewPageSkeleton(size)
+                // A branch's opening hours scroll on their own, under the branch's band.
+                branch != null && state.branchView == BranchView.HOURS && hoursModel != null && hoursState != null -> {
+                    BranchBand(branch, hoursState.hours?.now, state, model, size.isPhone)
+                    BranchSwitchRow(branch, state, model, size.isPhone)
                     com.saporini.mobile_desktop.hours.ui.OpeningHoursTab(hoursState, hoursModel, size, Modifier.fillMaxWidth().weight(1f))
+                }
                 else -> Box(Modifier.fillMaxWidth().weight(1f)) {
-                    val unsaved = shown == RestaurantTab.DETAILS && detailsChanged(state)
-                    com.saporini.mobile_desktop.core.components.ScrollColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        when (shown) {
-                            RestaurantTab.DETAILS -> DetailsTab(state, model, size)
-                            RestaurantTab.BRANCHES -> BranchesTab(state, model, size)
-                            RestaurantTab.HOURS -> {}
-                            RestaurantTab.PLACES -> PlacesTab(state, model, size)
-                            RestaurantTab.BRANDING -> BrandingTab(state, model, size)
-                            RestaurantTab.LEGAL -> LegalTab(state, model)
-                            RestaurantTab.MONEY -> MoneyTab(state, model, size)
+                    com.saporini.mobile_desktop.core.components.ScrollColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        if (branch != null) {
+                            BranchBand(branch, hoursState?.hours?.now, state, model, size.isPhone)
+                            BranchSwitchRow(branch, state, model, size.isPhone)
+                            BranchDetails(branch, state, model, size, wide, hoursState)
+                        } else {
+                            RestaurantHero(state, model, size, here)
+                            if (showTabs && tabs.size > 1) RestaurantTabs(tabs, shown, { t -> com.saporini.mobile_desktop.core.components.LeaveGuard.attempt { onTab(t) } }, wide)
+                            when (shown) {
+                                RestaurantTab.DETAILS -> DetailsTab(state, model, size, wide, here)
+                                RestaurantTab.BRANCHES -> BranchesTab(state, model, size, contentWidth)
+                                RestaurantTab.HOURS -> if (hoursModel != null && hoursState != null) {
+                                    here?.let { HereLine(it, state) }
+                                    com.saporini.mobile_desktop.hours.ui.OpeningHoursItems(hoursState, hoursModel, size)
+                                }
+                                RestaurantTab.BRANDING -> BrandingTab(state, model, size, wide)
+                                RestaurantTab.MONEY -> MoneyTab(state, model, size, wide)
+                            }
                         }
-                        Spacer(Modifier.height(if (unsaved) 96.dp else 12.dp))
+                        Spacer(Modifier.height(if (unsaved || hoursChanged) 96.dp else 28.dp))
                     }
-                    if (unsaved) com.saporini.mobile_desktop.core.components.UnsavedChangesBar(
-                        saving = state.saving,
-                        problem = state.details?.takeIf { it.showProblems }?.let { d -> detailsProblems(d).values.firstOrNull() },
-                        error = state.error,
-                        onDiscard = model::cancelDetails, onSave = model::saveDetails,
-                        message = if (size.isPhone) "Unsaved changes" else "You changed the restaurant's details",
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
-                    )
+                    if (hoursChanged && hoursModel != null && hoursState != null) {
+                        com.saporini.mobile_desktop.hours.ui.OpeningHoursBar(hoursState, hoursModel, size,
+                            Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
+                    }
+                    if (unsaved) {
+                        val bar = when {
+                            branch != null -> Triple(state.branch?.takeIf { it.showProblems }?.let { d -> branchProblems(d).values.firstOrNull() },
+                                (model::cancelBranch to model::saveBranch), "You changed the branch")
+                            shown == RestaurantTab.BRANDING -> Triple(null, ({ discardReceipt(state, model) } to { saveReceipt(state, model) }), "You changed the receipt")
+                            else -> Triple(state.details?.takeIf { it.showProblems }?.let { d -> detailsProblems(d).values.firstOrNull() }
+                                ?: state.branch?.takeIf { it.showProblems && here != null }?.let { d -> branchProblems(d).values.firstOrNull() },
+                                (model::discardDetailsAndBranch to model::saveDetailsAndBranch), "You changed the details")
+                        }
+                        com.saporini.mobile_desktop.core.components.UnsavedChangesBar(
+                            saving = state.saving, problem = bar.first, error = state.error,
+                            onDiscard = bar.second.first, onSave = bar.second.second,
+                            message = if (size.isPhone) "Unsaved changes" else bar.third,
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
+                        )
+                    }
                 }
             }
         }
+        // Add branch: the green tab on the right edge, as on the Super Admin's pages (user, 2026-11-21).
+        if (branch == null && shown == RestaurantTab.BRANCHES && state.canManage && state.loaded) {
+            var position by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0.3f) }
+            val maxOffset = with(androidx.compose.ui.platform.LocalDensity.current) {
+                (maxHeight - com.saporini.mobile_desktop.core.components.edgeActionButtonHeight(size.isPhone)).coerceAtLeast(0.dp).toPx()
+            }
+            com.saporini.mobile_desktop.core.components.RightEdgeActionButton(
+                "Add branch", model::newBranch, enabled = !state.saving, width = if (size.isPhone) 108.dp else 132.dp, compact = size.isPhone,
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, kotlin.math.round(position * maxOffset).toInt()) }
+                    .draggable(
+                        orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                        state = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
+                            if (maxOffset > 0f) position = (position + delta / maxOffset).coerceIn(0f, 1f)
+                        }
+                    )
+            )
+        }
     }
+    // The receipt asks before the person leaves it with changes (user, 2026-11-23). Save waits for the texts to be saved.
+    var leaveAfterSave by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val receiptUnsaved = shown == RestaurantTab.BRANDING && state.canEdit &&
+        (state.brandingChanged || com.saporini.mobile_desktop.platform.ReceiptLooks.changed(state.restaurantId))
+    com.saporini.mobile_desktop.core.components.GuardUnsaved(receiptUnsaved, "You changed the receipt and didn't save it.",
+        save = { leave -> saveReceipt(state, model); leaveAfterSave = leave },
+        discard = { discardReceipt(state, model) })
+    LaunchedEffect(state.saving, state.brandingChanged, com.saporini.mobile_desktop.platform.ReceiptLooks.changed(state.restaurantId), leaveAfterSave) {
+        val leave = leaveAfterSave ?: return@LaunchedEffect
+        if (!state.saving && !state.brandingChanged && !com.saporini.mobile_desktop.platform.ReceiptLooks.changed(state.restaurantId)) { leaveAfterSave = null; leave() }
+        else if (!state.saving && state.error != null) leaveAfterSave = null
+    }
+    com.saporini.mobile_desktop.core.components.LeaveGuardDialog(saving = state.saving && leaveAfterSave != null)
     Dialogs(state, model)
+    if (shown == RestaurantTab.HOURS && hoursModel != null && hoursState != null) com.saporini.mobile_desktop.hours.ui.OpeningHoursExtras(hoursState, hoursModel)
 }
 
-private fun anyDialogOpen(state: RestaurantDetailsState) = state.details != null || state.branch != null || state.address != null ||
+/** "Main Branch · the branch you work in": whose hours and contacts these are. */
+@Composable
+private fun HereLine(branch: com.saporini.mobile_desktop.platform.BranchDto, state: RestaurantDetailsState) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.size(30.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Kit.GreenSoft), Alignment.Center) {
+            Icon(Icons.Outlined.Place, null, Modifier.size(17.dp), tint = Kit.Green)
+        }
+        Text(branch.name, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Kit.Ink, translate = false)
+        Text(if (state.branches.size > 1) "the branch you work in · each branch has its own" else "the branch you work in", fontFamily = Inter(),
+            fontSize = 12.5.sp, color = Kit.Muted)
+    }
+}
+
+private fun anyDialogOpen(state: RestaurantDetailsState) = (state.branch != null && state.branch.id == null) || state.address != null ||
     state.contact != null || state.tax != null || state.currency != null || state.timezone != null || state.confirm != null ||
     state.ownerStep != null || state.transfer != null
-
-@Composable
-private fun TabActions(tab: RestaurantTab, state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, compact: Boolean) {
-    if (!state.canRead || !state.canEdit) return
-    // On a phone the buttons share the row with the logo, so they're squares with just an icon that says what they add.
-    val action: @Composable (String, ImageVector, ImageVector, Boolean, () -> Unit) -> Unit = { text, icon, phoneIcon, primary, onClick ->
-        when {
-            compact -> SquareAction(phoneIcon, text, primary, !state.saving, onClick)
-            primary -> ToolbarPrimaryButton(text, icon, !state.saving, onClick)
-            else -> ToolbarButton(text, icon, !state.saving, onClick)
-        }
-    }
-    when (tab) {
-        // Details is edited right on the page (the form below), so there's no Edit button.
-        RestaurantTab.DETAILS -> {}
-        RestaurantTab.BRANCHES -> if (state.canManage) action("Add branch", Icons.Outlined.Add, Icons.Outlined.AddBusiness, true, model::newBranch)
-        RestaurantTab.PLACES -> {
-            action("Add contact", Icons.Outlined.Person, Icons.Outlined.PersonAdd, false, model::newContact)
-            action("Add address", Icons.Outlined.Add, Icons.Outlined.AddLocationAlt, true, model::newAddress)
-        }
-        RestaurantTab.LEGAL -> if (state.canManage) action("Add tax details", Icons.Outlined.Add, Icons.Outlined.PostAdd, true, model::newTax)
-        else -> {}
-    }
-}
-
-/** A phone's 38 dp square button with just an icon: green for the tab's main action, white otherwise. */
-@Composable
-private fun SquareAction(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, primary: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    androidx.compose.material3.Surface(onClick = onClick, enabled = enabled, modifier = Modifier.size(38.dp), shape = RoundedCornerShape(8.dp),
-        color = if (primary) Kit.Green.copy(alpha = if (enabled) 1f else 0.45f) else Color.White,
-        border = if (primary) null else androidx.compose.foundation.BorderStroke(1.dp, Kit.Border)) {
-        Box(contentAlignment = Alignment.Center) { Icon(icon, description, Modifier.size(19.dp), tint = if (primary) Color.White else Kit.Ink) }
-    }
-}
 
 // ---- The top of the page ----
 
 /**
- * The restaurant at the top of the page, like a profile: a band in its own colour (Logo & receipts → main colour) with
- * its logo on it, the name and whether it's open, then what matters at a glance (code, branches, currency, time zone)
- * as small chips. [actions] (refresh, the tab's button) sit on the right.
+ * The restaurant at the top, like a profile: its cover picture (the Super Admin changes it there), the logo half on its
+ * edge, the name and whether it's open, and what matters at a glance (code, branches, currency, time zone) as chips.
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun RestaurantHero(state: RestaurantDetailsState, size: ScreenSize, actions: @Composable () -> Unit) {
-    val restaurant = state.restaurant
-    val name = restaurant?.name ?: "Restaurant"
-    val brand = parseHexColor(state.branding?.primaryColor)
-    val accent = brand?.let { Accent(it, it.copy(alpha = 0.26f), it.copy(alpha = 0.07f)) } ?: accentOf(name)
-    val logo = if (size.isPhone) 64.dp else 84.dp
-    val band = if (size.isPhone) 84.dp else 120.dp
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // The logo sits half on the band; the page's buttons sit beside it, just under the band (on every size, so the
-        // name below keeps the whole width).
-        Box(Modifier.fillMaxWidth().height(band + if (size.isPhone) 44.dp else logo / 2)) {
-            Box(Modifier.fillMaxWidth().height(band).clip(RoundedCornerShape(16.dp))) { CoverBackground(null, accent) }
-            Box(Modifier.align(Alignment.BottomStart).padding(start = if (size.isPhone) 14.dp else 18.dp).clip(RoundedCornerShape(logo * 0.3f))
-                .background(Color.White).padding(4.dp)) {
-                RestaurantLogo(state.branding?.logoUrl, name, logo)
+private fun RestaurantHero(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize, here: com.saporini.mobile_desktop.platform.BranchDto? = null) {
+    val restaurant = state.restaurant ?: return
+    val name = restaurant.name
+    // No brand colours any more (user, 2026-11-23): the band without a cover takes the restaurant's own accent.
+    val accent = accentOf(name)
+    val phone = size.isPhone
+    val logo = if (phone) 76.dp else 108.dp
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border), shadowElevation = 1.dp) {
+        Column {
+            Box(Modifier.fillMaxWidth().height(if (phone) 120.dp else 190.dp)) {
+                CoverBackground(restaurant.coverUrl, accent)
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.2f))))
+                // The cover can be changed by whoever changes the details (user, 2026-11-23: "the banner should be editable").
+                if (state.canEdit) {
+                    CoverButton(restaurant.coverUrl != null, "restaurant" in state.coverBusy, { model.uploadCover(null, it) }, { model.removeCover(null) },
+                        model::coverProblem, Modifier.align(Alignment.TopEnd).padding(12.dp),
+                        label = if (restaurant.coverUrl != null) "Change cover" else "Add a cover")
+                }
             }
-            Row(Modifier.align(Alignment.BottomEnd), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(if (size.isPhone) 8.dp else 10.dp)) { actions() }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(name, Modifier.weight(1f, fill = false), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (size.isPhone) 20.sp else 24.sp,
-                lineHeight = if (size.isPhone) 25.sp else 30.sp, color = Kit.Ink, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            restaurant?.let { StatusChip(restaurantStatusLabel(it.status, it.isActive), if (it.open) Kit.Green else Kit.Amber, strong = true) }
-        }
-        restaurant?.let {
-            val openBranches = state.branches.count { b -> b.open }
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                FactChip(Icons.Outlined.Badge, it.code)
-                FactChip(Icons.Outlined.Business, when {
-                    state.branches.isEmpty() -> "No branches yet"
-                    openBranches == state.branches.size -> "${state.branches.size} ${if (state.branches.size == 1) "branch" else "branches"}"
-                    else -> "${state.branches.size} branches · $openBranches open"
-                })
-                FactChip(Icons.Outlined.CurrencyExchange, "${it.currency} · ${currencyName(it.currency)}")
-                FactChip(Icons.Outlined.Schedule, timeZoneLabel(it.timezone))
+            Row(Modifier.fillMaxWidth().padding(start = if (phone) 14.dp else 22.dp, end = if (phone) 12.dp else 20.dp, bottom = if (phone) 14.dp else 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (phone) 12.dp else 18.dp)) {
+                HeroLogo(state, model, logo)
+                Column(Modifier.weight(1f).padding(top = if (phone) 8.dp else 14.dp), verticalArrangement = Arrangement.spacedBy(if (phone) 6.dp else 9.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(name, Modifier.weight(1f, fill = false), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (phone) 20.sp else 27.sp,
+                            lineHeight = if (phone) 25.sp else 32.sp, letterSpacing = (-0.3).sp, color = Kit.Ink, maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = false)
+                        DotPill(restaurantStatusLabel(restaurant.status, restaurant.isActive), if (restaurant.open) Kit.Green else Kit.Amber)
+                    }
+                    val openBranches = state.branches.count { b -> b.open }
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FactChip(Icons.Outlined.Badge, restaurant.code)
+                        FactChip(if (here != null) Icons.Outlined.Place else Icons.Outlined.Business, when {
+                            here != null -> if (state.branches.size > 1) "${here.name} · ${state.branches.size} branches" else here.name
+                            state.branches.isEmpty() -> "No branches yet"
+                            openBranches == state.branches.size -> if (state.branches.size == 1) "1 branch" else "${state.branches.size} branches"
+                            else -> "${state.branches.size} branches · $openBranches open"
+                        })
+                        FactChip(Icons.Outlined.CurrencyExchange, "${restaurant.currency} · ${currencyName(restaurant.currency)}")
+                        FactChip(Icons.Outlined.Schedule, timeZoneLabel(restaurant.timezone))
+                    }
+                }
+                Box(Modifier.padding(top = if (phone) 8.dp else 14.dp)) {
+                    RefreshButton(state.loading, model::refresh, size = if (phone) 36.dp else 40.dp)
+                }
             }
         }
+    }
+}
+
+private const val LogoCorner = 0.18f
+
+/**
+ * The logo on the card at the top, changed right there (user, 2026-11-23: "make the edit logo in the card above"): a round
+ * button on its corner picks a picture (or removes the logo), which is placed in its square first, then saved.
+ */
+@Composable
+private fun HeroLogo(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, logo: androidx.compose.ui.unit.Dp) {
+    val restaurant = state.restaurant ?: return
+    var placing by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var menu by remember { mutableStateOf(false) }
+    val pick = rememberPicturePicker({ picked ->
+        runCatching { picked.bytes.decodeToImageBitmap() }.getOrNull()?.let { placing = it } ?: model.logoProblem("This file can't be opened as a picture.")
+    }, model::logoProblem)
+    val hasLogo = state.branding?.logoUrl != null
+    Box(Modifier.offsetUpBy(logo / 2)) {
+        LogoBox(state.branding?.logoUrl, logo, Modifier.shadow(8.dp, RoundedCornerShape(logo * LogoCorner)), busy = state.uploadingLogo) {
+            RestaurantLogo(null, restaurant.name, logo)
+        }
+        if (state.canEdit) Box(Modifier.align(Alignment.BottomEnd).offset(x = 6.dp, y = 6.dp)) {
+            com.saporini.mobile_desktop.core.ui.HoverTooltip(if (hasLogo) "Change the logo" else "Add a logo") {
+                Box(Modifier.size(34.dp).shadow(3.dp, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(Color.White).border(1.dp, Kit.Border, androidx.compose.foundation.shape.CircleShape)
+                    .clickable(enabled = !state.uploadingLogo) { if (hasLogo) menu = true else pick() }, Alignment.Center) {
+                    Icon(Icons.Outlined.PhotoCamera, null, Modifier.size(17.dp), tint = Kit.Ink)
+                }
+            }
+            androidx.compose.material3.DropdownMenu(menu, { menu = false }, Modifier.background(Color.White)) {
+                androidx.compose.material3.DropdownMenuItem(
+                    leadingIcon = { Icon(Icons.Outlined.Upload, null, Modifier.size(18.dp), tint = Kit.Ink) },
+                    text = { Text("Choose another picture", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Ink) },
+                    onClick = { menu = false; pick() })
+                androidx.compose.material3.DropdownMenuItem(
+                    leadingIcon = { Icon(Icons.Outlined.Delete, null, Modifier.size(18.dp), tint = Kit.Danger) },
+                    text = { Text("Remove the logo", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Danger) },
+                    onClick = { menu = false; model.removeLogo() })
+            }
+        }
+    }
+    placing?.let { image ->
+        LogoCropDialog(image, busy = state.uploadingLogo, onCancel = { placing = null }) { png ->
+            placing = null
+            model.uploadLogo(png, "logo.png", "image/png")
+        }
+    }
+}
+
+/**
+ * The logo in its tile, the same at the top of the page and in Logo & receipts (user, 2026-11-23: "the logo up should be
+ * the same as down"): the whole picture on a soft background with a thin line round it; [empty] while there's none.
+ */
+@Composable
+private fun LogoBox(url: String?, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier, busy: Boolean = false,
+                    empty: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
+    val shape = RoundedCornerShape(size * LogoCorner)
+    Box(modifier.size(size).clip(shape).background(Kit.Canvas).border(1.dp, Kit.Border, shape), Alignment.Center) {
+        if (busy) CircularProgressIndicator(Modifier.size(28.dp), color = Kit.Green)
+        else RemoteImage(url, "Logo", Modifier.fillMaxSize(), contentScale = ContentScale.Fit, placeholder = empty)
     }
 }
 
@@ -381,36 +559,49 @@ private fun FactChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text
     }
 }
 
-/** "#4F7942" → the colour, or null when it isn't one. */
-private fun parseHexColor(text: String?): Color? {
-    val hex = text?.trim()?.removePrefix("#")?.takeIf { it.length == 6 && it.all { c -> c.isDigit() || c.lowercaseChar() in 'a'..'f' } } ?: return null
-    return Color(0xFF000000 or hex.toLong(16))
-}
 
-/** The page's parts as underlined tabs with icons (the chosen one green); they slide sideways on a phone. */
+/**
+ * The page's parts as underlined tabs with icons (the chosen one green). The careful ones (Legal & tax, Currency & time
+ * zone) sit apart at the end, with amber icons; on a narrow window everything slides sideways, a line before those two.
+ */
 @Composable
-private fun RestaurantTabs(tabs: List<RestaurantTab>, chosen: RestaurantTab, onTab: (RestaurantTab) -> Unit) {
+private fun RestaurantTabs(tabs: List<RestaurantTab>, chosen: RestaurantTab, onTab: (RestaurantTab) -> Unit, wide: Boolean) {
+    val main = tabs.filter { !it.careful }
+    val careful = tabs.filter { it.careful }
     val scroll = androidx.compose.foundation.rememberScrollState()
     val spans = remember { androidx.compose.runtime.mutableStateMapOf<RestaurantTab, Pair<Int, Int>>() }
-    com.saporini.mobile_desktop.core.components.CenterChosen(scroll, chosen, spans)
+    if (!wide) com.saporini.mobile_desktop.core.components.CenterChosen(scroll, chosen, spans)
     Box(Modifier.fillMaxWidth()) {
         Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(1.dp).background(Kit.Border))
-        Row(Modifier.fillMaxWidth().fadingEdges(scroll).horizontalScroll(scroll)) {
-            tabs.forEach { tab ->
-                val on = tab == chosen
-                Column(Modifier.width(androidx.compose.foundation.layout.IntrinsicSize.Max)
-                    .onGloballyPositioned { spans[tab] = it.positionInParent().x.roundToInt() to it.size.width }
-                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).clickable { onTab(tab) }.padding(horizontal = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(Modifier.padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(tabIcon(tab), null, Modifier.size(17.dp), tint = if (on) Kit.Green else Kit.Muted)
-                        Text(tab.label, fontFamily = Inter(), fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, fontSize = 13.5.sp,
-                            letterSpacing = 0.sp, color = if (on) Kit.Green else Kit.Ink, maxLines = 1, softWrap = false)
+        Row(Modifier.fillMaxWidth().then(if (wide) Modifier else Modifier.fadingEdges(scroll).horizontalScroll(scroll)),
+            verticalAlignment = Alignment.Bottom) {
+            main.forEach { tab -> TabItem(tab, tab == chosen, spans) { onTab(tab) } }
+            if (careful.isNotEmpty()) {
+                if (wide) Spacer(Modifier.weight(1f))
+                Box(Modifier.padding(horizontal = 6.dp, vertical = 12.dp).width(1.dp).height(20.dp).background(Kit.Border))
+                careful.forEach { tab ->
+                    com.saporini.mobile_desktop.core.ui.HoverTooltip("Careful: changing this affects the whole restaurant") {
+                        TabItem(tab, tab == chosen, spans) { onTab(tab) }
                     }
-                    Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)).background(if (on) Kit.Green else Color.Transparent))
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TabItem(tab: RestaurantTab, on: Boolean, spans: MutableMap<RestaurantTab, Pair<Int, Int>>, onClick: () -> Unit) {
+    val tint = if (tab.careful) Kit.Amber else Kit.Green
+    Column(Modifier.width(androidx.compose.foundation.layout.IntrinsicSize.Max)
+        .onGloballyPositioned { spans[tab] = it.positionInParent().x.roundToInt() to it.size.width }
+        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(Modifier.padding(vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Icon(tabIcon(tab), null, Modifier.size(18.dp), tint = if (on || tab.careful) tint else Kit.Muted)
+            Text(tab.label, fontFamily = Inter(), fontWeight = if (on) FontWeight.Bold else FontWeight.SemiBold, fontSize = 14.sp,
+                letterSpacing = 0.sp, color = if (on) tint else Kit.Ink, maxLines = 1, softWrap = false)
+        }
+        Box(Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)).background(if (on) tint else Color.Transparent))
     }
 }
 
@@ -418,65 +609,34 @@ private fun tabIcon(tab: RestaurantTab) = when (tab) {
     RestaurantTab.DETAILS -> Icons.Outlined.Storefront
     RestaurantTab.BRANCHES -> Icons.Outlined.Business
     RestaurantTab.HOURS -> Icons.Outlined.Schedule
-    RestaurantTab.PLACES -> Icons.Outlined.Place
-    RestaurantTab.BRANDING -> Icons.Outlined.Image
-    RestaurantTab.LEGAL -> Icons.Outlined.Gavel
+    RestaurantTab.BRANDING -> Icons.Outlined.Receipt
     RestaurantTab.MONEY -> Icons.Outlined.CurrencyExchange
-}
-
-/** A white card with an icon and a title, for one topic of the details. */
-@Composable
-private fun InfoCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
-    androidx.compose.material3.Surface(modifier, shape = RoundedCornerShape(14.dp), color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Kit.Border)) {
-        Column(Modifier.padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp)) {
-            Row(Modifier.padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(icon, null, Modifier.size(18.dp), tint = Kit.Ink)
-                Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Kit.Ink)
-            }
-            content()
-        }
-    }
-}
-
-/** One fact in an info card: a small icon tile, what it is, and its value ("Not set" in grey when there's none). */
-@Composable
-private fun InfoLine(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String?, last: Boolean = false) {
-    val shown = value?.takeIf { it.isNotBlank() }
-    Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Kit.Tint), Alignment.Center) {
-            Icon(icon, null, Modifier.size(17.dp), tint = Kit.Muted)
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = Kit.Muted)
-            Text(shown ?: "Not set", fontFamily = Inter(), fontWeight = if (shown != null) FontWeight.SemiBold else FontWeight.Normal, fontSize = 14.sp,
-                color = if (shown != null) Kit.Ink else Kit.Faint, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-        }
-    }
-    if (!last) Box(Modifier.padding(start = 46.dp).fillMaxWidth().height(1.dp).background(Kit.RowBorder))
 }
 
 // ---- Details ----
 
+/**
+ * Details (user, 2026-11-23: "this page looks terrible, and it repeats how guests reach you: just contact"): one form with
+ * each thing once (who you are, about, contact with the address of the branch you're in, social links); then, for the
+ * Super Admin, the owner, open or closed, and removing the restaurant.
+ */
 @Composable
-private fun DetailsTab(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize) {
-    val restaurant = state.restaurant ?: return
-    // The form beside a live preview of what guests see (under it on narrow screens, the booking page and the email
-    // line side by side on a tablet).
-    if (size.isDesktop) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column(Modifier.weight(1.55f), verticalArrangement = Arrangement.spacedBy(14.dp)) { DetailsForm(state, model, size) }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) { GuestPreview(state, wide = false, compact = false) }
-        }
-    } else {
-        DetailsForm(state, model, size)
-        GuestPreview(state, wide = !size.isPhone, compact = size.isPhone)
-    }
+private fun DetailsTab(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize, wide: Boolean,
+                       here: com.saporini.mobile_desktop.platform.BranchDto?) {
+    // No preview of the booking website beside it (user, 2026-11-23: "not realistic, I haven't started the website yet").
+    DetailsForm(state, model, here, size, wide)
     if (state.superAdmin) {
-        PanelPair(size, { m -> OwnerPanel(state, model, m) }, { m -> OpenClosePanel(state, model, m) })
+        if (wide) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.Top) {
+            OwnerCard(state, model, Modifier.weight(1f), compact = false)
+            OpenCloseCard(state, model, Modifier.weight(1f), compact = false)
+        } else {
+            OwnerCard(state, model, Modifier.fillMaxWidth(), compact = size.isPhone)
+            OpenCloseCard(state, model, Modifier.fillMaxWidth(), compact = size.isPhone)
+        }
     }
     // Removing the restaurant comes last, on its own (user rule).
-    if (state.canDelete) DangerZone(state, model, compact = size.isPhone)
+    if (state.canDelete) RemoveZone("Remove the restaurant", "It disappears everywhere and its staff are signed out. Its sales and records are kept.",
+        "Remove restaurant", compact = size.isPhone, enabled = !state.saving, onRemove = model::askRemoveRestaurant)
 }
 
 /** Whether the details form differs from what's saved. */
@@ -484,238 +644,378 @@ private fun detailsChanged(state: RestaurantDetailsState): Boolean {
     val d = state.details ?: return false
     val r = state.restaurant ?: return false
     return d.name != r.name || d.legalName != r.legalName || d.code != r.code || d.description != r.description.orEmpty() ||
-        d.email != r.email.orEmpty() || d.phone != r.phone.orEmpty() || d.website != r.website.orEmpty()
+        d.email != r.email.orEmpty() || d.phone != r.phone.orEmpty() || d.website != r.website.orEmpty() ||
+        d.social != com.saporini.mobile_desktop.platform.socialOf(r)
 }
 
 /**
- * The restaurant's details as a form in three cards: who it is (name, legal name, code: only the Super Admin changes
- * them, so the owner sees them locked), about it (the description guests read) and how guests reach it (email, phone,
- * website). Changes are saved with the floating bar; problems show under each field once Save was pressed.
+ * The details, shown as they are until Edit (user, 2026-11-23: "make it so you need an edit mode, it's confusing"). Two
+ * columns on a wide window (user: "who you are and social on the left, contact and the map on the right"), one under the
+ * other otherwise. Name, legal name and code are the Super Admin's: an owner sees the first two locked and never the code.
+ * The phone and email are the branch's too: changing them here changes them on the branch's page, and the other way round.
  */
 @Composable
-private fun DetailsForm(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize) {
+private fun DetailsForm(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, here: com.saporini.mobile_desktop.platform.BranchDto?,
+                        size: ScreenSize, wide: Boolean) {
     val restaurant = state.restaurant ?: return
     val draft = state.details
+    // Each card has its own Edit (user, 2026-11-23); one card is changed at a time.
+    val editingCard = state.editingCard.takeIf { state.canEdit && draft != null }
+    val on = { card: String -> editingCard == card }
+    val trailing = { card: String, extra: (@Composable () -> Unit)? ->
+        @Composable {
+            when {
+                on(card) -> extra?.invoke()
+                state.canEdit -> EditPill(enabled = editingCard == null && draft != null && !state.saving) { model.editCard(card) }
+            }
+        }
+    }
     val problems = if (draft?.showProblems == true) detailsProblems(draft) else emptyMap()
-    val editable = draft != null && !state.saving
+    val branchDraft = here?.let { h -> state.branch?.takeIf { it.id == h.id } }
+    val placeProblems = if (branchDraft?.showProblems == true) branchProblems(branchDraft) else emptyMap()
+    val savedAddress = here?.let { state.branchAddresses[it.id].orEmpty().firstOrNull() }
+    val editable = !state.saving
+    val placeEditable = editable && branchDraft != null
     val locked = !state.superAdmin
-    val value = { saved: String?, drafted: String? -> drafted ?: saved.orEmpty() }
-    // Two fields a row, one under the other on a phone.
-    val pairs = !size.isPhone
     val compact = size.isPhone
-    FormCard(Icons.Outlined.Storefront, "Who the restaurant is", "Its name on receipts, the booking website and every email.", compact,
-        trailing = if (locked) ({ LockedPill("Set by the Super Admin") }) else null) {
-        com.saporini.mobile_desktop.core.components.FieldPair(
-            { m -> TextInput(value(restaurant.name, draft?.name), { v -> model.changeDetails { it.copy(name = v) } }, m, label = "Name", required = !locked,
-                icon = Icons.Outlined.Storefront, problem = problems["name"], maxLength = MAX_RESTAURANT_NAME, enabled = editable && !locked) },
-            { m -> TextInput(value(restaurant.legalName, draft?.legalName), { v -> model.changeDetails { it.copy(legalName = v) } }, m, label = "Legal name",
-                required = !locked, icon = Icons.Outlined.Gavel, problem = problems["legalName"], maxLength = MAX_LEGAL_NAME, enabled = editable && !locked,
-                hint = "As registered, e.g. on invoices") },
-            wide = pairs
-        )
-        TextInput(value(restaurant.code, draft?.code), { v -> model.changeDetails { it.copy(code = v) } }, Modifier.fillMaxWidth(), label = "Code",
-            required = !locked, icon = Icons.Outlined.Badge, problem = problems["code"], maxLength = MAX_CODE, enabled = editable && !locked,
-            hint = "A short name the system uses, e.g. SAPORINI_TIRANA")
+    val pairs = !compact
+    val value = { saved: String?, drafted: String? -> drafted ?: saved.orEmpty() }
+    // What guests see: the branch's phone and email (kept the same as the restaurant's), else the restaurant's.
+    val phone = (branchDraft?.phone ?: here?.phone)?.trim()?.ifBlank { null } ?: value(restaurant.phone, draft?.phone)
+    val email = (branchDraft?.email ?: here?.email)?.trim()?.ifBlank { null } ?: value(restaurant.email, draft?.email)
+    val street = branchDraft?.street ?: savedAddress?.streetLine1.orEmpty()
+    val postalCode = branchDraft?.postalCode ?: savedAddress?.postalCode.orEmpty()
+    val city = branchDraft?.city ?: savedAddress?.city.orEmpty()
+    val country = branchDraft?.country ?: savedAddress?.country.orEmpty()
+    val social = draft?.social ?: com.saporini.mobile_desktop.platform.socialOf(restaurant)
+    val changeSocial = { f: (com.saporini.mobile_desktop.platform.SocialLinks) -> com.saporini.mobile_desktop.platform.SocialLinks ->
+        model.changeDetails { it.copy(social = f(it.social)) }
     }
-    FormCard(Icons.Outlined.Description, "About the restaurant", "A few words guests read on the booking website.", compact) {
-        TextInput(value(restaurant.description, draft?.description), { v -> model.changeDetails { it.copy(description = v) } }, Modifier.fillMaxWidth(),
-            label = "Description", optional = true, singleLine = false, minLines = 4, problem = problems["description"], maxLength = MAX_DESCRIPTION,
-            enabled = editable, placeholder = "A family trattoria in the heart of Tirana: fresh pasta every day and a garden for the summer.")
-    }
-    FormCard(Icons.Outlined.Phone, "How guests reach you", "Shown on the booking website and in every booking email; receipts print the phone. " +
-        "A branch's own phone and email come first.", compact) {
-        com.saporini.mobile_desktop.core.components.FieldPair(
-            { m -> TextInput(value(restaurant.email, draft?.email), { v -> model.changeDetails { it.copy(email = v.trim()) } }, m, label = "Email", required = true,
-                icon = Icons.Outlined.Mail, problem = problems["email"], maxLength = MAX_EMAIL_TEXT, enabled = editable, placeholder = "hello@restaurant.al") },
-            { m -> TextInput(value(restaurant.phone, draft?.phone), { v -> model.changeDetails { it.copy(phone = v) } }, m, label = "Phone", required = true,
-                icon = Icons.Outlined.Phone, problem = problems["phone"], enabled = editable, placeholder = "+355 69 123 4567") },
-            wide = pairs
-        )
-        TextInput(value(restaurant.website, draft?.website), { v -> model.changeDetails { it.copy(website = v.trim()) } }, Modifier.fillMaxWidth(),
-            label = "Website", optional = true, icon = Icons.Outlined.Language, problem = problems["website"], maxLength = MAX_WEBSITE, enabled = editable,
-            placeholder = "https://")
-    }
-}
-
-/**
- * A form card: an icon tile, a title and a short line on what it's for, an optional pill on the right (under the line
- * on a phone, [compact]), then the fields.
- */
-@Composable
-private fun FormCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, note: String, compact: Boolean,
-                     trailing: (@Composable () -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
-    androidx.compose.material3.Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Kit.Border)) {
-        Column(Modifier.padding(if (compact) 14.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.size(if (compact) 36.dp else 40.dp).clip(RoundedCornerShape(11.dp)).background(Kit.GreenSoft), Alignment.Center) {
-                    Icon(icon, null, Modifier.size(if (compact) 18.dp else 20.dp), tint = Kit.Green)
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Kit.Ink)
-                    Text(note, fontFamily = Inter(), fontSize = 12.sp, lineHeight = 16.sp, color = Kit.Muted)
-                    if (compact) trailing?.let { Box(Modifier.padding(top = 4.dp)) { it() } }
-                }
-                if (!compact) trailing?.invoke()
-            }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.RowBorder))
-            content()
-        }
-    }
-}
-
-@Composable
-private fun LockedPill(text: String) {
-    Row(Modifier.clip(RoundedCornerShape(50)).background(Kit.Tint).padding(start = 8.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Icon(Icons.Outlined.Lock, null, Modifier.size(13.dp), tint = Kit.Muted)
-        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Kit.Muted, maxLines = 1)
-    }
-}
-
-/**
- * What guests see, drawn from the form as it's typed: the top of the booking website (logo, name, description) and the
- * contact line their booking emails end with. [wide] (a tablet, where the preview has the page's whole width) puts the
- * two side by side.
- */
-@Composable
-private fun GuestPreview(state: RestaurantDetailsState, wide: Boolean, compact: Boolean) {
-    val restaurant = state.restaurant ?: return
-    val d = state.details
-    val name = (d?.name ?: restaurant.name).ifBlank { "Your restaurant" }
-    val description = (d?.description ?: restaurant.description.orEmpty()).trim()
-    val phone = (d?.phone ?: restaurant.phone.orEmpty()).trim()
-    val email = (d?.email ?: restaurant.email.orEmpty()).trim()
-    val website = (d?.website ?: restaurant.website.orEmpty()).trim()
-    // A small booking page.
-    val page: @Composable (Modifier) -> Unit = { m ->
-        Column(m.clip(RoundedCornerShape(12.dp)).background(Color.White).border(1.dp, Kit.Border, RoundedCornerShape(12.dp))) {
-            Box(Modifier.fillMaxWidth().height(56.dp).background(Kit.GreenSoft))
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.offsetUp(22.dp).clip(RoundedCornerShape(14.dp)).background(Color.White).padding(3.dp)) {
-                    RestaurantLogo(state.branding?.logoUrl, name, 48.dp)
-                }
-                Text(name, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Kit.Ink, maxLines = 2)
-                Text(description.ifBlank { "Add a description so guests know what to expect." }, fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 18.sp,
-                    color = if (description.isBlank()) Kit.Faint else Kit.Muted, maxLines = 4, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Kit.Green).padding(vertical = 10.dp), Alignment.Center) {
-                    Text("Book a table", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
-                }
-            }
-        }
-    }
-    // The line booking emails end with.
-    val emailEnd: @Composable (Modifier) -> Unit = { m ->
-        Row(m.clip(RoundedCornerShape(12.dp)).background(Color.White).border(1.dp, Kit.Border, RoundedCornerShape(12.dp))
-            .padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(Icons.Outlined.Mail, null, Modifier.size(17.dp), tint = Kit.Muted)
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("End of a booking email", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, color = Kit.Muted)
-                Text(listOfNotNull(phone.ifBlank { null }?.let { "Call $it" }, email.ifBlank { null }?.let { "write to $it" })
-                    .joinToString(" · ").ifBlank { "Add a phone and an email" }.let { "Questions? $it" },
-                    fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 17.sp, color = Kit.Ink)
-                if (website.isNotBlank()) Text(website, fontFamily = Inter(), fontSize = 12.sp, color = Kit.Green, maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            }
-        }
-    }
-    androidx.compose.material3.Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), color = Kit.Canvas,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Kit.Border)) {
-        Column(Modifier.padding(if (compact) 14.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Outlined.Language, null, Modifier.size(18.dp), tint = Kit.Ink)
-                Text("How guests see it", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Kit.Ink)
-            }
-            Text("The booking website and booking emails, as you type.", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
-            if (wide) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-                    page(Modifier.weight(1f))
-                    emailEnd(Modifier.weight(1f))
-                }
+    val who: @Composable (Modifier) -> Unit = { m ->
+        InfoSection("Who you are", "Your name, and a few words guests read about you.", m, picture = Res.drawable.workspace_restaurants,
+            compact = compact, marked = on("who"),
+            trailing = trailing("who", if (locked) ({ LockedNote("Name: set by the Super Admin") }) else null)) {
+            if (on("who")) {
+                FieldPair(
+                    { f -> TextInput(value(restaurant.name, draft?.name), { v -> model.changeDetails { it.copy(name = v) } }, f, label = "Name",
+                        required = !locked, icon = Icons.Outlined.Storefront, problem = problems["name"], maxLength = MAX_RESTAURANT_NAME,
+                        enabled = editable && !locked) },
+                    { f -> TextInput(value(restaurant.legalName, draft?.legalName), { v -> model.changeDetails { it.copy(legalName = v) } }, f,
+                        label = "Legal name", required = !locked, icon = Icons.Outlined.Gavel, problem = problems["legalName"], maxLength = MAX_LEGAL_NAME,
+                        enabled = editable && !locked, hint = "As registered, e.g. on invoices") },
+                    wide = pairs
+                )
+                if (state.superAdmin) TextInput(value(restaurant.code, draft?.code), { v -> model.changeDetails { it.copy(code = v) } }, Modifier.fillMaxWidth(),
+                    label = "Code", required = true, icon = Icons.Outlined.Badge, problem = problems["code"], maxLength = MAX_CODE, enabled = editable,
+                    hint = "A short name the system uses inside, e.g. SAPORINI_TIRANA. Guests never see it.")
+                TextInput(value(restaurant.description, draft?.description), { v -> model.changeDetails { it.copy(description = v) } }, Modifier.fillMaxWidth(),
+                    label = "Description", optional = true, singleLine = false, minLines = 4, problem = problems["description"], maxLength = MAX_DESCRIPTION,
+                    enabled = editable, placeholder = "A family trattoria in the heart of Tirana: fresh pasta every day and a garden for the summer.")
+                CardButtons(state, model)
             } else {
-                page(Modifier.fillMaxWidth())
-                emailEnd(Modifier.fillMaxWidth())
+                ValueLine(Icons.Outlined.Storefront, "Name", value(restaurant.name, draft?.name))
+                ValueLine(Icons.Outlined.Gavel, "Legal name", value(restaurant.legalName, draft?.legalName))
+                if (state.superAdmin) ValueLine(Icons.Outlined.Badge, "Code", value(restaurant.code, draft?.code))
+                ValueLine(Icons.Outlined.Description, "Description", value(restaurant.description, draft?.description), lines = 6)
             }
         }
     }
-}
-
-/** Moves something up by [by] (the logo sits half on the preview's band). */
-private fun Modifier.offsetUp(by: androidx.compose.ui.unit.Dp): Modifier = this.layout { measurable, constraints ->
-    val placeable = measurable.measure(constraints)
-    val shift = by.roundToPx()
-    layout(placeable.width, (placeable.height - shift).coerceAtLeast(0)) { placeable.place(0, -shift) }
-}
-
-/** Removing the restaurant, last on the page and on its own, in red; on a phone ([compact]) the button goes under the words. */
-@Composable
-private fun DangerZone(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, compact: Boolean) {
-    val about: @Composable (Modifier) -> Unit = { m ->
-        Row(m, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(Kit.Danger.copy(alpha = 0.1f)), Alignment.Center) {
-                Icon(Icons.Outlined.Delete, null, Modifier.size(20.dp), tint = Kit.Danger)
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Remove the restaurant", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Kit.Ink)
-                Text("It disappears everywhere and its staff are signed out. Its sales and records are kept.", fontFamily = Inter(), fontSize = 12.sp,
-                    lineHeight = 16.sp, color = Kit.Muted)
+    val socials: @Composable (Modifier) -> Unit = { m ->
+        InfoSection("Social links", "Where guests find you online.", m, picture = Res.drawable.overview_guests, compact = compact,
+            marked = on("social"), trailing = trailing("social", null)) {
+            if (on("social")) {
+                val field: @Composable (SocialNet, Modifier) -> Unit = { net, f ->
+                    SocialField(net, social.valueOf(net), { v -> changeSocial { s -> s.with(net, v) } }, problems[net.key], editable, f)
+                }
+                // Beside the other column each link has its own line; across the whole width they go two a line.
+                if (wide || compact) SocialNet.entries.forEach { net -> field(net, Modifier.fillMaxWidth()) }
+                else {
+                    FieldPair({ f -> field(SocialNet.INSTAGRAM, f) }, { f -> field(SocialNet.FACEBOOK, f) }, wide = true)
+                    FieldPair({ f -> field(SocialNet.TIKTOK, f) }, { f -> field(SocialNet.WHATSAPP, f) }, wide = true)
+                    field(SocialNet.MAPS, Modifier.fillMaxWidth())
+                }
+                CardButtons(state, model)
+            } else {
+                // Every network shows, "Not set" when empty (user, 2026-11-23).
+                SocialNet.entries.forEach { net ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SocialBadge(net, 34.dp)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(net.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = Kit.Muted, translate = false)
+                            val link = social.valueOf(net)
+                            if (link.isBlank()) Text("Not set", fontFamily = Inter(), fontSize = 13.5.sp, color = Kit.Faint)
+                            else Text(link, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.5.sp, color = Kit.Ink, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = false)
+                        }
+                    }
+                }
             }
         }
     }
-    val box = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Kit.Danger.copy(alpha = 0.04f))
-        .border(1.dp, Kit.Danger.copy(alpha = 0.25f), RoundedCornerShape(14.dp)).padding(if (compact) 14.dp else 18.dp)
-    if (compact) {
-        Column(box, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            about(Modifier.fillMaxWidth())
-            KitButton("Remove restaurant", model::askRemoveRestaurant, Modifier.fillMaxWidth(), icon = Icons.Outlined.Delete, style = ButtonStyle.DANGER_OUTLINE,
-                enabled = !state.saving)
+    val contact: @Composable (Modifier) -> Unit = { m ->
+        InfoSection("Contact", "On the booking website and in booking emails. Receipts print the phone and the address.", m,
+            picture = Res.drawable.settings_reservations, compact = compact, marked = on("contact"), trailing = trailing("contact", null)) {
+            if (on("contact")) {
+                // One phone and one email: the restaurant's and this branch's are changed together.
+                FieldPair(
+                    { f -> TextInput(phone, { v -> model.changeDetails { it.copy(phone = v) }; if (here != null) model.changeBranch { it.copy(phone = v) } }, f,
+                        label = "Phone", required = true, icon = Icons.Outlined.Phone, problem = problems["phone"] ?: placeProblems["phone"], enabled = editable,
+                        placeholder = "+355 69 123 4567") },
+                    { f -> TextInput(email, { v -> model.changeDetails { it.copy(email = v.trim()) }; if (here != null) model.changeBranch { it.copy(email = v.trim()) } },
+                        f, label = "Email", required = true, icon = Icons.Outlined.Mail, problem = problems["email"] ?: placeProblems["email"],
+                        maxLength = MAX_EMAIL_TEXT, enabled = editable, placeholder = "hello@restaurant.al") },
+                    wide = pairs
+                )
+                TextInput(value(restaurant.website, draft?.website), { v -> model.changeDetails { it.copy(website = v.trim()) } }, Modifier.fillMaxWidth(),
+                    label = "Website", optional = true, icon = Icons.Outlined.Language, problem = problems["website"], maxLength = MAX_WEBSITE,
+                    enabled = editable, placeholder = "https://")
+                if (here != null) {
+                    Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Address", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = Kit.Ink)
+                        if (state.branches.size > 1) Text("· ${here.name}", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted, translate = false)
+                    }
+                    TextInput(street, { v -> model.changeBranch { it.copy(street = v) } }, Modifier.fillMaxWidth(), label = "Street", icon = Icons.Outlined.Place,
+                        problem = placeProblems["street"], maxLength = MAX_STREET, enabled = placeEditable, placeholder = "Rruga e Durrësit 12")
+                    val postal: @Composable (Modifier) -> Unit = { f ->
+                        TextInput(postalCode, { v -> model.changeBranch { it.copy(postalCode = v) } }, f, label = "Postal code",
+                            problem = placeProblems["postalCode"], maxLength = MAX_POSTAL, enabled = placeEditable)
+                    }
+                    val town: @Composable (Modifier) -> Unit = { f ->
+                        TextInput(city, { v -> model.changeBranch { it.copy(city = v) } }, f, label = "City", problem = placeProblems["city"],
+                            maxLength = MAX_CITY, enabled = placeEditable)
+                    }
+                    val land: @Composable (Modifier) -> Unit = { f ->
+                        TextInput(country, { v -> model.changeBranch { it.copy(country = v) } }, f, label = "Country", problem = placeProblems["country"],
+                            maxLength = MAX_CITY, enabled = placeEditable)
+                    }
+                    if (compact) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            postal(Modifier.weight(0.8f))
+                            town(Modifier.weight(1f))
+                        }
+                        land(Modifier.fillMaxWidth())
+                    } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        postal(Modifier.weight(0.75f))
+                        town(Modifier.weight(1f))
+                        land(Modifier.weight(1f))
+                    }
+                }
+                CardButtons(state, model)
+            } else {
+                ValueLine(Icons.Outlined.Phone, "Phone", phone)
+                ValueLine(Icons.Outlined.Mail, "Email", email)
+                ValueLine(Icons.Outlined.Language, "Website", value(restaurant.website, draft?.website))
+                if (here != null) ValueLine(Icons.Outlined.Place, if (state.branches.size > 1) "Address · ${here.name}" else "Address",
+                    listOfNotNull(street.trim().ifBlank { null }, listOf(postalCode, city).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
+                        .ifBlank { null }, country.trim().ifBlank { null }).joinToString(", "), lines = 2)
+            }
         }
+    }
+    // The branch's exact spot as a pin (the real map comes later, user 2026-11-23: "we will implement the map too").
+    val map: @Composable (Modifier) -> Unit = { m ->
+        val coordinates = branchDraft?.coordinates ?: savedAddress?.let { a -> a.latitude?.let { lat -> a.longitude?.let { lng ->
+            com.saporini.mobile_desktop.platform.coordinatesText(lat to lng) } } }.orEmpty()
+        val point = com.saporini.mobile_desktop.platform.parseCoordinates(coordinates)
+        val uri = androidx.compose.ui.platform.LocalUriHandler.current
+        InfoSection("Map", if (on("map")) "Click on the map to put the pin there, or paste the exact location." else "Your pin, at the exact location.",
+            m, picture = Res.drawable.inventory_places, compact = compact, marked = on("map"), trailing = trailing("map", null)) {
+            Box(Modifier.fillMaxWidth().height(if (compact) 220.dp else 280.dp).clip(RoundedCornerShape(14.dp))
+                .border(1.dp, if (on("map")) Kit.Green.copy(alpha = 0.5f) else Kit.Border, RoundedCornerShape(14.dp))) {
+                com.saporini.mobile_desktop.core.ui.TileMap(point, com.saporini.mobile_desktop.core.ui.mapStartFor(restaurant.timezone), Modifier.fillMaxSize(),
+                    onPick = if (on("map") && placeEditable) ({ p -> model.changeBranch { it.copy(coordinates = com.saporini.mobile_desktop.platform.coordinatesText(p)) } })
+                        else null)
+                if (point == null) Row(Modifier.align(Alignment.TopStart).padding(10.dp).clip(RoundedCornerShape(50)).background(Color.White)
+                    .border(1.dp, Kit.Border, RoundedCornerShape(50)).padding(horizontal = 11.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Outlined.Place, null, Modifier.size(14.dp), tint = Kit.Muted)
+                    Text("No pin yet", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted)
+                } else Row(Modifier.align(Alignment.BottomStart).padding(10.dp).shadow(2.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
+                    .background(Color.White).padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Outlined.MyLocation, null, Modifier.size(14.dp), tint = Kit.Ink)
+                    Text(com.saporini.mobile_desktop.platform.coordinatesText(point), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                        color = Kit.Ink, translate = false)
+                }
+            }
+            if (on("map")) {
+                ExactLocationField(coordinates, placeProblems["coordinates"], placeEditable) { v -> model.changeBranch { it.copy(coordinates = v) } }
+                CardButtons(state, model)
+            } else if (point != null) LinkText("Open it in Google Maps ›") {
+                runCatching { uri.openUri("https://www.google.com/maps?q=${point.first},${point.second}") }
+            } else Text("No pin yet. Use Edit to put it on the map.", fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Faint)
+        }
+    }
+    val left: @Composable (Modifier) -> Unit = { m ->
+        Column(m, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            who(Modifier.fillMaxWidth())
+            socials(Modifier.fillMaxWidth())
+        }
+    }
+    val right: @Composable (Modifier) -> Unit = { m ->
+        Column(m, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            contact(Modifier.fillMaxWidth())
+            if (here != null) map(Modifier.fillMaxWidth())
+        }
+    }
+    if (wide) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+        left(Modifier.weight(1f))
+        right(Modifier.weight(1f))
     } else {
-        Row(box, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            about(Modifier.weight(1f))
-            KitButton("Remove restaurant", model::askRemoveRestaurant, icon = Icons.Outlined.Delete, style = ButtonStyle.DANGER_OUTLINE, enabled = !state.saving)
+        left(Modifier.fillMaxWidth())
+        right(Modifier.fillMaxWidth())
+    }
+}
+
+/** A card's Edit: a small outlined pill with a pencil (faded while another card is being changed). */
+@Composable
+private fun EditPill(enabled: Boolean, onClick: () -> Unit) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    Row(
+        Modifier.alpha(if (enabled) 1f else 0.45f).clip(RoundedCornerShape(50)).background(if (hovered && enabled) Kit.GreenSoft else Color.White)
+            .border(1.dp, if (hovered && enabled) Kit.Green.copy(alpha = 0.5f) else Kit.Border, RoundedCornerShape(50))
+            .clickable(enabled = enabled, interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(Icons.Outlined.Edit, null, Modifier.size(15.dp), tint = Kit.Green)
+        Text("Edit", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, color = Kit.Ink)
+    }
+}
+
+/** At the foot of the card being changed: Cancel (puts it back) and Save. */
+@Composable
+private fun CardButtons(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Kit.Border))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
+            KitButton("Cancel", { model.editCard(null) }, style = ButtonStyle.SECONDARY, enabled = !state.saving)
+            KitButton("Save", model::saveDetailsAndBranch, loading = state.saving)
         }
     }
 }
 
+/** One detail as it's saved: an icon, its name, its value (or that it's missing). */
 @Composable
-private fun OwnerPanel(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, modifier: Modifier) {
-    InfoCard(Icons.Outlined.Person, "Owner", modifier) {
+private fun ValueLine(icon: ImageVector, label: String, value: String?, lines: Int = 1) {
+    val text = value?.trim().orEmpty()
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Kit.Canvas), Alignment.Center) {
+            Icon(icon, null, Modifier.size(17.dp), tint = Kit.Muted)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = Kit.Muted)
+            if (text.isEmpty()) Text("Not set", fontFamily = Inter(), fontSize = 13.5.sp, color = Kit.Faint)
+            else Text(text, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 13.5.sp, lineHeight = 19.sp, color = Kit.Ink, maxLines = lines,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = false)
+        }
+    }
+}
+
+/** The places guests find a restaurant online, each in its own colours. */
+internal enum class SocialNet(val key: String, val label: String, val placeholder: String, val colors: List<Color>,
+                              val icon: ImageVector?, val letter: String? = null) {
+    INSTAGRAM("instagram", "Instagram", "instagram.com/yourrestaurant", listOf(Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF)),
+        Icons.Outlined.PhotoCamera),
+    FACEBOOK("facebook", "Facebook", "facebook.com/yourrestaurant", listOf(Color(0xFF1877F2)), null, "f"),
+    TIKTOK("tiktok", "TikTok", "@yourrestaurant", listOf(Color(0xFF111111)), Icons.Outlined.MusicNote),
+    WHATSAPP("whatsapp", "WhatsApp", "+355 69 123 4567", listOf(Color(0xFF25D366)), Icons.AutoMirrored.Outlined.Chat),
+    MAPS("maps", "Google Maps", "maps.app.goo.gl/…", listOf(Color(0xFFEA4335)), Icons.Outlined.Place)
+}
+
+private fun com.saporini.mobile_desktop.platform.SocialLinks.valueOf(net: SocialNet) = when (net) {
+    SocialNet.INSTAGRAM -> instagram
+    SocialNet.FACEBOOK -> facebook
+    SocialNet.TIKTOK -> tiktok
+    SocialNet.WHATSAPP -> whatsapp
+    SocialNet.MAPS -> maps
+}
+
+private fun com.saporini.mobile_desktop.platform.SocialLinks.with(net: SocialNet, value: String) = when (net) {
+    SocialNet.INSTAGRAM -> copy(instagram = value.trim())
+    SocialNet.FACEBOOK -> copy(facebook = value.trim())
+    SocialNet.TIKTOK -> copy(tiktok = value.trim())
+    SocialNet.WHATSAPP -> copy(whatsapp = value)
+    SocialNet.MAPS -> copy(maps = value.trim())
+}
+
+/** A social network's square, in its colours. */
+@Composable
+internal fun SocialBadge(net: SocialNet, size: androidx.compose.ui.unit.Dp) {
+    val shape = RoundedCornerShape(size * 0.28f)
+    Box(Modifier.size(size).clip(shape).then(if (net.colors.size == 1) Modifier.background(net.colors.first()) else Modifier.background(Brush.linearGradient(net.colors))),
+        Alignment.Center) {
+        if (net.letter != null) Text(net.letter, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = (size.value * 0.5f).sp, color = Color.White,
+            translate = false)
+        else net.icon?.let { Icon(it, null, Modifier.size(size * 0.5f), tint = Color.White) }
+    }
+}
+
+@Composable
+private fun SocialField(net: SocialNet, value: String, onChange: (String) -> Unit, problem: String?, enabled: Boolean, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(net.label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Kit.Ink, translate = false)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SocialBadge(net, 46.dp)
+            TextInput(value, onChange, Modifier.weight(1f), placeholder = net.placeholder, problem = problem,
+                maxLength = com.saporini.mobile_desktop.platform.MAX_SOCIAL_LINK, enabled = enabled)
+        }
+    }
+}
+
+/** The owner (Super Admin): who they are, whether they signed up, the invitation, giving the restaurant to someone else. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun OwnerCard(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, modifier: Modifier, compact: Boolean) {
+    InfoSection("Owner", "Who owns the restaurant and runs it in the POS.", modifier, picture = Res.drawable.users_owner, compact = compact) {
         val owner = state.owner
         if (owner == null) {
             Text(if (state.restaurant?.ownerUserId == null) "No owner yet. Add the person who owns the restaurant; they get an email to set a password."
                 else "The owner's account couldn't be found.", fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = Kit.Muted)
             if (state.restaurant?.ownerUserId == null && state.canManage) {
-                KitButton("Add the owner", model::startAddOwner, icon = Icons.Outlined.Person, enabled = !state.saving)
+                KitButton("Add the owner", model::startAddOwner, icon = Icons.Outlined.PersonAdd, enabled = !state.saving)
             }
         } else {
-            LabeledValue("Name", owner.displayName)
-            LabeledValue("Email", owner.email)
-            if (!owner.emailVerified) {
-                InviteNote(state.invite)
-                if (state.canManage) KitButton("Send the invitation again", model::resendOwnerInvite, icon = Icons.AutoMirrored.Outlined.Send, style = ButtonStyle.SECONDARY,
-                    enabled = !state.saving)
-            } else {
-                StatusChip("Signed up", Kit.Green, icon = Icons.Outlined.CheckCircle)
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Kit.Canvas).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                InitialsFace(owner.displayName, 44.dp)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(owner.displayName, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.5.sp, color = Kit.Ink, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = false)
+                    Text(owner.email, fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = false)
+                }
+                if (owner.emailVerified) DotPill("Signed up", Kit.Green) else DotPill("Not signed up yet", Kit.Amber)
             }
-            if (state.canTransferOwner) {
-                KitButton("Transfer ownership", model::startTransfer, icon = Icons.Outlined.SwapHoriz, style = ButtonStyle.SECONDARY,
-                    enabled = !state.saving)
+            if (!owner.emailVerified) InviteNote(state.invite)
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!owner.emailVerified && state.canManage) KitButton("Send the invitation again", model::resendOwnerInvite,
+                    icon = Icons.AutoMirrored.Outlined.Send, style = ButtonStyle.SECONDARY, enabled = !state.saving)
+                if (state.canTransferOwner) KitButton("Transfer ownership", model::startTransfer, icon = Icons.Outlined.SwapHoriz,
+                    style = ButtonStyle.SECONDARY, enabled = !state.saving)
             }
         }
         OwnerHistory(state.ownerTransfers)
     }
 }
 
+/** Open, suspended or closed (Super Admin), in its colour, with the buttons to change it. */
 @Composable
-private fun OpenClosePanel(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, modifier: Modifier) {
+private fun OpenCloseCard(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, modifier: Modifier, compact: Boolean) {
     val restaurant = state.restaurant ?: return
-    InfoCard(Icons.Outlined.Block, "Open or closed", modifier) {
-        Text(
-            if (restaurant.open) "Open: its staff sign in and work as usual."
-            else "${restaurantStatusLabel(restaurant.status, restaurant.isActive)}: its staff can't sign in. Data stays.",
-            fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, color = Kit.Ink
-        )
+    val color = if (restaurant.open) Kit.Green else Kit.Amber
+    InfoSection("Open or closed", "Closing signs its staff out at once. Nothing is deleted.", modifier, icon = Icons.Outlined.Storefront, compact = compact) {
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(color.copy(alpha = 0.07f)).border(1.dp, color.copy(alpha = 0.22f), RoundedCornerShape(14.dp))
+            .padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(42.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Color.White), Alignment.Center) {
+                Icon(if (restaurant.open) Icons.Outlined.CheckCircle else Icons.Outlined.Pause, null, Modifier.size(22.dp), tint = color)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(restaurantStatusLabel(restaurant.status, restaurant.isActive), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = color)
+                Text(if (restaurant.open) "Its staff sign in and work as usual." else "Its staff can't sign in until it opens again.",
+                    fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 17.sp, color = Kit.Ink)
+            }
+        }
         if (state.canManage) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (restaurant.open) {
                 KitButton("Suspend", { model.askStatus(false, "SUSPENDED") }, icon = Icons.Outlined.Pause, style = ButtonStyle.SECONDARY, enabled = !state.saving)
@@ -727,311 +1027,121 @@ private fun OpenClosePanel(state: RestaurantDetailsState, model: RestaurantDetai
     }
 }
 
-// ---- Branches ----
-
+/** One thing in a section's list: a picture or face, a small line over the title, the title, a detail, "Main", ⋮. */
 @Composable
-private fun BranchesTab(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize) {
-    val session = koinInject<SessionManager>()
-    val acting by session.actingRestaurant.collectAsState()
-    if (state.branches.isEmpty()) {
-        OverviewEmpty("No branches yet", "Add the first branch so the POS, kitchen and bookings can be used.", Icons.Outlined.Business,
-            action = if (state.canManage) ({ KitButton("Add branch", model::newBranch, icon = Icons.Outlined.Add) }) else null)
-        return
-    }
-    ListPanel(Modifier.fillMaxWidth()) {
-        state.branches.forEach { branch ->
-            val address = state.branchAddresses[branch.id].orEmpty().firstOrNull()
-            val actions = buildList {
-                if (state.canEdit) add(RowAction("Edit", Icons.Outlined.Edit) { model.editBranch(branch) })
-                if (state.canManage) {
-                    if (branch.open) {
-                        add(RowAction("Close for now", Icons.Outlined.Pause) { model.askBranchStatus(branch, "TEMPORARILY_CLOSED") })
-                        add(RowAction("Close", Icons.Outlined.Block) { model.askBranchStatus(branch, "INACTIVE") })
-                    } else {
-                        add(RowAction("Open again", Icons.Outlined.PlayArrow) { model.askBranchStatus(branch, "ACTIVE") })
-                    }
-                    add(RowAction("Remove", Icons.Outlined.Delete, danger = true) { model.askRemoveBranch(branch) })
-                }
-            }
-            TableRow(onClick = if (state.canEdit) ({ model.editBranch(branch) }) else null) {
-                Box(Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(if (branch.open) Kit.GreenSoft else Kit.Canvas), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.Business, null, Modifier.size(20.dp), tint = if (branch.open) Kit.Green else Kit.Grey)
-                }
-                if (size.isPhone) {
-                    // A phone: the name and where it is, then how to reach it and whether it's open, one under the other.
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        CellText(branch.name, listOfNotNull(branch.code, address?.oneLine).joinToString(" · "))
-                        listOfNotNull(branch.phone, branch.email).joinToString(" · ").takeIf { it.isNotBlank() }?.let {
-                            Text(it, fontFamily = Inter(), fontSize = 11.sp, color = Kit.Muted, maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            StatusChip(branchStatusLabel(branch.status, branch.isActive), if (branch.open) Kit.Green else Kit.Grey)
-                            if (acting?.branchId == branch.id) StatusChip("You're here", Kit.Blue)
-                        }
-                    }
-                } else {
-                    CellText(branch.name, listOfNotNull(branch.code, address?.oneLine).joinToString(" · "), Modifier.weight(1.6f))
-                    CellText(branch.phone ?: "No phone", branch.email, Modifier.weight(1f), strong = false)
-                    Row(Modifier.weight(0.9f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        StatusChip(branchStatusLabel(branch.status, branch.isActive), if (branch.open) Kit.Green else Kit.Grey)
-                        if (acting?.branchId == branch.id) StatusChip("You're here", Kit.Blue)
-                    }
-                }
-                RowActionsMenu(actions, state.saving)
-            }
-        }
-    }
-    NoteBox(Icons.Outlined.Info, if (state.superAdmin)
-        "A branch that's still in use (open orders, bookings to come, people clocked in, staff or devices) can't be removed. Close it instead, or move those first."
-    else "The owner keeps each branch's phone, email and address up to date. Adding, closing or removing branches is for the Super Admin.")
-}
-
-// ---- Address & contacts ----
-
-@Composable
-private fun PlacesTab(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize) {
-    PanelPair(size, { m ->
-        OverviewPanel(Icons.Outlined.Place, "Addresses", m, count = state.addresses.size) {
-            if (state.addresses.isEmpty()) {
-                Text("No address yet. Receipts print the address guests find the restaurant at.", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted)
-            }
-            state.addresses.forEach { address ->
-                ItemRow(
-                    title = address.oneLine.ifBlank { "Address" },
-                    detail = addressTypeLabel(address.addressType),
-                    chip = if (address.isPrimary) "Main" else null,
-                    actions = if (state.canEdit) listOf(
-                        RowAction("Edit", Icons.Outlined.Edit) { model.editAddress(address) },
-                        RowAction("Remove", Icons.Outlined.Delete, danger = true) { model.askRemoveAddress(address) }
-                    ) else emptyList(),
-                    busy = state.saving,
-                    onClick = if (state.canEdit) ({ model.editAddress(address) }) else null
-                )
-            }
-        }
-    }, { m ->
-        OverviewPanel(Icons.Outlined.Person, "Contacts", m, count = state.contacts.size) {
-            if (state.contacts.isEmpty()) {
-                Text("No contact people yet (accounting, a manager, support).", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted)
-            }
-            state.contacts.forEach { contact ->
-                ItemRow(
-                    title = contact.fullName,
-                    detail = listOfNotNull(contactTypeLabel(contact.contactType), contact.jobTitle, contact.email, contact.phone).joinToString(" · "),
-                    chip = if (contact.isPrimary) "Main" else null,
-                    actions = if (state.canEdit) listOf(
-                        RowAction("Edit", Icons.Outlined.Edit) { model.editContact(contact) },
-                        RowAction("Remove", Icons.Outlined.Delete, danger = true) { model.askRemoveContact(contact) }
-                    ) else emptyList(),
-                    busy = state.saving,
-                    onClick = if (state.canEdit) ({ model.editContact(contact) }) else null
-                )
-            }
-        }
-    })
-}
-
-@Composable
-private fun ItemRow(title: String, detail: String?, chip: String?, actions: List<RowAction>, busy: Boolean, onClick: (() -> Unit)?) {
+private fun ListLine(
+    leading: @Composable () -> Unit,
+    title: String,
+    over: String?,
+    detail: String?,
+    main: Boolean,
+    actions: List<RowAction>,
+    busy: Boolean,
+    onClick: (() -> Unit)?
+) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(1.dp, Kit.RowBorder, RoundedCornerShape(10.dp))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).border(1.dp, Kit.RowBorder, RoundedCornerShape(14.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier).padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        CellText(title, detail, Modifier.weight(1f))
-        chip?.let { StatusChip(it, Kit.Green) }
+        leading()
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            over?.takeIf { it.isNotBlank() }?.let { Text(it, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = Kit.Muted, maxLines = 1) }
+            Text(title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 13.5.sp, lineHeight = 18.sp, color = Kit.Ink, maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = false)
+            detail?.let { Text(it, fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = false) }
+        }
+        if (main) DotPill("Main", Kit.Green)
         RowActionsMenu(actions, busy)
+    }
+}
+
+@Composable
+private fun LineTile(icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Kit.GreenSoft), Alignment.Center) {
+        Icon(icon, null, Modifier.size(20.dp), tint = Kit.Green)
     }
 }
 
 // ---- Logo & receipts ----
 
+/** Saves the receipt: its design (on this device for now) and, when they changed, the top and bottom texts. */
+private fun saveReceipt(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel) = model.saveReceipt()
+
+/** Puts the receipt back as it was saved. */
+private fun discardReceipt(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel) = model.discardReceipt()
+
+/** The receipt, and only the receipt (user, 2026-11-23: the logo is changed at the top of the page). */
 @Composable
-private fun BrandingTab(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize) {
-    val scope = rememberCoroutineScope()
-    val picker = rememberFilePickerLauncher(type = FileKitType.Image) { file ->
-        if (file != null) scope.launch {
-            val contentType = photoContentType(file.name)
-            val bytes = runCatching { file.readBytes() }.getOrNull()
-            when {
-                contentType == null -> model.logoProblem("Use a PNG, JPEG or WebP picture for the logo.")
-                bytes == null -> model.logoProblem("This picture couldn't be read. Try another one.")
-                bytes.size > MaxPhotoBytes -> model.logoProblem("The logo is too big. Use a picture under 5 MB.")
-                runCatching { bytes.decodeToImageBitmap() }.isFailure -> model.logoProblem("This file can't be opened as a picture.")
-                else -> model.uploadLogo(bytes, file.name, contentType)
-            }
-        }
-    }
-    val draft = state.brandingDraft
-    PanelPair(size, { m ->
-        OverviewPanel(Icons.Outlined.Image, "Logo", m) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(Modifier.size(120.dp).clip(RoundedCornerShape(16.dp)).background(Kit.Canvas).border(1.dp, Kit.Border, RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center) {
-                    if (state.uploadingLogo) CircularProgressIndicator(Modifier.size(28.dp), color = Kit.Green)
-                    else RemoteImage(state.branding?.logoUrl, "Logo", Modifier.fillMaxSize(), contentScale = ContentScale.Fit) {
-                        Icon(Icons.Outlined.Image, null, Modifier.size(36.dp).align(Alignment.Center), tint = Kit.Faint)
-                    }
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("PNG, JPEG or WebP, up to 5 MB. A square picture looks best.", fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = Kit.Muted)
-                    if (state.canEdit) {
-                        KitButton(if (state.branding?.logoUrl == null) "Upload logo" else "Replace logo", { picker.launch() }, icon = Icons.Outlined.Upload,
-                            enabled = !state.uploadingLogo && !state.saving)
-                        if (state.branding?.logoUrl != null) KitButton("Remove logo", model::removeLogo, icon = Icons.Outlined.Delete,
-                            style = ButtonStyle.SECONDARY, enabled = !state.uploadingLogo && !state.saving)
-                    }
-                }
-            }
-            GroupLabel("Colours")
-            val main: @Composable (Modifier) -> Unit = { m ->
-                TextInput(draft.primaryColor, { v -> model.changeBranding { it.copy(primaryColor = v) } }, m, label = "Main colour",
-                    placeholder = "#4F7942", enabled = state.canEdit, problem = com.saporini.mobile_desktop.platform.colorProblem(draft.primaryColor))
-            }
-            val second: @Composable (Modifier) -> Unit = { m ->
-                TextInput(draft.secondaryColor, { v -> model.changeBranding { it.copy(secondaryColor = v) } }, m, label = "Second colour",
-                    placeholder = "#EEF3EB", enabled = state.canEdit, problem = com.saporini.mobile_desktop.platform.colorProblem(draft.secondaryColor))
-            }
-            if (size.isPhone) {
-                // One colour a row on a phone, each with its swatch.
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
-                    ColorSwatch(draft.primaryColor, 46.dp)
-                    main(Modifier.weight(1f))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
-                    ColorSwatch(draft.secondaryColor, 46.dp)
-                    second(Modifier.weight(1f))
-                }
-            } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
-                ColorSwatch(draft.primaryColor, 46.dp)
-                main(Modifier.weight(1f))
-                ColorSwatch(draft.secondaryColor, 46.dp)
-                second(Modifier.weight(1f))
-            }
-        }
-    }, { m ->
-        OverviewPanel(Icons.Outlined.Receipt, "Receipt texts", m) {
-            TextInput(draft.receiptHeader, { v -> model.changeBranding { it.copy(receiptHeader = v) } }, Modifier.fillMaxWidth(), label = "Top of the receipt",
-                placeholder = "e.g. Thank you for dining with us", singleLine = false, minLines = 2, maxLength = MAX_RECEIPT_TEXT, enabled = state.canEdit)
-            TextInput(draft.receiptFooter, { v -> model.changeBranding { it.copy(receiptFooter = v) } }, Modifier.fillMaxWidth(), label = "Bottom of the receipt",
-                placeholder = "e.g. Wi-Fi: Saporini · see you soon", singleLine = false, minLines = 2, maxLength = MAX_RECEIPT_TEXT, enabled = state.canEdit)
-            if (state.canEdit) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KitButton("Save", model::saveBranding, loading = state.saving, enabled = state.brandingChanged)
-                if (state.brandingChanged) KitButton("Undo", model::resetBranding, style = ButtonStyle.SECONDARY, enabled = !state.saving)
-            }
-        }
-    })
-    ReceiptPreview(state)
+private fun BrandingTab(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize, wide: Boolean) {
+    ReceiptDesigner(state, model, wide, size.isPhone)
 }
 
-/** A small receipt drawn from the saved details, so the effect of each field is easy to see. */
+// ---- Currency & time zone (careful) ----
+
 @Composable
-private fun ReceiptPreview(state: RestaurantDetailsState) {
+private fun MoneyTab(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize, wide: Boolean) {
     val restaurant = state.restaurant ?: return
-    val address = state.addresses.firstOrNull { it.isPrimary } ?: state.addresses.firstOrNull()
-    val tax = state.taxProfiles.firstOrNull { it.isDefault && it.effectiveAt(kotlin.time.Clock.System.now()) }
-    OverviewPanel(Icons.Outlined.Description, "How a receipt starts", Modifier.fillMaxWidth()) {
-        Column(
-            // A till receipt's width, narrower on a small phone.
-            Modifier.widthIn(max = 320.dp).fillMaxWidth().align(Alignment.CenterHorizontally).clip(RoundedCornerShape(6.dp)).background(Color(0xFFFFFEFB))
-                .border(1.dp, Kit.Border, RoundedCornerShape(6.dp)).padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            RemoteImage(state.branding?.logoUrl, null, Modifier.size(48.dp), contentScale = ContentScale.Fit) {}
-            ReceiptLine(restaurant.name, bold = true)
-            if (restaurant.legalName.isNotBlank() && restaurant.legalName != restaurant.name) ReceiptLine(restaurant.legalName)
-            address?.let { ReceiptLine(it.oneLine) } ?: ReceiptLine("(no address yet)", faint = true)
-            (state.branches.firstOrNull()?.phone ?: restaurant.phone)?.let { ReceiptLine("Tel. $it") }
-            tax?.vatNumber?.let { ReceiptLine("VAT $it") } ?: ReceiptLine("(no VAT number yet)", faint = true)
-            state.brandingDraft.receiptHeader.takeIf { it.isNotBlank() }?.let { ReceiptLine(it) }
-            ReceiptLine("- - - - - - - - - - - - - - -", faint = true)
-            ReceiptLine("1 × Espresso ........ ${restaurant.currency} 1.50", faint = true)
-            ReceiptLine("- - - - - - - - - - - - - - -", faint = true)
-            state.brandingDraft.receiptFooter.takeIf { it.isNotBlank() }?.let { ReceiptLine(it) }
-        }
-    }
-}
-
-@Composable
-private fun ReceiptLine(text: String, bold: Boolean = false, faint: Boolean = false) {
-    Text(text, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal,
-        fontSize = if (bold) 13.sp else 11.sp, lineHeight = 15.sp, color = if (faint) Kit.Faint else Kit.Ink, textAlign = TextAlign.Center)
-}
-
-// ---- Legal & tax ----
-
-@Composable
-private fun LegalTab(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel) {
-    val restaurant = state.restaurant ?: return
-    OverviewPanel(Icons.Outlined.Gavel, "Legal identity", Modifier.fillMaxWidth()) {
-        LabeledValue("Legal name", restaurant.legalName.ifBlank { "–" })
-        LabeledValue("Registered address", state.addresses.firstOrNull { it.addressType == "LEGAL" }?.oneLine ?: "Same as the main address")
-    }
-    OverviewPanel(Icons.Outlined.Badge, "Tax and VAT", Modifier.fillMaxWidth(), count = state.taxProfiles.size) {
-        if (state.taxProfiles.isEmpty()) {
-            Text("No tax details yet. Receipts print the VAT and tax numbers of the main tax details.", fontFamily = Inter(), fontSize = 13.sp, color = Kit.Muted)
-        }
-        state.taxProfiles.forEach { tax ->
-            ItemRow(
-                title = listOfNotNull(tax.vatNumber?.let { "VAT $it" }, tax.taxNumber?.let { "Tax no. $it" }).joinToString(" · ").ifBlank { tax.country },
-                detail = listOfNotNull(tax.country, tax.fiscalCode?.let { "Fiscal code $it" }, tax.taxOffice).joinToString(" · "),
-                chip = if (tax.isDefault) "On receipts" else null,
-                actions = if (state.canManage) listOf(
-                    RowAction("Edit", Icons.Outlined.Edit) { model.editTax(tax) },
-                    RowAction("Remove", Icons.Outlined.Delete, danger = true) { model.askRemoveTax(tax) }
-                ) else emptyList(),
-                busy = state.saving,
-                onClick = if (state.canManage) ({ model.editTax(tax) }) else null
-            )
-        }
-        if (!state.superAdmin) NoteBox(Icons.Outlined.Lock, "Tax and VAT details are the restaurant's legal identity. Ask the Super Admin to change them.")
-    }
-}
-
-// ---- Currency & time zone ----
-
-@Composable
-private fun MoneyTab(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel, size: ScreenSize) {
-    val restaurant = state.restaurant ?: return
-    PanelPair(size, { m ->
-        OverviewPanel(Icons.Outlined.CurrencyExchange, "Currency", m) {
-            Text("${restaurant.currency} · ${currencyName(restaurant.currency)}", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Kit.Ink)
-            Text("Changing it converts every price, wage, cost and fixed fee at the rate you enter. You see every amount first and can correct any of them. " +
-                "Past sales keep their own currency; Statistics shows each currency separately.",
-                fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = Kit.Muted)
-            if (state.canManage) KitButton("Change currency", model::startCurrencyChange, icon = Icons.Outlined.CurrencyExchange, enabled = !state.saving)
+    val compact = size.isPhone
+    CarefulBanner("Careful: these change the whole restaurant",
+        "A new currency converts every price, wage and cost; a new time zone moves bookings, opening hours and reports. Each one shows you everything first.",
+        compact)
+    val currency: @Composable (Modifier) -> Unit = { m ->
+        InfoSection("Currency", "Every price, wage, cost and fee is in it.", m, picture = Res.drawable.inventory_stock_value, compact = compact) {
+            BigValue(restaurant.currency, currencyName(restaurant.currency))
+            Text("Changing it converts every amount at the rate you enter, and you see each one first. Past sales keep their own currency.",
+                fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 18.sp, color = Kit.Muted)
+            if (state.canManage) KitButton("Change currency", model::startCurrencyChange, icon = Icons.Outlined.CurrencyExchange,
+                style = ButtonStyle.SECONDARY, enabled = !state.saving)
             if (state.currencyChanges.isNotEmpty()) {
                 GroupLabel("Earlier changes")
                 state.currencyChanges.forEach { change ->
-                    ItemRow("${change.oldCurrency} → ${change.newCurrency} · 1 ${change.oldCurrency} = ${change.rate.value} ${change.newCurrency}",
-                        listOfNotNull(dateTimeText(change.changedAt, TimeZone.of(restaurant.timezone)), change.changedByName,
-                            "${change.valuesConverted} amounts").joinToString(" · "), null, emptyList(), false, null)
+                    ListLine(
+                        leading = { LineTile(Icons.Outlined.History) },
+                        title = "${change.oldCurrency} → ${change.newCurrency} · 1 ${change.oldCurrency} = ${change.rate.value} ${change.newCurrency}",
+                        over = dateTimeText(change.changedAt, TimeZone.of(restaurant.timezone)),
+                        detail = listOfNotNull(change.changedByName, "${change.valuesConverted} amounts").joinToString(" · "),
+                        main = false, actions = emptyList(), busy = false, onClick = null
+                    )
                 }
             }
         }
-    }, { m ->
-        OverviewPanel(Icons.Outlined.Schedule, "Time zone", m) {
-            Text(timeZoneLabel(restaurant.timezone), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Kit.Ink)
-            Text(restaurant.timezone, fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
-            Text("Opening hours, menu hours, bookings and reports follow it. Before changing it you see what moves.",
-                fontFamily = Inter(), fontSize = 12.sp, lineHeight = 17.sp, color = Kit.Muted)
-            if (state.canManage) KitButton("Change time zone", model::startTimezoneChange, icon = Icons.Outlined.Language, enabled = !state.saving)
+    }
+    val zone: @Composable (Modifier) -> Unit = { m ->
+        InfoSection("Time zone", "Opening hours, bookings and reports follow it.", m, picture = Res.drawable.overview_next_hours, compact = compact) {
+            val now = runCatching { kotlin.time.Clock.System.now().toLocalDateTime(TimeZone.of(restaurant.timezone)).time }.getOrNull()
+            val clock = now?.let { "${it.hour.toString().padStart(2, '0')}:${it.minute.toString().padStart(2, '0')}" }
+            BigValue(timeZoneLabel(restaurant.timezone), listOfNotNull(restaurant.timezone, clock?.let { "$it there now" }).joinToString(" · "))
+            Text("Before changing it you see which bookings and times move.", fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 18.sp, color = Kit.Muted)
+            if (state.canManage) KitButton("Change time zone", model::startTimezoneChange, icon = Icons.Outlined.Language,
+                style = ButtonStyle.SECONDARY, enabled = !state.saving)
         }
-    })
+    }
+    if (wide) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
+        currency(Modifier.weight(1f))
+        zone(Modifier.weight(1f))
+    } else {
+        currency(Modifier.fillMaxWidth())
+        zone(Modifier.fillMaxWidth())
+    }
 }
 
 @Composable
-private fun PanelPair(size: ScreenSize, first: @Composable (Modifier) -> Unit, second: @Composable (Modifier) -> Unit) {
-    // Equal heights side by side on wide screens (panel content avoids lazy lists and BoxWithConstraints).
-    com.saporini.mobile_desktop.core.components.PanelRow(size, 1f to first, 1f to second)
+private fun BigValue(value: String, detail: String) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Kit.Canvas).padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(value, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 26.sp, letterSpacing = (-0.3).sp, color = Kit.Ink, translate = false)
+        Text(detail, fontFamily = Inter(), fontSize = 12.5.sp, color = Kit.Muted)
+    }
 }
 
 // ---- Dialogs ----
 
 @Composable
 private fun Dialogs(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel) {
-    state.branch?.let { BranchDialog(it, state, model) }
+    // Adding a branch is a window; a branch's own page changes it in place.
+    state.branch?.takeIf { it.id == null }?.let { BranchDialog(it, state, model) }
     state.address?.let { AddressDialog(it, state, model) }
     state.contact?.let { ContactDialog(it, state, model) }
     state.tax?.let { TaxDialog(it, state, model) }
@@ -1040,6 +1150,17 @@ private fun Dialogs(state: RestaurantDetailsState, model: RestaurantDetailsScree
     state.confirm?.let { ConfirmDialogs(it, state, model) }
     state.ownerStep?.let { OwnerDialog(it, model::editOwner, model::saveOwner, model::cancelOwner) }
     state.transfer?.let { OwnerTransferDialog(it, model) }
+}
+
+/**
+ * Tax details' and company addresses' windows (add, change, remove), for Finance & taxation → Tax setup (user, 2026-11-23:
+ * taxes moved there, and the company's addresses with them).
+ */
+@Composable
+internal fun CompanyDialogs(state: RestaurantDetailsState, model: RestaurantDetailsScreenModel) {
+    state.tax?.let { TaxDialog(it, state, model) }
+    state.address?.let { AddressDialog(it, state, model) }
+    state.confirm?.takeIf { it is RestaurantConfirm.RemoveTax || it is RestaurantConfirm.RemoveAddress }?.let { ConfirmDialogs(it, state, model) }
 }
 
 @Composable

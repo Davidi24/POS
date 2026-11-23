@@ -29,7 +29,7 @@ fun KdsTopBar(
     onBackToWorkspaces: (() -> Unit)? = null,
 ) {
     WorkspaceNavTopBar(kdsNavEntries(), fixed = 3, selected = selected, onSelect = onSelect, onLogout = onLogout,
-        onBackToWorkspaces = onBackToWorkspaces)
+        onBackToWorkspaces = onBackToWorkspaces, scope = com.saporini.mobile_desktop.core.session.Workspace.KDS)
 }
 
 @Composable

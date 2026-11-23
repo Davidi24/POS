@@ -114,7 +114,7 @@ object PosScreen : Screen {
             ) {
                 if (isPhoneLayout) com.saporini.mobile_desktop.core.components.HideOnScrollBar(hideBar) {
                     com.saporini.mobile_desktop.workspace.ui.PickerTopBar(currentUser, loggingOut = false, onLogout = { sessionManager.signOut() },
-                        compact = true, onBack = backToWorkspaces)
+                        compact = true, onBack = backToWorkspaces, scope = com.saporini.mobile_desktop.core.session.Workspace.POS)
                 }
                 if (!isPhoneLayout) {
                     PosTopBar(
@@ -126,12 +126,14 @@ object PosScreen : Screen {
                         onLogout = { sessionManager.signOut() },
                         onBackToWorkspaces = backToWorkspaces,
                         logo = {
-                            Image(
-                                painter = painterResource(Res.drawable.pos_simple_logo),
-                                contentDescription = "Saporini",
-                                modifier = Modifier.size(82.dp),
-                                contentScale = ContentScale.Fit
-                            )
+                            com.saporini.mobile_desktop.core.ui.BarLogo(82.dp) {
+                                Image(
+                                    painter = painterResource(Res.drawable.pos_simple_logo),
+                                    contentDescription = "Saporini",
+                                    modifier = Modifier.size(82.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
                         }
                     )
                 }
