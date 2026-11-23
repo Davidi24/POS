@@ -25,5 +25,9 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 - [ ] Written once development is done.
 - [ ] Run (later, when the user says).
 
+## Printing the two receipts (to do; user, 2026-11-23)
+- The receipt printers print what Restaurant info → Receipt designs: the preliminary bill and the fiscal invoice (blocks, lines,
+  pictures, barcode, QR codes, DGII's QR). The design is on the device for now and needs the server first (decide-later step 4 item 9).
+
 ## Done
 - Nothing yet.

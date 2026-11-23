@@ -25,5 +25,10 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 ## 3. Hard testing list (run later, when the user says)
 - To write once development is done.
 
+## DGII printing from an order (to do; user, 2026-11-23)
+- The order's Print button offers both receipts: "Preliminary bill" (any time, again and again, order stays open) and "Fiscal
+  invoice" (once; then Reprint). After a fiscal invoice the order can't be edited: changes need a credit note. Details and rules in
+  `16-payments-and-receipts.md` → "DGII: preliminary bill and fiscal invoice".
+
 ## Done
 - Nothing yet.
