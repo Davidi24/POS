@@ -14,6 +14,9 @@ import kotlinx.coroutines.launch
 /** Opens a card's export window with its report and picture. The screen provides it. */
 internal val LocalStatsSave = staticCompositionLocalOf<(CardReport, androidx.compose.ui.graphics.ImageBitmap?) -> Unit> { { _, _ -> } }
 
+/** Downloads need the password: a PIN sign-in sees the figures, without Download buttons (user, 2026-11-25). */
+internal val LocalStatsDownloads = staticCompositionLocalOf { true }
+
 /** A card's save: takes the card's picture as it is now, then opens the export window with the report and the picture. */
 @Composable
 internal fun rememberCardSave(): (CardReport) -> Unit {
@@ -39,6 +42,7 @@ internal fun csvShare(part: Long, total: Long): String = if (total <= 0) "0%" el
  */
 @Composable
 internal fun CardDownload(v: StatsView, stem: String, size: Dp = 32.dp, report: () -> CardReport) {
+    if (!LocalStatsDownloads.current) return
     val save = rememberCardSave()
     RegisterCard(stem, report)
     PanelDownloadButton(size) { save(report()) }

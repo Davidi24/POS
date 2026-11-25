@@ -70,6 +70,7 @@ public class PasswordController {
             @Valid @RequestBody ChangePasswordRequest request,
             Authentication authentication,
             HttpServletRequest httpRequest) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         UUID tokenId = extractTokenId(httpRequest);
         changePasswordService.changePassword(currentUser(authentication).getId(), tokenId, request);
         return ResponseEntity.noContent().build();

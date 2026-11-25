@@ -54,6 +54,7 @@ public class MySignInsController {
     public SignInPage mySignIns(Authentication authentication,
                                 @RequestParam(defaultValue = "0") int page,
                                 @RequestParam(defaultValue = "8") int size) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         UUID userId = ((AuthenticatedUser) authentication.getPrincipal()).getId();
         OffsetDateTime after = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
         int safeSize = Math.max(1, Math.min(size, 50));

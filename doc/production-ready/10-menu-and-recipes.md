@@ -14,6 +14,11 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 ## Known gaps
 - Demo dishes have no recipes on purpose: once a dish has one, serving needs a sale stock place and enough stock, or the kitchen gets a 409.
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: marking dishes sold out works on PIN; editing menus, dishes, prices, photos and recipes needs the password.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - To agree with the user when this step starts (mock data where the server isn't ready).
 

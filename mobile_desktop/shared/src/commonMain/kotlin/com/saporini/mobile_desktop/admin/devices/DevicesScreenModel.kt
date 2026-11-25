@@ -138,6 +138,8 @@ data class DevicesState(
     val signIn: DeviceSignInView? = null,
     // Works in every branch (BRANCHES_ALL or a platform admin): only they move a device to another branch.
     val everyBranch: Boolean = false,
+    // Signed in with a PIN: connecting devices needs the password (user, 2026-11-25).
+    val pinSignIn: Boolean = false,
     // The restaurant's branches, to move a device (only loaded for whoever manages devices and works in every branch).
     val branchChoices: List<com.saporini.mobile_desktop.platform.BranchDto> = emptyList(),
     // A new pairing code to show once; it can't be read again.
@@ -145,6 +147,8 @@ data class DevicesState(
     // Devices → Enter a code: the window is open, and why the last code didn't work (shown inside it).
     val enteringCode: Boolean = false,
     val codeError: String? = null,
+    // The code was typed and waits for the person who made it to agree (user, 2026-11-25).
+    val connectWait: ConnectWait? = null,
     // The device just added, so the screen can go straight on to confirming it.
     val justAdded: String? = null,
     val draft: DeviceDraft? = null,
@@ -160,7 +164,22 @@ data class DevicesState(
     fun isPrinter(id: String?): Boolean = printers.any { it.id == id }
     val onlineCount: Int get() = devices.count { it.online }
     /** Whether [device] can be connected (a code made, or this device made it) by this person. */
-    fun mayConnect(device: DeviceDto?): Boolean = device != null && (canEdit || (canConnect && device.deviceType in CONNECTABLE_TYPES))
+    fun mayConnect(device: DeviceDto?): Boolean = device != null && !pinSignIn && (canEdit || (canConnect && device.deviceType in CONNECTABLE_TYPES))
+    /** Why [mayConnect] says no, in one line. */
+    val connectRefusal: String get() = if (pinSignIn) "Sign in with your password to connect devices." else "Ask someone who connects devices to do it."
+}
+
+/**
+ * A code typed here, waiting for the person who made it to agree (user, 2026-11-25). [shownAt] is when [request]'s seconds left
+ * were read (this device's clock), for the countdown; [ended] says why it stopped (refused, time's up), inside the window.
+ */
+data class ConnectWait(
+    val request: ConnectRequestDto,
+    val claim: String,
+    val shownAt: Long,
+    val ended: String? = null
+) {
+    fun secondsLeft(now: Long): Long = (request.secondsLeft - (now - shownAt) / 1000).coerceAtLeast(0)
 }
 
 /** Tills, tablets and screens: what "Connect devices" alone may connect (the server's network rule covers the same). */
@@ -179,7 +198,9 @@ class DevicesScreenModel(
     private val connectHere: (suspend (restaurantId: String, pairingToken: String) -> com.saporini.mobile_desktop.auth.data.repository.ConnectedHere)? = null,
     // The restaurant's branches (to move a device) and people to choose (who can sign in on it).
     private val branchesOf: (suspend (restaurantId: String) -> List<com.saporini.mobile_desktop.platform.BranchDto>)? = null,
-    private val searchPeople: (suspend (query: String) -> List<SignInPerson>)? = null
+    private val searchPeople: (suspend (query: String) -> List<SignInPerson>)? = null,
+    // Enter a code: asks the code's maker to agree, then takes the connection (user, 2026-11-25).
+    private val connector: DeviceConnector? = null
 ) : ScreenModel {
 
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -191,6 +212,7 @@ class DevicesScreenModel(
     private var signIn = 0L
     private var active = false
     private var loadJob: Job? = null
+    private var waitJob: Job? = null
 
     init {
         work.launch {
@@ -206,7 +228,8 @@ class DevicesScreenModel(
                     canEdit = "DEVICES_MANAGE" in permissions,
                     canConnect = "DEVICES_CONNECT" in permissions || "DEVICES_MANAGE" in permissions,
                     canSeePrinters = "SETTINGS_READ" in permissions,
-                    everyBranch = com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user)
+                    everyBranch = com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user),
+                    pinSignIn = com.saporini.mobile_desktop.core.session.PIN_SIGN_IN in permissions
                 )
                 if (active) load()
             }
@@ -456,6 +479,7 @@ class DevicesScreenModel(
         needsConnect {
             write(null) { restaurantId ->
                 val code = repository.newPairingCode(restaurantId, deviceId, minutes)
+                ConnectWatch.codeMade(code.expiresAt?.let { runCatching { kotlin.time.Instant.parse(it).toEpochMilliseconds() }.getOrNull() })
                 mutable.update { state ->
                     if (state.selectedId != deviceId) state
                     else state.copy(freshCode = code, pairingCodes = listOf(code.copy(pairingToken = null)) + state.pairingCodes.filterNot { it.id == code.id })
@@ -493,44 +517,113 @@ class DevicesScreenModel(
 
     fun openEnterCode() = mutable.update { it.copy(enteringCode = true, codeError = null, error = null, notice = null) }
 
-    fun closeEnterCode() = mutable.update { if (it.saving) it else it.copy(enteringCode = false, codeError = null) }
+    fun closeEnterCode() {
+        if (state.value.saving) return
+        cancelWait()
+        mutable.update { it.copy(enteringCode = false, codeError = null) }
+    }
 
     /**
-     * Devices → Enter a code: the device the app runs on becomes the till or tablet the code was made for, connected by the
-     * person signed in here. Why a code didn't work stays inside the window.
+     * Devices → Enter a code: the device the app runs on asks to become the till or tablet the code was made for, and waits
+     * for the person who made the code to agree (user, 2026-11-25: "it goes to the person who generated the code"). Once they
+     * agree it takes the connection; why it didn't work stays inside the window.
      */
     fun enterCode(code: String) {
-        val connect = connectHere ?: return
+        val connector = connector ?: return
         val current = state.value
         val restaurantId = current.restaurantId ?: return
-        if (current.saving || code.isBlank()) return
-        if (!current.canConnect && !current.canEdit) {
-            mutable.update { it.copy(codeError = "Ask someone who connects devices to do it.") }
+        if (current.saving || current.connectWait != null || code.isBlank()) return
+        if ((!current.canConnect && !current.canEdit) || current.pinSignIn) {
+            mutable.update { it.copy(codeError = current.connectRefusal) }
             return
         }
         val token = signIn
         mutable.update { it.copy(saving = true, codeError = null) }
         work.launch {
-            writes.withLock {
-                try {
-                    val connected = connect(restaurantId, code.trim())
-                    if (token != signIn) return@withLock
-                    val name = connected.till.name
-                    mutable.update {
-                        it.copy(enteringCode = false, notice = if (connected.networkSaved) "This device is $name now. This Wi-Fi is saved as the restaurant's network."
-                        else "This device is $name now. Staff sign in here with their PIN.")
-                    }
-                    load()
+            try {
+                val asked = connector.ask(restaurantId, code.trim())
+                if (token != signIn) return@launch
+                mutable.update { it.copy(connectWait = ConnectWait(asked.request, asked.claimToken, nowMs())) }
+                followWait(restaurantId, asked.request.id, asked.claimToken, token)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (token == signIn) mutable.update { it.copy(codeError = adminMessage(e, write = true)) }
+            } finally {
+                mutable.update { it.copy(saving = false) }
+            }
+        }
+    }
+
+    /** Looks every two seconds whether the code's maker answered; agreed = this device takes the connection. */
+    private fun followWait(restaurantId: String, requestId: String, claim: String, token: Long) {
+        val connector = connector ?: return
+        waitJob?.cancel()
+        waitJob = work.launch {
+            while (true) {
+                kotlinx.coroutines.delay(2_000)
+                if (token != signIn) return@launch
+                val request = try {
+                    connector.get(restaurantId, requestId)
                 } catch (e: CancellationException) {
                     throw e
-                } catch (e: Exception) {
-                    if (token == signIn) mutable.update { it.copy(codeError = adminMessage(e, write = true)) }
-                } finally {
-                    mutable.update { it.copy(saving = false) }
+                } catch (_: Exception) {
+                    continue // a missed look; the next one tries again
+                }
+                val wait = state.value.connectWait?.takeIf { it.request.id == requestId && it.ended == null } ?: return@launch
+                when (request.status) {
+                    "WAITING" -> mutable.update { it.copy(connectWait = wait.copy(request = request, shownAt = nowMs())) }
+                    "AGREED" -> {
+                        try {
+                            val connected = connector.claim(restaurantId, requestId, claim)
+                            if (token != signIn) return@launch
+                            com.saporini.mobile_desktop.core.session.TokenStore.connectTill(connected.till)
+                            val name = connected.till.name
+                            mutable.update {
+                                it.copy(enteringCode = false, connectWait = null,
+                                    notice = if (connected.networkSaved) "This device is $name now. This Wi-Fi is saved as the restaurant's network."
+                                    else "This device is $name now. Staff sign in here with their PIN.")
+                            }
+                            load()
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            mutable.update { it.copy(connectWait = wait.copy(request = request, ended = adminMessage(e, write = true))) }
+                        }
+                        return@launch
+                    }
+                    "REFUSED" -> {
+                        mutable.update { it.copy(connectWait = wait.copy(request = request,
+                            ended = "${request.madeBy ?: "The person who made the code"} said no, so the code was ended. Ask for a new one.")) }
+                        return@launch
+                    }
+                    "EXPIRED" -> {
+                        mutable.update { it.copy(connectWait = wait.copy(request = request,
+                            ended = "Nobody agreed in time. Try again, or ask for a new code.")) }
+                        return@launch
+                    }
+                    else -> {
+                        mutable.update { it.copy(connectWait = null) }
+                        return@launch
+                    }
                 }
             }
         }
     }
+
+    fun clearCodeError() = mutable.update { it.copy(codeError = null) }
+
+    /** Stops waiting (Cancel, or Try again after it ended): back to typing a code. */
+    fun cancelWait() {
+        val wait = state.value.connectWait ?: return
+        waitJob?.cancel()
+        mutable.update { it.copy(connectWait = null) }
+        val restaurantId = state.value.restaurantId ?: return
+        val connector = connector ?: return
+        if (wait.ended == null) work.launch { runCatching { connector.cancel(restaurantId, wait.request.id) } }
+    }
+
+    private fun nowMs(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 
     /** Who can sign in on the open till or tablet: nothing chosen = everyone at its branch. */
     fun saveSignIn(roleIds: List<String>, userIds: List<String>) {

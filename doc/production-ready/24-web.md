@@ -25,6 +25,11 @@ already do, so they're built once everything else is final.
 - One website per restaurant (their own address) or one site for all of them.
 - Where the web pages live (own domain, hosting).
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: the web has no PIN sign-in; check nothing here relies on one.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - To agree with the user when this step starts.
 

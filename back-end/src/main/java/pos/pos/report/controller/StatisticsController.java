@@ -99,6 +99,7 @@ public class StatisticsController {
             @RequestParam(required = false) @Size(max = 3, message = "currency must be a 3-letter code") String currency,
             Authentication authentication
     ) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.DOWNLOADS);
         String csv = statisticsService.csvReport(authentication, restaurantId, branchId, from, to, code, currency);
         String fileName = code + "-" + from + "-to-" + to + ".csv";
         return ResponseEntity.ok()

@@ -157,11 +157,13 @@ private val appModule = module {
     single<com.saporini.mobile_desktop.admin.inventory.InventoryRepository> { com.saporini.mobile_desktop.admin.inventory.InventoryApi(client = get()) }
     factory { com.saporini.mobile_desktop.admin.inventory.InventoryScreenModel(repository = get(), session = get(), pendingMoveStorage = TokenStore) }
     single<com.saporini.mobile_desktop.admin.devices.DevicesRepository> { com.saporini.mobile_desktop.admin.devices.DevicesApi(client = get()) }
+    single<com.saporini.mobile_desktop.admin.devices.DeviceConnector> { com.saporini.mobile_desktop.admin.devices.DeviceConnectApi(client = get()) }
     factory {
         val auth = get<com.saporini.mobile_desktop.auth.data.repository.AuthRepository>()
         val platform = get<com.saporini.mobile_desktop.platform.PlatformRepository>()
         val people = get<com.saporini.mobile_desktop.admin.people.PeopleRepository>()
         com.saporini.mobile_desktop.admin.devices.DevicesScreenModel(repository = get(), session = get(), connectHere = { restaurantId, code -> auth.connectTill(restaurantId, code) },
+            connector = get(),
             branchesOf = { restaurantId -> platform.branches(restaurantId) },
             searchPeople = { query ->
                 people

@@ -15,6 +15,11 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 ## Known gaps
 - Places, kinds and counts write no history events yet.
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: receiving, waste, transfers and counting work on PIN; items, places, kinds, adjustments and returns, and approving counts need the password.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - To agree with the user when this step starts (mock data where the server isn't ready).
 

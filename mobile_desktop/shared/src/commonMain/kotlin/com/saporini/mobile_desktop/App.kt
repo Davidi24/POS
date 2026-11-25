@@ -85,13 +85,14 @@ fun App() {
     // on the kitchen display. Locking signs the person out, and the PIN pad comes back. Devices that aren't tills never lock.
     val till by TokenStore.till.collectAsState()
     LaunchedEffect(Unit) { com.saporini.mobile_desktop.core.session.watchPlatformInput { com.saporini.mobile_desktop.core.session.IdleLock.touch() } }
-    // A till or tablet tells the server it's on, every minute, signed in or not (2026-11-25): Devices shows it online.
+    // A till or tablet tells the server it's on, every 30 seconds, signed in or not (2026-11-25): Devices shows it online.
     LaunchedEffect(till?.deviceId, till?.secret) {
         val heartbeat = com.saporini.mobile_desktop.core.session.TillHeartbeat
         val connection = till ?: return@LaunchedEffect heartbeat.reset()
         while (true) {
             heartbeat.beat(connection)
-            kotlinx.coroutines.delay(60_000)
+            // Every 30 seconds, so a till that moved to another device knows it soon (user, 2026-11-25).
+            kotlinx.coroutines.delay(30_000)
         }
     }
     LaunchedEffect(isAuthenticated, till) {
@@ -172,6 +173,7 @@ fun App() {
                             else if (navigator.lastItem !is com.saporini.mobile_desktop.auth.ui.login.SignedOutScreen)
                                 navigator.replaceAll(com.saporini.mobile_desktop.auth.ui.login.signInScreen())
                         } else if (navigator.lastItem == LoginScreen || navigator.lastItem == com.saporini.mobile_desktop.auth.ui.login.PinLoginScreen) {
+                            com.saporini.mobile_desktop.core.session.PasswordNext.once = false
                             user?.let { navigator.replaceAll(resolveStartScreen(it)) }
                         }
                     }
@@ -199,6 +201,8 @@ fun App() {
                         }
                     }
                     com.saporini.mobile_desktop.core.components.ScreenMessages(contextError, null, sessionManager::clearContextError)
+                    // A code you made typed on another device (agree or refuse), and this till moving to another device.
+                    com.saporini.mobile_desktop.admin.devices.ui.TillChanges(navigator)
                 }
             }
         }

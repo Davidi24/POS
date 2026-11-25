@@ -28,6 +28,11 @@ comes once Kitchen, Tables, Orders and Payments (steps 11–15) work properly on
 ## Before this step (steps 11–15)
 - New orders, dishes and payments get their id on the device and an idempotency key, so they can be sent later without duplicates.
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: decide here how a till signs in by PIN while offline, and that nothing password-only works offline.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - An "Offline" sign in the top bar with how many changes wait to be sent; what each screen shows and allows while offline.
 

@@ -100,6 +100,11 @@ has all branches:
 - [ ] Statistics/Finance comparisons between branches (rankings, a branch against the average).
 - [ ] What a phone shows for the switcher (now the slim top bar only in POS, Admin Hub and Inventory).
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: choosing the branch you work in works on PIN; anything that changes branches or the whole restaurant needs the password.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - [x] First round: the switcher and both levels in every workspace (2026-11-23), built and running.
 - [x] Cards in "The whole restaurant" made the picker's small size (user, 2026-11-23: "they are so big").

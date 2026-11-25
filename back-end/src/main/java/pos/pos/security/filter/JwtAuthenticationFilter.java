@@ -154,15 +154,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Their roles as their restaurant has them, less what's switched off for them (the Super Admin's ticks per
         // Co-Super-Admin, an owner's per-person changes), plus what's given to them alone.
+        // A PIN sign-in (on a till) leaves out what changes the system (user, 2026-11-25: `PinSignIn.PASSWORD_ONLY`).
         List<SimpleGrantedAuthority> permissionAuthorities = pos.pos.role.service.EffectivePermissions
                 .forUser(permissionRepository, userId, user.getRestaurantId(), activeRoleIds)
                 .stream()
+                .filter(code -> session.getSessionType() != pos.pos.auth.enums.SessionType.PIN
+                        || !pos.pos.security.rbac.PinSignIn.PASSWORD_ONLY.contains(code))
                 .map(SimpleGrantedAuthority::new)
                 .toList();
 
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
         authorities.addAll(roleAuthorities);
         authorities.addAll(permissionAuthorities);
+        // Signed in with a PIN on a till: what needs a password checks this mark (user, 2026-11-25).
+        if (session.getSessionType() == pos.pos.auth.enums.SessionType.PIN) {
+            authorities.add(new SimpleGrantedAuthority(pos.pos.security.rbac.PinSignIn.MARK));
+        }
 
         SecurityContextHolder.clearContext();
 

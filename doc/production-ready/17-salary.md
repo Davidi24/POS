@@ -12,6 +12,11 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 ## Known gaps (MOCK, in memory: `SalaryPlans`)
 - Moving a person to another team, and payouts (Pay / Mark as not paid). Marking paid sends no money.
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: all of Salary needs the password; seeing your own pay in My shift works on PIN.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - To agree with the user when this step starts (mock data where the server isn't ready).
 

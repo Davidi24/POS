@@ -23,6 +23,11 @@ Status: Not started (Not started → Screens → Development → Hard testing li
   "Who is told" setting (Owner and Manager by default)? Suggestion: yes (decide-later step 1 #1; moved here from Settings on
   2026-11-24). **(your call)**
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: reading and opening notifications works on PIN; who is told about what (Admin Hub settings) needs the password.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - [ ] Agree the screens with the user when this step starts (mock data where the server isn't ready).
 

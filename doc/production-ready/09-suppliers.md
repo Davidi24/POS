@@ -12,6 +12,11 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 ## Known gaps (MOCK, in memory)
 - Orders to suppliers, price lists (catalog) and supplier pictures/banners.
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: looking at suppliers works on PIN; changing suppliers, their places and prices needs the password (purchase orders: decide here).
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - To agree with the user when this step starts (mock data where the server isn't ready).
 

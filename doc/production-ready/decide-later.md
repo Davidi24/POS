@@ -128,6 +128,21 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    Suggestion: a notification to the owner ("Till 1 tried from another network"), so they can allow the new network at once when
    the restaurant's internet changed. Belongs with step 6 (Notifications).
 
+3. **What a PIN sign-in can't do (password only).** Decided and built 2026-11-25 (user: "I agree with all of the things you said, build it"); each step file has a "PIN or password (check here)" part to adjust screen by screen.
+   User, 2026-11-25: "if someone logs in with PIN he should have limited things; things with a security risk need the password;
+   do it all together, it's a lot of work; what a waiter or the kitchen display does should not be blocked, like void an order."
+   Agreed so far: service work stays on PIN (POS, kitchen display, My shift, clock-in, looking at stock), voids, refunds,
+   discounts and closing unpaid included, each still needing the person's own permission. First rule written but not built:
+   connecting devices needs the password (server `security/rbac/PinSignIn`, mark PIN_SIGN_IN on a PIN sign-in's permissions;
+   app `DevicesState.pinSignIn`).
+   Proposed password-only list, waiting for the user's yes: all device management and the network rules; adding, removing or
+   switching off staff, roles and permissions, resetting someone's PIN, password links; your own password, email, username,
+   phone, PIN and your other devices; money settings (payments, billing, fiscal and tax, receipt design, fraud limits, currency,
+   time zone); salary (rates, payouts, marking paid); restaurant info and branches; the other Admin Hub settings; downloads and
+   exports; marking fraud checks reviewed; the audit log. Open: menu price changes, stock adjustments and waste, approving
+   counts, opening hours ("Open now" stays on PIN). Either as that list or as whole areas closed on PIN (Admin Hub, Finance,
+   Fraud; Statistics without downloads). A "Sign in with your password" button where something is password-only.
+
 ## Step 19 — Statistics
 
 1. ~~**See the sales in a currency you know**~~ Built in step 2 (user, 2026-11-19: "do it now"), for the whole app, chosen beside

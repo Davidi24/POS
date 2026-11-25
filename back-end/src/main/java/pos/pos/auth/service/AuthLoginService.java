@@ -226,7 +226,7 @@ public class AuthLoginService {
     private AuthenticationResponse issue(User user, String normalizedIdentifier, ClientInfo normalizedClientInfo, SessionType sessionType, OffsetDateTime now) {
         List<Role> activeRoles = loadActiveRoles(user.getId());
         List<String> roleCodes = activeRoles.stream().map(Role::getCode).toList();
-        List<String> permissionCodes = loadPermissionCodes(user, activeRoles);
+        List<String> permissionCodes = pos.pos.security.rbac.PinSignIn.mark(loadPermissionCodes(user, activeRoles), sessionType);
 
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);

@@ -27,6 +27,7 @@ Lock	Blocca	Bloquear	Kyç
 {}, account menu	{}, menu dell'account	{}, menú de la cuenta	{}, menyja e llogarisë
 Profile	Profilo	Perfil	Profili
 Report a problem	Segnala un problema	Informar de un problema	Raporto një problem
+Use your password	Usa la tua password	Usa tu contraseña	Përdor fjalëkalimin
 Signing out…	Uscita in corso…	Cerrando sesión…	Duke dalë…
 Sign out	Esci	Cerrar sesión	Dil
 My details	I miei dati	Mis datos	Të dhënat e mia
@@ -150,6 +151,8 @@ We'll send a link to the new email. It changes once you open it.	Invieremo un li
 Send the link	Invia il link	Enviar el enlace	Dërgo lidhjen
 New email	Nuova email	Nuevo correo	Email-i i ri
 Your old email gets a short note, so you'll know if it wasn't you.	La vecchia email riceve un breve avviso, così saprai se non sei stato tu.	Tu correo anterior recibe un aviso breve, para que sepas si no fuiste tú.	Email-i i vjetër merr një njoftim të shkurtër, që ta dish nëse s'ishe ti.
+You signed in with your PIN	Hai effettuato l'accesso con il PIN	Iniciaste sesión con tu PIN	Ke hyrë me PIN-in tënd
+To change your account, your PIN or your devices, sign in with your password.	Per modificare il tuo account, il PIN o i dispositivi, accedi con la tua password.	Para cambiar tu cuenta, tu PIN o tus dispositivos, inicia sesión con tu contraseña.	Për të ndryshuar llogarinë, PIN-in ose pajisjet, hyr me fjalëkalimin tënd.
 Done	Fatto	Listo	U krye
 Sent	Inviato	Enviado	Dërguar
 The Super Admin has your message and will get back to you.	Il Super Admin ha ricevuto il tuo messaggio e ti risponderà.	El Super Admin recibió tu mensaje y te responderá.	Super Admini e ka mesazhin tënd dhe do të të përgjigjet.
@@ -204,6 +207,8 @@ Added	Aggiunto	Añadido	Shtuar
 Removed	Rimosso	Eliminado	Hequr
 Reset	Reimpostato	Restablecido	Rivendosur
 Changed	Modificato	Cambiado	Ndryshuar
+X-Device-Name	X-Device-Name	X-Device-Name	X-Device-Name
+X-Device-System	X-Device-System	X-Device-System	X-Device-System
 SCAN-1	SCAN-1	SCAN-1	SCAN-1
 Stock scanner	Scanner del magazzino	Escáner de inventario	Skaner i stokut
 Zebra	Zebra	Zebra	Zebra
@@ -238,6 +243,8 @@ Paper width must be 1–500 mm	La larghezza della carta deve essere 1–500 mm	E
 This isn't a printer IP address	Questo non è l'indirizzo IP di una stampante	Esta no es la dirección IP de una impresora	Kjo nuk është adresë IP printeri
 Enter the printer's IP address	Inserisci l'indirizzo IP della stampante	Escribe la dirección IP de la impresora	Shkruaj adresën IP të printerit
 The port must be 1–65535	La porta deve essere 1–65535	El puerto debe ser 1–65535	Porta duhet të jetë 1–65535
+Sign in with your password to connect devices.	Accedi con la tua password per collegare i dispositivi.	Inicia sesión con tu contraseña para conectar dispositivos.	Hyr me fjalëkalimin tënd për të lidhur pajisjet.
+Ask someone who connects devices to do it.	Chiedi a chi collega i dispositivi di farlo.	Pídele a quien conecta los dispositivos que lo haga.	Kërkoji dikujt që lidh pajisjet ta bëjë.
 Choose a branch first	Scegli prima una sede	Primero elige una sucursal	Zgjidh fillimisht një pikë
 Till	Cassa	Caja	Arkë
 Tablet	Tablet	Tableta	Tablet
@@ -252,7 +259,8 @@ No pairing code came back	Nessun codice di abbinamento ricevuto	No llegó ningú
 This device is {} now. This Wi-Fi is saved as the restaurant's network.	Ora questo dispositivo è {}. Questo Wi-Fi è salvato come rete del ristorante.	Ahora este dispositivo es {}. Este Wi-Fi quedó guardado como la red del restaurante.	Tani kjo pajisje është {}. Ky Wi-Fi u ruajt si rrjeti i restorantit.
 This device is {} now. Staff sign in here with their PIN.	Questo dispositivo ora è {}. Il personale accede qui con il proprio PIN.	Este dispositivo ahora es {}. El personal inicia sesión aquí con su PIN.	Kjo pajisje tani është {}. Stafi hyn këtu me PIN-in e vet.
 This device is no longer {}.	Questo dispositivo non è più {}.	Este dispositivo ya no es {}.	Kjo pajisje nuk është më {}.
-Ask someone who connects devices to do it.	Chiedi a chi collega i dispositivi di farlo.	Pídele a quien conecta los dispositivos que lo haga.	Kërkoji dikujt që lidh pajisjet ta bëjë.
+{} said no, so the code was ended. Ask for a new one.	{} ha detto di no, quindi il codice è stato chiuso. Chiedine uno nuovo.	{} dijo que no, así que el código se cerró. Pide uno nuevo.	{} tha jo, prandaj kodi u mbyll. Kërko një të ri.
+Nobody agreed in time. Try again, or ask for a new code.	Nessuno ha accettato in tempo. Riprova o chiedi un nuovo codice.	Nadie aceptó a tiempo. Inténtalo de nuevo o pide un código nuevo.	Askush nuk pranoi në kohë. Provo përsëri ose kërko një kod të ri.
 Saved	Salvato	Guardado	U ruajt
 {} works at {} now.	{} ora lavora a {}.	{} ahora funciona en {}.	{} tani punon në {}.
 {} was moved.	{} è stato spostato.	{} se movió.	{} u zhvendos.
@@ -275,11 +283,17 @@ No longer {}	Non è più {}	Ya no es {}	Nuk është më {}
 This is {}	Questo è {}	Este es {}	Kjo është {}
 Forget it	Dimenticalo	Olvidarlo	Harroje
 Enter a code	Inserisci un codice	Ingresa un código	Fut një kod
+It didn't connect	Non si è collegato	No se conectó	Nuk u lidh
+Waiting for an answer	In attesa di una risposta	Esperando una respuesta	Në pritje të një përgjigjeje
 Connect	Collega	Conectar	Lidh
+Close	Chiudi	Cerrar	Mbyll
+Try again	Riprova	Reintentar	Provo përsëri
 Type the code from the till or tablet's page. This device becomes that one.	Scrivi il codice dalla pagina della cassa o del tablet. Questo dispositivo diventa quello.	Escribe el código de la página de la caja o la tableta. Este dispositivo pasa a ser ese.	Shkruaj kodin nga faqja e arkës ose e tabletit. Kjo pajisje bëhet ajo.
 This device is {} now. With a code it becomes another one.	Questo dispositivo ora è {}. Con un codice diventa un altro.	Este dispositivo ahora es {}. Con un código pasa a ser otro.	Kjo pajisje tani është {}. Me një kod bëhet një tjetër.
-Code	Codice	Código	Kodi
-K7P4-9QXM	K7P4-9QXM	K7P4-9QXM	K7P4-9QXM
+The person who made the code	La persona che ha creato il codice	La persona que creó el código	Personi që krijoi kodin
+Waiting for {}	In attesa di {}	Esperando a {}	Në pritje të {}
+{} made this code and got a message to agree. Then this device becomes {}.	{} ha creato questo codice e ha ricevuto un messaggio per accettare. Poi questo dispositivo diventa {}.	{} creó este código y recibió un mensaje para aceptar. Luego este dispositivo se convierte en {}.	{} e krijoi këtë kod dhe mori një mesazh për ta pranuar. Pastaj kjo pajisje bëhet {}.
+{} is in use on another device. That one stops being it when {} agrees.	{} è in uso su un altro dispositivo, che smette di esserlo quando {} accetta.	{} está en uso en otro dispositivo, que deja de serlo cuando {} acepte.	{} përdoret në një pajisje tjetër, e cila pushon së qeni e tillë kur {} pranon.
 You're on {}.	Sei su {}.	Estás en {}.	Je në {}.
 Make the device you're using now {}.	Rendi {} il dispositivo che stai usando ora.	Convierte en {} el dispositivo que usas ahora.	Bëje {} pajisjen që po përdor tani.
 {} is this computer	{} è questo computer	{} es esta computadora	{} është ky kompjuter
@@ -297,7 +311,7 @@ Disconnect this device?	Scollegare questo dispositivo?	¿Desconectar este dispos
 It stops being {}. Staff can't sign in here with their PIN until it's connected again.	Smette di essere {}. Il personale non può accedere qui con il PIN finché non viene ricollegato.	Deja de ser {}. El personal no puede iniciar sesión aquí con su PIN hasta que se conecte de nuevo.	Nuk do të jetë më {}. Stafi nuk mund të hyjë këtu me PIN derisa të lidhet sërish.
 Connect with a code	Collega con un codice	Conectar con un código	Lidhu me kod
 Type the code on the card terminal to connect it.	Scrivi il codice sul terminale POS per collegarlo.	Escribe el código en la terminal de pago para conectarla.	Shkruaj kodin në terminalin e kartave për ta lidhur.
-For another device: sign in on it, open Devices and press “Enter a code”.	Per un altro dispositivo: accedi lì, apri Dispositivi e premi “Inserisci un codice”.	Para otro dispositivo: inicia sesión en él, abre Dispositivos y pulsa “Ingresa un código”.	Për një pajisje tjetër: hyr në të, hap Pajisjet dhe shtyp “Fut një kod”.
+For another device: sign in on it, open Devices and press “Enter a code”. You agree when it's typed.	Per un altro dispositivo: accedi lì, apri Dispositivi e premi “Inserisci un codice”. Quando viene digitato, accetti tu.	Para otro dispositivo: inicia sesión en él, abre Dispositivos y pulsa “Introducir un código”. Cuando se escribe, tú lo aceptas.	Për një pajisje tjetër: hyr në të, hap Pajisjet dhe shtyp “Fut një kod”. Kur shkruhet, e pranon ti.
 Who can sign in here	Chi può accedere qui	Quién puede iniciar sesión aquí	Kush mund të hyjë këtu
 {} always can.	{} possono sempre.	{} siempre pueden.	{} mund gjithmonë.
 Who can use {} with their PIN.	Chi può usare {} con il proprio PIN.	Quién puede usar {} con su PIN.	Kush mund ta përdorë {} me PIN-in e vet.
@@ -362,7 +376,7 @@ Notes	Note	Notas	Shënime
 Where it is, who to call when it breaks…	Dov'è, chi chiamare quando si guasta…	Dónde está, a quién llamar si se daña…	Ku ndodhet, kë të thërrasësh kur prishet…
 Pairing code	Codice di abbinamento	Código de vinculación	Kod lidhjeje
 For {}	Per {}	Para {}	Për {}
-On the device, sign in, open Devices and press “Enter a code”. It works once and can't be shown again.	Sul dispositivo, accedi, apri Dispositivi e premi “Inserisci un codice”. Funziona una volta e non si può mostrare di nuovo.	En el dispositivo, inicia sesión, abre Dispositivos y pulsa “Ingresa un código”. Funciona una vez y no se puede volver a mostrar.	Në pajisje, hyr, hap Pajisjet dhe shtyp “Fut një kod”. Punon një herë dhe nuk mund të shfaqet përsëri.
+On the device, sign in, open Devices and press “Enter a code”. You're asked to agree when it's typed. It works once and can't be shown again.	Sul dispositivo, accedi, apri Dispositivi e premi “Inserisci un codice”. Quando viene digitato ti verrà chiesto di accettare. Funziona una volta e non può essere mostrato di nuovo.	En el dispositivo, inicia sesión, abre Dispositivos y pulsa “Introducir un código”. Cuando se escriba, se te pedirá que aceptes. Funciona una vez y no se puede volver a mostrar.	Në pajisje, hyr, hap Pajisjet dhe shtyp “Fut një kod”. Kur të shkruhet, do të të kërkohet ta pranosh. Funksionon një herë dhe nuk mund të shfaqet më.
 Type it on the card terminal. It works once and can't be shown again.	Scrivilo sul terminale POS. Funziona una volta e non si può mostrare di nuovo.	Escríbelo en la terminal de pago. Funciona una vez y no se puede volver a mostrar.	Shkruaje në terminalin e kartave. Funksionon një herë dhe nuk mund të shfaqet përsëri.
 Works until {}	Valido fino a {}	Válido hasta {}	Vlen deri më {}
 Select the code to copy it.	Seleziona il codice per copiarlo.	Selecciona el código para copiarlo.	Zgjidh kodin për ta kopjuar.
@@ -374,6 +388,7 @@ Open its pairing screen.	Apri la sua schermata di abbinamento.	Abre su pantalla 
 Open Saporini on the {} and sign in with your own account.	Apri Saporini su {} e accedi con il tuo account.	Abre Saporini en {} e inicia sesión con tu cuenta.	Hap Saporini në {} dhe hyr me llogarinë tënde.
 Go to Admin Hub → Devices and press “Enter a code”.	Vai su Admin Hub → Dispositivi e premi “Inserisci un codice”.	Ve a Admin Hub → Dispositivos y pulsa “Ingresa un código”.	Shko te Admin Hub → Pajisjet dhe shtyp “Fut një kod”.
 Type this code. It works once.	Digita questo codice. Funziona una volta.	Escribe este código. Funciona una vez.	Shkruaj këtë kod. Punon një herë.
+Type this code. You're asked here to agree, then it's connected.	Digita questo codice. Ti verrà chiesto qui di accettare, poi sarà collegato.	Escribe este código. Aquí se te pedirá que aceptes y luego quedará conectado.	Shkruaj këtë kod. Këtu do të të kërkohet ta pranosh, pastaj lidhet.
 Works until {}. When it shows as connected, confirm it.	Valido fino a {}. Quando risulta collegato, confermalo.	Válido hasta {}. Cuando aparezca como conectado, confírmalo.	Vlen deri më {}. Kur të shfaqet i lidhur, konfirmoje.
 Make a pairing code	Crea un codice di abbinamento	Crear un código de vinculación	Krijo një kod lidhjeje
 Switch it on and load the paper.	Accendila e carica la carta.	Enciéndela y pon el papel.	Ndize dhe vendos letrën.
@@ -424,7 +439,6 @@ Can't be used until switched on	Non utilizzabile finché non viene attivato	No s
 Lost or stolen: locked out	Perso o rubato: bloccato	Perdido o robado: bloqueado	I humbur ose i vjedhur: i bllokuar
 No longer used	Non più usato	Ya no se usa	Nuk përdoret më
 Added, not confirmed yet	Aggiunto, non ancora confermato	Agregado, aún sin confirmar	Shtuar, ende pa u konfirmuar
-Back to {}	Torna a {}	Volver a {}	Kthehu te {}
 Confirm it works	Conferma che funziona	Confirmar que funciona	Konfirmo që punon
 This branch	Questa sede	Esta sucursal	Kjo pikë
 Last seen	Visto l'ultima volta	Visto por última vez	Parë për herë të fundit
@@ -455,6 +469,7 @@ This computer	Questo computer	Esta computadora	Ky kompjuter
 Local network · {}	Rete locale · {}	Red local · {}	Rrjet lokal · {}
 Details	Dettagli	Detalles	Detajet
 How it's written down here.	Come è registrato qui.	Cómo está registrado aquí.	Si është regjistruar këtu.
+Code	Codice	Código	Kodi
 Maker and model	Produttore e modello	Fabricante y modelo	Prodhuesi dhe modeli
 Serial	Seriale	Serie	Numri serial
 Tills	Casse	Cajas	Arkat
@@ -472,6 +487,8 @@ Cash drawers	Cassetti contanti	Cajones de efectivo	Sirtarët e parave
 cash drawer	cassetto contanti	cajón de efectivo	sirtar parash
 Opened by the receipt printer	Aperto dalla stampante scontrini	Lo abre la impresora de recibos	Hapet nga printeri i faturave
 Everything that runs the restaurant, and whether it works	Tutto ciò che fa funzionare il ristorante e se funziona	Todo lo que hace funcionar el restaurante y si funciona	Gjithçka që vë në punë restorantin dhe nëse punon
+Back to {}	Torna a {}	Volver a {}	Kthehu te {}
+Back to the devices	Torna ai dispositivi	Volver a los dispositivos	Kthehu te pajisjet
 Add device	Aggiungi dispositivo	Añadir dispositivo	Shto pajisje
 No access to devices	Nessun accesso ai dispositivi	Sin acceso a los dispositivos	Pa qasje te pajisjet
 Your role needs “Connect devices” to see devices.	Il tuo ruolo ha bisogno di “Collegare i dispositivi” per vedere i dispositivi.	Tu rol necesita “Conectar dispositivos” para ver los dispositivos.	Roli yt ka nevojë për “Lidh pajisjet” për të parë pajisjet.
@@ -488,7 +505,6 @@ None yet	Ancora nessuno	Todavía ninguno	Ende asnjë
 {} to confirm	{} da confermare	{} por confirmar	{} për t'u konfirmuar
 1 device	1 dispositivo	1 dispositivo	1 pajisje
 {} devices	{} dispositivi	{} dispositivos	{} pajisje
-Back to the devices	Torna ai dispositivi	Volver a los dispositivos	Kthehu te pajisjet
 Find a {}	Trova {}	Buscar {}	Gjej {}
 No {} yet	Ancora nessun {}	Todavía no hay {}	Ende pa {}
 Nothing matches	Nessun risultato	No hay coincidencias	Asnjë përputhje
@@ -518,6 +534,18 @@ A person	Una persona	Una persona	Një person
 From {}	Dal {}	Desde {}	Nga {}
 until {}	fino al {}	hasta {}	deri më {}
 End	Termina	Terminar	Përfundo
+This device isn't {} any more.	Questo dispositivo non è più {}.	Este dispositivo ya no es {}.	Kjo pajisje nuk është më {}.
+{} moves to {}.	{} passa a {}.	{} pasa a {}.	{} kalon te {}.
+Refused. That code doesn't work any more.	Rifiutato. Quel codice non funziona più.	Rechazado. Ese código ya no funciona.	U refuzua. Ai kod nuk funksionon më.
+{} wants to become {}	{} vuole diventare {}	{} quiere convertirse en {}	{} do të bëhet {}
+Refuse	Rifiuta	Rechazar	Refuzo
+Agree	Accetta	Aceptar	Prano
+{} typed your code for {} on it.	{} ha digitato lì il tuo codice per {}.	{} escribió ahí tu código para {}.	{} shkroi atje kodin tënd për {}.
+This device is {} now. If you agree, it stops being {} and you leave it.	Questo dispositivo ora è {}. Se accetti, smette di essere {} e lo lasci.	Este dispositivo ahora es {}. Si aceptas, deja de ser {} y sales de él.	Kjo pajisje tani është {}. Nëse pranon, pushon së qeni {} dhe del prej saj.
+The device that is {} now stops being it.	Il dispositivo che ora è {} smette di esserlo.	El dispositivo que ahora es {} deja de serlo.	Pajisja që tani është {} pushon së qeni e tillë.
+Time's up. Nothing changed.	Tempo scaduto. Non è cambiato nulla.	Se acabó el tiempo. No cambió nada.	Koha mbaroi. Nuk ndryshoi asgjë.
+This device isn't {} any more	Questo dispositivo non è più {}	Este dispositivo ya no es {}	Kjo pajisje nuk është më {}
+{} was connected on another device, or switched off in Devices. Staff can't sign in here with their PIN now.	{} è stato collegato su un altro dispositivo o disattivato in Dispositivi. Il personale ora non può accedere qui con il PIN.	{} se conectó en otro dispositivo o se desactivó en Dispositivos. El personal ya no puede iniciar sesión aquí con su PIN.	{} u lidh në një pajisje tjetër ose u çaktivizua te Pajisjet. Stafi nuk mund të hyjë më këtu me PIN-in e tij.
 Deleting items is unavailable	L'eliminazione degli articoli non è disponibile	No se pueden eliminar artículos	Fshirja e artikujve nuk është e disponueshme
 Item photos are unavailable	Le foto degli articoli non sono disponibili	Las fotos de artículos no están disponibles	Fotot e artikujve nuk janë të disponueshme
 Place pictures are unavailable	Le immagini dei luoghi non sono disponibili	Las imágenes de lugares no están disponibles	Fotot e vendeve nuk janë të disponueshme
@@ -727,7 +755,6 @@ Monthly count, after the delivery…	Inventario mensile, dopo la consegna…	Con
 Finished	Concluso	Terminado	Përfunduar
 {} of {} counted	{} di {} contati	{} de {} contados	{} nga {} të numëruar
 Count · {}	Inventario · {}	Conteo · {}	Numërim · {}
-Close	Chiudi	Cerrar	Mbyll
 Press “Start counting”, then type what you find on the shelves for each item and press ✓. Stock doesn't change yet.	Premi “Inizia a contare”, poi digita cosa trovi sugli scaffali per ogni articolo e premi ✓. Il magazzino non cambia ancora.	Pulsa “Empezar a contar”, escribe lo que encuentres en los estantes para cada artículo y pulsa ✓. El inventario aún no cambia.	Shtyp “Nis numërimin”, pastaj shkruaj çfarë gjen në rafte për çdo artikull dhe shtyp ✓. Stoku ende nuk ndryshon.
 Type what's on the shelf for each item and press ✓. When everything is counted, press “Finish count”.	Digita cosa c'è sullo scaffale per ogni articolo e premi ✓. Quando hai contato tutto, premi “Concludi inventario”.	Escribe lo que hay en el estante para cada artículo y pulsa ✓. Cuando todo esté contado, pulsa “Terminar conteo”.	Shkruaj çfarë ka në raft për çdo artikull dhe shtyp ✓. Kur të jetë numëruar gjithçka, shtyp “Përfundo numërimin”.
 Check the differences. “Approve and update stock” makes the stock what was counted; the differences are kept as count corrections.	Controlla le differenze. “Approva e aggiorna il magazzino” porta il magazzino a quanto contato; le differenze restano come correzioni d'inventario.	Revisa las diferencias. “Aprobar y actualizar inventario” deja el inventario como lo contado; las diferencias quedan como correcciones de conteo.	Kontrollo diferencat. “Mirato dhe përditëso stokun” e bën stokun sa u numërua; diferencat ruhen si korrigjime numërimi.
@@ -1585,7 +1612,6 @@ Their role changed, so the permissions you changed for them before are cleared. 
 Permissions	Permessi	Permisos	Lejet
 Their role changed: this starts from what {} gives. What you changed for them before is cleared.	Il ruolo è cambiato: si parte da ciò che dà {}. Quello che avevi cambiato per questa persona viene azzerato.	Su rol cambió: se parte de lo que da {}. Lo que cambiaste antes para esta persona se borra.	Roli ndryshoi: fillohet nga ajo që jep {}. Ajo që kishe ndryshuar më parë për këtë person fshihet.
 Couldn't load what {} can do. {}	Impossibile caricare cosa può fare {}. {}	No se pudo cargar lo que puede hacer {}. {}	Nuk u ngarkua çfarë mund të bëjë {}. {}
-Try again	Riprova	Reintentar	Provo përsëri
 Their role	Il suo ruolo	Su rol	Roli i tyre
 An owner can do everything in this restaurant, the same as you. Only the Super Admin can remove an owner later.	Un proprietario può fare tutto in questo ristorante, come te. Solo il Super Admin può rimuovere un proprietario in seguito.	Un dueño puede hacer todo en este restaurante, igual que tú. Solo el Super Admin puede quitar a un dueño después.	Një pronar mund të bëjë gjithçka në këtë restorant, njësoj si ti. Vetëm Super Admini mund ta heqë një pronar më vonë.
 An admin opens the Admin Hub (shifts, users, settings, audit log), Inventory and Statistics. POS and the kitchen display come from the roles below, which are on for them: switch off what they shouldn't do. Only the owner can give them more.	Un admin apre l'Admin Hub (turni, utenti, impostazioni, registro delle modifiche), Inventario e Statistiche. POS e schermo della cucina vengono dai ruoli sotto, attivi per lui: disattiva ciò che non deve fare. Solo il proprietario può dargli di più.	Un admin abre el Admin Hub (turnos, usuarios, ajustes, registro de cambios), Inventario y Estadísticas. El POS y la pantalla de cocina vienen de los roles de abajo, activados para él: desactiva lo que no deba hacer. Solo el dueño puede darle más.	Një admin hap Admin Hub-in (turnet, përdoruesit, cilësimet, regjistrin e ndryshimeve), Inventarin dhe Statistikat. POS-i dhe ekrani i kuzhinës vijnë nga rolet më poshtë, të aktivizuara për të: çaktivizo atë që nuk duhet të bëjë. Vetëm pronari mund t'i japë më shumë.
@@ -1961,8 +1987,6 @@ The refund amount must be between 0 and 1,000,000.	L'importo del rimborso deve e
 Staff	Personale	Personal	Stafi
 Branches	Sedi	Sucursales	Pikat
 X-Device-Id	X-Device-Id	X-Device-Id	X-Device-Id
-X-Device-Name	X-Device-Name	X-Device-Name	X-Device-Name
-X-Device-System	X-Device-System	X-Device-System	X-Device-System
 No backend URL candidates configured	No backend URL candidates configured	No backend URL candidates configured	No backend URL candidates configured
 network is unreachable	network is unreachable	network is unreachable	network is unreachable
 connection refused	connection refused	connection refused	connection refused
@@ -6484,6 +6508,16 @@ SMS delivery is currently unavailable	L'invio di SMS al momento non è disponibi
 Customer code already exists in this restaurant	Il codice cliente esiste già in questo ristorante	El código de cliente ya existe en este restaurante	Kodi i klientit ekziston tashmë në këtë restorant
 Customer update violates a data constraint	L'aggiornamento del cliente viola un vincolo dei dati	La actualización del cliente infringe una regla de datos	Përditësimi i klientit shkel një rregull të të dhënave
 This code doesn't work. It may be used, ended, or typed wrong.	Questo codice non funziona. Forse è già usato, scaduto o scritto male.	Este código no funciona. Puede que ya se haya usado, haya vencido o esté mal escrito.	Ky kod nuk punon. Mund të jetë përdorur, të ketë mbaruar ose të jetë shkruar gabim.
+This code doesn't work any more. Ask for a new one.	Questo codice non funziona più. Chiedine uno nuovo.	Este código ya no funciona. Pide uno nuevo.	Ky kod nuk funksionon më. Kërko një të ri.
+This code is for a card terminal: type it on the terminal itself.	Questo codice è per un terminale di pagamento: digitalo sul terminale stesso.	Este código es para un terminal de pago: escríbelo en el propio terminal.	Ky kod është për një terminal kartash: shkruaje në vetë terminalin.
+Someone else is waiting with this code. Try again in a few minutes.	Qualcun altro è in attesa con questo codice. Riprova tra qualche minuto.	Otra persona está esperando con este código. Inténtalo de nuevo en unos minutos.	Dikush tjetër po pret me këtë kod. Provo përsëri pas pak minutash.
+Not agreed yet.	Non ancora accettato.	Aún no aceptado.	Ende nuk është pranuar.
+This device is already connected.	Questo dispositivo è già collegato.	Este dispositivo ya está conectado.	Kjo pajisje është lidhur tashmë.
+The person who made the code refused it.	La persona che ha creato il codice l'ha rifiutato.	La persona que creó el código lo rechazó.	Personi që krijoi kodin e refuzoi.
+This request has ended. Ask for a new code.	Questa richiesta è terminata. Chiedi un nuovo codice.	Esta solicitud terminó. Pide un código nuevo.	Kjo kërkesë ka mbaruar. Kërko një kod të ri.
+Only the person who made the code answers this.	Solo la persona che ha creato il codice può rispondere.	Solo la persona que creó el código puede responder.	Vetëm personi që krijoi kodin mund të përgjigjet.
+This request isn't waiting any more.	Questa richiesta non è più in attesa.	Esta solicitud ya no está esperando.	Kjo kërkesë nuk është më në pritje.
+This request isn't there any more.	Questa richiesta non c'è più.	Esta solicitud ya no existe.	Kjo kërkesë nuk ekziston më.
 Save the restaurant's network first.	Salva prima la rete del ristorante.	Primero guarda la red del restaurante.	Ruaj më parë rrjetin e restorantit.
 Couldn't tell which network you're on.	Impossibile capire su quale rete sei.	No se pudo saber en qué red estás.	Nuk u kuptua në cilin rrjet je.
 Only a network a device tried from can be allowed from here.	Da qui puoi consentire solo una rete da cui ha provato un dispositivo.	Desde aquí solo puedes permitir una red desde la que intentó un dispositivo.	Nga këtu mund të lejosh vetëm një rrjet nga i cili provoi një pajisje.
@@ -7081,6 +7115,9 @@ Read-only access - sees POS, kitchen display and admin hub without changing anyt
 Kitchen staff - views and updates kitchen display tickets	Personale di cucina: vede e fa avanzare le comande	Personal de cocina: ve y avanza las comandas	Stafi i kuzhinës: sheh dhe ecën përpara me porositë
 Keeps the restaurant clean - tables, floors, kitchen and toilets	Tiene pulito il ristorante: tavoli, pavimenti, cucina e bagni	Mantiene limpio el restaurante: mesas, pisos, cocina y baños	Mban pastër restorantin: tavolinat, dyshemetë, kuzhinën dhe tualetet
 Temporary help for busy nights and events, paid for the hours they come in	Aiuto temporaneo per serate piene ed eventi, pagato per le ore in cui viene	Ayuda temporal para noches llenas y eventos, pagada por las horas que viene	Ndihmë e përkohshme për mbrëmje të ngarkuara dhe evente, e paguar për orët që vjen
+Sign in with your password to change your account.	Accedi con la tua password per modificare il tuo account.	Inicia sesión con tu contraseña para cambiar tu cuenta.	Hyr me fjalëkalimin tënd për të ndryshuar llogarinë.
+Sign in with your password to download reports.	Accedi con la tua password per scaricare i report.	Inicia sesión con tu contraseña para descargar informes.	Hyr me fjalëkalimin tënd për të shkarkuar raportet.
+Sign in with your password to do this.	Accedi con la tua password per farlo.	Inicia sesión con tu contraseña para hacer esto.	Hyr me fjalëkalimin tënd për ta bërë këtë.
 Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id
 Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token
 The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters
@@ -7201,6 +7238,9 @@ Each covers the days chosen at the top.	Ognuno copre i giorni scelti in alto.	Ca
 · Closed	· Chiuso	· Cerrado	· E mbyllur
 · No sales	· Nessuna vendita	· Sin ventas	· Pa shitje
 In	In	En	Në
+K7P4-9QXM	K7P4-9QXM	K7P4-9QXM	K7P4-9QXM
+For another device: sign in on it, open Devices and press “Enter a code”.	Per un altro dispositivo: accedi lì, apri Dispositivi e premi “Inserisci un codice”.	Para otro dispositivo: inicia sesión en él, abre Dispositivos y pulsa “Ingresa un código”.	Për një pajisje tjetër: hyr në të, hap Pajisjet dhe shtyp “Fut një kod”.
+On the device, sign in, open Devices and press “Enter a code”. It works once and can't be shown again.	Sul dispositivo, accedi, apri Dispositivi e premi “Inserisci un codice”. Funziona una volta e non si può mostrare di nuovo.	En el dispositivo, inicia sesión, abre Dispositivos y pulsa “Ingresa un código”. Funciona una vez y no se puede volver a mostrar.	Në pajisje, hyr, hap Pajisjet dhe shtyp “Fut një kod”. Punon një herë dhe nuk mund të shfaqet përsëri.
 This device was {}	Questo dispositivo era {}	Este dispositivo era {}	Kjo pajisje ishte {}
 This device is {}	Questo dispositivo è {}	Este dispositivo es {}	Kjo pajisje është {}
 This device isn't a till or tablet yet	Questo dispositivo non è ancora una cassa né un tablet	Este dispositivo aún no es una caja ni una tableta	Kjo pajisje ende nuk është arkë apo tablet

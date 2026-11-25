@@ -17,6 +17,11 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 - Sales details' orders are by when they opened and need ORDER_READ (wanted: by when paid, under REPORTS_READ).
 - Branch filter is switched off (`OneBranchPreview = true`, temporary); the server answers at most 366 days.
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: looking at Statistics works on PIN; every Download (cards, pages, Sales details, reports) needs the password.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - To agree with the user when this step starts (mock data where the server isn't ready).
 

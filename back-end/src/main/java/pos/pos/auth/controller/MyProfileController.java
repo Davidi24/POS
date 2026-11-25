@@ -42,18 +42,21 @@ public class MyProfileController {
     @PutMapping("/details")
     @Operation(summary = "Change my name and phone")
     public MyProfileResponse updateDetails(@Valid @RequestBody UpdateMyDetailsRequest request, Authentication authentication) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         return myProfileService.updateDetails(me(authentication), request);
     }
 
     @PostMapping("/email")
     @Operation(summary = "Ask to change my email (a link goes to the new address)")
     public MyProfileResponse changeEmail(@Valid @RequestBody ChangeMyEmailRequest request, Authentication authentication) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         return myProfileService.requestEmailChange(me(authentication), request);
     }
 
     @PutMapping("/username")
     @Operation(summary = "Change my username (3 times in 30 days at most)")
     public MyProfileResponse changeUsername(@Valid @RequestBody pos.pos.auth.dto.ChangeMyUsernameRequest request, Authentication authentication) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         return myProfileService.changeUsername(me(authentication), request);
     }
 
@@ -66,6 +69,7 @@ public class MyProfileController {
     @PostMapping("/pin/suggestion")
     @Operation(summary = "A new random PIN to choose (10 a day)")
     public pos.pos.auth.service.PinService.PinSuggestion suggestPin(Authentication authentication) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         return pinService.suggest(me(authentication));
     }
 
@@ -76,6 +80,7 @@ public class MyProfileController {
     @PutMapping("/pin")
     @Operation(summary = "Use a suggested PIN")
     public pos.pos.auth.service.PinService.PinStatus savePin(@Valid @RequestBody SavePinRequest request, Authentication authentication) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         return pinService.save(me(authentication), request.pin());
     }
 
@@ -93,6 +98,7 @@ public class MyProfileController {
     @DeleteMapping("/email")
     @Operation(summary = "Cancel my waiting email change")
     public MyProfileResponse cancelEmailChange(Authentication authentication) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         return myProfileService.cancelEmailChange(me(authentication));
     }
 
