@@ -184,7 +184,7 @@ internal fun DevicesContent(
                     }
                 } }) {
                 if (openId == null) HereChip(state, ::open)
-                if (openId == null && (state.canConnect || state.canEdit)) ToolbarButton("Enter a code", Icons.Outlined.VpnKey, !state.saving) { model.openEnterCode() }
+                if (openId == null && (state.canConnect || state.canEdit) && !state.pinSignIn) ToolbarButton("Enter a code", Icons.Outlined.VpnKey, !state.saving) { model.openEnterCode() }
                 RefreshButton(state.loading, model::refresh)
                 // Inside a kind, its own "Add a …" button takes over.
                 if (state.canEdit && openKind == null) ToolbarPrimaryButton("Add device", Icons.Outlined.Add, !state.saving) { picking = true }

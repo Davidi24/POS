@@ -55,6 +55,8 @@ public class AdminController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Ask the Super Admin: owners to remove another owner or for a support admin; anyone working there about a problem")
     public AdminDtos.PlatformRequest ask(@PathVariable UUID restaurantId, @Valid @RequestBody AdminDtos.CreateRequest request, Authentication auth) {
+        // Reporting a problem works on a PIN; asking to remove an owner or for a support admin needs the password (user, 2026-11-25).
+        if (!"PROBLEM".equals(request.kind())) pos.pos.security.rbac.PinSignIn.refuse(auth, pos.pos.security.rbac.PinSignIn.CHANGE_SYSTEM);
         return adminService.ask(auth, restaurantId, request);
     }
 

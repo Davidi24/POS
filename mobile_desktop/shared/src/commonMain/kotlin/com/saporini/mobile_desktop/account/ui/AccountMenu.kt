@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.ReportProblem
 import androidx.compose.material.icons.outlined.Storefront
@@ -201,6 +202,16 @@ internal fun AccountMenu(onLogout: () -> Unit, withName: Boolean = false, small:
                     text = { Text("Report a problem", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink) },
                     leadingIcon = { Icon(Icons.Outlined.ReportProblem, null, Modifier.size(19.dp), tint = Kit.Ink) },
                     onClick = { open = false; reporting = true }
+                )
+            }
+            // Signed in with a PIN: what changes the system needs the password (user, 2026-11-25).
+            if (com.saporini.mobile_desktop.core.session.signedInWithPin(user)) {
+                val session = org.koin.compose.getKoin().getOrNull<com.saporini.mobile_desktop.core.session.SessionManager>()
+                DropdownMenuItem(
+                    text = { Text("Use your password", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink) },
+                    leadingIcon = { Icon(androidx.compose.material.icons.Icons.Outlined.Password, null, Modifier.size(19.dp), tint = Kit.Ink) },
+                    enabled = session != null,
+                    onClick = { open = false; session?.let { com.saporini.mobile_desktop.core.session.usePasswordInstead(it) } }
                 )
             }
             HorizontalDivider(color = Kit.Border)

@@ -47,6 +47,11 @@ restaurant doesn't need to hire someone; the app helps doing it"). It comes righ
 - [ ] Expenses: receipt photos, a bank statement import, recurring bills (rent every month).
 - [ ] The workspace card's picture (the user's own, like the others).
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: all of Finance & taxation needs the password.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - [x] First version of every place on MOCK figures (2026-11-23), built and running.
 - [ ] The user looks at them; changes asked go here.

@@ -43,6 +43,11 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 - [x] Who can sign in, "Only some": a bar of role pictures, the chosen role's people with ticks (user, 2026-11-25: "an icon
   for each role, a nav bar; by the role its people ready; admins or down, you know the rule").
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: everything about devices needs the password (connecting, adding, removing, moving, who can sign in, the network rules); a till still signs in by PIN.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - [ ] Agree the screens with the user when this step starts (mock data where the server isn't ready).
 
@@ -119,6 +124,17 @@ Status: Not started (Not started → Screens → Development → Hard testing li
   (or the till's page → Use this device), sign out → the PIN pad, PIN sign-in works from the same Wi-Fi; the server's own
   computer and the second one count as one network locally (`loopback-is-this-network`), and in production (behind the
   proxy) every till of the restaurant shows one public address.
+- A typed code waits for its maker (written 2026-11-25): typing a till's code on another device shows "Waiting for <maker>"
+  with the time left; the maker gets the window (also on another of their devices, and after signing in again within the
+  3 minutes) and the notification; Agree connects the new device within a few seconds; Refuse ends the code (typing it again
+  fails); no answer in 3 minutes = nothing changes and both sides say so; a second person typing the same code while one
+  waits gets "Someone else is waiting"; Cancel on the new device stops it. Agreeing on the device that is that till: it
+  leaves the till at once (password sign-in → the start, PIN sign-in → the sign-in screen). The old till on a third device:
+  within about 30 seconds "This device isn't Bar till any more", then the same; on its PIN pad it goes to the password
+  sign-in. "Use this device" still connects at once (own code only); someone else's code through the redeem endpoint is 400.
+- Eight code boxes: typing, pasting "k7p4-9qxm" or "K7P49QXM", Backspace, Enter, the 8th character sends it; a wrong code
+  turns the boxes red until typed again; on a phone the keyboard shows capitals and Done.
+- A till doesn't lock for 3 minutes on a device's page, in Enter a code and in the agree window.
 - [ ] Run (later, when the user says).
 
 ## Printing the two receipts (to do; user, 2026-11-23)

@@ -55,6 +55,7 @@ import androidx.compose.material.icons.outlined.Computer
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Smartphone
@@ -119,8 +120,11 @@ object ProfileScreen : Screen {
         val session = koinInject<SessionManager>()
         val model = rememberScreenModel { ProfileScreenModel(repository, session) }
         val state by model.state.collectAsState()
-        LaunchedEffect(Unit) { model.loadDevices(); model.loadProfile(); model.loadPin() }
-        ProfileContent(LocalAccount.current, state, model, onBack = { if (navigator.canPop) navigator.pop() })
+        // A PIN sign-in doesn't see or change the account's security: that needs the password (user, 2026-11-25).
+        val pin = com.saporini.mobile_desktop.core.session.signedInWithPin(LocalAccount.current.user)
+        LaunchedEffect(Unit) { model.loadProfile(); if (!pin) { model.loadDevices(); model.loadPin() } }
+        ProfileContent(LocalAccount.current, state, model, onBack = { if (navigator.canPop) navigator.pop() },
+            onUsePassword = { com.saporini.mobile_desktop.core.session.usePasswordInstead(session) })
     }
 }
 
@@ -134,7 +138,8 @@ internal enum class ProfileSection(val label: String, val icon: ImageVector, val
 
 @Composable
 internal fun ProfileContent(account: AccountInfo, state: ProfileState, model: ProfileScreenModel?, onBack: () -> Unit,
-                            start: ProfileSection = ProfileSection.DETAILS) {
+                            start: ProfileSection = ProfileSection.DETAILS, onUsePassword: (() -> Unit)? = null) {
+    val pin = com.saporini.mobile_desktop.core.session.signedInWithPin(account.user)
     var section by remember { mutableStateOf(start) }
     var askEverywhere by remember { mutableStateOf(false) }
     // A PIN generated but not used yet: leaving asks first (user, 2026-11-25: "if I go back and haven't saved, ask me to use it
@@ -152,7 +157,7 @@ internal fun ProfileContent(account: AccountInfo, state: ProfileState, model: Pr
         if (state.pinSuggestion == null) go() else section = ProfileSection.SECURITY
     }
     com.saporini.mobile_desktop.core.ui.PlatformBackHandler(enabled = state.pinSuggestion != null) { back() }
-    LaunchedEffect(section) { if (section == ProfileSection.SECURITY && !state.signInsLoaded) model?.loadSignIns() }
+    LaunchedEffect(section) { if (section == ProfileSection.SECURITY && !state.signInsLoaded && !pin) model?.loadSignIns() }
     Box(Modifier.fillMaxSize().background(Kit.Canvas)) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val phone = maxWidth < 600.dp
@@ -165,7 +170,8 @@ internal fun ProfileContent(account: AccountInfo, state: ProfileState, model: Pr
                         Column(Modifier.widthIn(max = 860.dp).fillMaxWidth().padding(horizontal = 32.dp, vertical = 28.dp),
                             verticalArrangement = Arrangement.spacedBy(18.dp)) {
                             SectionHeader(section, phone = false)
-                            SectionBody(section, account, state, model, phone = false, wide = wideCards, onSignOutEverywhere = { askEverywhere = true })
+                            SectionBody(section, account, state, model, phone = false, wide = wideCards, onSignOutEverywhere = { askEverywhere = true },
+                                pin = pin, onUsePassword = onUsePassword)
                             Spacer(Modifier.height(24.dp))
                         }
                     }
@@ -183,7 +189,8 @@ internal fun ProfileContent(account: AccountInfo, state: ProfileState, model: Pr
                             ProfileSection.entries.forEach { s -> SectionChip(s, s == section) { pick(s) } }
                         }
                         SectionHeader(section, phone = true)
-                        SectionBody(section, account, state, model, phone = phone, wide = false, onSignOutEverywhere = { askEverywhere = true })
+                        SectionBody(section, account, state, model, phone = phone, wide = false, onSignOutEverywhere = { askEverywhere = true },
+                            pin = pin, onUsePassword = onUsePassword)
                         Spacer(Modifier.height(24.dp))
                     }
                 }
@@ -279,9 +286,12 @@ private fun SectionHeader(section: ProfileSection, phone: Boolean) {
 
 @Composable
 private fun SectionBody(section: ProfileSection, account: AccountInfo, state: ProfileState, model: ProfileScreenModel?, phone: Boolean, wide: Boolean,
-                        onSignOutEverywhere: () -> Unit) {
+                        onSignOutEverywhere: () -> Unit, pin: Boolean = false, onUsePassword: (() -> Unit)? = null) {
+    // Signed in with a PIN: your details only to look at, your security and devices behind the password (user, 2026-11-25).
+    if (pin && section != ProfileSection.PREFERENCES) PasswordNeededCard(onUsePassword)
+    if (pin && (section == ProfileSection.SECURITY || section == ProfileSection.DEVICES)) return
     when (section) {
-        ProfileSection.DETAILS -> ProfileDetailsCard(account, state, model, phone)
+        ProfileSection.DETAILS -> ProfileDetailsCard(account, state, model, phone, locked = pin)
         ProfileSection.SECURITY -> {
             if (wide) {
                 Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.Top) {
@@ -900,7 +910,7 @@ private fun SignOutEverywhereDialog(signOutEverywhere: suspend () -> Unit, onClo
  * "Change photo" on it; Save asks for the password only when the username changes.
  */
 @Composable
-private fun ProfileDetailsCard(account: AccountInfo, state: ProfileState, model: ProfileScreenModel?, phone: Boolean) {
+private fun ProfileDetailsCard(account: AccountInfo, state: ProfileState, model: ProfileScreenModel?, phone: Boolean, locked: Boolean = false) {
     val user = account.user
     val profile = state.profile
     val look = remember(user?.roles) { com.saporini.mobile_desktop.admin.people.ui.roleLookOf(user?.roles?.firstOrNull().orEmpty()) }
@@ -953,7 +963,7 @@ private fun ProfileDetailsCard(account: AccountInfo, state: ProfileState, model:
                                 placeLine(account)?.let { HeroFact(Icons.Outlined.Storefront, it) }
                             }
                         }
-                        if (!stack) EditButtons(editing, canSave, state.savingDetails, onEdit = { editing = true }, onCancel = { editing = false }, onSave = save)
+                        if (!stack && !locked) EditButtons(editing, canSave, state.savingDetails, onEdit = { editing = true }, onCancel = { editing = false }, onSave = save)
                     }
                 }
                 // The photo, half over the banner. While editing it says "Change photo" on it.
@@ -979,7 +989,7 @@ private fun ProfileDetailsCard(account: AccountInfo, state: ProfileState, model:
                     Text("Remove photo", Modifier.clip(RoundedCornerShape(6.dp)).clickable(enabled = !state.photoBusy) { model?.removePhoto() }.padding(vertical = 2.dp),
                         fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Danger)
                 }
-                if (stack) EditButtons(editing, canSave, state.savingDetails, onEdit = { editing = true }, onCancel = { editing = false }, onSave = save, full = true)
+                if (stack && !locked) EditButtons(editing, canSave, state.savingDetails, onEdit = { editing = true }, onCancel = { editing = false }, onSave = save, full = true)
 
                 FormGroupTitle("Personal information")
                 FieldGrid(stack) {
@@ -995,7 +1005,7 @@ private fun ProfileDetailsCard(account: AccountInfo, state: ProfileState, model:
                 // Email and phone together (user, 2026-11-18: "email and phone in the same category").
                 FormGroupTitle("Contact")
                 FieldGrid(stack) {
-                    EmailField(profile, it, onChange = { changeEmail = true }, onCancelPending = { model?.cancelEmailChange() })
+                    EmailField(profile, it, onChange = { changeEmail = true }, onCancelPending = { model?.cancelEmailChange() }, locked = locked)
                     PhoneField(phoneNumber, editing, it, onChange = { phoneNumber = it })
                 }
                 state.detailsProblem?.let { ProblemLine(it) }
@@ -1078,7 +1088,8 @@ private fun ProfileField(label: String, value: String, editing: Boolean, modifie
 
 /** The email in its box, Confirmed, and Change (always: it never changes without the link); a waiting change under it. */
 @Composable
-private fun EmailField(profile: com.saporini.mobile_desktop.auth.data.dto.MyProfile?, modifier: Modifier, onChange: () -> Unit, onCancelPending: () -> Unit) {
+private fun EmailField(profile: com.saporini.mobile_desktop.auth.data.dto.MyProfile?, modifier: Modifier, onChange: () -> Unit, onCancelPending: () -> Unit,
+                       locked: Boolean = false) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         // "Confirmed" sits beside the label, so a long email keeps the box's width (it used to get only half of it).
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1094,7 +1105,7 @@ private fun EmailField(profile: com.saporini.mobile_desktop.auth.data.dto.MyProf
                 Icon(Icons.Outlined.Email, null, Modifier.size(16.dp), tint = Kit.Muted)
                 Text(profile?.email ?: "–", Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp,
                     letterSpacing = 0.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (profile != null && profile.pendingEmail == null) {
+                if (profile != null && profile.pendingEmail == null && !locked) {
                     Text("Change", Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onChange).padding(horizontal = 10.dp, vertical = 6.dp),
                         fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Green)
                 }
@@ -1187,4 +1198,25 @@ private fun ChangeEmailDialog(state: ProfileState, model: ProfileScreenModel?, o
 private fun ProblemLine(text: String) {
     Text(text, Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFFFBEDEB)).padding(horizontal = 12.dp, vertical = 9.dp),
         fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, letterSpacing = 0.sp, color = Kit.Danger)
+}
+
+
+/**
+ * Signed in with a PIN (user, 2026-11-25: "a PIN can do the job, a password can change the system"): your account's security
+ * needs your password. "Use your password" signs out here and the till shows the password form once.
+ */
+@Composable
+private fun PasswordNeededCard(onUsePassword: (() -> Unit)?) {
+    Surface(shape = RoundedCornerShape(16.dp), color = Color(0xFFFFF8EA), border = BorderStroke(1.dp, Color(0xFFF1DDB0))) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Icon(Icons.Outlined.Lock, null, Modifier.size(22.dp), tint = Kit.Amber)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("You signed in with your PIN", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp, letterSpacing = 0.sp, color = Kit.Ink)
+                Text("To change your account, your PIN or your devices, sign in with your password.", fontFamily = Inter(), fontSize = 13.sp,
+                    lineHeight = 18.sp, letterSpacing = 0.sp, color = Kit.Muted)
+            }
+            if (onUsePassword != null) KitButton("Use your password", onUsePassword, icon = Icons.Outlined.Password, style = ButtonStyle.SECONDARY)
+        }
+    }
 }

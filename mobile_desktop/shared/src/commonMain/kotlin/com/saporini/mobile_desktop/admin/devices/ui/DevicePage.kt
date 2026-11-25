@@ -89,6 +89,9 @@ internal fun DevicePage(
     val kind = kindOf(device)
     val wide = size.isDesktop
     var moving by remember { mutableStateOf(false) }
+    // Setting up a device (a code shown, someone typing it) takes a while: a till waits 3 minutes here before it locks
+    // (user, 2026-11-25: "when I'm in that part don't make me sleep, make it stay 3 or 4 minutes").
+    com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
     ScrollColumn(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         DeviceHeader(device, kind, state, size, onConfirm, onEdit, onRemove, onMove = { moving = true })
         if (wide) {

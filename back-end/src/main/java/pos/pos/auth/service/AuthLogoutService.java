@@ -87,6 +87,10 @@ public class AuthLogoutService {
         }
 
         validateSession(currentSession, validatedRefreshToken);
+        // Signing out every device needs the password, not a PIN typed on a till (user, 2026-11-25).
+        if (currentSession.getSessionType() == pos.pos.auth.enums.SessionType.PIN) {
+            throw pos.pos.security.rbac.PinSignIn.refusal(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
+        }
 
         userSessionRepository.revokeAllActiveSessionsByUserId(
                 validatedRefreshToken.userId(),

@@ -20,6 +20,11 @@ tables, menu, staff, devices, payments, settings), so it's built when all of the
 - Which parts can be skipped, and whether it can be opened again later (from Admin Hub).
 - A short first-time tour for staff too (a waiter's first sign-in), or only for owners.
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: setting up a restaurant needs the password.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - "Get your restaurant ready": the list with what's done and what's left, each line opening the real screen; the moment it's ready to open.
 

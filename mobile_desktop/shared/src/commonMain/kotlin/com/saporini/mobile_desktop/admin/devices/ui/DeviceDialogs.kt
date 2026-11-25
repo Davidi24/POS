@@ -146,7 +146,7 @@ internal fun DeviceEditorDialog(draft: DeviceDraft, state: DevicesState, model: 
 internal fun FreshCodeDialog(code: PairingCodeDto, device: DeviceDto?, onDone: () -> Unit) {
     AppDialog("Pairing code", onDone, subtitle = device?.let { "For ${it.name}" }, maxWidth = 480.dp,
         buttons = { KitButton("Done", onDone, icon = Icons.Outlined.Check) }) {
-        Text(if (device != null && kindOf(device) != DeviceKind.CARD) "On the device, sign in, open Devices and press “Enter a code”. It works once and can't be shown again."
+        Text(if (device != null && kindOf(device) != DeviceKind.CARD) "On the device, sign in, open Devices and press “Enter a code”. You're asked to agree when it's typed. It works once and can't be shown again."
             else "Type it on the card terminal. It works once and can't be shown again.",
             fontFamily = Inter(), fontSize = 13.sp, lineHeight = 19.sp, color = Kit.Ink)
         SelectionContainer {
@@ -196,7 +196,7 @@ internal fun ConfirmDeviceDialog(device: DeviceDto, state: DevicesState, model: 
                     HowStep(1, "Open Saporini on the ${kind.one} and sign in with your own account.")
                     HowStep(2, "Go to Admin Hub → Devices and press “Enter a code”.")
                 }
-                HowStep(3, "Type this code. It works once.")
+                HowStep(3, if (kind == DeviceKind.CARD) "Type this code. It works once." else "Type this code. You're asked here to agree, then it's connected.")
                 if (code?.pairingToken != null) {
                     SelectionContainer {
                         Text(code.pairingToken, Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Kit.GreenSoft)

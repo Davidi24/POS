@@ -93,13 +93,15 @@ internal fun StatisticsContent(state: StatisticsState, model: StatisticsScreenMo
     var export by remember { mutableStateOf<CardExport?>(null) }
     val registry = remember(state.tab) { CardRegistry() }
     val info = reportInfo(state, view)
-    androidx.compose.runtime.CompositionLocalProvider(LocalStatsSave provides { report, picture -> export = CardExport(report, picture) }) {
+    val downloads = !com.saporini.mobile_desktop.core.session.signedInWithPin(com.saporini.mobile_desktop.account.ui.LocalAccount.current.user)
+    androidx.compose.runtime.CompositionLocalProvider(LocalStatsSave provides { report, picture -> export = CardExport(report, picture) },
+        LocalStatsDownloads provides downloads) {
         // Sales details → a day → an order (user, 2026-11-15), under the export window so a day's Download opens over it.
         DayBookDialog(view, state, model, model.todayDate(), info) { saved = it }
     }
     export?.let { ReportExportDialog(it, info, onClose = { export = null }, onResult = { saved = it }) }
     androidx.compose.runtime.CompositionLocalProvider(LocalStatsSave provides { report, picture -> export = CardExport(report, picture) },
-        LocalCardRegistry provides registry) {
+        LocalCardRegistry provides registry, LocalStatsDownloads provides downloads) {
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val size = screenSizeFor(maxWidth)
         ScrollColumn(Modifier.fillMaxSize()) {

@@ -664,6 +664,7 @@ class PageExportItem(val stem: String, val report: CardReport, val chart: ImageB
  */
 @Composable
 internal fun PageExportButton(info: ReportInfo, size: Dp, onResult: (String) -> Unit) {
+    if (!LocalStatsDownloads.current) return
     val registry = LocalCardRegistry.current
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }

@@ -27,6 +27,7 @@ public class PhoneVerificationController {
     @PostMapping("/request-phone-verification")
     @Operation(summary = "Send a phone verification code to the authenticated user's current phone")
     public ResponseEntity<Void> requestPhoneVerification(Authentication authentication) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         phoneVerificationService.requestPhoneVerification(currentUser(authentication).getId());
         return ResponseEntity.noContent().build();
     }
@@ -37,6 +38,7 @@ public class PhoneVerificationController {
             @Valid @RequestBody VerifyPhoneRequest request,
             Authentication authentication
     ) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         phoneVerificationService.verifyPhone(currentUser(authentication).getId(), request);
         return ResponseEntity.noContent().build();
     }

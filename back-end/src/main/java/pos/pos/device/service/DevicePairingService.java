@@ -50,10 +50,51 @@ public class DevicePairingService {
      */
     @Transactional(noRollbackFor = pos.pos.device.network.OutsideNetworkException.class)
     public DevicePairingRedeemResponse redeem(String rawPairingToken, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId) {
+        return connect(tokenOf(rawPairingToken), remoteAddress, enteredBy, restaurantId);
+    }
+
+    /**
+     * "Use this device" on a till's page: the code its maker made a moment ago, used on the device they're on. Someone else's
+     * code goes through Enter a code, which waits for its maker to agree (user, 2026-11-25; `DeviceConnectRequestService`).
+     */
+    @Transactional(noRollbackFor = pos.pos.device.network.OutsideNetworkException.class)
+    public DevicePairingRedeemResponse redeemOwn(String rawPairingToken, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId) {
+        DevicePairingToken token = tokenOf(rawPairingToken);
+        if (enteredBy == null || !enteredBy.equals(token.getCreatedBy())) {
+            throw new AuthException("This code waits for the person who made it to agree: open Devices and press \u201cEnter a code\u201d.",
+                    HttpStatus.BAD_REQUEST);
+        }
+        return connect(token, remoteAddress, enteredBy, restaurantId);
+    }
+
+    /** A code typed on another device that its maker agreed to (`DeviceConnectRequestService.claim`). */
+    @Transactional(noRollbackFor = pos.pos.device.network.OutsideNetworkException.class)
+    public DevicePairingRedeemResponse redeemAgreed(java.util.UUID pairingTokenId, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId) {
+        return connect(pairingTokenRepository.findById(pairingTokenId).orElseThrow(this::invalidPairingToken), remoteAddress, enteredBy, restaurantId);
+    }
+
+    /** The code as typed, still usable in [restaurantId] (not used, ended or for a device switched off); nothing changes. */
+    @Transactional
+    public DevicePairingToken usableToken(String rawPairingToken, java.util.UUID restaurantId) {
+        DevicePairingToken token = tokenOf(rawPairingToken);
+        Device device = token.getDevice();
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if ((restaurantId != null && !restaurantId.equals(device.getRestaurant().getId()))
+                || !token.isActiveAt(now)
+                || !device.isActive()
+                || (device.getStatus() != DeviceStatus.PROVISIONING && device.getStatus() != DeviceStatus.ACTIVE)) {
+            throw invalidPairingToken();
+        }
+        return token;
+    }
+
+    private DevicePairingToken tokenOf(String rawPairingToken) {
         // A typed code in any case, with or without its dash (user, 2026-11-25); older long codes as they are.
         String tokenHash = opaqueTokenService.hash(PairingCodes.typed(rawPairingToken), pairingProperties.getTokenPepper());
-        DevicePairingToken token = pairingTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(this::invalidPairingToken);
+        return pairingTokenRepository.findByTokenHash(tokenHash).orElseThrow(this::invalidPairingToken);
+    }
+
+    private DevicePairingRedeemResponse connect(DevicePairingToken token, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId) {
         Device observedDevice = token.getDevice();
         if (restaurantId != null && !restaurantId.equals(observedDevice.getRestaurant().getId())) throw invalidPairingToken();
         Device device = deviceRepository.findForUpdateByIdAndRestaurantId(

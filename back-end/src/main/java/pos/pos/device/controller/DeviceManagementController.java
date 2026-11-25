@@ -90,6 +90,7 @@ public class DeviceManagementController {
             @Valid @RequestBody CreateDevicePairingTokenRequest request,
             Authentication authentication
     ) {
+        pos.pos.security.rbac.PinSignIn.refuse(authentication, pos.pos.security.rbac.PinSignIn.CONNECT_DEVICES);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(deviceManagementService.createPairingToken(authentication, restaurantId, deviceId, request));
     }

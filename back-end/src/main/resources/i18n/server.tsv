@@ -243,6 +243,16 @@ SMS delivery is currently unavailable	L'invio di SMS al momento non è disponibi
 Customer code already exists in this restaurant	Il codice cliente esiste già in questo ristorante	El código de cliente ya existe en este restaurante	Kodi i klientit ekziston tashmë në këtë restorant
 Customer update violates a data constraint	L'aggiornamento del cliente viola un vincolo dei dati	La actualización del cliente infringe una regla de datos	Përditësimi i klientit shkel një rregull të të dhënave
 This code doesn't work. It may be used, ended, or typed wrong.	Questo codice non funziona. Forse è già usato, scaduto o scritto male.	Este código no funciona. Puede que ya se haya usado, haya vencido o esté mal escrito.	Ky kod nuk punon. Mund të jetë përdorur, të ketë mbaruar ose të jetë shkruar gabim.
+This code doesn't work any more. Ask for a new one.	Questo codice non funziona più. Chiedine uno nuovo.	Este código ya no funciona. Pide uno nuevo.	Ky kod nuk funksionon më. Kërko një të ri.
+This code is for a card terminal: type it on the terminal itself.	Questo codice è per un terminale di pagamento: digitalo sul terminale stesso.	Este código es para un terminal de pago: escríbelo en el propio terminal.	Ky kod është për një terminal kartash: shkruaje në vetë terminalin.
+Someone else is waiting with this code. Try again in a few minutes.	Qualcun altro è in attesa con questo codice. Riprova tra qualche minuto.	Otra persona está esperando con este código. Inténtalo de nuevo en unos minutos.	Dikush tjetër po pret me këtë kod. Provo përsëri pas pak minutash.
+Not agreed yet.	Non ancora accettato.	Aún no aceptado.	Ende nuk është pranuar.
+This device is already connected.	Questo dispositivo è già collegato.	Este dispositivo ya está conectado.	Kjo pajisje është lidhur tashmë.
+The person who made the code refused it.	La persona che ha creato il codice l'ha rifiutato.	La persona que creó el código lo rechazó.	Personi që krijoi kodin e refuzoi.
+This request has ended. Ask for a new code.	Questa richiesta è terminata. Chiedi un nuovo codice.	Esta solicitud terminó. Pide un código nuevo.	Kjo kërkesë ka mbaruar. Kërko një kod të ri.
+Only the person who made the code answers this.	Solo la persona che ha creato il codice può rispondere.	Solo la persona que creó el código puede responder.	Vetëm personi që krijoi kodin mund të përgjigjet.
+This request isn't waiting any more.	Questa richiesta non è più in attesa.	Esta solicitud ya no está esperando.	Kjo kërkesë nuk është më në pritje.
+This request isn't there any more.	Questa richiesta non c'è più.	Esta solicitud ya no existe.	Kjo kërkesë nuk ekziston më.
 Save the restaurant's network first.	Salva prima la rete del ristorante.	Primero guarda la red del restaurante.	Ruaj më parë rrjetin e restorantit.
 Couldn't tell which network you're on.	Impossibile capire su quale rete sei.	No se pudo saber en qué red estás.	Nuk u kuptua në cilin rrjet je.
 Only a network a device tried from can be allowed from here.	Da qui puoi consentire solo una rete da cui ha provato un dispositivo.	Desde aquí solo puedes permitir una red desde la que intentó un dispositivo.	Nga këtu mund të lejosh vetëm një rrjet nga i cili provoi një pajisje.
@@ -819,6 +829,9 @@ Read-only access - sees POS, kitchen display and admin hub without changing anyt
 Kitchen staff - views and updates kitchen display tickets	Personale di cucina: vede e fa avanzare le comande	Personal de cocina: ve y avanza las comandas	Stafi i kuzhinës: sheh dhe ecën përpara me porositë
 Keeps the restaurant clean - tables, floors, kitchen and toilets	Tiene pulito il ristorante: tavoli, pavimenti, cucina e bagni	Mantiene limpio el restaurante: mesas, pisos, cocina y baños	Mban pastër restorantin: tavolinat, dyshemetë, kuzhinën dhe tualetet
 Temporary help for busy nights and events, paid for the hours they come in	Aiuto temporaneo per serate piene ed eventi, pagato per le ore in cui viene	Ayuda temporal para noches llenas y eventos, pagada por las horas que viene	Ndihmë e përkohshme për mbrëmje të ngarkuara dhe evente, e paguar për orët që vjen
+Sign in with your password to change your account.	Accedi con la tua password per modificare il tuo account.	Inicia sesión con tu contraseña para cambiar tu cuenta.	Hyr me fjalëkalimin tënd për të ndryshuar llogarinë.
+Sign in with your password to download reports.	Accedi con la tua password per scaricare i report.	Inicia sesión con tu contraseña para descargar informes.	Hyr me fjalëkalimin tënd për të shkarkuar raportet.
+Sign in with your password to do this.	Accedi con la tua password per farlo.	Inicia sesión con tu contraseña para hacer esto.	Hyr me fjalëkalimin tënd për ta bërë këtë.
 Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id
 Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token
 The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters

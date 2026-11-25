@@ -317,7 +317,7 @@ internal fun pageReports(tab: StatsTab): List<String> = when (tab) {
 internal fun StatsDownloadButton(state: StatisticsState, model: StatisticsScreenModel, v: StatsView, codes: List<String>, size: androidx.compose.ui.unit.Dp) {
     var open by remember { mutableStateOf(false) }
     val kinds = codes.mapNotNull { code -> ReportGroups.flatMap { it.reports }.firstOrNull { it.code == code } }
-    if (kinds.isEmpty()) return
+    if (kinds.isEmpty() || !LocalStatsDownloads.current) return
     val busy = state.downloading != null
     Box {
         Surface(onClick = { open = true }, modifier = Modifier.size(size), shape = RoundedCornerShape(8.dp), color = Color.White,

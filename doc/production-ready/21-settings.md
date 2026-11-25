@@ -30,6 +30,11 @@ over all of them, after Fraud & audit log and before Onboarding.
 - [ ] Nothing a restaurant might change is still fixed in the code.
 - [ ] No empty pages left (each page filled by its step, or hidden).
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: every Admin Hub setting needs the password.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - [ ] Agree the screens with the user when this step starts (mock data where the server isn't ready).
 

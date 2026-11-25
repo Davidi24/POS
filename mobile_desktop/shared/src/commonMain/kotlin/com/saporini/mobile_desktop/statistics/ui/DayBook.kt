@@ -130,7 +130,7 @@ internal fun DayBookDialog(v: StatsView, state: StatisticsState, model: Statisti
         buttons = {
             Spacer(Modifier.weight(1f))
             // Download all (user, 2026-11-15): the whole page as a report; every page shows first, with how many there are.
-            KitButton(if (details.ordersLoading) "Loading the orders…" else "Download all", { exporting = true }, icon = Icons.Outlined.Download,
+            if (LocalStatsDownloads.current) KitButton(if (details.ordersLoading) "Loading the orders…" else "Download all", { exporting = true }, icon = Icons.Outlined.Download,
                 loading = details.ordersLoading, enabled = v.days.any { it.sales > 0 })
         }) {
         DetailsContent(v, state, details, today, zone, model)

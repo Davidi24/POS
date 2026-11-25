@@ -84,8 +84,12 @@ import kotlin.time.Instant
 /** A PIN is 5 digits (user, 2026-11-18). */
 const val PIN_LENGTH = 5
 
-/** Where signing in starts on this device: the PIN pad on a connected till, the password form anywhere else. */
-fun signInScreen(): Screen = if (TokenStore.till.value != null) PinLoginScreen else LoginScreen
+/**
+ * Where signing in starts on this device: the PIN pad on a connected till, the password form anywhere else, and once after
+ * "Use your password" (things that change the system need it; user, 2026-11-25).
+ */
+fun signInScreen(): Screen =
+    if (TokenStore.till.value != null && !com.saporini.mobile_desktop.core.session.PasswordNext.once) PinLoginScreen else LoginScreen
 
 /**
  * The PIN pad's state. [shake] counts wrong PINs so the dots shake each time; [pausedUntil] = 5 wrong PINs on this till,

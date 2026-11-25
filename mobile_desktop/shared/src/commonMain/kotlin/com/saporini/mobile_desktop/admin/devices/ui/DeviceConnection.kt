@@ -26,6 +26,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
@@ -156,24 +162,169 @@ internal fun HereChip(state: DevicesState, onOpen: (DeviceDto) -> Unit) {
 
 /**
  * Devices → Enter a code (user, 2026-11-25: "the person who puts the code logs in and puts it in the Devices section, not in
- * the sign-in"): the code made on a till or tablet's page, typed on the device you're signed in on, which becomes that one.
+ * the sign-in"): the code made on a till or tablet's page, typed in eight boxes with the dash already there (user: "eight
+ * squares and the line in the middle, I don't have to write it"). Then it waits for the person who made the code to agree
+ * (user: "it goes to the person who generated the code"); the till doesn't lock meanwhile (3 minutes, like other important work).
  */
 @Composable
 internal fun EnterCodeDialog(state: DevicesState, model: DevicesScreenModel) {
+    com.saporini.mobile_desktop.core.session.IdleTime(com.saporini.mobile_desktop.core.session.IdleLevel.IMPORTANT)
     val till by TokenStore.till.collectAsState()
     var code by remember { mutableStateOf("") }
-    val typed = code.filter { it.isLetterOrDigit() }
-    AppDialog(title = "Enter a code", onDismiss = model::closeEnterCode, maxWidth = 460.dp, busy = state.saving,
+    val wait = state.connectWait
+    val title = when {
+        wait == null -> "Enter a code"
+        wait.ended != null -> "It didn't connect"
+        else -> "Waiting for an answer"
+    }
+    AppDialog(title = title, onDismiss = model::closeEnterCode, maxWidth = 480.dp, busy = state.saving,
         buttons = {
-            KitButton("Cancel", model::closeEnterCode, style = ButtonStyle.SECONDARY, enabled = !state.saving)
-            KitButton("Connect", { model.enterCode(code) }, icon = Icons.Outlined.Login, enabled = typed.length >= 8, loading = state.saving)
+            when {
+                wait == null -> {
+                    KitButton("Cancel", model::closeEnterCode, style = ButtonStyle.SECONDARY, enabled = !state.saving)
+                    KitButton("Connect", { model.enterCode(code) }, icon = Icons.Outlined.Login, enabled = code.length == CodeLength, loading = state.saving)
+                }
+                wait.ended != null -> {
+                    KitButton("Close", model::closeEnterCode, style = ButtonStyle.SECONDARY)
+                    KitButton("Try again", { code = ""; model.cancelWait() }, icon = Icons.Outlined.Refresh)
+                }
+                else -> KitButton("Cancel", model::closeEnterCode, style = ButtonStyle.SECONDARY)
+            }
         }) {
-        Text("Type the code from the till or tablet's page. This device becomes that one.", fontFamily = Inter(), fontSize = 14.sp,
-            lineHeight = 20.sp, letterSpacing = 0.sp, color = Kit.Ink)
-        till?.let { Note("This device is ${it.name} now. With a code it becomes another one.", Kit.Amber) }
-        com.saporini.mobile_desktop.core.components.TextInput(code, { code = it.uppercase().take(40) }, label = "Code",
-            icon = Icons.Outlined.VpnKey, placeholder = "K7P4-9QXM")
-        state.codeError?.let { com.saporini.mobile_desktop.core.components.MessageBar(it, com.saporini.mobile_desktop.core.components.MessageKind.ERROR) }
+        if (wait == null) {
+            Text("Type the code from the till or tablet's page. This device becomes that one.", fontFamily = Inter(), fontSize = 14.sp,
+                lineHeight = 20.sp, letterSpacing = 0.sp, color = Kit.Ink)
+            till?.let { Note("This device is ${it.name} now. With a code it becomes another one.", Kit.Amber) }
+            Spacer(Modifier.height(4.dp))
+            CodeBoxes(code, enabled = !state.saving, error = state.codeError != null,
+                onChange = { typed ->
+                    val full = typed.length == CodeLength && code.length < CodeLength
+                    code = typed
+                    if (state.codeError != null) model.clearCodeError()
+                    if (full) model.enterCode(typed)
+                },
+                onDone = { if (code.length == CodeLength) model.enterCode(code) })
+            state.codeError?.let { com.saporini.mobile_desktop.core.components.MessageBar(it, com.saporini.mobile_desktop.core.components.MessageKind.ERROR) }
+        } else {
+            WaitingForMaker(wait)
+        }
+    }
+}
+
+/** A pairing code's length: "K7P4-9QXM" without its dash. */
+private const val CodeLength = 8
+
+/** Letters and digits only, in capitals, at most eight: a pasted "k7p4-9qxm" comes in whole. */
+private fun cleanCode(text: String): String = text.filter { it.isLetterOrDigit() && it.code < 128 }.uppercase().take(CodeLength)
+
+/**
+ * The code in eight boxes, four, a short line, four (user, 2026-11-25). One hidden field takes the typing, pasting and
+ * the keyboard's Done; the box being typed in has the green frame and a blinking caret.
+ */
+@Composable
+private fun CodeBoxes(value: String, enabled: Boolean, error: Boolean, onChange: (String) -> Unit, onDone: () -> Unit) {
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    var focused by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    val blink = androidx.compose.animation.core.rememberInfiniteTransition()
+    val caret by blink.animateFloat(1f, 0f, androidx.compose.animation.core.infiniteRepeatable(
+        androidx.compose.animation.core.tween(530, easing = androidx.compose.animation.core.LinearEasing),
+        androidx.compose.animation.core.RepeatMode.Reverse))
+    androidx.compose.foundation.text.BasicTextField(
+        value = androidx.compose.ui.text.input.TextFieldValue(value, androidx.compose.ui.text.TextRange(value.length)),
+        onValueChange = { onChange(cleanCode(it.text)) },
+        enabled = enabled,
+        singleLine = true,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters,
+            autoCorrectEnabled = false,
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Ascii,
+            imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onDone() }),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.Transparent),
+        textStyle = androidx.compose.ui.text.TextStyle(color = Color.Transparent),
+        modifier = Modifier.fillMaxWidth()
+            .focusRequester(focus)
+            .onFocusChanged { focused = it.isFocused }
+            .onKeyEnter(onDone),
+        decorationBox = { _ ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                for (i in 0 until CodeLength) {
+                    if (i == CodeLength / 2) {
+                        Box(Modifier.width(16.dp).height(3.dp).clip(RoundedCornerShape(2.dp)).background(if (value.length >= i) Kit.Ink else Kit.Faint))
+                    }
+                    val char = value.getOrNull(i)
+                    val current = focused && enabled && i == value.length.coerceAtMost(CodeLength - 1) && value.length < CodeLength
+                    val frame = when {
+                        error -> Kit.Danger
+                        current -> Kit.Green
+                        char != null -> Kit.Ink.copy(alpha = 0.35f)
+                        else -> Kit.Border
+                    }
+                    Box(Modifier.weight(1f).height(58.dp).clip(RoundedCornerShape(12.dp))
+                        .background(if (current) Kit.GreenSoft else if (char != null) Color.White else Kit.Canvas)
+                        .border(BorderStroke(if (current || error) 2.dp else 1.5.dp, frame), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center) {
+                        if (char != null) {
+                            Text(char.toString(), translate = false, fontFamily = Inter(), fontSize = 24.sp, fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.sp, color = Kit.Ink)
+                        } else if (current) {
+                            Box(Modifier.width(2.dp).height(24.dp).background(Kit.Green.copy(alpha = caret)))
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+/** Enter on a computer's keyboard does what the phone keyboard's Done does. */
+private fun Modifier.onKeyEnter(action: () -> Unit): Modifier = this.then(Modifier.onPreviewKeyEvent { event ->
+    val enter = event.key == androidx.compose.ui.input.key.Key.Enter || event.key == androidx.compose.ui.input.key.Key.NumPadEnter
+    if (enter && event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) { action(); true } else false
+})
+
+/** Waiting for the person who made the code: who, what this device becomes, and the time left (counted down here). */
+@Composable
+private fun WaitingForMaker(wait: com.saporini.mobile_desktop.admin.devices.ConnectWait) {
+    val request = wait.request
+    val maker = request.madeBy ?: "The person who made the code"
+    var now by remember { mutableStateOf(Clock.System.now().toEpochMilliseconds()) }
+    androidx.compose.runtime.LaunchedEffect(wait.shownAt, wait.ended) {
+        while (wait.ended == null) { kotlinx.coroutines.delay(1_000); now = Clock.System.now().toEpochMilliseconds() }
+    }
+    val left = wait.secondsLeft(now)
+    val pulse = androidx.compose.animation.core.rememberInfiniteTransition()
+    val grow by pulse.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(
+        androidx.compose.animation.core.tween(1600, easing = androidx.compose.animation.core.LinearEasing)))
+    val tint = if (wait.ended != null) Kit.Amber else Kit.Green
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) {
+            if (wait.ended == null) {
+                Box(Modifier.size(56.dp + 40.dp * grow).clip(CircleShape).background(tint.copy(alpha = 0.18f * (1f - grow))))
+            }
+            Box(Modifier.size(64.dp).clip(CircleShape).background(tint.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+                Icon(if (wait.ended != null) Icons.Outlined.ErrorOutline else Icons.Outlined.HowToReg, null, Modifier.size(30.dp), tint = tint)
+            }
+        }
+        if (wait.ended == null) {
+            Text("Waiting for $maker", fontFamily = Inter(), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp,
+                color = Kit.Ink, textAlign = TextAlign.Center)
+            Text("$maker made this code and got a message to agree. Then this device becomes ${request.deviceName}.",
+                fontFamily = Inter(), fontSize = 13.5.sp, lineHeight = 19.sp, letterSpacing = 0.sp, color = Kit.Muted, textAlign = TextAlign.Center)
+            Row(Modifier.clip(RoundedCornerShape(50)).background(Kit.Tint).padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Outlined.Timer, null, Modifier.size(15.dp), tint = Kit.Muted)
+                Text("${left / 60}:${(left % 60).toString().padStart(2, '0')} left", fontFamily = Inter(), fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp, color = Kit.Ink)
+            }
+            if (request.deviceInUse) Note("${request.deviceName} is in use on another device. That one stops being it when $maker agrees.", Kit.Muted)
+        } else {
+            Text(wait.ended, fontFamily = Inter(), fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.sp, color = Kit.Ink,
+                textAlign = TextAlign.Center)
+        }
     }
 }
 
@@ -196,7 +347,7 @@ internal fun ThisDeviceCard(device: DeviceDto, state: DevicesState, model: Devic
                 KitButton("Disconnect", { disconnecting = true }, style = ButtonStyle.DANGER_OUTLINE, icon = Icons.Outlined.LinkOff)
             }
             !usable -> Note("Put ${device.name} back in use to connect it.", Kit.Muted)
-            !state.mayConnect(device) -> Note("Ask someone who connects devices to do it.", Kit.Muted)
+            !state.mayConnect(device) -> Note(state.connectRefusal, Kit.Muted)
             else -> {
                 if (device.connected) { Note("It's connected on another device now. Using it here moves it, and the other one stops working.", Kit.Amber); Spacer(Modifier.height(10.dp)) }
                 ActionRow(Icons.Outlined.PointOfSale, Kit.Ink, "Use it here", "Staff then sign in on this computer with their PIN.") {
@@ -239,11 +390,11 @@ internal fun CodeCard(device: DeviceDto, state: DevicesState, model: DevicesScre
     val card = kindOf(device) == DeviceKind.CARD
     Panel("Connect with a code",
         if (card) "Type the code on the card terminal to connect it."
-        else "For another device: sign in on it, open Devices and press “Enter a code”.",
+        else "For another device: sign in on it, open Devices and press “Enter a code”. You agree when it's typed.",
         Icons.Outlined.VpnKey, Kit.Blue, picture = Res.drawable.auth_pin_create) {
         when {
             !usable -> Note("Put ${device.name} back in use to connect it.", Kit.Muted)
-            !state.mayConnect(device) -> Note("Ask someone who connects devices to do it.", Kit.Muted)
+            !state.mayConnect(device) -> Note(state.connectRefusal, Kit.Muted)
             else -> {
                 if (code != null) { FreshCode(code.pairingToken!!, code.expiresAt); Spacer(Modifier.height(12.dp)) }
                 CodeButton(state, model, again = code != null)

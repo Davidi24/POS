@@ -104,7 +104,7 @@ public class AuthRefreshService {
 
         List<Role> activeRoles = roleRepository.findActiveRolesByUserId(user.getId());
         List<String> roleCodes = activeRoles.stream().map(Role::getCode).toList();
-        List<String> permissionCodes = loadPermissionCodes(user, activeRoles);
+        List<String> permissionCodes = pos.pos.security.rbac.PinSignIn.mark(loadPermissionCodes(user, activeRoles), session.getSessionType());
 
         UUID newTokenId = UUID.randomUUID();
         String newAccessToken = jwtService.generateAccessToken(user.getId(), roleCodes, newTokenId);

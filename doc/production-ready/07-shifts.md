@@ -18,6 +18,11 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 - Must a waiter be clocked in to open an order?
 - Where people clock in (the till, their own phone, both).
 
+## PIN or password (check here)
+Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
+a PIN sign-in gets its permissions without those). Now for this step: My shift, clocking in and out, breaks and the team's month work on PIN; planning shifts and usual shifts (Admin Hub → Shifts) need the password.
+- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+
 ## 1. Screens
 - To agree with the user when this step starts (mock data where the server isn't ready).
 

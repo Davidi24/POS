@@ -45,7 +45,7 @@ public class DeviceCodeController {
 
     @PostMapping("/restaurants/{restaurantId}/device-pairing/redeem")
     @PreAuthorize("hasAnyAuthority('DEVICES_CONNECT', 'DEVICES_MANAGE')")
-    @Operation(summary = "Connect the device you're signed in on with a pairing code")
+    @Operation(summary = "Use this device: connect the device you are signed in on with a code you just made for it")
     public ResponseEntity<DevicePairingRedeemResponse> redeem(
             @PathVariable UUID restaurantId,
             @Valid @RequestBody DevicePairingRedeemRequest request,
@@ -53,11 +53,12 @@ public class DeviceCodeController {
             HttpServletRequest servletRequest
     ) {
         settingsDomainSupport.requireManageableRestaurant(authentication, restaurantId);
+        pos.pos.security.rbac.PinSignIn.refuse(authentication, pos.pos.security.rbac.PinSignIn.CONNECT_DEVICES);
         String address = clientInfoExtractor.extractIp(servletRequest);
         rateLimiter.check("DEVICE_PAIRING_IP", address, maxTriesPerAddress, java.time.Duration.ofMinutes(triesWindowMinutes),
                 "Too many tries. Wait a few minutes and try again.");
         try {
-            return ResponseEntity.ok(devicePairingService.redeem(request.pairingToken(), address,
+            return ResponseEntity.ok(devicePairingService.redeemOwn(request.pairingToken(), address,
                     settingsDomainSupport.currentActorId(authentication), restaurantId));
         } catch (pos.pos.exception.auth.AuthException refused) {
             // A wrong code is not a sign-in problem: a 401 here would make the app refresh its sign-in and send it again.
