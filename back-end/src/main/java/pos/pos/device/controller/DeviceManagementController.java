@@ -34,7 +34,7 @@ public class DeviceManagementController {
     private final DeviceManagementService deviceManagementService;
 
     @GetMapping("/assignments")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'DEVICES_CONNECT', 'DEVICES_MANAGE')")
     @Operation(summary = "List device assignment history")
     public ResponseEntity<List<DeviceAssignmentResponse>> getAssignments(
             @PathVariable UUID restaurantId,
@@ -70,7 +70,7 @@ public class DeviceManagementController {
     }
 
     @GetMapping("/pairing-tokens")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'DEVICES_CONNECT', 'DEVICES_MANAGE')")
     @Operation(summary = "List device pairing token history")
     public ResponseEntity<List<DevicePairingTokenResponse>> getPairingTokens(
             @PathVariable UUID restaurantId,
@@ -81,7 +81,8 @@ public class DeviceManagementController {
     }
 
     @PostMapping("/pairing-tokens")
-    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
+    // Connect devices: tills, tablets and screens only (checked in the service).
+    @PreAuthorize("hasAnyAuthority('DEVICES_MANAGE', 'DEVICES_CONNECT')")
     @Operation(summary = "Issue a new device pairing token")
     public ResponseEntity<DevicePairingTokenResponse> createPairingToken(
             @PathVariable UUID restaurantId,

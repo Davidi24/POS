@@ -31,12 +31,16 @@ public class SessionService {
     public List<UserSessionResponse> getMyActiveSessions(UUID userId, UUID currentTokenId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        return userSessionRepository.findActiveSessionsByUserId(userId, now)
-                .stream()
-                .map(s -> userSessionMapper.toSessionResponse(
-                        s,
-                        currentTokenId != null && currentTokenId.equals(s.getTokenId())
-                ))
+        List<pos.pos.auth.entity.UserSession> sessions = userSessionRepository.findActiveSessionsByUserId(userId, now);
+        // Which ones are on this device's network (the current session's address).
+        String here = sessions.stream().filter(s -> currentTokenId != null && currentTokenId.equals(s.getTokenId()))
+                .map(s -> pos.pos.device.network.NetworkAddress.of(s.getIpAddress())).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+        return sessions.stream()
+                .map(s -> {
+                    UserSessionResponse response = userSessionMapper.toSessionResponse(s, currentTokenId != null && currentTokenId.equals(s.getTokenId()));
+                    response.setSameNetwork(here != null && here.equals(pos.pos.device.network.NetworkAddress.of(s.getIpAddress())));
+                    return response;
+                })
                 .toList();
     }
 

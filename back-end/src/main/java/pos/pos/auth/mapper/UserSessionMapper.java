@@ -19,6 +19,14 @@ public class UserSessionMapper {
 
     private final JwtProperties jwtProperties;
 
+    // Where a session's address is (set by Spring; tests may leave it out).
+    private pos.pos.security.geo.GeoPlaces geoPlaces;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setGeoPlaces(pos.pos.security.geo.GeoPlaces geoPlaces) {
+        this.geoPlaces = geoPlaces;
+    }
+
     public UserSession toSession(
             UUID userId,
             UUID tokenId,
@@ -39,6 +47,7 @@ public class UserSessionMapper {
                 .tokenId(tokenId)
                 .sessionType(sessionType)
                 .deviceName(finalDeviceName)
+                .deviceSystem(normalizedClientInfo != null ? normalizedClientInfo.deviceSystem() : null)
                 .refreshTokenHash(refreshTokenHash)
                 .ipAddress(normalizedClientInfo != null ? normalizedClientInfo.ipAddress() : null)
                 .userAgent(userAgent)
@@ -55,6 +64,8 @@ public class UserSessionMapper {
                 .userId(session.getUserId())
                 .sessionType(session.getSessionType() != null ? session.getSessionType().name() : null)
                 .deviceName(session.getDeviceName())
+                .deviceSystem(session.getDeviceSystem())
+                .place(geoPlaces == null ? null : geoPlaces.placeOf(session.getIpAddress()))
                 .ipAddress(session.getIpAddress())
                 .userAgent(session.getUserAgent())
                 .lastUsedAt(session.getLastUsedAt())

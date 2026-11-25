@@ -16,7 +16,8 @@ public final class ClientInfoNormalizer {
                 normalizeIpAddress(clientInfo.ipAddress()),
                 normalizeUserAgent(clientInfo.userAgent()),
                 normalizeDeviceId(clientInfo.deviceId()),
-                normalizeDeviceName(clientInfo.deviceName())
+                normalizeDeviceName(clientInfo.deviceName()),
+                normalizeDeviceSystem(clientInfo.deviceSystem())
         );
     }
 
@@ -27,6 +28,15 @@ public final class ClientInfoNormalizer {
         value = value.replaceAll("\\p{Cntrl}", "").trim();
         if (value.isEmpty()) return null;
         return value.length() > 100 ? value.substring(0, 100) : value;
+    }
+
+    /** What the device runs: printable characters only, at most 80; blank counts as not sent. */
+    public static String normalizeDeviceSystem(String system) {
+        String value = NormalizationUtils.normalize(system);
+        if (value == null) return null;
+        value = value.replaceAll("\\p{Cntrl}", "").trim();
+        if (value.isEmpty()) return null;
+        return value.length() > 80 ? value.substring(0, 80) : value;
     }
 
     /** The app's device id: letters, digits, "-" and "_", at most 100; anything else counts as not sent. */

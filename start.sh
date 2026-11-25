@@ -4,6 +4,10 @@
 #   ./start.sh           backend + desktop app; closing the app stops the backend again (the data stays)
 #   ./start.sh backend   only the backend, left running
 #   ./start.sh app       only the desktop app, for a backend that's already running
+#   ./start.sh app 192.168.1.20
+#                        only the desktop app, for the backend on another computer on this Wi-Fi (its address; a port or a
+#                        whole http:// address works too). Nothing else is needed here: no Docker. To try a till or tablet,
+#                        choose "Connect with a code" when signing in and type the code made in Admin Hub → Devices.
 #   ./start.sh stop      stop the backend
 #   ./start.sh logs      follow the backend's log
 #   ./start.sh reset     delete the database and uploaded photos, back to the demo data (asks first)
@@ -15,7 +19,7 @@
 # Settings, e.g. `POS_API_PORT=18080 ./start.sh`:
 #   POS_API_PORT  (8080)       the backend's port on this computer
 #   POS_MAIL_PORT (8025)       Mailpit: a page with every email the backend sent
-#   POS_BIND      (127.0.0.1)  0.0.0.0 lets other devices on your network (a phone) reach the backend
+#   POS_BIND      (127.0.0.1)  0.0.0.0 lets other devices on your network (a phone, another laptop) reach the backend
 
 set -euo pipefail
 
@@ -259,6 +263,7 @@ screen_scale() {
 launch_app() {
   say "Opening the desktop app (close its window to finish)"
   note "Demo sign-in: admin / ChangeMe123!"
+  note "A till or tablet: choose \"Connect with a code\" and type the code from Admin Hub → Devices."
   export SAPORINI_API_BASE_URL="$API_URL"
   screen_scale
   gradle :desktopApp:run
@@ -284,11 +289,26 @@ case "${1:-all}" in
     say "The backend is running. ./start.sh stop stops it."
     ;;
   app)
-    ensure_java
-    curl -s -o /dev/null --max-time 3 "$API_URL/" ||
-      warn "Nothing answers at $API_URL yet. Start the backend with ./start.sh backend (the app opens anyway)."
-    build_app
-    launch_app
+    if [ -n "${2:-}" ]; then
+      # The backend on another computer (user, 2026-11-25: try a till on a second laptop).
+      case "$2" in
+        http://*|https://*) API_URL="${2%/}" ;;
+        *:*) API_URL="http://$2" ;;
+        *) API_URL="http://$2:$POS_API_PORT" ;;
+      esac
+      ensure_java
+      say "Using the backend at $API_URL"
+      curl -s -o /dev/null --max-time 5 "$API_URL/" ||
+        warn "Nothing answers at $API_URL. Check that its backend runs, that both computers are on the same Wi-Fi, and its firewall lets port ${API_URL##*:} in (the app opens anyway)."
+      build_app
+      launch_app
+    else
+      ensure_java
+      curl -s -o /dev/null --max-time 3 "$API_URL/" ||
+        warn "Nothing answers at $API_URL yet. Start the backend with ./start.sh backend (the app opens anyway)."
+      build_app
+      launch_app
+    fi
     ;;
   stop)
     find_compose

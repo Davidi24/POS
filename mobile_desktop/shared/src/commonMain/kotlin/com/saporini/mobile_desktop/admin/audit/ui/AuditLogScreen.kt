@@ -369,6 +369,7 @@ private fun areaLabel(code: String?): String = when {
     code.isNullOrBlank() -> ""
     code == "SETTINGS" -> "General settings"
     code == "ACCOUNT" -> "Accounts and sign-ins"
+    code == "DEVICE_NETWORK" -> "Restaurant's network"
     code.startsWith("SETTINGS_") -> humanize(code.removePrefix("SETTINGS_")) + " settings"
     else -> humanize(code)
 }

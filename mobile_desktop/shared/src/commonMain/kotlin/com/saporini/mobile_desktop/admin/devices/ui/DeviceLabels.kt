@@ -49,7 +49,7 @@ internal fun deviceStatusLabel(status: String?): String = when (status) {
 }
 
 internal fun deviceStatusColor(status: String?): Color = when (status) {
-    "ACTIVE" -> Kit.Green
+    "ACTIVE" -> Kit.Blue
     "PROVISIONING" -> Kit.Amber
     "MAINTENANCE" -> Kit.Purple
     "BLOCKED" -> Kit.Danger
@@ -69,7 +69,7 @@ internal fun connectionLabel(connection: String?): String = when (connection) {
 }
 
 internal fun pairingStateLabel(state: String?, active: Boolean): Pair<String, Color> = when {
-    active -> "Waiting to be used" to Kit.Green
+    active -> "Waiting to be used" to Kit.Blue
     state == "USED" || state == "REDEEMED" -> "Used" to Kit.Blue
     state == "REVOKED" -> "Cancelled" to Kit.Grey
     state == "EXPIRED" -> "Expired" to Kit.Grey

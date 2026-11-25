@@ -60,7 +60,7 @@ class AuthProfileServiceTest {
         assertThat(response.isEmailVerified()).isTrue();
         assertThat(response.isPhoneVerified()).isFalse();
         assertThat(response.getRoles()).containsExactly("OWNER", "MANAGER");
-        assertThat(response.getPermissions()).containsExactly("USERS_CREATE", "SESSIONS_MANAGE");
+        assertThat(response.getPermissions()).containsExactly("SESSIONS_MANAGE", "USERS_CREATE");
     }
 
     @Test

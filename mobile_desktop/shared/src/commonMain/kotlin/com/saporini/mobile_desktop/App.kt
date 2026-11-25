@@ -85,6 +85,15 @@ fun App() {
     // on the kitchen display. Locking signs the person out, and the PIN pad comes back. Devices that aren't tills never lock.
     val till by TokenStore.till.collectAsState()
     LaunchedEffect(Unit) { com.saporini.mobile_desktop.core.session.watchPlatformInput { com.saporini.mobile_desktop.core.session.IdleLock.touch() } }
+    // A till or tablet tells the server it's on, every minute, signed in or not (2026-11-25): Devices shows it online.
+    LaunchedEffect(till?.deviceId, till?.secret) {
+        val heartbeat = com.saporini.mobile_desktop.core.session.TillHeartbeat
+        val connection = till ?: return@LaunchedEffect heartbeat.reset()
+        while (true) {
+            heartbeat.beat(connection)
+            kotlinx.coroutines.delay(60_000)
+        }
+    }
     LaunchedEffect(isAuthenticated, till) {
         if (!isAuthenticated || till == null) return@LaunchedEffect
         val idle = com.saporini.mobile_desktop.core.session.IdleLock

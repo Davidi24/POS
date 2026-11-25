@@ -215,7 +215,7 @@ private fun workspaceOf(code: String): String = when {
     code.startsWith("INVENTORY_") || code.startsWith("SUPPLIERS_") -> "INVENTORY"
     code == "ADMIN_ACCESS" || code.startsWith("USERS_") || code.startsWith("ROLES_") || code.startsWith("SETTINGS_") ||
         code.startsWith("SHIFT_") || code == "SESSIONS_MANAGE" || code.startsWith("RESTAURANTS_") || code == "SALARY_MANAGE" ||
-        code == "DEVICES_MANAGE" -> "ADMIN"
+        code.startsWith("DEVICES_") -> "ADMIN"
     code == "STATISTICS_ACCESS" || code.startsWith("REPORTS_") -> "STATISTICS"
     code.startsWith("FRAUD_") -> "FRAUD"
     else -> "OTHER"
@@ -240,7 +240,7 @@ private fun sectionOf(code: String): String? = when {
     code == "SHIFT_SELF" -> "My shift"
     code == "SHIFT_READ" || code == "SHIFT_MANAGE" -> "Shifts"
     code == "SALARY_MANAGE" -> "Salary"
-    code == "DEVICES_MANAGE" -> "Devices"
+    code.startsWith("DEVICES_") -> "Devices"
     code.startsWith("INVENTORY_") -> "Stock"
     code.startsWith("SUPPLIERS_") -> "Suppliers"
     code.startsWith("USERS_") -> "Users"

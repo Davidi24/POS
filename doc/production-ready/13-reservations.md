@@ -1,4 +1,4 @@
-# 14. Reservations
+# 13. Reservations
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 

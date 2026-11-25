@@ -1,4 +1,4 @@
-# 9. Inventory
+# 8. Inventory
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 

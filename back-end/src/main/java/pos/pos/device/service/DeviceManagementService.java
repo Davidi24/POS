@@ -175,6 +175,10 @@ public class DeviceManagementService {
         // Pairing token is the technical side of onboarding the device.
         // The device/app uses this short-lived token to complete pairing with the backend.
         Device device = requireManageableDevice(authentication, restaurantId, deviceId);
+        // "Connect devices" alone (user, 2026-11-25): tills, tablets and screens; card terminals and the rest need "Manage devices".
+        if (!hasAuthority(authentication, "DEVICES_MANAGE") && !pos.pos.device.network.DeviceNetworkService.RULED.contains(device.getDeviceType())) {
+            throw new AuthException("Only someone who manages devices can connect this one.", HttpStatus.FORBIDDEN);
+        }
         if (!device.isActive() || (device.getStatus() != DeviceStatus.PROVISIONING && device.getStatus() != DeviceStatus.ACTIVE)) {
             throw new AuthException("Only active or provisioning devices can be paired", HttpStatus.CONFLICT);
         }
@@ -191,8 +195,11 @@ public class DeviceManagementService {
             devicePairingTokenRepository.saveAllAndFlush(openTokens);
         }
 
-        // Persist only the hash; return the raw token once in the response for the caller/device.
-        OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(devicePairingProperties.getTokenPepper());
+        // Persist only the hash; return the code once in the response for the caller/device. A short code to type on the
+        // device (user, 2026-11-25), shown as "K7P4-9QXM".
+        String code = PairingCodes.newCode();
+        OpaqueTokenService.IssuedToken issuedToken = new OpaqueTokenService.IssuedToken(
+                PairingCodes.shown(code), opaqueTokenService.hash(code, devicePairingProperties.getTokenPepper()));
         DevicePairingToken token = new DevicePairingToken();
         token.setDevice(device);
         token.setTokenHash(issuedToken.tokenHash());
@@ -252,6 +259,10 @@ public class DeviceManagementService {
     private Device requireAccessibleDevice(Authentication authentication, UUID restaurantId, UUID deviceId) {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
         return requireDeviceInRestaurant(restaurantId, deviceId);
+    }
+
+    private static boolean hasAuthority(Authentication authentication, String code) {
+        return authentication != null && authentication.getAuthorities().stream().anyMatch(a -> code.equals(a.getAuthority()));
     }
 
     private Device requireManageableDevice(Authentication authentication, UUID restaurantId, UUID deviceId) {

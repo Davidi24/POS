@@ -22,5 +22,9 @@ data class SignedInDevice(
     val id: String,
     val name: String? = null,
     val lastUsedAt: String? = null,
-    val signedInAt: String? = null
+    val signedInAt: String? = null,
+    // What it runs, where its address is, and whether it's on the network of this sign-in (2026-11-25).
+    val system: String? = null,
+    val place: String? = null,
+    val sameNetwork: Boolean = false
 )

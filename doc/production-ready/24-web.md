@@ -17,6 +17,8 @@ already do, so they're built once everything else is final.
 - The page where a new restaurant applies and checks its application by its code (moved here from step 1): the sign-in screen's
   "Don't have an account? Click here" opens it (`SignUpPage.url()`, today `<server>/public/apply`, not built yet).
 - The guest website for each restaurant: menu, booking, opening hours.
+- Admin Hub → Settings → Online booking (says "coming later" today): what it holds comes with the website (moved here from
+  Settings on 2026-11-24).
 
 ## Decisions to take
 - Which of the `web/` apps are really needed (a browser POS, KDS or Admin, or the app alone).

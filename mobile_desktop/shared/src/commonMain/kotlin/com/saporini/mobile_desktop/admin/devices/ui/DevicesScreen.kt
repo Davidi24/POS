@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -21,10 +22,17 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import com.saporini.mobile_desktop.core.i18n.Text
+import com.saporini.mobile_desktop.core.i18n.tr
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -67,6 +75,7 @@ import com.saporini.mobile_desktop.core.components.RowActionsMenu
 import com.saporini.mobile_desktop.core.components.OverviewEmpty
 import com.saporini.mobile_desktop.core.components.SearchField
 import com.saporini.mobile_desktop.core.components.ToolbarPrimaryButton
+import com.saporini.mobile_desktop.core.components.ToolbarButton
 import com.saporini.mobile_desktop.core.format.agoText
 import com.saporini.mobile_desktop.core.format.dateTimeText
 import com.saporini.mobile_desktop.core.theme.Inter
@@ -152,7 +161,30 @@ internal fun DevicesContent(
         val size = screenSizeFor(maxWidth)
         val side = if (size.isPhone) 14.dp else 22.dp
         Column(Modifier.fillMaxSize().padding(start = side, end = side, top = if (size.isPhone) 12.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            PageHeader("Devices", "Everything that runs the restaurant, and whether it works") {
+            // Inside a kind or a device, the way back sits in the header, beside "Devices", with where you are under it
+            // (user, 2026-11-25: "the back arrow on the device, up, make it better").
+            val openDevice = openId?.let { byId[it] }
+            val back: (() -> Unit)? = when {
+                openDevice != null -> ::closeDevice
+                openKind != null -> ({ openKind = null })
+                else -> null
+            }
+            PageHeader("Devices",
+                when {
+                    openDevice != null -> "${kindOf(openDevice).title} › ${openDevice.name}"
+                    openKind != null -> openKind?.title
+                    else -> "Everything that runs the restaurant, and whether it works"
+                },
+                leading = back?.let { goBack -> {
+                    // One step back inside the page: a plain arrow (the curved one in the top bar leaves the workspace; user rule).
+                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = goBack).pointerHoverIcon(PointerIcon.Hand),
+                        contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack,
+                            if (openDevice != null) "Back to ${kindOf(openDevice).title}" else "Back to the devices", Modifier.size(24.dp), tint = Kit.Ink)
+                    }
+                } }) {
+                if (openId == null) HereChip(state, ::open)
+                if (openId == null && (state.canConnect || state.canEdit)) ToolbarButton("Enter a code", Icons.Outlined.VpnKey, !state.saving) { model.openEnterCode() }
                 RefreshButton(state.loading, model::refresh)
                 // Inside a kind, its own "Add a …" button takes over.
                 if (state.canEdit && openKind == null) ToolbarPrimaryButton("Add device", Icons.Outlined.Add, !state.saving) { picking = true }
@@ -160,7 +192,7 @@ internal fun DevicesContent(
             ScreenMessages(state.error.takeIf { state.draft == null && confirming == null }, state.notice ?: localNotice,
                 onClear = { model.clearMessages(); localNotice = null })
             when {
-                !state.canRead -> PageState(PageStateKind.NO_ACCESS, "No access to devices", "Your role needs “View settings” to see devices.")
+                !state.canRead -> PageState(PageStateKind.NO_ACCESS, "No access to devices", "Your role needs “Connect devices” to see devices.")
                 state.devices.isEmpty() && state.printers.isEmpty() && state.loading -> OverviewPageSkeleton(size, sidePanel = false)
                 state.devices.isEmpty() && state.printers.isEmpty() && state.stale -> PageState(PageStateKind.FAILED, action = { RetryText(onClick = model::refresh) })
                 openId != null && byId[openId] != null -> byId.getValue(openId!!).let { device ->
@@ -168,7 +200,9 @@ internal fun DevicesContent(
                         onConfirm = { startConfirm(device) }, onEdit = { model.edit(device.id) },
                         onRemove = { if (DeviceExtras.isExtra(device.id)) removingExtra = device else model.askDelete(device.id) })
                 }
-                openKind == null -> KindGrid(Modifier.fillMaxWidth().weight(1f), all, size) { openKind = it }
+                // Someone who only connects devices sees the tills and the tablets & screens (user, 2026-11-25).
+                openKind == null -> KindGrid(Modifier.fillMaxWidth().weight(1f), all, size,
+                    if (state.canEdit) DeviceKind.entries else listOf(DeviceKind.TILL, DeviceKind.TABLET), state, ::open) { openKind = it }
                 else -> openKind?.let { kind ->
                     KindPage(Modifier.fillMaxWidth().weight(1f), kind, all.filter { kindOf(it) == kind }, state, size,
                         onBack = { openKind = null }, onAdd = { add(kind) }, onOpen = ::open, onConfirm = ::startConfirm,
@@ -177,6 +211,29 @@ internal fun DevicesContent(
                 }
             }
         }
+        // Inside a kind, "Add a till" is the green tab on the right edge, as on the other pages (user, 2026-11-25); it can be
+        // dragged up and down.
+        val addKind = openKind
+        if (addKind != null && openId == null && state.canEdit && state.canRead) {
+            var position by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0.3f) }
+            val compact = size.isPhone
+            val maxOffset = with(androidx.compose.ui.platform.LocalDensity.current) {
+                (maxHeight - com.saporini.mobile_desktop.core.components.edgeActionButtonHeight(compact)).coerceAtLeast(0.dp).toPx()
+            }
+            val label = "Add a ${addKind.one}"
+            com.saporini.mobile_desktop.core.components.RightEdgeActionButton(
+                label, { add(addKind) }, enabled = !state.saving,
+                width = (if (compact) 50 + label.length * 6 else 62 + label.length * 7).coerceAtLeast(if (compact) 100 else 124).dp, compact = compact,
+                modifier = Modifier.align(Alignment.TopEnd)
+                    .offset { androidx.compose.ui.unit.IntOffset(0, kotlin.math.round(position * maxOffset).toInt()) }
+                    .draggable(
+                        orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                        state = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
+                            if (maxOffset > 0f) position = (position + delta / maxOffset).coerceIn(0f, 1f)
+                        }
+                    )
+            )
+        }
     }
 
     if (picking) AddDevicePicker(onPick = ::add, onDismiss = { picking = false })
@@ -184,6 +241,7 @@ internal fun DevicesContent(
         ExtraDeviceDialog(kind, state.printers, onDismiss = { addingExtra = null }) { added -> addingExtra = null; confirming = added.id }
     }
     state.draft?.let { DeviceEditorDialog(it, state, model) }
+    if (state.enteringCode) EnterCodeDialog(state, model)
     confirming?.let { id ->
         byId[id]?.let { device ->
             ConfirmDeviceDialog(device, state, model, onDone = { confirmed ->
@@ -195,7 +253,7 @@ internal fun DevicesContent(
         }
     }
     // A pairing code made from the device's own dialog (the confirm dialog shows its code itself).
-    if (confirming == null) state.freshCode?.let { FreshCodeDialog(it, state.selected, model::dismissFreshCode) }
+    if (confirming == null && openId == null) state.freshCode?.let { FreshCodeDialog(it, state.selected, model::dismissFreshCode) }
     state.confirmDelete?.let { id ->
         val device = byId[id]
         ConfirmDialog("Remove ${device?.name ?: "this device"}?",
@@ -213,7 +271,7 @@ internal fun DevicesContent(
 /** Each kind's colour: its dot, the hover border and its count. */
 private val DeviceKind.color: Color
     get() = when (this) {
-        DeviceKind.TILL -> Kit.Green
+        DeviceKind.TILL -> Color(0xFF475569)
         DeviceKind.TABLET -> Kit.Blue
         DeviceKind.PRINTER -> Kit.Purple
         DeviceKind.CARD -> Kit.Amber
@@ -230,9 +288,14 @@ private val KindCardMinWidth = 220.dp
  * a row, and so does a phone, with smaller cards (user, 2026-10-31: "make it so much better").
  */
 @Composable
-private fun KindGrid(modifier: Modifier, all: List<DeviceDto>, size: ScreenSize, onOpen: (DeviceKind) -> Unit) {
+private fun KindGrid(
+    modifier: Modifier, all: List<DeviceDto>, size: ScreenSize, kinds: List<DeviceKind>, state: DevicesState,
+    onOpenDevice: (DeviceDto) -> Unit, onOpen: (DeviceKind) -> Unit
+) {
     val gap = if (size.isPhone) 10.dp else 14.dp
-    ScrollColumn(modifier) {
+    val here = hereId()
+    val heartbeat by com.saporini.mobile_desktop.core.session.TillHeartbeat.state.collectAsState()
+    ScrollColumn(modifier, verticalArrangement = Arrangement.spacedBy(gap)) {
         BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             val columns = when {
                 size.isPhone -> 2
@@ -241,12 +304,12 @@ private fun KindGrid(modifier: Modifier, all: List<DeviceDto>, size: ScreenSize,
             }
             val cardWidth = if (columns == 1) maxWidth else ((maxWidth - gap * (columns - 1)) / columns).coerceAtMost(KindCardMaxWidth)
             Column(Modifier.width(cardWidth * columns + gap * (columns - 1)), verticalArrangement = Arrangement.spacedBy(gap)) {
-                DeviceKind.entries.chunked(columns).forEach { row ->
+                kinds.chunked(columns).forEach { row ->
                     // Cards in a row keep the same height when one's chips take two lines.
                     Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally)) {
                         row.forEach { kind ->
                             val devices = all.filter { kindOf(it) == kind }
-                            KindCard(kind, devices, Modifier.width(cardWidth).fillMaxHeight(), compact = size.isPhone) { onOpen(kind) }
+                            KindCard(kind, devices, Modifier.width(cardWidth).fillMaxHeight(), compact = size.isPhone, here = here, heartbeat = heartbeat) { onOpen(kind) }
                         }
                     }
                 }
@@ -258,14 +321,30 @@ private fun KindGrid(modifier: Modifier, all: List<DeviceDto>, size: ScreenSize,
 
 /** What a kind's devices are doing, as short chips: in use, in repair, offline. */
 @Composable
-private fun KindChips(kind: DeviceKind, devices: List<DeviceDto>) {
+private fun KindChips(kind: DeviceKind, devices: List<DeviceDto>, here: String?, heartbeat: com.saporini.mobile_desktop.core.session.TillHeartbeat.State) {
+    if (kind.pairs && devices.isNotEmpty()) {
+        // Devices that sign in say how many are online, offline and not connected (user, 2026-11-25).
+        val links = devices.map { linkOf(it, it.id == here, heartbeat) }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+            Link.entries.forEach { link ->
+                val count = links.count { it == link }
+                if (count > 0) StatusChip(when (link) {
+                    Link.ONLINE -> "$count online"
+                    Link.OFFLINE -> "$count offline"
+                    Link.NOT_CONNECTED -> "$count not connected"
+                    Link.NOT_IN_USE -> "$count not in use"
+                }, link.color)
+            }
+        }
+        return
+    }
     val inUse = devices.count { it.status == "ACTIVE" }
     val repair = devices.count { it.status == "MAINTENANCE" || it.status == "BLOCKED" }
     val offline = devices.count { kind.pairs && it.status == "ACTIVE" && !it.online }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
         if (devices.isEmpty()) Text("None yet", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Faint)
         else {
-            StatusChip("$inUse in use", Kit.Green)
+            StatusChip("$inUse in use", Kit.Blue)
             if (repair > 0) StatusChip("$repair in repair", Kit.Purple)
             if (offline > 0) StatusChip("$offline offline", Kit.Grey)
         }
@@ -288,10 +367,15 @@ private fun WaitingBadge(count: Int, modifier: Modifier, short: Boolean = false)
  * [compact]: a phone's two-a-row card, with tighter text and the waiting badge as just a number.
  */
 @Composable
-private fun KindCard(kind: DeviceKind, devices: List<DeviceDto>, modifier: Modifier, compact: Boolean = false, onOpen: () -> Unit) {
+private fun KindCard(
+    kind: DeviceKind, devices: List<DeviceDto>, modifier: Modifier, compact: Boolean = false, here: String? = null,
+    heartbeat: com.saporini.mobile_desktop.core.session.TillHeartbeat.State = com.saporini.mobile_desktop.core.session.TillHeartbeat.State.UNKNOWN,
+    onOpen: () -> Unit
+) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val waiting = devices.count { it.status == "PROVISIONING" }
+    // Devices that sign in show "not connected" instead (their chips); the rest wait to be confirmed.
+    val waiting = if (kind.pairs) 0 else devices.count { it.status == "PROVISIONING" }
     Surface(
         onClick = onOpen, modifier = modifier.hoverable(interaction).pointerHoverIcon(PointerIcon.Hand), shape = RoundedCornerShape(16.dp), color = Color.White,
         border = BorderStroke(if (hovered) 1.5.dp else 1.dp, if (hovered) kind.color.copy(alpha = 0.55f) else Kit.Border),
@@ -321,7 +405,7 @@ private fun KindCard(kind: DeviceKind, devices: List<DeviceDto>, modifier: Modif
                 }
                 Text(kind.hint, fontFamily = Inter(), fontSize = if (compact) 11.5.sp else 12.sp, lineHeight = if (compact) 15.sp else 16.sp, color = Kit.Muted,
                     maxLines = if (compact) 2 else 1, minLines = if (compact) 2 else 1, overflow = TextOverflow.Ellipsis)
-                KindChips(kind, devices)
+                KindChips(kind, devices, here, heartbeat)
             }
         }
     }
@@ -329,123 +413,180 @@ private fun KindCard(kind: DeviceKind, devices: List<DeviceDto>, modifier: Modif
 
 // ---------- A kind's own page ----------
 
-/** One kind: back to the kinds, its picture and name, "Add a …"; what waits to be confirmed; then its devices to open, edit or remove. */
+/**
+ * One kind: back to the kinds, its picture and name, "Add a …"; how many are online, offline and not connected; then every
+ * device as a card (user, 2026-11-25: "make it look better": the Manage places cards' look), this device first, then online,
+ * offline, not connected yet and not in use.
+ */
 @Composable
 private fun KindPage(
     modifier: Modifier, kind: DeviceKind, devices: List<DeviceDto>, state: DevicesState, size: ScreenSize,
     onBack: () -> Unit, onAdd: () -> Unit, onOpen: (DeviceDto) -> Unit, onConfirm: (DeviceDto) -> Unit, onEdit: (DeviceDto) -> Unit, onRemove: (DeviceDto) -> Unit
 ) {
     val canEdit = state.canEdit && !state.saving
+    val here = hereId()
+    val heartbeat by com.saporini.mobile_desktop.core.session.TillHeartbeat.state.collectAsState()
     var query by remember(kind) { mutableStateOf("") }
+    val linkFor = { d: DeviceDto -> if (kind.pairs && !DeviceExtras.isExtra(d.id)) linkOf(d, d.id == here, heartbeat) else null }
     val shown = devices.filter { d -> query.isBlank() || listOfNotNull(d.name, d.code, d.model, d.manufacturer).any { it.contains(query.trim(), ignoreCase = true) } }
-        .sortedWith(compareBy({ it.status != "PROVISIONING" }, { it.status == "RETIRED" }, { it.name.lowercase() }))
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            // One step back inside the page: a plain arrow (the curved one in the top bar leaves the workspace; user rule).
-            Box(Modifier.size(34.dp).clip(CircleShape).clickable(onClick = onBack), contentAlignment = Alignment.Center) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to the devices", Modifier.size(22.dp), tint = Kit.Ink)
-            }
-            KindThumb(kind, if (size.isPhone) 42.dp else 50.dp)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(kind.title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (size.isPhone) 17.sp else 19.sp, color = Kit.Ink, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis)
-                Text(listOf(if (devices.size == 1) "1 device" else "${devices.size} devices", kind.hint).joinToString(" · "), fontFamily = Inter(), fontSize = 12.sp,
-                    color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            if (state.canEdit && !size.isPhone) KitButton("Add a ${kind.one}", onAdd, icon = Icons.Outlined.Add, enabled = canEdit)
-        }
-        if (state.canEdit && size.isPhone) KitButton("Add a ${kind.one}", onAdd, Modifier.fillMaxWidth(), icon = Icons.Outlined.Add, enabled = canEdit)
-        // Devices waiting to be confirmed come first in the list, each with its own Confirm button (no second box above).
-        Surface(Modifier.fillMaxWidth().weight(1f), shape = RoundedCornerShape(12.dp), color = Color.White,
-            border = BorderStroke(1.dp, if (size.isPhone) Color.Transparent else Kit.Border)) {
-            Column(Modifier.padding(if (size.isPhone) 0.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(Modifier.padding(start = 4.dp, top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Outlined.Devices, null, Modifier.size(18.dp), tint = Kit.Ink)
-                    Text(kind.title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Kit.Ink)
-                    Spacer(Modifier.weight(1f))
-                    Text("${shown.size}", Modifier.clip(RoundedCornerShape(50)).background(Kit.Tint).padding(horizontal = 8.dp, vertical = 1.dp),
-                        fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Muted)
-                }
-                if (devices.size > 4) SearchField(query, { query = it }, if (size.isPhone) Modifier.fillMaxWidth() else Modifier.width(380.dp),
-                    placeholder = "Find a ${kind.one}", height = 44.dp)
-                if (shown.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) {
-                        OverviewEmpty(if (devices.isEmpty()) "No ${kind.title.lowercase()} yet" else "Nothing matches",
-                            if (devices.isEmpty()) "Add one, then confirm it works." else "Try another name or code.", Icons.Outlined.Devices)
+        .sortedWith(compareBy<DeviceDto>({ it.id != here }, { linkFor(it)?.ordinal ?: if (it.status == "RETIRED") 9 else 0 },
+            { it.status != "PROVISIONING" }, { it.name.lowercase() }))
+    Column(modifier.padding(top = if (size.isPhone) 6.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(if (size.isPhone) 16.dp else 22.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // The way back is in the page's header now.
+            KindThumb(kind, if (size.isPhone) 44.dp else 54.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(kind.title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (size.isPhone) 18.sp else 21.sp, letterSpacing = (-0.2).sp,
+                    color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // How they're doing, at a glance.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                    Text(if (devices.size == 1) "1 device" else "${devices.size} devices", fontFamily = Inter(), fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.5.sp, color = Kit.Muted)
+                    if (kind.pairs) Link.entries.forEach { link ->
+                        val count = devices.count { linkFor(it) == link }
+                        if (count > 0) LinkCount(link, count)
                     }
-                } else ScrollColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    shown.forEach { device ->
-                        DeviceRow(device, kind, size, state.canEdit, canEdit, onOpen = { onOpen(device) }, onEdit = { onEdit(device) },
-                            onConfirm = { onConfirm(device) }, onRemove = { onRemove(device) })
-                    }
-                    Spacer(Modifier.height(6.dp))
                 }
             }
         }
-    }
-}
-
-/** A device on its kind's page: a strip in its status colour, its picture, name and details, how it's reached, its status, Edit and ⋮. */
-@Composable
-private fun DeviceRow(
-    device: DeviceDto, kind: DeviceKind, size: ScreenSize, canEdit: Boolean, enabled: Boolean,
-    onOpen: () -> Unit, onEdit: () -> Unit, onConfirm: () -> Unit, onRemove: () -> Unit
-) {
-    val tone = deviceStatusColor(device.status)
-    Surface(onClick = onOpen, modifier = Modifier.fillMaxWidth().pointerHoverIcon(PointerIcon.Hand), shape = RoundedCornerShape(12.dp), color = Color.White,
-        border = BorderStroke(1.dp, Kit.RowBorder)) {
-        Row(Modifier.height(IntrinsicSize.Min)) {
-            Box(Modifier.width(4.dp).fillMaxHeight().background(tone))
-            Row(Modifier.weight(1f).padding(start = 12.dp, end = 6.dp, top = 9.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                KindThumb(kind, 44.dp)
-                Column(Modifier.weight(1.3f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(device.name, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(listOfNotNull(deviceTypeLabel(device.deviceType).takeIf { kind == DeviceKind.TABLET }, device.code,
-                        listOfNotNull(device.manufacturer, device.model).joinToString(" ").ifBlank { null }).joinToString(" · "),
-                        fontFamily = Inter(), fontSize = 11.5.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (size.isPhone) Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Box(Modifier.size(7.dp).clip(CircleShape).background(tone))
-                        Text(deviceStatusLabel(device.status), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.5.sp, color = tone, maxLines = 1)
-                    }
-                }
-                if (!size.isPhone) Box(Modifier.weight(1f)) { ConnectionText(device, kind) }
-                if (!size.isPhone) StatusPill(deviceStatusLabel(device.status), tone)
-                if (canEdit && !size.isPhone) {
-                    if (device.status == "PROVISIONING") KitButton("Confirm", onConfirm, icon = Icons.Outlined.Verified, enabled = enabled)
-                    else Surface(onClick = onEdit, enabled = enabled, shape = RoundedCornerShape(8.dp), color = Color.White, border = BorderStroke(1.dp, Kit.Border)) {
-                        Row(Modifier.padding(horizontal = 11.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Icon(Icons.Outlined.Edit, null, Modifier.size(15.dp), tint = Kit.Ink)
-                            Text("Edit", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Kit.Ink)
+        if (devices.size > 6) SearchField(query, { query = it }, if (size.isPhone) Modifier.fillMaxWidth() else Modifier.width(380.dp),
+            placeholder = "Find a ${kind.one}", height = 44.dp)
+        if (shown.isEmpty()) {
+            Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) {
+                OverviewEmpty(if (devices.isEmpty()) "No ${kind.title.lowercase()} yet" else "Nothing matches",
+                    if (devices.isEmpty()) "Add one, then connect it." else "Try another name or code.", Icons.Outlined.Devices)
+            }
+        } else ScrollColumn(Modifier.fillMaxWidth().weight(1f)) {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                // Small cards (user, 2026-11-25: "much smaller"): as many as fit at about 220 dp, five at most; two on a phone.
+                val columns = if (size.isPhone) 2 else ((maxWidth + 12.dp) / (220.dp + 12.dp)).toInt().coerceIn(2, 5)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    shown.chunked(columns).forEach { row ->
+                        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            row.forEach { device ->
+                                DeviceCard(device, kind, linkFor(device), device.id == here, state, canEdit, Modifier.weight(1f).fillMaxHeight(),
+                                    onOpen = { onOpen(device) }, onEdit = { onEdit(device) }, onConfirm = { onConfirm(device) }, onRemove = { onRemove(device) })
+                            }
+                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                 }
-                if (canEdit) RowActionsMenu(listOfNotNull(
-                    RowAction("Open", Icons.Outlined.Info, onClick = onOpen),
-                    RowAction("Confirm it works", Icons.Outlined.Verified, onClick = onConfirm).takeIf { device.status == "PROVISIONING" },
-                    RowAction("Edit", Icons.Outlined.Edit, onClick = onEdit).takeIf { !DeviceExtras.isExtra(device.id) },
-                    RowAction("Remove", Icons.Outlined.DeleteOutline, danger = true, onClick = onRemove)
-                ), busy = !enabled)
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** "● 3 online": a state and how many, in its colour. */
+@Composable
+private fun LinkCount(link: Link, count: Int) {
+    Row(Modifier.clip(RoundedCornerShape(50)).background(link.color.copy(alpha = 0.10f)).padding(horizontal = 9.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(link.color))
+        Text(when (link) {
+            Link.ONLINE -> "$count online"
+            Link.OFFLINE -> "$count offline"
+            Link.NOT_CONNECTED -> "$count not connected"
+            Link.NOT_IN_USE -> "$count not in use"
+        }, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp,
+            color = if (link == Link.OFFLINE) Kit.Muted else link.color, maxLines = 1)
+    }
+}
+
+/**
+ * A device as a small card (user, 2026-11-25: "make the cards much smaller"): its picture on a short black band with its
+ * state as a small white pill and "This device" on the one you're on; its name, code, and one line saying how it is (seen
+ * now, last seen, not connected yet with Connect, in repair). The whole card opens it; ⋮ for whoever manages devices.
+ */
+@Composable
+private fun DeviceCard(
+    device: DeviceDto, kind: DeviceKind, link: Link?, here: Boolean, state: DevicesState, enabled: Boolean, modifier: Modifier,
+    onOpen: () -> Unit, onEdit: () -> Unit, onConfirm: () -> Unit, onRemove: () -> Unit
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val zoom by androidx.compose.animation.core.animateFloatAsState(if (hovered) 1.06f else 1f, androidx.compose.animation.core.tween(280))
+    val off = link == Link.NOT_IN_USE || (link == null && (device.status == "RETIRED" || device.status == "INACTIVE"))
+    val accent = when {
+        here -> Kit.Ink
+        link != null -> link.color
+        else -> deviceStatusColor(device.status)
+    }
+    val now = Clock.System.now()
+    val zone = RestaurantTime.zone
+    Surface(onClick = onOpen, modifier = modifier.hoverable(interaction).pointerHoverIcon(PointerIcon.Hand).alpha(if (off) 0.6f else 1f),
+        shape = RoundedCornerShape(14.dp), color = Color.White,
+        border = BorderStroke(if (here) 1.5.dp else 1.dp, if (here) Kit.Ink.copy(alpha = 0.55f) else if (hovered) accent.copy(alpha = 0.5f) else Kit.RowBorder),
+        shadowElevation = if (hovered) 6.dp else 1.dp, interactionSource = interaction) {
+        Column {
+            Box(Modifier.fillMaxWidth().height(92.dp).clipToBounds().background(PhotoBlack)) {
+                Image(painterResource(kind.image), kind.title, Modifier.fillMaxSize().padding(vertical = 4.dp).graphicsLayer { scaleX = zoom; scaleY = zoom },
+                    contentScale = ContentScale.Fit,
+                    colorFilter = if (off) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null)
+                StatePill(link?.icon ?: Icons.Outlined.Circle,
+                    when {
+                        link == null || link == Link.NOT_IN_USE -> deviceStatusLabel(device.status)
+                        link == Link.NOT_CONNECTED -> "Not connected"
+                        else -> link.label
+                    },
+                    if (link == Link.OFFLINE) Kit.Muted else link?.color ?: accent, dot = link == Link.ONLINE,
+                    modifier = Modifier.align(Alignment.TopStart))
+                if (here) Box(Modifier.align(Alignment.TopEnd).padding(7.dp).size(24.dp).shadow(2.dp, CircleShape).clip(CircleShape).background(Kit.Ink),
+                    Alignment.Center) {
+                    Icon(Icons.Outlined.Computer, "This device", Modifier.size(14.dp), tint = Color.White)
+                }
+            }
+            Column(Modifier.fillMaxWidth().weight(1f).padding(start = 12.dp, end = 4.dp, top = 9.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(device.name, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (state.canEdit) Box(Modifier.size(28.dp), Alignment.Center) {
+                        RowActionsMenu(listOfNotNull(
+                            RowAction("Open", Icons.Outlined.Info, onClick = onOpen),
+                            RowAction("Confirm it works", Icons.Outlined.Verified, onClick = onConfirm).takeIf { link == null && device.status == "PROVISIONING" },
+                            RowAction("Edit", Icons.Outlined.Edit, onClick = onEdit).takeIf { !DeviceExtras.isExtra(device.id) },
+                            RowAction("Remove", Icons.Outlined.DeleteOutline, danger = true, onClick = onRemove)
+                        ), busy = !enabled)
+                    }
+                }
+                Text(listOfNotNull(device.code, listOfNotNull(device.manufacturer, device.model).joinToString(" ").ifBlank { null }).joinToString(" · "),
+                    Modifier.padding(end = 8.dp), fontFamily = Inter(), fontSize = 11.5.sp, letterSpacing = 0.sp, color = Kit.Muted, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.weight(1f))
+                // One line on how it is.
+                Row(Modifier.padding(top = 4.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val (line, tone) = when (link) {
+                        Link.ONLINE -> (if (here) "You're on it" else "Seen now") to OnlineGreen
+                        Link.OFFLINE -> (device.lastSeenAt?.let { "Seen ${tr(agoText(it, now, zone))}" } ?: "Not seen yet") to Kit.Muted
+                        Link.NOT_CONNECTED -> "Not set up yet" to Kit.Amber
+                        Link.NOT_IN_USE -> deviceStatusLabel(device.status) to Kit.Purple
+                        null -> when (kind) {
+                            DeviceKind.PRINTER -> (device.printerIp ?: connectionLabel(device.printerConnectionType)) to Kit.Muted
+                            else -> (if (device.status == "ACTIVE") "Plugged in" else "Not checked yet") to Kit.Muted
+                        }
+                    }
+                    Icon(link?.icon ?: if (kind == DeviceKind.PRINTER) Icons.Outlined.Lan else Icons.Outlined.Cable, null, Modifier.size(14.dp), tint = tone)
+                    Text(line, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp, color = tone,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (link == Link.NOT_CONNECTED && state.mayConnect(device)) {
+                        Text("Connect", Modifier.clip(RoundedCornerShape(50)).background(Kit.Ink).clickable(onClick = onOpen)
+                            .padding(horizontal = 10.dp, vertical = 4.dp), fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 11.5.sp,
+                            letterSpacing = 0.sp, color = Color.White, maxLines = 1)
+                    }
+                }
             }
         }
     }
 }
 
-/** How the device is reached: connected or when it was last seen (devices that sign in), the printer's address, or plugged in. */
+/** A white pill on a device's picture: its state's icon (a live dot when online) and word, in its colour. */
 @Composable
-private fun ConnectionText(device: DeviceDto, kind: DeviceKind) {
-    val now = Clock.System.now()
-    val (text, color) = when {
-        kind == DeviceKind.PRINTER -> (device.printerIp ?: connectionLabel(device.printerConnectionType)) to Kit.Muted
-        kind.mock -> (if (device.status == "ACTIVE") "Plugged in" else "Not checked") to Kit.Muted
-        device.online -> "Connected" to Kit.Green
-        device.lastSeenAt != null -> agoText(device.lastSeenAt, now, RestaurantTime.zone) to Kit.Muted
-        device.status == "PROVISIONING" -> "Not paired yet" to Kit.Muted
-        else -> "Offline" to Kit.Muted
-    }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (kind.pairs) Box(Modifier.size(7.dp).clip(CircleShape).background(if (device.online) Kit.Green else Color(0xFFD5D8D3)))
-        Text(text, fontFamily = Inter(), fontWeight = FontWeight.Medium, fontSize = 11.sp, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun StatePill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, color: Color, dot: Boolean = false, modifier: Modifier = Modifier) {
+    Row(modifier.padding(7.dp).shadow(1.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50)).background(Color.White)
+        .padding(start = 6.dp, end = 8.dp, top = 3.dp, bottom = 3.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (dot) Box(Modifier.size(7.dp).clip(CircleShape).background(color)) else Icon(icon, null, Modifier.size(12.dp), tint = color)
+        Text(text, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 11.sp, letterSpacing = 0.sp, color = color, maxLines = 1)
     }
 }
 
@@ -501,18 +642,11 @@ private fun AddDevicePicker(onPick: (DeviceKind) -> Unit, onDismiss: () -> Unit)
 
 // ---------- One device (its page is DevicePage.kt) ----------
 
+/** The codes made for the open device, newest first. */
 @Composable
-internal fun PairingSection(state: DevicesState, model: DevicesScreenModel) {
-    var minutes by remember { mutableStateOf(15) }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        if (state.canEdit) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-                SelectInput(minutes, listOf(15, 60, 240, 1440), { pairingDuration(it) }, { minutes = it }, Modifier.width(160.dp), label = "Code lasts")
-                KitButton("New code", { model.newPairingCode(minutes) }, icon = Icons.Outlined.QrCode2, loading = state.saving)
-            }
-        }
-        if (state.pairingCodes.isEmpty()) Text("No codes yet.", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
-        state.pairingCodes.take(6).forEach { code -> PairingCodeRow(code, state, model) }
+internal fun PairingCodeList(state: DevicesState, model: DevicesScreenModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        state.pairingCodes.take(5).forEach { code -> PairingCodeRow(code, state, model) }
     }
 }
 
@@ -529,7 +663,7 @@ private fun PairingCodeRow(code: PairingCodeDto, state: DevicesState, model: Dev
     val zone = RestaurantTime.zone
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(1.dp, Kit.RowBorder, RoundedCornerShape(10.dp))
-            .background(if (code.active) Kit.GreenSoft.copy(alpha = 0.5f) else Color.White).padding(horizontal = 12.dp, vertical = 9.dp),
+            .background(if (code.active) Kit.Canvas else Color.White).padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

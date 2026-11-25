@@ -38,6 +38,8 @@ import java.util.UUID;
 public class DeviceSettingsService {
 
     private final DeviceRepository deviceRepository;
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
     private final DevicePairingTokenRepository devicePairingTokenRepository;
     private final SettingsDomainSupport settingsDomainSupport;
     private final SettingsAuditService settingsAuditService;
@@ -251,6 +253,25 @@ public class DeviceSettingsService {
         );
     }
 
+    /** Moves a device to another branch of the same restaurant; its connection stays, the new branch's network rule applies. */
+    @Transactional
+    public DeviceResponse moveDevice(Authentication authentication, UUID restaurantId, UUID branchId, UUID deviceId, UUID toBranchId) {
+        // Only someone who works in every branch (user, 2026-11-25: "the owner has only one branch, why does it say Change?").
+        boolean everyBranch = authentication.getAuthorities().stream().map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .anyMatch(a -> a.equals("BRANCHES_ALL") || a.equals("ROLE_SUPER_ADMIN") || a.equals("ROLE_CO_SUPER_ADMIN"));
+        if (!everyBranch) {
+            throw new pos.pos.exception.auth.AuthException("Only someone who works in every branch moves a device to another one.",
+                    org.springframework.http.HttpStatus.FORBIDDEN);
+        }
+        Device device = requireBranchDeviceForUpdate(authentication, restaurantId, branchId, deviceId);
+        Branch to = settingsDomainSupport.requireAccessibleBranch(authentication, restaurantId, toBranchId);
+        if (device.getBranch() != null && to.getId().equals(device.getBranch().getId())) return toResponse(device);
+        device.setBranch(to);
+        stampAuditFields(device, settingsDomainSupport.currentActorId(authentication));
+        return saveAuditAndRespond(authentication, device, "Moving the device violates a data constraint", "DEVICE", "UPDATE",
+                "Moved " + device.getName() + " to " + to.getName());
+    }
+
     @Transactional
     public DeviceResponse updateDeviceStatus(
             Authentication authentication,
@@ -299,6 +320,16 @@ public class DeviceSettingsService {
     @Transactional
     public void deleteDevice(Authentication authentication, UUID restaurantId, UUID branchId, UUID deviceId) {
         Device device = requireBranchDevice(authentication, restaurantId, branchId, deviceId);
+        // A till or tablet keeps a little history that mustn't stop it from going (2026-11-25: one that ever had a pairing code
+        // couldn't be removed): its codes and assignments go with it; a kitchen station and the shifts clocked in on it keep
+        // their rows without it. Who connected it stays in the Audit log.
+        for (String sql : List.of(
+                "delete from {h-schema}\"device-pairing-tokens\" where device_id = :id",
+                "delete from {h-schema}\"device-assignments\" where device_id = :id",
+                "update {h-schema}kds_stations set device_id = null where device_id = :id",
+                "update {h-schema}shifts set device_id = null where device_id = :id")) {
+            entityManager.createNativeQuery(sql).setParameter("id", device.getId()).executeUpdate();
+        }
 
         deleteAndAudit(authentication, device, "DEVICE", "DELETE", "Deleted branch device");
     }
@@ -553,9 +584,12 @@ public class DeviceSettingsService {
                 .appVersion(device.getAppVersion())
                 .status(device.getStatus() == null ? null : device.getStatus().name())
                 .active(device.isActive())
-                .online(device.isOnline())
+                .online(isOnline(device))
+                .connected(org.springframework.util.StringUtils.hasText(device.getAuthSecretHash()))
+                .connectedAt(device.getAuthSecretRotatedAt())
                 .lastSeenAt(device.getLastSeenAt())
                 .ipAddress(device.getIpAddress())
+                .place(geoPlaces == null ? null : geoPlaces.placeOf(device.getIpAddress()))
                 .macAddress(device.getMacAddress())
                 .notes(device.getNotes())
                 .printerConnectionType(printerProfile == null ? null : printerProfile.getConnectionType())
@@ -567,6 +601,28 @@ public class DeviceSettingsService {
                 .createdAt(device.getCreatedAt())
                 .updatedAt(device.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * A device that signs in is online while it's heard from (its heartbeat every minute, `app.devices.online-minutes`, 3 by
+     * default); a printer is what was set on it.
+     */
+    private boolean isOnline(Device device) {
+        if (device.getDeviceType() == DeviceType.PRINTER) return device.isOnline();
+        java.time.OffsetDateTime seen = device.getLastSeenAt();
+        return device.isOnline() && seen != null
+                && seen.isAfter(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusMinutes(onlineMinutes));
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${app.devices.online-minutes:3}")
+    private int onlineMinutes = 3;
+
+    // Where a device's address is (set by Spring; unit tests may leave it out).
+    private pos.pos.security.geo.GeoPlaces geoPlaces;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setGeoPlaces(pos.pos.security.geo.GeoPlaces geoPlaces) {
+        this.geoPlaces = geoPlaces;
     }
 
     private String toApiDeviceType(DeviceType deviceType) {

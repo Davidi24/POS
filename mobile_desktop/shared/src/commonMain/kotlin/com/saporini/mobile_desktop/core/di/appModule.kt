@@ -159,7 +159,15 @@ private val appModule = module {
     single<com.saporini.mobile_desktop.admin.devices.DevicesRepository> { com.saporini.mobile_desktop.admin.devices.DevicesApi(client = get()) }
     factory {
         val auth = get<com.saporini.mobile_desktop.auth.data.repository.AuthRepository>()
-        com.saporini.mobile_desktop.admin.devices.DevicesScreenModel(repository = get(), session = get(), connectHere = { auth.connectTill(it) })
+        val platform = get<com.saporini.mobile_desktop.platform.PlatformRepository>()
+        val people = get<com.saporini.mobile_desktop.admin.people.PeopleRepository>()
+        com.saporini.mobile_desktop.admin.devices.DevicesScreenModel(repository = get(), session = get(), connectHere = { restaurantId, code -> auth.connectTill(restaurantId, code) },
+            branchesOf = { restaurantId -> platform.branches(restaurantId) },
+            searchPeople = { query ->
+                people
+                    .staff(com.saporini.mobile_desktop.admin.people.StaffFilter(search = query, active = true), 0, 20).items
+                    .map { com.saporini.mobile_desktop.admin.devices.SignInPerson(it.id, it.displayName) }
+            })
     }
     single<com.saporini.mobile_desktop.admin.audit.AuditLogRepository> { com.saporini.mobile_desktop.admin.audit.AuditLogApi(client = get()) }
     factory { com.saporini.mobile_desktop.admin.audit.AuditLogScreenModel(repository = get(), session = get()) }
@@ -184,6 +192,7 @@ private val appModule = module {
 
     single { MenuApi(client = get()) }
     single { com.saporini.mobile_desktop.admin.settings.SettingsApi(client = get()) }
+    single { com.saporini.mobile_desktop.admin.devices.DeviceNetworkApi(client = get()) }
 
     single<MenuRepository> {
         DefaultMenuRepository(api = get())

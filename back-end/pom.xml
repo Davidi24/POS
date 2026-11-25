@@ -33,6 +33,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
+		<!-- Where a sign-in came from (city, country), read from a place database kept on the server (DB-IP Lite, MMDB). -->
+		<dependency>
+			<groupId>com.maxmind.db</groupId>
+			<artifactId>maxmind-db</artifactId>
+			<version>3.1.1</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

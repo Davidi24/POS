@@ -1,4 +1,4 @@
-# 18. Salary
+# 17. Salary
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 

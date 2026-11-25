@@ -34,9 +34,14 @@ import java.util.UUID;
 public class MySignInsController {
 
     private final AuthLoginAttemptRepository attempts;
+    private final pos.pos.security.geo.GeoPlaces geoPlaces;
 
-    /** One try: [result] is SIGNED_IN or the failure reason (INVALID_CREDENTIALS, ACCOUNT_LOCKED, DEVICE_RATE_LIMITED…). */
-    public record SignInView(UUID id, OffsetDateTime at, String result, String deviceId, String deviceName, String ipAddress) {
+    /**
+     * One try: [result] is SIGNED_IN or the failure reason (INVALID_CREDENTIALS, ACCOUNT_LOCKED, DEVICE_RATE_LIMITED…);
+     * [system] what the device runs, [place] where its address is (2026-11-25).
+     */
+    public record SignInView(UUID id, OffsetDateTime at, String result, String deviceId, String deviceName, String ipAddress,
+                             String system, String place) {
     }
 
     /** A page of tries, newest first, with how many there are and the 30 days' counts by result. */
@@ -60,7 +65,7 @@ public class MySignInsController {
         return new SignInPage(found.getContent().stream()
                 .map(a -> new SignInView(a.getId(), a.getAttemptedAt(),
                         a.isSuccess() ? "SIGNED_IN" : a.getFailureReason() != null ? a.getFailureReason().name() : "FAILED",
-                        a.getDeviceId(), a.getDeviceName(), a.getIpAddress()))
+                        a.getDeviceId(), a.getDeviceName(), a.getIpAddress(), a.getDeviceSystem(), geoPlaces.placeOf(a.getIpAddress())))
                 .toList(), found.getTotalElements(), found.getNumber(), safeSize, counts);
     }
 }

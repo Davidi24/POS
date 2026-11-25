@@ -72,6 +72,11 @@ security:
 app:
   payments:
     provider: ${APP_PAYMENTS_PROVIDER:test}
+  # A till on this computer (127.0.0.1) is on the same network as one next to it on the Wi-Fi (trying tills on a second
+  # computer; NetworkAddress).
+  devices:
+    network:
+      loopback-is-this-network: true
   storage:
     floor-plans:
       provider: local

@@ -9,6 +9,8 @@ public record DevicePairingRedeemResponse(
         UUID branchId,
         String deviceName,
         String deviceType,
-        String deviceSecret
+        String deviceSecret,
+        // The branch had no network yet: this device's is now the restaurant's network (user, 2026-11-24).
+        boolean networkSaved
 ) {
 }

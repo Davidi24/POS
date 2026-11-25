@@ -15,7 +15,7 @@ Read the step's file before working on it, keep its sections and "Done" up to da
 
 ## Where we are
 
-**Now: step 4 ([Restaurant & branches](04-restaurant-and-branches.md)): its second PR (Restaurant info redone, the receipt designer with the preliminary bill and the fiscal invoice, Finance & taxation's first screens, choosing the branch to work in) is ready to merge; then step 5 ([Settings](05-settings.md)). Every branch together comes after the first launch (step 25).** Keep this list up to date as each part is finished (user, 2026-11-18:
+**Now: step 5 ([Devices & printing](05-devices-and-printing.md)): its decisions first. Every branch together comes after the first launch (step 25).** Keep this list up to date as each part is finished (user, 2026-11-18:
 "check boxes so I know what I have left and where I am").
 
 - [x] 1. [Sign-in & accounts](01-sign-in-and-accounts.md): built and merged (#100, #101); its hard testing list is written.
@@ -40,50 +40,44 @@ Read the step's file before working on it, keep its sections and "Done" up to da
   - [x] Hard testing list written
   - [x] Merged (PR #103, 2026-11-20)
   - [ ] Hard testing (later, when you say)
-- [ ] 4. [Restaurant & branches (plus opening hours)](04-restaurant-and-branches.md) ← **now**
+- [x] 4. [Restaurant & branches (plus opening hours)](04-restaurant-and-branches.md): built and merged (#104, #105); its hard testing list is written.
   - [x] Decisions
   - [x] Screens (Super Admin pages gone through; opening hours and the restaurant page: you look later)
   - [x] Development
   - [x] Hard testing list written
   - [x] Merged (PR #104, 2026-11-22)
   - [x] Restaurant info (opening hours and the restaurant's page) looked at together (2026-11-22 – 23)
-  - [ ] Second PR merged (Restaurant info round, receipt designer, Finance first screens, branch choice)
+  - [x] Second PR merged (PR #105, 2026-11-23: Restaurant info round, receipt designer, Finance first screens, branch choice)
   - [ ] Hard testing (later, when you say)
-- [ ] 5. [Settings](05-settings.md)
+- [ ] 5. [Devices & printing](05-devices-and-printing.md) ← **now**
   - [ ] Decisions
   - [ ] Screens
   - [ ] Development
   - [ ] Hard testing list written
   - [ ] Merged
   - [ ] Hard testing (later, when you say)
-- [ ] 6. [Devices & printing](06-devices-and-printing.md)
+- [ ] 6. [Notifications](06-notifications.md)
   - [ ] Decisions
   - [ ] Screens
   - [ ] Development
   - [ ] Hard testing list written
   - [ ] Merged
   - [ ] Hard testing (later, when you say)
-- [ ] 7. [Notifications](07-notifications.md)
-  - [ ] Decisions
-  - [ ] Screens
-  - [ ] Development
-  - [ ] Hard testing list written
-  - [ ] Merged
-  - [ ] Hard testing (later, when you say)
-- [ ] 8. [Shifts](08-shifts.md)
-- [ ] 9. [Inventory](09-inventory.md)
-- [ ] 10. [Suppliers](10-suppliers.md)
-- [ ] 11. [Menu & recipes](11-menu-and-recipes.md)
-- [ ] 12. [Kitchen](12-kitchen.md)
-- [ ] 13. [Tables](13-tables.md)
-- [ ] 14. [Reservations](14-reservations.md)
-- [ ] 15. [Orders](15-orders.md)
-- [ ] 16. [Payments & receipts](16-payments-and-receipts.md)
-- [ ] 17. [Offline](17-offline.md)
-- [ ] 18. [Salary](18-salary.md)
-- [ ] 19. [My Sales](19-my-sales.md)
-- [ ] 20. [Statistics](20-statistics.md)
-- [ ] 21. [Fraud detection & Audit log](21-fraud-and-audit-log.md)
+- [ ] 7. [Shifts](07-shifts.md)
+- [ ] 8. [Inventory](08-inventory.md)
+- [ ] 9. [Suppliers](09-suppliers.md)
+- [ ] 10. [Menu & recipes](10-menu-and-recipes.md)
+- [ ] 11. [Kitchen](11-kitchen.md)
+- [ ] 12. [Tables](12-tables.md)
+- [ ] 13. [Reservations](13-reservations.md)
+- [ ] 14. [Orders](14-orders.md)
+- [ ] 15. [Payments & receipts](15-payments-and-receipts.md)
+- [ ] 16. [Offline](16-offline.md)
+- [ ] 17. [Salary](17-salary.md)
+- [ ] 18. [My Sales](18-my-sales.md)
+- [ ] 19. [Statistics](19-statistics.md)
+- [ ] 20. [Fraud detection & Audit log](20-fraud-and-audit-log.md)
+- [ ] 21. [Settings](21-settings.md): moved here from step 5 (user, 2026-11-24: each step decides its own settings while its screens are looked at; this is the last pass over all of them)
 - [ ] 22. [Onboarding](22-onboarding.md)
 - [ ] 23. [Finance & taxation](23-finance-and-taxation.md): added 2026-11-23 (user: "one more app, finance and taxation"); first screens built on MOCK figures
   - [ ] Decisions
@@ -102,7 +96,7 @@ Read the step's file before working on it, keep its sections and "Done" up to da
   - [ ] Hard testing (later, when you say)
 
 Added 2026-11-17 (user: "offline, multi-language and onboarding"): Languages right after sign-in, so every later screen is
-translated as it's finished; Offline after Payments, once the service flows work online (steps 12–16 already give new orders,
+translated as it's finished; Offline after Payments, once the service flows work online (steps 11–15 already give new orders,
 dishes and payments their own id and an idempotency key); Onboarding last, since it walks through screens from almost every step.
 
 Added 2026-11-23 (user: "one more app, finance and taxation"; "make finance and taxation before the web; the web is the last
@@ -110,12 +104,17 @@ thing we'll do, after the app is finished"): Finance & taxation is step 23 and W
 restaurant" was added as step 5, then moved after the first launch as step 25 (user: "right now we work as if there is one
 branch; after the first launch we update it for multiple branches; we add it completely in the end").
 
+Changed 2026-11-24 (user: "is it better to leave settings for later, since I'll see things and decide what settings they should
+have?"): Settings moved from step 5 to step 21, after Fraud & audit log and before Onboarding. Each step decides its own
+settings while its screens are looked at; step 21 is the last pass over all of them. Steps 6–21 moved up by one (Devices &
+printing is now 5, Notifications 6, …, Fraud & audit log 20).
+
 Rules for every step
 - Settings: check that the step's own settings are actually used.
 - Notifications: check the step's own notifications.
 - Audit log: every change the step's service makes writes an audit entry (who, what, before → after).
 - Replace the step's MOCKs (listed in its file and in AGENTS.md) with real server data.
 - Languages (from step 3 on): the step's screens take their words from the translation files, in every language.
-- Offline (steps 12–16): new orders, dishes and payments get their id on the device and an idempotency key, ready for step 17.
+- Offline (steps 11–15): new orders, dishes and payments get their id on the device and an idempotency key, ready for step 16.
 
 Waiting for your decision: [decide-later.md](decide-later.md) (suggestions kept for the end, by step).

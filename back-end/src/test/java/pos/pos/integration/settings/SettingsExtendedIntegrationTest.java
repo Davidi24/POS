@@ -607,7 +607,9 @@ class SettingsExtendedIntegrationTest extends AbstractSettingsIntegrationTest {
                 .andReturn();
 
         assertThat(bodyOf(updatedDeviceResult).get("status").asText()).isEqualTo("ACTIVE");
-        assertThat(bodyOf(updatedDeviceResult).get("online").asBoolean()).isTrue();
+        // A till or tablet is online only when its heartbeat was heard in the last few minutes (step 5), not because it was
+        // marked so by hand.
+        assertThat(bodyOf(updatedDeviceResult).get("online").asBoolean()).isFalse();
 
         mockMvc.perform(post("/restaurants/{restaurantId}/branches/{branchId}/devices",
                         restaurant.getId(), branch.getId())

@@ -1,4 +1,4 @@
-# 20. Statistics
+# 19. Statistics
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 
@@ -11,7 +11,8 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 - Wages and labour cost, VAT (20%), card fees, money out (wages, stock, fees) on Finance.
 - All of Tables (bookings) and Stock.
 - Narrower filters scale the figures instead of the server filtering.
-- Service hours (breakfast / lunch / dinner) should become a setting; bill bands; sales per place.
+- Service hours (breakfast / lunch / dinner, today 06–11 / 11–16 / from 16) should become a setting, decided in this step
+  (moved here from Settings on 2026-11-24); bill bands; sales per place.
 - Closed days guessed from sales (needs opening hours).
 - Sales details' orders are by when they opened and need ORDER_READ (wanted: by when paid, under REPORTS_READ).
 - Branch filter is switched off (`OneBranchPreview = true`, temporary); the server answers at most 366 days.

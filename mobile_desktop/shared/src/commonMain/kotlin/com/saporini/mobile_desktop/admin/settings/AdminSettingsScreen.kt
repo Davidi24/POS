@@ -322,6 +322,16 @@ private fun SettingsPageRealMoney(category: SettingsCategory, onBack: () -> Unit
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 val loadedValues = values
                 when {
+                    // Devices & printing: the restaurant's network for now (user, 2026-11-24); it saves on its own.
+                    category == SettingsCategory.DEVICES && scope != null -> ScrollColumn(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            Modifier.padding(start = side, end = (side - ScrollbarGap).coerceAtLeast(0.dp), top = 4.dp, bottom = 28.dp)
+                                .widthIn(max = 820.dp).fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(if (phone) 12.dp else 14.dp)
+                        ) {
+                            DeviceNetworkSettings(scope.restaurantId, scope.branchId, phone)
+                        }
+                    }
                     sections.isEmpty() -> ComingSoon(category, Modifier.align(Alignment.Center).padding(24.dp))
                     scope == null -> CenterMessage("Sign in with an assigned restaurant to change its settings.", Modifier.align(Alignment.Center))
                     loadError != null -> Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -605,7 +615,6 @@ private fun ComingSoon(category: SettingsCategory, modifier: Modifier) {
         Text("Nothing to set here yet", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink)
         Text(
             when (category) {
-                SettingsCategory.DEVICES -> "Printers and where each ticket prints are coming next."
                 SettingsCategory.ONLINE_BOOKING -> "This comes with the website."
                 else -> "We'll decide together what goes here."
             },

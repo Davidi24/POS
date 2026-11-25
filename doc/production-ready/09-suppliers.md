@@ -1,4 +1,4 @@
-# 10. Suppliers
+# 9. Suppliers
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 

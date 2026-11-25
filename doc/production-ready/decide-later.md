@@ -10,6 +10,7 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    like unpaid orders). It could mean someone is guessing that person's password, or that the person forgot it and needs help.
    Suggestion: yes, with "Who is told" in Admin Hub → Settings (Owner and Manager by default).
    Also to decide: should a till that pauses after 5 wrong PINs tell them too?
+   → Comes up in step 6 (Notifications) (2026-11-24).
 
 2. **Which limits a restaurant can change in Admin Hub → Settings.**
    Today they're fixed: 8 wrong passwords lock an account for 15 minutes; a sign-in lasts 30 days without use; 5 devices per
@@ -17,16 +18,20 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    important work).
    Suggestion: the till lock times and the PIN pause become settings (they depend on how a restaurant works); the password
    and sign-in limits stay fixed for everyone (they're about safety, not about how a restaurant works).
+   → Comes up in step 5 (Devices & printing) (2026-11-24).
 
 3. **A Manager connecting tills.**
    Today connecting a till needs "change settings" (Admin and up). An owner can give that to a Manager, but it gives them
    all of Settings.
    Suggestion: a separate "Connect tills" permission the owner can tick for a Manager, without the rest of Settings.
+   → Comes up in step 5 (Devices & printing) (2026-11-24).
+   → Decided 2026-11-25: "Connect devices" (Owner, Co-Owner, Admin by default; can be given to a Manager). Built in step 5.
 
 4. **Typing a pairing code on a new till.**
    Today a till is connected from Admin Hub → Devices while signed in on it. The other way: a manager makes a code on any
    device and types it on the new till's sign-in screen (a small "Set up this device as a till" link).
    Suggestion: add it when the first real restaurant sets up its tills.
+   → Decided 2026-11-25 (user: "connect with the code, both"): the sign-in screen's "Connect with a code". Built in step 5.
 
 5. **The hidden server box in the phone app** (with the server address, waiting for the domain).
    A secret spot in the app to change which server it talks to, for trying a new version on a test server.
@@ -67,13 +72,13 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    Suggestion: the server asks for it (once a day, kept), the app shows it filled in and the person can still change it. If the
    service doesn't answer, the field stays empty and they type it, as today.
 
-2. **The person who reported a problem sees its answer.** (2026-11-21) → Decided 2026-11-21: in step 7 (Notifications).
+2. **The person who reported a problem sees its answer.** (2026-11-21) → Decided 2026-11-21: in step 6 (Notifications).
    Anyone in a restaurant can now send "Report a problem" from the profile menu, and it goes on the Super Admin's Requests board.
    They can't see it again yet: not where it stands, who has it, or how it was solved.
    Suggestion: "My problems" under the same menu item, a short list with the stage (Open, Assigned, In progress, Solved) and the
    answer; a notification when it's solved.
 
-3. **Tell the support admin when a request is given to them.** (2026-11-21) → Decided 2026-11-21: in step 7 (Notifications).
+3. **Tell the support admin when a request is given to them.** (2026-11-21) → Decided 2026-11-21: in step 6 (Notifications).
    Assigning a request to a support admin changes nothing for them until they open Requests.
    Suggestion: a notification (and an email) "<restaurant>: a problem was given to you", opening the ticket.
 
@@ -110,7 +115,20 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    Suggestion: save it with the restaurant's branding (the picture in the same storage as the logo), and have the printers
    (Devices) print it when printing is built.
 
-## Step 20 — Statistics
+## Step 5 — Devices & printing
+
+1. **A till already signed in that leaves the restaurant's network.**
+   Since 2026-11-24 a PIN sign-in works only on the restaurant's network. A till that is already signed in isn't stopped when it
+   leaves; it locks itself after 30 seconds without use anyway, and its PIN sign-in lasts 12 hours at most.
+   Suggestion: leave it. Checking the network on every refresh would sign every till out at once in the middle of service the
+   moment the restaurant's internet address changes.
+
+2. **Tell the owner when a device is turned away from another network.**
+   Today it shows only in Settings → Devices & printing → "Tried from other networks" and in the Audit log.
+   Suggestion: a notification to the owner ("Till 1 tried from another network"), so they can allow the new network at once when
+   the restaurant's internet changed. Belongs with step 6 (Notifications).
+
+## Step 19 — Statistics
 
 1. ~~**See the sales in a currency you know**~~ Built in step 2 (user, 2026-11-19: "do it now"), for the whole app, chosen beside
    the language. Kept here for what was proposed: (user, 2026-11-19: "just to see"; payments always stay in the restaurant's own
