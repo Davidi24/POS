@@ -262,7 +262,7 @@ public final class Words {
         try (InputStream in = Words.class.getResourceAsStream("/i18n/server.tsv")) {
             if (in == null) return;
             String text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            String[] lines = text.split("\n");
+            String[] lines = text.split("\r?\n");  // a Windows checkout has CRLF
             for (int n = 1; n < lines.length; n++) {
                 String line = lines[n];
                 if (line.isBlank()) continue;

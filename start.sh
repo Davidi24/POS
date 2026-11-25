@@ -7,14 +7,15 @@
 #   ./start.sh app 192.168.1.20
 #                        only the desktop app, for the backend on another computer on this Wi-Fi (its address; a port or a
 #                        whole http:// address works too). Nothing else is needed here: no Docker. To try a till or tablet,
-#                        choose "Connect with a code" when signing in and type the code made in Admin Hub → Devices.
+#                        sign in on it, open Admin Hub → Devices and press "Enter a code".
 #   ./start.sh stop      stop the backend
 #   ./start.sh logs      follow the backend's log
 #   ./start.sh reset     delete the database and uploaded photos, back to the demo data (asks first)
 #
 # Needs Docker (or Podman), and the internet the first time. The desktop app needs Java 17 to 25: yours is used if
 # you have one, otherwise a JDK 21 is downloaded once into .tools/ (nothing is installed on the system).
-# Linux and macOS; on Windows, run it in WSL.
+# Linux and macOS. On Windows use start.cmd (from PowerShell, cmd or a double click; the same commands); this file hands
+# over to it when run from Git Bash, or when PowerShell opens it in a Git Bash window.
 #
 # Settings, e.g. `POS_API_PORT=18080 ./start.sh`:
 #   POS_API_PORT  (8080)       the backend's port on this computer
@@ -45,7 +46,16 @@ die()  { printf '%sxx%s  %s\n' "$RED" "$OFF" "$*" >&2; exit 1; }
 case "$(uname -s)" in
   Linux) OS=linux ;;
   Darwin) OS=mac ;;
-  *) die "This script runs on Linux and macOS. On Windows, run it in WSL (Ubuntu) with Docker Desktop." ;;
+  MINGW*|MSYS*|CYGWIN*)
+    # Windows (Git Bash): start.ps1 does the work there, as for start.cmd.
+    status=0
+    MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass \
+      -File "$(cygpath -w "$ROOT/start.ps1")" "$@" || status=$?
+    # A Git Bash window of its own (PowerShell or Explorer opened this file) closes at once: keep a failure readable.
+    if [ "$status" != 0 ] && [ "${SHLVL:-1}" -le 1 ]; then read -r -p "Press Enter to close this window. " _ || true; fi
+    exit "$status"
+    ;;
+  *) die "This script runs on Linux and macOS. On Windows, use start.cmd." ;;
 esac
 command -v curl >/dev/null 2>&1 || die "curl is missing. Install it (e.g. sudo apt install curl), then run this again."
 
@@ -263,7 +273,7 @@ screen_scale() {
 launch_app() {
   say "Opening the desktop app (close its window to finish)"
   note "Demo sign-in: admin / ChangeMe123!"
-  note "A till or tablet: choose \"Connect with a code\" and type the code from Admin Hub → Devices."
+  note "A till or tablet: sign in on it, open Admin Hub → Devices and press \"Enter a code\"."
   export SAPORINI_API_BASE_URL="$API_URL"
   screen_scale
   gradle :desktopApp:run
