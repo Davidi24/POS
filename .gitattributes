@@ -1,0 +1,7 @@
+# Scripts keep the line endings their shell needs, also in a Windows checkout (Git for Windows turns LF into CRLF by
+# default, and bash stops at the first CR). Windows scripts get CRLF.
+*.sh                    text eol=lf
+mobile_desktop/gradlew  text eol=lf
+*.cmd                   text eol=crlf
+*.bat                   text eol=crlf
+*.ps1                   text eol=crlf
