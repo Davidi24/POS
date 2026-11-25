@@ -1,4 +1,4 @@
-# 12. Kitchen
+# 11. Kitchen
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 

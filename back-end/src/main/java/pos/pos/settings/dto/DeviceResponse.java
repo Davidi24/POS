@@ -31,9 +31,16 @@ public class DeviceResponse {
     private String appVersion;
     private String status;
     private Boolean active;
+    // Heard from in the last few minutes (devices that sign in send a heartbeat every minute; user, 2026-11-25: "online, what
+    // is not"). Printers keep what was set on them.
     private Boolean online;
+    // Connected with a pairing code and not replaced since, and when that was.
+    private Boolean connected;
+    private OffsetDateTime connectedAt;
     private OffsetDateTime lastSeenAt;
     private String ipAddress;
+    // Where its address is ("Tirana, Albania"), from the server's place database (2026-11-25).
+    private String place;
     private String macAddress;
     private String notes;
     private PrinterConnectionType printerConnectionType;

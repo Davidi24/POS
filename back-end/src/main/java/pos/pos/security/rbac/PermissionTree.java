@@ -90,7 +90,8 @@ public final class PermissionTree {
         part("ADMIN", "Roles", "ADMIN_ACCESS", "ROLES_READ", "ROLES_CREATE", "ROLES_UPDATE", "ROLES_DELETE", "ROLES_ASSIGN_PERMISSIONS");
         part("ADMIN", "Settings", "ADMIN_ACCESS", "SETTINGS_READ", "SETTINGS_UPDATE", "SETTINGS_MONEY");
         part("ADMIN", "Audit log", "ADMIN_ACCESS", "SETTINGS_AUDIT");
-        part("ADMIN", "Devices", "ADMIN_ACCESS", "DEVICES_MANAGE");
+        // Connecting comes first (user, 2026-11-25): managing devices needs it.
+        part("ADMIN", "Devices", "ADMIN_ACCESS", "DEVICES_CONNECT", "DEVICES_MANAGE");
         part("ADMIN", "Restaurant info", "ADMIN_ACCESS", "RESTAURANTS_READ", "RESTAURANTS_UPDATE", "HOURS_UPDATE", "BRANCHES_ALL");
         // Statistics: one place for each page.
         part("STATISTICS", null, null, "STATISTICS_ACCESS");

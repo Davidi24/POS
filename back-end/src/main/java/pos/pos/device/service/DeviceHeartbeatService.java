@@ -33,6 +33,13 @@ public class DeviceHeartbeatService {
     /** Authenticate a paired device and record its latest successful contact. */
     @Transactional
     public DeviceHeartbeatResponse heartbeat(UUID deviceId, String rawDeviceSecret, String remoteAddress) {
+        return heartbeat(deviceId, rawDeviceSecret, remoteAddress, null);
+    }
+
+    /** The same, keeping what the app says it runs on ([about], when sent). */
+    @Transactional
+    public DeviceHeartbeatResponse heartbeat(UUID deviceId, String rawDeviceSecret, String remoteAddress,
+                                             pos.pos.device.dto.DeviceHeartbeatRequest about) {
         if (!StringUtils.hasText(rawDeviceSecret)) {
             throw unauthorized();
         }
@@ -56,6 +63,11 @@ public class DeviceHeartbeatService {
         device.setLastSeenAt(now);
         if (StringUtils.hasText(remoteAddress)) {
             device.setIpAddress(remoteAddress);
+        }
+        if (about != null) {
+            if (StringUtils.hasText(about.platform())) device.setPlatform(about.platform().trim());
+            if (StringUtils.hasText(about.osVersion())) device.setOsVersion(about.osVersion().trim());
+            if (StringUtils.hasText(about.appVersion())) device.setAppVersion(about.appVersion().trim());
         }
         deviceRepository.saveAndFlush(device);
         return new DeviceHeartbeatResponse(device.getId(), true, now);

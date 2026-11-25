@@ -146,7 +146,8 @@ internal fun DeviceEditorDialog(draft: DeviceDraft, state: DevicesState, model: 
 internal fun FreshCodeDialog(code: PairingCodeDto, device: DeviceDto?, onDone: () -> Unit) {
     AppDialog("Pairing code", onDone, subtitle = device?.let { "For ${it.name}" }, maxWidth = 480.dp,
         buttons = { KitButton("Done", onDone, icon = Icons.Outlined.Check) }) {
-        Text("Type this on the device when it asks for a pairing code. It works once and can't be shown again.",
+        Text(if (device != null && kindOf(device) != DeviceKind.CARD) "On the device, sign in, open Devices and press “Enter a code”. It works once and can't be shown again."
+            else "Type it on the card terminal. It works once and can't be shown again.",
             fontFamily = Inter(), fontSize = 13.sp, lineHeight = 19.sp, color = Kit.Ink)
         SelectionContainer {
             Text(
@@ -185,9 +186,16 @@ internal fun ConfirmDeviceDialog(device: DeviceDto, state: DevicesState, model: 
         ConfirmSteps(if (ready) 2 else 1)
         state.error?.let { MessageBar(it, MessageKind.ERROR) }
         when (kind) {
+            // A till or tablet: someone signs in on it and types the code in Devices, so it's known who set it up (user,
+            // 2026-11-25); a card terminal on its own pairing screen.
             DeviceKind.TILL, DeviceKind.TABLET, DeviceKind.CARD -> {
-                HowStep(1, "Open Saporini on the ${kind.one}.")
-                HowStep(2, "Choose “Pair this device”.")
+                if (kind == DeviceKind.CARD) {
+                    HowStep(1, "Switch on the card terminal.")
+                    HowStep(2, "Open its pairing screen.")
+                } else {
+                    HowStep(1, "Open Saporini on the ${kind.one} and sign in with your own account.")
+                    HowStep(2, "Go to Admin Hub → Devices and press “Enter a code”.")
+                }
                 HowStep(3, "Type this code. It works once.")
                 if (code?.pairingToken != null) {
                     SelectionContainer {
@@ -197,7 +205,7 @@ internal fun ConfirmDeviceDialog(device: DeviceDto, state: DevicesState, model: 
                     }
                     Text("Works until ${dateTimeText(code.expiresAt, RestaurantTime.zone)}. When it shows as connected, confirm it.",
                         fontFamily = Inter(), fontSize = 12.sp, color = Kit.Muted)
-                } else KitButton("Make a pairing code", { model.newPairingCode(60) }, icon = Icons.Outlined.QrCode2, loading = state.saving, enabled = state.canEdit)
+                } else KitButton("Make a pairing code", { model.newPairingCode(60) }, icon = Icons.Outlined.QrCode2, loading = state.saving, enabled = state.mayConnect(device))
             }
             DeviceKind.PRINTER -> {
                 HowStep(1, "Switch it on and load the paper.")

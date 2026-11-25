@@ -61,7 +61,7 @@ public class CurrentUserMapper {
                 .emailVerified(user.isEmailVerified())
                 .phoneVerified(user.isPhoneVerified())
                 .roles(normalizeCodes(roles))
-                .permissions(normalizeCodes(permissions))
+                .permissions(sortedCodes(permissions))
                 .restaurantName(restaurantName(user.getRestaurantId()))
                 .restaurantLogoUrl(restaurantLogo(user.getRestaurantId()))
                 .photoUrl(user.getAvatarUrl())
@@ -92,13 +92,18 @@ public class CurrentUserMapper {
                 .emailVerified(user.isEmailVerified())
                 .phoneVerified(user.isPhoneVerified())
                 .roles(normalizeCodes(roles))
-                .permissions(normalizeCodes(permissions))
+                .permissions(sortedCodes(permissions))
                 .restaurantName(restaurantName(user.getRestaurantId()))
                 .restaurantLogoUrl(restaurantLogo(user.getRestaurantId()))
                 .photoUrl(user.getPhotoUrl())
                 .language(user.getLanguage())
                 .branchName(branchName(user.getRestaurantId(), availableBranch(user.getRestaurantId(), user.getDefaultBranchId())))
                 .build();
+    }
+
+    /** Permissions in one order (sign-in, refresh and /auth/me listed them differently, so the app saw a change each time). */
+    private List<String> sortedCodes(List<String> codes) {
+        return normalizeCodes(codes).stream().sorted().toList();
     }
 
     private List<String> normalizeCodes(List<String> codes) {

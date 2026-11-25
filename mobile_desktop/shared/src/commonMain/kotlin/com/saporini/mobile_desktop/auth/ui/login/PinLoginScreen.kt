@@ -133,8 +133,9 @@ class PinLoginScreenModel(
             _state.update { it.copy(disconnected = true, pin = "") }
             return
         }
+        // Busy at once, so a key pressed while it's sent can't send it again.
+        _state.update { it.copy(busy = true, problem = null) }
         screenModelScope.launch {
-            _state.update { it.copy(busy = true, problem = null) }
             try {
                 repository.pinLogin(till, pin)
                 val me = repository.me()
@@ -150,6 +151,14 @@ class PinLoginScreenModel(
                     "PIN_PAUSED" -> _state.update {
                         it.copy(busy = false, pin = "", problem = null,
                             pausedUntil = com.saporini.mobile_desktop.core.format.instantOrNull(e.lockedUntil) ?: (Clock.System.now() + 15.minutes))
+                    }
+                    // The till is outside the restaurant's Wi-Fi while its branch keeps tills there (user, 2026-11-24).
+                    "OUTSIDE_NETWORK" -> _state.update {
+                        it.copy(busy = false, pin = "", problem = "This till works only on the restaurant's Wi-Fi. Connect it to the Wi-Fi and try again.")
+                    }
+                    // The person isn't one of those chosen for this till (Devices → Who can sign in here, 2026-11-25).
+                    "NOT_ON_THIS_DEVICE" -> _state.update {
+                        it.copy(busy = false, pin = "", problem = "You can't use this device. Ask a manager.")
                     }
                     "DEVICE_NOT_CONNECTED" -> {
                         TokenStore.forgetTill()

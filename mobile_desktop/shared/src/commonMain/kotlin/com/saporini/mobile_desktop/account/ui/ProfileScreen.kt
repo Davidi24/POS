@@ -7,6 +7,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.outlined.CurrencyExchange
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.TextButton
@@ -136,6 +137,21 @@ internal fun ProfileContent(account: AccountInfo, state: ProfileState, model: Pr
                             start: ProfileSection = ProfileSection.DETAILS) {
     var section by remember { mutableStateOf(start) }
     var askEverywhere by remember { mutableStateOf(false) }
+    // A PIN generated but not used yet: leaving asks first (user, 2026-11-25: "if I go back and haven't saved, ask me to use it
+    // before I leave, so I don't get confused").
+    var leaving by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var leaveAfterSave by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val guard: (() -> Unit) -> Unit = { go -> if (state.pinSuggestion != null && model != null) leaving = go else go() }
+    val back = { guard(onBack) }
+    val pick = { s: ProfileSection -> if (s == section) Unit else guard { section = s } }
+    // Used it: go where the person was going; it didn't work: stay (the problem shows in the PIN card).
+    LaunchedEffect(leaveAfterSave, state.pinBusy, state.pinSuggestion, state.pinProblem) {
+        val go = leaveAfterSave ?: return@LaunchedEffect
+        if (state.pinBusy) return@LaunchedEffect
+        leaveAfterSave = null
+        if (state.pinSuggestion == null) go() else section = ProfileSection.SECURITY
+    }
+    com.saporini.mobile_desktop.core.ui.PlatformBackHandler(enabled = state.pinSuggestion != null) { back() }
     LaunchedEffect(section) { if (section == ProfileSection.SECURITY && !state.signInsLoaded) model?.loadSignIns() }
     Box(Modifier.fillMaxSize().background(Kit.Canvas)) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -144,7 +160,7 @@ internal fun ProfileContent(account: AccountInfo, state: ProfileState, model: Pr
             val wideCards = maxWidth >= 1180.dp
             if (sidebar) {
                 Row(Modifier.fillMaxSize()) {
-                    ProfileSidebar(account, section, onSelect = { section = it }, onBack = onBack)
+                    ProfileSidebar(account, section, onSelect = { pick(it) }, onBack = back)
                     ScrollColumn(Modifier.weight(1f).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Column(Modifier.widthIn(max = 860.dp).fillMaxWidth().padding(horizontal = 32.dp, vertical = 28.dp),
                             verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -159,12 +175,12 @@ internal fun ProfileContent(account: AccountInfo, state: ProfileState, model: Pr
                     Column(Modifier.fillMaxWidth().padding(horizontal = if (phone) 14.dp else 24.dp, vertical = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Kit.Ink) }
+                            IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Kit.Ink) }
                             Text("Profile", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 22.sp, letterSpacing = (-0.3).sp, color = Kit.Ink)
                         }
                         // The sidebar's places as a row on narrow windows.
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ProfileSection.entries.forEach { s -> SectionChip(s, s == section) { section = s } }
+                            ProfileSection.entries.forEach { s -> SectionChip(s, s == section) { pick(s) } }
                         }
                         SectionHeader(section, phone = true)
                         SectionBody(section, account, state, model, phone = phone, wide = false, onSignOutEverywhere = { askEverywhere = true })
@@ -176,6 +192,23 @@ internal fun ProfileContent(account: AccountInfo, state: ProfileState, model: Pr
         ScreenMessages(state.error, state.notice, onClear = { model?.clearMessages() })
     }
     if (askEverywhere && model != null) SignOutEverywhereDialog(model::signOutEverywhere) { askEverywhere = false }
+    leaving?.let { go ->
+        if (state.pinSuggestion == null || model == null) { leaving = null; return@let }
+        AppDialog(
+            title = "Use your new PIN?",
+            onDismiss = { leaving = null },
+            maxWidth = 460.dp,
+            buttons = {
+                KitButton("Leave without it", { leaving = null; model.dropPinSuggestion(); go() }, style = ButtonStyle.SECONDARY)
+                KitButton("Use this PIN", { leaving = null; leaveAfterSave = go; model.usePin() }, icon = Icons.Outlined.Check,
+                    enabled = (state.pin?.changesLeft ?: 0) > 0)
+            }
+        ) {
+            Text(if (state.pin?.hasPin == true) "You generated a new PIN but didn't use it. Your old PIN still works until you do."
+                else "You generated a PIN but didn't use it. You have no PIN on the tills until you do.",
+                fontFamily = Inter(), fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.sp, color = Kit.Ink)
+        }
+    }
 }
 
 /** White column on the left: back, the person, then the four places. */
@@ -287,7 +320,13 @@ private fun PinCard(state: ProfileState, model: ProfileScreenModel?, modifier: M
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Kit.GreenSoft.copy(alpha = 0.55f))
                     .border(1.dp, Kit.Green.copy(alpha = 0.25f), RoundedCornerShape(14.dp)).padding(vertical = 18.dp, horizontal = 14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Your new PIN", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Green)
+                    // Not the person's until "Use this PIN" (2026-11-25: a PIN generated and typed at once was refused).
+                    Row(Modifier.clip(RoundedCornerShape(50)).background(Kit.Amber.copy(alpha = 0.14f)).padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Icon(Icons.Outlined.Info, null, Modifier.size(14.dp), tint = Kit.Amber)
+                        Text("Not yours yet: press Use this PIN", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp,
+                            color = Kit.Amber)
+                    }
                     Spacer(Modifier.height(10.dp))
                     // Each digit 42 dp, narrower when the card is (small phones), so the five always fit.
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
@@ -299,7 +338,7 @@ private fun PinCard(state: ProfileState, model: ProfileScreenModel?, modifier: M
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    Text("Remember it: after you use it, it isn't shown again.", fontFamily = Inter(), fontSize = 12.5.sp, letterSpacing = 0.sp,
+                    Text("It works on the tills once you press Use this PIN. Remember it: it isn't shown again.", fontFamily = Inter(), fontSize = 12.5.sp, letterSpacing = 0.sp,
                         color = Kit.Muted, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
                 Spacer(Modifier.height(12.dp))
@@ -315,7 +354,7 @@ private fun PinCard(state: ProfileState, model: ProfileScreenModel?, modifier: M
                     }
                     if (maxWidth >= 300.dp) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            another(Modifier.weight(1f)); use(Modifier.weight(1f))
+                            use(Modifier.weight(1f)); another(Modifier.weight(1f))
                         }
                     } else {
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -510,7 +549,8 @@ private fun SignInLine(record: com.saporini.mobile_desktop.auth.data.dto.SignInR
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 if (device != null) Icon(if (computer) Icons.Outlined.Computer else Icons.Outlined.Smartphone, null, Modifier.size(13.dp), tint = Kit.Muted)
-                Text(listOfNotNull(device, record.ipAddress?.takeIf { !mine }).joinToString(" · ").ifBlank { "This device" },
+                Text(listOfNotNull(device, record.system?.takeIf { it.isNotBlank() }, record.place?.takeIf { !mine && it.isNotBlank() }
+                    ?: record.ipAddress?.takeIf { !mine }).joinToString(" · ").ifBlank { "This device" },
                     fontFamily = Inter(), fontSize = 12.sp, letterSpacing = 0.sp, color = Kit.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -775,10 +815,15 @@ private fun DevicesCard(state: ProfileState, model: ProfileScreenModel?, phone: 
                 Text(state.devicesProblem, fontFamily = Inter(), fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Danger)
                 com.saporini.mobile_desktop.core.components.RetryText(onClick = { model?.loadDevices() })
             }
-            else -> state.devices.forEachIndexed { i, device ->
-                if (i > 0) HorizontalDivider(color = Kit.RowBorder)
-                DeviceLine(device, now, zone, phone, ending = state.endingDevice == device.id, busy = state.endingDevice != null,
-                    onSignOut = { model?.endDevice(device) })
+            else -> {
+                state.devices.forEachIndexed { i, device ->
+                    if (i > 0) HorizontalDivider(color = Kit.RowBorder)
+                    DeviceLine(device, now, zone, phone, ending = state.endingDevice == device.id, busy = state.endingDevice != null,
+                        onSignOut = { model?.endDevice(device) })
+                }
+                // DB-IP's free place database asks to be named where its places show (CC BY 4.0).
+                if (state.devices.any { !it.place.isNullOrBlank() }) Text("Places by DB-IP", Modifier.padding(top = 6.dp), fontFamily = Inter(),
+                    fontSize = 10.5.sp, letterSpacing = 0.sp, color = Kit.Faint)
             }
         }
         if (phone) {
@@ -807,6 +852,10 @@ private fun DeviceLine(device: MySession, now: kotlin.time.Instant, zone: TimeZo
                 Text(name, Modifier.weight(1f, fill = false), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.sp,
                     color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (device.current) HeroPill("This device", Kit.Green, Kit.GreenSoft)
+            }
+            com.saporini.mobile_desktop.core.session.deviceWhere(device.deviceSystem, device.place, device.sameNetwork && !device.current)?.let { where ->
+                Text(where, fontFamily = Inter(), fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Ink.copy(alpha = 0.78f), maxLines = 1,
+                    overflow = TextOverflow.Ellipsis)
             }
             Text(detail, fontFamily = Inter(), fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }

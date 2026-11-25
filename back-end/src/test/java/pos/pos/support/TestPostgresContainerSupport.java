@@ -33,6 +33,8 @@ public final class TestPostgresContainerSupport {
         registry.add("PUBLIC_BASE_URL", () -> "https://api.pos.example");
         // Production stores dish photos in R2; tests don't need live Cloudflare credentials (a test can still override it).
         registry.add("app.storage.menu-images.provider", () -> "disabled");
+        // Tests never download the place database for sign-ins.
+        registry.add("app.geo.enabled", () -> "false");
         registerSharedPoolProperties(registry);
         registry.add("spring.flyway.default-schema", () -> schema);
         registry.add("spring.flyway.schemas[0]", () -> schema);

@@ -70,6 +70,10 @@ public class AuthLoginAttempt {
     @Column(name = "device_name", length = 100)
     private String deviceName;
 
+    // What the device runs ("Linux 6.17", "Android 14"), when the app says (2026-11-25).
+    @Column(name = "device_system", length = 80)
+    private String deviceSystem;
+
     @Column(name = "user_agent", columnDefinition = "text")
     private String userAgent;
 

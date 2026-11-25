@@ -179,7 +179,7 @@ internal data class SettingsSection(val title: String, val fields: List<SettingF
 // ---- Categories (the grid) ----
 
 internal enum class SettingsCategory(val title: String, val description: String, val image: DrawableResource, val available: Boolean = true) {
-    DEVICES("Devices & printing", "Printers, receipts and where each ticket prints", Res.drawable.workspace_pos),
+    DEVICES("Devices & printing", "The tills' network, printers and where each ticket prints", Res.drawable.workspace_pos),
     TABLES("Tables", "Joining and moving tables, QR ordering, special cases", Res.drawable.settings_tables),
     RESERVATIONS("Reservations", "Booking length, late guests, confirmations and groups", Res.drawable.settings_reservations),
     ORDERS("Orders & kitchen", "Kitchen, order changes, order types and pre-orders", Res.drawable.settings_orders_kitchen),

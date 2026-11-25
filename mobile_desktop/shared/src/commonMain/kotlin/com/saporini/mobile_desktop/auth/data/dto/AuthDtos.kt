@@ -102,7 +102,10 @@ data class SignInRecord(
     val result: String = "",
     val deviceId: String? = null,
     val deviceName: String? = null,
-    val ipAddress: String? = null
+    val ipAddress: String? = null,
+    // What it runs and where its address is (2026-11-25).
+    val system: String? = null,
+    val place: String? = null
 )
 
 /** One device the person is signed in on (Profile → Your devices); [current] = this device. */
@@ -111,6 +114,10 @@ data class MySession(
     val id: String,
     val deviceName: String? = null,
     val ipAddress: String? = null,
+    // What it runs, where its address is, and whether it's on this device's network (2026-11-25).
+    val deviceSystem: String? = null,
+    val place: String? = null,
+    val sameNetwork: Boolean = false,
     val lastUsedAt: String? = null,
     val createdAt: String? = null,
     val current: Boolean = false
@@ -209,7 +216,9 @@ data class PairingRedeemResponse(
     val branchId: String? = null,
     val deviceName: String,
     val deviceType: String? = null,
-    val deviceSecret: String
+    val deviceSecret: String,
+    // The branch had no network yet: this device's Wi-Fi is now the restaurant's network (user, 2026-11-24).
+    val networkSaved: Boolean = false
 )
 
 /** Signing in on a connected till with a PIN. */

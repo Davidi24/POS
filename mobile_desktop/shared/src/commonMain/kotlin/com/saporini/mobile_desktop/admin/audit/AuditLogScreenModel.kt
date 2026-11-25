@@ -100,7 +100,7 @@ data class AuditLogState(
 
 /** Signing in and out, wrong passwords and PINs, locks (user, 2026-11-18: "save everything, even the okay sign-ins"). */
 private val SignInActions = setOf("SIGNED_IN", "SIGNED_OUT", "SIGNED_OUT_EVERYWHERE", "SIGN_IN_FAILED", "SIGN_IN_REFUSED", "ACCOUNT_LOCKED",
-    "WRONG_PIN", "TILL_PAUSED")
+    "WRONG_PIN", "TILL_PAUSED", "OUTSIDE_NETWORK")
 
 /** The kind of a change from its action: SIGN_IN, ADDED, REMOVED, RESET or CHANGED (the default). */
 fun actionKind(action: String?): String {
@@ -118,7 +118,7 @@ fun actionKind(action: String?): String {
 fun actorLabel(entry: AuditEntryDto): String = entry.actorName ?: when {
     entry.actorUserId != null -> "Someone"
     // A wrong PIN: nobody is known until the PIN is right.
-    entry.action == "WRONG_PIN" -> "Unknown person"
+    entry.action == "WRONG_PIN" || entry.action == "OUTSIDE_NETWORK" -> "Unknown person"
     else -> "System"
 }
 

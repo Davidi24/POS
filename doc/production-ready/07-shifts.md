@@ -1,4 +1,4 @@
-# 8. Shifts
+# 7. Shifts
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 

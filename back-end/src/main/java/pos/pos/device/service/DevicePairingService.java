@@ -31,14 +31,31 @@ public class DevicePairingService {
     private final DevicePairingProperties pairingProperties;
     private final OpaqueTokenService opaqueTokenService;
     private final pos.pos.auth.service.AccountAudit accountAudit;
+    private final pos.pos.device.network.DeviceNetworkService deviceNetworks;
+    private final pos.pos.user.repository.UserRepository userRepository;
 
-    /** Redeem a one-time enrollment token and return a device secret exactly once. */
-    @Transactional
+    /**
+     * Redeem a one-time enrollment token and return a device secret exactly once. A till, tablet or screen is connected only
+     * from its restaurant's network while that's switched on (`DeviceNetworkService.beforeConnect`; a refusal is kept).
+     */
+    @Transactional(noRollbackFor = pos.pos.device.network.OutsideNetworkException.class)
     public DevicePairingRedeemResponse redeem(String rawPairingToken, String remoteAddress) {
-        String tokenHash = opaqueTokenService.hash(rawPairingToken, pairingProperties.getTokenPepper());
+        return redeem(rawPairingToken, remoteAddress, null, null);
+    }
+
+    /**
+     * A code typed on the new till by someone signed in on it ([enteredBy], in [restaurantId]; user, 2026-11-25: "the person
+     * who puts the code logs in and puts it in the Devices section, so I know who set it up"). A code of another restaurant is
+     * as good as none.
+     */
+    @Transactional(noRollbackFor = pos.pos.device.network.OutsideNetworkException.class)
+    public DevicePairingRedeemResponse redeem(String rawPairingToken, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId) {
+        // A typed code in any case, with or without its dash (user, 2026-11-25); older long codes as they are.
+        String tokenHash = opaqueTokenService.hash(PairingCodes.typed(rawPairingToken), pairingProperties.getTokenPepper());
         DevicePairingToken token = pairingTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(this::invalidPairingToken);
         Device observedDevice = token.getDevice();
+        if (restaurantId != null && !restaurantId.equals(observedDevice.getRestaurant().getId())) throw invalidPairingToken();
         Device device = deviceRepository.findForUpdateByIdAndRestaurantId(
                         observedDevice.getId(), observedDevice.getRestaurant().getId())
                 .orElseThrow(DeviceNotFoundException::new);
@@ -53,6 +70,7 @@ public class DevicePairingService {
                 || (device.getStatus() != DeviceStatus.PROVISIONING && device.getStatus() != DeviceStatus.ACTIVE)) {
             throw invalidPairingToken();
         }
+        pos.pos.device.network.DeviceNetworkService.ConnectCheck network = deviceNetworks.beforeConnect(device, token.getCreatedBy(), enteredBy, remoteAddress);
 
         OpaqueTokenService.IssuedToken issuedSecret = opaqueTokenService.issue(pairingProperties.getTokenPepper());
         device.setAuthSecretHash(issuedSecret.tokenHash());
@@ -68,8 +86,14 @@ public class DevicePairingService {
         deviceRepository.saveAndFlush(device);
         pairingTokenRepository.saveAndFlush(token);
         // Connecting a till or tablet is what lets staff sign in on it with a PIN (user, 2026-11-18), so it's in the log.
-        accountAudit.inRestaurant(device.getRestaurant().getId(), device.getId(), token.getCreatedBy(), "DEVICE_CONNECTED",
-                device.getName() + " was connected with a pairing code" + (StringUtils.hasText(remoteAddress) ? " from " + remoteAddress : ""));
+        String typedBy = enteredBy == null || enteredBy.equals(token.getCreatedBy()) ? "" : userRepository.findById(enteredBy)
+                .map(u -> ", typed in by " + pos.pos.auth.service.AccountAudit.nameOf(u)).orElse("");
+        String madeBy = token.getCreatedBy() == null ? "" : userRepository.findById(token.getCreatedBy())
+                .map(u -> " made by " + pos.pos.auth.service.AccountAudit.nameOf(u)).orElse("");
+        accountAudit.inRestaurant(device.getRestaurant().getId(), device.getId(), enteredBy != null ? enteredBy : token.getCreatedBy(), "DEVICE_CONNECTED",
+                device.getName() + " was connected with a pairing code" + madeBy + typedBy
+                        + (StringUtils.hasText(remoteAddress) ? " from " + remoteAddress : "")
+                        + (network.outside() ? " (outside the restaurant's network, by an owner)" : ""));
 
         return new DevicePairingRedeemResponse(
                 device.getId(),
@@ -77,7 +101,8 @@ public class DevicePairingService {
                 device.getBranch() == null ? null : device.getBranch().getId(),
                 device.getName(),
                 device.getDeviceType().name(),
-                issuedSecret.rawToken()
+                issuedSecret.rawToken(),
+                network.learned()
         );
     }
 

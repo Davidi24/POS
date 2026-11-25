@@ -99,7 +99,10 @@ public enum AppPermission {
     SETTINGS_UPDATE("Change settings", "Bookings, tables, orders, shifts, inventory and other settings"),
     SETTINGS_MONEY("Change payment and fraud settings", "Tax, service charge, paying, receipts and fraud checks"),
     SETTINGS_AUDIT("See the audit log", "Every change made, by whom and when"),
-    DEVICES_MANAGE("Manage devices", "Add, connect and remove tills, tablets, printers and other devices"),
+    // Setting up a till, tablet or screen on the device itself or with a code (user, 2026-11-25), without the rest of
+    // Devices. Owner, co-owner and admin by default; away from the restaurant's network only an owner connects.
+    DEVICES_CONNECT("Connect devices", "Connect tills, tablets and screens, on the device itself or with a code"),
+    DEVICES_MANAGE("Manage devices", "Add, change and remove tills, tablets, printers and other devices, and the restaurant's network"),
     RESTAURANTS_READ("See restaurant info", "The restaurant's details, branches, logo and currency"),
     RESTAURANTS_UPDATE("Change restaurant info", "Description, phone, email, addresses, logo, colours and receipt texts"),
     HOURS_UPDATE("Change opening hours", "Each branch's week and its special days"),

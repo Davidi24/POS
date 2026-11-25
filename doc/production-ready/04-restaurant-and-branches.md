@@ -47,7 +47,7 @@ Status: Hard testing list ready (Not started → Screens → Development → Har
   someone who may change the hours may have no booking permissions.
 - [x] 3. "Open now" stays at most 18 hours, fixed (not a setting): it's a safety net so a branch opened for a late group isn't
   left open by mistake; longer openings on purpose are special days with their own hours.
-- [x] 4. Requests follow-ups go to step 7 (Notifications), not this PR: the reporter sees their problem again ("My
+- [x] 4. Requests follow-ups go to step 6 (Notifications), not this PR: the reporter sees their problem again ("My
   problems") and is told when it's solved; a support admin is told when a ticket is given to them.
 - [x] 5. Before the PR: the full backend suite from a clean copy, failures fixed, the app's test code compiles; then commit and PR.
   Order after the decisions: walk through opening hours and the restaurant page together, build 1 and 2, write the hard

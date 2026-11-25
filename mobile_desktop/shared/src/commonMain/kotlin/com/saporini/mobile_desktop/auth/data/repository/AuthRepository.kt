@@ -26,11 +26,16 @@ class AuthRepository(
     suspend fun login(identifier: String, password: String, signOutSessionId: String? = null): AuthenticationResponse {
         val response = executeWithFallback { baseUrl ->
             client.post("$baseUrl/auth/device/login") {
+                // A refused sign-in is final: without this the sign-in plugin sent it a second time, so every wrong password or PIN
+                // counted twice toward the lock and the till's pause (2026-11-25).
+                attributes.put(io.ktor.client.plugins.auth.AuthCircuitBreaker, Unit)
                 contentType(ContentType.Application.Json)
                 // This device's id, for the per-device sign-in limit (user, 2026-11-17), and its name for the devices list.
                 header("X-Device-Id", com.saporini.mobile_desktop.core.session.DeviceIdentity.id)
                 // Only plain ASCII may go in a header; anything else would stop the request before it's sent.
                 header("X-Device-Name", com.saporini.mobile_desktop.core.session.DeviceIdentity.name.filter { it.code in 32..126 }.trim())
+                // What it runs ("Linux 6.17"), shown in the person's devices (2026-11-25).
+                header("X-Device-System", com.saporini.mobile_desktop.core.session.deviceSystem())
                 setBody(LoginRequest(identifier, password, signOutSessionId))
             }.body<AuthenticationResponse>()
         }
@@ -49,9 +54,11 @@ class AuthRepository(
     suspend fun pinLogin(till: com.saporini.mobile_desktop.core.session.TillConnection, pin: String): AuthenticationResponse {
         val response = executeWithFallback { baseUrl ->
             client.post("$baseUrl/auth/device/pin-login") {
+                attributes.put(io.ktor.client.plugins.auth.AuthCircuitBreaker, Unit)
                 contentType(ContentType.Application.Json)
                 header("X-Device-Id", com.saporini.mobile_desktop.core.session.DeviceIdentity.id)
                 header("X-Device-Name", till.name.filter { it.code in 32..126 }.trim().ifBlank { "Till" })
+                header("X-Device-System", com.saporini.mobile_desktop.core.session.deviceSystem())
                 setBody(com.saporini.mobile_desktop.auth.data.dto.PinLoginRequest(till.deviceId, till.secret, pin))
             }.body<AuthenticationResponse>()
         }
@@ -60,10 +67,14 @@ class AuthRepository(
         return response
     }
 
-    /** Connects this device as a till with a pairing code (made by the Admin Hub), and keeps the connection on the device. */
-    suspend fun connectTill(pairingToken: String): com.saporini.mobile_desktop.core.session.TillConnection {
+    /**
+     * Connects this device as a till with a pairing code (made by the Admin Hub), and keeps the connection on the device. The
+     * answer also says whether this Wi-Fi was saved as the restaurant's network just now (its first till).
+     */
+    suspend fun connectTill(restaurantId: String, pairingToken: String): ConnectedHere {
+        // Typed in by the person signed in here, so the server knows who set it up (user, 2026-11-25); a wrong code is a 400.
         val answer = executeWithFallback { baseUrl ->
-            client.post("$baseUrl/public/devices/pairing/redeem") {
+            client.post("$baseUrl/restaurants/$restaurantId/device-pairing/redeem") {
                 contentType(ContentType.Application.Json)
                 setBody(com.saporini.mobile_desktop.auth.data.dto.PairingRedeemRequest(pairingToken.trim()))
             }.body<com.saporini.mobile_desktop.auth.data.dto.PairingRedeemResponse>()
@@ -71,7 +82,7 @@ class AuthRepository(
         val connection = com.saporini.mobile_desktop.core.session.TillConnection(answer.deviceId, answer.deviceSecret, answer.restaurantId,
             answer.branchId, answer.deviceName, answer.deviceType)
         TokenStore.connectTill(connection)
-        return connection
+        return ConnectedHere(connection, answer.networkSaved)
     }
 
     /** Profile → Preferences → Language: the person's own language (en, it, es, sq). */
@@ -261,3 +272,6 @@ class AuthRepository(
             message.contains("connection refused")
     }
 }
+
+/** This device connected as a till: the connection, and whether its Wi-Fi became the restaurant's network. */
+data class ConnectedHere(val till: com.saporini.mobile_desktop.core.session.TillConnection, val networkSaved: Boolean)

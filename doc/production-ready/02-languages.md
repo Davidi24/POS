@@ -23,12 +23,12 @@ once per screen instead of going through every screen again at the end. The sign
 - [x] Whose choice (user, 2026-11-18: "each person makes a default in profile and then can change it any time in the nav bar"): each person sets their language in Profile → Preferences; the language button in the top bar switches it at any time on that device. Before anyone signs in, the sign-in screens use the language last used on the device (English the first time).
 - [x] Guests (user, 2026-11-18: "English and the one they booked in, so English always included"): booking emails come in the language the guest booked in with an English version under it (just English when they booked in English); guest pages always offer English.
 - [x] Who translates (user, 2026-11-18): I translate while building; a native speaker checks later and we fix what they find.
-- [x] What restaurants type themselves (menu, places, roles) (user, 2026-11-18: "the things that need to be written manually, we do them later in menu"): waits for step 11 (Menu & recipes), with the proposal below.
+- [x] What restaurants type themselves (menu, places, roles) (user, 2026-11-18: "the things that need to be written manually, we do them later in menu"): waits for step 10 (Menu & recipes), with the proposal below.
 
 ## Proposed so far (2026-11-17, to confirm when this step starts)
 - The app's own words are translated once by us; each person picks their language.
 - What a restaurant types (menu, sections, options, role and place names, receipt texts): one main language required, other
-  languages optional per item (a "Languages" tab in the editor, built in step 11 for dishes); anything not translated shows in the
+  languages optional per item (a "Languages" tab in the editor, built in step 10 for dishes); anything not translated shows in the
   main language. Guests see their language where it exists, waiters their own, the kitchen always the main language.
 - A "Translate" button fills the other languages for the owner to check, through our server: Microsoft Translator (free about
   2 million characters a month) first, Google Cloud Translation (500,000 free) as the backup; check their current terms and the

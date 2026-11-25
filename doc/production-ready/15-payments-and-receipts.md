@@ -1,4 +1,4 @@
-# 16. Payments & receipts
+# 15. Payments & receipts
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 

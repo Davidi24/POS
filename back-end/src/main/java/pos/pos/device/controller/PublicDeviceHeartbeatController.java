@@ -22,18 +22,22 @@ import java.util.UUID;
 public class PublicDeviceHeartbeatController {
 
     private final DeviceHeartbeatService deviceHeartbeatService;
+    private final pos.pos.security.util.ClientInfoExtractor clientInfoExtractor;
 
     @PostMapping("/{deviceId}/heartbeat")
     @Operation(summary = "Authenticate a paired device and record its heartbeat")
     public ResponseEntity<DeviceHeartbeatResponse> heartbeat(
             @PathVariable UUID deviceId,
             @RequestHeader(value = "X-Device-Secret", required = false) String deviceSecret,
+            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody(required = false) pos.pos.device.dto.DeviceHeartbeatRequest about,
             HttpServletRequest servletRequest
     ) {
+        // The device's own address behind the proxy (2026-11-25), as pairing and the network rule read it.
         return ResponseEntity.ok(deviceHeartbeatService.heartbeat(
                 deviceId,
                 deviceSecret,
-                servletRequest.getRemoteAddr()
+                clientInfoExtractor.extractIp(servletRequest),
+                about
         ));
     }
 }

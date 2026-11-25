@@ -22,6 +22,8 @@ actual object DeviceIdentity {
         }
         val host = (System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME")
             ?: runCatching { java.io.File("/etc/hostname").readText().trim() }.getOrNull())?.takeIf { it.isNotBlank() }
+            // "fedora", not "fedora.fritz.box" (the router's domain says nothing about the computer).
+            ?.substringBefore('.')?.takeIf { it.isNotBlank() }
         // Plain letters only: a header can't carry "·" or accents.
         (if (host != null) "$os computer ($host)" else "$os computer").take(100)
     }

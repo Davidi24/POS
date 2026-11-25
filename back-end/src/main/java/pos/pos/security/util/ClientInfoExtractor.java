@@ -84,7 +84,10 @@ public class ClientInfoExtractor {
     public ClientInfo extract(HttpServletRequest request) {
         return new ClientInfo(
                 extractIp(request),
-                extractUserAgent(request)
+                extractUserAgent(request),
+                null,
+                null,
+                ClientInfoNormalizer.normalizeDeviceSystem(request.getHeader("X-Device-System"))
         );
     }
 

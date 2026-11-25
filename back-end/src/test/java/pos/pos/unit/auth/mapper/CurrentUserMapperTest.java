@@ -44,7 +44,7 @@ class CurrentUserMapperTest {
         assertThat(response.getId()).isEqualTo(USER_ID);
         assertThat(response.getIsActive()).isTrue();
         assertThat(response.getRoles()).containsExactly("OWNER", "MANAGER");
-        assertThat(response.getPermissions()).containsExactly("USERS_CREATE", "SESSIONS_MANAGE");
+        assertThat(response.getPermissions()).containsExactly("SESSIONS_MANAGE", "USERS_CREATE");
     }
 
     @Test

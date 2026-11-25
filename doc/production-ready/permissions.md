@@ -115,7 +115,8 @@ Columns: **Ow** Owner · **Co** Co-Owner · **Ad** Admin · **Ma** Manager · **
 | Settings | Change settings | Bookings, tables, orders, shifts, inventory and other settings | See settings | ✓ | ✓ | ✓ | – | – | – | – | – | – |
 | Settings | Change payment and fraud settings 🛡 | Tax, service charge, paying, receipts and fraud checks | See settings | ✓ | ✓ | – | – | – | – | – | – | – |
 | Audit log | See the audit log | Every change made, by whom and when | Open Admin Hub | ✓ | ✓ | ✓ | – | – | – | – | – | – |
-| Devices | Manage devices 🛡 | Add, connect and remove tills, tablets, printers and other devices | Open Admin Hub | ✓ | ✓ | – | – | – | – | – | – | – |
+| Devices | Connect devices | Connect tills, tablets and screens, on the device itself or with a code | Open Admin Hub | ✓ | ✓ | ✓ | – | – | – | – | – | – |
+| Devices | Manage devices 🛡 | Add, change and remove tills, tablets, printers and other devices, and the restaurant's network | Connect devices | ✓ | ✓ | – | – | – | – | – | – | – |
 | Restaurant info | See restaurant info | The restaurant's details, branches, logo and currency | Open Admin Hub | ✓ | ✓ | ✓ | ✓ | – | ✓ | – | – | – |
 | Restaurant info | Change restaurant info 🛡 | Description, phone, email, addresses, logo, colours and receipt texts | See restaurant info | ✓ | ✓ | – | – | – | – | – | – | – |
 | Restaurant info | Change opening hours | Each branch's week and its special days | See restaurant info | ✓ | ✓ | ✓ | ✓ | – | – | – | – | – |

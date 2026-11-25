@@ -8,7 +8,8 @@ enum class AdminSection(val label: String, val permission: String, val alsoWith:
     SHIFTS("Shifts", "SHIFT_READ"),
     // Hours worked, hourly wages, tips and pay: its own page, apart from the shift schedule.
     PAY("Salary", "SALARY_MANAGE"),
-    DEVICES("Devices", "DEVICES_MANAGE"),
+    // Connect devices is enough to connect tills, tablets and screens there (user, 2026-11-25); Manage devices does the rest.
+    DEVICES("Devices", "DEVICES_CONNECT", "DEVICES_MANAGE"),
     SETTINGS("Settings", "SETTINGS_READ"),
     USERS("Users", "USERS_READ"),
     AUDIT_LOGS("Audit log", "SETTINGS_AUDIT"),

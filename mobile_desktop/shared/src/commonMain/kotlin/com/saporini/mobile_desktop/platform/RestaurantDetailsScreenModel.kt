@@ -423,7 +423,25 @@ class RestaurantDetailsScreenModel(
     init {
         work.watchRestaurantPermissions(session) { active }
         work.launch {
+            var last: com.saporini.mobile_desktop.auth.data.dto.CurrentUserResponse? = null
             session.currentUser.collectLatest { user ->
+                val before = last
+                last = user
+                // The same person in the same restaurant and branch (their rights, photo or language changed): the page stays
+                // where it is, with the open part and what's being changed (2026-11-24: it went back to its first part).
+                if (before != null && user != null && before.id == user.id && before.restaurantId == user.restaurantId &&
+                    before.defaultBranchId == user.defaultBranchId) {
+                    val access = restaurantAccess(user)
+                    mutable.update {
+                        it.copy(
+                            superAdmin = isPlatformAdmin(user), canRead = access.read, canEdit = access.edit, canManage = access.manage,
+                            canDelete = access.delete,
+                            canTransferOwner = com.saporini.mobile_desktop.core.session.isSuperAdmin(user) && access.manage
+                        )
+                    }
+                    if (active && access.read && !state.value.loaded && !state.value.loading) load()
+                    return@collectLatest
+                }
                 actions.cancel()
                 actions = CoroutineScope(work.coroutineContext + SupervisorJob(work.coroutineContext[Job]))
                 revision++

@@ -114,7 +114,10 @@ class SessionManager {
 
     val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
 
-    fun signIn(user: CurrentUserResponse) {
+    fun signIn(fresh: CurrentUserResponse) {
+        // The server lists the same permissions in another order after a token refresh than from /auth/me. Sorted, the
+        // same person with the same rights is the same value, so screens aren't reset every 15 minutes (2026-11-24).
+        val user = fresh.copy(permissions = fresh.permissions.distinct().sorted())
         val previous = signedIn.value
         if (previous?.id != user.id) identityRevision++
         signedIn.value = user

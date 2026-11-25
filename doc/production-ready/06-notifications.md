@@ -1,4 +1,4 @@
-# 7. Notifications
+# 6. Notifications
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 
@@ -18,6 +18,10 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 
 ## Decisions to take
 - [ ] Phone notifications (push) or only inside the app? **(your call)**
+- [ ] What Settings → Notifications holds (an empty page today). **(your call)**
+- [ ] Tell the chosen roles when an account locks after 8 wrong passwords, and when a till pauses after 5 wrong PINs, with a
+  "Who is told" setting (Owner and Manager by default)? Suggestion: yes (decide-later step 1 #1; moved here from Settings on
+  2026-11-24). **(your call)**
 
 ## 1. Screens
 - [ ] Agree the screens with the user when this step starts (mock data where the server isn't ready).

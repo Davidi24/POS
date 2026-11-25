@@ -71,6 +71,9 @@ public class AuthLoginService {
     private final AuthLoginAttemptRepository authLoginAttemptRepository;
     private final PinService pinService;
     private final pos.pos.device.service.ConnectedDeviceService connectedDevices;
+    private final pos.pos.device.network.DeviceNetworkService deviceNetworks;
+    private final pos.pos.device.signin.DeviceSignInService deviceSignIn;
+    private final pos.pos.security.geo.GeoPlaces geoPlaces;
     private final AccountAudit accountAudit;
     private final UserSessionMapper userSessionMapper;
     private final CurrentUserMapper currentUserMapper;
@@ -166,6 +169,7 @@ public class AuthLoginService {
      * Sign in with a PIN on one of the restaurant's connected tills (user, 2026-11-18): the device's id and secret say which
      * restaurant; the PIN finds the person there. 5 wrong PINs on a till within 15 minutes pause PIN sign-in on it for 15
      * minutes (people can still use their password). A PIN session lasts at most 12 hours and doesn't count toward the 5 devices.
+     * While the till's branch keeps tills on its network, a PIN from anywhere else is OUTSIDE_NETWORK (403).
      */
     @Transactional(noRollbackFor = {LoginRefusedException.class})
     public AuthenticationResponse pinLogin(UUID deviceId, String deviceSecret, String pin, ClientInfo clientInfo) {
@@ -173,9 +177,12 @@ public class AuthLoginService {
         pos.pos.device.service.ConnectedDeviceService.Connected device = connectedDevices.check(deviceId, deviceSecret).orElseThrow(() ->
                 new LoginRefusedException(LoginRefusedException.Reason.DEVICE_NOT_CONNECTED,
                         "This device isn't connected to a restaurant. Sign in with your password.", HttpStatus.UNAUTHORIZED, null));
+        // A till works only on its restaurant's network while its branch keeps tills on it (user, 2026-11-24).
+        deviceNetworks.beforePin(device, clientInfo == null ? null : clientInfo.ipAddress());
         String tillKey = "till:" + device.deviceId();
         ClientInfo base = ClientInfoNormalizer.normalize(clientInfo);
-        ClientInfo info = new ClientInfo(base == null ? null : base.ipAddress(), base == null ? null : base.userAgent(), tillKey, device.name());
+        ClientInfo info = new ClientInfo(base == null ? null : base.ipAddress(), base == null ? null : base.userAgent(), tillKey, device.name(),
+                base == null ? null : base.deviceSystem());
         java.time.Duration pause = java.time.Duration.ofMinutes(lockDurationMinutes);
         OffsetDateTime pausedUntil = pausedUntil(authLoginAttemptRepository.wrongPinTimesForDevice(tillKey, now.minus(pause.multipliedBy(2))), 5, pause, now);
         if (pausedUntil != null) {
@@ -203,6 +210,14 @@ public class AuthLoginService {
         validateUserCanLogin(user, now, user.getUsername(), info);
         if (userRepository.worksAtClosedRestaurant(user.getId())) {
             throw new LoginRefusedException(LoginRefusedException.Reason.RESTAURANT_CLOSED, RESTAURANT_CLOSED_MESSAGE, HttpStatus.FORBIDDEN, null);
+        }
+        // Only the people chosen for this till (Devices → Who can sign in here; user, 2026-11-25). The PIN was right, so it
+        // doesn't count as a wrong one.
+        if (!deviceSignIn.allows(device.deviceId(), user.getId(), loadActiveRoles(user.getId()))) {
+            accountAudit.about(user, user.getId(), "NOT_ON_THIS_DEVICE",
+                    AccountAudit.nameOf(user) + " tried to sign in on " + AccountAudit.deviceOf(device.name()) + ", which isn't for them");
+            throw new LoginRefusedException(LoginRefusedException.Reason.NOT_ON_THIS_DEVICE, "You can't use this device. Ask a manager.",
+                    HttpStatus.FORBIDDEN, null);
         }
         return issue(user, user.getUsername(), info, SessionType.PIN, now);
     }
@@ -284,7 +299,8 @@ public class AuthLoginService {
         List<LoginRefusedException.SignedInDevice> devices = userSessionRepository.findActiveSessionsByUserId(userId, now).stream()
                 .filter(s -> s.getSessionType() != SessionType.PIN)
                 .sorted(java.util.Comparator.comparing(UserSession::getLastUsedAt, java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())))
-                .map(s -> new LoginRefusedException.SignedInDevice(s.getId(), s.getDeviceName(), s.getLastUsedAt(), s.getCreatedAt()))
+                .map(s -> new LoginRefusedException.SignedInDevice(s.getId(), s.getDeviceName(), s.getLastUsedAt(), s.getCreatedAt(),
+                        s.getDeviceSystem(), geoPlaces.placeOf(s.getIpAddress()), sameNetwork(s.getIpAddress(), clientInfo == null ? null : clientInfo.ipAddress())))
                 .toList();
         throw new LoginRefusedException(LoginRefusedException.Reason.TOO_MANY_DEVICES,
                 "You're signed in on " + maxActiveSessions + " devices. Sign out one to continue.", HttpStatus.CONFLICT, null, null, devices);
@@ -425,6 +441,12 @@ public class AuthLoginService {
      * - Records the exact time of the attempt.
      * - Persists the record using the repository.
      */
+    /** Whether two addresses are on one network (the same public address, or the same local network). */
+    static boolean sameNetwork(String a, String b) {
+        String one = pos.pos.device.network.NetworkAddress.of(a);
+        return one != null && one.equals(pos.pos.device.network.NetworkAddress.of(b));
+    }
+
     private void saveLoginAttempt(
             UUID userId,
             String identifier,
@@ -439,6 +461,7 @@ public class AuthLoginService {
                 .ipAddress(clientInfo != null ? clientInfo.ipAddress() : null)
                 .deviceId(clientInfo != null ? clientInfo.deviceId() : null)
                 .deviceName(clientInfo != null ? clientInfo.deviceName() : null)
+                .deviceSystem(clientInfo != null ? clientInfo.deviceSystem() : null)
                 .userAgent(clientInfo != null ? clientInfo.userAgent() : null)
                 .success(success)
                 .failureReason(failureReason)

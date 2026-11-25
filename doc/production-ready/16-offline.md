@@ -1,9 +1,9 @@
-# 17. Offline
+# 16. Offline
 
 Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
 
 Why here (2026-11-17): it's about the till, the tablets and the kitchen screen keeping service going when the internet drops, so it
-comes once Kitchen, Tables, Orders and Payments (steps 12–16) work properly online. Those steps keep it in mind (see "Before this step").
+comes once Kitchen, Tables, Orders and Payments (steps 11–15) work properly online. Those steps keep it in mind (see "Before this step").
 
 ## Where it is
 - App: every workspace; mostly POS (Tables, Orders, Take payment), the kitchen screen (KDS) and printing.
@@ -25,7 +25,7 @@ comes once Kitchen, Tables, Orders and Payments (steps 12–16) work properly on
 - Order numbers created offline, and how long the restaurant may stay offline.
 - Signing in while offline (with a PIN on a paired device, from step 1).
 
-## Before this step (steps 12–16)
+## Before this step (steps 11–15)
 - New orders, dishes and payments get their id on the device and an idempotency key, so they can be sent later without duplicates.
 
 ## 1. Screens

@@ -23,6 +23,15 @@ import pos.pos.device.service.DevicePairingService;
 public class PublicDevicePairingController {
 
     private final DevicePairingService devicePairingService;
+    private final pos.pos.security.util.ClientInfoExtractor clientInfoExtractor;
+    private final pos.pos.security.service.PublicRequestRateLimiter rateLimiter;
+
+    // Codes are short enough to type (user, 2026-11-25), so tries are limited per network address.
+    @org.springframework.beans.factory.annotation.Value("${app.devices.pairing.max-tries-per-address:30}")
+    private int maxTriesPerAddress = 30;
+
+    @org.springframework.beans.factory.annotation.Value("${app.devices.pairing.tries-window-minutes:10}")
+    private int triesWindowMinutes = 10;
 
     @PostMapping("/redeem")
     @Operation(summary = "Redeem a one-time device pairing token")
@@ -30,6 +39,9 @@ public class PublicDevicePairingController {
             @Valid @RequestBody DevicePairingRedeemRequest request,
             HttpServletRequest servletRequest
     ) {
-        return ResponseEntity.ok(devicePairingService.redeem(request.pairingToken(), servletRequest.getRemoteAddr()));
+        String address = clientInfoExtractor.extractIp(servletRequest);
+        rateLimiter.check("DEVICE_PAIRING_IP", address, maxTriesPerAddress, java.time.Duration.ofMinutes(triesWindowMinutes),
+                "Too many tries. Wait a few minutes and try again.");
+        return ResponseEntity.ok(devicePairingService.redeem(request.pairingToken(), address));
     }
 }

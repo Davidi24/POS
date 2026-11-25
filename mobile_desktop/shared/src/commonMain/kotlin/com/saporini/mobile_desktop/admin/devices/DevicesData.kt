@@ -37,9 +37,15 @@ data class DeviceDto(
     val appVersion: String? = null,
     val status: String = "PROVISIONING",
     val active: Boolean = true,
+    // Heard from in the last few minutes (a till or tablet sends a heartbeat every minute).
     val online: Boolean = false,
+    // Connected with a pairing code (and not moved to another device since), and when.
+    val connected: Boolean = false,
+    val connectedAt: String? = null,
     val lastSeenAt: String? = null,
     val ipAddress: String? = null,
+    // Where its address is ("Tirana, Albania"), from the server's place database (2026-11-25).
+    val place: String? = null,
     val macAddress: String? = null,
     val notes: String? = null,
     val printerConnectionType: String? = null,
@@ -118,7 +124,43 @@ data class DeviceAssignmentDto(
 @Serializable
 data class DeviceAssignmentRequestDto(val assignmentType: String, val branchId: String? = null, val userId: String? = null, val notes: String? = null)
 
+/** Who can sign in on a till or tablet (user, 2026-11-25): [everyone] when nothing is chosen. */
+@Serializable
+data class DeviceSignInView(
+    val deviceId: String,
+    val everyone: Boolean = true,
+    val roles: List<SignInRole> = emptyList(),
+    val people: List<SignInPerson> = emptyList(),
+    val roleChoices: List<SignInRole> = emptyList(),
+    val alwaysAllowed: List<String> = emptyList(),
+    // The roles the person editing sees, each with its people (the Users rule): the form's role bar.
+    val tabs: List<SignInTab> = emptyList()
+)
+
+/** A role as a tab of the who-can-sign-in form, with its people; [always] = they sign in on any device anyway. */
+@Serializable
+data class SignInTab(val id: String, val code: String = "", val name: String, val picture: String? = null, val always: Boolean = false,
+                     val people: List<SignInPerson> = emptyList())
+
+@Serializable
+data class SignInRole(val id: String, val code: String = "", val name: String, val picture: String? = null)
+
+@Serializable
+data class SignInPerson(val id: String, val name: String, val photoUrl: String? = null)
+
+@Serializable
+data class SetDeviceSignInBody(val roleIds: List<String>, val userIds: List<String>)
+
+@Serializable
+data class MoveDeviceBody(val branchId: String)
+
 interface DevicesRepository {
+    suspend fun signIn(restaurantId: String, deviceId: String): DeviceSignInView = throw UnsupportedOperationException("Not here")
+    suspend fun setSignIn(restaurantId: String, deviceId: String, roleIds: List<String>, userIds: List<String>): DeviceSignInView =
+        throw UnsupportedOperationException("Not here")
+    suspend fun moveDevice(restaurantId: String, branchId: String, deviceId: String, toBranchId: String): DeviceDto =
+        throw UnsupportedOperationException("Not here")
+
     suspend fun devices(restaurantId: String, branchId: String): List<DeviceDto>
     suspend fun saveDevice(restaurantId: String, branchId: String, deviceId: String?, request: DeviceRequestDto): DeviceDto
     suspend fun setStatus(restaurantId: String, branchId: String, deviceId: String, request: DeviceStatusRequestDto): DeviceDto
@@ -148,6 +190,14 @@ class DevicesApi(
     private fun device(restaurantId: String, deviceId: String) = "${restaurant(restaurantId)}/devices/${id(deviceId)}"
 
     override suspend fun devices(restaurantId: String, branchId: String): List<DeviceDto> = client.get(branchDevices(restaurantId, branchId)).body()
+
+    override suspend fun signIn(restaurantId: String, deviceId: String): DeviceSignInView = client.get("${device(restaurantId, deviceId)}/sign-in").body()
+
+    override suspend fun setSignIn(restaurantId: String, deviceId: String, roleIds: List<String>, userIds: List<String>): DeviceSignInView =
+        client.put("${device(restaurantId, deviceId)}/sign-in") { contentType(ContentType.Application.Json); setBody(SetDeviceSignInBody(roleIds, userIds)) }.body()
+
+    override suspend fun moveDevice(restaurantId: String, branchId: String, deviceId: String, toBranchId: String): DeviceDto =
+        client.patch("${branchDevices(restaurantId, branchId)}/${id(deviceId)}/branch") { contentType(ContentType.Application.Json); setBody(MoveDeviceBody(toBranchId)) }.body()
 
     override suspend fun saveDevice(restaurantId: String, branchId: String, deviceId: String?, request: DeviceRequestDto): DeviceDto =
         if (deviceId == null) client.post(branchDevices(restaurantId, branchId)) { contentType(ContentType.Application.Json); setBody(request) }.body()

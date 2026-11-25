@@ -119,7 +119,7 @@ public class DeviceSettingsController {
     }
 
     @GetMapping("/restaurants/{restaurantId}/branches/{branchId}/devices")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'DEVICES_CONNECT', 'DEVICES_MANAGE')")
     @Operation(summary = "List branch devices")
     public ResponseEntity<List<DeviceResponse>> getDevices(
             @PathVariable UUID restaurantId,
@@ -166,6 +166,23 @@ public class DeviceSettingsController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(deviceSettingsService.updateDeviceStatus(authentication, restaurantId, branchId, deviceId, request));
+    }
+
+    /** Moves a device to another branch of the restaurant (user, 2026-11-25: a device works in the branch chosen for it). */
+    @PatchMapping("/restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}/branch")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
+    @Operation(summary = "Move a device to another branch")
+    public ResponseEntity<DeviceResponse> moveDevice(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            @PathVariable UUID deviceId,
+            @Valid @RequestBody MoveDeviceRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(deviceSettingsService.moveDevice(authentication, restaurantId, branchId, deviceId, request.branchId()));
+    }
+
+    public record MoveDeviceRequest(@jakarta.validation.constraints.NotNull UUID branchId) {
     }
 
     @DeleteMapping("/restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}")

@@ -99,6 +99,16 @@ class AuthLoginServiceTest {
     @Mock
     private pos.pos.auth.service.AccountAudit accountAudit;
 
+    // The restaurant's network, who can sign in on a till and where a device is (step 5); doing nothing by default.
+    @Mock
+    private pos.pos.device.network.DeviceNetworkService deviceNetworks;
+
+    @Mock
+    private pos.pos.device.signin.DeviceSignInService deviceSignIn;
+
+    @Mock
+    private pos.pos.security.geo.GeoPlaces geoPlaces;
+
     @InjectMocks
     private AuthLoginService authLoginService;
 

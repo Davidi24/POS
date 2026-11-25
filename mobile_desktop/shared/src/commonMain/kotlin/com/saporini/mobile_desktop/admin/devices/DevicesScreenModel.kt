@@ -123,14 +123,28 @@ data class DevicesState(
     val restaurantId: String? = null,
     val branchId: String? = null,
     val canRead: Boolean = false,
+    // Manage devices: add, change, remove, confirm (the server's DEVICES_MANAGE).
     val canEdit: Boolean = false,
+    // Connect devices (user, 2026-11-25): tills, tablets and screens on this device or with a code, nothing else.
+    val canConnect: Boolean = false,
+    // Printers belong to the restaurant's settings; someone who only connects devices doesn't see them.
+    val canSeePrinters: Boolean = false,
     val devices: List<DeviceDto> = emptyList(),
     val printers: List<DeviceDto> = emptyList(),
     val selectedId: String? = null,
     val pairingCodes: List<PairingCodeDto> = emptyList(),
     val assignments: List<DeviceAssignmentDto> = emptyList(),
+    // Who can sign in on the open till or tablet (null while loading or for other devices).
+    val signIn: DeviceSignInView? = null,
+    // Works in every branch (BRANCHES_ALL or a platform admin): only they move a device to another branch.
+    val everyBranch: Boolean = false,
+    // The restaurant's branches, to move a device (only loaded for whoever manages devices and works in every branch).
+    val branchChoices: List<com.saporini.mobile_desktop.platform.BranchDto> = emptyList(),
     // A new pairing code to show once; it can't be read again.
     val freshCode: PairingCodeDto? = null,
+    // Devices → Enter a code: the window is open, and why the last code didn't work (shown inside it).
+    val enteringCode: Boolean = false,
+    val codeError: String? = null,
     // The device just added, so the screen can go straight on to confirming it.
     val justAdded: String? = null,
     val draft: DeviceDraft? = null,
@@ -145,7 +159,13 @@ data class DevicesState(
     val selected: DeviceDto? get() = (devices + printers).firstOrNull { it.id == selectedId }
     fun isPrinter(id: String?): Boolean = printers.any { it.id == id }
     val onlineCount: Int get() = devices.count { it.online }
+    /** Whether [device] can be connected (a code made, or this device made it) by this person. */
+    fun mayConnect(device: DeviceDto?): Boolean = device != null && (canEdit || (canConnect && device.deviceType in CONNECTABLE_TYPES))
 }
+
+/** Tills, tablets and screens: what "Connect devices" alone may connect (the server's network rule covers the same). */
+// The server answers a till as "TERMINAL" (POS_TERMINAL when sent).
+val CONNECTABLE_TYPES = setOf("POS_TERMINAL", "TERMINAL", "TABLET", "KDS", "CUSTOMER_DISPLAY")
 
 /**
  * Admin Hub → Devices: the branch's devices and the restaurant's printers, adding/editing/removing them, their
@@ -155,7 +175,11 @@ class DevicesScreenModel(
     private val repository: DevicesRepository,
     session: SessionManager,
     // Makes the device the app runs on a till with a pairing code (user, 2026-11-18: PIN sign-in only on connected tills).
-    private val connectHere: (suspend (pairingToken: String) -> com.saporini.mobile_desktop.core.session.TillConnection)? = null
+    // The code is typed in by the person signed in here, so the server knows who set it up (user, 2026-11-25).
+    private val connectHere: (suspend (restaurantId: String, pairingToken: String) -> com.saporini.mobile_desktop.auth.data.repository.ConnectedHere)? = null,
+    // The restaurant's branches (to move a device) and people to choose (who can sign in on it).
+    private val branchesOf: (suspend (restaurantId: String) -> List<com.saporini.mobile_desktop.platform.BranchDto>)? = null,
+    private val searchPeople: (suspend (query: String) -> List<SignInPerson>)? = null
 ) : ScreenModel {
 
     private val work = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -178,8 +202,11 @@ class DevicesScreenModel(
                 mutable.value = DevicesState(
                     restaurantId = user?.takeIf { it.isActive }?.restaurantId,
                     branchId = user?.defaultBranchId,
-                    canRead = "SETTINGS_READ" in permissions,
-                    canEdit = "SETTINGS_UPDATE" in permissions
+                    canRead = "SETTINGS_READ" in permissions || "DEVICES_CONNECT" in permissions || "DEVICES_MANAGE" in permissions,
+                    canEdit = "DEVICES_MANAGE" in permissions,
+                    canConnect = "DEVICES_CONNECT" in permissions || "DEVICES_MANAGE" in permissions,
+                    canSeePrinters = "SETTINGS_READ" in permissions,
+                    everyBranch = com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user)
                 )
                 if (active) load()
             }
@@ -217,13 +244,15 @@ class DevicesScreenModel(
                 // coroutineScope: a failed call ends up in the catch below instead of escaping the screen.
                 val (branchDevices, printers) = coroutineScope {
                     val devices = current.branchId?.let { branchId -> async { repository.devices(restaurantId, branchId) } }
-                    val printers = repository.printers(restaurantId)
+                    val printers = if (current.canSeePrinters) repository.printers(restaurantId) else emptyList()
                     devices?.await().orEmpty() to printers
                 }
                 if (token != revision) return@launch
+                val branches = if (current.canEdit && current.everyBranch) runCatching { branchesOf?.invoke(restaurantId) }.getOrNull().orEmpty() else emptyList()
                 mutable.update { state ->
                     val all = branchDevices + printers
                     state.copy(
+                        branchChoices = branches.filter { it.isActive },
                         devices = branchDevices.sortedBy { it.name.lowercase() },
                         printers = printers.sortedBy { it.name.lowercase() },
                         selectedId = state.selectedId?.takeIf { id -> all.any { it.id == id } },
@@ -244,7 +273,7 @@ class DevicesScreenModel(
 
     /** Opens one device: its pairing codes and who it is given to. */
     fun select(deviceId: String?) {
-        mutable.update { it.copy(selectedId = deviceId, pairingCodes = emptyList(), assignments = emptyList(), freshCode = null) }
+        mutable.update { it.copy(selectedId = deviceId, pairingCodes = emptyList(), assignments = emptyList(), signIn = null, freshCode = null) }
         if (deviceId != null) loadDetail(deviceId)
     }
 
@@ -259,9 +288,12 @@ class DevicesScreenModel(
                     val assignments = repository.assignments(restaurantId, deviceId)
                     codes.await() to assignments
                 }
+                // Who can sign in: tills, tablets and screens only.
+                val device = state.value.devices.firstOrNull { it.id == deviceId }
+                val signIn = if (device?.deviceType in CONNECTABLE_TYPES) runCatching { repository.signIn(restaurantId, deviceId) }.getOrNull() else null
                 if (token == detailRevision && state.value.selectedId == deviceId) {
                     mutable.update { it.copy(pairingCodes = loadedCodes.sortedByDescending { c -> c.createdAt.orEmpty() },
-                        assignments = assignments.sortedByDescending { a -> a.assignedAt.orEmpty() }) }
+                        assignments = assignments.sortedByDescending { a -> a.assignedAt.orEmpty() }, signIn = signIn) }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -421,7 +453,7 @@ class DevicesScreenModel(
             mutable.update { it.copy(error = "A pairing code can last 1 minute to ${MAX_PAIRING_MINUTES / 60} hours") }
             return
         }
-        needsEdit {
+        needsConnect {
             write(null) { restaurantId ->
                 val code = repository.newPairingCode(restaurantId, deviceId, minutes)
                 mutable.update { state ->
@@ -436,11 +468,15 @@ class DevicesScreenModel(
     fun connectThisDevice() {
         val deviceId = state.value.selectedId ?: return
         val connect = connectHere ?: return
-        needsEdit {
+        needsConnect {
             write(null) { restaurantId ->
                 val code = repository.newPairingCode(restaurantId, deviceId, 5)
-                val connection = connect(code.pairingToken ?: error("No pairing code came back"))
-                mutable.update { it.copy(notice = "This device is ${connection.name} now. Staff sign in here with their PIN.") }
+                val connected = connect(restaurantId, code.pairingToken ?: error("No pairing code came back"))
+                val name = connected.till.name
+                mutable.update {
+                    it.copy(notice = if (connected.networkSaved) "This device is $name now. This Wi-Fi is saved as the restaurant's network."
+                    else "This device is $name now. Staff sign in here with their PIN.")
+                }
                 load()
             }
         }
@@ -454,6 +490,80 @@ class DevicesScreenModel(
     }
 
     fun dismissFreshCode() = mutable.update { it.copy(freshCode = null) }
+
+    fun openEnterCode() = mutable.update { it.copy(enteringCode = true, codeError = null, error = null, notice = null) }
+
+    fun closeEnterCode() = mutable.update { if (it.saving) it else it.copy(enteringCode = false, codeError = null) }
+
+    /**
+     * Devices → Enter a code: the device the app runs on becomes the till or tablet the code was made for, connected by the
+     * person signed in here. Why a code didn't work stays inside the window.
+     */
+    fun enterCode(code: String) {
+        val connect = connectHere ?: return
+        val current = state.value
+        val restaurantId = current.restaurantId ?: return
+        if (current.saving || code.isBlank()) return
+        if (!current.canConnect && !current.canEdit) {
+            mutable.update { it.copy(codeError = "Ask someone who connects devices to do it.") }
+            return
+        }
+        val token = signIn
+        mutable.update { it.copy(saving = true, codeError = null) }
+        work.launch {
+            writes.withLock {
+                try {
+                    val connected = connect(restaurantId, code.trim())
+                    if (token != signIn) return@withLock
+                    val name = connected.till.name
+                    mutable.update {
+                        it.copy(enteringCode = false, notice = if (connected.networkSaved) "This device is $name now. This Wi-Fi is saved as the restaurant's network."
+                        else "This device is $name now. Staff sign in here with their PIN.")
+                    }
+                    load()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (token == signIn) mutable.update { it.copy(codeError = adminMessage(e, write = true)) }
+                } finally {
+                    mutable.update { it.copy(saving = false) }
+                }
+            }
+        }
+    }
+
+    /** Who can sign in on the open till or tablet: nothing chosen = everyone at its branch. */
+    fun saveSignIn(roleIds: List<String>, userIds: List<String>) {
+        val deviceId = state.value.selectedId ?: return
+        needsEdit {
+            write("Saved") { restaurantId ->
+                val saved = repository.setSignIn(restaurantId, deviceId, roleIds, userIds)
+                mutable.update { if (it.selectedId == deviceId) it.copy(signIn = saved) else it }
+            }
+        }
+    }
+
+    /** People to choose for a device, by name (empty without a search). */
+    suspend fun findPeople(query: String): List<SignInPerson> =
+        if (query.isBlank()) emptyList() else runCatching { searchPeople?.invoke(query.trim()) }.getOrNull().orEmpty()
+
+    /** Moves the open device to another branch: it leaves this branch's list. */
+    fun moveTo(toBranchId: String) {
+        val current = state.value
+        val deviceId = current.selectedId ?: return
+        val branchId = current.branchId ?: return
+        if (toBranchId == branchId) return
+        val name = current.branchChoices.firstOrNull { it.id == toBranchId }?.name
+        needsEdit {
+            write(null) { restaurantId ->
+                val moved = repository.moveDevice(restaurantId, branchId, deviceId, toBranchId)
+                mutable.update { state ->
+                    state.copy(devices = state.devices.filterNot { it.id == deviceId }, selectedId = null,
+                        notice = if (name != null) "${moved.name} works at $name now." else "${moved.name} was moved.")
+                }
+            }
+        }
+    }
 
     fun revokePairingCode(codeId: String) {
         val deviceId = state.value.selectedId ?: return
@@ -501,6 +611,15 @@ class DevicesScreenModel(
     }
 
     // ---- Plumbing ----
+
+    /** Making a code or connecting this device: "Manage devices", or "Connect devices" for a till, tablet or screen. */
+    private inline fun needsConnect(action: () -> Unit) {
+        if (!state.value.mayConnect(state.value.selected)) {
+            mutable.update { it.copy(error = "Ask someone who manages devices to connect this one.") }
+            return
+        }
+        action()
+    }
 
     private inline fun needsEdit(action: () -> Unit) {
         if (!state.value.canEdit) {

@@ -689,6 +689,10 @@ private fun DeviceLimitDialog(
                 Column(Modifier.weight(1f)) {
                     Text(name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = ink, maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    com.saporini.mobile_desktop.core.session.deviceWhere(device.system, device.place, device.sameNetwork)?.let { where ->
+                        Text(where, fontFamily = Inter(), fontSize = 12.5.sp, color = ink.copy(alpha = 0.78f), maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, translate = true)
+                    }
                     Text("Last used " + com.saporini.mobile_desktop.core.format.agoText(device.lastUsedAt ?: device.signedInAt, now, zone),
                         fontFamily = Inter(), fontSize = 12.5.sp, color = muted)
                 }
@@ -696,5 +700,7 @@ private fun DeviceLimitDialog(
                     colors = RadioButtonDefaults.colors(selectedColor = ink))
             }
         }
+        // DB-IP's free place database asks to be named where its places show (CC BY 4.0).
+        if (devices.any { !it.place.isNullOrBlank() }) Text("Places by DB-IP", fontFamily = Inter(), fontSize = 10.5.sp, color = muted.copy(alpha = 0.8f))
     }
 }
