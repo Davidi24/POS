@@ -18,6 +18,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class DeviceConnectRequestIntegrationTest extends AbstractPosApiIntegrationTest {
 
+    /**
+     * Every test request comes from this computer, and connecting a device allows 30 tries per address in 10 minutes: the
+     * suite's tries must not add up across tests (they did on CI, in another order), so each test starts and ends at zero.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    @org.junit.jupiter.api.AfterEach
+    void freshPairingTries() {
+        jdbcTemplate.update("delete from " + SCHEMA + ".public_rate_limits where scope = 'DEVICE_PAIRING_IP'");
+    }
+
     @Test
     void theMakerAgreesThenTheAskingDeviceTakesTheConnection() throws Exception {
         World world = newWorld("connect agree");

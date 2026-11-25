@@ -22,6 +22,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PinSignInLimitsIntegrationTest extends AbstractPosApiIntegrationTest {
 
+    /**
+     * Every test request comes from this computer, and connecting a device allows 30 tries per address in 10 minutes: the
+     * suite's tries must not add up across tests (they did on CI, in another order), so each test starts and ends at zero.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    @org.junit.jupiter.api.AfterEach
+    void freshPairingTries() {
+        jdbcTemplate.update("delete from " + SCHEMA + ".public_rate_limits where scope = 'DEVICE_PAIRING_IP'");
+    }
+
     /** Service work a PIN sign-in keeps (an owner has all of these). */
     private static final List<String> KEPT = List.of("ORDER_READ", "ORDER_UPDATE", "ORDER_VOID", "ORDER_CLOSE", "ORDER_CLOSE_UNPAID",
             "ORDER_DISCOUNT_APPLY", "PAYMENT_REFUND", "TABLES_UPDATE", "RESERVATION_MANAGE", "MENUS_SOLD_OUT", "KDS_UPDATE",
