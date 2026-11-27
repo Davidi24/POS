@@ -32,16 +32,19 @@ import java.util.stream.Collectors;
 
 /**
  * Who can sign in on a till or tablet (user, 2026-11-25: "assign the users who can use it, if I want"). Nothing chosen =
- * everyone at its branch; otherwise people with one of the chosen roles, or the chosen people. Owners, co-owners, admins and
- * managers always can, so nobody is locked out of a till. Checked at PIN sign-in.
+ * everyone at its branch; otherwise people with one of the chosen roles, or the chosen people. Owners and co-owners always
+ * can (admins and managers are chosen like anyone else since 2026-11-27), so the restaurant is never locked out of a till.
+ * Checked at PIN sign-in.
  */
 @Service
 @RequiredArgsConstructor
 public class DeviceSignInService {
 
     /** Can always sign in on any device of their restaurant. */
-    static final Set<String> ALWAYS = Set.of("SUPER_ADMIN", "CO_SUPER_ADMIN", "OWNER", "CO_OWNER", "ADMIN", "MANAGER");
-    private static final List<String> ALWAYS_NAMES = List.of("Owner", "Co-Owner", "Admin", "Manager");
+    // Owners only: admins and managers are chosen like anyone else (user, 2026-11-27: "I can remove access to someone; it
+    // doesn't mean all admins can use it").
+    static final Set<String> ALWAYS = Set.of("SUPER_ADMIN", "CO_SUPER_ADMIN", "OWNER", "CO_OWNER");
+    private static final List<String> ALWAYS_NAMES = List.of("Owner", "Co-Owner");
 
     private final DeviceAllowedRoleRepository allowedRoles;
     private final DeviceAllowedUserRepository allowedUsers;

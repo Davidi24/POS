@@ -59,7 +59,9 @@ public class DeviceCodeController {
                 "Too many tries. Wait a few minutes and try again.");
         try {
             return ResponseEntity.ok(devicePairingService.redeemOwn(request.pairingToken(), address,
-                    settingsDomainSupport.currentActorId(authentication), restaurantId));
+                    settingsDomainSupport.currentActorId(authentication), restaurantId,
+                    pos.pos.security.util.ClientInfoNormalizer.normalizeDeviceName(servletRequest.getHeader("X-Device-Name")),
+                    pos.pos.security.util.ClientInfoNormalizer.normalizeDeviceSystem(servletRequest.getHeader("X-Device-System"))));
         } catch (pos.pos.exception.auth.AuthException refused) {
             // A wrong code is not a sign-in problem: a 401 here would make the app refresh its sign-in and send it again.
             if (refused.getStatus() != org.springframework.http.HttpStatus.UNAUTHORIZED) throw refused;

@@ -51,6 +51,7 @@ public class DeviceManagementService {
     private final SettingsAuditService settingsAuditService;
     private final DevicePairingProperties devicePairingProperties;
     private final OpaqueTokenService opaqueTokenService;
+    private final pos.pos.auth.service.AccountAudit accountAudit;
 
     @Transactional(readOnly = true)
     public List<DeviceAssignmentResponse> getAssignments(
@@ -182,6 +183,11 @@ public class DeviceManagementService {
         if (!device.isActive() || (device.getStatus() != DeviceStatus.PROVISIONING && device.getStatus() != DeviceStatus.ACTIVE)) {
             throw new AuthException("Only active or provisioning devices can be paired", HttpStatus.CONFLICT);
         }
+        // A device in use is disconnected first (user, 2026-11-25: "when it's connected you can't generate a code; you
+        // disconnect it first, otherwise it's confusing").
+        if (StringUtils.hasText(device.getAuthSecretHash())) {
+            throw new AuthException(device.getName() + " is in use. Disconnect it first to make a code.", HttpStatus.CONFLICT);
+        }
         UUID actorId = settingsDomainSupport.currentActorId(authentication);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
@@ -259,6 +265,34 @@ public class DeviceManagementService {
     private Device requireAccessibleDevice(Authentication authentication, UUID restaurantId, UUID deviceId) {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
         return requireDeviceInRestaurant(restaurantId, deviceId);
+    }
+
+    /**
+     * Disconnect (user, 2026-11-25): the device stops being connected. Its secret goes, so the device that had it stops
+     * working at once (its heartbeat and PIN sign-ins are refused and the app there says so), and its open codes end. The
+     * device stays in the list; a new code or "Use this device" connects it again. Like making a code: "Connect devices" for
+     * tills, tablets and screens, "Manage devices" for the rest.
+     */
+    @Transactional
+    public void disconnect(Authentication authentication, UUID restaurantId, UUID deviceId) {
+        Device device = requireManageableDevice(authentication, restaurantId, deviceId);
+        if (!hasAuthority(authentication, "DEVICES_MANAGE") && !pos.pos.device.network.DeviceNetworkService.RULED.contains(device.getDeviceType())) {
+            throw new AuthException("Only someone who manages devices can disconnect this one.", HttpStatus.FORBIDDEN);
+        }
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        List<DevicePairingToken> openTokens = devicePairingTokenRepository.findAllByDevice_IdAndUsedAtIsNullAndRevokedAtIsNull(device.getId());
+        for (DevicePairingToken openToken : openTokens) openToken.revokeAt(now);
+        if (!openTokens.isEmpty()) devicePairingTokenRepository.saveAllAndFlush(openTokens);
+        boolean wasConnected = StringUtils.hasText(device.getAuthSecretHash());
+        device.setAuthSecretHash(null);
+        device.setAuthSecretRotatedAt(null);
+        device.setOnline(false);
+        deviceRepository.saveAndFlush(device);
+        if (wasConnected) {
+            UUID actorId = settingsDomainSupport.currentActorId(authentication);
+            String who = userRepository.findById(actorId).map(pos.pos.auth.service.AccountAudit::nameOf).orElse("Someone");
+            accountAudit.inRestaurant(restaurantId, device.getId(), actorId, "DEVICE_DISCONNECTED", who + " disconnected " + device.getName());
+        }
     }
 
     private static boolean hasAuthority(Authentication authentication, String code) {

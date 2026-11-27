@@ -118,6 +118,13 @@ public class Device extends AbstractAuditedEntity {
     @Column(name = "auth_secret_rotated_at", columnDefinition = "timestamptz")
     private OffsetDateTime authSecretRotatedAt;
 
+    // Which device it's connected on now, as that device said when connecting (user, 2026-11-27: "make it say who has it").
+    @Column(name = "connected_device_name", length = 150)
+    private String connectedDeviceName;
+
+    @Column(name = "connected_device_system", length = 80)
+    private String connectedDeviceSystem;
+
     // Last time the device contacted the backend.
     @Column(name = "last_seen_at", columnDefinition = "timestamptz")
     private OffsetDateTime lastSeenAt;
@@ -186,6 +193,11 @@ public class Device extends AbstractAuditedEntity {
         osVersion = NormalizationUtils.normalize(osVersion);
         appVersion = NormalizationUtils.normalize(appVersion);
         authSecretHash = NormalizationUtils.normalize(authSecretHash);
+        // No connection, nobody has it.
+        if (authSecretHash == null) {
+            connectedDeviceName = null;
+            connectedDeviceSystem = null;
+        }
         ipAddress = NormalizationUtils.normalize(ipAddress);
         macAddress = normalizeMacAddress(macAddress);
         notes = NormalizationUtils.normalize(notes);

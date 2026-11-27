@@ -18,7 +18,7 @@ public class LoginRefusedException extends AuthException {
         TOO_MANY_DEVICES,
         // A refresh for a sign-in that has ended: [signedOutReason] says why (password changed, signed out everywhere…).
         SIGNED_OUT,
-        // PIN sign-in: a PIN nobody in the restaurant has; the till paused after 5 wrong PINs; the device isn't connected;
+        // PIN sign-in: a PIN nobody in the restaurant has; the till paused after 10 wrong PINs; the device isn't connected;
         // the till is outside its restaurant's network while its branch keeps tills on it (user, 2026-11-24).
         WRONG_PIN, PIN_PAUSED, DEVICE_NOT_CONNECTED, OUTSIDE_NETWORK,
         // The person may not sign in on this till or tablet (Devices → Who can sign in here, 2026-11-25).
