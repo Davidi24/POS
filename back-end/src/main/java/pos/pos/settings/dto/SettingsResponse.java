@@ -72,6 +72,9 @@ public class SettingsResponse {
     private Integer kitchenSlowAfterMinutes;
     private Integer kitchenReadyWaitingMinutes;
     private java.math.BigDecimal valuableStockFrom;
+    private Boolean printKitchenOnSend;
+    private Boolean printBillOnRequest;
+    private String printReceiptAfterPayment;
     private Integer inventoryCountFrequency;
     private pos.pos.settings.enums.InventoryCountPeriod inventoryCountPeriod;
     private OffsetDateTime inventoryCountScheduleStartedAt;

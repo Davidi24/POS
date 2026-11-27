@@ -258,6 +258,16 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "kitchen_ready_waiting_minutes", nullable = false)
     private int kitchenReadyWaitingMinutes = 5;
 
+    // Printing (2026-11-27): kitchen tickets when an order is sent, the bill when it's asked for, the receipt after payment.
+    @Column(name = "print_kitchen_on_send", nullable = false)
+    private boolean printKitchenOnSend = true;
+
+    @Column(name = "print_bill_on_request", nullable = false)
+    private boolean printBillOnRequest = true;
+
+    @Column(name = "print_receipt_after_payment", nullable = false, length = 10)
+    private String printReceiptAfterPayment = "ASK";
+
     // Inventory → Overview: stock worth at least this much (at cost) counts as valuable.
     @Column(name = "valuable_stock_from", nullable = false, precision = 12, scale = 2)
     private java.math.BigDecimal valuableStockFrom = new java.math.BigDecimal("100.00");

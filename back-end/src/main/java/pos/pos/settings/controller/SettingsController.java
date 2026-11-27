@@ -173,6 +173,17 @@ public class SettingsController {
         return ResponseEntity.ok(settingsService.updateTables(authentication, restaurantId, request));
     }
 
+    @PatchMapping("/printing")
+    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @Operation(summary = "When kitchen tickets, bills and receipts print by themselves")
+    public ResponseEntity<SettingsResponse> updatePrinting(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody pos.pos.settings.dto.UpdateSettingsPrintingRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updatePrinting(authentication, restaurantId, request));
+    }
+
     @PatchMapping("/inventory")
     @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
     @Operation(summary = "Set from what value stock counts as valuable on the Inventory overview")

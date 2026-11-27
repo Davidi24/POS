@@ -327,6 +327,17 @@ public class SettingsService {
         return saveSettingsAndAudit(context, settings, null, "UPDATE_INVENTORY", "Updated inventory settings");
     }
 
+    /** When things print by themselves (2026-11-27). */
+    @Transactional
+    public SettingsResponse updatePrinting(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsPrintingRequest request) {
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setPrintKitchenOnSend(request.getPrintKitchenOnSend());
+        settings.setPrintBillOnRequest(request.getPrintBillOnRequest());
+        settings.setPrintReceiptAfterPayment(request.getPrintReceiptAfterPayment());
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_PRINTING", "Updated when things print");
+    }
+
     @Transactional
     public SettingsResponse updateTables(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsTablesRequest request) {
         if (request.getSeatingMostExtraGuests() < request.getSeatingExtraGuests()) {

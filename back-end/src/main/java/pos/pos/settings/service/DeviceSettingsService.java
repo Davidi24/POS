@@ -407,6 +407,9 @@ public class DeviceSettingsService {
         printerProfile.setPrinterPort(request.getPrinterPort());
         printerProfile.setAutoCut(Boolean.TRUE.equals(request.getAutoCut()));
         printerProfile.setCashDrawerKickEnabled(Boolean.TRUE.equals(request.getCashDrawerKickEnabled()));
+        printerProfile.setSystemPrinterName(request.getSystemPrinterName());
+        printerProfile.setHostDeviceId(request.getHostDeviceId());
+        if (request.getPrinterRole() != null) printerProfile.setPrinterRole(request.getPrinterRole());
     }
 
     private Device requirePrinter(UUID restaurantId, UUID deviceId) {
@@ -520,7 +523,10 @@ public class DeviceSettingsService {
                 || request.getPrinterIp() != null
                 || request.getPrinterPort() != null
                 || request.getAutoCut() != null
-                || request.getCashDrawerKickEnabled() != null) {
+                || request.getCashDrawerKickEnabled() != null
+                || request.getSystemPrinterName() != null
+                || request.getHostDeviceId() != null
+                || request.getPrinterRole() != null) {
             throw new AuthException("printer-specific fields are not allowed on branch device endpoints", HttpStatus.BAD_REQUEST);
         }
     }
@@ -587,6 +593,8 @@ public class DeviceSettingsService {
                 .online(isOnline(device))
                 .connected(org.springframework.util.StringUtils.hasText(device.getAuthSecretHash()))
                 .connectedAt(device.getAuthSecretRotatedAt())
+                .connectedDeviceName(device.getConnectedDeviceName())
+                .connectedDeviceSystem(device.getConnectedDeviceSystem())
                 .lastSeenAt(device.getLastSeenAt())
                 .ipAddress(device.getIpAddress())
                 .place(geoPlaces == null ? null : geoPlaces.placeOf(device.getIpAddress()))
@@ -596,6 +604,15 @@ public class DeviceSettingsService {
                 .paperWidthMm(printerProfile == null ? null : printerProfile.getPaperWidthMm())
                 .printerIp(printerProfile == null ? null : printerProfile.getPrinterIp())
                 .printerPort(printerProfile == null ? null : printerProfile.getPrinterPort())
+                .systemPrinterName(printerProfile == null ? null : printerProfile.getSystemPrinterName())
+                .hostDeviceId(printerProfile == null ? null : printerProfile.getHostDeviceId())
+                .printerRole(printerProfile == null ? null : printerProfile.getPrinterRole())
+                .printerState(printerProfile == null ? null : printerState(printerProfile))
+                .printerReachedAt(printerProfile == null ? null : printerProfile.getReachedAt())
+                .printerCheckedAt(printerProfile == null ? null : printerProfile.getCheckedAt())
+                .printerCheckedBy(printerProfile == null || printerProfile.getCheckedBy() == null ? null
+                        : deviceRepository.findById(printerProfile.getCheckedBy()).map(Device::getName).orElse(null))
+                .printerProblem(printerProfile == null ? null : printerProfile.getCheckProblem())
                 .autoCut(printerProfile == null ? null : printerProfile.isAutoCut())
                 .cashDrawerKickEnabled(printerProfile == null ? null : printerProfile.isCashDrawerKickEnabled())
                 .createdAt(device.getCreatedAt())
@@ -605,13 +622,23 @@ public class DeviceSettingsService {
 
     /**
      * A device that signs in is online while it's heard from (its heartbeat every minute, `app.devices.online-minutes`, 3 by
-     * default); a printer is what was set on it.
+     * default); a printer while a till reached it lately (tills check every minute).
      */
     private boolean isOnline(Device device) {
-        if (device.getDeviceType() == DeviceType.PRINTER) return device.isOnline();
+        if (device.getDeviceType() == DeviceType.PRINTER) {
+            return device.getPrinterProfile() != null && "ONLINE".equals(printerState(device.getPrinterProfile()));
+        }
         java.time.OffsetDateTime seen = device.getLastSeenAt();
         return device.isOnline() && seen != null
                 && seen.isAfter(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusMinutes(onlineMinutes));
+    }
+
+    /** ONLINE: a till reached it lately; OFFLINE: one checked lately and nobody reached it; UNCHECKED: no till checked lately. */
+    private String printerState(DevicePrinterProfile profile) {
+        java.time.OffsetDateTime since = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusMinutes(onlineMinutes);
+        if (profile.getReachedAt() != null && profile.getReachedAt().isAfter(since)) return "ONLINE";
+        if (profile.getCheckedAt() != null && profile.getCheckedAt().isAfter(since)) return "OFFLINE";
+        return "UNCHECKED";
     }
 
     @org.springframework.beans.factory.annotation.Value("${app.devices.online-minutes:3}")
