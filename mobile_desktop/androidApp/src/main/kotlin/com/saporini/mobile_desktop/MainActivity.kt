@@ -17,6 +17,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Keys no text field took: a barcode scanner's quick burst ending with Enter is a scan (user, 2026-11-27).
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        val scanner = com.saporini.mobile_desktop.core.scan.ScanCatcher
+        if (keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) {
+            if (scanner.enter()) return true
+        } else {
+            event.unicodeChar.takeIf { it > 0 }?.let { scanner.char(it.toChar()) }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     // Every touch or key on the app's screen keeps a connected till from locking.
     override fun onUserInteraction() {
         super.onUserInteraction()

@@ -11,7 +11,7 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 - Adding: pick the kind, editor, then Confirm (pairing code for tills, tablets and terminals).
 
 ## Known gaps (MOCK)
-- [ ] Barcode scanners and cash drawers live only in memory (`DeviceExtras.kt`); the server has no SCANNER / CASH_DRAWER types.
+- [x] Barcode scanners and cash drawers live only in memory (2026-11-27: cash drawers are devices on the server, plugged into a printer; scanners need nothing set up, a scan anywhere shows what it is).
 - [x] The printer test page prints (2026-11-27); a cash drawer opens through its receipt printer on cash payments.
 - [x] Nothing printed (2026-11-27: kitchen tickets, bills, receipts, test pages and the drawer print now; the logo and pictures too since the second round).
 - [x] Settings → Devices & printing is an empty page (2026-11-27: the restaurant's network, Where things print, When things print).
@@ -175,6 +175,17 @@ a PIN sign-in gets its permissions without those). Now for this step: everything
   device", "isn't paired any more"); with no till open for 3 minutes printers read Not checked; a till that can't reach a
   printer in another branch doesn't turn it Offline while another till reaches it; the Printers card counts the offline ones
   in red; a locked till still checks; nothing comes out of the printers.
+- Card terminals, drawers, scanners, codes (written 2026-11-27): a card terminal connected to Bar till by Bluetooth (the paired
+  one picked on a tablet, "Paired as" on a computer) or by cable; not connected reads amber everywhere and Bar till's payment
+  screen says no terminal; on Bar till a card payment opens "Waiting for Card terminal 1" (Approved takes it, Declined takes
+  nothing and says so, Cancel goes back), the tablet without one only records it; a terminal can't be connected to a printer
+  or another restaurant's till; removing the till lets go of the terminal. A cash drawer plugged into the receipt printer:
+  Open the drawer opens it, a cash payment at a till printing there opens it, a drawer can't go into a till; removing it stops
+  the drawer opening. A barcode scanner: a scan with no field clicked shows the item (picture, stock per place) with Open in
+  Inventory (Stock's scan window opens there) or New item with this barcode; in a search box it only types; a person without
+  stock access sees "You can't see stock items"; signed out nothing happens; Devices → Barcode scanners: Try it reads a scan.
+  Codes: Enter a code is only on the Tills and Tablets & screens pages; a till's code in Tablets & screens (and the other
+  way) says "This code doesn't work here…" and connects nothing; in its own kind it waits for its maker as before.
 - Eight code boxes: typing, pasting "k7p4-9qxm" or "K7P49QXM", Backspace, Enter, the 8th character sends it; a wrong code
   turns the boxes red until typed again; on a phone the keyboard shows capitals and Done.
 - A till doesn't lock for 3 minutes on a device's page, in Enter a code and in the agree window.
@@ -185,6 +196,11 @@ a PIN sign-in gets its permissions without those). Now for this step: everything
   pictures, barcode, QR codes, DGII's QR). The design is kept on the server (`/restaurants/{r}/receipt-design`, since V137).
 
 ## Done
+- 2026-11-27 — Card terminals through a till or tablet (Bluetooth or cable), cash drawers on the server (plugged into a
+  printer), barcode scanners with nothing to set up (a scan anywhere shows what it is), codes typed inside their kind (user:
+  "make them work only if they are connected with a till or a tablet"; "the scanner: you just connect it"; "you go inside the
+  till to enter the code"). Server V147, `applyLink`, `/card-terminal`, codes by `kind`; app: terminal and drawer fields and
+  cards, the payment's terminal step (test mode), `ScanCatcher`/`ScanWindow`/`ScannerPage`, Enter a code on the kind pages.
 - 2026-11-27 — Printing, second round (user: "the printer prints exactly as I configured the receipt"; "second only if the
   first fails"; ready-made printer kinds; Bluetooth; a USB printer on one till printing for the others; "a normal printer
   for documents like in Statistics"). Server V145 (`printer_role`, `print_queue`), `/printers/{p}/jobs`, the queue and its

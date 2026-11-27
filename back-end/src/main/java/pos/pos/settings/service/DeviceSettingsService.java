@@ -5,6 +5,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.device.entity.Device;
 import pos.pos.device.entity.DevicePrinterProfile;
@@ -380,6 +381,57 @@ public class DeviceSettingsService {
         if (device.getPrinterProfile() != null) {
             device.setPrinterProfile(null);
         }
+        applyLink(device, restaurantId, request);
+    }
+
+    /**
+     * What a card terminal or a cash drawer is connected to (user, 2026-11-27): a card terminal works only through a till or
+     * tablet of the restaurant, by Bluetooth or cable (none chosen = not connected, so it can't take payments); a cash drawer is
+     * plugged into one of the restaurant's printers. Other devices are connected to nothing.
+     */
+    private void applyLink(Device device, UUID restaurantId, UpsertDeviceRequest request) {
+        UUID linked = request.getLinkedDeviceId();
+        DeviceType type = device.getDeviceType();
+        if (type != DeviceType.PAYMENT_TERMINAL && type != DeviceType.CASH_DRAWER) {
+            if (linked != null || request.getLinkType() != null || StringUtils.hasText(request.getLinkAddress())) {
+                throw new AuthException("Only card terminals and cash drawers are connected to another device.", HttpStatus.BAD_REQUEST);
+            }
+            clearLink(device);
+            return;
+        }
+        if (linked == null) {
+            clearLink(device);
+            return;
+        }
+        Device target = deviceRepository.findById(linked)
+                .filter(candidate -> candidate.getRestaurant() != null && restaurantId.equals(candidate.getRestaurant().getId()))
+                .filter(candidate -> candidate.getStatus() != DeviceStatus.RETIRED)
+                .orElseThrow(() -> new AuthException("Choose one of this restaurant's devices.", HttpStatus.BAD_REQUEST));
+        if (type == DeviceType.PAYMENT_TERMINAL) {
+            if (target.getDeviceType() != DeviceType.POS_TERMINAL && target.getDeviceType() != DeviceType.TABLET) {
+                throw new AuthException("A card terminal is connected to a till or a tablet.", HttpStatus.BAD_REQUEST);
+            }
+            if (!"USB".equals(request.getLinkType()) && !"BLUETOOTH".equals(request.getLinkType())) {
+                throw new AuthException("Choose Bluetooth or cable.", HttpStatus.BAD_REQUEST);
+            }
+            if ("BLUETOOTH".equals(request.getLinkType()) && !StringUtils.hasText(request.getLinkAddress())) {
+                throw new AuthException("Choose the paired card terminal.", HttpStatus.BAD_REQUEST);
+            }
+            device.setLinkType(request.getLinkType());
+        } else {
+            if (target.getDeviceType() != DeviceType.PRINTER) {
+                throw new AuthException("A cash drawer is plugged into a printer.", HttpStatus.BAD_REQUEST);
+            }
+            device.setLinkType("PRINTER");
+        }
+        device.setLinkedDeviceId(target.getId());
+        device.setLinkAddress(StringUtils.hasText(request.getLinkAddress()) ? request.getLinkAddress().trim() : null);
+    }
+
+    private static void clearLink(Device device) {
+        device.setLinkedDeviceId(null);
+        device.setLinkType(null);
+        device.setLinkAddress(null);
     }
 
     private void ensurePrinterProfile(Device device, UpsertDeviceRequest request) {
@@ -613,6 +665,11 @@ public class DeviceSettingsService {
                 .printerCheckedBy(printerProfile == null || printerProfile.getCheckedBy() == null ? null
                         : deviceRepository.findById(printerProfile.getCheckedBy()).map(Device::getName).orElse(null))
                 .printerProblem(printerProfile == null ? null : printerProfile.getCheckProblem())
+                .linkedDeviceId(device.getLinkedDeviceId())
+                .linkedDeviceName(device.getLinkedDeviceId() == null ? null
+                        : deviceRepository.findById(device.getLinkedDeviceId()).map(Device::getName).orElse(null))
+                .linkType(device.getLinkType())
+                .linkAddress(device.getLinkAddress())
                 .autoCut(printerProfile == null ? null : printerProfile.isAutoCut())
                 .cashDrawerKickEnabled(printerProfile == null ? null : printerProfile.isCashDrawerKickEnabled())
                 .createdAt(device.getCreatedAt())

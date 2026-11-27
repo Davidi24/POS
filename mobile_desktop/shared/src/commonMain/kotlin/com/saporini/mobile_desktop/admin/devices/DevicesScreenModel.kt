@@ -54,6 +54,11 @@ data class DeviceDraft(
     val systemPrinterName: String = "",
     val hostDeviceId: String? = null,
     val printerRole: String = "OTHER",
+    // A card terminal: the till or tablet it's connected to, BLUETOOTH or USB, the paired terminal's address or the cable's
+    // port; a cash drawer: the printer it's plugged into (2026-11-27).
+    val linkedDeviceId: String? = null,
+    val linkType: String = "BLUETOOTH",
+    val linkAddress: String = "",
     // Kept as the server sent them; the Admin Hub doesn't edit what the device reports about itself.
     val platform: String? = null,
     val osVersion: String? = null,
@@ -68,7 +73,8 @@ fun deviceDraftOf(device: DeviceDto, printer: Boolean) = DeviceDraft(
     paperWidthText = device.paperWidthMm?.toString() ?: "80", printerIp = device.printerIp.orEmpty(),
     printerPortText = device.printerPort?.toString().orEmpty(), autoCut = device.autoCut ?: true,
     cashDrawerKick = device.cashDrawerKickEnabled ?: false, systemPrinterName = device.systemPrinterName.orEmpty(),
-    hostDeviceId = device.hostDeviceId, printerRole = device.printerRole ?: "OTHER", platform = device.platform, osVersion = device.osVersion, appVersion = device.appVersion
+    hostDeviceId = device.hostDeviceId, printerRole = device.printerRole ?: "OTHER", linkedDeviceId = device.linkedDeviceId,
+    linkType = device.linkType?.takeIf { it != "PRINTER" } ?: "BLUETOOTH", linkAddress = device.linkAddress.orEmpty(), platform = device.platform, osVersion = device.osVersion, appVersion = device.appVersion
 )
 
 private val IP_TEXT = Regex("^[0-9A-Fa-f:.]*$")
@@ -94,6 +100,9 @@ fun deviceProblem(draft: DeviceDraft): String? {
         draft.printer && draft.connection == "NETWORK" && draft.printerIp.isBlank() -> "Enter the printer's IP address"
         draft.printer && draft.connection == "USB" && draft.systemPrinterName.isBlank() -> "Choose the printer on this computer"
         draft.printer && draft.connection == "BLUETOOTH" && draft.systemPrinterName.isBlank() -> "Choose the paired Bluetooth printer"
+        !draft.printer && draft.deviceType == "PAYMENT_TERMINAL" && draft.linkedDeviceId != null && draft.linkType == "BLUETOOTH"
+            && draft.linkAddress.isBlank() -> "Choose the paired card terminal"
+        !draft.printer && draft.deviceType == "CASH_DRAWER" && draft.linkedDeviceId == null -> "Choose the printer it's plugged into"
         draft.printer && draft.printerPortText.isNotBlank() && draft.printerPortText.trim().toIntOrNull()?.takeIf { it in 1..65535 } == null ->
             "The port must be 1–65535"
         else -> null
@@ -126,7 +135,16 @@ fun deviceRequest(draft: DeviceDraft, branchId: String?) = DeviceRequestDto(
     cashDrawerKickEnabled = draft.cashDrawerKick.takeIf { draft.printer },
     systemPrinterName = draft.systemPrinterName.trim().ifEmpty { null }.takeIf { draft.printer && draft.connection in setOf("USB", "BLUETOOTH") },
     hostDeviceId = draft.hostDeviceId.takeIf { draft.printer && draft.connection in setOf("USB", "BLUETOOTH") },
-    printerRole = draft.printerRole.takeIf { draft.printer }
+    printerRole = draft.printerRole.takeIf { draft.printer },
+    // Only card terminals (a till or tablet) and cash drawers (a printer) are connected to another device.
+    linkedDeviceId = draft.linkedDeviceId.takeIf { !draft.printer && draft.deviceType in setOf("PAYMENT_TERMINAL", "CASH_DRAWER") },
+    linkType = when {
+        draft.printer || draft.linkedDeviceId == null -> null
+        draft.deviceType == "CASH_DRAWER" -> "PRINTER"
+        draft.deviceType == "PAYMENT_TERMINAL" -> draft.linkType
+        else -> null
+    },
+    linkAddress = draft.linkAddress.trim().ifEmpty { null }.takeIf { !draft.printer && draft.deviceType == "PAYMENT_TERMINAL" && draft.linkedDeviceId != null }
 )
 
 data class DevicesState(
@@ -156,6 +174,8 @@ data class DevicesState(
     val freshCode: PairingCodeDto? = null,
     // Devices → Enter a code: the window is open, and why the last code didn't work (shown inside it).
     val enteringCode: Boolean = false,
+    // Where the code is typed (user, 2026-11-27: "you go inside the till to enter the code"): TILL or TABLET.
+    val codeKind: String? = null,
     val codeError: String? = null,
     // The code was typed and waits for the person who made it to agree (user, 2026-11-25).
     val connectWait: ConnectWait? = null,
@@ -408,9 +428,10 @@ class DevicesScreenModel(
 
     /** A free short code and a name for a new device of [type]: TAB-4 and "Tablet 4" when TAB-1…3 exist. */
     private fun suggestion(type: String): Pair<String, String> {
-        val prefix = when (type) { "POS_TERMINAL" -> "TILL"; "TABLET" -> "TAB"; "KDS" -> "KDS"; "CUSTOMER_DISPLAY" -> "CD"; "PAYMENT_TERMINAL" -> "PAY"; else -> "PRN" }
+        val prefix = when (type) { "POS_TERMINAL" -> "TILL"; "TABLET" -> "TAB"; "KDS" -> "KDS"; "CUSTOMER_DISPLAY" -> "CD"; "PAYMENT_TERMINAL" -> "PAY"
+            "CASH_DRAWER" -> "DRW"; else -> "PRN" }
         val label = when (type) { "POS_TERMINAL" -> "Till"; "TABLET" -> "Tablet"; "KDS" -> "Kitchen screen"; "CUSTOMER_DISPLAY" -> "Guest display"
-            "PAYMENT_TERMINAL" -> "Card terminal"; else -> "Printer" }
+            "PAYMENT_TERMINAL" -> "Card terminal"; "CASH_DRAWER" -> "Cash drawer"; else -> "Printer" }
         val taken = (state.value.devices + state.value.printers).map { it.code.uppercase() }.toSet()
         val next = generateSequence(1) { it + 1 }.first { "$prefix-$it" !in taken }
         return "$prefix-$next" to "$label $next"
@@ -642,13 +663,27 @@ class DevicesScreenModel(
         }
     }
 
+    /** Opens [drawer] (a cash drawer) through the printer it's plugged into, from this device. */
+    fun openDrawer(drawer: DeviceDto) {
+        val printing = com.saporini.mobile_desktop.core.printing.PrintHooks.printing ?: return
+        val printer = state.value.printers.firstOrNull { it.id == drawer.linkedDeviceId }
+        if (printer == null) {
+            mutable.update { it.copy(error = "Choose the printer it's plugged into first") }
+            return
+        }
+        work.launch {
+            val opened = printing.openDrawer(printTargetOf(printer))
+            mutable.update { if (opened) it.copy(notice = "Sent to ${printer.name}. Did the drawer open?") else it }
+        }
+    }
+
     /** A test page on [device] (a printer), from this device. */
     fun testPrinter(device: DeviceDto) {
         val printing = com.saporini.mobile_desktop.core.printing.PrintHooks.printing ?: return
         work.launch { printing.testPage(printTargetOf(device)) }
     }
 
-    fun openEnterCode() = mutable.update { it.copy(enteringCode = true, codeError = null, error = null, notice = null) }
+    fun openEnterCode(kind: String) = mutable.update { it.copy(enteringCode = true, codeKind = kind, codeError = null, error = null, notice = null) }
 
     fun closeEnterCode() {
         if (state.value.saving) return
@@ -674,7 +709,7 @@ class DevicesScreenModel(
         mutable.update { it.copy(saving = true, codeError = null) }
         work.launch {
             try {
-                val asked = connector.ask(restaurantId, code.trim())
+                val asked = connector.ask(restaurantId, code.trim(), current.codeKind)
                 if (token != signIn) return@launch
                 mutable.update { it.copy(connectWait = ConnectWait(asked.request, asked.claimToken, nowMs())) }
                 followWait(restaurantId, asked.request.id, asked.claimToken, token)

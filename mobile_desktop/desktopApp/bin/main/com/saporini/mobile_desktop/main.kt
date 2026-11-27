@@ -84,6 +84,16 @@ fun main() {
     application {
         Window(
             onCloseRequest = ::exitApplication,
+            // Keys no text field took: a barcode scanner's quick burst ending with Enter is a scan (user, 2026-11-27).
+            onKeyEvent = { event ->
+                val awt = event.nativeKeyEvent as? java.awt.event.KeyEvent
+                val scanner = com.saporini.mobile_desktop.core.scan.ScanCatcher
+                when {
+                    awt?.id == java.awt.event.KeyEvent.KEY_TYPED && awt.keyChar != '\n' && awt.keyChar != '\r' -> { scanner.char(awt.keyChar); false }
+                    awt?.id == java.awt.event.KeyEvent.KEY_PRESSED && awt.keyCode == java.awt.event.KeyEvent.VK_ENTER -> scanner.enter()
+                    else -> false
+                }
+            },
             title = "mobile_desktop",
             state = rememberWindowState(
                 placement = WindowPlacement.Floating,

@@ -50,6 +50,11 @@ public interface DeviceRepository extends JpaRepository<Device, UUID> {
 
     Optional<Device> findByIdAndRestaurant_Id(UUID deviceId, UUID restaurantId);
 
+    /** Devices of [type] connected to [linkedDeviceId] (a till's card terminals, a printer's cash drawers). */
+    List<Device> findByRestaurant_IdAndDeviceTypeAndLinkedDeviceIdOrderByNameAsc(UUID restaurantId, pos.pos.device.enums.DeviceType type, UUID linkedDeviceId);
+
+    List<Device> findByRestaurant_IdAndDeviceType(UUID restaurantId, pos.pos.device.enums.DeviceType type);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT d FROM Device d WHERE d.id = :deviceId AND d.restaurant.id = :restaurantId")
     Optional<Device> findForUpdateByIdAndRestaurantId(

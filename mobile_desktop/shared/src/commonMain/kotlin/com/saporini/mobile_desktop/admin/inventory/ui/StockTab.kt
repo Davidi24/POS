@@ -187,6 +187,14 @@ internal fun StockTab(state: InventoryState, model: InventoryScreenModel, size: 
     var sort by rememberSaveable { mutableStateOf(StockSort.URGENT) }
     var scanning by remember { mutableStateOf(false) }
     var scanned by remember { mutableStateOf<String?>(null) }
+    // A barcode scanned elsewhere opens here once the items have loaded (2026-11-27).
+    val jumpScan = com.saporini.mobile_desktop.admin.inventory.InventoryJump.scan
+    LaunchedEffect(jumpScan, state.items.isNotEmpty(), state.loading) {
+        val code = jumpScan ?: return@LaunchedEffect
+        if (state.items.isEmpty() && state.loading) return@LaunchedEffect
+        com.saporini.mobile_desktop.admin.inventory.InventoryJump.scan = null
+        scanned = code
+    }
     // Lines picked for one change together ("place|item"); the Stock action button only shows while some are picked.
     var selected by remember { mutableStateOf(setOf<String>()) }
     // Lines that vanish (another place picked, stock gone) drop out of the selection.

@@ -218,6 +218,8 @@ fun App() {
                     com.saporini.mobile_desktop.admin.devices.ui.TillChanges(navigator)
                     // Printing's toasts and questions ("Print the receipt?", which printer).
                     com.saporini.mobile_desktop.core.printing.PrintingPanel()
+                    // A barcode scanned anywhere while signed in: what it is (2026-11-27).
+                    com.saporini.mobile_desktop.core.scan.ScanWindow(navigator)
                 }
             }
         }

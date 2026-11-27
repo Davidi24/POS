@@ -209,22 +209,6 @@ Reset	Reimpostato	Restablecido	Rivendosur
 Changed	Modificato	Cambiado	Ndryshuar
 X-Device-Name	X-Device-Name	X-Device-Name	X-Device-Name
 X-Device-System	X-Device-System	X-Device-System	X-Device-System
-SCAN-1	SCAN-1	SCAN-1	SCAN-1
-Stock scanner	Scanner del magazzino	Escáner de inventario	Skaner i stokut
-Zebra	Zebra	Zebra	Zebra
-USB, in the store room. Used for counts and deliveries.	USB, nel magazzino. Usato per inventari e consegne.	USB, en el almacén. Se usa para conteos y entregas.	USB, në magazinë. Përdoret për numërime dhe dorëzime.
-SCAN-2	SCAN-2	SCAN-2	SCAN-2
-Bar scanner	Scanner del bar	Escáner del bar	Skaner i barit
-Honeywell	Honeywell	Honeywell	Honeywell
-Voyager 1472g	Voyager 1472g	Voyager 1472g	Voyager 1472g
-Bluetooth, new.	Bluetooth, nuovo.	Bluetooth, nuevo.	Bluetooth, i ri.
-DRW-1	DRW-1	DRW-1	DRW-1
-Front cash drawer	Cassetto contanti della cassa	Cajón de efectivo de caja	Sirtari i parave i arkës
-Vasario	Vasario	Vasario	Vasario
-Plugged into the Receipt printer.	Collegato alla stampante scontrini.	Conectado a la impresora de recibos.	Lidhur me printerin e faturave.
-DRW-2	DRW-2	DRW-2	DRW-2
-Bar cash drawer	Cassetto contanti del bar	Cajón de efectivo del bar	Sirtari i parave i barit
-Plugged into the Bar printer.	Collegato alla stampante del bar.	Conectado a la impresora del bar.	Lidhur me printerin e barit.
 Scanner	Scanner	Escáner	Skaner
 Cash drawer	Cassetto contanti	Cajón de efectivo	Sirtar parash
 Receipt printer	Stampante scontrini	Impresora de recibos	Printer faturash
@@ -257,6 +241,8 @@ This isn't a printer IP address	Questo non è l'indirizzo IP di una stampante	Es
 Enter the printer's IP address	Inserisci l'indirizzo IP della stampante	Escribe la dirección IP de la impresora	Shkruaj adresën IP të printerit
 Choose the printer on this computer	Scegli la stampante su questo computer	Elige la impresora en esta computadora	Zgjidh printerin në këtë kompjuter
 Choose the paired Bluetooth printer	Scegli la stampante Bluetooth associata	Elige la impresora Bluetooth vinculada	Zgjidh printerin Bluetooth të çiftuar
+Choose the paired card terminal	Scegli il terminale di pagamento associato	Elige el terminal de pago vinculado	Zgjidh terminalin e kartave të çiftuar
+Choose the printer it's plugged into	Scegli la stampante a cui è collegato	Elige la impresora a la que está conectado	Zgjidh printerin ku është lidhur
 The port must be 1–65535	La porta deve essere 1–65535	El puerto debe ser 1–65535	Porta duhet të jetë 1–65535
 Sign in with your password to connect devices.	Accedi con la tua password per collegare i dispositivi.	Inicia sesión con tu contraseña para conectar dispositivos.	Hyr me fjalëkalimin tënd për të lidhur pajisjet.
 Ask someone who connects devices to do it.	Chiedi a chi collega i dispositivi di farlo.	Pídele a quien conecta los dispositivos que lo haga.	Kërkoji dikujt që lidh pajisjet ta bëjë.
@@ -276,6 +262,8 @@ This device is {} now. Staff sign in here with their PIN.	Questo dispositivo ora
 Couldn't load what it prints	Impossibile caricare cosa stampa	No se pudo cargar lo que imprime	Nuk u ngarkua çfarë printon
 Saved	Salvato	Guardado	U ruajt
 Couldn't save. Try again.	Non è stato possibile salvare. Riprova.	No se pudo guardar. Inténtalo de nuevo.	Nuk u ruajt. Provo përsëri.
+Choose the printer it's plugged into first	Prima scegli la stampante a cui è collegato	Primero elige la impresora a la que está conectado	Zgjidh fillimisht printerin ku është lidhur
+Sent to {}. Did the drawer open?	Inviato a {}. Il cassetto si è aperto?	Enviado a {}. ¿Se abrió el cajón?	U dërgua te {}. A u hap sirtari?
 {} said no, so the code was ended. Ask for a new one.	{} ha detto di no, quindi il codice è stato chiuso. Chiedine uno nuovo.	{} dijo que no, así que el código se cerró. Pide uno nuevo.	{} tha jo, prandaj kodi u mbyll. Kërko një të ri.
 Nobody agreed in time. Try again, or ask for a new code.	Nessuno ha accettato in tempo. Riprova o chiedi un nuovo codice.	Nadie aceptó a tiempo. Inténtalo de nuevo o pide un código nuevo.	Askush nuk pranoi në kohë. Provo përsëri ose kërko një kod të ri.
 {} works at {} now.	{} ora lavora a {}.	{} ahora funciona en {}.	{} tani punon në {}.
@@ -306,13 +294,15 @@ Nobody has connected it yet	Nessuno l'ha ancora collegato	Nadie lo ha conectado 
 No longer {}	Non è più {}	Ya no es {}	Nuk është më {}
 This is {}	Questo è {}	Este es {}	Kjo është {}
 Forget it	Dimenticalo	Olvidarlo	Harroje
-Enter a code	Inserisci un codice	Ingresa un código	Fut një kod
+Enter a tablet's or screen's code	Inserisci il codice di un tablet o schermo	Ingresa el código de una tableta o pantalla	Fut kodin e një tableti ose ekrani
+Enter a till's code	Inserisci il codice di una cassa	Ingresa el código de una caja	Fut kodin e një arke
 It didn't connect	Non si è collegato	No se conectó	Nuk u lidh
 Waiting for an answer	In attesa di una risposta	Esperando una respuesta	Në pritje të një përgjigjeje
 Connect	Collega	Conectar	Lidh
 Close	Chiudi	Cerrar	Mbyll
 Try again	Riprova	Reintentar	Provo përsëri
-Type the code from the till or tablet's page. This device becomes that one.	Scrivi il codice dalla pagina della cassa o del tablet. Questo dispositivo diventa quello.	Escribe el código de la página de la caja o la tableta. Este dispositivo pasa a ser ese.	Shkruaj kodin nga faqja e arkës ose e tabletit. Kjo pajisje bëhet ajo.
+Type the code from the tablet's or screen's page. This device becomes that one.	Digita il codice dalla pagina del tablet o dello schermo. Questo dispositivo diventa quello.	Escribe el código de la página de la tableta o pantalla. Este dispositivo pasa a ser ese.	Shkruaj kodin nga faqja e tabletit ose ekranit. Kjo pajisje bëhet ajo.
+Type the code from the till's page. This device becomes that till.	Digita il codice dalla pagina della cassa. Questo dispositivo diventa quella cassa.	Escribe el código de la página de la caja. Este dispositivo pasa a ser esa caja.	Shkruaj kodin nga faqja e arkës. Kjo pajisje bëhet ajo arkë.
 This device is {} now. With a code it becomes another one.	Questo dispositivo ora è {}. Con un codice diventa un altro.	Este dispositivo ahora es {}. Con un código pasa a ser otro.	Kjo pajisje tani është {}. Me një kod bëhet një tjetër.
 The person who made the code	La persona che ha creato il codice	La persona que creó el código	Personi që krijoi kodin
 Waiting for {}	In attesa di {}	Esperando a {}	Në pritje të {}
@@ -411,11 +401,14 @@ Select the code to copy it.	Seleziona il codice per copiarlo.	Selecciona el cód
 Confirm {}	Conferma {}	Confirmar {}	Konfirmo {}
 Later	Più tardi	Más tarde	Më vonë
 Confirm, it works	Conferma, funziona	Confirmar, funciona	Konfirmo, punon
-Switch on the card terminal.	Accendi il terminale POS.	Enciende la terminal de pago.	Ndiz terminalin e kartave.
-Open its pairing screen.	Apri la sua schermata di abbinamento.	Abre su pantalla de vinculación.	Hap ekranin e tij të lidhjes.
+Connect it to {} by {}.	Collegalo a {} via {}.	Conéctalo a {} por {}.	Lidhe me {} me {}.
+Edit it and choose the till or tablet it's connected to.	Modificalo e scegli la cassa o il tablet a cui è collegato.	Edítalo y elige la caja o tableta a la que está conectado.	Ndryshoje dhe zgjidh arkën ose tabletin me të cilin është lidhur.
+Card payments on that till or tablet go to it.	I pagamenti con carta su quella cassa o tablet vanno a lui.	Los pagos con tarjeta en esa caja o tableta van a él.	Pagesat me kartë në atë arkë ose tablet shkojnë tek ai.
+Try a test payment	Prova un pagamento di test	Prueba un pago de prueba	Provo një pagesë provë
+Test mode: no payment provider is connected yet, so card payments ask how the card went.	Modalità test: nessun fornitore di pagamenti è ancora collegato, quindi i pagamenti con carta chiedono com'è andata.	Modo de prueba: aún no hay un proveedor de pagos conectado, así que los pagos con tarjeta preguntan cómo fue.	Modalitet prove: ende nuk është lidhur asnjë ofrues pagesash, ndaj pagesat me kartë pyesin si shkoi.
 Open Saporini on the {} and sign in with your own account.	Apri Saporini su {} e accedi con il tuo account.	Abre Saporini en {} e inicia sesión con tu cuenta.	Hap Saporini në {} dhe hyr me llogarinë tënde.
-Go to Admin Hub → Devices and press “Enter a code”.	Vai su Admin Hub → Dispositivi e premi “Inserisci un codice”.	Ve a Admin Hub → Dispositivos y pulsa “Ingresa un código”.	Shko te Admin Hub → Pajisjet dhe shtyp “Fut një kod”.
-Type this code. It works once.	Digita questo codice. Funziona una volta.	Escribe este código. Funciona una vez.	Shkruaj këtë kod. Punon një herë.
+Go to Admin Hub → Devices → Tills and press “Enter a code”.	Vai in Admin Hub → Dispositivi → Casse e premi “Inserisci un codice”.	Ve a Admin Hub → Dispositivos → Cajas y pulsa “Ingresa un código”.	Shko te Admin Hub → Pajisjet → Arkat dhe shtyp “Fut një kod”.
+Go to Admin Hub → Devices → Tablets & screens and press “Enter a code”.	Vai in Admin Hub → Dispositivi → Tablet e schermi e premi “Inserisci un codice”.	Ve a Admin Hub → Dispositivos → Tabletas y pantallas y pulsa “Ingresa un código”.	Shko te Admin Hub → Pajisjet → Tabletë dhe ekrane dhe shtyp “Fut një kod”.
 Type this code. You're asked here to agree, then it's connected.	Digita questo codice. Ti verrà chiesto qui di accettare, poi sarà collegato.	Escribe este código. Aquí se te pedirá que aceptes y luego quedará conectado.	Shkruaj këtë kod. Këtu do të të kërkohet ta pranosh, pastaj lidhet.
 Works until {}. When it shows as connected, confirm it.	Valido fino a {}. Quando risulta collegato, confermalo.	Válido hasta {}. Cuando aparezca como conectado, confírmalo.	Vlen deri më {}. Kur të shfaqet i lidhur, konfirmoje.
 Make a pairing code	Crea un codice di abbinamento	Crear un código de vinculación	Krijo një kod lidhjeje
@@ -431,11 +424,11 @@ Click the field below and scan any barcode, a bottle or a box.	Fai clic nel camp
 Test scan	Scansione di prova	Escaneo de prueba	Skanim prove
 Click here, then scan	Fai clic qui, poi scansiona	Haz clic aquí y luego escanea	Kliko këtu, pastaj skano
 Read “{}”. The scanner works.	Letto “{}”. Lo scanner funziona.	Leído “{}”. El escáner funciona.	U lexua “{}”. Skaneri punon.
-Plug the drawer's cable into the receipt printer.	Collega il cavo del cassetto alla stampante scontrini.	Conecta el cable del cajón a la impresora de recibos.	Lidh kabllon e sirtarit me printerin e faturave.
+Plug the drawer's cable into {}.	Collega il cavo del cassetto a {}.	Conecta el cable del cajón a {}.	Fut kabllon e sirtarit në {}.
+Edit it and choose the printer it's plugged into.	Modificalo e scegli la stampante a cui è collegato.	Edítalo y elige la impresora a la que está conectado.	Ndryshoje dhe zgjidh printerin ku është lidhur.
 Open it from here, like after a cash payment.	Aprilo da qui, come dopo un pagamento in contanti.	Ábrelo desde aquí, como después de un pago en efectivo.	Hape nga këtu, si pas një pagese me para në dorë.
 Open it again	Aprilo di nuovo	Abrirlo de nuevo	Hape përsëri
 Open the drawer	Apri il cassetto	Abrir el cajón	Hap sirtarin
-Sent. Did the drawer open?	Inviato. Il cassetto si è aperto?	Enviado. ¿Se abrió el cajón?	U dërgua. A u hap sirtari?
 Confirm	Conferma	Confirmar	Konfirmo
 Next you'll check it works and confirm it.	Poi verificherai che funziona e lo confermerai.	Después comprobarás que funciona y lo confirmarás.	Më pas do të kontrollosh që punon dhe do ta konfirmosh.
 Enter a short code	Inserisci un codice breve	Escribe un código corto	Shkruaj një kod të shkurtër
@@ -443,6 +436,7 @@ That code is already used	Quel codice è già in uso	Ese código ya está en uso
 Plugged into the {}.	Collegato a {}.	Conectado a {}.	Lidhur me {}.
 Plugged into	Collegato a	Conectado a	Lidhur me
 The receipt printer opens the drawer after a cash payment.	La stampante scontrini apre il cassetto dopo un pagamento in contanti.	La impresora de recibos abre el cajón tras un pago en efectivo.	Printeri i faturave e hap sirtarin pas një pagese me para në dorë.
+Zebra	Zebra	Zebra	Zebra
 Where it is…	Dov'è…	Dónde está…	Ku ndodhet…
 Set it up on the computer it's plugged into: its printers show there.	Configurala sul computer a cui è collegata: lì si vedono le sue stampanti.	Configúrala en la computadora a la que está conectada: allí se ven sus impresoras.	Konfiguroje në kompjuterin ku është lidhur: printerat e tij duken atje.
 On {}. Change it on the computer it's plugged into.	Su {}. Cambiala sul computer a cui è collegata.	En {}. Cámbiala en la computadora a la que está conectada.	Në {}. Ndryshoje në kompjuterin ku është lidhur.
@@ -463,6 +457,23 @@ Paired as {}.	Associata come {}.	Vinculada como {}.	I çiftuar si {}.
 Paired printer	Stampante associata	Impresora vinculada	Printeri i çiftuar
 The other tills print on it through this one	Le altre casse ci stampano tramite questa	Las otras cajas imprimen en ella a través de esta	Arkat e tjera printojnë në të përmes kësaj
 Prints from this device	Stampa da questo dispositivo	Imprime desde este dispositivo	Printon nga kjo pajisje
+Connected to	Collegato a	Conectado a	I lidhur me
+Add a till or tablet first: a card terminal works only through one.	Aggiungi prima una cassa o un tablet: un terminale di pagamento funziona solo tramite uno di essi.	Agrega primero una caja o tableta: un terminal de pago solo funciona a través de una.	Shto fillimisht një arkë ose tablet: një terminal kartash punon vetëm përmes njërit.
+Till or tablet	Cassa o tablet	Caja o tableta	Arkë ose tablet
+Card payments on it go to this terminal	I pagamenti con carta su di essa vanno a questo terminale	Los pagos con tarjeta en ella van a este terminal	Pagesat me kartë në të shkojnë te ky terminal
+Bluetooth	Bluetooth	Bluetooth	Bluetooth
+Cable	Cavo	Cable	Kabllo
+COM3 or /dev/ttyUSB0	COM3 or /dev/ttyUSB0	COM3 or /dev/ttyUSB0	COM3 or /dev/ttyUSB0
+Plug the cable into the till or tablet above	Collega il cavo alla cassa o al tablet qui sopra	Conecta el cable a la caja o tableta de arriba	Fut kabllon në arkën ose tabletin më sipër
+Paired as	Associato come	Vinculado como	I çiftuar si
+Card terminal 1	Terminale 1	Terminal 1	Terminali 1
+Its name in the computer's Bluetooth settings	Il suo nome nelle impostazioni Bluetooth del computer	Su nombre en la configuración Bluetooth de la computadora	Emri i tij te cilësimet Bluetooth të kompjuterit
+Allow “Nearby devices” to see what's paired with this device.	Consenti “Dispositivi nelle vicinanze” per vedere cosa è associato a questo dispositivo.	Permite “Dispositivos cercanos” para ver qué está vinculado a este dispositivo.	Lejo “Pajisjet në afërsi” për të parë çfarë është çiftuar me këtë pajisje.
+Nothing is paired yet. Pair the terminal in this device's Bluetooth settings, then come back.	Non c'è ancora niente di associato. Associa il terminale nelle impostazioni Bluetooth di questo dispositivo, poi torna qui.	Aún no hay nada vinculado. Vincula el terminal en la configuración Bluetooth de este dispositivo y luego vuelve.	Ende nuk ka asgjë të çiftuar. Çifto terminalin te cilësimet Bluetooth të kësaj pajisjeje, pastaj kthehu.
+Choose the terminal	Scegli il terminale	Elige el terminal	Zgjidh terminalin
+Paired terminal	Terminale associato	Terminal vinculado	Terminali i çiftuar
+Add a receipt printer first: the drawer plugs into it.	Aggiungi prima una stampante scontrini: il cassetto si collega a essa.	Agrega primero una impresora de recibos: el cajón se conecta a ella.	Shto fillimisht një printer faturash: sirtari lidhet me të.
+The drawer's cable goes into the printer	Il cavo del cassetto va nella stampante	El cable del cajón va a la impresora	Kabllo e sirtarit futet në printer
 Customer display	Display cliente	Pantalla del cliente	Ekran për klientin
 Barcode scanner	Scanner di codici a barre	Escáner de códigos de barras	Skaner barkodesh
 To confirm	Da confermare	Por confirmar	Për t'u konfirmuar
@@ -472,7 +483,6 @@ In repair	In riparazione	En reparación	Në riparim
 Retired	Dismesso	Retirado	I nxjerrë jashtë përdorimit
 Network (IP)	Rete (IP)	Red (IP)	Rrjet (IP)
 On a computer (USB)	Su un computer (USB)	En una computadora (USB)	Në një kompjuter (USB)
-Bluetooth	Bluetooth	Bluetooth	Bluetooth
 Serial cable	Cavo seriale	Cable serie	Kabllo seriale
 Waiting to be used	In attesa di essere usato	Esperando a usarse	Në pritje për t'u përdorur
 Used	Usato	Usado	I përdorur
@@ -507,6 +517,8 @@ Cuts the paper	Taglia la carta	Corta el papel	Pret letrën
 Yes	Sì	Sí	Po
 No	No	No	Jo
 Opens a cash drawer	Apre un cassetto contanti	Abre un cajón de efectivo	Hap një sirtar parash
+Nothing yet	Ancora niente	Todavía nada	Ende asgjë
+By	Tramite	Por	Me
 App version	Versione dell'app	Versión de la app	Versioni i aplikacionit
 How it's reached	Come si raggiunge	Cómo se conecta	Si arrihet
 Tills and tablets with the app open check it every minute.	Le casse e i tablet con l'app aperta la controllano ogni minuto.	Las cajas y tabletas con la app abierta la revisan cada minuto.	Arkat dhe tabletët me aplikacionin të hapur e kontrollojnë çdo minutë.
@@ -516,6 +528,12 @@ Details	Dettagli	Detalles	Detajet
 Code	Codice	Código	Kodi
 Maker and model	Produttore e modello	Fabricante y modelo	Prodhuesi dhe modeli
 Serial	Seriale	Serie	Numri serial
+Card payments on {} go to it, by {}.	I pagamenti con carta su {} vanno a lui, via {}.	Los pagos con tarjeta en {} van a él, por {}.	Pagesat me kartë në {} shkojnë tek ai, me {}.
+It isn't connected to a till or tablet, so it can't take payments.	Non è collegato a una cassa o a un tablet, quindi non può accettare pagamenti.	No está conectado a una caja o tableta, así que no puede cobrar.	Nuk është lidhur me një arkë ose tablet, ndaj nuk mund të marrë pagesa.
+Test mode: no payment provider is connected yet, so the till asks how the card went.	Modalità test: nessun fornitore di pagamenti è ancora collegato, quindi la cassa chiede com'è andata la carta.	Modo de prueba: aún no hay un proveedor de pagos conectado, así que la caja pregunta cómo fue la tarjeta.	Modalitet prove: ende nuk është lidhur asnjë ofrues pagesash, ndaj arka pyet si shkoi karta.
+Choose	Scegli	Elegir	Zgjidh
+Plugged into {}. It opens on cash payments at the tills that print there.	Collegato a {}. Si apre con i pagamenti in contanti alle casse che stampano lì.	Conectado a {}. Se abre con los pagos en efectivo en las cajas que imprimen ahí.	I lidhur me {}. Hapet me pagesat në para në dorë te arkat që printojnë aty.
+It isn't plugged into a printer, so it can't open.	Non è collegato a una stampante, quindi non può aprirsi.	No está conectado a una impresora, así que no puede abrirse.	Nuk është lidhur me një printer, ndaj nuk mund të hapet.
 Tills	Casse	Cajas	Arkat
 Orders and payments at the counter	Ordini e pagamenti al banco	Pedidos y pagos en el mostrador	Porosi dhe pagesa në banak
 Tablets & screens	Tablet e schermi	Tabletas y pantallas	Tabletë dhe ekrane
@@ -524,12 +542,12 @@ Printers	Stampanti	Impresoras	Printerët
 Receipts and kitchen tickets	Scontrini e comande	Recibos y comandas	Fatura dhe fletë porosish
 Card terminals	Terminali per carte	Terminales de tarjetas	Terminalet e kartave
 card terminal	terminale per carte	terminal de tarjetas	terminal kartash
-Card and phone payments	Pagamenti con carta e telefono	Pagos con tarjeta y teléfono	Pagesa me kartë dhe telefon
+Card payments, through the till or tablet they're connected to	Pagamenti con carta, tramite la cassa o il tablet a cui sono collegati	Pagos con tarjeta, a través de la caja o tableta a la que están conectados	Pagesa me kartë, përmes arkës ose tabletit me të cilin janë lidhur
 Barcode scanners	Scanner di codici a barre	Escáneres de códigos de barras	Skanerët e barkodeve
-Scan stock on deliveries and counts	Scansiona il magazzino a consegne e inventari	Escanea el inventario en entregas y conteos	Skano stokun në dorëzime dhe numërime
+Plug it in and scan. Nothing to set up	Collegalo e scansiona. Niente da impostare	Conéctalo y escanea. Nada que configurar	Lidhe dhe skano. Asgjë për të vendosur
 Cash drawers	Cassetti contanti	Cajones de efectivo	Sirtarët e parave
 cash drawer	cassetto contanti	cajón de efectivo	sirtar parash
-Opened by the receipt printer	Aperto dalla stampante scontrini	Lo abre la impresora de recibos	Hapet nga printeri i faturave
+Plugged into a receipt printer, which opens it	Collegato a una stampante scontrini, che lo apre	Conectado a una impresora de recibos, que lo abre	I lidhur me një printer faturash, që e hap
 Everything that runs the restaurant, and whether it works	Tutto ciò che fa funzionare il ristorante e se funziona	Todo lo que hace funcionar el restaurante y si funciona	Gjithçka që vë në punë restorantin dhe nëse punon
 Back to {}	Torna a {}	Volver a {}	Kthehu te {}
 Back to the devices	Torna ai dispositivi	Volver a los dispositivos	Kthehu te pajisjet
@@ -543,13 +561,16 @@ It disappears from the list.	Scompare dall'elenco.	Desaparece de la lista.	Zhduk
 {} in use · offline	{} in uso · offline	{} en uso · sin conexión	{} në përdorim · offline
 {} not connected	{} non collegati	{} sin conectar	{} të palidhura
 {} switched off	{} spenti	{} apagados	{} të fikura
+Plug it in and scan	Collegalo e scansiona	Conéctalo y escanea	Lidhe dhe skano
 None yet	Ancora nessuno	Todavía ninguno	Ende asnjë
 {} in use	{} in uso	{} en uso	{} në përdorim
 {} in repair	{} in riparazione	{} en reparación	{} në riparim
 {} offline	{} offline	{} sin conexión	{} jashtë linje
+{} not plugged in	{} non collegati	{} sin conectar	{} të palidhur
 {} to confirm	{} da confermare	{} por confirmar	{} për t'u konfirmuar
 1 device	1 dispositivo	1 dispositivo	1 pajisje
 {} devices	{} dispositivi	{} dispositivos	{} pajisje
+Enter a code	Inserisci un codice	Ingresa un código	Fut një kod
 Find a {}	Trova {}	Buscar {}	Gjej {}
 No {} yet	Ancora nessun {}	Todavía no hay {}	Ende pa {}
 Nothing matches	Nessun risultato	No hay coincidencias	Asnjë përputhje
@@ -579,6 +600,19 @@ A person	Una persona	Una persona	Një person
 From {}	Dal {}	Desde {}	Nga {}
 until {}	fino al {}	hasta {}	deri më {}
 End	Termina	Terminar	Përfundo
+In {}	In {}	En {}	Në {}
+Not plugged into a printer	Non collegato a una stampante	Sin conectar a una impresora	I palidhur me printer
+On {} · {}	Su {} · {}	En {} · {}	Te {} · {}
+Not connected to a till or tablet	Non collegato a una cassa o tablet	Sin conectar a una caja o tableta	I palidhur me arkë ose tablet
+Nothing to set up here.	Qui non c'è niente da impostare.	Aquí no hay nada que configurar.	Këtu nuk ka asgjë për të vendosur.
+How it works	Come funziona	Cómo funciona	Si funksionon
+USB: plug it into the till, tablet or computer.	USB: collegalo alla cassa, al tablet o al computer.	USB: conéctalo a la caja, la tableta o la computadora.	USB: lidhe me arkën, tabletin ose kompjuterin.
+Bluetooth: pair it in the device's Bluetooth settings.	Bluetooth: associalo nelle impostazioni Bluetooth del dispositivo.	Bluetooth: vincúlalo en la configuración Bluetooth del dispositivo.	Bluetooth: çiftoje te cilësimet Bluetooth të pajisjes.
+Sign in, then scan anywhere: the app shows the stock item with that barcode.	Accedi, poi scansiona ovunque: l'app mostra l'articolo di magazzino con quel codice a barre.	Inicia sesión y escanea en cualquier lugar: la app muestra el artículo de inventario con ese código de barras.	Hyr, pastaj skano kudo: aplikacioni tregon artikullin e stokut me atë barkod.
+In a search box the code just types in.	In una casella di ricerca il codice viene solo scritto.	En un cuadro de búsqueda el código solo se escribe.	Në një kuti kërkimi kodi thjesht shkruhet.
+Try it	Provalo	Pruébalo	Provoje
+Waiting for a scan	In attesa di una scansione	Esperando un escaneo	Në pritje të një skanimi
+Look it up	Cercalo	Búscalo	Kërkoje
 What it prints	Cosa stampa	Qué imprime	Çfarë printon
 Test page	Pagina di prova	Página de prueba	Faqe prove
 What does {} print?	Cosa stampa {}?	¿Qué imprime {}?	Çfarë printon {}?
@@ -1348,7 +1382,6 @@ Choose a supplier.	Scegli un fornitore.	Elige un proveedor.	Zgjidh një furnitor
 Write how much you want of at least one item.	Scrivi quanto vuoi di almeno un articolo.	Escribe cuánto quieres de al menos un artículo.	Shkruaj sa do nga të paktën një artikull.
 From their place	Dal loro luogo	Desde su lugar	Nga vendi i tyre
 No places added	Nessun luogo aggiunto	No se añadieron lugares	Asnjë vend i shtuar
-Choose	Scegli	Elegir	Zgjidh
 Add their places on the supplier.	Aggiungi i loro luoghi nel fornitore.	Añade sus lugares en el proveedor.	Shto vendet e tyre te furnitori.
 What to order	Cosa ordinare	Qué pedir	Çfarë të porositësh
 Fill running low	Riempi ciò che scarseggia	Reponer lo que se agota	Plotëso ato në mbarim
@@ -2321,6 +2354,15 @@ Choose where the bill prints.	Scegli dove stampare il conto.	Elige dónde se imp
 Print the receipt?	Stampare lo scontrino?	¿Imprimir el recibo?	Ta printoj faturën?
 Print	Stampa	Imprimir	Printo
 The payment is done.	Il pagamento è fatto.	El pago está hecho.	Pagesa u krye.
+Scanned {}	Scansionato {}	Escaneado {}	U skanua {}
+Open in Inventory	Apri in Magazzino	Abrir en Inventario	Hape te Inventari
+New item with this barcode	Nuovo articolo con questo codice a barre	Nuevo artículo con este código de barras	Artikull i ri me këtë barkod
+Looking it up…	Lo cerco…	Buscándolo…	Po e kërkoj…
+You can't see stock items. Ask someone who handles stock.	Non puoi vedere gli articoli di magazzino. Chiedi a chi gestisce il magazzino.	No puedes ver los artículos de inventario. Pregunta a quien maneja el inventario.	Nuk mund t'i shohësh artikujt e stokut. Pyet dikë që merret me stokun.
+Couldn't look it up. Scan it again.	Impossibile cercarlo. Scansionalo di nuovo.	No se pudo buscar. Escanéalo de nuevo.	Nuk u kërkua dot. Skanoje përsëri.
+No item has this barcode.	Nessun articolo ha questo codice a barre.	Ningún artículo tiene este código de barras.	Asnjë artikull nuk ka këtë barkod.
+Not counted, so it has no stock.	Non contato, quindi non ha giacenza.	No se cuenta, así que no tiene inventario.	Nuk numërohet, ndaj nuk ka stok.
+None in stock.	Nessuno in magazzino.	Nada en inventario.	Asnjë në stok.
 Every branch's stock together	Il magazzino di tutte le sedi insieme	El inventario de todas las sucursales juntas	Stoku i të gjitha pikave bashkë
 Users, roles and branches	Utenti, ruoli e sedi	Usuarios, roles y sucursales	Përdoruesit, rolet dhe pikat
 Every branch combined	Tutte le sedi insieme	Todas las sucursales juntas	Të gjitha pikat bashkë
@@ -3904,7 +3946,6 @@ Take it back	Riprendila	Recuperarla	Merre mbrapsht
 Who takes it over?	Chi se ne occupa?	¿Quién se encarga?	Kush e merr përsipër?
 You have no support admins yet. Add one on the Admins page first.	Non hai ancora admin di supporto. Aggiungine uno prima nella pagina Admin.	Aún no tienes admins de soporte. Primero agrega uno en la página Admins.	Nuk ke ende admin ndihme. Shto një më parë te faqja Adminët.
 Has it now	Ce l'ha ora	La tiene ahora	E ka tani
-In {}	In {}	En {}	Në {}
 It's yours: it goes to Assigned, and you start it when you begin.	È tua: va in Assegnate e la inizi quando cominci.	Es tuya: pasa a Asignadas y la empiezas cuando te pongas.	Është e jotja: shkon te Të caktuarat dhe e fillon kur të nisësh.
 Put {} in {}?	Mettere {} in {}?	¿Poner a {} en {}?	Ta vendosësh {} te {}?
 {} already takes care of {}.	{} si occupa già di {}.	{} ya se encarga de {}.	{} kujdeset tashmë për {}.
@@ -4655,6 +4696,7 @@ Hold card or device near the reader, insert the chip, or swipe the magnetic stri
 Margherita Pizza	Pizza Margherita	Pizza Margarita	Pica Margarita
 Fettuccine Alfredo	Fettuccine Alfredo	Fettuccine Alfredo	Fettuccine Alfredo
 Insalata Caprese	Insalata Caprese	Insalata Caprese	Insalata Caprese
+The card was declined. Try again or choose another way to pay.	La carta è stata rifiutata. Riprova o scegli un altro modo di pagare.	La tarjeta fue rechazada. Inténtalo de nuevo o elige otra forma de pago.	Karta u refuzua. Provo përsëri ose zgjidh një mënyrë tjetër pagese.
 The server answered for another order	Il server ha risposto per un altro ordine	El servidor respondió por otro pedido	Serveri u përgjigj për një porosi tjetër
 You can't take payments	Non puoi incassare pagamenti	No puedes cobrar	Nuk mund të marrësh pagesa
 Only a manager can cancel a payment, on the day it was taken, before any refund	Solo un responsabile può annullare un pagamento, nel giorno in cui è stato preso, prima di qualsiasi rimborso	Solo un gerente puede cancelar un pago, el mismo día que se cobró, antes de cualquier reembolso	Vetëm një menaxher mund të anulojë një pagesë, në ditën që u mor, para çdo rimbursimi
@@ -4741,6 +4783,11 @@ Paid in full	Pagato per intero	Pagado por completo	Paguar plotësisht
 Give back {}	Resto {}	Cambio {}	Kusuri {}
 The order is closed. The table shows Paid until the guests leave.	L'ordine è chiuso. Il tavolo mostra Pagato finché gli ospiti non se ne vanno.	El pedido está cerrado. La mesa muestra Pagado hasta que se vayan los clientes.	Porosia është e mbyllur. Tavolina tregon E paguar derisa të ikin mysafirët.
 Back to orders	Torna agli ordini	Volver a los pedidos	Kthehu te porositë
+Goes to {} ({})	Va a {} ({})	Va a {} ({})	Shkon te {} ({})
+No card terminal is connected to this device. Take the card on its terminal, then record it here.	Nessun terminale di pagamento è collegato a questo dispositivo. Passa la carta sul suo terminale, poi registralo qui.	No hay un terminal de pago conectado a este dispositivo. Cobra la tarjeta en su terminal y luego regístralo aquí.	Asnjë terminal kartash nuk është lidhur me këtë pajisje. Merr kartën në terminalin e saj, pastaj regjistroje këtu.
+Declined	Rifiutata	Rechazada	U refuzua
+Ask the guest to tap, insert or swipe the card on {}.	Chiedi all'ospite di avvicinare, inserire o strisciare la carta su {}.	Pide al cliente que acerque, inserte o deslice la tarjeta en {}.	Kërkoji klientit të afrojë, fusë ose kalojë kartën te {}.
+Test mode: no card terminal is reached yet. Choose what happened on it.	Modalità test: nessun terminale di pagamento viene ancora raggiunto. Scegli cosa è successo.	Modo de prueba: aún no se llega a ningún terminal de pago. Elige qué pasó.	Modalitet prove: ende nuk arrihet asnjë terminal kartash. Zgjidh çfarë ndodhi.
 Reason (optional)	Motivo (facoltativo)	Motivo (opcional)	Arsyeja (opsionale)
 Booked for {}. The rest can be added when they arrive.	Prenotato per {}. Il resto si può aggiungere al loro arrivo.	Reservado para {}. El resto se puede añadir cuando lleguen.	E rezervuar për {}. Pjesa tjetër mund të shtohet kur të mbërrijnë.
 Fewer	Meno	Menos	Më pak
@@ -5346,7 +5393,6 @@ Set pay first	Imposta prima la paga	Define primero el pago	Vendos fillimisht pag
 Mark as not paid	Segna come non pagato	Marcar como no pagado	Shëno si të papaguar
 Move to {}	Sposta in {}	Mover a {}	Zhvendos te {}
 Set up pay	Imposta la paga	Definir pago	Vendos pagesën
-Nothing yet	Ancora niente	Todavía nada	Ende asgjë
 Enter how much you pay.	Inserisci quanto paghi.	Escribe cuánto pagas.	Shkruaj sa paguan.
 Enter an amount, like 200.	Inserisci un importo, come 200.	Escribe un importe, como 200.	Shkruaj një shumë, si 200.
 Enter an amount above zero.	Inserisci un importo sopra zero.	Escribe un importe mayor que cero.	Shkruaj një shumë mbi zero.
@@ -6609,7 +6655,9 @@ Customer code already exists in this restaurant	Il codice cliente esiste già in
 Customer update violates a data constraint	L'aggiornamento del cliente viola un vincolo dei dati	La actualización del cliente infringe una regla de datos	Përditësimi i klientit shkel një rregull të të dhënave
 This code doesn't work. It may be used, ended, or typed wrong.	Questo codice non funziona. Forse è già usato, scaduto o scritto male.	Este código no funciona. Puede que ya se haya usado, haya vencido o esté mal escrito.	Ky kod nuk punon. Mund të jetë përdorur, të ketë mbaruar ose të jetë shkruar gabim.
 This code doesn't work any more. Ask for a new one.	Questo codice non funziona più. Chiedine uno nuovo.	Este código ya no funciona. Pide uno nuevo.	Ky kod nuk funksionon më. Kërko një të ri.
-This code is for a card terminal: type it on the terminal itself.	Questo codice è per un terminale di pagamento: digitalo sul terminale stesso.	Este código es para un terminal de pago: escríbelo en el propio terminal.	Ky kod është për një terminal kartash: shkruaje në vetë terminalin.
+This code doesn't work here.	Questo codice non funziona qui.	Este código no funciona aquí.	Ky kod nuk punon këtu.
+This code doesn't work here. It's for a tablet or screen: enter it in Tablets & screens.	Questo codice non funziona qui. È per un tablet o uno schermo: inseriscilo in Tablet e schermi.	Este código no funciona aquí. Es para una tableta o pantalla: ingrésalo en Tabletas y pantallas.	Ky kod nuk punon këtu. Është për një tablet ose ekran: fute te Tabletë dhe ekrane.
+This code doesn't work here. It's for a till: enter it in Tills.	Questo codice non funziona qui. È per una cassa: inseriscilo in Casse.	Este código no funciona aquí. Es para una caja: ingrésalo en Cajas.	Ky kod nuk punon këtu. Është për një arkë: fute te Arkat.
 That device is in use. Disconnect it first, then make a new code.	Quel dispositivo è in uso. Scollegalo prima, poi crea un nuovo codice.	Ese dispositivo está en uso. Desconéctalo primero y luego crea un código nuevo.	Ajo pajisje është në përdorim. Shkëpute fillimisht, pastaj krijo një kod të ri.
 Someone else is waiting with this code. Try again in a few minutes.	Qualcun altro è in attesa con questo codice. Riprova tra qualche minuto.	Otra persona está esperando con este código. Inténtalo de nuevo en unos minutos.	Dikush tjetër po pret me këtë kod. Provo përsëri pas pak minutash.
 Not agreed yet.	Non ancora accettato.	Aún no aceptado.	Ende nuk është pranuar.
@@ -7236,7 +7284,14 @@ Refresh rate-limit window must be positive and representable	Refresh rate-limit 
 Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key
 Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token
 Choose what kind of printer it is	Scegli che tipo di stampante è	Elige qué tipo de impresora es	Zgjidh çfarë lloj printeri është
+Choose how it's connected	Scegli come è collegato	Elige cómo está conectado	Zgjidh si është lidhur
 Only someone who works in every branch moves a device to another one.	Solo chi lavora in tutte le sedi sposta un dispositivo in un'altra.	Solo quien trabaja en todas las sucursales mueve un dispositivo a otra.	Vetëm ai që punon në të gjitha degët e zhvendos një pajisje në një tjetër.
+Only card terminals and cash drawers are connected to another device.	Solo i terminali di pagamento e i cassetti si collegano a un altro dispositivo.	Solo los terminales de pago y los cajones se conectan a otro dispositivo.	Vetëm terminalet e kartave dhe sirtarët lidhen me një pajisje tjetër.
+Choose one of this restaurant's devices.	Scegli uno dei dispositivi di questo ristorante.	Elige uno de los dispositivos de este restaurante.	Zgjidh një nga pajisjet e këtij restoranti.
+A card terminal is connected to a till or a tablet.	Un terminale di pagamento si collega a una cassa o a un tablet.	Un terminal de pago se conecta a una caja o una tableta.	Një terminal kartash lidhet me një arkë ose tablet.
+Choose Bluetooth or cable.	Scegli Bluetooth o cavo.	Elige Bluetooth o cable.	Zgjidh Bluetooth ose kabllo.
+Choose the paired card terminal.	Scegli il terminale di pagamento associato.	Elige el terminal de pago vinculado.	Zgjidh terminalin e kartave të çiftuar.
+A cash drawer is plugged into a printer.	Un cassetto si collega a una stampante.	Un cajón se conecta a una impresora.	Një sirtar lidhet me një printer.
 Invalid deviceType	Invalid deviceType	Invalid deviceType	Invalid deviceType
 Invalid status	Invalid status	Invalid status	Invalid status
 Reservation rule update violates a data constraint	L'aggiornamento della regola di prenotazione viola un vincolo dei dati	La actualización de la regla de reservas infringe una regla de datos	Përditësimi i rregullit të rezervimit shkel një rregull të të dhënave
@@ -7351,6 +7406,32 @@ Each covers the days chosen at the top.	Ognuno copre i giorni scelti in alto.	Ca
 · Closed	· Chiuso	· Cerrado	· E mbyllur
 · No sales	· Nessuna vendita	· Sin ventas	· Pa shitje
 In	In	En	Në
+SCAN-1	SCAN-1	SCAN-1	SCAN-1
+Stock scanner	Scanner del magazzino	Escáner de inventario	Skaner i stokut
+USB, in the store room. Used for counts and deliveries.	USB, nel magazzino. Usato per inventari e consegne.	USB, en el almacén. Se usa para conteos y entregas.	USB, në magazinë. Përdoret për numërime dhe dorëzime.
+SCAN-2	SCAN-2	SCAN-2	SCAN-2
+Bar scanner	Scanner del bar	Escáner del bar	Skaner i barit
+Honeywell	Honeywell	Honeywell	Honeywell
+Voyager 1472g	Voyager 1472g	Voyager 1472g	Voyager 1472g
+Bluetooth, new.	Bluetooth, nuovo.	Bluetooth, nuevo.	Bluetooth, i ri.
+DRW-1	DRW-1	DRW-1	DRW-1
+Front cash drawer	Cassetto contanti della cassa	Cajón de efectivo de caja	Sirtari i parave i arkës
+Vasario	Vasario	Vasario	Vasario
+Plugged into the Receipt printer.	Collegato alla stampante scontrini.	Conectado a la impresora de recibos.	Lidhur me printerin e faturave.
+DRW-2	DRW-2	DRW-2	DRW-2
+Bar cash drawer	Cassetto contanti del bar	Cajón de efectivo del bar	Sirtari i parave i barit
+Plugged into the Bar printer.	Collegato alla stampante del bar.	Conectado a la impresora del bar.	Lidhur me printerin e barit.
+Type the code from the till or tablet's page. This device becomes that one.	Scrivi il codice dalla pagina della cassa o del tablet. Questo dispositivo diventa quello.	Escribe el código de la página de la caja o la tableta. Este dispositivo pasa a ser ese.	Shkruaj kodin nga faqja e arkës ose e tabletit. Kjo pajisje bëhet ajo.
+Switch on the card terminal.	Accendi il terminale POS.	Enciende la terminal de pago.	Ndiz terminalin e kartave.
+Open its pairing screen.	Apri la sua schermata di abbinamento.	Abre su pantalla de vinculación.	Hap ekranin e tij të lidhjes.
+Go to Admin Hub → Devices and press “Enter a code”.	Vai su Admin Hub → Dispositivi e premi “Inserisci un codice”.	Ve a Admin Hub → Dispositivos y pulsa “Ingresa un código”.	Shko te Admin Hub → Pajisjet dhe shtyp “Fut një kod”.
+Type this code. It works once.	Digita questo codice. Funziona una volta.	Escribe este código. Funciona una vez.	Shkruaj këtë kod. Punon një herë.
+Plug the drawer's cable into the receipt printer.	Collega il cavo del cassetto alla stampante scontrini.	Conecta el cable del cajón a la impresora de recibos.	Lidh kabllon e sirtarit me printerin e faturave.
+Sent. Did the drawer open?	Inviato. Il cassetto si è aperto?	Enviado. ¿Se abrió el cajón?	U dërgua. A u hap sirtari?
+Card and phone payments	Pagamenti con carta e telefono	Pagos con tarjeta y teléfono	Pagesa me kartë dhe telefon
+Scan stock on deliveries and counts	Scansiona il magazzino a consegne e inventari	Escanea el inventario en entregas y conteos	Skano stokun në dorëzime dhe numërime
+Opened by the receipt printer	Aperto dalla stampante scontrini	Lo abre la impresora de recibos	Hapet nga printeri i faturave
+This code is for a card terminal: type it on the terminal itself.	Questo codice è per un terminale di pagamento: digitalo sul terminale stesso.	Este código es para un terminal de pago: escríbelo en el propio terminal.	Ky kod është për një terminal kartash: shkruaje në vetë terminalin.
 This device is no longer {}.	Questo dispositivo non è più {}.	Este dispositivo ya no es {}.	Kjo pajisje nuk është më {}.
 You're on {}.	Sei su {}.	Estás en {}.	Je në {}.
 Make the device you're using now {}.	Rendi {} il dispositivo che stai usando ora.	Convierte en {} el dispositivo que usas ahora.	Bëje {} pajisjen që po përdor tani.
@@ -7655,7 +7736,6 @@ need an admin	serve un admin	necesitan un admin	duan një admin
 YOUR ANSWER	LA TUA RISPOSTA	TU RESPUESTA	PËRGJIGJJA JOTE
 Done, without a note.	Fatto, senza nota.	Hecho, sin nota.	U bë, pa shënim.
 Declined, without a note.	Rifiutata, senza nota.	Rechazada, sin nota.	U refuzua, pa shënim.
-Declined	Rifiutata	Rechazada	U refuzua
 Give {}	Dai {}	Asignar a {}	Jep {}
 Give a support admin	Dai un admin di supporto	Asignar un admin de soporte	Jep një admin ndihme
 Who takes care of {}?	Chi si occupa di {}?	¿Quién se encarga de {}?	Kush kujdeset për {}?
@@ -7754,3 +7834,4 @@ Bluetooth is off on this device.	Il Bluetooth è spento su questo dispositivo.	E
 It isn't paired with this device any more.	Non è più associata a questo dispositivo.	Ya no está vinculada a este dispositivo.	Nuk është më i çiftuar me këtë pajisje.
 Allow “Nearby devices” for the app on this device.	Consenti “Dispositivi nelle vicinanze” all'app su questo dispositivo.	Permite “Dispositivos cercanos” a la app en este dispositivo.	Lejo “Pajisjet në afërsi” për aplikacionin në këtë pajisje.
 Printers installed on a computer print only from that computer.	Le stampanti installate su un computer stampano solo da quel computer.	Las impresoras instaladas en una computadora solo imprimen desde esa computadora.	Printerët e instaluar në një kompjuter printojnë vetëm nga ai kompjuter.
+cable	cavo	cable	kabllo

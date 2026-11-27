@@ -244,7 +244,9 @@ Customer code already exists in this restaurant	Il codice cliente esiste già in
 Customer update violates a data constraint	L'aggiornamento del cliente viola un vincolo dei dati	La actualización del cliente infringe una regla de datos	Përditësimi i klientit shkel një rregull të të dhënave
 This code doesn't work. It may be used, ended, or typed wrong.	Questo codice non funziona. Forse è già usato, scaduto o scritto male.	Este código no funciona. Puede que ya se haya usado, haya vencido o esté mal escrito.	Ky kod nuk punon. Mund të jetë përdorur, të ketë mbaruar ose të jetë shkruar gabim.
 This code doesn't work any more. Ask for a new one.	Questo codice non funziona più. Chiedine uno nuovo.	Este código ya no funciona. Pide uno nuevo.	Ky kod nuk funksionon më. Kërko një të ri.
-This code is for a card terminal: type it on the terminal itself.	Questo codice è per un terminale di pagamento: digitalo sul terminale stesso.	Este código es para un terminal de pago: escríbelo en el propio terminal.	Ky kod është për një terminal kartash: shkruaje në vetë terminalin.
+This code doesn't work here.	Questo codice non funziona qui.	Este código no funciona aquí.	Ky kod nuk punon këtu.
+This code doesn't work here. It's for a tablet or screen: enter it in Tablets & screens.	Questo codice non funziona qui. È per un tablet o uno schermo: inseriscilo in Tablet e schermi.	Este código no funciona aquí. Es para una tableta o pantalla: ingrésalo en Tabletas y pantallas.	Ky kod nuk punon këtu. Është për një tablet ose ekran: fute te Tabletë dhe ekrane.
+This code doesn't work here. It's for a till: enter it in Tills.	Questo codice non funziona qui. È per una cassa: inseriscilo in Casse.	Este código no funciona aquí. Es para una caja: ingrésalo en Cajas.	Ky kod nuk punon këtu. Është për një arkë: fute te Arkat.
 That device is in use. Disconnect it first, then make a new code.	Quel dispositivo è in uso. Scollegalo prima, poi crea un nuovo codice.	Ese dispositivo está en uso. Desconéctalo primero y luego crea un código nuevo.	Ajo pajisje është në përdorim. Shkëpute fillimisht, pastaj krijo një kod të ri.
 Someone else is waiting with this code. Try again in a few minutes.	Qualcun altro è in attesa con questo codice. Riprova tra qualche minuto.	Otra persona está esperando con este código. Inténtalo de nuevo en unos minutos.	Dikush tjetër po pret me këtë kod. Provo përsëri pas pak minutash.
 Not agreed yet.	Non ancora accettato.	Aún no aceptado.	Ende nuk është pranuar.
@@ -850,7 +852,14 @@ Refresh rate-limit window must be positive and representable	Refresh rate-limit 
 Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key
 Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token
 Choose what kind of printer it is	Scegli che tipo di stampante è	Elige qué tipo de impresora es	Zgjidh çfarë lloj printeri është
+Choose how it's connected	Scegli come è collegato	Elige cómo está conectado	Zgjidh si është lidhur
 Only someone who works in every branch moves a device to another one.	Solo chi lavora in tutte le sedi sposta un dispositivo in un'altra.	Solo quien trabaja en todas las sucursales mueve un dispositivo a otra.	Vetëm ai që punon në të gjitha degët e zhvendos një pajisje në një tjetër.
+Only card terminals and cash drawers are connected to another device.	Solo i terminali di pagamento e i cassetti si collegano a un altro dispositivo.	Solo los terminales de pago y los cajones se conectan a otro dispositivo.	Vetëm terminalet e kartave dhe sirtarët lidhen me një pajisje tjetër.
+Choose one of this restaurant's devices.	Scegli uno dei dispositivi di questo ristorante.	Elige uno de los dispositivos de este restaurante.	Zgjidh një nga pajisjet e këtij restoranti.
+A card terminal is connected to a till or a tablet.	Un terminale di pagamento si collega a una cassa o a un tablet.	Un terminal de pago se conecta a una caja o una tableta.	Një terminal kartash lidhet me një arkë ose tablet.
+Choose Bluetooth or cable.	Scegli Bluetooth o cavo.	Elige Bluetooth o cable.	Zgjidh Bluetooth ose kabllo.
+Choose the paired card terminal.	Scegli il terminale di pagamento associato.	Elige el terminal de pago vinculado.	Zgjidh terminalin e kartave të çiftuar.
+A cash drawer is plugged into a printer.	Un cassetto si collega a una stampante.	Un cajón se conecta a una impresora.	Një sirtar lidhet me një printer.
 Invalid deviceType	Invalid deviceType	Invalid deviceType	Invalid deviceType
 Invalid status	Invalid status	Invalid status	Invalid status
 Reservation rule update violates a data constraint	L'aggiornamento della regola di prenotazione viola un vincolo dei dati	La actualización de la regla de reservas infringe una regla de datos	Përditësimi i rregullit të rezervimit shkel një rregull të të dhënave

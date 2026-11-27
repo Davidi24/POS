@@ -18,7 +18,7 @@ import kotlinx.serialization.Serializable
 // printers, and the one-time codes that pair a new device.
 
 /** Device kinds a branch can register (printers live on their own list). "POS_TERMINAL" is the server's name for a till. */
-val DEVICE_TYPES = listOf("POS_TERMINAL", "TABLET", "KDS", "CUSTOMER_DISPLAY", "PAYMENT_TERMINAL")
+val DEVICE_TYPES = listOf("POS_TERMINAL", "TABLET", "KDS", "CUSTOMER_DISPLAY", "PAYMENT_TERMINAL", "CASH_DRAWER")
 val DEVICE_STATUSES = listOf("PROVISIONING", "ACTIVE", "INACTIVE", "BLOCKED", "MAINTENANCE", "RETIRED")
 val PRINTER_CONNECTIONS = listOf("NETWORK", "USB", "BLUETOOTH", "SERIAL")
 
@@ -68,6 +68,11 @@ data class DeviceDto(
     val printerCheckedAt: String? = null,
     val printerCheckedBy: String? = null,
     val printerProblem: String? = null,
+    // A card terminal's till or tablet (USB, BLUETOOTH), or a cash drawer's printer (PRINTER) (2026-11-27).
+    val linkedDeviceId: String? = null,
+    val linkedDeviceName: String? = null,
+    val linkType: String? = null,
+    val linkAddress: String? = null,
     val updatedAt: String? = null
 )
 
@@ -97,7 +102,10 @@ data class DeviceRequestDto(
     val cashDrawerKickEnabled: Boolean? = null,
     val systemPrinterName: String? = null,
     val hostDeviceId: String? = null,
-    val printerRole: String? = null
+    val printerRole: String? = null,
+    val linkedDeviceId: String? = null,
+    val linkType: String? = null,
+    val linkAddress: String? = null
 )
 
 /** A till or kitchen station a printer can print for, and the printer it prints on now. */

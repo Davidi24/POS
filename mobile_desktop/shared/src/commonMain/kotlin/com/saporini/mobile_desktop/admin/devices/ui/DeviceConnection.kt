@@ -205,7 +205,7 @@ internal fun EnterCodeDialog(state: DevicesState, model: DevicesScreenModel) {
     var code by remember { mutableStateOf("") }
     val wait = state.connectWait
     val title = when {
-        wait == null -> "Enter a code"
+        wait == null -> if (state.codeKind == "TABLET") "Enter a tablet's or screen's code" else "Enter a till's code"
         wait.ended != null -> "It didn't connect"
         else -> "Waiting for an answer"
     }
@@ -224,7 +224,8 @@ internal fun EnterCodeDialog(state: DevicesState, model: DevicesScreenModel) {
             }
         }) {
         if (wait == null) {
-            Text("Type the code from the till or tablet's page. This device becomes that one.", fontFamily = Inter(), fontSize = 14.sp,
+            Text(if (state.codeKind == "TABLET") "Type the code from the tablet's or screen's page. This device becomes that one."
+                else "Type the code from the till's page. This device becomes that till.", fontFamily = Inter(), fontSize = 14.sp,
                 lineHeight = 20.sp, letterSpacing = 0.sp, color = Kit.Ink)
             till?.let { Note("This device is ${it.name} now. With a code it becomes another one.", Kit.Amber) }
             Spacer(Modifier.height(4.dp))

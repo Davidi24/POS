@@ -97,4 +97,13 @@ public class UpsertDeviceRequest {
 
     @jakarta.validation.constraints.Pattern(regexp = "RECEIPT|KITCHEN|BAR|SMALL|DOCUMENT|OTHER", message = "Choose what kind of printer it is")
     private String printerRole;
+
+    // A card terminal: the till or tablet it's connected to and how (USB, BLUETOOTH); a cash drawer: its printer (PRINTER).
+    private UUID linkedDeviceId;
+
+    @jakarta.validation.constraints.Pattern(regexp = "USB|BLUETOOTH|PRINTER", message = "Choose how it's connected")
+    private String linkType;
+
+    @Size(max = 200)
+    private String linkAddress;
 }

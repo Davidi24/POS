@@ -96,11 +96,11 @@ internal fun DevicePage(
         DeviceHeader(device, kind, state, size, onConfirm, onEdit, onRemove, onMove = { moving = true })
         if (wide) {
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { LeftCards(device, kind, state, model) }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { LeftCards(device, kind, state, model, onEdit) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) { RightCards(device, kind, state, model, onEdit) }
             }
         } else {
-            LeftCards(device, kind, state, model)
+            LeftCards(device, kind, state, model, onEdit)
             RightCards(device, kind, state, model, onEdit)
         }
         Spacer(Modifier.height(12.dp))
@@ -273,11 +273,14 @@ private fun FactStrip(facts: List<Fact>, phone: Boolean) {
 // ---------- The cards ----------
 
 @Composable
-private fun LeftCards(device: DeviceDto, kind: DeviceKind, state: DevicesState, model: DevicesScreenModel) {
+private fun LeftCards(device: DeviceDto, kind: DeviceKind, state: DevicesState, model: DevicesScreenModel, onEdit: () -> Unit) {
     val extra = DeviceExtras.isExtra(device.id)
     // Connecting it, in one card (user, 2026-11-27): Use this device, or a code typed on another device in Devices → Enter a
     // code (a card terminal on its own pairing screen); Disconnect while it's in use.
-    if ((kind == DeviceKind.TILL || kind == DeviceKind.TABLET || kind == DeviceKind.CARD) && !extra) ConnectCard(device, state, model)
+    if ((kind == DeviceKind.TILL || kind == DeviceKind.TABLET) && !extra) ConnectCard(device, state, model)
+    // A card terminal works through the till or tablet it's connected to; a drawer through its printer (2026-11-27).
+    if (kind == DeviceKind.CARD) TerminalLinkCard(device, state, onEdit)
+    if (kind == DeviceKind.DRAWER) DrawerCard(device, state, model, onEdit)
     // Who can sign in with their PIN (tills, tablets and screens), then its state: using it on the left, what's known about it
     // on the right, so the two columns come out about as long (user, 2026-11-27: "put the cards in a better order").
     if ((kind == DeviceKind.TILL || kind == DeviceKind.TABLET) && !extra) SignInCard(device, state, model)
@@ -415,6 +418,11 @@ private fun ReachCard(device: DeviceDto, kind: DeviceKind, hostName: String? = n
                 InfoLine(Icons.Outlined.PointOfSale, "Opens a cash drawer", if (device.cashDrawerKickEnabled == true) "Yes" else "No").takeUnless { document })
         }
         DeviceExtras.isExtra(device.id) -> listOf(InfoLine(Icons.Outlined.Cable, "Connection", if (device.status == "ACTIVE") "Plugged in" else "Not checked yet"))
+        kind == DeviceKind.CARD -> listOfNotNull(
+            InfoLine(Icons.Outlined.PointOfSale, "Connected to", device.linkedDeviceName ?: "Nothing yet"),
+            InfoLine(Icons.Outlined.Cable, "By", when (device.linkType) { "USB" -> "Cable"; "BLUETOOTH" -> "Bluetooth"; else -> "–" }),
+            device.linkAddress?.let { InfoLine(Icons.Outlined.Bluetooth, if (device.linkType == "USB") "Port" else "Address", it) })
+        kind == DeviceKind.DRAWER -> listOf(InfoLine(Icons.Outlined.Print, "Plugged into", device.linkedDeviceName ?: "Nothing yet"))
         else -> listOfNotNull(
             InfoLine(Icons.Outlined.Link, "Connected", device.connectedAt?.let { dateTimeText(it, zone) } ?: "Not yet"),
             InfoLine(Icons.Outlined.Schedule, "Last seen", if (device.online) "Now" else device.lastSeenAt?.let { agoText(it, now, zone) } ?: "Never",
@@ -474,5 +482,35 @@ private fun DetailsCard(device: DeviceDto, state: DevicesState, onEdit: () -> Un
                 Text(notes, fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp, letterSpacing = 0.sp, color = Kit.Ink, translate = false)
             }
         }
+    }
+}
+
+/**
+ * A card terminal's connection (user, 2026-11-27: "they work only if they are connected with a till or a tablet, by Bluetooth or
+ * cable"): which till or tablet and how, or that it can't take payments until it's connected.
+ */
+@Composable
+private fun TerminalLinkCard(device: DeviceDto, state: DevicesState, onEdit: () -> Unit) {
+    val connected = device.linkedDeviceId != null
+    Panel("Connection", null, Icons.Outlined.PointOfSale, if (connected) Kit.Green else Kit.Amber,
+        trailing = if (state.canEdit) ({ KitButton(if (connected) "Change" else "Connect", onEdit, style = ButtonStyle.SECONDARY) }) else null) {
+        Text(if (connected) "Card payments on ${device.linkedDeviceName} go to it, by ${if (device.linkType == "USB") "cable" else "Bluetooth"}."
+            else "It isn't connected to a till or tablet, so it can't take payments.", fontFamily = Inter(), fontSize = 13.5.sp, lineHeight = 19.sp,
+            letterSpacing = 0.sp, color = if (connected) Kit.Ink else Kit.Amber)
+        Text("Test mode: no payment provider is connected yet, so the till asks how the card went.", fontFamily = Inter(), fontSize = 12.sp,
+            lineHeight = 16.sp, letterSpacing = 0.sp, color = Kit.Faint)
+    }
+}
+
+/** A cash drawer: the printer it's plugged into, and opening it from here. */
+@Composable
+private fun DrawerCard(device: DeviceDto, state: DevicesState, model: DevicesScreenModel, onEdit: () -> Unit) {
+    val plugged = device.linkedDeviceId != null
+    Panel("Printer", null, Icons.Outlined.Print, if (plugged) Kit.Green else Kit.Amber,
+        trailing = if (state.canEdit) ({ KitButton(if (plugged) "Change" else "Choose", onEdit, style = ButtonStyle.SECONDARY) }) else null) {
+        Text(if (plugged) "Plugged into ${device.linkedDeviceName}. It opens on cash payments at the tills that print there."
+            else "It isn't plugged into a printer, so it can't open.", fontFamily = Inter(), fontSize = 13.5.sp, lineHeight = 19.sp,
+            letterSpacing = 0.sp, color = if (plugged) Kit.Ink else Kit.Amber)
+        if (plugged) KitButton("Open the drawer", { model.openDrawer(device) }, icon = Icons.Outlined.PointOfSale, style = ButtonStyle.SECONDARY)
     }
 }

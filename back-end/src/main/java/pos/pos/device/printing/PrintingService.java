@@ -293,8 +293,12 @@ public class PrintingService {
     private Map<UUID, PrintingDtos.Printer> printersOf(UUID restaurantId) {
         Map<UUID, String> names = new HashMap<>();
         tillsOf(restaurantId).forEach(row -> names.put((UUID) row[0], (String) row[1]));
+        // A printer with a cash drawer plugged into it opens it (the drawer is a device of its own since 2026-11-27).
+        Set<UUID> withDrawer = devices.findByRestaurant_IdAndDeviceType(restaurantId, pos.pos.device.enums.DeviceType.CASH_DRAWER).stream()
+                .filter(drawer -> drawer.isActive() && drawer.getStatus() != DeviceStatus.RETIRED && drawer.getLinkedDeviceId() != null)
+                .map(Device::getLinkedDeviceId).collect(Collectors.toSet());
         return devices.findRestaurantPrinters(restaurantId).stream()
-                .collect(Collectors.toMap(Device::getId, device -> printerOf(device, names), (a, b) -> a, LinkedHashMap::new));
+                .collect(Collectors.toMap(Device::getId, device -> printerOf(device, names, withDrawer.contains(device.getId())), (a, b) -> a, LinkedHashMap::new));
     }
 
     /** Tills and tablets of the restaurant that aren't retired: [id, name, branch name]. */
@@ -358,7 +362,7 @@ public class PrintingService {
         return new AuthException("Device authentication failed", HttpStatus.UNAUTHORIZED);
     }
 
-    private static PrintingDtos.Printer printerOf(Device device, Map<UUID, String> tillNames) {
+    private static PrintingDtos.Printer printerOf(Device device, Map<UUID, String> tillNames, boolean drawer) {
         DevicePrinterProfile profile = device.getPrinterProfile();
         boolean usable = device.isActive() && (device.getStatus() == DeviceStatus.ACTIVE || device.getStatus() == DeviceStatus.PROVISIONING);
         UUID host = profile == null ? null : profile.getHostDeviceId();
@@ -367,6 +371,6 @@ public class PrintingService {
                 profile == null ? null : profile.getPrinterIp(), profile == null ? null : profile.getPrinterPort(),
                 profile == null ? null : profile.getSystemPrinterName(), host, host == null ? null : tillNames.get(host),
                 profile == null ? 80 : profile.getPaperWidthMm(), profile != null && profile.isAutoCut(),
-                profile != null && profile.isCashDrawerKickEnabled(), usable);
+                drawer || (profile != null && profile.isCashDrawerKickEnabled()), usable);
     }
 }

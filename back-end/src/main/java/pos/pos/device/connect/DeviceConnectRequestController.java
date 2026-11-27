@@ -61,7 +61,7 @@ public class DeviceConnectRequestController {
         rateLimiter.check("DEVICE_PAIRING_IP", address, maxTriesPerAddress, Duration.ofMinutes(triesWindowMinutes),
                 "Too many tries. Wait a few minutes and try again.");
         try {
-            return service.ask(body.pairingToken(), restaurantId, settingsDomainSupport.currentActorId(authentication),
+            return service.ask(body.pairingToken(), body.kind(), restaurantId, settingsDomainSupport.currentActorId(authentication),
                     ClientInfoNormalizer.normalizeDeviceName(servletRequest.getHeader("X-Device-Name")),
                     ClientInfoNormalizer.normalizeDeviceSystem(servletRequest.getHeader("X-Device-System")), address);
         } catch (AuthException refused) {

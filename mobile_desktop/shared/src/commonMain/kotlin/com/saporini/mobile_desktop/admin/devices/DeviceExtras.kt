@@ -3,25 +3,14 @@ package com.saporini.mobile_desktop.admin.devices
 import androidx.compose.runtime.mutableStateListOf
 
 /**
- * MOCK until the backend round: barcode scanners and cash drawers. The server only knows tills, tablets, kitchen screens,
- * guest displays, card terminals and printers, so these live in memory here (lost when the app closes). A scanner types
- * into a focused field like a keyboard; a cash drawer is plugged into a receipt printer that opens it.
- * Production pass: SCANNER and CASH_DRAWER device types on the server (a drawer linked to its printer).
+ * Devices the server doesn't keep. Since 2026-11-27 none: cash drawers are devices on the server (plugged into a printer) and
+ * barcode scanners need nothing set up (user: "you just connect it"); kept empty so older screens' checks still read.
  */
 internal object DeviceExtras {
     const val SCANNER = "SCANNER"
     const val CASH_DRAWER = "CASH_DRAWER"
 
-    val items = mutableStateListOf(
-        DeviceDto("mock-scan-1", code = "SCAN-1", name = "Stock scanner", deviceType = SCANNER, manufacturer = "Zebra", model = "DS2208",
-            status = "ACTIVE", online = true, notes = "USB, in the store room. Used for counts and deliveries."),
-        DeviceDto("mock-scan-2", code = "SCAN-2", name = "Bar scanner", deviceType = SCANNER, manufacturer = "Honeywell", model = "Voyager 1472g",
-            status = "PROVISIONING", notes = "Bluetooth, new."),
-        DeviceDto("mock-drawer-1", code = "DRW-1", name = "Front cash drawer", deviceType = CASH_DRAWER, manufacturer = "APG", model = "Vasario",
-            status = "ACTIVE", online = true, notes = "Plugged into the Receipt printer."),
-        DeviceDto("mock-drawer-2", code = "DRW-2", name = "Bar cash drawer", deviceType = CASH_DRAWER, manufacturer = "APG", model = "Vasario",
-            status = "ACTIVE", online = true, notes = "Plugged into the Bar printer.")
-    )
+    val items = mutableStateListOf<DeviceDto>()
 
     fun isExtra(id: String?) = id?.startsWith("mock-") == true
 

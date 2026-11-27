@@ -192,7 +192,7 @@ class DeviceConnectRequestIntegrationTest extends AbstractPosApiIntegrationTest 
         post("/restaurants/{r}/device-connect-requests", r).as(asker).body(Map.of("pairingToken", "ZZZZZZZZ")).expect(400);
         UUID card = device(world, "Card reader", "PAYMENT_TERMINAL");
         assertThat(post("/restaurants/{r}/device-connect-requests", r).as(asker).body(Map.of("pairingToken", code(world, card))).expect(400)
-                .get("message").asText()).contains("card terminal");
+                .get("message").asText()).contains("doesn't work here");
         UUID theirs = till(elsewhere, "Their till");
         post("/restaurants/{r}/device-connect-requests", r).as(asker).body(Map.of("pairingToken", code(elsewhere, theirs))).expect(400);
         // A request of another restaurant isn't there for this one.

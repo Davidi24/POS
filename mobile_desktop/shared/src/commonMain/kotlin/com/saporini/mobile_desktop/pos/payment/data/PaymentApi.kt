@@ -30,7 +30,14 @@ interface PaymentRepository {
     suspend fun payment(restaurantId: String, paymentId: String): PaymentDto
 
     suspend fun branchPayments(restaurantId: String, branchId: String, filter: PaymentListFilter, page: Int, size: Int): PaymentPageDto
+
+    /** The card terminal connected to the till or tablet [deviceId], or null (user, 2026-11-27: terminals work only through one). */
+    suspend fun cardTerminal(restaurantId: String, deviceId: String): CardTerminalDto? = null
 }
+
+/** A till's card terminal: its name and how it's connected (BLUETOOTH or USB). */
+@kotlinx.serialization.Serializable
+data class CardTerminalDto(val id: String, val name: String = "", val linkType: String? = null, val linkAddress: String? = null)
 
 class PaymentApi(
     private val client: HttpClient,
@@ -39,6 +46,13 @@ class PaymentApi(
 
     private fun orderPath(restaurantId: String, orderId: String) =
         "${baseUrlProvider().trimEnd('/')}/restaurants/${restaurantId.encodeURLPathPart()}/orders/${orderId.encodeURLPathPart()}"
+
+    override suspend fun cardTerminal(restaurantId: String, deviceId: String): CardTerminalDto? {
+        val answer = client.get("${baseUrlProvider().trimEnd('/')}/restaurants/${restaurantId.encodeURLPathPart()}/card-terminal") {
+            parameter("deviceId", deviceId)
+        }
+        return if (answer.status == io.ktor.http.HttpStatusCode.NoContent) null else answer.body()
+    }
 
     override suspend fun summary(restaurantId: String, orderId: String): OrderPaymentSummaryDto =
         client.get("${orderPath(restaurantId, orderId)}/payments").body()

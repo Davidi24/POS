@@ -59,6 +59,11 @@ public class DeviceResponse {
     private OffsetDateTime printerCheckedAt;
     private String printerCheckedBy;
     private String printerProblem;
+    // A card terminal's till or tablet, or a cash drawer's printer, and how it's connected.
+    private UUID linkedDeviceId;
+    private String linkedDeviceName;
+    private String linkType;
+    private String linkAddress;
     private Boolean autoCut;
     private Boolean cashDrawerKickEnabled;
     private OffsetDateTime createdAt;

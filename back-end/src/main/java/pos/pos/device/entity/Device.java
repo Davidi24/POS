@@ -20,6 +20,7 @@ import pos.pos.utils.NormalizationUtils;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.Objects;
 
 @Entity
@@ -138,6 +139,17 @@ public class Device extends AbstractAuditedEntity {
 
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
+
+    // A card terminal's till or tablet (USB, BLUETOOTH), or a cash drawer's printer (PRINTER), with the Bluetooth address or
+    // the cable's port (user, 2026-11-27).
+    @Column(name = "linked_device_id", columnDefinition = "uuid")
+    private UUID linkedDeviceId;
+
+    @Column(name = "link_type", length = 20)
+    private String linkType;
+
+    @Column(name = "link_address", length = 200)
+    private String linkAddress;
 
     @OneToMany(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DeviceAssignment> assignments = new ArrayList<>();
