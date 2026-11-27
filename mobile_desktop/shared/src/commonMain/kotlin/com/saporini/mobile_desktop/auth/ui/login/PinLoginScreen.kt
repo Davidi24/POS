@@ -92,7 +92,7 @@ fun signInScreen(): Screen =
     if (TokenStore.till.value != null && !com.saporini.mobile_desktop.core.session.PasswordNext.once) PinLoginScreen else LoginScreen
 
 /**
- * The PIN pad's state. [shake] counts wrong PINs so the dots shake each time; [pausedUntil] = 5 wrong PINs on this till,
+ * The PIN pad's state. [shake] counts wrong PINs so the dots shake each time; [pausedUntil] = 10 wrong PINs on this till,
  * no tries until then; [disconnected] = the server no longer knows this device as a till.
  */
 data class PinLoginState(
@@ -222,7 +222,7 @@ private fun PinPad(state: PinLoginState, tillName: String?, isCompact: Boolean, 
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
-    // Seconds left of a pause after 5 wrong PINs.
+    // Seconds left of a pause after 10 wrong PINs.
     var left by remember(state.pausedUntil) { mutableStateOf(0L) }
     LaunchedEffect(state.pausedUntil) {
         val until = state.pausedUntil ?: return@LaunchedEffect

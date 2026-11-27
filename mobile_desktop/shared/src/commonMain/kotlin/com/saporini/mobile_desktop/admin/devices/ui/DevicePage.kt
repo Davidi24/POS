@@ -165,6 +165,12 @@ private fun DeviceHeader(
                         LinkPill(link, big = true)
                         Text(linkDetail(device, link, here), fontFamily = Inter(), fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Muted, maxLines = 1,
                             overflow = TextOverflow.Ellipsis)
+                    } else if (kind == DeviceKind.PRINTER && reachOf(device) != null) {
+                        // Whether it answers, as tills found it (user, 2026-11-27).
+                        val reach = reachOf(device)!!
+                        StatePillBig(StateLook(reach.label, "", reach.icon, reach.color))
+                        Text(reachDetail(device, reach), fontFamily = Inter(), fontSize = 13.sp, letterSpacing = 0.sp,
+                            color = if (reach == Reach.OFFLINE) Kit.Danger else Kit.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     } else {
                         StatePillBig(stateLook(device.status))
                         if (kind == DeviceKind.PRINTER) Text(connectionLabel(device.printerConnectionType), fontFamily = Inter(), fontSize = 13.sp,
@@ -268,21 +274,21 @@ private fun FactStrip(facts: List<Fact>, phone: Boolean) {
 
 @Composable
 private fun LeftCards(device: DeviceDto, kind: DeviceKind, state: DevicesState, model: DevicesScreenModel) {
-    // The two ways to connect it, each its own card (user, 2026-11-25: "separate, not together"); a card terminal isn't the app.
     val extra = DeviceExtras.isExtra(device.id)
-    if ((kind == DeviceKind.TILL || kind == DeviceKind.TABLET) && !extra) ThisDeviceCard(device, state, model)
-    // A code for it: a till or tablet takes it from someone signed in on it, in Devices → Enter a code (user, 2026-11-25:
-    // "the person who puts the code logs in and puts it in the Devices section"); a card terminal on its own pairing screen.
-    if ((kind == DeviceKind.TILL || kind == DeviceKind.TABLET || kind == DeviceKind.CARD) && !extra) CodeCard(device, state, model)
+    // Connecting it, in one card (user, 2026-11-27): Use this device, or a code typed on another device in Devices → Enter a
+    // code (a card terminal on its own pairing screen); Disconnect while it's in use.
+    if ((kind == DeviceKind.TILL || kind == DeviceKind.TABLET || kind == DeviceKind.CARD) && !extra) ConnectCard(device, state, model)
+    // Who can sign in with their PIN (tills, tablets and screens), then its state: using it on the left, what's known about it
+    // on the right, so the two columns come out about as long (user, 2026-11-27: "put the cards in a better order").
+    if ((kind == DeviceKind.TILL || kind == DeviceKind.TABLET) && !extra) SignInCard(device, state, model)
+    // A printer: the tills and kitchen stations it prints for, and a real test page (2026-11-27).
+    if (kind == DeviceKind.PRINTER) PrinterJobsCard(device, state, model)
     StateCard(device, kind, state, model)
 }
 
 @Composable
 private fun RightCards(device: DeviceDto, kind: DeviceKind, state: DevicesState, model: DevicesScreenModel, onEdit: () -> Unit) {
-    val extra = DeviceExtras.isExtra(device.id)
-    // Who can sign in with their PIN (tills, tablets and screens).
-    if ((kind == DeviceKind.TILL || kind == DeviceKind.TABLET) && !extra) SignInCard(device, state, model)
-    ReachCard(device, kind)
+    ReachCard(device, kind, state.devices.firstOrNull { it.id == device.hostDeviceId }?.name)
     DetailsCard(device, state, onEdit)
 }
 
@@ -344,7 +350,7 @@ internal fun InfoLines(lines: List<InfoLine>) {
 private fun StateCard(device: DeviceDto, kind: DeviceKind, state: DevicesState, model: DevicesScreenModel) {
     val extra = DeviceExtras.isExtra(device.id)
     val current = stateLook(device.status)
-    Panel("State", "Only devices in use can be used.", Icons.Outlined.ToggleOn, current.color,
+    Panel("State", null, Icons.Outlined.ToggleOn, current.color,
         picture = Res.drawable.shifts_needs_review) {
         if (device.status == "PROVISIONING") {
             Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFFFF8EC))
@@ -387,16 +393,27 @@ private fun StateCard(device: DeviceDto, kind: DeviceKind, state: DevicesState, 
 
 /** How the device is reached: when it was connected, last seen, its address and place, what it runs; a printer's connection. */
 @Composable
-private fun ReachCard(device: DeviceDto, kind: DeviceKind) {
+private fun ReachCard(device: DeviceDto, kind: DeviceKind, hostName: String? = null) {
     val now = Clock.System.now()
     val zone = RestaurantTime.zone
     val lines = when {
-        kind == DeviceKind.PRINTER -> listOf(
-            InfoLine(Icons.Outlined.Cable, "Connection", connectionLabel(device.printerConnectionType)),
-            InfoLine(Icons.Outlined.Lan, "Address", listOfNotNull(device.printerIp, device.printerPort?.toString()).joinToString(":").ifBlank { "–" }),
-            InfoLine(Icons.Outlined.Receipt, "Paper", "${device.paperWidthMm ?: "–"} mm"),
-            InfoLine(Icons.Outlined.ContentCut, "Cuts the paper", if (device.autoCut == true) "Yes" else "No"),
-            InfoLine(Icons.Outlined.PointOfSale, "Opens a cash drawer", if (device.cashDrawerKickEnabled == true) "Yes" else "No"))
+        kind == DeviceKind.PRINTER -> {
+            val document = device.printerRole == "DOCUMENT"
+            val where = when (device.printerConnectionType) {
+                "NETWORK" -> listOfNotNull(device.printerIp, device.printerPort?.toString()).joinToString(":").ifBlank { "–" }
+                "BLUETOOTH" -> (device.systemPrinterName ?: "–") + (hostName?.let { " · paired with $it" } ?: "")
+                else -> (device.systemPrinterName ?: "–") + (hostName?.let { " · on $it" } ?: "")
+            }
+            listOfNotNull(
+                InfoLine(Icons.Outlined.Print, "Kind", com.saporini.mobile_desktop.admin.devices.printerRoleLabel(device.printerRole)),
+                InfoLine(Icons.Outlined.Cable, "Connection", connectionLabel(device.printerConnectionType)),
+                InfoLine(Icons.Outlined.Lan, if (device.printerConnectionType == "NETWORK") "Address" else "Printer", where),
+                InfoLine(Icons.Outlined.Receipt, "Paper", if (document) "A4" else "${device.paperWidthMm ?: "–"} mm"),
+                InfoLine(Icons.Outlined.Schedule, "Last answered", device.printerReachedAt?.let { agoText(it, now, zone) } ?: "Not yet",
+                    if (device.printerState == "ONLINE") OnlineGreen else Kit.Ink),
+                InfoLine(Icons.Outlined.ContentCut, "Cuts the paper", if (device.autoCut == true) "Yes" else "No").takeUnless { document },
+                InfoLine(Icons.Outlined.PointOfSale, "Opens a cash drawer", if (device.cashDrawerKickEnabled == true) "Yes" else "No").takeUnless { document })
+        }
         DeviceExtras.isExtra(device.id) -> listOf(InfoLine(Icons.Outlined.Cable, "Connection", if (device.status == "ACTIVE") "Plugged in" else "Not checked yet"))
         else -> listOfNotNull(
             InfoLine(Icons.Outlined.Link, "Connected", device.connectedAt?.let { dateTimeText(it, zone) } ?: "Not yet"),
@@ -406,9 +423,11 @@ private fun ReachCard(device: DeviceDto, kind: DeviceKind) {
             InfoLine(Icons.Outlined.Computer, "System", systemText(device.platform, device.osVersion)),
             device.appVersion?.let { InfoLine(Icons.Outlined.Apps, "App version", it) })
     }
-    Panel("How it's reached", if (kind == DeviceKind.PRINTER) "Where the tills send what it prints." else "What the server knows about it.",
+    Panel("How it's reached", null,
         Icons.Outlined.Wifi, Kit.Blue, picture = Res.drawable.supplier_place) {
         InfoLines(lines)
+        if (kind == DeviceKind.PRINTER) Text("Tills and tablets with the app open check it every minute.", fontFamily = Inter(), fontSize = 12.sp,
+            lineHeight = 16.sp, letterSpacing = 0.sp, color = Kit.Faint)
     }
 }
 
@@ -439,7 +458,7 @@ internal fun systemText(platform: String?, version: String?): String {
 @Composable
 private fun DetailsCard(device: DeviceDto, state: DevicesState, onEdit: () -> Unit) {
     val extra = DeviceExtras.isExtra(device.id)
-    Panel("Details", "How it's written down here.", Icons.Outlined.Info, Kit.Grey,
+    Panel("Details", null, Icons.Outlined.Info, Kit.Grey,
         picture = Res.drawable.inventory_stock_items,
         trailing = if (state.canEdit && !extra) ({ KitButton("Edit", onEdit, style = ButtonStyle.SECONDARY, icon = Icons.Outlined.Edit, enabled = !state.saving) }) else null) {
         InfoLines(listOfNotNull(

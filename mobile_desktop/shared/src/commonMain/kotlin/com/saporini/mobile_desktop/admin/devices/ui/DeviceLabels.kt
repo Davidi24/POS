@@ -62,7 +62,7 @@ internal fun DeviceDto.needsAttention(printer: Boolean): Boolean =
 
 internal fun connectionLabel(connection: String?): String = when (connection) {
     "NETWORK" -> "Network (IP)"
-    "USB" -> "USB cable"
+    "USB" -> "On a computer (USB)"
     "BLUETOOTH" -> "Bluetooth"
     "SERIAL" -> "Serial cable"
     else -> humanize(connection)

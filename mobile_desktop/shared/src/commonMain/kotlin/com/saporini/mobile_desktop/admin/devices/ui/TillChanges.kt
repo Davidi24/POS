@@ -240,7 +240,7 @@ private fun ConnectApprovalDialog(
 private fun TillMovedDialog(name: String, onOk: () -> Unit) {
     AppDialog(title = "This device isn't $name any more", onDismiss = onOk, maxWidth = 460.dp,
         buttons = { KitButton("OK", onOk) }) {
-        Text("$name was connected on another device, or switched off in Devices. Staff can't sign in here with their PIN now.",
+        Text("$name was disconnected or switched off in Devices. Staff can't sign in here with their PIN now.",
             fontFamily = Inter(), fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.sp, color = Kit.Ink, textAlign = TextAlign.Start)
     }
 }

@@ -152,14 +152,25 @@ internal fun DevicesContent(
             else -> model.newDevice(kind.types.first())
         }
     }
+    // A printer just added: after confirming it, what it prints (user, 2026-11-27).
+    var offerUse by remember { mutableStateOf<String?>(null) }
+    var useItFor by remember { mutableStateOf<String?>(null) }
     // A device that was just added goes straight on to being confirmed.
     LaunchedEffect(state.justAdded) {
-        state.justAdded?.let { id -> confirming = id; model.select(id); model.clearJustAdded() }
+        state.justAdded?.let { id ->
+            if (state.isPrinter(id)) offerUse = id
+            confirming = id; model.select(id); model.clearJustAdded()
+        }
     }
 
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val size = screenSizeFor(maxWidth)
-        val side = if (size.isPhone) 14.dp else 22.dp
+        // More room at the sides (user, 2026-11-27: "more space in left and right"), so the cards clear the right-edge tab.
+        val side = when {
+            size.isPhone -> 14.dp
+            size.isDesktop -> 44.dp
+            else -> 30.dp
+        }
         Column(Modifier.fillMaxSize().padding(start = side, end = side, top = if (size.isPhone) 12.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // Inside a kind or a device, the way back sits in the header, beside "Devices", with where you are under it
             // (user, 2026-11-25: "the back arrow on the device, up, make it better").
@@ -248,8 +259,21 @@ internal fun DevicesContent(
                 confirming = null
                 if (confirmed && DeviceExtras.isExtra(device.id)) { DeviceExtras.confirm(device.id); localNotice = "${device.name} is confirmed" }
                 else if (confirmed) model.confirm(device.id)
+                if (offerUse == device.id) { useItFor = device.id; offerUse = null }
                 if (openId == null) model.select(null)
             })
+        }
+    }
+    // A new printer, once confirmed: what it prints (a document printer has nothing to choose).
+    useItFor?.let { id ->
+        val printer = state.printers.firstOrNull { it.id == id }
+        if (printer == null || printer.printerRole == "DOCUMENT") useItFor = null
+        else {
+            LaunchedEffect(id) { if (state.selectedId != id) model.select(id) }
+            PrinterJobsDialog(printer, state, model) {
+                useItFor = null
+                if (openId == null) model.select(null)
+            }
         }
     }
     // A pairing code made from the device's own dialog (the confirm dialog shows its code itself).
@@ -329,10 +353,10 @@ private fun KindChips(kind: DeviceKind, devices: List<DeviceDto>, here: String?,
             Link.entries.forEach { link ->
                 val count = links.count { it == link }
                 if (count > 0) StatusChip(when (link) {
-                    Link.ONLINE -> "$count online"
-                    Link.OFFLINE -> "$count offline"
+                    Link.ONLINE -> "$count in use · online"
+                    Link.OFFLINE -> "$count in use · offline"
                     Link.NOT_CONNECTED -> "$count not connected"
-                    Link.NOT_IN_USE -> "$count not in use"
+                    Link.NOT_IN_USE -> "$count switched off"
                 }, link.color)
             }
         }
@@ -340,13 +364,14 @@ private fun KindChips(kind: DeviceKind, devices: List<DeviceDto>, here: String?,
     }
     val inUse = devices.count { it.status == "ACTIVE" }
     val repair = devices.count { it.status == "MAINTENANCE" || it.status == "BLOCKED" }
-    val offline = devices.count { kind.pairs && it.status == "ACTIVE" && !it.online }
+    // Printers that don't answer (tills check every minute) show in red.
+    val offline = devices.count { if (kind == DeviceKind.PRINTER) reachOf(it) == Reach.OFFLINE else kind.pairs && it.status == "ACTIVE" && !it.online }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
         if (devices.isEmpty()) Text("None yet", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Faint)
         else {
             StatusChip("$inUse in use", Kit.Blue)
             if (repair > 0) StatusChip("$repair in repair", Kit.Purple)
-            if (offline > 0) StatusChip("$offline offline", Kit.Grey)
+            if (offline > 0) StatusChip("$offline offline", if (kind == DeviceKind.PRINTER) Kit.Danger else Kit.Grey)
         }
         if (kind.mock) Text("sample", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Faint)
     }
@@ -484,10 +509,10 @@ private fun LinkCount(link: Link, count: Int) {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(link.color))
         Text(when (link) {
-            Link.ONLINE -> "$count online"
-            Link.OFFLINE -> "$count offline"
+            Link.ONLINE -> "$count in use · online"
+            Link.OFFLINE -> "$count in use · offline"
             Link.NOT_CONNECTED -> "$count not connected"
-            Link.NOT_IN_USE -> "$count not in use"
+            Link.NOT_IN_USE -> "$count switched off"
         }, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp,
             color = if (link == Link.OFFLINE) Kit.Muted else link.color, maxLines = 1)
     }
@@ -507,9 +532,12 @@ private fun DeviceCard(
     val hovered by interaction.collectIsHoveredAsState()
     val zoom by androidx.compose.animation.core.animateFloatAsState(if (hovered) 1.06f else 1f, androidx.compose.animation.core.tween(280))
     val off = link == Link.NOT_IN_USE || (link == null && (device.status == "RETIRED" || device.status == "INACTIVE"))
+    // A printer says whether it answers (tills check every minute).
+    val reach = if (kind == DeviceKind.PRINTER) reachOf(device) else null
     val accent = when {
         here -> Kit.Ink
         link != null -> link.color
+        reach != null -> reach.color
         else -> deviceStatusColor(device.status)
     }
     val now = Clock.System.now()
@@ -523,7 +551,8 @@ private fun DeviceCard(
                 Image(painterResource(kind.image), kind.title, Modifier.fillMaxSize().padding(vertical = 4.dp).graphicsLayer { scaleX = zoom; scaleY = zoom },
                     contentScale = ContentScale.Fit,
                     colorFilter = if (off) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null)
-                StatePill(link?.icon ?: Icons.Outlined.Circle,
+                if (reach != null) StatePill(reach.icon, reach.label, reach.color, dot = reach == Reach.ONLINE, modifier = Modifier.align(Alignment.TopStart))
+                else StatePill(link?.icon ?: Icons.Outlined.Circle,
                     when {
                         link == null || link == Link.NOT_IN_USE -> deviceStatusLabel(device.status)
                         link == Link.NOT_CONNECTED -> "Not connected"
@@ -561,11 +590,15 @@ private fun DeviceCard(
                         Link.NOT_CONNECTED -> "Not set up yet" to Kit.Amber
                         Link.NOT_IN_USE -> deviceStatusLabel(device.status) to Kit.Purple
                         null -> when (kind) {
-                            DeviceKind.PRINTER -> (device.printerIp ?: connectionLabel(device.printerConnectionType)) to Kit.Muted
+                            DeviceKind.PRINTER -> when (reach) {
+                                Reach.OFFLINE -> (device.printerProblem ?: "It doesn't answer") to Kit.Danger
+                                Reach.ONLINE -> (device.printerIp ?: connectionLabel(device.printerConnectionType)) to OnlineGreen
+                                else -> (device.printerIp ?: connectionLabel(device.printerConnectionType)) to Kit.Muted
+                            }
                             else -> (if (device.status == "ACTIVE") "Plugged in" else "Not checked yet") to Kit.Muted
                         }
                     }
-                    Icon(link?.icon ?: if (kind == DeviceKind.PRINTER) Icons.Outlined.Lan else Icons.Outlined.Cable, null, Modifier.size(14.dp), tint = tone)
+                    Icon(link?.icon ?: reach?.icon ?: if (kind == DeviceKind.PRINTER) Icons.Outlined.Lan else Icons.Outlined.Cable, null, Modifier.size(14.dp), tint = tone)
                     Text(line, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp, color = tone,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (link == Link.NOT_CONNECTED && state.mayConnect(device)) {
