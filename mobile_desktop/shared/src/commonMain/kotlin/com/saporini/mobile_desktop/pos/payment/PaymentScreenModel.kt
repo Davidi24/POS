@@ -229,6 +229,9 @@ class PaymentScreenModel(
             writes.withLock {
                 try {
                     val response = repository.take(restaurantId, orderId, request, key)
+                    // Cash opens the drawer; the last payment prints the receipt (2026-11-27).
+                    com.saporini.mobile_desktop.core.printing.PrintHooks.paid(orderId, request.method,
+                        response.orderClosed || isSettled(response.summary))
                     if (token != revision) return@withLock
                     mutable.update {
                         it.copy(summary = response.summary, lastPayment = response.payment, pendingKey = null,

@@ -349,7 +349,8 @@ internal fun TicketsSection(
     }
     val hooks = if (waiter != null) CardHooks(photos, { _, _, _ -> }, {}, {}, onGoToOrder = { waiter.onGoToOrder(it.orderId) })
         else CardHooks(photos, onAction = { t, a, i -> step(t, a, i) }, onOpen = { model.selectTicket(it.id) },
-            onPrint = { localNotice = "Kitchen printing comes once a printer is connected (Admin Hub → Devices)." },
+            // The ticket again on its station's printer (2026-11-27).
+            onPrint = { ticket -> com.saporini.mobile_desktop.core.printing.PrintHooks.reprint(ticket) },
             onStartDishes = { t, ids -> startDishes(t, ids) })
     val idle = remember(photos) { CardHooks(photos, { _, _, _ -> }, {}, {}) }
 

@@ -298,6 +298,8 @@ class TableLayoutApi(
     suspend fun setBillRequested(restaurantId: String, orderId: String, requested: Boolean) {
         val url = "${baseUrlProvider()}/restaurants/$restaurantId/orders/$orderId/bill-request"
         if (requested) client.post(url) else client.delete(url)
+        // The bill prints on this till's printer when that's switched on (2026-11-27).
+        if (requested) com.saporini.mobile_desktop.core.printing.PrintHooks.billRequested(orderId)
     }
 
     // Some tables leave the group and become free; [keepTableId] keeps the guests and the order (null: the server picks).

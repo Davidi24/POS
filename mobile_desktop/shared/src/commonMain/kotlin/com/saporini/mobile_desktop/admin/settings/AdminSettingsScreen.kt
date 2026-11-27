@@ -330,6 +330,7 @@ private fun SettingsPageRealMoney(category: SettingsCategory, onBack: () -> Unit
                             verticalArrangement = Arrangement.spacedBy(if (phone) 12.dp else 14.dp)
                         ) {
                             DeviceNetworkSettings(scope.restaurantId, scope.branchId, phone)
+                            PrintingSettings(scope.restaurantId, canEdit = canEdit)
                         }
                     }
                     sections.isEmpty() -> ComingSoon(category, Modifier.align(Alignment.Center).padding(24.dp))

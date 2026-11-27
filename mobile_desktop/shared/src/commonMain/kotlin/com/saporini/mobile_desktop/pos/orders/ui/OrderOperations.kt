@@ -139,7 +139,7 @@ class OrderOperations internal constructor(
         request: OrderActionInput = OrderActionInput()
     ): Result<Order> = model.mutate("ORDER_UPDATE", "sendToKitchen", selectResult = false) { scope ->
         repository.sendToKitchen(restaurantId = scope.restaurantId, orderId = orderId, request = request)
-    }
+    }.onSuccess { com.saporini.mobile_desktop.core.printing.PrintHooks.kitchenSent(orderId) }
 
     suspend fun markOrderReady(
         orderId: String,
@@ -149,7 +149,9 @@ class OrderOperations internal constructor(
     }
 
     suspend fun requestBill(orderId: String): Result<Order> = model.mutate("ORDER_CLOSE", "requestBill", selectResult = false) { scope ->
-        repository.requestBill(restaurantId = scope.restaurantId, orderId = orderId)
+        repository.requestBill(restaurantId = scope.restaurantId, orderId = orderId).also {
+            com.saporini.mobile_desktop.core.printing.PrintHooks.billRequested(orderId)
+        }
     }
 
     suspend fun fulfillOrder(
@@ -271,7 +273,7 @@ class OrderOperations internal constructor(
         request: OrderActionInput = OrderActionInput()
     ): Result<OrderLineItem> = model.mutate("ORDER_UPDATE", "fireItem", selectResult = false) { scope ->
         repository.fireItem(restaurantId = scope.restaurantId, orderId = orderId, lineItemId = lineItemId, request = request)
-    }
+    }.onSuccess { com.saporini.mobile_desktop.core.printing.PrintHooks.kitchenSent(orderId) }
 
     suspend fun readyItem(
         orderId: String,
