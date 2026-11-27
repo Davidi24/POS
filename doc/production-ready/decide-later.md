@@ -143,6 +143,16 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    counts, opening hours ("Open now" stays on PIN). Either as that list or as whole areas closed on PIN (Admin Hub, Finance,
    Fraud; Statistics without downloads). A "Sign in with your password" button where something is password-only.
 
+4. **Pictures behind the receipt (the designer's "Picture behind").**
+   Since 2026-11-27 every block prints as designed, the logo and pictures included, but a picture behind the words doesn't print:
+   receipt printers print line by line and can't put words over a picture.
+   Suggestion: when a design has a picture behind, send the whole receipt as one picture (slower to print, and the letters come
+   out a little less sharp); otherwise print as now.
+
+5. **Kitchen printers that print bigger or in red.**
+   Many kitchen printers print in two colours or allow very large letters.
+   Suggestion: a kitchen ticket look (letter size, notes in red) per station, set in Where things print.
+
 ## Step 19 — Statistics
 
 1. ~~**See the sales in a currency you know**~~ Built in step 2 (user, 2026-11-19: "do it now"), for the whole app, chosen beside

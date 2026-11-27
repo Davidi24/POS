@@ -245,6 +245,7 @@ Customer update violates a data constraint	L'aggiornamento del cliente viola un 
 This code doesn't work. It may be used, ended, or typed wrong.	Questo codice non funziona. Forse è già usato, scaduto o scritto male.	Este código no funciona. Puede que ya se haya usado, haya vencido o esté mal escrito.	Ky kod nuk punon. Mund të jetë përdorur, të ketë mbaruar ose të jetë shkruar gabim.
 This code doesn't work any more. Ask for a new one.	Questo codice non funziona più. Chiedine uno nuovo.	Este código ya no funciona. Pide uno nuevo.	Ky kod nuk funksionon më. Kërko një të ri.
 This code is for a card terminal: type it on the terminal itself.	Questo codice è per un terminale di pagamento: digitalo sul terminale stesso.	Este código es para un terminal de pago: escríbelo en el propio terminal.	Ky kod është për një terminal kartash: shkruaje në vetë terminalin.
+That device is in use. Disconnect it first, then make a new code.	Quel dispositivo è in uso. Scollegalo prima, poi crea un nuovo codice.	Ese dispositivo está en uso. Desconéctalo primero y luego crea un código nuevo.	Ajo pajisje është në përdorim. Shkëpute fillimisht, pastaj krijo një kod të ri.
 Someone else is waiting with this code. Try again in a few minutes.	Qualcun altro è in attesa con questo codice. Riprova tra qualche minuto.	Otra persona está esperando con este código. Inténtalo de nuevo en unos minutos.	Dikush tjetër po pret me këtë kod. Provo përsëri pas pak minutash.
 Not agreed yet.	Non ancora accettato.	Aún no aceptado.	Ende nuk është pranuar.
 This device is already connected.	Questo dispositivo è già collegato.	Este dispositivo ya está conectado.	Kjo pajisje është lidhur tashmë.
@@ -259,15 +260,22 @@ Only a network a device tried from can be allowed from here.	Da qui puoi consent
 A branch keeps {} networks at most. Remove one first.	Una sede tiene al massimo {} reti. Rimuovine prima una.	Una sucursal guarda {} redes como máximo. Quita una primero.	Një pikë mban të shumtën {} rrjete. Hiq njërin më parë.
 That network isn't saved any more.	Quella rete non è più salvata.	Esa red ya no está guardada.	Ai rrjet nuk është më i ruajtur.
 Connect this device from the restaurant's Wi-Fi.	Collega questo dispositivo dal Wi-Fi del ristorante.	Conecta este dispositivo desde el Wi-Fi del restaurante.	Lidhe këtë pajisje nga Wi-Fi-i i restorantit.
+A document printer prints documents only. Choose it when you print a report.	Una stampante documenti stampa solo documenti. Sceglila quando stampi un report.	Una impresora de documentos solo imprime documentos. Elígela cuando imprimas un informe.	Një printer dokumentesh printon vetëm dokumente. Zgjidhe kur printon një raport.
+A till you chose isn't one of this restaurant's.	Una cassa che hai scelto non è di questo ristorante.	Una caja que elegiste no es de este restaurante.	Një arkë që zgjodhe nuk është e këtij restoranti.
+A kitchen station you chose isn't one of this restaurant's.	Una postazione di cucina che hai scelto non è di questo ristorante.	Una estación de cocina que elegiste no es de este restaurante.	Një stacion kuzhine që zgjodhe nuk është i këtij restoranti.
+That isn't something to print.	Questo non è qualcosa da stampare.	Eso no es algo para imprimir.	Kjo nuk është diçka për t'u printuar.
+That print isn't there any more.	Quella stampa non c'è più.	Esa impresión ya no está.	Ai printim nuk është më.
 Device authentication failed	Autenticazione del dispositivo non riuscita	Falló la autenticación del dispositivo	Vërtetimi i pajisjes dështoi
 Unsupported assignmentType	Unsupported assignmentType	Unsupported assignmentType	Unsupported assignmentType
 Device assignment not found	Assegnazione del dispositivo non trovata	Asignación del dispositivo no encontrada	Caktimi i pajisjes nuk u gjet
 Only someone who manages devices can connect this one.	Solo chi gestisce i dispositivi può collegare questo.	Solo quien administra los dispositivos puede conectar este.	Vetëm dikush që menaxhon pajisjet mund ta lidhë këtë.
 Only active or provisioning devices can be paired	Solo i dispositivi attivi o in configurazione possono essere associati	Solo se pueden vincular dispositivos activos o en configuración	Vetëm pajisjet aktive ose në konfigurim mund të lidhen
 Device pairing token not found	Codice di associazione del dispositivo non trovato	Código de vinculación del dispositivo no encontrado	Kodi i lidhjes së pajisjes nuk u gjet
+Only someone who manages devices can disconnect this one.	Solo chi gestisce i dispositivi può scollegare questo.	Solo quien gestiona los dispositivos puede desconectar este.	Vetëm ai që menaxhon pajisjet mund ta shkëpusë këtë.
 Assigned user must belong to the same restaurant as the device	L'utente assegnato deve appartenere allo stesso ristorante del dispositivo	El usuario asignado debe pertenecer al mismo restaurante que el dispositivo	Përdoruesi i caktuar duhet t'i përkasë të njëjtit restorant si pajisja
 Device assignment update violates a data constraint	L'aggiornamento dell'assegnazione viola un vincolo dei dati	La actualización de la asignación infringe una regla de datos	Përditësimi i caktimit shkel një rregull të të dhënave
 Device pairing token update violates a data constraint	L'aggiornamento del codice di associazione viola un vincolo dei dati	La actualización del código de vinculación infringe una regla de datos	Përditësimi i kodit të lidhjes shkel një rregull të të dhënave
+This code waits for the person who made it to agree: open Devices and press “Enter a code”.	Questo codice aspetta che chi l'ha creato sia d'accordo: apri Dispositivi e premi “Inserisci un codice”.	Este código espera que quien lo creó esté de acuerdo: abre Dispositivos y pulsa “Ingresa un código”.	Ky kod pret që ai që e krijoi të pajtohet: hap Pajisjet dhe shtyp “Fut një kod”.
 Pairing token is invalid or expired	Il codice di associazione non è valido o è scaduto	El código de vinculación no es válido o expiró	Kodi i lidhjes është i pavlefshëm ose ka skaduar
 At most 50 roles	Al massimo 50 ruoli	Como máximo 50 roles	Më së shumti 50 role
 At most 200 people	Al massimo 200 persone	Como máximo 200 personas	Më së shumti 200 persona
@@ -841,6 +849,8 @@ Refresh rate-limit attempt limits must be positive	Refresh rate-limit attempt li
 Refresh rate-limit window must be positive and representable	Refresh rate-limit window must be positive and representable	Refresh rate-limit window must be positive and representable	Refresh rate-limit window must be positive and representable
 Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key
 Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token
+Choose what kind of printer it is	Scegli che tipo di stampante è	Elige qué tipo de impresora es	Zgjidh çfarë lloj printeri është
+Only someone who works in every branch moves a device to another one.	Solo chi lavora in tutte le sedi sposta un dispositivo in un'altra.	Solo quien trabaja en todas las sucursales mueve un dispositivo a otra.	Vetëm ai që punon në të gjitha degët e zhvendos një pajisje në një tjetër.
 Invalid deviceType	Invalid deviceType	Invalid deviceType	Invalid deviceType
 Invalid status	Invalid status	Invalid status	Invalid status
 Reservation rule update violates a data constraint	L'aggiornamento della regola di prenotazione viola un vincolo dei dati	La actualización de la regla de reservas infringe una regla de datos	Përditësimi i rregullit të rezervimit shkel një rregull të të dhënave
