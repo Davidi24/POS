@@ -14,7 +14,7 @@ public final class DeviceSignInDtos {
 
     /**
      * [everyone] when nothing is chosen; else the chosen [roles] and [people]. [roleChoices]: the restaurant's roles that can
-     * be chosen; [alwaysAllowed]: the roles that can always sign in (owners, admins, managers).
+     * be chosen; [alwaysAllowed]: the roles that can always sign in (owners and co-owners).
      */
     public record DeviceSignInView(UUID deviceId, boolean everyone, List<RoleLine> roles, List<PersonLine> people,
                                    List<RoleLine> roleChoices, List<String> alwaysAllowed, List<RoleTab> tabs) {

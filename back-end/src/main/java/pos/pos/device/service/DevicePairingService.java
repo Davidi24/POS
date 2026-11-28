@@ -50,7 +50,7 @@ public class DevicePairingService {
      */
     @Transactional(noRollbackFor = pos.pos.device.network.OutsideNetworkException.class)
     public DevicePairingRedeemResponse redeem(String rawPairingToken, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId) {
-        return connect(tokenOf(rawPairingToken), remoteAddress, enteredBy, restaurantId);
+        return connect(tokenOf(rawPairingToken), remoteAddress, enteredBy, restaurantId, null, null);
     }
 
     /**
@@ -58,19 +58,22 @@ public class DevicePairingService {
      * code goes through Enter a code, which waits for its maker to agree (user, 2026-11-25; `DeviceConnectRequestService`).
      */
     @Transactional(noRollbackFor = pos.pos.device.network.OutsideNetworkException.class)
-    public DevicePairingRedeemResponse redeemOwn(String rawPairingToken, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId) {
+    public DevicePairingRedeemResponse redeemOwn(String rawPairingToken, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId,
+                                                 String onDeviceName, String onDeviceSystem) {
         DevicePairingToken token = tokenOf(rawPairingToken);
         if (enteredBy == null || !enteredBy.equals(token.getCreatedBy())) {
-            throw new AuthException("This code waits for the person who made it to agree: open Devices and press \u201cEnter a code\u201d.",
+            throw new AuthException("This code waits for the person who made it to agree: open Devices and press “Enter a code”.",
                     HttpStatus.BAD_REQUEST);
         }
-        return connect(token, remoteAddress, enteredBy, restaurantId);
+        return connect(token, remoteAddress, enteredBy, restaurantId, onDeviceName, onDeviceSystem);
     }
 
     /** A code typed on another device that its maker agreed to (`DeviceConnectRequestService.claim`). */
     @Transactional(noRollbackFor = pos.pos.device.network.OutsideNetworkException.class)
-    public DevicePairingRedeemResponse redeemAgreed(java.util.UUID pairingTokenId, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId) {
-        return connect(pairingTokenRepository.findById(pairingTokenId).orElseThrow(this::invalidPairingToken), remoteAddress, enteredBy, restaurantId);
+    public DevicePairingRedeemResponse redeemAgreed(java.util.UUID pairingTokenId, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId,
+                                                    String onDeviceName, String onDeviceSystem) {
+        return connect(pairingTokenRepository.findById(pairingTokenId).orElseThrow(this::invalidPairingToken), remoteAddress, enteredBy, restaurantId,
+                onDeviceName, onDeviceSystem);
     }
 
     /** The code as typed, still usable in [restaurantId] (not used, ended or for a device switched off); nothing changes. */
@@ -94,7 +97,8 @@ public class DevicePairingService {
         return pairingTokenRepository.findByTokenHash(tokenHash).orElseThrow(this::invalidPairingToken);
     }
 
-    private DevicePairingRedeemResponse connect(DevicePairingToken token, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId) {
+    private DevicePairingRedeemResponse connect(DevicePairingToken token, String remoteAddress, java.util.UUID enteredBy, java.util.UUID restaurantId,
+                                                String onDeviceName, String onDeviceSystem) {
         Device observedDevice = token.getDevice();
         if (restaurantId != null && !restaurantId.equals(observedDevice.getRestaurant().getId())) throw invalidPairingToken();
         Device device = deviceRepository.findForUpdateByIdAndRestaurantId(
@@ -116,6 +120,8 @@ public class DevicePairingService {
         OpaqueTokenService.IssuedToken issuedSecret = opaqueTokenService.issue(pairingProperties.getTokenPepper());
         device.setAuthSecretHash(issuedSecret.tokenHash());
         device.setAuthSecretRotatedAt(now);
+        device.setConnectedDeviceName(StringUtils.hasText(onDeviceName) ? onDeviceName.trim() : null);
+        device.setConnectedDeviceSystem(StringUtils.hasText(onDeviceSystem) ? onDeviceSystem.trim() : null);
         device.setStatus(DeviceStatus.ACTIVE);
         device.setOnline(true);
         device.setLastSeenAt(now);

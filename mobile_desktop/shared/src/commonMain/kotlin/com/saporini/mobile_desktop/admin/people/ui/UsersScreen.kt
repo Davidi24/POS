@@ -180,7 +180,7 @@ internal fun UsersScreen(modifier: Modifier = Modifier, branch: com.saporini.mob
         UsersContent(staffState, staff, rolesState, roles, modifier)
         return
     }
-    // At a branch (step 25): its staff, the people who work there (and those who work everywhere). MOCK: filtered on the
+    // At a branch (step 26): its staff, the people who work there (and those who work everywhere). MOCK: filtered on the
     // device until the server lists people by branch, so the role cards still count everyone.
     val shown = staffState.copy(people = staffState.people.filter { it.defaultBranchId == null || it.defaultBranchId == branch.id })
     Column(modifier) {

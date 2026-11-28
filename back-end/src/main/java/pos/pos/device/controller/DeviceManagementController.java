@@ -95,6 +95,15 @@ public class DeviceManagementController {
                 .body(deviceManagementService.createPairingToken(authentication, restaurantId, deviceId, request));
     }
 
+    @PostMapping("/disconnect")
+    @PreAuthorize("hasAnyAuthority('DEVICES_MANAGE', 'DEVICES_CONNECT')")
+    @Operation(summary = "Disconnect the device: it stops working where it was connected, and can be connected again")
+    public ResponseEntity<Void> disconnect(@PathVariable UUID restaurantId, @PathVariable UUID deviceId, Authentication authentication) {
+        pos.pos.security.rbac.PinSignIn.refuse(authentication, pos.pos.security.rbac.PinSignIn.CONNECT_DEVICES);
+        deviceManagementService.disconnect(authentication, restaurantId, deviceId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/pairing-tokens/{pairingTokenId}/revoke")
     @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Revoke a device pairing token")

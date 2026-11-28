@@ -191,6 +191,22 @@ private fun StationEditor(
         ToggleRow("Takes timed orders", input.acceptsScheduledOrders, { onChange(input.copy(acceptsScheduledOrders = it)) },
             detail = "Food ordered for later (and with bookings) can come to this station.")
         ToggleRow("In use", input.active, { onChange(input.copy(active = it)) })
+        // How its tickets print (decided 2026-11-28).
+        Caption("Printed tickets")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("NORMAL" to "Normal letters", "BIG" to "Big letters", "HUGE" to "Very big letters").forEach { (code, label) ->
+                val chosen = input.ticketTextSize == code
+                Surface(onClick = { onChange(input.copy(ticketTextSize = code)) }, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(10.dp),
+                    color = if (chosen) Kit.GreenSoft else Color.White, border = BorderStroke(if (chosen) 1.5.dp else 1.dp, if (chosen) Kit.Green else Kit.Border)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = when (code) { "HUGE" -> 14.sp; "BIG" -> 13.sp; else -> 12.sp },
+                            color = if (chosen) Kit.Green else Kit.Ink)
+                    }
+                }
+            }
+        }
+        ToggleRow("Notes in red", input.ticketNotesRed, { onChange(input.copy(ticketNotesRed = it)) },
+            detail = "On printers that print in two colours; the others print them in black.")
         RoutingEditor(input, dishes, names, onChange)
         problem?.takeIf { input.name.isNotBlank() }?.let { MessageBar(it, MessageKind.WARNING) }
     }

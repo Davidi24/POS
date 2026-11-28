@@ -39,7 +39,7 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    waiter could type a wrong address and the till would stop working.
    Suggestion: only in test copies.
 
-6. **A "not a robot" check on the restaurant application** (now a web page, step 24).
+6. **A "not a robot" check on the restaurant application** (now a web page, step 25).
    Applications are already limited to 5 an hour per network address and 3 a day per email, and each one waits for your
    review. Suggestion: add the check only if fake applications start coming in.
 
@@ -61,7 +61,7 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
 
 4. **Restaurant applications' emails.**
    The application emails go out in English: whoever applies has no account or language yet.
-   Suggestion: when the web form is built (step 24), it sends the page's language and the emails follow it.
+   Suggestion: when the web form is built (step 25), it sends the page's language and the emails follow it.
 
 ## Step 4 — Restaurant & branches
 
@@ -100,13 +100,13 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
 7. **Which map to use in production.** (2026-11-23)
    Restaurant info → Details → Map shows OpenStreetMap's own tiles (free, light use only, credit on the map). Many restaurants
    opening it every day would be too much for their server.
-   Suggestion: a map service with a key (MapTiler, Mapbox or Google Maps) through our server, decided with the website (step 24),
+   Suggestion: a map service with a key (MapTiler, Mapbox or Google Maps) through our server, decided with the website (step 25),
    which will show the same map to guests.
 
 8. ~~The restaurant's colours.~~ Decided 2026-11-23: done in step 4's second PR. (2026-11-23)
    The Colours card was taken out of Logo & receipts (user: "useless"). The two colours already saved stay on the server, and
    the guest booking page may still tint itself with the main one.
-   Suggestion: drop them on the server too (and from the booking page), or bring them back with the website (step 24) if the
+   Suggestion: drop them on the server too (and from the booking page), or bring them back with the website (step 25) if the
    website wants a brand colour.
 
 9. ~~Keep the receipt design on the server.~~ Decided 2026-11-23: done in step 4's second PR. (2026-11-23)
@@ -117,13 +117,13 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
 
 ## Step 5 — Devices & printing
 
-1. **A till already signed in that leaves the restaurant's network.**
+1. **A till already signed in that leaves the restaurant's network.** Decided 2026-11-28: leave it.
    Since 2026-11-24 a PIN sign-in works only on the restaurant's network. A till that is already signed in isn't stopped when it
    leaves; it locks itself after 30 seconds without use anyway, and its PIN sign-in lasts 12 hours at most.
    Suggestion: leave it. Checking the network on every refresh would sign every till out at once in the middle of service the
    moment the restaurant's internet address changes.
 
-2. **Tell the owner when a device is turned away from another network.**
+2. **Tell the owner when a device is turned away from another network.** Decided 2026-11-28: in step 6 (written in its file).
    Today it shows only in Settings → Devices & printing → "Tried from other networks" and in the Audit log.
    Suggestion: a notification to the owner ("Till 1 tried from another network"), so they can allow the new network at once when
    the restaurant's internet changed. Belongs with step 6 (Notifications).
@@ -142,6 +142,16 @@ the end"). Each one has what it is, the suggestion, and the step it belongs to. 
    exports; marking fraud checks reviewed; the audit log. Open: menu price changes, stock adjustments and waste, approving
    counts, opening hours ("Open now" stays on PIN). Either as that list or as whole areas closed on PIN (Admin Hub, Finance,
    Fraud; Statistics without downloads). A "Sign in with your password" button where something is password-only.
+
+4. **Pictures behind the receipt (the designer's "Picture behind").** Decided and built 2026-11-28 (user: "print it as one picture").
+   Since 2026-11-27 every block prints as designed, the logo and pictures included, but a picture behind the words doesn't print:
+   receipt printers print line by line and can't put words over a picture.
+   Suggestion: when a design has a picture behind, send the whole receipt as one picture (slower to print, and the letters come
+   out a little less sharp); otherwise print as now.
+
+5. **Kitchen printers that print bigger or in red.** Decided and built 2026-11-28 (user: "yes, per station").
+   Many kitchen printers print in two colours or allow very large letters.
+   Suggestion: a kitchen ticket look (letter size, notes in red) per station, set in Where things print.
 
 ## Step 19 — Statistics
 

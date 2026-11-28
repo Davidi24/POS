@@ -59,7 +59,7 @@ private fun adminNavEntries(): List<NavEntry<AdminSection>> {
     val scoped = com.saporini.mobile_desktop.workspace.ui.usesBranchScope()
     val all = scoped && com.saporini.mobile_desktop.core.session.BranchScope.isAll(com.saporini.mobile_desktop.core.session.Workspace.ADMIN)
     return AdminSection.shown(user?.permissions.orEmpty(), scoped, all)
-        // At a branch, Users are its staff (step 25).
+        // At a branch, Users are its staff (step 26).
         .map { NavEntry(it, if (it == AdminSection.USERS && scoped && !all) "Staff" else it.label, it.icon(), it.filledIcon()) }
 }
 

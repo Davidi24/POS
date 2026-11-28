@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package com.saporini.mobile_desktop.kds.model
 
 import kotlinx.serialization.Serializable
@@ -61,7 +63,9 @@ import kotlin.time.Instant
     val name: String, val stationType: String = "PREP", val displayOrder: Int = 0,
     val active: Boolean = true, val acceptsScheduledOrders: Boolean = true,
     val deviceId: String? = null, val deviceCode: String? = null, val deviceName: String? = null,
-    val screenLabel: String? = null, val notes: String? = null, val routings: List<KdsRouting> = emptyList()
+    val screenLabel: String? = null, val notes: String? = null, val routings: List<KdsRouting> = emptyList(),
+    // How its tickets print (2026-11-28): letter size NORMAL / BIG / HUGE, notes in red.
+    val ticketTextSize: String = "NORMAL", val ticketNotesRed: Boolean = false
 )
 @Serializable data class KdsDevice(
     val deviceId: String, val deviceCode: String = "", val deviceName: String = "",
@@ -74,7 +78,9 @@ import kotlin.time.Instant
     val name: String, val stationType: String, val code: String? = null,
     val displayOrder: Int = 0, val active: Boolean = true, val acceptsScheduledOrders: Boolean = true,
     val screenLabel: String? = null, val notes: String? = null, val deviceId: String? = null,
-    val routings: List<KdsRoutingInput> = emptyList()
+    val routings: List<KdsRoutingInput> = emptyList(),
+    // Always sent (the app leaves default values out, and Normal / off must reach the server too).
+    @kotlinx.serialization.EncodeDefault val ticketTextSize: String = "NORMAL", @kotlinx.serialization.EncodeDefault val ticketNotesRed: Boolean = false
 ) {
     fun problem(): String? = when {
         name.isBlank() || name.length > 150 -> "Enter a station name of up to 150 characters."
@@ -112,4 +118,4 @@ data class KdsHistoryFilter(val from: Instant? = null, val to: Instant? = null, 
 enum class KdsLiveEvent { CONNECTED, CHANGED, DISCONNECTED }
 
 fun KdsStation.toInput() = KdsStationInput(name, stationType, code, displayOrder, active, acceptsScheduledOrders, screenLabel, notes, deviceId,
-    routings.map { KdsRoutingInput(it.menuItemId, it.displayOrder, it.priority, it.courseLabel, it.active) })
+    routings.map { KdsRoutingInput(it.menuItemId, it.displayOrder, it.priority, it.courseLabel, it.active) }, ticketTextSize, ticketNotesRed)

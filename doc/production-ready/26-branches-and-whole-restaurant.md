@@ -1,4 +1,4 @@
-# 25. Branches and the whole restaurant
+# 26. Branches and the whole restaurant
 
 Status: Screens; working in a branch on, every branch together coming soon (Not started → Screens → Development → Hard testing list ready → Done)
 

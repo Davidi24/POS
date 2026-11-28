@@ -556,6 +556,7 @@ private fun ReportExportDialogRealMoney(export: CardExport, info: ReportInfo, on
     var withTable by remember(export) { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var printing by remember { mutableStateOf(false) }
+    val documentPrinter = com.saporini.mobile_desktop.core.printing.rememberDocumentPrinterPicker()
     val pages = remember(export, withChart, withTable) { reportPages(report, info, export.chart, withChart, withTable) }
     val fileName = "${report.stem}-${report.fileDates ?: info.fileDates}"
     val saver = rememberFileSaverLauncher(FileKitDialogSettings.createDefault()) { file ->
@@ -585,8 +586,11 @@ private fun ReportExportDialogRealMoney(export: CardExport, info: ReportInfo, on
             // Printing has its own flag: only Print shows it's working (user, 2026-11-15: Download looked busy while printing).
             if (canPrintTables) KitButton("Print", {
                 scope.launch {
+                    // A document: one of the computer's printers, chosen now (user, 2026-11-27).
+                    val target = documentPrinter.choose() ?: return@launch
                     printing = true
-                    val outcome = printDocument(report.title, if (pdf) pages else reportPages(report, info, null, withChart = false, withTable = true))
+                    val outcome = com.saporini.mobile_desktop.core.printing.printDocumentOn(target, report.title,
+                        if (pdf) pages else reportPages(report, info, null, withChart = false, withTable = true))
                     printing = false
                     printMessage(outcome)?.let(onResult)
                 }
@@ -709,6 +713,7 @@ private fun PageExportDialogRealMoney(items: List<PageExportItem>, info: ReportI
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var printing by remember { mutableStateOf(false) }
+    val documentPrinter = com.saporini.mobile_desktop.core.printing.rememberDocumentPrinterPicker()
     var pdf by remember { mutableStateOf(true) }
     // The PDF pages taken out ("stem#index") and the reports left out of the CSV files.
     var leftPages by remember(items) { mutableStateOf(emptySet<String>()) }
@@ -765,10 +770,11 @@ private fun PageExportDialogRealMoney(items: List<PageExportItem>, info: ReportI
             // Printing has its own flag: only Print all shows it's working (user, 2026-11-15: Download looked busy while printing).
             if (canPrintTables) KitButton("Print all", {
                 scope.launch {
+                    val target = documentPrinter.choose() ?: return@launch
                     printing = true
                     val pages = if (pdf) items.flatMap { pagesOf(it) }
                         else items.filter { kept(it) }.flatMap { reportPages(it.report, info, null, withChart = false, withTable = true) }
-                    val outcome = printDocument("${info.page} · ${info.period}", pages)
+                    val outcome = com.saporini.mobile_desktop.core.printing.printDocumentOn(target, "${info.page} · ${info.period}", pages)
                     printing = false
                     printMessage(outcome)?.let(onResult)
                 }

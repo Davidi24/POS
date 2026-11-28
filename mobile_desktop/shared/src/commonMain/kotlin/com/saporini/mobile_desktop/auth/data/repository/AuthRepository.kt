@@ -75,6 +75,9 @@ class AuthRepository(
         // Typed in by the person signed in here, so the server knows who set it up (user, 2026-11-25); a wrong code is a 400.
         val answer = executeWithFallback { baseUrl ->
             client.post("$baseUrl/restaurants/$restaurantId/device-pairing/redeem") {
+                // What this device is, so Devices says where the till is (user, 2026-11-27: "make it say who has it").
+                header("X-Device-Name", com.saporini.mobile_desktop.core.session.DeviceIdentity.name.filter { it.code in 32..126 }.trim().take(150))
+                header("X-Device-System", com.saporini.mobile_desktop.core.session.deviceSystem())
                 contentType(ContentType.Application.Json)
                 setBody(com.saporini.mobile_desktop.auth.data.dto.PairingRedeemRequest(pairingToken.trim()))
             }.body<com.saporini.mobile_desktop.auth.data.dto.PairingRedeemResponse>()

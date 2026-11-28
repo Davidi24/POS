@@ -51,7 +51,7 @@ data class ConnectRequestDto(
 data class ConnectAsked(val request: ConnectRequestDto, val claimToken: String)
 
 @Serializable
-private data class ConnectAskBody(val pairingToken: String)
+private data class ConnectAskBody(val pairingToken: String, val kind: String? = null)
 
 @Serializable
 private data class ConnectClaimBody(val claimToken: String)
@@ -72,7 +72,8 @@ data class ConnectedByCode(val till: TillConnection, val networkSaved: Boolean)
 
 /** `/restaurants/{r}/device-connect-requests`: asking (the new device) and answering (the code's maker). */
 interface DeviceConnector {
-    suspend fun ask(restaurantId: String, code: String): ConnectAsked
+    // [kind] is where the code is typed: TILL or TABLET (a code for the other kind doesn't work there).
+    suspend fun ask(restaurantId: String, code: String, kind: String? = null): ConnectAsked
     suspend fun get(restaurantId: String, requestId: String): ConnectRequestDto
     suspend fun cancel(restaurantId: String, requestId: String): ConnectRequestDto
     suspend fun claim(restaurantId: String, requestId: String, claimToken: String): ConnectedByCode
@@ -91,13 +92,13 @@ class DeviceConnectApi(
 
     private fun one(restaurantId: String, requestId: String) = "${base(restaurantId)}/${requestId.encodeURLPathPart()}"
 
-    override suspend fun ask(restaurantId: String, code: String): ConnectAsked =
+    override suspend fun ask(restaurantId: String, code: String, kind: String?): ConnectAsked =
         client.post(base(restaurantId)) {
             // What this device is, so the maker knows which one asks ("Linux computer (fedora)", "Linux 6.17").
             header("X-Device-Name", DeviceIdentity.name.filter { it.code in 32..126 }.trim().take(150))
             header("X-Device-System", deviceSystem())
             contentType(ContentType.Application.Json)
-            setBody(ConnectAskBody(code.trim()))
+            setBody(ConnectAskBody(code.trim(), kind))
         }.body()
 
     override suspend fun get(restaurantId: String, requestId: String): ConnectRequestDto = client.get(one(restaurantId, requestId)).body()

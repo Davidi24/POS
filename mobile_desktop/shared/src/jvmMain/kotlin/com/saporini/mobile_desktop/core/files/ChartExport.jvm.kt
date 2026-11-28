@@ -26,7 +26,7 @@ actual fun encodePng(image: ImageBitmap): ByteArray =
     Image.makeFromBitmap(image.asSkiaBitmap()).encodeToData(EncodedImageFormat.PNG)?.bytes ?: error("Couldn't make the picture")
 
 /** The computer prints the pages with Java's printing (the system print window, A4), drawing them as the PDF does. */
-actual suspend fun printDocument(title: String, pages: List<DocPage>): PrintOutcome = withContext(Dispatchers.IO) {
+actual suspend fun printDocument(title: String, pages: List<DocPage>, printer: String?): PrintOutcome = withContext(Dispatchers.IO) {
     // No printer set up (common on a fresh computer): open the PDF in the system's viewer, which has its own Print.
     if (javax.print.PrintServiceLookup.lookupPrintServices(null, null).isEmpty()) {
         return@withContext runCatching {
@@ -41,6 +41,9 @@ actual suspend fun printDocument(title: String, pages: List<DocPage>): PrintOutc
         val pictures = pages.flatMap { it.items.filterIsInstance<DocItem.Picture>() }.associateWith { onWhite(it.image).toAwtImage() }
         val job = PrinterJob.getPrinterJob()
         job.jobName = title
+        // The printer chosen in the app's own list (2026-11-27); without one, the system's print window asks.
+        val chosen = printer?.takeIf { it.isNotBlank() }?.let { name -> javax.print.PrintServiceLookup.lookupPrintServices(null, null).firstOrNull { it.name == name } }
+        chosen?.let { job.printService = it }
         val paper = Paper().apply {
             setSize(A4_WIDTH.toDouble(), A4_HEIGHT.toDouble())
             setImageableArea(0.0, 0.0, A4_WIDTH.toDouble(), A4_HEIGHT.toDouble())
@@ -85,7 +88,7 @@ actual suspend fun printDocument(title: String, pages: List<DocPage>): PrintOutc
             }
             Printable.PAGE_EXISTS
         }, format)
-        if (!job.printDialog()) return@runCatching false
+        if (chosen == null && !job.printDialog()) return@runCatching false
         job.print()
         true
     }.getOrDefault(false)

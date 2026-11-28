@@ -6,6 +6,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.statement.bodyAsText
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -37,6 +38,9 @@ object TillHeartbeat {
     @Serializable
     private data class About(val platform: String?, val osVersion: String?)
 
+    @Serializable
+    private data class LockTimes(val tillLockSeconds: Int? = null, val tillLockImportantSeconds: Int? = null)
+
     private val _state = MutableStateFlow(State.UNKNOWN)
     val state: StateFlow<State> = _state.asStateFlow()
 
@@ -60,7 +64,14 @@ object TillHeartbeat {
                 setBody(about)
             }
             when (answer.status.value) {
-                in 200..299 -> State.OK
+                in 200..299 -> {
+                    // The restaurant's lock times ride along (2026-11-28).
+                    runCatching {
+                        val times = Json { ignoreUnknownKeys = true }.decodeFromString(LockTimes.serializer(), answer.bodyAsText())
+                        IdleLock.useTimes(times.tillLockSeconds, times.tillLockImportantSeconds)
+                    }
+                    State.OK
+                }
                 401, 403, 404 -> State.REFUSED
                 else -> State.UNREACHABLE
             }

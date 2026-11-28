@@ -86,6 +86,16 @@ fun App() {
     val till by TokenStore.till.collectAsState()
     LaunchedEffect(Unit) { com.saporini.mobile_desktop.core.session.watchPlatformInput { com.saporini.mobile_desktop.core.session.IdleLock.touch() } }
     // A till or tablet tells the server it's on, every 30 seconds, signed in or not (2026-11-25): Devices shows it online.
+    // A till or tablet prints, for the other devices, on the printer plugged into it or paired with it (2026-11-27).
+    LaunchedEffect(till?.deviceId, till?.secret) {
+        val connection = till ?: return@LaunchedEffect
+        com.saporini.mobile_desktop.core.printing.PrintRelay.run(connection)
+    }
+    // It also checks once a minute which printers answer, so Devices shows one that's off before the next order (2026-11-27).
+    LaunchedEffect(till?.deviceId, till?.secret) {
+        val connection = till ?: return@LaunchedEffect
+        com.saporini.mobile_desktop.core.printing.PrinterWatch.run(connection)
+    }
     LaunchedEffect(till?.deviceId, till?.secret) {
         val heartbeat = com.saporini.mobile_desktop.core.session.TillHeartbeat
         val connection = till ?: return@LaunchedEffect heartbeat.reset()
@@ -97,11 +107,14 @@ fun App() {
     }
     LaunchedEffect(isAuthenticated, till) {
         if (!isAuthenticated || till == null) return@LaunchedEffect
+        // A kitchen screen never locks by itself: the cook signed in with a PIN locks it with Lock (user, 2026-11-27:
+        // "the kitchen doesn't work the same: if you sign in with a PIN you lock it yourself").
+        if (till?.type == "KDS") return@LaunchedEffect
         val idle = com.saporini.mobile_desktop.core.session.IdleLock
         idle.touch()
         while (true) {
             kotlinx.coroutines.delay(1_000)
-            val limit = idle.level.seconds
+            val limit = idle.secondsFor(idle.level)
             if (limit < 0) { idle.touch(); continue }
             if (idle.idleSeconds() >= limit) {
                 sessionManager.signOut("IDLE")
@@ -203,6 +216,10 @@ fun App() {
                     com.saporini.mobile_desktop.core.components.ScreenMessages(contextError, null, sessionManager::clearContextError)
                     // A code you made typed on another device (agree or refuse), and this till moving to another device.
                     com.saporini.mobile_desktop.admin.devices.ui.TillChanges(navigator)
+                    // Printing's toasts and questions ("Print the receipt?", which printer).
+                    com.saporini.mobile_desktop.core.printing.PrintingPanel()
+                    // A barcode scanned anywhere while signed in: what it is (2026-11-27).
+                    com.saporini.mobile_desktop.core.scan.ScanWindow(navigator)
                 }
             }
         }

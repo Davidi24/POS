@@ -101,7 +101,7 @@ data class BranchListScreen(
     val logoUrl: String? = null,
     val coverUrl: String? = null,
     val place: String? = null,
-    // An owner, co-owner or admin choosing the branch they work in after signing in (step 25): no way back to a restaurant
+    // An owner, co-owner or admin choosing the branch they work in after signing in (step 26): no way back to a restaurant
     // list, a welcome instead, and straight on to the workspaces when the restaurant has one branch.
     val ownBranches: Boolean = false
 ) : Screen {

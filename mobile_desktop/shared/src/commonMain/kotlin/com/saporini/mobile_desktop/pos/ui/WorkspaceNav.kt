@@ -53,7 +53,7 @@ internal fun <K> WorkspaceNavTopBar(
     onLogout: () -> Unit,
     onBackToWorkspaces: (() -> Unit)? = null,
     logo: @Composable () -> Unit = { WorkspaceLogo() },
-    // The workspace whose branch switcher shows in the bar (branch level or all branches, step 25); null = none.
+    // The workspace whose branch switcher shows in the bar (branch level or all branches, step 26); null = none.
     scope: com.saporini.mobile_desktop.core.session.Workspace? = null
 ) {
     val head = entries.take(fixed)

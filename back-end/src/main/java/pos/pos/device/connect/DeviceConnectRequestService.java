@@ -10,6 +10,7 @@ import pos.pos.auth.service.AccountAudit;
 import pos.pos.config.properties.DevicePairingProperties;
 import pos.pos.device.dto.DevicePairingRedeemResponse;
 import pos.pos.device.entity.Device;
+import pos.pos.device.enums.DeviceType;
 import pos.pos.device.entity.DevicePairingToken;
 import pos.pos.device.network.DeviceNetworkService;
 import pos.pos.device.repository.DevicePairingTokenRepository;
@@ -64,11 +65,22 @@ public class DeviceConnectRequestService {
     private int claimMinutes = 2;
 
     @Transactional
-    public DeviceConnectDtos.Asked ask(String rawCode, UUID restaurantId, UUID askedBy, String askingDevice, String askingSystem, String address) {
+    public DeviceConnectDtos.Asked ask(String rawCode, String kind, UUID restaurantId, UUID askedBy, String askingDevice, String askingSystem, String address) {
         DevicePairingToken token = pairing.usableToken(rawCode, restaurantId);
         Device device = token.getDevice();
         if (!DeviceNetworkService.RULED.contains(device.getDeviceType())) {
-            throw new AuthException("This code is for a card terminal: type it on the terminal itself.", HttpStatus.BAD_REQUEST);
+            throw new AuthException("This code doesn't work here.", HttpStatus.BAD_REQUEST);
+        }
+        // A code is typed inside its own kind (user, 2026-11-27): a till's code in Tills, a tablet's or screen's in Tablets & screens.
+        boolean till = device.getDeviceType() == DeviceType.POS_TERMINAL;
+        if ("TILL".equals(kind) && !till) {
+            throw new AuthException("This code doesn't work here. It's for a tablet or screen: enter it in Tablets & screens.", HttpStatus.BAD_REQUEST);
+        }
+        if ("TABLET".equals(kind) && till) {
+            throw new AuthException("This code doesn't work here. It's for a till: enter it in Tills.", HttpStatus.BAD_REQUEST);
+        }
+        if (StringUtils.hasText(device.getAuthSecretHash())) {
+            throw new AuthException("That device is in use. Disconnect it first, then make a new code.", HttpStatus.CONFLICT);
         }
         OffsetDateTime now = now();
         requests.forgetBefore(now.minusDays(7));
@@ -189,7 +201,8 @@ public class DeviceConnectRequestService {
         if (DeviceConnectRequest.DONE.equals(state)) throw new AuthException("This device is already connected.", HttpStatus.CONFLICT);
         if (DeviceConnectRequest.REFUSED.equals(state)) throw new AuthException("The person who made the code refused it.", HttpStatus.CONFLICT);
         if (!DeviceConnectRequest.AGREED.equals(state)) throw new AuthException("This request has ended. Ask for a new code.", HttpStatus.CONFLICT);
-        DevicePairingRedeemResponse connected = pairing.redeemAgreed(request.getPairingTokenId(), address, actor, restaurantId);
+        DevicePairingRedeemResponse connected = pairing.redeemAgreed(request.getPairingTokenId(), address, actor, restaurantId,
+                request.getAskingDeviceName(), request.getAskingDeviceSystem());
         request.setStatus(DeviceConnectRequest.DONE);
         request.setDoneAt(now);
         return connected;

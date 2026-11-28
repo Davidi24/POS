@@ -137,6 +137,100 @@ class PinSignInLimitsIntegrationTest extends AbstractPosApiIntegrationTest {
         order(world, waiterPin.access(), Map.of(dish, 1));
     }
 
+    @Test
+    void withChosenPeopleOnlyOwnersAlwaysSignInOnATill() throws Exception {
+        World world = newWorld("pin chosen");
+        UUID r = world.restaurantId();
+        UUID device = till(world, "Bar till");
+        String code = post("/restaurants/{r}/devices/{d}/pairing-tokens", r, device).as(world.ownerToken())
+                .body(Map.of("ttlMinutes", 10)).expect(201).get("pairingToken").asText();
+        String secret = post("/restaurants/{r}/device-pairing/redeem", r).as(world.ownerToken())
+                .body(Map.of("pairingToken", code)).expect(200).get("deviceSecret").asText();
+        UUID waiterRole = roleRepository.findByCode("WAITER").orElseThrow().getId();
+        put("/restaurants/{r}/devices/{d}/sign-in", r, device).as(world.ownerToken())
+                .body(Map.of("roleIds", List.of(waiterRole), "userIds", List.of())).expect(200);
+
+        // Admins and managers are chosen like anyone else now (user, 2026-11-27); owners still always sign in.
+        for (String role : List.of("ADMIN", "MANAGER")) {
+            User person = staff(world, role.toLowerCase(), role);
+            JsonNode refused = post("/auth/device/pin-login").header("X-Device-Id", "pin-it-" + person.getId())
+                    .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", givePin(token(person)))).expect(403);
+            assertThat(refused.get("code").asText()).as(role).isEqualTo("NOT_ON_THIS_DEVICE");
+        }
+        User waiter = staff(world, "waiter", "WAITER");
+        post("/auth/device/pin-login").header("X-Device-Id", "pin-it-" + waiter.getId())
+                .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", givePin(token(waiter)))).expect(200);
+        post("/auth/device/pin-login").header("X-Device-Id", "pin-it-" + world.owner().getId())
+                .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", givePin(world.ownerToken()))).expect(200);
+        JsonNode view = get("/restaurants/{r}/devices/{d}/sign-in", r, device).as(world.ownerToken()).expect(200);
+        assertThat(codes(view.get("alwaysAllowed"))).containsExactly("Owner", "Co-Owner");
+    }
+
+    @Test
+    void aTillPausesPinSignInAfterTenWrongPins() throws Exception {
+        World world = newWorld("pin pause");
+        UUID r = world.restaurantId();
+        UUID device = till(world, "Pause till");
+        String code = post("/restaurants/{r}/devices/{d}/pairing-tokens", r, device).as(world.ownerToken())
+                .body(Map.of("ttlMinutes", 10)).expect(201).get("pairingToken").asText();
+        String secret = post("/restaurants/{r}/device-pairing/redeem", r).as(world.ownerToken())
+                .body(Map.of("pairingToken", code)).expect(200).get("deviceSecret").asText();
+        String pin = givePin(world.ownerToken());
+        String wrong = String.format("%05d", (Integer.parseInt(pin) + 1) % 100_000);
+        // 10 wrong PINs (user, 2026-11-27: "not 5 times, make it 10"): nine are wrong, the tenth pauses the till.
+        for (int i = 1; i <= 9; i++) {
+            assertThat(post("/auth/device/pin-login").header("X-Device-Id", "pin-pause-" + i)
+                    .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", wrong)).expect(401).get("code").asText()).isEqualTo("WRONG_PIN");
+        }
+        assertThat(post("/auth/device/pin-login").header("X-Device-Id", "pin-pause-10")
+                .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", wrong)).expect(429).get("code").asText()).isEqualTo("PIN_PAUSED");
+        // Paused: even the right PIN waits.
+        assertThat(post("/auth/device/pin-login").header("X-Device-Id", "pin-pause-right")
+                .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", pin)).expect(429).get("code").asText()).isEqualTo("PIN_PAUSED");
+    }
+
+    @Test
+    void theRestaurantChoosesTheTillLockAndThePinPause() throws Exception {
+        World world = newWorld("till lock");
+        UUID r = world.restaurantId();
+        UUID device = till(world, "Lock till");
+        String code = post("/restaurants/{r}/devices/{d}/pairing-tokens", r, device).as(world.ownerToken())
+                .body(Map.of("ttlMinutes", 10)).expect(201).get("pairingToken").asText();
+        String secret = post("/restaurants/{r}/device-pairing/redeem", r).as(world.ownerToken())
+                .body(Map.of("pairingToken", code)).expect(200).get("deviceSecret").asText();
+        // Saved in Settings → Devices & printing; refused out of range, or the important time below the usual one; not by a waiter.
+        JsonNode saved = patch("/restaurants/{r}/settings/till-lock", r).as(world.ownerToken())
+                .body(Map.of("tillLockSeconds", 60, "tillLockImportantSeconds", 300, "pinPauseAfter", 3, "pinPauseMinutes", 5)).expect(200);
+        assertThat(saved.get("tillLockSeconds").asInt()).isEqualTo(60);
+        assertThat(saved.get("pinPauseAfter").asInt()).isEqualTo(3);
+        patch("/restaurants/{r}/settings/till-lock", r).as(world.ownerToken())
+                .body(Map.of("tillLockSeconds", 5, "tillLockImportantSeconds", 300, "pinPauseAfter", 3, "pinPauseMinutes", 5)).expect(400);
+        patch("/restaurants/{r}/settings/till-lock", r).as(world.ownerToken())
+                .body(Map.of("tillLockSeconds", 300, "tillLockImportantSeconds", 60, "pinPauseAfter", 3, "pinPauseMinutes", 5)).expect(400);
+        patch("/restaurants/{r}/settings/till-lock", r).as(token(staff(world, "waiter", "WAITER")))
+                .body(Map.of("tillLockSeconds", 60, "tillLockImportantSeconds", 300, "pinPauseAfter", 3, "pinPauseMinutes", 5)).expect(403);
+        // The till gets its lock times with each heartbeat.
+        JsonNode beat = post("/public/devices/{d}/heartbeat", device).header("X-Device-Secret", secret).body(Map.of("platform", "Linux")).expect(200);
+        assertThat(beat.get("tillLockSeconds").asInt()).isEqualTo(60);
+        assertThat(beat.get("tillLockImportantSeconds").asInt()).isEqualTo(300);
+        // 3 wrong PINs now pause it.
+        String pin = givePin(world.ownerToken());
+        String wrong = String.format("%05d", (Integer.parseInt(pin) + 1) % 100_000);
+        for (int i = 1; i <= 2; i++) {
+            assertThat(post("/auth/device/pin-login").header("X-Device-Id", "lock-" + i)
+                    .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", wrong)).expect(401).get("code").asText()).isEqualTo("WRONG_PIN");
+        }
+        assertThat(post("/auth/device/pin-login").header("X-Device-Id", "lock-3")
+                .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", wrong)).expect(429).get("code").asText()).isEqualTo("PIN_PAUSED");
+    }
+
+    /** A PIN for the person signed in with [passwordToken]: suggested, then kept. */
+    private String givePin(String passwordToken) throws Exception {
+        String pin = post("/auth/me/pin/suggestion").as(passwordToken).expect(200).get("pin").asText();
+        put("/auth/me/pin").as(passwordToken).body(Map.of("pin", pin)).expect(200);
+        return pin;
+    }
+
     // ---- helpers ----
 
     private void assertPinPermissions(JsonNode permissions) {

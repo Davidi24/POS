@@ -106,6 +106,13 @@ public class KdsStation extends AbstractAuditedEntity {
     @Column(name = "accepts_scheduled_orders", nullable = false)
     private boolean acceptsScheduledOrders = true;
 
+    // How its tickets print (decided 2026-11-28): letter size NORMAL / BIG / HUGE, and notes in red on two-colour printers.
+    @Column(name = "ticket_text_size", nullable = false, length = 10)
+    private String ticketTextSize = "NORMAL";
+
+    @Column(name = "ticket_notes_red", nullable = false)
+    private boolean ticketNotesRed = false;
+
     @Column(name = "screen_label", length = 80)
     private String screenLabel;
 

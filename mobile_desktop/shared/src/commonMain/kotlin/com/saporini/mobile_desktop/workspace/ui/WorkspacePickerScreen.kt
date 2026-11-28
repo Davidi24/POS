@@ -160,7 +160,7 @@ object WorkspacePickerScreen : Screen {
                         ) { if (!navigator.pop()) navigator.replaceAll(com.saporini.mobile_desktop.platform.ui.RestaurantListScreen) }
                         Spacer(Modifier.width(if (narrow) 6.dp else 10.dp))
                     }
-                    // An owner, co-owner or admin back to their restaurant's branches and the whole restaurant (step 25).
+                    // An owner, co-owner or admin back to their restaurant's branches and the whole restaurant (step 26).
                     else if (user?.restaurantId != null && com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user) && navigator.canPop) {
                         androidx.compose.material3.IconButton(onClick = { navigator.pop() }, modifier = Modifier.size(40.dp)) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to the branches", Modifier.size(24.dp), tint = TitleInk)
@@ -190,7 +190,7 @@ object WorkspacePickerScreen : Screen {
                     )
                 }
                 // Owners, co-owners and admins: the restaurant and the branch they work in, with the other branches to switch to
-                // (step 25); nothing shows with one branch.
+                // (step 26); nothing shows with one branch.
                 val ownRestaurant = user?.restaurantId
                 if (acting == null && ownRestaurant != null && com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user)) {
                     Spacer(Modifier.height(if (narrow) 10.dp else 14.dp))
@@ -329,7 +329,7 @@ internal fun PickerTopBar(
     // Inside a workspace on a phone: back to "Choose your workspace" instead of the logo and smaller controls (user,
     // 2026-10-30); the page under it keeps some room instead of a line.
     onBack: (() -> Unit)? = null,
-    // Inside a workspace: its branch switcher (step 25).
+    // Inside a workspace: its branch switcher (step 26).
     scope: Workspace? = null
 ) {
     val slim = onBack != null

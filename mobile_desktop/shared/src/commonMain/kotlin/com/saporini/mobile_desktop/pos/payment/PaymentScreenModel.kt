@@ -61,7 +61,12 @@ data class PaymentUiState(
     val completed: Boolean = false,
     val correction: PaymentCorrection? = null,
     val receipt: ReceiptDto? = null,
-    val loadingReceipt: Boolean = false
+    val loadingReceipt: Boolean = false,
+    // The card terminal of the till or tablet this runs on (none: card payments are only recorded here), and a card payment
+    // waiting for it (user, 2026-11-27). Test mode until a payment provider is connected: the person says how it went.
+    val terminal: com.saporini.mobile_desktop.pos.payment.data.CardTerminalDto? = null,
+    val terminalWait: Boolean = false,
+    val terminalApproved: Boolean = false
 ) {
     // Orders' or a table's "Take payments" (2026-11-20).
     val canTake: Boolean get() = "ORDER_CLOSE" in permissions || "TABLES_PAYMENT" in permissions
@@ -111,10 +116,41 @@ class PaymentScreenModel(
         revision++
         loadJob?.cancel()
         mutable.update {
-            PaymentUiState(restaurantId = it.restaurantId, userId = it.userId, permissions = it.permissions, orderId = orderId)
+            PaymentUiState(restaurantId = it.restaurantId, userId = it.userId, permissions = it.permissions, orderId = orderId, terminal = it.terminal)
         }
-        if (orderId != null) refresh()
+        if (orderId != null) {
+            refresh()
+            loadTerminal()
+        }
     }
+
+    /** The card terminal connected to this till or tablet, if it is one. */
+    private fun loadTerminal() {
+        val restaurantId = state.value.restaurantId ?: return
+        val deviceId = com.saporini.mobile_desktop.core.session.TokenStore.till.value?.deviceId
+        if (deviceId == null) {
+            mutable.update { it.copy(terminal = null) }
+            return
+        }
+        work.launch {
+            val terminal = try { repository.cardTerminal(restaurantId, deviceId) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+            mutable.update { it.copy(terminal = terminal) }
+        }
+    }
+
+    /** The card terminal said yes (test mode: the person says so): the payment is taken. */
+    fun cardApproved() {
+        mutable.update { it.copy(terminalWait = false, terminalApproved = true) }
+        take()
+    }
+
+    /** The card terminal said no: nothing is taken. */
+    fun cardDeclined() = mutable.update {
+        it.copy(terminalWait = false, terminalApproved = false,
+            error = PaymentFailure("The card was declined. Try again or choose another way to pay.", PaymentFailure.Kind.VALIDATION))
+    }
+
+    fun cancelCard() = mutable.update { it.copy(terminalWait = false, terminalApproved = false) }
 
     fun refresh() {
         val current = state.value
@@ -210,6 +246,11 @@ class PaymentScreenModel(
             return
         }
         val draft = current.draft
+        // A card payment on a till with a card terminal goes to the terminal first (user, 2026-11-27).
+        if (draft.method.card && current.terminal != null && !current.terminalApproved) {
+            mutable.update { it.copy(terminalWait = true, error = null) }
+            return
+        }
         val request = TakePaymentRequestDto(
             method = draft.method.api,
             amount = centsToDecimal(quote.amountCents ?: 0),
@@ -229,6 +270,9 @@ class PaymentScreenModel(
             writes.withLock {
                 try {
                     val response = repository.take(restaurantId, orderId, request, key)
+                    // Cash opens the drawer; the last payment prints the receipt (2026-11-27).
+                    com.saporini.mobile_desktop.core.printing.PrintHooks.paid(orderId, request.method,
+                        response.orderClosed || isSettled(response.summary))
                     if (token != revision) return@withLock
                     mutable.update {
                         it.copy(summary = response.summary, lastPayment = response.payment, pendingKey = null,
@@ -245,7 +289,7 @@ class PaymentScreenModel(
                     mutable.update { it.copy(error = failure, pendingKey = if (failure.mayHaveWorked) key else null) }
                     if (failure.kind == PaymentFailure.Kind.CONFLICT || failure.mayHaveWorked) refresh()
                 } finally {
-                    if (token == revision) mutable.update { it.copy(submitting = false) }
+                    if (token == revision) mutable.update { it.copy(submitting = false, terminalApproved = false) }
                 }
             }
         }

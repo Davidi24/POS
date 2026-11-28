@@ -18,7 +18,7 @@ import kotlinx.serialization.Serializable
 // printers, and the one-time codes that pair a new device.
 
 /** Device kinds a branch can register (printers live on their own list). "POS_TERMINAL" is the server's name for a till. */
-val DEVICE_TYPES = listOf("POS_TERMINAL", "TABLET", "KDS", "CUSTOMER_DISPLAY", "PAYMENT_TERMINAL")
+val DEVICE_TYPES = listOf("POS_TERMINAL", "TABLET", "KDS", "CUSTOMER_DISPLAY", "PAYMENT_TERMINAL", "CASH_DRAWER")
 val DEVICE_STATUSES = listOf("PROVISIONING", "ACTIVE", "INACTIVE", "BLOCKED", "MAINTENANCE", "RETIRED")
 val PRINTER_CONNECTIONS = listOf("NETWORK", "USB", "BLUETOOTH", "SERIAL")
 
@@ -42,6 +42,9 @@ data class DeviceDto(
     // Connected with a pairing code (and not moved to another device since), and when.
     val connected: Boolean = false,
     val connectedAt: String? = null,
+    // Which device it's connected on, as that device said ("Linux computer (fedora)", "Linux 6.17").
+    val connectedDeviceName: String? = null,
+    val connectedDeviceSystem: String? = null,
     val lastSeenAt: String? = null,
     val ipAddress: String? = null,
     // Where its address is ("Tirana, Albania"), from the server's place database (2026-11-25).
@@ -54,6 +57,22 @@ data class DeviceDto(
     val printerPort: Int? = null,
     val autoCut: Boolean? = null,
     val cashDrawerKickEnabled: Boolean? = null,
+    // A printer installed on a computer: its name there and the till it's plugged into (2026-11-27).
+    val systemPrinterName: String? = null,
+    val hostDeviceId: String? = null,
+    // RECEIPT, KITCHEN, BAR, SMALL, DOCUMENT or OTHER (2026-11-27).
+    val printerRole: String? = null,
+    // Whether a printer answers (tills check every minute): ONLINE, OFFLINE or UNCHECKED; when, by which till, and why not.
+    val printerState: String? = null,
+    val printerReachedAt: String? = null,
+    val printerCheckedAt: String? = null,
+    val printerCheckedBy: String? = null,
+    val printerProblem: String? = null,
+    // A card terminal's till or tablet (USB, BLUETOOTH), or a cash drawer's printer (PRINTER) (2026-11-27).
+    val linkedDeviceId: String? = null,
+    val linkedDeviceName: String? = null,
+    val linkType: String? = null,
+    val linkAddress: String? = null,
     val updatedAt: String? = null
 )
 
@@ -80,8 +99,45 @@ data class DeviceRequestDto(
     val printerIp: String? = null,
     val printerPort: Int? = null,
     val autoCut: Boolean? = null,
-    val cashDrawerKickEnabled: Boolean? = null
+    val cashDrawerKickEnabled: Boolean? = null,
+    val systemPrinterName: String? = null,
+    val hostDeviceId: String? = null,
+    val printerRole: String? = null,
+    val linkedDeviceId: String? = null,
+    val linkType: String? = null,
+    val linkAddress: String? = null
 )
+
+/** A till or kitchen station a printer can print for, and the printer it prints on now. */
+@Serializable
+data class PrintTargetDto(val id: String, val name: String = "", val branchName: String? = null, val printerId: String? = null,
+                          val printerName: String? = null)
+
+/** What a printer prints (`/printers/{p}/jobs`): the tills whose receipts and the kitchen stations whose tickets. */
+@Serializable
+data class PrinterJobsDto(
+    val receiptTillIds: List<String> = emptyList(),
+    val kitchenStationIds: List<String> = emptyList(),
+    val tills: List<PrintTargetDto> = emptyList(),
+    val stations: List<PrintTargetDto> = emptyList()
+)
+
+@Serializable
+data class SetPrinterJobsBody(val receiptTillIds: List<String>, val kitchenStationIds: List<String>)
+
+/** The kinds of printers "Add a printer" offers, each filling in its usual settings (user, 2026-11-27). */
+enum class PrinterPreset(val role: String, val title: String, val line: String, val defaultName: String, val paperMm: Int, val cut: Boolean,
+                         val drawer: Boolean) {
+    RECEIPT("RECEIPT", "Receipt printer", "Bills and receipts at the till; opens the cash drawer", "Receipt printer", 80, true, true),
+    KITCHEN("KITCHEN", "Kitchen printer", "Tickets for a kitchen station", "Kitchen printer", 80, true, false),
+    BAR("BAR", "Bar printer", "Drink tickets at the bar", "Bar printer", 80, true, false),
+    SMALL("SMALL", "Small receipt printer", "58 mm receipts, often a portable one", "Small receipt printer", 58, true, false),
+    DOCUMENT("DOCUMENT", "Document printer", "A4 reports and documents, like Statistics", "Document printer", 210, false, false),
+    OTHER("OTHER", "Other printer", "Set everything yourself", "Printer", 80, true, false)
+}
+
+/** What a printer's role is called. */
+fun printerRoleLabel(role: String?): String = PrinterPreset.entries.firstOrNull { it.role == role }?.title ?: "Other printer"
 
 @Serializable
 data class DeviceStatusRequestDto(val status: String, val active: Boolean, val online: Boolean)
@@ -158,6 +214,11 @@ interface DevicesRepository {
     suspend fun signIn(restaurantId: String, deviceId: String): DeviceSignInView = throw UnsupportedOperationException("Not here")
     suspend fun setSignIn(restaurantId: String, deviceId: String, roleIds: List<String>, userIds: List<String>): DeviceSignInView =
         throw UnsupportedOperationException("Not here")
+    /** The device stops being connected: where it was connected it stops working, and it can be connected again. */
+    suspend fun disconnect(restaurantId: String, deviceId: String): Unit = throw UnsupportedOperationException("Not here")
+    suspend fun printerJobs(restaurantId: String, printerId: String): PrinterJobsDto = throw UnsupportedOperationException("Not here")
+    suspend fun setPrinterJobs(restaurantId: String, printerId: String, body: SetPrinterJobsBody): PrinterJobsDto =
+        throw UnsupportedOperationException("Not here")
     suspend fun moveDevice(restaurantId: String, branchId: String, deviceId: String, toBranchId: String): DeviceDto =
         throw UnsupportedOperationException("Not here")
 
@@ -195,6 +256,16 @@ class DevicesApi(
 
     override suspend fun setSignIn(restaurantId: String, deviceId: String, roleIds: List<String>, userIds: List<String>): DeviceSignInView =
         client.put("${device(restaurantId, deviceId)}/sign-in") { contentType(ContentType.Application.Json); setBody(SetDeviceSignInBody(roleIds, userIds)) }.body()
+
+    override suspend fun disconnect(restaurantId: String, deviceId: String) {
+        client.post("${device(restaurantId, deviceId)}/disconnect")
+    }
+
+    override suspend fun printerJobs(restaurantId: String, printerId: String): PrinterJobsDto =
+        client.get("${restaurant(restaurantId)}/printers/${id(printerId)}/jobs").body()
+
+    override suspend fun setPrinterJobs(restaurantId: String, printerId: String, body: SetPrinterJobsBody): PrinterJobsDto =
+        client.put("${restaurant(restaurantId)}/printers/${id(printerId)}/jobs") { contentType(ContentType.Application.Json); setBody(body) }.body()
 
     override suspend fun moveDevice(restaurantId: String, branchId: String, deviceId: String, toBranchId: String): DeviceDto =
         client.patch("${branchDevices(restaurantId, branchId)}/${id(deviceId)}/branch") { contentType(ContentType.Application.Json); setBody(MoveDeviceBody(toBranchId)) }.body()

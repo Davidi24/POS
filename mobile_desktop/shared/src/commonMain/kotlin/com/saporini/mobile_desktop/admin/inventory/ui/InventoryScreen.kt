@@ -128,8 +128,19 @@ internal fun InventoryScreen(modifier: Modifier = Modifier) {
     DisposableEffect(recipes) { onDispose { recipes.onDispose() } }
     LaunchedEffect(view) { recipes.setActive(view == InventoryView.ITEMS) }
     val state by model.state.collectAsState()
+    // A barcode scanned elsewhere: Stock with what it is, or a new item with it (2026-11-27).
+    val jumpScan = com.saporini.mobile_desktop.admin.inventory.InventoryJump.scan
+    val jumpNew = com.saporini.mobile_desktop.admin.inventory.InventoryJump.newItem
+    LaunchedEffect(jumpScan, state.rights) { if (jumpScan != null && InventoryView.STOCK.allowedIn(state.rights)) view = InventoryView.STOCK }
+    LaunchedEffect(jumpNew, state.rights, state.restaurantId) {
+        val code = jumpNew ?: return@LaunchedEffect
+        if (state.restaurantId == null || !state.rights.createItems) return@LaunchedEffect
+        com.saporini.mobile_desktop.admin.inventory.InventoryJump.newItem = null
+        if (InventoryView.ITEMS.allowedIn(state.rights)) view = InventoryView.ITEMS
+        model.newItemWithBarcode(code)
+    }
     val recipeState by recipes.state.collectAsState()
-    // Branch level or every branch (step 25): at a branch, only its places and what's in them; for every branch, all of it
+    // Branch level or every branch (step 26): at a branch, only its places and what's in them; for every branch, all of it
     // with each branch side by side on the overview.
     val branchId = com.saporini.mobile_desktop.workspace.ui.scopedBranchId(com.saporini.mobile_desktop.core.session.Workspace.INVENTORY)
     val everyBranch = com.saporini.mobile_desktop.workspace.ui.usesBranchScope() &&

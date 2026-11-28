@@ -221,7 +221,11 @@ class RestaurantReadinessIntegrationTest extends AbstractPosApiIntegrationTest {
                 .body(Map.of("ttlMinutes", 10)).expect(201).get("pairingToken").asText();
         String secret = post("/public/devices/pairing/redeem").body(Map.of("pairingToken", usedToken)).expect(200).get("deviceSecret").asText();
         post("/public/devices/{d}/heartbeat", device).header("X-Device-Secret", secret).expect(200);
-        String unusedToken = post("/restaurants/{r}/devices/{d}/pairing-tokens", w.restaurantId(), device).as(admin)
+        // A device in use makes no new code (it's disconnected first, 2026-11-25): the unused code is another till's.
+        String spare = post("/restaurants/{r}/branches/{b}/devices", w.restaurantId(), w.branchId()).as(admin)
+                .body(Map.of("code", "TILL_" + next(), "name", "Back till", "deviceType", "TERMINAL", "status", "ACTIVE",
+                        "active", true, "online", false)).expect(201).get("id").asText();
+        String unusedToken = post("/restaurants/{r}/devices/{d}/pairing-tokens", w.restaurantId(), spare).as(admin)
                 .body(Map.of("ttlMinutes", 10)).expect(201).get("pairingToken").asText();
 
         delete("/restaurants/{r}", w.restaurantId()).as(admin).expect(204);
@@ -234,8 +238,8 @@ class RestaurantReadinessIntegrationTest extends AbstractPosApiIntegrationTest {
         assertThat(row.get("is_active")).isEqualTo(false);
         assertThat(row.get("is_online")).isEqualTo(false);
         assertThat(row.get("auth_secret_hash")).isNull();
-        assertThat(jdbcTemplate.queryForObject("select count(*) from " + S + "\"device-pairing-tokens\" where device_id = ?"
-                + " and used_at is null and revoked_at is null", Long.class, UUID.fromString(device))).isZero();
+        assertThat(jdbcTemplate.queryForObject("select count(*) from " + S + "\"device-pairing-tokens\" where device_id in (?, ?)"
+                + " and used_at is null and revoked_at is null", Long.class, UUID.fromString(device), UUID.fromString(spare))).isZero();
         assertThat(jdbcTemplate.queryForObject("select is_active from " + S + "\"device-assignments\" where id = ?",
                 Boolean.class, UUID.fromString(assignment))).isFalse();
         // History stays: the device row, its assignment, the sale and its receipt.
@@ -244,7 +248,7 @@ class RestaurantReadinessIntegrationTest extends AbstractPosApiIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("select count(*) from " + S + "payments where order_id = ?", Long.class, order)).isEqualTo(1);
         get("/restaurants/{r}/orders/{o}/receipt", w.restaurantId(), order).as(admin).expect(200);
         assertThat(jdbcTemplate.queryForObject("select message from " + S + "\"settings-audit-logs\" where entity_id = ? and action = 'ARCHIVE'",
-                String.class, w.restaurantId())).contains("devices retired=1");
+                String.class, w.restaurantId())).contains("devices retired=2");
         // Staff of the archived restaurant are out too.
         get("/auth/me").as(w.ownerToken()).expect(401);
     }

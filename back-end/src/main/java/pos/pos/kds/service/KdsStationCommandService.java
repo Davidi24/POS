@@ -118,6 +118,8 @@ public class KdsStationCommandService {
         station.setDisplayOrder(request.getDisplayOrder() == null ? 0 : request.getDisplayOrder());
         station.setActive(request.getActive() == null || request.getActive());
         station.setAcceptsScheduledOrders(request.getAcceptsScheduledOrders() == null || request.getAcceptsScheduledOrders());
+        if (request.getTicketTextSize() != null) station.setTicketTextSize(request.getTicketTextSize());
+        if (request.getTicketNotesRed() != null) station.setTicketNotesRed(request.getTicketNotesRed());
         station.setScreenLabel(request.getScreenLabel());
         station.setNotes(request.getNotes());
 

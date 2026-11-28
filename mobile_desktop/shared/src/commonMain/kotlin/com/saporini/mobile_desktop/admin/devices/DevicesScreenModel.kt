@@ -50,6 +50,15 @@ data class DeviceDraft(
     val printerPortText: String = "9100",
     val autoCut: Boolean = true,
     val cashDrawerKick: Boolean = false,
+    // A printer installed on a computer: its name there and the till it's plugged into.
+    val systemPrinterName: String = "",
+    val hostDeviceId: String? = null,
+    val printerRole: String = "OTHER",
+    // A card terminal: the till or tablet it's connected to, BLUETOOTH or USB, the paired terminal's address or the cable's
+    // port; a cash drawer: the printer it's plugged into (2026-11-27).
+    val linkedDeviceId: String? = null,
+    val linkType: String = "BLUETOOTH",
+    val linkAddress: String = "",
     // Kept as the server sent them; the Admin Hub doesn't edit what the device reports about itself.
     val platform: String? = null,
     val osVersion: String? = null,
@@ -63,7 +72,9 @@ fun deviceDraftOf(device: DeviceDto, printer: Boolean) = DeviceDraft(
     macAddress = device.macAddress.orEmpty(), notes = device.notes.orEmpty(), connection = device.printerConnectionType ?: "NETWORK",
     paperWidthText = device.paperWidthMm?.toString() ?: "80", printerIp = device.printerIp.orEmpty(),
     printerPortText = device.printerPort?.toString().orEmpty(), autoCut = device.autoCut ?: true,
-    cashDrawerKick = device.cashDrawerKickEnabled ?: false, platform = device.platform, osVersion = device.osVersion, appVersion = device.appVersion
+    cashDrawerKick = device.cashDrawerKickEnabled ?: false, systemPrinterName = device.systemPrinterName.orEmpty(),
+    hostDeviceId = device.hostDeviceId, printerRole = device.printerRole ?: "OTHER", linkedDeviceId = device.linkedDeviceId,
+    linkType = device.linkType?.takeIf { it != "PRINTER" } ?: "BLUETOOTH", linkAddress = device.linkAddress.orEmpty(), platform = device.platform, osVersion = device.osVersion, appVersion = device.appVersion
 )
 
 private val IP_TEXT = Regex("^[0-9A-Fa-f:.]*$")
@@ -87,6 +98,11 @@ fun deviceProblem(draft: DeviceDraft): String? {
         draft.printer && draft.paperWidthText.trim().toIntOrNull()?.takeIf { it in 1..500 } == null -> "Paper width must be 1–500 mm"
         draft.printer && (draft.printerIp.trim().length > 45 || !IP_TEXT.matches(draft.printerIp.trim())) -> "This isn't a printer IP address"
         draft.printer && draft.connection == "NETWORK" && draft.printerIp.isBlank() -> "Enter the printer's IP address"
+        draft.printer && draft.connection == "USB" && draft.systemPrinterName.isBlank() -> "Choose the printer on this computer"
+        draft.printer && draft.connection == "BLUETOOTH" && draft.systemPrinterName.isBlank() -> "Choose the paired Bluetooth printer"
+        !draft.printer && draft.deviceType == "PAYMENT_TERMINAL" && draft.linkedDeviceId != null && draft.linkType == "BLUETOOTH"
+            && draft.linkAddress.isBlank() -> "Choose the paired card terminal"
+        !draft.printer && draft.deviceType == "CASH_DRAWER" && draft.linkedDeviceId == null -> "Choose the printer it's plugged into"
         draft.printer && draft.printerPortText.isNotBlank() && draft.printerPortText.trim().toIntOrNull()?.takeIf { it in 1..65535 } == null ->
             "The port must be 1–65535"
         else -> null
@@ -116,7 +132,19 @@ fun deviceRequest(draft: DeviceDraft, branchId: String?) = DeviceRequestDto(
     printerIp = draft.printerIp.trim().ifEmpty { null }.takeIf { draft.printer },
     printerPort = draft.printerPortText.trim().toIntOrNull().takeIf { draft.printer },
     autoCut = draft.autoCut.takeIf { draft.printer },
-    cashDrawerKickEnabled = draft.cashDrawerKick.takeIf { draft.printer }
+    cashDrawerKickEnabled = draft.cashDrawerKick.takeIf { draft.printer },
+    systemPrinterName = draft.systemPrinterName.trim().ifEmpty { null }.takeIf { draft.printer && draft.connection in setOf("USB", "BLUETOOTH") },
+    hostDeviceId = draft.hostDeviceId.takeIf { draft.printer && draft.connection in setOf("USB", "BLUETOOTH") },
+    printerRole = draft.printerRole.takeIf { draft.printer },
+    // Only card terminals (a till or tablet) and cash drawers (a printer) are connected to another device.
+    linkedDeviceId = draft.linkedDeviceId.takeIf { !draft.printer && draft.deviceType in setOf("PAYMENT_TERMINAL", "CASH_DRAWER") },
+    linkType = when {
+        draft.printer || draft.linkedDeviceId == null -> null
+        draft.deviceType == "CASH_DRAWER" -> "PRINTER"
+        draft.deviceType == "PAYMENT_TERMINAL" -> draft.linkType
+        else -> null
+    },
+    linkAddress = draft.linkAddress.trim().ifEmpty { null }.takeIf { !draft.printer && draft.deviceType == "PAYMENT_TERMINAL" && draft.linkedDeviceId != null }
 )
 
 data class DevicesState(
@@ -146,12 +174,18 @@ data class DevicesState(
     val freshCode: PairingCodeDto? = null,
     // Devices → Enter a code: the window is open, and why the last code didn't work (shown inside it).
     val enteringCode: Boolean = false,
+    // Where the code is typed (user, 2026-11-27: "you go inside the till to enter the code"): TILL or TABLET.
+    val codeKind: String? = null,
     val codeError: String? = null,
     // The code was typed and waits for the person who made it to agree (user, 2026-11-25).
     val connectWait: ConnectWait? = null,
+    // What the open printer prints: the tills and kitchen stations (null while loading).
+    val printerJobs: PrinterJobsDto? = null,
     // The device just added, so the screen can go straight on to confirming it.
     val justAdded: String? = null,
     val draft: DeviceDraft? = null,
+    // Only how an existing device is connected is being changed (its own window, user 2026-11-28: "not all in one form").
+    val draftPart: String? = null,
     val confirmDelete: String? = null,
     val loading: Boolean = false,
     val loadingDetail: Boolean = false,
@@ -181,6 +215,13 @@ data class ConnectWait(
 ) {
     fun secondsLeft(now: Long): Long = (request.secondsLeft - (now - shownAt) / 1000).coerceAtLeast(0)
 }
+
+/** How the app sends to [device] (a printer). */
+fun printTargetOf(device: DeviceDto) = com.saporini.mobile_desktop.core.printing.PrintPrinter(
+    id = device.id, name = device.name, connectionType = device.printerConnectionType, ip = device.printerIp, port = device.printerPort,
+    systemPrinterName = device.systemPrinterName, hostDeviceId = device.hostDeviceId, role = device.printerRole ?: "OTHER",
+    paperWidthMm = device.paperWidthMm ?: 80,
+    autoCut = device.autoCut ?: true, cashDrawerKick = device.cashDrawerKickEnabled ?: false)
 
 /** Tills, tablets and screens: what "Connect devices" alone may connect (the server's network rule covers the same). */
 // The server answers a till as "TERMINAL" (POS_TERMINAL when sent).
@@ -213,6 +254,7 @@ class DevicesScreenModel(
     private var active = false
     private var loadJob: Job? = null
     private var waitJob: Job? = null
+    private var liveJob: Job? = null
 
     init {
         work.launch {
@@ -239,10 +281,38 @@ class DevicesScreenModel(
     fun setActive(value: Boolean) {
         if (value == active) return
         active = value
-        if (value) load() else {
+        if (value) { load(); followLive() } else {
             revision++
             loadJob?.cancel()
+            liveJob?.cancel()
             mutable.update { it.copy(loading = false) }
+        }
+    }
+
+    /**
+     * While Devices is open its devices are looked at again every 5 seconds, quietly (user, 2026-11-25: "I configure one and
+     * I have to go out and come back in to see it's on"): connected, online, offline show as they happen.
+     */
+    private fun followLive() {
+        liveJob?.cancel()
+        liveJob = work.launch {
+            while (true) {
+                kotlinx.coroutines.delay(5_000)
+                val current = state.value
+                val restaurantId = current.restaurantId ?: continue
+                val branchId = current.branchId ?: continue
+                if (!active || current.loading || current.saving || !current.canRead) continue
+                val token = revision
+                val fresh = try {
+                    repository.devices(restaurantId, branchId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    continue // a missed look; the next one tries again
+                }
+                if (token != revision || state.value.branchId != branchId) continue
+                mutable.update { it.copy(devices = fresh.sortedBy { device -> device.name.lowercase() }) }
+            }
         }
     }
 
@@ -296,8 +366,10 @@ class DevicesScreenModel(
 
     /** Opens one device: its pairing codes and who it is given to. */
     fun select(deviceId: String?) {
-        mutable.update { it.copy(selectedId = deviceId, pairingCodes = emptyList(), assignments = emptyList(), signIn = null, freshCode = null) }
-        if (deviceId != null) loadDetail(deviceId)
+        mutable.update { it.copy(selectedId = deviceId, pairingCodes = emptyList(), assignments = emptyList(), signIn = null, freshCode = null,
+            printerJobs = null) }
+        if (deviceId != null && state.value.isPrinter(deviceId)) loadPrinterJobs(deviceId)
+        else if (deviceId != null) loadDetail(deviceId)
     }
 
     private fun loadDetail(deviceId: String) {
@@ -344,11 +416,24 @@ class DevicesScreenModel(
         mutable.update { it.copy(draft = DeviceDraft(printer = true, deviceType = "PRINTER", code = code, name = name), notice = null) }
     }
 
+    /**
+     * A ready-made kind of printer picked while adding one (user, 2026-11-27): fills in its paper, cut and drawer, and its name
+     * while the name is still the suggested one.
+     */
+    fun usePreset(preset: PrinterPreset) = change { draft ->
+        val (_, suggested) = suggestion("PRINTER")
+        val number = suggested.substringAfterLast(' ')
+        val keepName = draft.name.isNotBlank() && draft.name != suggested && PrinterPreset.entries.none { draft.name == "${it.defaultName} $number" }
+        draft.copy(printerRole = preset.role, paperWidthText = preset.paperMm.toString(), autoCut = preset.cut, cashDrawerKick = preset.drawer,
+            name = if (keepName) draft.name else "${preset.defaultName} $number")
+    }
+
     /** A free short code and a name for a new device of [type]: TAB-4 and "Tablet 4" when TAB-1…3 exist. */
     private fun suggestion(type: String): Pair<String, String> {
-        val prefix = when (type) { "POS_TERMINAL" -> "TILL"; "TABLET" -> "TAB"; "KDS" -> "KDS"; "CUSTOMER_DISPLAY" -> "CD"; "PAYMENT_TERMINAL" -> "PAY"; else -> "PRN" }
+        val prefix = when (type) { "POS_TERMINAL" -> "TILL"; "TABLET" -> "TAB"; "KDS" -> "KDS"; "CUSTOMER_DISPLAY" -> "CD"; "PAYMENT_TERMINAL" -> "PAY"
+            "CASH_DRAWER" -> "DRW"; else -> "PRN" }
         val label = when (type) { "POS_TERMINAL" -> "Till"; "TABLET" -> "Tablet"; "KDS" -> "Kitchen screen"; "CUSTOMER_DISPLAY" -> "Guest display"
-            "PAYMENT_TERMINAL" -> "Card terminal"; else -> "Printer" }
+            "PAYMENT_TERMINAL" -> "Card terminal"; "CASH_DRAWER" -> "Cash drawer"; else -> "Printer" }
         val taken = (state.value.devices + state.value.printers).map { it.code.uppercase() }.toSet()
         val next = generateSequence(1) { it + 1 }.first { "$prefix-$it" !in taken }
         return "$prefix-$next" to "$label $next"
@@ -365,7 +450,14 @@ class DevicesScreenModel(
         state.copy(draft = change(draft).copy(id = draft.id, printer = draft.printer))
     }
 
-    fun cancelEdit() = mutable.update { it.copy(draft = null) }
+    fun cancelEdit() = mutable.update { it.copy(draft = null, draftPart = null) }
+
+    /** Changes only how [deviceId] (a printer or a cash drawer) is connected, in a window of its own. */
+    fun editConnection(deviceId: String) = needsEdit {
+        val current = state.value
+        val device = (current.devices + current.printers).firstOrNull { it.id == deviceId } ?: return@needsEdit
+        mutable.update { it.copy(draft = deviceDraftOf(device, current.isPrinter(deviceId)), draftPart = "CONNECTION", notice = null, error = null) }
+    }
 
     fun save() {
         val current = state.value
@@ -387,8 +479,8 @@ class DevicesScreenModel(
             mutable.update { state ->
                 fun List<DeviceDto>.put() = (if (any { it.id == saved.id }) map { if (it.id == saved.id) saved else it } else this + saved).sortedBy { it.name.lowercase() }
                 val added = saved.id.takeIf { draft.id == null }
-                if (draft.printer) state.copy(printers = state.printers.put(), draft = null, justAdded = added)
-                else state.copy(devices = state.devices.put(), draft = null, justAdded = added)
+                if (draft.printer) state.copy(printers = state.printers.put(), draft = null, draftPart = null, justAdded = added)
+                else state.copy(devices = state.devices.put(), draft = null, draftPart = null, justAdded = added)
             }
         }
     }
@@ -399,6 +491,11 @@ class DevicesScreenModel(
         val device = current.devices.firstOrNull { it.id == deviceId } ?: return
         val branchId = current.branchId ?: return
         if (status !in DEVICE_STATUSES || status == device.status) return
+        // In use means it's ready: a card terminal needs its till or tablet, a drawer its printer (2026-11-28).
+        if (status == "ACTIVE" && device.linkedDeviceId == null && device.deviceType in setOf("PAYMENT_TERMINAL", "CASH_DRAWER")) {
+            mutable.update { it.copy(error = if (device.deviceType == "CASH_DRAWER") "Plug it into a printer first" else "Connect it to a till or tablet first") }
+            return
+        }
         needsEdit {
             val usable = status == "ACTIVE" || status == "PROVISIONING" || status == "MAINTENANCE"
             write(null) { restaurantId ->
@@ -495,7 +592,9 @@ class DevicesScreenModel(
         needsConnect {
             write(null) { restaurantId ->
                 val code = repository.newPairingCode(restaurantId, deviceId, 5)
+                val before = com.saporini.mobile_desktop.core.session.TokenStore.till.value
                 val connected = connect(restaurantId, code.pairingToken ?: error("No pairing code came back"))
+                releaseBefore(restaurantId, before, connected.till.deviceId)
                 val name = connected.till.name
                 mutable.update {
                     it.copy(notice = if (connected.networkSaved) "This device is $name now. This Wi-Fi is saved as the restaurant's network."
@@ -508,14 +607,116 @@ class DevicesScreenModel(
 
     /** This device stops being a till (the PIN pad goes; the device itself stays in the list). */
     fun disconnectThisDevice() {
-        val name = com.saporini.mobile_desktop.core.session.TokenStore.till.value?.name ?: return
-        com.saporini.mobile_desktop.core.session.TokenStore.forgetTill()
-        mutable.update { it.copy(notice = "This device is no longer $name.") }
+        val till = com.saporini.mobile_desktop.core.session.TokenStore.till.value ?: return
+        disconnect(till.deviceId)
+    }
+
+    /**
+     * Disconnect (user, 2026-11-25: "when it's connected you can't make a code or Use this device; you disconnect it first"):
+     * the server takes its connection away, so wherever it was connected it stops working; then it can be connected again.
+     */
+    fun disconnect(deviceId: String) {
+        val device = state.value.devices.firstOrNull { it.id == deviceId }
+        val here = com.saporini.mobile_desktop.core.session.TokenStore.till.value?.takeIf { it.deviceId == deviceId }
+        val name = device?.name ?: here?.name ?: return
+        if (!state.value.mayConnect(device ?: return)) {
+            mutable.update { it.copy(error = it.connectRefusal) }
+            return
+        }
+        write("$name is disconnected. It can be connected again.") { restaurantId ->
+            repository.disconnect(restaurantId, deviceId)
+            if (here != null) com.saporini.mobile_desktop.core.session.TokenStore.forgetTill()
+            mutable.update { state ->
+                state.copy(devices = state.devices.map { if (it.id == deviceId) it.copy(connected = false, online = false) else it },
+                    freshCode = state.freshCode?.takeUnless { it.deviceId == deviceId })
+            }
+            load()
+        }
     }
 
     fun dismissFreshCode() = mutable.update { it.copy(freshCode = null) }
 
-    fun openEnterCode() = mutable.update { it.copy(enteringCode = true, codeError = null, error = null, notice = null) }
+    // ---- Printers (2026-11-27) ----
+
+    /** A printer's page opened: what it prints. */
+    fun loadPrinterJobs(printerId: String) {
+        val restaurantId = state.value.restaurantId ?: return
+        work.launch {
+            runCatching { repository.printerJobs(restaurantId, printerId) }
+                .onSuccess { jobs -> if (state.value.selectedId == printerId) mutable.update { it.copy(printerJobs = jobs) } }
+                .onFailure { e -> if (e is CancellationException) throw e; mutable.update { it.copy(error = "Couldn't load what it prints") } }
+        }
+    }
+
+    /**
+     * What [printerId] prints (user, 2026-11-27: "you configure a printer and say what it should print"): the tills whose receipts
+     * and the stations whose tickets; one printer each, so one taken here leaves the printer it was on. Shows at once, saved behind.
+     */
+    fun savePrinterJobs(printerId: String, tillIds: List<String>, stationIds: List<String>) = needsEdit {
+        val restaurantId = state.value.restaurantId ?: return@needsEdit
+        val printerName = state.value.printers.firstOrNull { it.id == printerId }?.name
+        val before = state.value.printerJobs
+        before?.let { jobs ->
+            fun List<PrintTargetDto>.moved(ids: List<String>) = map { t ->
+                when {
+                    t.id in ids -> t.copy(printerId = printerId, printerName = printerName)
+                    t.printerId == printerId -> t.copy(printerId = null, printerName = null)
+                    else -> t
+                }
+            }
+            mutable.update { it.copy(printerJobs = jobs.copy(receiptTillIds = tillIds, kitchenStationIds = stationIds,
+                tills = jobs.tills.moved(tillIds), stations = jobs.stations.moved(stationIds))) }
+        }
+        work.launch {
+            runCatching { repository.setPrinterJobs(restaurantId, printerId, SetPrinterJobsBody(tillIds, stationIds)) }
+                .onSuccess { saved -> if (state.value.selectedId == printerId) mutable.update { it.copy(printerJobs = saved, notice = "Saved") } }
+                .onFailure { e ->
+                    if (e is CancellationException) throw e
+                    mutable.update { it.copy(printerJobs = before, error = e.message?.takeIf { m -> m.isNotBlank() && m.length < 160 } ?: "Couldn't save. Try again.") }
+                }
+        }
+    }
+
+    /**
+     * Connects [terminal] (a card terminal) to the till or tablet [linkedId] by [linkType] (BLUETOOTH needs the paired terminal's
+     * [linkAddress]); null = not connected. Nothing else of the terminal changes (user, 2026-11-28). [onDone] once saved.
+     */
+    fun connectTerminal(terminal: DeviceDto, linkedId: String?, linkType: String?, linkAddress: String?, onDone: () -> Unit = {}) = needsEdit {
+        val branchId = state.value.branchId ?: return@needsEdit
+        val draft = deviceDraftOf(terminal, false).copy(linkedDeviceId = linkedId, linkType = linkType ?: "BLUETOOTH",
+            linkAddress = linkAddress.orEmpty().trim())
+        deviceProblem(draft)?.let { problem ->
+            mutable.update { it.copy(error = problem) }
+            return@needsEdit
+        }
+        write(if (linkedId == null) "${terminal.name} is disconnected" else "${terminal.name} is connected") { restaurantId ->
+            val saved = repository.saveDevice(restaurantId, branchId, terminal.id, deviceRequest(draft, branchId))
+            mutable.update { state -> state.copy(devices = state.devices.map { if (it.id == saved.id) saved else it }) }
+            onDone()
+        }
+    }
+
+    /** Opens [drawer] (a cash drawer) through the printer it's plugged into, from this device. */
+    fun openDrawer(drawer: DeviceDto) {
+        val printing = com.saporini.mobile_desktop.core.printing.PrintHooks.printing ?: return
+        val printer = state.value.printers.firstOrNull { it.id == drawer.linkedDeviceId }
+        if (printer == null) {
+            mutable.update { it.copy(error = "Choose the printer it's plugged into first") }
+            return
+        }
+        work.launch {
+            val opened = printing.openDrawer(printTargetOf(printer))
+            mutable.update { if (opened) it.copy(notice = "Sent to ${printer.name}. Did the drawer open?") else it }
+        }
+    }
+
+    /** A test page on [device] (a printer), from this device. */
+    fun testPrinter(device: DeviceDto) {
+        val printing = com.saporini.mobile_desktop.core.printing.PrintHooks.printing ?: return
+        work.launch { printing.testPage(printTargetOf(device)) }
+    }
+
+    fun openEnterCode(kind: String) = mutable.update { it.copy(enteringCode = true, codeKind = kind, codeError = null, error = null, notice = null) }
 
     fun closeEnterCode() {
         if (state.value.saving) return
@@ -541,7 +742,7 @@ class DevicesScreenModel(
         mutable.update { it.copy(saving = true, codeError = null) }
         work.launch {
             try {
-                val asked = connector.ask(restaurantId, code.trim())
+                val asked = connector.ask(restaurantId, code.trim(), current.codeKind)
                 if (token != signIn) return@launch
                 mutable.update { it.copy(connectWait = ConnectWait(asked.request, asked.claimToken, nowMs())) }
                 followWait(restaurantId, asked.request.id, asked.claimToken, token)
@@ -575,9 +776,11 @@ class DevicesScreenModel(
                     "WAITING" -> mutable.update { it.copy(connectWait = wait.copy(request = request, shownAt = nowMs())) }
                     "AGREED" -> {
                         try {
+                            val before = com.saporini.mobile_desktop.core.session.TokenStore.till.value
                             val connected = connector.claim(restaurantId, requestId, claim)
                             if (token != signIn) return@launch
                             com.saporini.mobile_desktop.core.session.TokenStore.connectTill(connected.till)
+                            releaseBefore(restaurantId, before, connected.till.deviceId)
                             val name = connected.till.name
                             mutable.update {
                                 it.copy(enteringCode = false, connectWait = null,
@@ -612,6 +815,15 @@ class DevicesScreenModel(
     }
 
     fun clearCodeError() = mutable.update { it.copy(codeError = null) }
+
+    /**
+     * This device was another till or tablet before ([before]) and is [now] something else: that one is disconnected on the
+     * server, so it doesn't stay "in use" with nobody on it. A refusal changes nothing here.
+     */
+    private suspend fun releaseBefore(restaurantId: String, before: com.saporini.mobile_desktop.core.session.TillConnection?, now: String) {
+        if (before == null || before.deviceId == now || before.restaurantId != restaurantId) return
+        runCatching { repository.disconnect(restaurantId, before.deviceId) }
+    }
 
     /** Stops waiting (Cancel, or Try again after it ended): back to typing a code. */
     fun cancelWait() {
@@ -750,6 +962,7 @@ class DevicesScreenModel(
     fun clearMessages() = mutable.update { it.copy(error = null, notice = null) }
 
     override fun onDispose() {
+        liveJob?.cancel()
         revision++
         detailRevision++
         active = false

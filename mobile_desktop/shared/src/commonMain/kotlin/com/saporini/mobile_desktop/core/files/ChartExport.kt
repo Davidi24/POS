@@ -25,7 +25,7 @@ enum class PrintOutcome { PRINTED, OPENED_IN_VIEWER, NOT_PRINTED }
  * a PDF in the computer's own viewer, whose Print can still print or save them (OPENED_IN_VIEWER). NOT_PRINTED when cancelled
  * or on the phone.
  */
-expect suspend fun printDocument(title: String, pages: List<DocPage>): PrintOutcome
+expect suspend fun printDocument(title: String, pages: List<DocPage>, printer: String? = null): PrintOutcome
 
 /** A4 in points. */
 const val A4_WIDTH = 595f

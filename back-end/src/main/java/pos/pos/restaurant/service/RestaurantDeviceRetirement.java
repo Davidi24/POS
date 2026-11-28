@@ -49,7 +49,7 @@ public class RestaurantDeviceRetirement {
                         + " where used_at is null and revoked_at is null and device_id in (" + devices + ")",
                 now, ownerId);
         return jdbc.update("update " + schema + "devices set status = 'RETIRED', is_active = false, is_online = false,"
-                        + " auth_secret_hash = null, auth_secret_rotated_at = null, updated_at = ?, updated_by = ?"
+                        + " auth_secret_hash = null, auth_secret_rotated_at = null, connected_device_name = null, connected_device_system = null, updated_at = ?, updated_by = ?"
                         + " where " + devicesWhere + " and (status <> 'RETIRED' or is_active or auth_secret_hash is not null)",
                 now, actorId, ownerId);
     }

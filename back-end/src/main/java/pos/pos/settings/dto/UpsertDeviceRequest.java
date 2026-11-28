@@ -88,4 +88,22 @@ public class UpsertDeviceRequest {
     private Boolean autoCut;
 
     private Boolean cashDrawerKickEnabled;
+
+    // A printer installed on a computer: its name there, and the till it's plugged into (2026-11-27).
+    @Size(max = 200, message = "systemPrinterName must be at most 200 characters")
+    private String systemPrinterName;
+
+    private java.util.UUID hostDeviceId;
+
+    @jakarta.validation.constraints.Pattern(regexp = "RECEIPT|KITCHEN|BAR|SMALL|DOCUMENT|OTHER", message = "Choose what kind of printer it is")
+    private String printerRole;
+
+    // A card terminal: the till or tablet it's connected to and how (USB, BLUETOOTH); a cash drawer: its printer (PRINTER).
+    private UUID linkedDeviceId;
+
+    @jakarta.validation.constraints.Pattern(regexp = "USB|BLUETOOTH|PRINTER", message = "Choose how it's connected")
+    private String linkType;
+
+    @Size(max = 200)
+    private String linkAddress;
 }

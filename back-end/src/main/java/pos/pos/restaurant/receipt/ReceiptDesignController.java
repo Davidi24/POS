@@ -32,7 +32,8 @@ public class ReceiptDesignController {
     private final ReceiptDesignService service;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('RESTAURANTS_READ')")
+    // Every till prints receipts with it, so anyone working at the restaurant reads it (2026-11-27); changing it stays the owner's.
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "The receipts' design (preliminary bill and fiscal invoice); design null = never saved")
     public ResponseEntity<ReceiptDesignResponse> get(@PathVariable UUID restaurantId, Authentication authentication) {
         return ResponseEntity.ok(service.get(authentication, restaurantId));

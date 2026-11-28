@@ -76,7 +76,7 @@ class BranchListScreenModel(
                 revision++
                 val access = restaurantAccess(user)
                 val current = state.value
-                // Super admins, and owners, co-owners and admins choosing the branch they work in (step 25).
+                // Super admins, and owners, co-owners and admins choosing the branch they work in (step 26).
                 val chooses = isPlatformAdmin(user) || com.saporini.mobile_desktop.core.session.canSeeEveryBranch(user)
                 val keepContext = previousUser == user?.id && chooses && access.read
                 previousUser = user?.id

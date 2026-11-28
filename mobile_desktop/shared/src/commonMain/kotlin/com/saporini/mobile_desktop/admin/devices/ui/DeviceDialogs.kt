@@ -1,6 +1,18 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.saporini.mobile_desktop.admin.devices.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.runtime.collectAsState
+import com.saporini.mobile_desktop.core.components.SelectInput
+import com.saporini.mobile_desktop.core.components.KitButton
+import com.saporini.mobile_desktop.core.components.Kit
+import com.saporini.mobile_desktop.core.i18n.tr
+import com.saporini.mobile_desktop.core.theme.Inter
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.QrCodeScanner
@@ -18,7 +31,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
-import com.saporini.mobile_desktop.admin.devices.DeviceExtras
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +45,12 @@ import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Lan
 import androidx.compose.material.icons.outlined.Numbers
 import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material.icons.outlined.Cable
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.LocalBar
+import androidx.compose.material.icons.outlined.Restaurant
 import com.saporini.mobile_desktop.core.i18n.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -59,15 +77,11 @@ import com.saporini.mobile_desktop.core.components.AppDialog
 import com.saporini.mobile_desktop.core.components.ButtonStyle
 import com.saporini.mobile_desktop.core.components.Caption
 import com.saporini.mobile_desktop.core.components.FieldPair
-import com.saporini.mobile_desktop.core.components.Kit
-import com.saporini.mobile_desktop.core.components.KitButton
 import com.saporini.mobile_desktop.core.components.MessageBar
 import com.saporini.mobile_desktop.core.components.MessageKind
-import com.saporini.mobile_desktop.core.components.SelectInput
 import com.saporini.mobile_desktop.core.components.TextInput
 import com.saporini.mobile_desktop.core.components.ToggleRow
 import com.saporini.mobile_desktop.core.format.dateTimeText
-import com.saporini.mobile_desktop.core.theme.Inter
 import com.saporini.mobile_desktop.pos.reservations.ui.RestaurantTime
 
 /** Adding or editing a device (or a printer, which has its connection and paper settings). */
@@ -78,7 +92,7 @@ internal fun DeviceEditorDialog(draft: DeviceDraft, state: DevicesState, model: 
     AppDialog(
         if (draft.id == null) "Add a $kind" else "Edit ${draft.name.ifBlank { kind }}",
         model::cancelEdit,
-        subtitle = if (draft.printer) "Printers belong to the whole restaurant; routes choose what each one prints."
+        subtitle = if (draft.printer) "Printers belong to the whole restaurant. Next you choose what it prints."
         else if (draft.id == null) "Next you'll connect it and confirm it works." else null,
         busy = state.saving,
         buttons = {
@@ -86,7 +100,7 @@ internal fun DeviceEditorDialog(draft: DeviceDraft, state: DevicesState, model: 
             KitButton(if (draft.id == null) "Add $kind" else "Save", model::save, icon = Icons.Outlined.Check, loading = state.saving)
         }
     ) {
-        if (draft.id == null) KindBanner(deviceKind, 120.dp)
+        if (draft.id == null && !draft.printer) KindBanner(deviceKind, 120.dp)
         state.error?.let { MessageBar(it, MessageKind.ERROR) }
         FieldPair(
             { m -> TextInput(draft.name, { v -> model.change { it.copy(name = v) } }, m, label = "Name", required = true,
@@ -104,24 +118,22 @@ internal fun DeviceEditorDialog(draft: DeviceDraft, state: DevicesState, model: 
                 { m -> if (draft.id != null) SelectInput(draft.status, DEVICE_STATUSES, ::deviceStatusLabel, { v -> model.change { it.copy(status = v) } }, m, label = "Status")
                     else Spacer(m) }
             )
+            // How a card terminal or drawer is connected has its own window now (Connect / Change on its page; 2026-11-28).
         } else {
-            Caption("Connection")
-            FieldPair(
-                { m -> SelectInput(draft.connection, PRINTER_CONNECTIONS, ::connectionLabel, { v -> model.change { it.copy(connection = v) } }, m, label = "Connected by") },
-                { m -> TextInput(draft.paperWidthText, { v -> model.change { it.copy(paperWidthText = v.filter(Char::isDigit).take(3)) } }, m,
-                    label = "Paper width", suffix = "mm", keyboardType = KeyboardType.Number, hint = "Usually 58 or 80") }
-            )
-            if (draft.connection == "NETWORK") {
-                FieldPair(
-                    { m -> TextInput(draft.printerIp, { v -> model.change { it.copy(printerIp = v.trim()) } }, m, label = "IP address", required = true,
-                        icon = Icons.Outlined.Lan, placeholder = "192.168.1.50", maxLength = 45) },
-                    { m -> TextInput(draft.printerPortText, { v -> model.change { it.copy(printerPortText = v.filter(Char::isDigit).take(5)) } }, m,
-                        label = "Port", optional = true, icon = Icons.Outlined.Numbers, placeholder = "9100", keyboardType = KeyboardType.Number) }
-                )
+            // Ready-made kinds fill in paper, cut and drawer (user, 2026-11-27); an existing printer changes its kind in a list.
+            if (draft.id == null) PresetTiles(draft, model)
+            else SelectInput(draft.printerRole, com.saporini.mobile_desktop.admin.devices.PrinterPreset.entries.map { it.role },
+                { role -> com.saporini.mobile_desktop.admin.devices.printerRoleLabel(role) }, { v -> model.change { it.copy(printerRole = v) } }, Modifier.fillMaxWidth(),
+                label = "Kind of printer")
+            val document = draft.printerRole == "DOCUMENT"
+            // How it's connected has its own window (How it's reached → Change; 2026-11-28); here what it is.
+            if (!document) TextInput(draft.paperWidthText, { v -> model.change { it.copy(paperWidthText = v.filter(Char::isDigit).take(3)) } },
+                label = "Paper width", suffix = "mm", keyboardType = KeyboardType.Number, hint = "Usually 58 or 80")
+            if (!document) {
+                ToggleRow("Cut the paper after each print", draft.autoCut, { v -> model.change { it.copy(autoCut = v) } })
+                ToggleRow("Open the cash drawer", draft.cashDrawerKick, { v -> model.change { it.copy(cashDrawerKick = v) } },
+                    detail = "For receipt printers with a cash drawer plugged in")
             }
-            ToggleRow("Cut the paper after each print", draft.autoCut, { v -> model.change { it.copy(autoCut = v) } })
-            ToggleRow("Open the cash drawer", draft.cashDrawerKick, { v -> model.change { it.copy(cashDrawerKick = v) } },
-                detail = "For receipt printers with a cash drawer plugged in")
         }
         Caption("Hardware (optional)")
         FieldPair(
@@ -188,15 +200,21 @@ internal fun ConfirmDeviceDialog(device: DeviceDto, state: DevicesState, model: 
         when (kind) {
             // A till or tablet: someone signs in on it and types the code in Devices, so it's known who set it up (user,
             // 2026-11-25); a card terminal on its own pairing screen.
-            DeviceKind.TILL, DeviceKind.TABLET, DeviceKind.CARD -> {
-                if (kind == DeviceKind.CARD) {
-                    HowStep(1, "Switch on the card terminal.")
-                    HowStep(2, "Open its pairing screen.")
-                } else {
-                    HowStep(1, "Open Saporini on the ${kind.one} and sign in with your own account.")
-                    HowStep(2, "Go to Admin Hub → Devices and press “Enter a code”.")
-                }
-                HowStep(3, if (kind == DeviceKind.CARD) "Type this code. It works once." else "Type this code. You're asked here to agree, then it's connected.")
+            DeviceKind.CARD -> {
+                // Through its till or tablet only (user, 2026-11-27).
+                val host = device.linkedDeviceName
+                HowStep(1, if (host != null) "Connect it to $host by ${if (device.linkType == "USB") "cable" else "Bluetooth"}."
+                    else "On its page, press Connect and choose the till or tablet.")
+                HowStep(2, "Card payments on that till or tablet go to it.")
+                KitButton(if (tested) "Try again" else "Try a test payment", { tested = true }, icon = Icons.Outlined.PointOfSale,
+                    style = if (tested) ButtonStyle.SECONDARY else ButtonStyle.PRIMARY, enabled = host != null)
+                if (tested) Done("Test mode: no payment provider is connected yet, so card payments ask how the card went.")
+            }
+            DeviceKind.TILL, DeviceKind.TABLET -> {
+                HowStep(1, "Open Saporini on the ${kind.one} and sign in with your own account.")
+                HowStep(2, if (kind == DeviceKind.TILL) "Go to Admin Hub → Devices → Tills and press “Enter a code”."
+                    else "Go to Admin Hub → Devices → Tablets & screens and press “Enter a code”.")
+                HowStep(3, "Type this code. You're asked here to agree, then it's connected.")
                 if (code?.pairingToken != null) {
                     SelectionContainer {
                         Text(code.pairingToken, Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Kit.GreenSoft)
@@ -211,7 +229,7 @@ internal fun ConfirmDeviceDialog(device: DeviceDto, state: DevicesState, model: 
                 HowStep(1, "Switch it on and load the paper.")
                 HowStep(2, if (device.printerIp != null) "Make sure it's on the restaurant's network (${device.printerIp})." else "Plug it in (${connectionLabel(device.printerConnectionType)}).")
                 HowStep(3, "Print a test page.")
-                KitButton(if (tested) "Print another test page" else "Print a test page", { tested = true }, icon = Icons.Outlined.Print, style = if (tested) ButtonStyle.SECONDARY else ButtonStyle.PRIMARY)
+                KitButton(if (tested) "Print another test page" else "Print a test page", { tested = true; model.testPrinter(device) }, icon = Icons.Outlined.Print, style = if (tested) ButtonStyle.SECONDARY else ButtonStyle.PRIMARY)
                 if (tested) Done("A test page went to ${device.name}. Did it come out?")
             }
             DeviceKind.SCANNER -> {
@@ -221,10 +239,11 @@ internal fun ConfirmDeviceDialog(device: DeviceDto, state: DevicesState, model: 
                 if (scanned.trim().length >= 4) Done("Read “${scanned.trim()}”. The scanner works.")
             }
             DeviceKind.DRAWER -> {
-                HowStep(1, "Plug the drawer's cable into the receipt printer.")
+                HowStep(1, device.linkedDeviceName?.let { "Plug the drawer's cable into $it." } ?: "Edit it and choose the printer it's plugged into.")
                 HowStep(2, "Open it from here, like after a cash payment.")
-                KitButton(if (tested) "Open it again" else "Open the drawer", { tested = true }, icon = Icons.Outlined.PointOfSale, style = if (tested) ButtonStyle.SECONDARY else ButtonStyle.PRIMARY)
-                if (tested) Done("Sent. Did the drawer open?")
+                KitButton(if (tested) "Open it again" else "Open the drawer", { tested = true; model.openDrawer(device) }, icon = Icons.Outlined.PointOfSale,
+                    style = if (tested) ButtonStyle.SECONDARY else ButtonStyle.PRIMARY, enabled = device.linkedDeviceId != null)
+                if (tested) Done("Sent to ${device.linkedDeviceName}. Did the drawer open?")
             }
         }
     }
@@ -269,47 +288,236 @@ private fun Done(text: String) {
     }
 }
 
-/** MOCK: adding a barcode scanner or a cash drawer (kept in memory, see DeviceExtras). */
+/**
+ * A printer on this computer (USB): picked from the printers installed here, and kept as plugged into this till (2026-11-27).
+ * On a phone there are none: it's set up on the computer it's plugged into.
+ */
 @Composable
-internal fun ExtraDeviceDialog(kind: DeviceKind, printers: List<DeviceDto>, onDismiss: () -> Unit, onAdded: (DeviceDto) -> Unit) {
-    val type = if (kind == DeviceKind.SCANNER) DeviceExtras.SCANNER else DeviceExtras.CASH_DRAWER
-    val suggested = remember { DeviceExtras.suggestion(type) }
-    var name by remember { mutableStateOf(suggested.second) }
-    var code by remember { mutableStateOf(suggested.first) }
-    var maker by remember { mutableStateOf("") }
-    var modelName by remember { mutableStateOf("") }
-    var printer by remember { mutableStateOf(printers.firstOrNull { it.cashDrawerKickEnabled == true } ?: printers.firstOrNull()) }
-    var notes by remember { mutableStateOf("") }
-    var problem by remember { mutableStateOf<String?>(null) }
-    AppDialog("Add a ${kind.one}", onDismiss, subtitle = "Next you'll check it works and confirm it.", buttons = {
-        KitButton("Cancel", onDismiss, style = ButtonStyle.SECONDARY)
-        KitButton("Add ${kind.one}", {
-            problem = when {
-                name.isBlank() -> "Enter a name"
-                code.isBlank() -> "Enter a short code"
-                DeviceExtras.items.any { it.code.equals(code.trim(), ignoreCase = true) } -> "That code is already used"
-                else -> null
+internal fun SystemPrinterPicker(draft: com.saporini.mobile_desktop.admin.devices.DeviceDraft, model: DevicesScreenModel) {
+    val printers = remember { com.saporini.mobile_desktop.core.printing.PrinterLink.systemPrinters() }
+    val here = com.saporini.mobile_desktop.core.session.TokenStore.till.collectAsState().value
+    if (printers.isEmpty()) {
+        Text(if (draft.systemPrinterName.isBlank()) "Set it up on the computer it's plugged into: its printers show there."
+            else "On ${draft.systemPrinterName}. Change it on the computer it's plugged into.",
+            fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 17.sp, letterSpacing = 0.sp, color = Kit.Muted)
+        return
+    }
+    SelectInput(draft.systemPrinterName.takeIf { it in printers } ?: "", listOf("") + printers, { if (it.isEmpty()) tr("Choose a printer") else it },
+        { v -> model.change { it.copy(systemPrinterName = v, hostDeviceId = here?.deviceId ?: it.hostDeviceId) } },
+        Modifier.fillMaxWidth(), label = "Printer on this computer", required = true)
+}
+
+
+/** "What kind of printer?": the ready-made kinds as tiles; one click fills in its paper, cut and drawer (user, 2026-11-27). */
+@Composable
+internal fun PresetTiles(draft: DeviceDraft, model: DevicesScreenModel) {
+    val narrow = com.saporini.mobile_desktop.core.components.LocalNarrowDialog.current
+    Caption("What kind of printer?")
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+        maxItemsInEachRow = if (narrow) 2 else 3) {
+        com.saporini.mobile_desktop.admin.devices.PrinterPreset.entries.forEach { preset ->
+            val chosen = draft.printerRole == preset.role
+            Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(if (chosen) Kit.GreenSoft else Color.White)
+                .border(if (chosen) 1.5.dp else 1.dp, if (chosen) Kit.Green else Kit.Border, RoundedCornerShape(12.dp))
+                .clickable { model.usePreset(preset) }.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(presetIcon(preset), null, Modifier.size(17.dp), tint = if (chosen) Kit.Green else Kit.Ink)
+                    Text(preset.title, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp,
+                        color = if (chosen) Kit.Green else Kit.Ink, maxLines = 1)
+                }
+                Text(preset.line, fontFamily = Inter(), fontSize = 11.5.sp, lineHeight = 15.sp, letterSpacing = 0.sp, color = Kit.Muted, maxLines = 2)
             }
-            if (problem == null) {
-                val plugged = printer?.takeIf { kind == DeviceKind.DRAWER }?.let { "Plugged into the ${it.name}." }
-                onAdded(DeviceExtras.add(type, name, code, maker, modelName, listOfNotNull(plugged, notes.trim().ifBlank { null }).joinToString(" ")))
-            }
-        }, icon = Icons.Outlined.Check)
-    }) {
-        KindBanner(kind, 120.dp)
-        problem?.let { MessageBar(it, MessageKind.ERROR) }
-        FieldPair(
-            { m -> TextInput(name, { name = it }, m, label = "Name", required = true, icon = Icons.Outlined.Devices, maxLength = MAX_DEVICE_NAME) },
-            { m -> TextInput(code, { code = it.uppercase() }, m, label = "Short code", required = true, icon = Icons.Outlined.Badge, maxLength = MAX_DEVICE_CODE) }
-        )
-        if (kind == DeviceKind.DRAWER && printers.isNotEmpty()) {
-            SelectInput(printer, printers, { it.name }, { printer = it }, Modifier.fillMaxWidth(), label = "Plugged into", icon = Icons.Outlined.Print,
-                hint = "The receipt printer opens the drawer after a cash payment.")
         }
-        FieldPair(
-            { m -> TextInput(maker, { maker = it }, m, label = "Maker", optional = true, placeholder = if (kind == DeviceKind.SCANNER) "Zebra" else "APG", maxLength = 100) },
-            { m -> TextInput(modelName, { modelName = it }, m, label = "Model", optional = true, maxLength = 100) }
-        )
-        TextInput(notes, { notes = it }, label = "Notes", optional = true, singleLine = false, minLines = 2, placeholder = "Where it is…", maxLength = MAX_DEVICE_NOTES)
+    }
+}
+
+private fun presetIcon(preset: com.saporini.mobile_desktop.admin.devices.PrinterPreset) = when (preset) {
+    com.saporini.mobile_desktop.admin.devices.PrinterPreset.RECEIPT -> Icons.Outlined.PointOfSale
+    com.saporini.mobile_desktop.admin.devices.PrinterPreset.KITCHEN -> Icons.Outlined.Restaurant
+    com.saporini.mobile_desktop.admin.devices.PrinterPreset.BAR -> Icons.Outlined.LocalBar
+    com.saporini.mobile_desktop.admin.devices.PrinterPreset.SMALL -> Icons.Outlined.Receipt
+    com.saporini.mobile_desktop.admin.devices.PrinterPreset.DOCUMENT -> Icons.Outlined.Description
+    com.saporini.mobile_desktop.admin.devices.PrinterPreset.OTHER -> Icons.Outlined.Print
+}
+
+/**
+ * A Bluetooth printer (user, 2026-11-27): on a phone or tablet, picked from the devices paired with it (Android asks for
+ * "Nearby devices" first), and kept as paired with this till, which prints for the others. On a computer a paired printer is
+ * in its printer list, so it's added as a printer on this computer.
+ */
+@Composable
+internal fun BluetoothPrinterPicker(draft: DeviceDraft, model: DevicesScreenModel) {
+    val access = com.saporini.mobile_desktop.core.printing.rememberBluetoothAccess()
+    val here = com.saporini.mobile_desktop.core.session.TokenStore.till.collectAsState().value
+    val computer = com.saporini.mobile_desktop.core.printing.PrinterLink.systemPrinters().isNotEmpty() ||
+        com.saporini.mobile_desktop.core.session.deviceSystem().let { !it.startsWith("Android") }
+    if (computer) {
+        Text("On a computer, pair the printer in the computer's Bluetooth settings, then choose “On a computer (USB)”: paired printers show in its printer list.",
+            fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 17.sp, letterSpacing = 0.sp, color = Kit.Muted)
+        return
+    }
+    if (!access.allowed) {
+        BluetoothAsk("Let this device use Bluetooth to see its printers.", "Allow Bluetooth", access.ask)
+        return
+    }
+    val paired = remember(access.allowed) { com.saporini.mobile_desktop.core.printing.PrinterLink.bluetoothPrinters() }
+    if (paired.isEmpty()) {
+        Text(if (draft.systemPrinterName.isBlank()) "Nothing is paired yet. Pair the printer in this device's Bluetooth settings, then come back."
+            else "Paired as ${draft.systemPrinterName}.",
+            fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 17.sp, letterSpacing = 0.sp, color = Kit.Muted)
+        return
+    }
+    val addresses = paired.map { it.address }
+    SelectInput(draft.systemPrinterName.takeIf { it in addresses } ?: "", listOf("") + addresses,
+        { address -> if (address.isEmpty()) tr("Choose a printer") else paired.first { it.address == address }.let { "${it.name} · ${it.address}" } },
+        { v -> model.change { it.copy(systemPrinterName = v, hostDeviceId = here?.deviceId ?: it.hostDeviceId) } },
+        Modifier.fillMaxWidth(), label = "Paired printer", required = true,
+        hint = if (here != null) "The other tills print on it through this one" else "Prints from this device")
+}
+
+/**
+ * Where a card terminal is connected (user, 2026-11-27: "only with a till or a tablet; Bluetooth and cable, both"): the till or
+ * tablet, how, and on a phone or tablet the paired terminal (Bluetooth) or, by cable, the port's name if it has one.
+ */
+@Composable
+internal fun TerminalLinkFields(draft: DeviceDraft, state: DevicesState, model: DevicesScreenModel) {
+    val hosts = state.devices.filter { it.deviceType in setOf("POS_TERMINAL", "TERMINAL", "TABLET") && it.status != "RETIRED" }
+    Caption("Connected to")
+    if (hosts.isEmpty()) {
+        Text("Add a till or tablet first: a card terminal works only through one.", fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 17.sp,
+            letterSpacing = 0.sp, color = Kit.Amber)
+        return
+    }
+    // Each till or tablet with its picture, like the Connect window (user, 2026-11-28: "put the icons of the till or tablet").
+    HostPicks(hosts, draft.linkedDeviceId) { id -> model.change { it.copy(linkedDeviceId = id) } }
+    if (draft.linkedDeviceId == null) return
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("BLUETOOTH" to "Bluetooth", "USB" to "Cable").forEach { (code, label) ->
+            val chosen = draft.linkType == code
+            Row(Modifier.clip(RoundedCornerShape(50)).background(if (chosen) Kit.GreenSoft else Color.White)
+                .border(1.dp, if (chosen) Kit.Green else Kit.Border, RoundedCornerShape(50))
+                .clickable { model.change { it.copy(linkType = code, linkAddress = if (it.linkType == code) it.linkAddress else "") } }
+                .padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(if (code == "BLUETOOTH") Icons.Outlined.Bluetooth else Icons.Outlined.Cable, null, Modifier.size(16.dp), tint = if (chosen) Kit.Green else Kit.Muted)
+                Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = if (chosen) Kit.Green else Kit.Ink)
+            }
+        }
+    }
+    if (draft.linkType == "BLUETOOTH") PairedTerminalPicker(draft.linkAddress) { v -> model.change { it.copy(linkAddress = v) } }
+    else TextInput(draft.linkAddress, { v -> model.change { it.copy(linkAddress = v.take(200)) } }, label = "Port", optional = true,
+        placeholder = "COM3 or /dev/ttyUSB0", hint = "Plug the cable into the till or tablet above")
+}
+
+/** The paired card terminal, on the phone or tablet it's paired with (a computer: its name as paired there). */
+@Composable
+private fun PairedTerminalPicker(address: String, onAddress: (String) -> Unit) {
+    val access = com.saporini.mobile_desktop.core.printing.rememberBluetoothAccess()
+    val phone = com.saporini.mobile_desktop.core.session.deviceSystem().startsWith("Android")
+    if (!phone) {
+        TextInput(address, { v -> onAddress(v.take(200)) }, label = "Paired as", required = true,
+            placeholder = "Card terminal 1", hint = "Its name in the computer's Bluetooth settings")
+        return
+    }
+    if (!access.allowed) {
+        BluetoothAsk("Let this device use Bluetooth to see the card terminal.", "Allow Bluetooth", access.ask)
+        return
+    }
+    val paired = remember(access.allowed) { com.saporini.mobile_desktop.core.printing.PrinterLink.bluetoothPrinters() }
+    if (paired.isEmpty()) {
+        Text("Nothing is paired yet. Pair the terminal in this device's Bluetooth settings, then come back.", fontFamily = Inter(), fontSize = 12.5.sp,
+            lineHeight = 17.sp, letterSpacing = 0.sp, color = Kit.Muted)
+        return
+    }
+    val addresses = paired.map { it.address }
+    SelectInput(address.takeIf { it in addresses } ?: "", listOf("") + addresses,
+        { address -> if (address.isEmpty()) tr("Choose the terminal") else paired.first { it.address == address }.let { "${it.name} · ${it.address}" } },
+        { v -> onAddress(v) }, Modifier.fillMaxWidth(), label = "Paired terminal", required = true)
+}
+
+/** The printer a cash drawer is plugged into: that printer opens it. */
+@Composable
+internal fun DrawerLinkFields(draft: DeviceDraft, state: DevicesState, model: DevicesScreenModel) {
+    val printers = state.printers.filter { it.printerRole != "DOCUMENT" && it.status != "RETIRED" }
+    Caption("Plugged into")
+    if (printers.isEmpty()) {
+        Text("Add a receipt printer first: the drawer plugs into it.", fontFamily = Inter(), fontSize = 12.5.sp, lineHeight = 17.sp, letterSpacing = 0.sp,
+            color = Kit.Amber)
+        return
+    }
+    SelectInput(draft.linkedDeviceId.orEmpty(), listOf("") + printers.map { it.id },
+        { id -> if (id.isEmpty()) tr("Choose a printer") else printers.first { it.id == id }.name },
+        { v -> model.change { it.copy(linkedDeviceId = v.ifEmpty { null }) } }, Modifier.fillMaxWidth(), label = "Printer", required = true,
+        hint = "The drawer's cable goes into the printer")
+}
+
+/**
+ * Connecting a card terminal (user, 2026-11-28: "when you say connect, only choose one of the tills or tablets, not edit the
+ * info"): the restaurant's tills and tablets to pick from, then Bluetooth or cable. Nothing else of the terminal changes.
+ */
+@Composable
+internal fun TerminalConnectDialog(device: DeviceDto, state: DevicesState, model: DevicesScreenModel, onDone: () -> Unit) {
+    val hosts = state.devices.filter { it.deviceType in setOf("POS_TERMINAL", "TERMINAL", "TABLET") && it.status != "RETIRED" }
+        .sortedWith(compareBy({ it.deviceType == "TABLET" }, { it.name.lowercase() }))
+    var host by remember(device.id) { mutableStateOf(device.linkedDeviceId) }
+    var way by remember(device.id) { mutableStateOf(device.linkType?.takeIf { it == "USB" || it == "BLUETOOTH" } ?: "BLUETOOTH") }
+    var address by remember(device.id) { mutableStateOf(device.linkAddress.orEmpty()) }
+    val ready = host != null && (way == "USB" || address.isNotBlank())
+    AppDialog("Connect ${device.name}", onDone, subtitle = "Card payments on the till or tablet you choose go to it.", maxWidth = 560.dp,
+        busy = state.saving,
+        buttons = {
+            if (device.linkedDeviceId != null) KitButton("Disconnect", {
+                model.connectTerminal(device, null, null, null, onDone)
+            }, style = ButtonStyle.DANGER_OUTLINE, enabled = !state.saving)
+            KitButton("Cancel", onDone, style = ButtonStyle.SECONDARY, enabled = !state.saving)
+            KitButton("Connect", { model.connectTerminal(device, host, way, address, onDone) }, icon = Icons.Outlined.Check,
+                enabled = ready, loading = state.saving)
+        }) {
+        state.error?.let { MessageBar(it, MessageKind.ERROR) }
+        if (hosts.isEmpty()) {
+            Text("Add a till or tablet first: a card terminal works only through one.", fontFamily = Inter(), fontSize = 13.sp, lineHeight = 18.sp,
+                letterSpacing = 0.sp, color = Kit.Amber)
+            return@AppDialog
+        }
+        HostPicks(hosts, host) { host = it }
+        if (host == null) return@AppDialog
+        Caption("How")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("BLUETOOTH" to "Bluetooth", "USB" to "Cable").forEach { (code, label) ->
+                val chosen = way == code
+                Row(Modifier.clip(RoundedCornerShape(50)).background(if (chosen) Kit.GreenSoft else Color.White)
+                    .border(1.dp, if (chosen) Kit.Green else Kit.Border, RoundedCornerShape(50))
+                    .clickable { if (way != code) { way = code; address = "" } }
+                    .padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(if (code == "BLUETOOTH") Icons.Outlined.Bluetooth else Icons.Outlined.Cable, null, Modifier.size(16.dp), tint = if (chosen) Kit.Green else Kit.Muted)
+                    Text(label, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = if (chosen) Kit.Green else Kit.Ink)
+                }
+            }
+        }
+        if (way == "BLUETOOTH") PairedTerminalPicker(address) { address = it }
+        else TextInput(address, { address = it.take(200) }, label = "Port", optional = true, placeholder = "COM3 or /dev/ttyUSB0",
+            hint = "Plug the cable into the till or tablet above")
+    }
+}
+
+/** The tills and tablets a card terminal can be connected to, each with its picture; a click picks one. */
+@Composable
+internal fun HostPicks(hosts: List<DeviceDto>, chosenId: String?, onPick: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        hosts.forEach { one ->
+            val chosen = chosenId == one.id
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(if (chosen) Kit.GreenSoft else Color.White)
+                .border(if (chosen) 1.5.dp else 1.dp, if (chosen) Kit.Green else Kit.RowBorder, RoundedCornerShape(12.dp))
+                .clickable { onPick(one.id) }.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                KindThumb(if (one.deviceType == "TABLET") DeviceKind.TABLET else DeviceKind.TILL, 40.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(one.name, translate = false, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink)
+                    Text(deviceTypeLabel(one.deviceType), fontFamily = Inter(), fontSize = 12.sp, letterSpacing = 0.sp, color = Kit.Muted)
+                }
+                Icon(if (chosen) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked, null, Modifier.size(20.dp),
+                    tint = if (chosen) Kit.Green else Kit.Faint)
+            }
+        }
     }
 }

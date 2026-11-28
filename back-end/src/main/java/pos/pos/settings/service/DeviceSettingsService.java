@@ -5,6 +5,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 import pos.pos.device.entity.Device;
 import pos.pos.device.entity.DevicePrinterProfile;
@@ -102,6 +103,9 @@ public class DeviceSettingsService {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
 
         Device device = requirePrinter(restaurantId, printerId);
+        // A cash drawer plugged into it isn't in use any more (it waits for another printer).
+        entityManager.createNativeQuery("update {h-schema}devices set status = 'PROVISIONING' where linked_device_id = :id and status = 'ACTIVE'")
+                .setParameter("id", device.getId()).executeUpdate();
 
         deleteAndAudit(authentication, device, "DEVICE_PRINTER", "DELETE", "Deleted printer settings");
     }
@@ -284,6 +288,9 @@ public class DeviceSettingsService {
         // with pairing so a token cannot remain usable after the device is disabled.
         Device device = requireBranchDeviceForUpdate(authentication, restaurantId, branchId, deviceId);
 
+        if (request.getStatus() == DeviceStatus.ACTIVE && notReady(device) != null) {
+            throw new AuthException(notReady(device), HttpStatus.BAD_REQUEST);
+        }
         if (request.getStatus() != null) {
             device.setStatus(request.getStatus());
         }
@@ -327,7 +334,9 @@ public class DeviceSettingsService {
                 "delete from {h-schema}\"device-pairing-tokens\" where device_id = :id",
                 "delete from {h-schema}\"device-assignments\" where device_id = :id",
                 "update {h-schema}kds_stations set device_id = null where device_id = :id",
-                "update {h-schema}shifts set device_id = null where device_id = :id")) {
+                "update {h-schema}shifts set device_id = null where device_id = :id",
+                // A card terminal connected to it isn't in use any more (it waits for another till or tablet).
+                "update {h-schema}devices set status = 'PROVISIONING' where linked_device_id = :id and status = 'ACTIVE'")) {
             entityManager.createNativeQuery(sql).setParameter("id", device.getId()).executeUpdate();
         }
 
@@ -380,6 +389,70 @@ public class DeviceSettingsService {
         if (device.getPrinterProfile() != null) {
             device.setPrinterProfile(null);
         }
+        applyLink(device, restaurantId, request);
+    }
+
+    /**
+     * What a card terminal or a cash drawer is connected to (user, 2026-11-27): a card terminal works only through a till or
+     * tablet of the restaurant, by Bluetooth or cable (none chosen = not connected, so it can't take payments); a cash drawer is
+     * plugged into one of the restaurant's printers. Other devices are connected to nothing.
+     */
+    private void applyLink(Device device, UUID restaurantId, UpsertDeviceRequest request) {
+        UUID linked = request.getLinkedDeviceId();
+        DeviceType type = device.getDeviceType();
+        if (type != DeviceType.PAYMENT_TERMINAL && type != DeviceType.CASH_DRAWER) {
+            if (linked != null || request.getLinkType() != null || StringUtils.hasText(request.getLinkAddress())) {
+                throw new AuthException("Only card terminals and cash drawers are connected to another device.", HttpStatus.BAD_REQUEST);
+            }
+            clearLink(device);
+            return;
+        }
+        if (linked == null) {
+            clearLink(device);
+            // Not connected: not in use (it waits to be confirmed once it's connected again).
+            if (device.getStatus() == DeviceStatus.ACTIVE) device.setStatus(DeviceStatus.PROVISIONING);
+            return;
+        }
+        Device target = deviceRepository.findById(linked)
+                .filter(candidate -> candidate.getRestaurant() != null && restaurantId.equals(candidate.getRestaurant().getId()))
+                .filter(candidate -> candidate.getStatus() != DeviceStatus.RETIRED)
+                .orElseThrow(() -> new AuthException("Choose one of this restaurant's devices.", HttpStatus.BAD_REQUEST));
+        if (type == DeviceType.PAYMENT_TERMINAL) {
+            if (target.getDeviceType() != DeviceType.POS_TERMINAL && target.getDeviceType() != DeviceType.TABLET) {
+                throw new AuthException("A card terminal is connected to a till or a tablet.", HttpStatus.BAD_REQUEST);
+            }
+            if (!"USB".equals(request.getLinkType()) && !"BLUETOOTH".equals(request.getLinkType())) {
+                throw new AuthException("Choose Bluetooth or cable.", HttpStatus.BAD_REQUEST);
+            }
+            if ("BLUETOOTH".equals(request.getLinkType()) && !StringUtils.hasText(request.getLinkAddress())) {
+                throw new AuthException("Choose the paired card terminal.", HttpStatus.BAD_REQUEST);
+            }
+            device.setLinkType(request.getLinkType());
+        } else {
+            if (target.getDeviceType() != DeviceType.PRINTER) {
+                throw new AuthException("A cash drawer is plugged into a printer.", HttpStatus.BAD_REQUEST);
+            }
+            device.setLinkType("PRINTER");
+        }
+        device.setLinkedDeviceId(target.getId());
+        device.setLinkAddress(StringUtils.hasText(request.getLinkAddress()) ? request.getLinkAddress().trim() : null);
+    }
+
+    /**
+     * Why a card terminal or a cash drawer can't be in use yet, or null (user, 2026-11-28: "in use means everything has passed,
+     * so it's ready"): a terminal needs its till or tablet, a drawer its printer.
+     */
+    private static String notReady(Device device) {
+        if (device.getLinkedDeviceId() != null) return null;
+        if (device.getDeviceType() == DeviceType.PAYMENT_TERMINAL) return "Connect it to a till or tablet first.";
+        if (device.getDeviceType() == DeviceType.CASH_DRAWER) return "Plug it into a printer first.";
+        return null;
+    }
+
+    private static void clearLink(Device device) {
+        device.setLinkedDeviceId(null);
+        device.setLinkType(null);
+        device.setLinkAddress(null);
     }
 
     private void ensurePrinterProfile(Device device, UpsertDeviceRequest request) {
@@ -407,6 +480,9 @@ public class DeviceSettingsService {
         printerProfile.setPrinterPort(request.getPrinterPort());
         printerProfile.setAutoCut(Boolean.TRUE.equals(request.getAutoCut()));
         printerProfile.setCashDrawerKickEnabled(Boolean.TRUE.equals(request.getCashDrawerKickEnabled()));
+        printerProfile.setSystemPrinterName(request.getSystemPrinterName());
+        printerProfile.setHostDeviceId(request.getHostDeviceId());
+        if (request.getPrinterRole() != null) printerProfile.setPrinterRole(request.getPrinterRole());
     }
 
     private Device requirePrinter(UUID restaurantId, UUID deviceId) {
@@ -520,7 +596,10 @@ public class DeviceSettingsService {
                 || request.getPrinterIp() != null
                 || request.getPrinterPort() != null
                 || request.getAutoCut() != null
-                || request.getCashDrawerKickEnabled() != null) {
+                || request.getCashDrawerKickEnabled() != null
+                || request.getSystemPrinterName() != null
+                || request.getHostDeviceId() != null
+                || request.getPrinterRole() != null) {
             throw new AuthException("printer-specific fields are not allowed on branch device endpoints", HttpStatus.BAD_REQUEST);
         }
     }
@@ -587,6 +666,8 @@ public class DeviceSettingsService {
                 .online(isOnline(device))
                 .connected(org.springframework.util.StringUtils.hasText(device.getAuthSecretHash()))
                 .connectedAt(device.getAuthSecretRotatedAt())
+                .connectedDeviceName(device.getConnectedDeviceName())
+                .connectedDeviceSystem(device.getConnectedDeviceSystem())
                 .lastSeenAt(device.getLastSeenAt())
                 .ipAddress(device.getIpAddress())
                 .place(geoPlaces == null ? null : geoPlaces.placeOf(device.getIpAddress()))
@@ -596,6 +677,20 @@ public class DeviceSettingsService {
                 .paperWidthMm(printerProfile == null ? null : printerProfile.getPaperWidthMm())
                 .printerIp(printerProfile == null ? null : printerProfile.getPrinterIp())
                 .printerPort(printerProfile == null ? null : printerProfile.getPrinterPort())
+                .systemPrinterName(printerProfile == null ? null : printerProfile.getSystemPrinterName())
+                .hostDeviceId(printerProfile == null ? null : printerProfile.getHostDeviceId())
+                .printerRole(printerProfile == null ? null : printerProfile.getPrinterRole())
+                .printerState(printerProfile == null ? null : printerState(printerProfile))
+                .printerReachedAt(printerProfile == null ? null : printerProfile.getReachedAt())
+                .printerCheckedAt(printerProfile == null ? null : printerProfile.getCheckedAt())
+                .printerCheckedBy(printerProfile == null || printerProfile.getCheckedBy() == null ? null
+                        : deviceRepository.findById(printerProfile.getCheckedBy()).map(Device::getName).orElse(null))
+                .printerProblem(printerProfile == null ? null : printerProfile.getCheckProblem())
+                .linkedDeviceId(device.getLinkedDeviceId())
+                .linkedDeviceName(device.getLinkedDeviceId() == null ? null
+                        : deviceRepository.findById(device.getLinkedDeviceId()).map(Device::getName).orElse(null))
+                .linkType(device.getLinkType())
+                .linkAddress(device.getLinkAddress())
                 .autoCut(printerProfile == null ? null : printerProfile.isAutoCut())
                 .cashDrawerKickEnabled(printerProfile == null ? null : printerProfile.isCashDrawerKickEnabled())
                 .createdAt(device.getCreatedAt())
@@ -605,13 +700,23 @@ public class DeviceSettingsService {
 
     /**
      * A device that signs in is online while it's heard from (its heartbeat every minute, `app.devices.online-minutes`, 3 by
-     * default); a printer is what was set on it.
+     * default); a printer while a till reached it lately (tills check every minute).
      */
     private boolean isOnline(Device device) {
-        if (device.getDeviceType() == DeviceType.PRINTER) return device.isOnline();
+        if (device.getDeviceType() == DeviceType.PRINTER) {
+            return device.getPrinterProfile() != null && "ONLINE".equals(printerState(device.getPrinterProfile()));
+        }
         java.time.OffsetDateTime seen = device.getLastSeenAt();
         return device.isOnline() && seen != null
                 && seen.isAfter(java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusMinutes(onlineMinutes));
+    }
+
+    /** ONLINE: a till reached it lately; OFFLINE: one checked lately and nobody reached it; UNCHECKED: no till checked lately. */
+    private String printerState(DevicePrinterProfile profile) {
+        java.time.OffsetDateTime since = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusMinutes(onlineMinutes);
+        if (profile.getReachedAt() != null && profile.getReachedAt().isAfter(since)) return "ONLINE";
+        if (profile.getCheckedAt() != null && profile.getCheckedAt().isAfter(since)) return "OFFLINE";
+        return "UNCHECKED";
     }
 
     @org.springframework.beans.factory.annotation.Value("${app.devices.online-minutes:3}")

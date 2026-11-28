@@ -70,6 +70,9 @@ class DeviceManagementServiceTest {
     @Mock
     private OpaqueTokenService opaqueTokenService;
 
+    @Mock
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     private DeviceManagementService deviceManagementService;
 
     @BeforeEach
@@ -83,7 +86,8 @@ class DeviceManagementServiceTest {
                 settingsDomainSupport,
                 settingsAuditService,
                 devicePairingProperties,
-                opaqueTokenService
+                opaqueTokenService,
+                accountAudit
         );
     }
 

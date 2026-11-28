@@ -79,30 +79,57 @@ class DeviceConnectRequestIntegrationTest extends AbstractPosApiIntegrationTest 
         assertThat(get("/restaurants/{r}/device-connect-requests/{id}", r, requestId).as(asker).expect(200).get("status").asText()).isEqualTo("DONE");
         post("/restaurants/{r}/device-connect-requests/{id}/claim", r, requestId).as(asker).body(Map.of("claimToken", claim)).expect(409);
 
-        // The new device works; the code is used up.
+        // The new device works; the code is used up; Devices says which device has it (user, 2026-11-27).
         post("/public/devices/{d}/heartbeat", device).header("X-Device-Secret", secret).body(Map.of("platform", "Linux")).expect(200);
+        JsonNode listed = null;
+        for (JsonNode one : get("/restaurants/{r}/branches/{b}/devices", r, world.branchId()).as(world.ownerToken()).expect(200)) {
+            if (one.get("id").asText().equals(device.toString())) listed = one;
+        }
+        assertThat(listed).isNotNull();
+        assertThat(listed.get("connectedDeviceName").asText()).isEqualTo("Linux computer (bar)");
+        assertThat(listed.get("connectedDeviceSystem").asText()).isEqualTo("Linux 6.17");
+        post("/restaurants/{r}/devices/{d}/disconnect", r, device).as(world.ownerToken()).expect(204);
+        for (JsonNode one : get("/restaurants/{r}/branches/{b}/devices", r, world.branchId()).as(world.ownerToken()).expect(200)) {
+            if (one.get("id").asText().equals(device.toString())) assertThat(one.get("connectedDeviceName").isNull()).isTrue();
+        }
         post("/restaurants/{r}/device-connect-requests", r).as(asker).body(Map.of("pairingToken", code)).expect(400);
     }
 
     @Test
-    void movingATillStopsTheDeviceThatWasIt() throws Exception {
+    void aTillInUseIsDisconnectedFirstThenItsDeviceStopsWorking() throws Exception {
         World world = newWorld("connect move");
         UUID r = world.restaurantId();
         String asker = token(staff(world, "admin", "ADMIN"));
         UUID device = till(world, "Front till");
+        String old = code(world, device);
         String first = post("/restaurants/{r}/device-pairing/redeem", r).as(world.ownerToken())
-                .body(Map.of("pairingToken", code(world, device))).expect(200).get("deviceSecret").asText();
+                .body(Map.of("pairingToken", old)).expect(200).get("deviceSecret").asText();
         post("/public/devices/{d}/heartbeat", device).header("X-Device-Secret", first).body(Map.of("platform", "Linux")).expect(200);
 
-        JsonNode asked = post("/restaurants/{r}/device-connect-requests", r).as(asker).body(Map.of("pairingToken", code(world, device))).expect(200);
-        assertThat(asked.get("request").get("deviceInUse").asBoolean()).isTrue();
-        UUID requestId = id(asked.get("request"));
-        post("/restaurants/{r}/device-connect-requests/{id}/agree", r, requestId).as(world.ownerToken()).expect(200);
-        post("/restaurants/{r}/device-connect-requests/{id}/claim", r, requestId).as(asker)
-                .body(Map.of("claimToken", asked.get("claimToken").asText())).expect(200);
+        // In use: no new code until it's disconnected (user, 2026-11-25).
+        assertThat(post("/restaurants/{r}/devices/{d}/pairing-tokens", r, device).as(world.ownerToken()).body(Map.of("ttlMinutes", 15))
+                .expect(409).get("message").asText()).isEqualTo("Front till is in use. Disconnect it first to make a code.");
+        // A waiter can't disconnect it.
+        post("/restaurants/{r}/devices/{d}/disconnect", r, device).as(token(staff(world, "waiter", "WAITER"))).expect(403);
 
+        post("/restaurants/{r}/devices/{d}/disconnect", r, device).as(asker).expect(204);
         assertThat(post("/public/devices/{d}/heartbeat", device).header("X-Device-Secret", first).body(Map.of("platform", "Linux"))
                 .send().status()).isEqualTo(401);
+        JsonNode listed = get("/restaurants/{r}/branches/{b}/devices", r, world.branchId()).as(world.ownerToken()).expect(200);
+        for (JsonNode one : listed) {
+            if (one.get("id").asText().equals(device.toString())) assertThat(one.get("connected").asBoolean()).isFalse();
+        }
+        assertThat(jdbcTemplate.queryForObject("select count(*) from " + SCHEMA + ".\"settings-audit-logs\" where action = 'DEVICE_DISCONNECTED'"
+                + " and entity_id = ?", Integer.class, device)).isEqualTo(1);
+
+        // Then it's connected again on the other device, through the agreement.
+        JsonNode asked = post("/restaurants/{r}/device-connect-requests", r).as(asker).body(Map.of("pairingToken", code(world, device))).expect(200);
+        assertThat(asked.get("request").get("deviceInUse").asBoolean()).isFalse();
+        UUID requestId = id(asked.get("request"));
+        post("/restaurants/{r}/device-connect-requests/{id}/agree", r, requestId).as(world.ownerToken()).expect(200);
+        String second = post("/restaurants/{r}/device-connect-requests/{id}/claim", r, requestId).as(asker)
+                .body(Map.of("claimToken", asked.get("claimToken").asText())).expect(200).get("deviceSecret").asText();
+        post("/public/devices/{d}/heartbeat", device).header("X-Device-Secret", second).body(Map.of("platform", "Linux")).expect(200);
     }
 
     @Test
@@ -165,7 +192,7 @@ class DeviceConnectRequestIntegrationTest extends AbstractPosApiIntegrationTest 
         post("/restaurants/{r}/device-connect-requests", r).as(asker).body(Map.of("pairingToken", "ZZZZZZZZ")).expect(400);
         UUID card = device(world, "Card reader", "PAYMENT_TERMINAL");
         assertThat(post("/restaurants/{r}/device-connect-requests", r).as(asker).body(Map.of("pairingToken", code(world, card))).expect(400)
-                .get("message").asText()).contains("card terminal");
+                .get("message").asText()).contains("doesn't work here");
         UUID theirs = till(elsewhere, "Their till");
         post("/restaurants/{r}/device-connect-requests", r).as(asker).body(Map.of("pairingToken", code(elsewhere, theirs))).expect(400);
         // A request of another restaurant isn't there for this one.

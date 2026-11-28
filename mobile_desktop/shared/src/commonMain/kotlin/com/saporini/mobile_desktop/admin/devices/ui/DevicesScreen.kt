@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.admin.devices.DEVICE_STATUSES
 import com.saporini.mobile_desktop.admin.devices.DeviceAssignmentDto
 import com.saporini.mobile_desktop.admin.devices.DeviceDto
-import com.saporini.mobile_desktop.admin.devices.DeviceExtras
 import com.saporini.mobile_desktop.admin.devices.DevicesScreenModel
 import com.saporini.mobile_desktop.admin.devices.DevicesState
 import com.saporini.mobile_desktop.admin.devices.PairingCodeDto
@@ -98,18 +97,21 @@ import kotlin.time.Clock
 // then what waits to be confirmed, then every device by kind. A device opens in a dialog with everything about it.
 // Adding: pick the kind, fill in a name, then confirm it works (pairing code, test print, a test scan or opening the drawer).
 
-/** The kinds of device the restaurant has, each with its picture. Scanners and cash drawers are MOCK ([DeviceExtras]). */
+/** The kinds of device the restaurant has, each with its picture. Every one is kept by the server except barcode scanners, which need nothing set up. */
 internal enum class DeviceKind(val title: String, val one: String, val hint: String, val image: DrawableResource, val types: List<String>) {
     TILL("Tills", "till", "Orders and payments at the counter", Res.drawable.device_till, listOf("POS_TERMINAL", "TERMINAL")),
     TABLET("Tablets & screens", "tablet", "Waiter tablets, kitchen screens, the guest display", Res.drawable.device_tablet, listOf("TABLET", "KDS", "CUSTOMER_DISPLAY")),
     PRINTER("Printers", "printer", "Receipts and kitchen tickets", Res.drawable.device_printer, listOf("PRINTER")),
-    CARD("Card terminals", "card terminal", "Card and phone payments", Res.drawable.device_card_terminal, listOf("PAYMENT_TERMINAL")),
-    SCANNER("Barcode scanners", "scanner", "Scan stock on deliveries and counts", Res.drawable.device_scanner, listOf(DeviceExtras.SCANNER)),
-    DRAWER("Cash drawers", "cash drawer", "Opened by the receipt printer", Res.drawable.device_cash_drawer, listOf(DeviceExtras.CASH_DRAWER));
+    CARD("Card terminals", "card terminal", "Card payments, through the till or tablet they're connected to", Res.drawable.device_card_terminal, listOf("PAYMENT_TERMINAL")),
+    SCANNER("Barcode scanners", "scanner", "Plug it in and scan. Nothing to set up", Res.drawable.device_scanner, emptyList()),
+    DRAWER("Cash drawers", "cash drawer", "Plugged into a receipt printer, which opens it", Res.drawable.device_cash_drawer, listOf("CASH_DRAWER"));
 
-    /** Devices of this kind sign in with a pairing code (the others are plugged into one that does). */
-    val pairs get() = this == TILL || this == TABLET || this == CARD
-    val mock get() = this == SCANNER || this == DRAWER
+    /** Devices of this kind connect with a code (tills and tablets); card terminals and drawers are connected to one. */
+    val pairs get() = this == TILL || this == TABLET
+    // Scanners aren't kept anywhere: plugged in, they just work.
+    val nothingToSetUp get() = this == SCANNER
+    // A code is typed inside its kind (user, 2026-11-27): Tills or Tablets & screens.
+    val codeKind: String? get() = when (this) { TILL -> "TILL"; TABLET -> "TABLET"; else -> null }
 }
 
 internal fun kindOf(device: DeviceDto): DeviceKind = DeviceKind.entries.firstOrNull { device.deviceType in it.types } ?: DeviceKind.TABLET
@@ -133,33 +135,42 @@ internal fun DevicesContent(
     // Like Users: the kinds as cards, and a kind's own page to manage its devices (user rule).
     var openKind by remember { mutableStateOf(startKind) }
     var picking by remember { mutableStateOf(startAdding) }
-    var addingExtra by remember { mutableStateOf<DeviceKind?>(null) }
     var openId by remember { mutableStateOf(startOpen) }
     var confirming by remember { mutableStateOf(startConfirming) }
-    var removingExtra by remember { mutableStateOf<DeviceDto?>(null) }
-    var localNotice by remember { mutableStateOf<String?>(null) }
-    val all = state.devices + state.printers + DeviceExtras.items
+    val all = state.devices + state.printers
     val byId = all.associateBy { it.id }
 
-    fun open(device: DeviceDto) { openKind = kindOf(device); openId = device.id; if (!DeviceExtras.isExtra(device.id)) model.select(device.id) }
+    fun open(device: DeviceDto) { openKind = kindOf(device); openId = device.id; model.select(device.id) }
     fun closeDevice() { openId = null; model.select(null) }
-    fun startConfirm(device: DeviceDto) { confirming = device.id; if (!DeviceExtras.isExtra(device.id)) model.select(device.id) }
+    fun startConfirm(device: DeviceDto) { confirming = device.id; model.select(device.id) }
     fun add(kind: DeviceKind) {
         picking = false
         when (kind) {
             DeviceKind.PRINTER -> model.newPrinter()
-            DeviceKind.SCANNER, DeviceKind.DRAWER -> addingExtra = kind
+            DeviceKind.SCANNER -> openKind = DeviceKind.SCANNER
+            DeviceKind.DRAWER -> model.newDevice("CASH_DRAWER")
             else -> model.newDevice(kind.types.first())
         }
     }
+    // A printer just added: after confirming it, what it prints (user, 2026-11-27).
+    var offerUse by remember { mutableStateOf<String?>(null) }
+    var useItFor by remember { mutableStateOf<String?>(null) }
     // A device that was just added goes straight on to being confirmed.
     LaunchedEffect(state.justAdded) {
-        state.justAdded?.let { id -> confirming = id; model.select(id); model.clearJustAdded() }
+        state.justAdded?.let { id ->
+            if (state.isPrinter(id)) offerUse = id
+            confirming = id; model.select(id); model.clearJustAdded()
+        }
     }
 
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val size = screenSizeFor(maxWidth)
-        val side = if (size.isPhone) 14.dp else 22.dp
+        // More room at the sides (user, 2026-11-27: "more space in left and right"), so the cards clear the right-edge tab.
+        val side = when {
+            size.isPhone -> 14.dp
+            size.isDesktop -> 44.dp
+            else -> 30.dp
+        }
         Column(Modifier.fillMaxSize().padding(start = side, end = side, top = if (size.isPhone) 12.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // Inside a kind or a device, the way back sits in the header, beside "Devices", with where you are under it
             // (user, 2026-11-25: "the back arrow on the device, up, make it better").
@@ -184,13 +195,12 @@ internal fun DevicesContent(
                     }
                 } }) {
                 if (openId == null) HereChip(state, ::open)
-                if (openId == null && (state.canConnect || state.canEdit) && !state.pinSignIn) ToolbarButton("Enter a code", Icons.Outlined.VpnKey, !state.saving) { model.openEnterCode() }
                 RefreshButton(state.loading, model::refresh)
                 // Inside a kind, its own "Add a …" button takes over.
                 if (state.canEdit && openKind == null) ToolbarPrimaryButton("Add device", Icons.Outlined.Add, !state.saving) { picking = true }
             }
-            ScreenMessages(state.error.takeIf { state.draft == null && confirming == null }, state.notice ?: localNotice,
-                onClear = { model.clearMessages(); localNotice = null })
+            ScreenMessages(state.error.takeIf { state.draft == null && confirming == null }, state.notice,
+                onClear = model::clearMessages)
             when {
                 !state.canRead -> PageState(PageStateKind.NO_ACCESS, "No access to devices", "Your role needs “Connect devices” to see devices.")
                 state.devices.isEmpty() && state.printers.isEmpty() && state.loading -> OverviewPageSkeleton(size, sidePanel = false)
@@ -198,23 +208,26 @@ internal fun DevicesContent(
                 openId != null && byId[openId] != null -> byId.getValue(openId!!).let { device ->
                     DevicePage(Modifier.fillMaxWidth().weight(1f), device, state, model, size, onBack = ::closeDevice,
                         onConfirm = { startConfirm(device) }, onEdit = { model.edit(device.id) },
-                        onRemove = { if (DeviceExtras.isExtra(device.id)) removingExtra = device else model.askDelete(device.id) })
+                        onRemove = { model.askDelete(device.id) })
                 }
                 // Someone who only connects devices sees the tills and the tablets & screens (user, 2026-11-25).
                 openKind == null -> KindGrid(Modifier.fillMaxWidth().weight(1f), all, size,
                     if (state.canEdit) DeviceKind.entries else listOf(DeviceKind.TILL, DeviceKind.TABLET), state, ::open) { openKind = it }
+                openKind == DeviceKind.SCANNER -> ScannerPage(Modifier.fillMaxWidth().weight(1f), size)
                 else -> openKind?.let { kind ->
                     KindPage(Modifier.fillMaxWidth().weight(1f), kind, all.filter { kindOf(it) == kind }, state, size,
                         onBack = { openKind = null }, onAdd = { add(kind) }, onOpen = ::open, onConfirm = ::startConfirm,
-                        onEdit = { device -> if (DeviceExtras.isExtra(device.id)) open(device) else model.edit(device.id) },
-                        onRemove = { device -> if (DeviceExtras.isExtra(device.id)) removingExtra = device else model.askDelete(device.id) })
+                        // A code is typed inside its kind: Tills or Tablets & screens (user, 2026-11-27).
+                        onEnterCode = kind.codeKind?.takeIf { (state.canConnect || state.canEdit) && !state.pinSignIn }?.let { codeKind -> { model.openEnterCode(codeKind) } },
+                        onEdit = { device -> model.edit(device.id) },
+                        onRemove = { device -> model.askDelete(device.id) })
                 }
             }
         }
         // Inside a kind, "Add a till" is the green tab on the right edge, as on the other pages (user, 2026-11-25); it can be
         // dragged up and down.
         val addKind = openKind
-        if (addKind != null && openId == null && state.canEdit && state.canRead) {
+        if (addKind != null && addKind != DeviceKind.SCANNER && openId == null && state.canEdit && state.canRead) {
             var position by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0.3f) }
             val compact = size.isPhone
             val maxOffset = with(androidx.compose.ui.platform.LocalDensity.current) {
@@ -237,19 +250,29 @@ internal fun DevicesContent(
     }
 
     if (picking) AddDevicePicker(onPick = ::add, onDismiss = { picking = false })
-    addingExtra?.let { kind ->
-        ExtraDeviceDialog(kind, state.printers, onDismiss = { addingExtra = null }) { added -> addingExtra = null; confirming = added.id }
-    }
-    state.draft?.let { DeviceEditorDialog(it, state, model) }
+    // New printers, card terminals and drawers (and connection changes) go in steps; the rest in the editor (2026-11-28).
+    state.draft?.let { draft -> if (usesAddSteps(draft, state)) AddDeviceDialog(draft, state, model) else DeviceEditorDialog(draft, state, model) }
     if (state.enteringCode) EnterCodeDialog(state, model)
     confirming?.let { id ->
         byId[id]?.let { device ->
             ConfirmDeviceDialog(device, state, model, onDone = { confirmed ->
                 confirming = null
-                if (confirmed && DeviceExtras.isExtra(device.id)) { DeviceExtras.confirm(device.id); localNotice = "${device.name} is confirmed" }
-                else if (confirmed) model.confirm(device.id)
+                if (confirmed) model.confirm(device.id)
+                if (offerUse == device.id) { useItFor = device.id; offerUse = null }
                 if (openId == null) model.select(null)
             })
+        }
+    }
+    // A new printer, once confirmed: what it prints (a document printer has nothing to choose).
+    useItFor?.let { id ->
+        val printer = state.printers.firstOrNull { it.id == id }
+        if (printer == null || printer.printerRole == "DOCUMENT") useItFor = null
+        else {
+            LaunchedEffect(id) { if (state.selectedId != id) model.select(id) }
+            PrinterJobsDialog(printer, state, model) {
+                useItFor = null
+                if (openId == null) model.select(null)
+            }
         }
     }
     // A pairing code made from the device's own dialog (the confirm dialog shows its code itself).
@@ -259,10 +282,6 @@ internal fun DevicesContent(
         ConfirmDialog("Remove ${device?.name ?: "this device"}?",
             "It disappears from the list and can no longer be used. To stop it for a while, set it to “Switched off” or “Blocked” instead.",
             "Remove", onConfirm = { model.confirmDelete(); openId = null }, onDismiss = model::dismissDelete, danger = true, busy = state.saving)
-    }
-    removingExtra?.let { device ->
-        ConfirmDialog("Remove ${device.name}?", "It disappears from the list.", "Remove",
-            onConfirm = { DeviceExtras.remove(device.id); removingExtra = null; openId = null; localNotice = "Removed" }, onDismiss = { removingExtra = null }, danger = true)
     }
 }
 
@@ -329,26 +348,33 @@ private fun KindChips(kind: DeviceKind, devices: List<DeviceDto>, here: String?,
             Link.entries.forEach { link ->
                 val count = links.count { it == link }
                 if (count > 0) StatusChip(when (link) {
-                    Link.ONLINE -> "$count online"
-                    Link.OFFLINE -> "$count offline"
+                    Link.ONLINE -> "$count in use · online"
+                    Link.OFFLINE -> "$count in use · offline"
                     Link.NOT_CONNECTED -> "$count not connected"
-                    Link.NOT_IN_USE -> "$count not in use"
+                    Link.NOT_IN_USE -> "$count switched off"
                 }, link.color)
             }
         }
         return
     }
-    val inUse = devices.count { it.status == "ACTIVE" }
+    if (kind == DeviceKind.SCANNER) {
+        StatusChip("Plug it in and scan", Kit.Green)
+        return
+    }
+    val inUse = devices.count { it.status == "ACTIVE" && notReadyReason(it) == null }
     val repair = devices.count { it.status == "MAINTENANCE" || it.status == "BLOCKED" }
-    val offline = devices.count { kind.pairs && it.status == "ACTIVE" && !it.online }
+    // Card terminals not connected to a till or tablet can't take payments; drawers without a printer can't open.
+    val loose = if (kind == DeviceKind.CARD || kind == DeviceKind.DRAWER) devices.count { it.linkedDeviceId == null && it.status != "RETIRED" } else 0
+    // Printers that don't answer (tills check every minute) show in red.
+    val offline = devices.count { if (kind == DeviceKind.PRINTER) reachOf(it) == Reach.OFFLINE else kind.pairs && it.status == "ACTIVE" && !it.online }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-        if (devices.isEmpty()) Text("None yet", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Faint)
+        if (devices.isEmpty()) Text(if (kind.nothingToSetUp) "Nothing to set up" else "None yet", fontFamily = Inter(), fontSize = 12.sp, color = Kit.Faint)
         else {
             StatusChip("$inUse in use", Kit.Blue)
             if (repair > 0) StatusChip("$repair in repair", Kit.Purple)
-            if (offline > 0) StatusChip("$offline offline", Kit.Grey)
+            if (offline > 0) StatusChip("$offline offline", if (kind == DeviceKind.PRINTER) Kit.Danger else Kit.Grey)
+            if (loose > 0) StatusChip(if (kind == DeviceKind.CARD) "$loose not connected" else "$loose not plugged in", Kit.Amber)
         }
-        if (kind.mock) Text("sample", fontFamily = Inter(), fontSize = 11.sp, color = Kit.Faint)
     }
 }
 
@@ -421,13 +447,14 @@ private fun KindCard(
 @Composable
 private fun KindPage(
     modifier: Modifier, kind: DeviceKind, devices: List<DeviceDto>, state: DevicesState, size: ScreenSize,
-    onBack: () -> Unit, onAdd: () -> Unit, onOpen: (DeviceDto) -> Unit, onConfirm: (DeviceDto) -> Unit, onEdit: (DeviceDto) -> Unit, onRemove: (DeviceDto) -> Unit
+    onBack: () -> Unit, onAdd: () -> Unit, onOpen: (DeviceDto) -> Unit, onConfirm: (DeviceDto) -> Unit, onEdit: (DeviceDto) -> Unit, onRemove: (DeviceDto) -> Unit,
+    onEnterCode: (() -> Unit)? = null
 ) {
     val canEdit = state.canEdit && !state.saving
     val here = hereId()
     val heartbeat by com.saporini.mobile_desktop.core.session.TillHeartbeat.state.collectAsState()
     var query by remember(kind) { mutableStateOf("") }
-    val linkFor = { d: DeviceDto -> if (kind.pairs && !DeviceExtras.isExtra(d.id)) linkOf(d, d.id == here, heartbeat) else null }
+    val linkFor = { d: DeviceDto -> if (kind.pairs) linkOf(d, d.id == here, heartbeat) else null }
     val shown = devices.filter { d -> query.isBlank() || listOfNotNull(d.name, d.code, d.model, d.manufacturer).any { it.contains(query.trim(), ignoreCase = true) } }
         .sortedWith(compareBy<DeviceDto>({ it.id != here }, { linkFor(it)?.ordinal ?: if (it.status == "RETIRED") 9 else 0 },
             { it.status != "PROVISIONING" }, { it.name.lowercase() }))
@@ -435,6 +462,7 @@ private fun KindPage(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             // The way back is in the page's header now.
             KindThumb(kind, if (size.isPhone) 44.dp else 54.dp)
+            val enterCode = onEnterCode
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(kind.title, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (size.isPhone) 18.sp else 21.sp, letterSpacing = (-0.2).sp,
                     color = Kit.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -448,6 +476,7 @@ private fun KindPage(
                     }
                 }
             }
+            if (enterCode != null) ToolbarButton(if (size.isPhone) "Code" else "Enter a code", Icons.Outlined.VpnKey, !state.saving, onClick = enterCode)
         }
         if (devices.size > 6) SearchField(query, { query = it }, if (size.isPhone) Modifier.fillMaxWidth() else Modifier.width(380.dp),
             placeholder = "Find a ${kind.one}", height = 44.dp)
@@ -484,10 +513,10 @@ private fun LinkCount(link: Link, count: Int) {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(link.color))
         Text(when (link) {
-            Link.ONLINE -> "$count online"
-            Link.OFFLINE -> "$count offline"
+            Link.ONLINE -> "$count in use · online"
+            Link.OFFLINE -> "$count in use · offline"
             Link.NOT_CONNECTED -> "$count not connected"
-            Link.NOT_IN_USE -> "$count not in use"
+            Link.NOT_IN_USE -> "$count switched off"
         }, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp,
             color = if (link == Link.OFFLINE) Kit.Muted else link.color, maxLines = 1)
     }
@@ -507,9 +536,12 @@ private fun DeviceCard(
     val hovered by interaction.collectIsHoveredAsState()
     val zoom by androidx.compose.animation.core.animateFloatAsState(if (hovered) 1.06f else 1f, androidx.compose.animation.core.tween(280))
     val off = link == Link.NOT_IN_USE || (link == null && (device.status == "RETIRED" || device.status == "INACTIVE"))
+    // A printer says whether it answers (tills check every minute).
+    val reach = if (kind == DeviceKind.PRINTER) reachOf(device) else null
     val accent = when {
         here -> Kit.Ink
         link != null -> link.color
+        reach != null -> reach.color
         else -> deviceStatusColor(device.status)
     }
     val now = Clock.System.now()
@@ -523,7 +555,12 @@ private fun DeviceCard(
                 Image(painterResource(kind.image), kind.title, Modifier.fillMaxSize().padding(vertical = 4.dp).graphicsLayer { scaleX = zoom; scaleY = zoom },
                     contentScale = ContentScale.Fit,
                     colorFilter = if (off) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }) else null)
-                StatePill(link?.icon ?: Icons.Outlined.Circle,
+                if (reach != null) StatePill(reach.icon, reach.label, reach.color, dot = reach == Reach.ONLINE, modifier = Modifier.align(Alignment.TopStart))
+                // A card terminal or drawer that isn't connected says so, never In use (2026-11-28).
+                else if (link == null && notReadyReason(device) != null) shownLook(device).let { look ->
+                    StatePill(look.icon, look.label, look.color, modifier = Modifier.align(Alignment.TopStart))
+                }
+                else StatePill(link?.icon ?: Icons.Outlined.Circle,
                     when {
                         link == null || link == Link.NOT_IN_USE -> deviceStatusLabel(device.status)
                         link == Link.NOT_CONNECTED -> "Not connected"
@@ -544,7 +581,7 @@ private fun DeviceCard(
                         RowActionsMenu(listOfNotNull(
                             RowAction("Open", Icons.Outlined.Info, onClick = onOpen),
                             RowAction("Confirm it works", Icons.Outlined.Verified, onClick = onConfirm).takeIf { link == null && device.status == "PROVISIONING" },
-                            RowAction("Edit", Icons.Outlined.Edit, onClick = onEdit).takeIf { !DeviceExtras.isExtra(device.id) },
+                            RowAction("Edit", Icons.Outlined.Edit, onClick = onEdit),
                             RowAction("Remove", Icons.Outlined.DeleteOutline, danger = true, onClick = onRemove)
                         ), busy = !enabled)
                     }
@@ -561,11 +598,17 @@ private fun DeviceCard(
                         Link.NOT_CONNECTED -> "Not set up yet" to Kit.Amber
                         Link.NOT_IN_USE -> deviceStatusLabel(device.status) to Kit.Purple
                         null -> when (kind) {
-                            DeviceKind.PRINTER -> (device.printerIp ?: connectionLabel(device.printerConnectionType)) to Kit.Muted
+                            DeviceKind.PRINTER -> when (reach) {
+                                Reach.OFFLINE -> (device.printerProblem ?: "It doesn't answer") to Kit.Danger
+                                Reach.ONLINE -> (device.printerIp ?: connectionLabel(device.printerConnectionType)) to OnlineGreen
+                                else -> (device.printerIp ?: connectionLabel(device.printerConnectionType)) to Kit.Muted
+                            }
+                            // A card terminal works through its till or tablet; a drawer through its printer (2026-11-27).
+                            DeviceKind.CARD, DeviceKind.DRAWER -> linkLine(device) to (if (device.linkedDeviceId == null) Kit.Amber else Kit.Muted)
                             else -> (if (device.status == "ACTIVE") "Plugged in" else "Not checked yet") to Kit.Muted
                         }
                     }
-                    Icon(link?.icon ?: if (kind == DeviceKind.PRINTER) Icons.Outlined.Lan else Icons.Outlined.Cable, null, Modifier.size(14.dp), tint = tone)
+                    Icon(link?.icon ?: reach?.icon ?: if (kind == DeviceKind.PRINTER) Icons.Outlined.Lan else Icons.Outlined.Cable, null, Modifier.size(14.dp), tint = tone)
                     Text(line, Modifier.weight(1f), fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, letterSpacing = 0.sp, color = tone,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (link == Link.NOT_CONNECTED && state.mayConnect(device)) {
@@ -616,7 +659,7 @@ private fun AddDevicePicker(onPick: (DeviceKind) -> Unit, onDismiss: () -> Unit)
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val perRow = if (maxWidth < 520.dp) 2 else 3
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                DeviceKind.entries.chunked(perRow).forEach { row ->
+                DeviceKind.entries.filter { it != DeviceKind.SCANNER }.chunked(perRow).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         row.forEach { kind ->
                             Surface(onClick = { onPick(kind) }, modifier = Modifier.weight(1f).pointerHoverIcon(PointerIcon.Hand), shape = RoundedCornerShape(14.dp),
@@ -718,4 +761,66 @@ private fun AssignmentRow(assignment: DeviceAssignmentDto, state: DevicesState, 
         }
         if (assignment.active && state.canEdit) KitButton("End", { model.unassign(assignment.id) }, style = ButtonStyle.SECONDARY, enabled = !state.saving)
     }
+}
+
+/** What a card terminal or a cash drawer is connected to, in a few words. */
+internal fun linkLine(device: DeviceDto): String = when {
+    device.deviceType == "CASH_DRAWER" -> device.linkedDeviceName?.let { "In $it" } ?: "Not plugged into a printer"
+    device.linkedDeviceName != null -> "On ${device.linkedDeviceName} · ${if (device.linkType == "USB") "Cable" else "Bluetooth"}"
+    else -> "Not connected to a till or tablet"
+}
+
+/**
+ * Barcode scanners (user, 2026-11-27: "you just connect it and it should show something, simple as that"): nothing to add or
+ * set up. Plugged in (USB) or paired (Bluetooth), a scan anywhere in the app shows what it is. A box to try one.
+ */
+@Composable
+private fun ScannerPage(modifier: Modifier, size: ScreenSize) {
+    var typed by remember { mutableStateOf("") }
+    var tried by remember { mutableStateOf<String?>(null) }
+    com.saporini.mobile_desktop.core.components.ScrollColumn(modifier.padding(top = if (size.isPhone) 6.dp else 12.dp)) {
+        Column(Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                KindThumb(DeviceKind.SCANNER, if (size.isPhone) 44.dp else 54.dp)
+                Column(Modifier.weight(1f)) {
+                    Text("Barcode scanners", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = if (size.isPhone) 18.sp else 21.sp,
+                        letterSpacing = (-0.2).sp, color = Kit.Ink)
+                    Text("Nothing to set up here.", fontFamily = Inter(), fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Muted)
+                }
+            }
+            Panel("How it works", null, Icons.Outlined.QrCodeScanner, Kit.Ink) {
+                listOf(
+                    "USB: plug it into the till, tablet or computer.",
+                    "Bluetooth: pair it in the device's Bluetooth settings.",
+                    "Sign in, then scan anywhere: the app shows the stock item with that barcode.",
+                    "In a search box the code just types in."
+                ).forEachIndexed { index, line ->
+                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box(Modifier.size(22.dp).clip(CircleShape).background(Kit.Tint), Alignment.Center) {
+                            Text("${index + 1}", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 11.5.sp, letterSpacing = 0.sp, color = Kit.Ink)
+                        }
+                        Text(line, fontFamily = Inter(), fontSize = 13.5.sp, lineHeight = 19.sp, letterSpacing = 0.sp, color = Kit.Ink)
+                    }
+                }
+            }
+            Panel("Try it", null, Icons.Outlined.QrCodeScanner, Kit.Green) {
+                com.saporini.mobile_desktop.core.components.TextInput(typed, { value ->
+                    // A scanner ends with Enter: the field sees it as a new line.
+                    if (value.contains('\n')) { tried = value.substringBefore('\n').trim().ifEmpty { null }; typed = "" } else typed = value
+                }, Modifier.fillMaxWidth(), label = "Click here, then scan", icon = Icons.Outlined.QrCodeScanner, placeholder = "Waiting for a scan",
+                    singleLine = false)
+                if (typed.isNotBlank()) KitButtonRow { com.saporini.mobile_desktop.core.components.KitButton("Look it up", { tried = typed.trim(); typed = "" }) }
+                tried?.let { code ->
+                    Text("Read “$code”. The scanner works.", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, letterSpacing = 0.sp,
+                        color = Kit.Green)
+                    com.saporini.mobile_desktop.core.scan.ScanLookupContent(com.saporini.mobile_desktop.core.scan.rememberScanLookup(code))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KitButtonRow(content: @Composable () -> Unit) {
+    Row { content() }
 }

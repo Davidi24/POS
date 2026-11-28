@@ -71,10 +71,42 @@ internal val OnlineGreen = Color(0xFF16A34A)
 
 /** Where a till, tablet or card terminal stands. */
 internal enum class Link(val label: String, val color: Color, val icon: ImageVector) {
-    ONLINE("Online", OnlineGreen, Icons.Outlined.Wifi),
-    OFFLINE("Offline", Kit.Grey, Icons.Outlined.WifiOff),
+    // Set up = "In use", and whether it's on now (user, 2026-11-25: "it should say in use or configured"); switched-off ones
+    // read "Switched off", so "In use" never sits beside "Not in use".
+    ONLINE("In use · Online", OnlineGreen, Icons.Outlined.Wifi),
+    OFFLINE("In use · Offline", Kit.Grey, Icons.Outlined.WifiOff),
     NOT_CONNECTED("Not connected yet", Kit.Amber, Icons.Outlined.LinkOff),
-    NOT_IN_USE("Not in use", Kit.Purple, Icons.Outlined.DoNotDisturbOn)
+    NOT_IN_USE("Switched off", Kit.Purple, Icons.Outlined.DoNotDisturbOn)
+}
+
+/**
+ * Whether a printer answers (user, 2026-11-27): tills with the app open check every minute. Online = one reached it lately;
+ * Offline = one checked and nobody reached it; Not checked = no till checked it lately (none open, or none connected).
+ */
+internal enum class Reach(val label: String, val color: Color, val icon: ImageVector) {
+    ONLINE("Online", OnlineGreen, Icons.Outlined.Wifi),
+    OFFLINE("Offline", Kit.Danger, Icons.Outlined.WifiOff),
+    UNCHECKED("Not checked", Kit.Grey, Icons.Outlined.Schedule)
+}
+
+/** A printer in use, as it answers; null for one switched off or in repair (its state says it). */
+internal fun reachOf(device: DeviceDto): Reach? =
+    if (device.status != "ACTIVE" && device.status != "PROVISIONING") null
+    else when (device.printerState) {
+        "ONLINE" -> Reach.ONLINE
+        "OFFLINE" -> Reach.OFFLINE
+        else -> Reach.UNCHECKED
+    }
+
+/** The line under a printer's state: "It answers · Bar till checks it", "No answer at 192.168.1.52 · checked by Bar till". */
+internal fun reachDetail(device: DeviceDto, reach: Reach): String {
+    val by = device.printerCheckedBy
+    return when (reach) {
+        Reach.ONLINE -> if (by != null) "It answers · $by checks it" else "It answers"
+        Reach.OFFLINE -> (device.printerProblem ?: "It doesn't answer") + (by?.let { " · checked by $it" } ?: "")
+        Reach.UNCHECKED -> device.printerCheckedAt?.let { "Not checked since ${tr(agoText(it, Clock.System.now(), RestaurantTime.zone))}" }
+            ?: "No till has checked it yet"
+    }
 }
 
 /** The device the app runs on now, when it's a till or tablet ([TokenStore.till]). */
@@ -173,7 +205,7 @@ internal fun EnterCodeDialog(state: DevicesState, model: DevicesScreenModel) {
     var code by remember { mutableStateOf("") }
     val wait = state.connectWait
     val title = when {
-        wait == null -> "Enter a code"
+        wait == null -> if (state.codeKind == "TABLET") "Enter a tablet's or screen's code" else "Enter a till's code"
         wait.ended != null -> "It didn't connect"
         else -> "Waiting for an answer"
     }
@@ -192,7 +224,8 @@ internal fun EnterCodeDialog(state: DevicesState, model: DevicesScreenModel) {
             }
         }) {
         if (wait == null) {
-            Text("Type the code from the till or tablet's page. This device becomes that one.", fontFamily = Inter(), fontSize = 14.sp,
+            Text(if (state.codeKind == "TABLET") "Type the code from the tablet's or screen's page. This device becomes that one."
+                else "Type the code from the till's page. This device becomes that till.", fontFamily = Inter(), fontSize = 14.sp,
                 lineHeight = 20.sp, letterSpacing = 0.sp, color = Kit.Ink)
             till?.let { Note("This device is ${it.name} now. With a code it becomes another one.", Kit.Amber) }
             Spacer(Modifier.height(4.dp))
@@ -329,29 +362,41 @@ private fun WaitingForMaker(wait: com.saporini.mobile_desktop.admin.devices.Conn
 }
 
 /**
- * "This device" on a till or tablet's page (user, 2026-11-25: the two ways as separate cards; green only for online): make
- * the device you're on this till, or, when you're on it, disconnect it (asks first).
+ * Connecting it, in one card (user, 2026-11-27: "these two are so connected, merge them in one card"; before: This device and
+ * Connect with a code). In use: who has it and Disconnect (asks first), nothing else (user, 2026-11-25: "you disconnect it
+ * first"). Not in use: "Use this device" (tills and tablets) and a code for another device; a card terminal only the code.
  */
 @Composable
-internal fun ThisDeviceCard(device: DeviceDto, state: DevicesState, model: DevicesScreenModel) {
+internal fun ConnectCard(device: DeviceDto, state: DevicesState, model: DevicesScreenModel) {
     val till by TokenStore.till.collectAsState()
     val here = till?.deviceId == device.id
     val usable = device.status == "ACTIVE" || device.status == "PROVISIONING"
+    val card = kindOf(device) == DeviceKind.CARD
+    val code = state.freshCode?.takeIf { it.deviceId == device.id && it.pairingToken != null }
     var asking by remember { mutableStateOf(false) }
-    var disconnecting by remember { mutableStateOf(false) }
-    Panel("This device", if (here) "You're on ${device.name}." else "Make the device you're using now ${device.name}.",
-        Icons.Outlined.Computer, Kit.Ink, picture = Res.drawable.workspace_pos) {
+    Panel("Connection", null, Icons.Outlined.Link, Kit.Ink, picture = if (card) Res.drawable.auth_pin_create else Res.drawable.workspace_pos) {
         when {
-            here -> ActionRow(Icons.Outlined.Computer, Kit.Ink, "${device.name} is this computer",
-                "Staff sign in here with their PIN.") {
-                KitButton("Disconnect", { disconnecting = true }, style = ButtonStyle.DANGER_OUTLINE, icon = Icons.Outlined.LinkOff)
+            here -> ActionRow(Icons.Outlined.Computer, Kit.Ink, "${device.name} is this computer", "Staff sign in here with their PIN.") {
+                DisconnectButton(device, here = true, state, model)
             }
             !usable -> Note("Put ${device.name} back in use to connect it.", Kit.Muted)
             !state.mayConnect(device) -> Note(state.connectRefusal, Kit.Muted)
-            else -> {
-                if (device.connected) { Note("It's connected on another device now. Using it here moves it, and the other one stops working.", Kit.Amber); Spacer(Modifier.height(10.dp)) }
-                ActionRow(Icons.Outlined.PointOfSale, Kit.Ink, "Use it here", "Staff then sign in on this computer with their PIN.") {
+            // Which device has it (user, 2026-11-27: "make it say who has it"), when that device said.
+            device.connected -> ActionRow(Icons.Outlined.Link, Kit.Ink,
+                device.connectedDeviceName?.let { "In use on $it" } ?: if (card) "${device.name} is in use" else "In use on another device",
+                listOfNotNull(device.connectedDeviceSystem, device.connectedAt?.let { "since ${dateTimeText(it, RestaurantTime.zone)}" })
+                    .joinToString(" · ").ifBlank { "Disconnect it to connect it again." }) {
+                DisconnectButton(device, here = false, state, model)
+            }
+            else -> Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (!card) ActionRow(Icons.Outlined.PointOfSale, Kit.Ink, "Use it here", "Staff then sign in on this computer with their PIN.") {
                     KitButton("Use this device", { asking = true }, style = ButtonStyle.SECONDARY, icon = Icons.Outlined.Login, loading = state.saving)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (!card) Text("OR WITH A CODE, ON ANOTHER DEVICE", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 10.5.sp,
+                        letterSpacing = 0.8.sp, color = Kit.Faint)
+                    if (code != null) FreshCode(code.pairingToken!!, code.expiresAt)
+                    CodeButton(state, model, again = code != null)
                 }
             }
         }
@@ -362,43 +407,25 @@ internal fun ThisDeviceCard(device: DeviceDto, state: DevicesState, model: Devic
                 KitButton("Cancel", { asking = false }, style = ButtonStyle.SECONDARY)
                 KitButton("Connect", { asking = false; model.connectThisDevice() })
             }) {
-            Text(if (device.connected) "Staff will sign in here with their PIN. The device that is ${device.name} now stops being it."
-                else "Staff will sign in here with their PIN.", fontFamily = Inter(), fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink)
-        }
-    }
-    if (disconnecting) {
-        AppDialog(title = "Disconnect this device?", onDismiss = { disconnecting = false }, maxWidth = 460.dp,
-            buttons = {
-                KitButton("Cancel", { disconnecting = false }, style = ButtonStyle.SECONDARY)
-                KitButton("Disconnect", { disconnecting = false; model.disconnectThisDevice() }, style = ButtonStyle.DANGER)
-            }) {
-            Text("It stops being ${device.name}. Staff can't sign in here with their PIN until it's connected again.",
-                fontFamily = Inter(), fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink)
+            Text("Staff will sign in here with their PIN.", fontFamily = Inter(), fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink)
         }
     }
 }
 
-/**
- * "Connect with a code": make a code for this device. A till or tablet takes it from someone signed in on it, in Devices →
- * Enter a code, so it's known who set it up (user, 2026-11-25); a card terminal on its own pairing screen. One code works at
- * a time: a new one ends the one before, so there's no list of old codes (user, 2026-11-25: "should that delete the other?").
- */
+/** Disconnect, asking first: on this device, or on the device where it's in use now (which then stops working). */
 @Composable
-internal fun CodeCard(device: DeviceDto, state: DevicesState, model: DevicesScreenModel) {
-    val usable = device.status == "ACTIVE" || device.status == "PROVISIONING"
-    val code = state.freshCode?.takeIf { it.deviceId == device.id && it.pairingToken != null }
-    val card = kindOf(device) == DeviceKind.CARD
-    Panel("Connect with a code",
-        if (card) "Type the code on the card terminal to connect it."
-        else "For another device: sign in on it, open Devices and press “Enter a code”. You agree when it's typed.",
-        Icons.Outlined.VpnKey, Kit.Blue, picture = Res.drawable.auth_pin_create) {
-        when {
-            !usable -> Note("Put ${device.name} back in use to connect it.", Kit.Muted)
-            !state.mayConnect(device) -> Note(state.connectRefusal, Kit.Muted)
-            else -> {
-                if (code != null) { FreshCode(code.pairingToken!!, code.expiresAt); Spacer(Modifier.height(12.dp)) }
-                CodeButton(state, model, again = code != null)
-            }
+private fun DisconnectButton(device: DeviceDto, here: Boolean, state: DevicesState, model: DevicesScreenModel) {
+    var asking by remember { mutableStateOf(false) }
+    KitButton("Disconnect", { asking = true }, style = ButtonStyle.DANGER_OUTLINE, icon = Icons.Outlined.LinkOff, loading = state.saving)
+    if (asking) {
+        AppDialog(title = if (here) "Disconnect this device?" else "Disconnect ${device.name}?", onDismiss = { asking = false }, maxWidth = 460.dp,
+            buttons = {
+                KitButton("Cancel", { asking = false }, style = ButtonStyle.SECONDARY)
+                KitButton("Disconnect", { asking = false; model.disconnect(device.id) }, style = ButtonStyle.DANGER)
+            }) {
+            Text(if (here) "It stops being ${device.name}. Staff can't sign in here with their PIN until it's connected again."
+                else "The device that is ${device.name} now stops working. Then you can connect it again, here or on another device.",
+                fontFamily = Inter(), fontSize = 14.sp, letterSpacing = 0.sp, color = Kit.Ink)
         }
     }
 }
@@ -421,16 +448,14 @@ private fun Note(text: String, color: Color) {
 internal fun SignInCard(device: DeviceDto, state: DevicesState, model: DevicesScreenModel) {
     val view = state.signIn
     var editing by remember { mutableStateOf(false) }
-    Panel("Who can sign in here", view?.alwaysAllowed?.takeIf { it.isNotEmpty() }
-        ?.let { "${it.joinToString(", ") { name -> tr(name) }} always can." } ?: "Who can use ${device.name} with their PIN.",
+    Panel("Who can sign in here", null,
         Icons.Outlined.Groups, Kit.Purple, picture = Res.drawable.overview_guests,
         trailing = if (state.canEdit && view != null) ({
             KitButton("Edit", { editing = true }, style = ButtonStyle.SECONDARY, icon = Icons.Outlined.Edit, enabled = !state.saving)
         }) else null) {
         when {
             view == null -> Text("Loading…", fontFamily = Inter(), fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Muted)
-            view.everyone -> Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Kit.RowBorder, RoundedCornerShape(12.dp))
-                .padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            view.everyone -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Outlined.Public, null, Modifier.size(18.dp), tint = Kit.Muted)
                 Column(Modifier.weight(1f)) {
                     Text("Everyone at the branch", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, letterSpacing = 0.sp, color = Kit.Ink)
@@ -438,19 +463,9 @@ internal fun SignInCard(device: DeviceDto, state: DevicesState, model: DevicesSc
                         color = Kit.Muted)
                 }
             }
-            else -> Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (view.roles.isNotEmpty()) {
-                    Text("ROLES", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.8.sp, color = Kit.Faint)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        view.roles.forEach { role -> RoleChip(role.name, on = true, onClick = null) }
-                    }
-                }
-                if (view.people.isNotEmpty()) {
-                    Text("PEOPLE", fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 10.5.sp, letterSpacing = 0.8.sp, color = Kit.Faint)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        view.people.forEach { person -> PersonChip(person, onRemove = null) }
-                    }
-                }
+            // By role, with how many (user, 2026-11-27: "make it 12 Admin, all of them, or 8 Manager"), not every name.
+            else -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                signInGroups(view).forEach { group -> RoleCount(group) }
             }
         }
     }
@@ -486,7 +501,7 @@ private fun SignInDialog(device: DeviceDto, view: com.saporini.mobile_desktop.ad
                 Text("Who uses ${device.name} with their PIN", fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 14.sp, letterSpacing = 0.sp,
                     color = Kit.Ink)
                 Text(view.alwaysAllowed.takeIf { it.isNotEmpty() }?.let { "${it.joinToString(", ") { name -> tr(name) }} always can." }
-                    ?: "Owners and managers always can.", fontFamily = Inter(), fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Muted)
+                    ?: "Owners always can.", fontFamily = Inter(), fontSize = 12.5.sp, letterSpacing = 0.sp, color = Kit.Muted)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -505,7 +520,8 @@ private fun SignInDialog(device: DeviceDto, view: com.saporini.mobile_desktop.ad
 /**
  * "Only some" (user, 2026-11-25: "an icon for each role, a nav bar; by the role I choose, list all its people ready to pick;
  * admins or down, you know the rule"): the roles the person editing sees as a bar of pictures, then the chosen role's people
- * with a tick each, and "Everyone who is a …" on top to take the whole role. Owners, admins and managers show as "Always".
+ * with a tick each, and "Everyone who is a …" on top to take the whole role. Owners show as "Always"; admins and managers are
+ * chosen like anyone else (user, 2026-11-27: "I can remove access to someone; it doesn't mean all admins can use it").
  */
 @Composable
 private fun RolePeoplePicker(view: com.saporini.mobile_desktop.admin.devices.DeviceSignInView, roles: Set<String>,
@@ -618,6 +634,44 @@ private fun RoleChip(name: String, on: Boolean, onClick: (() -> Unit)?) {
         Icon(if (on) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked, null, Modifier.size(16.dp), tint = if (on) Kit.Ink else Kit.Faint)
         Text(name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp, letterSpacing = 0.sp, color = if (on) Kit.Ink else Kit.Muted,
             maxLines = 1)
+    }
+}
+
+/** One role on the Who can sign in card: the whole role ("All 12 people") or how many of its people ("8 of 10 people"). */
+private data class SignInGroup(val name: String, val code: String, val picture: String?, val count: String)
+
+/**
+ * The card's summary: each role the person sees, whole or how many of its people; chosen roles they don't see; chosen people
+ * outside every role they see as "Other people".
+ */
+private fun signInGroups(view: com.saporini.mobile_desktop.admin.devices.DeviceSignInView): List<SignInGroup> {
+    val wholeRoles = view.roles.map { it.id }.toSet()
+    val chosen = view.people.map { it.id }.toSet()
+    val groups = view.tabs.mapNotNull { tab ->
+        when {
+            tab.id in wholeRoles -> SignInGroup(tab.name, tab.code, tab.picture, "All ${tab.people.size} people")
+            else -> tab.people.count { it.id in chosen }.takeIf { it > 0 }
+                ?.let { SignInGroup(tab.name, tab.code, tab.picture, "$it of ${tab.people.size} people") }
+        }
+    }
+    val unseenRoles = view.roles.filter { role -> view.tabs.none { it.id == role.id } }
+        .map { SignInGroup(it.name, it.code, it.picture, "All") }
+    val others = view.people.count { person -> view.tabs.none { tab -> tab.people.any { it.id == person.id } } }
+    return groups + unseenRoles + listOfNotNull(others.takeIf { it > 0 }?.let { SignInGroup("Other people", "", null, "$it") })
+}
+
+/** "[picture] Admin  All 12 people" as a chip in the role's colour. */
+@Composable
+private fun RoleCount(group: SignInGroup) {
+    val look = com.saporini.mobile_desktop.admin.people.ui.roleLookOf(group.code, group.name, group.picture)
+    Row(Modifier.clip(RoundedCornerShape(50)).background(look.color.copy(alpha = 0.08f))
+        .border(1.dp, look.color.copy(alpha = 0.35f), RoundedCornerShape(50))
+        .padding(start = 6.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        androidx.compose.foundation.Image(org.jetbrains.compose.resources.painterResource(look.image), null, Modifier.size(26.dp),
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+        Text(group.name, fontFamily = Inter(), fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.sp, color = Kit.Ink, maxLines = 1)
+        Text(group.count, fontFamily = Inter(), fontWeight = FontWeight.Bold, fontSize = 12.5.sp, letterSpacing = 0.sp, color = look.color, maxLines = 1)
     }
 }
 

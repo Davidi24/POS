@@ -28,6 +28,8 @@ import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.Lock
@@ -61,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import com.saporini.mobile_desktop.core.components.ChoiceChip
 import com.saporini.mobile_desktop.core.components.Kit
 import com.saporini.mobile_desktop.core.components.KitButton
+import com.saporini.mobile_desktop.core.components.AppDialog
 import com.saporini.mobile_desktop.core.components.KitDivider
 import com.saporini.mobile_desktop.core.components.ButtonStyle
 import com.saporini.mobile_desktop.core.components.MessageBar
@@ -136,6 +139,7 @@ private fun TakePaymentContentRealMoney(state: PaymentUiState, model: PaymentScr
         }
     }
     if (state.correction != null) CorrectionDialog(state, model)
+    if (state.terminalWait) TerminalWaitDialog(state, model)
     if (showReceipt) ReceiptDialog(state, model) { showReceipt = false }
 }
 
@@ -299,6 +303,7 @@ private fun EntryCard(state: PaymentUiState, model: PaymentScreenModel) {
             }
             // Card
             if (draft.method.card) {
+                TerminalLine(state.terminal)
                 TextInput(draft.cardLast4, model::cardLast4, label = "Last 4 digits of the card", optional = true, keyboardType = KeyboardType.Number,
                     placeholder = "4242", hint = "Helps find the payment later. Never type the whole card number.")
             }
@@ -419,5 +424,44 @@ internal fun SumLine(label: String, value: String, strong: Boolean = false, colo
         Text(label, Modifier.weight(1f), fontFamily = Inter(), fontWeight = if (strong) FontWeight.Bold else FontWeight.Medium,
             fontSize = if (strong) 15.sp else 13.sp, color = if (strong) Kit.Ink else Kit.Muted)
         Text(value, fontFamily = Inter(), fontWeight = if (strong) FontWeight.Bold else FontWeight.SemiBold, fontSize = if (strong) 17.sp else 13.sp, color = color)
+    }
+}
+
+/** Where a card payment goes: this till's card terminal, or nowhere (it's only recorded here). */
+@Composable
+private fun TerminalLine(terminal: com.saporini.mobile_desktop.pos.payment.data.CardTerminalDto?) {
+    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+        .background(if (terminal != null) Kit.GreenSoft else Kit.Tint).padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.CreditCard, null, Modifier.size(18.dp),
+            tint = if (terminal != null) Kit.Green else Kit.Muted)
+        Text(
+            if (terminal != null) "Goes to ${terminal.name} (${if (terminal.linkType == "BLUETOOTH") "Bluetooth" else "cable"})"
+            else "No card terminal is connected to this device. Take the card on its terminal, then record it here.",
+            fontFamily = Inter(), fontSize = 13.sp, lineHeight = 17.sp, letterSpacing = 0.sp, color = if (terminal != null) Kit.Green else Kit.Muted)
+    }
+}
+
+/**
+ * A card payment waiting for the till's card terminal (user, 2026-11-27). Test mode until a payment provider is connected: no
+ * terminal is reached, so the person says whether the card went through.
+ */
+@Composable
+private fun TerminalWaitDialog(state: PaymentUiState, model: PaymentScreenModel) {
+    val terminal = state.terminal ?: return
+    val quote = state.quote
+    val currency = state.summary?.currency
+    val charge = (quote?.amountCents ?: 0) + (quote?.tipCents ?: 0)
+    AppDialog("Waiting for ${terminal.name}", model::cancelCard, subtitle = moneyText(charge, currency), maxWidth = 460.dp,
+        buttons = {
+            KitButton("Cancel", model::cancelCard, style = ButtonStyle.SECONDARY)
+            KitButton("Declined", model::cardDeclined, style = ButtonStyle.DANGER_OUTLINE)
+            KitButton("Approved", model::cardApproved, icon = androidx.compose.material.icons.Icons.Outlined.Check)
+        }) {
+        Text("Ask the guest to tap, insert or swipe the card on ${terminal.name}.", fontFamily = Inter(), fontSize = 14.sp, lineHeight = 19.sp,
+            letterSpacing = 0.sp, color = Kit.Ink)
+        Text("Test mode: no card terminal is reached yet. Choose what happened on it.", Modifier.clip(RoundedCornerShape(10.dp))
+            .background(Kit.Amber.copy(alpha = 0.12f)).padding(horizontal = 12.dp, vertical = 8.dp), fontFamily = Inter(), fontSize = 12.5.sp,
+            lineHeight = 17.sp, letterSpacing = 0.sp, color = Color(0xFF8B5C18))
     }
 }

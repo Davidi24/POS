@@ -158,6 +158,7 @@ private val appModule = module {
     factory { com.saporini.mobile_desktop.admin.inventory.InventoryScreenModel(repository = get(), session = get(), pendingMoveStorage = TokenStore) }
     single<com.saporini.mobile_desktop.admin.devices.DevicesRepository> { com.saporini.mobile_desktop.admin.devices.DevicesApi(client = get()) }
     single<com.saporini.mobile_desktop.admin.devices.DeviceConnector> { com.saporini.mobile_desktop.admin.devices.DeviceConnectApi(client = get()) }
+    single { com.saporini.mobile_desktop.core.printing.Printing(client = get(), session = get()).also { com.saporini.mobile_desktop.core.printing.PrintHooks.printing = it } }
     factory {
         val auth = get<com.saporini.mobile_desktop.auth.data.repository.AuthRepository>()
         val platform = get<com.saporini.mobile_desktop.platform.PlatformRepository>()

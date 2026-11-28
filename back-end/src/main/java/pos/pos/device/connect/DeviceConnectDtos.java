@@ -12,7 +12,9 @@ public final class DeviceConnectDtos {
     private DeviceConnectDtos() {
     }
 
-    public record AskRequest(@NotBlank @Size(max = 200) String pairingToken) {
+    // [kind] is where the code was typed (Devices → Tills or Tablets & screens): a code for the other kind doesn't work there.
+    public record AskRequest(@NotBlank @Size(max = 200) String pairingToken,
+                             @jakarta.validation.constraints.Pattern(regexp = "TILL|TABLET") String kind) {
     }
 
     public record ClaimRequest(@NotBlank @Size(max = 200) String claimToken) {

@@ -31,6 +31,8 @@ public class KdsStationResponse {
     private Integer displayOrder;
     private Boolean active;
     private Boolean acceptsScheduledOrders;
+    private String ticketTextSize;
+    private Boolean ticketNotesRed;
     private String screenLabel;
     private String notes;
     private OffsetDateTime createdAt;
