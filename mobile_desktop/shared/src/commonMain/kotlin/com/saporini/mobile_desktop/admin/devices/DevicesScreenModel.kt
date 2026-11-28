@@ -184,6 +184,8 @@ data class DevicesState(
     // The device just added, so the screen can go straight on to confirming it.
     val justAdded: String? = null,
     val draft: DeviceDraft? = null,
+    // Only how an existing device is connected is being changed (its own window, user 2026-11-28: "not all in one form").
+    val draftPart: String? = null,
     val confirmDelete: String? = null,
     val loading: Boolean = false,
     val loadingDetail: Boolean = false,
@@ -448,7 +450,14 @@ class DevicesScreenModel(
         state.copy(draft = change(draft).copy(id = draft.id, printer = draft.printer))
     }
 
-    fun cancelEdit() = mutable.update { it.copy(draft = null) }
+    fun cancelEdit() = mutable.update { it.copy(draft = null, draftPart = null) }
+
+    /** Changes only how [deviceId] (a printer or a cash drawer) is connected, in a window of its own. */
+    fun editConnection(deviceId: String) = needsEdit {
+        val current = state.value
+        val device = (current.devices + current.printers).firstOrNull { it.id == deviceId } ?: return@needsEdit
+        mutable.update { it.copy(draft = deviceDraftOf(device, current.isPrinter(deviceId)), draftPart = "CONNECTION", notice = null, error = null) }
+    }
 
     fun save() {
         val current = state.value
@@ -470,8 +479,8 @@ class DevicesScreenModel(
             mutable.update { state ->
                 fun List<DeviceDto>.put() = (if (any { it.id == saved.id }) map { if (it.id == saved.id) saved else it } else this + saved).sortedBy { it.name.lowercase() }
                 val added = saved.id.takeIf { draft.id == null }
-                if (draft.printer) state.copy(printers = state.printers.put(), draft = null, justAdded = added)
-                else state.copy(devices = state.devices.put(), draft = null, justAdded = added)
+                if (draft.printer) state.copy(printers = state.printers.put(), draft = null, draftPart = null, justAdded = added)
+                else state.copy(devices = state.devices.put(), draft = null, draftPart = null, justAdded = added)
             }
         }
     }
@@ -482,6 +491,11 @@ class DevicesScreenModel(
         val device = current.devices.firstOrNull { it.id == deviceId } ?: return
         val branchId = current.branchId ?: return
         if (status !in DEVICE_STATUSES || status == device.status) return
+        // In use means it's ready: a card terminal needs its till or tablet, a drawer its printer (2026-11-28).
+        if (status == "ACTIVE" && device.linkedDeviceId == null && device.deviceType in setOf("PAYMENT_TERMINAL", "CASH_DRAWER")) {
+            mutable.update { it.copy(error = if (device.deviceType == "CASH_DRAWER") "Plug it into a printer first" else "Connect it to a till or tablet first") }
+            return
+        }
         needsEdit {
             val usable = status == "ACTIVE" || status == "PROVISIONING" || status == "MAINTENANCE"
             write(null) { restaurantId ->
@@ -660,6 +674,25 @@ class DevicesScreenModel(
                     if (e is CancellationException) throw e
                     mutable.update { it.copy(printerJobs = before, error = e.message?.takeIf { m -> m.isNotBlank() && m.length < 160 } ?: "Couldn't save. Try again.") }
                 }
+        }
+    }
+
+    /**
+     * Connects [terminal] (a card terminal) to the till or tablet [linkedId] by [linkType] (BLUETOOTH needs the paired terminal's
+     * [linkAddress]); null = not connected. Nothing else of the terminal changes (user, 2026-11-28). [onDone] once saved.
+     */
+    fun connectTerminal(terminal: DeviceDto, linkedId: String?, linkType: String?, linkAddress: String?, onDone: () -> Unit = {}) = needsEdit {
+        val branchId = state.value.branchId ?: return@needsEdit
+        val draft = deviceDraftOf(terminal, false).copy(linkedDeviceId = linkedId, linkType = linkType ?: "BLUETOOTH",
+            linkAddress = linkAddress.orEmpty().trim())
+        deviceProblem(draft)?.let { problem ->
+            mutable.update { it.copy(error = problem) }
+            return@needsEdit
+        }
+        write(if (linkedId == null) "${terminal.name} is disconnected" else "${terminal.name} is connected") { restaurantId ->
+            val saved = repository.saveDevice(restaurantId, branchId, terminal.id, deviceRequest(draft, branchId))
+            mutable.update { state -> state.copy(devices = state.devices.map { if (it.id == saved.id) saved else it }) }
+            onDone()
         }
     }
 

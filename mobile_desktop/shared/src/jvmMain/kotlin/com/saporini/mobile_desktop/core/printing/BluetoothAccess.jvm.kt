@@ -2,6 +2,6 @@ package com.saporini.mobile_desktop.core.printing
 
 import androidx.compose.runtime.Composable
 
-// On a computer, paired Bluetooth printers are in its own printer list; nothing to ask.
+// A computer needs no permission from the app; switching Bluetooth on is done by PrinterLink.turnOnBluetooth.
 @Composable
-actual fun rememberBluetoothAccess(): BluetoothAccess = BluetoothAccess(true) {}
+actual fun rememberBluetoothAccess(): BluetoothAccess = BluetoothAccess(allowed = true, ask = {})

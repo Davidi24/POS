@@ -91,4 +91,73 @@ actual object PrinterLink {
     } catch (e: SecurityException) {
         "Allow “Nearby devices” for the app on this device."
     }
+
+    actual fun pairedDevices(): List<BluetoothPrinter> = bluetoothPrinters()
+
+    actual val canScanBluetooth: Boolean = true
+
+    @Suppress("DEPRECATION")
+    private fun adapter(): android.bluetooth.BluetoothAdapter? = android.bluetooth.BluetoothAdapter.getDefaultAdapter()
+
+    actual suspend fun bluetoothPower(): BluetoothPower {
+        val adapter = adapter() ?: return BluetoothPower.NONE
+        return if (adapter.isEnabled) BluetoothPower.ON else BluetoothPower.OFF
+    }
+
+    // A phone or tablet asks the person to switch it on (the screen does that).
+    actual suspend fun turnOnBluetooth(): Boolean = false
+
+    @android.annotation.SuppressLint("MissingPermission")
+    actual suspend fun scanBluetooth(seconds: Int): List<NearbyDevice> {
+        val adapter = adapter() ?: return emptyList()
+        val context = com.saporini.mobile_desktop.core.session.TokenPersistence.appContext
+        val found = java.util.concurrent.ConcurrentHashMap<String, NearbyDevice>()
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context, intent: android.content.Intent) {
+                @Suppress("DEPRECATION")
+                val device = intent.getParcelableExtra<android.bluetooth.BluetoothDevice>(android.bluetooth.BluetoothDevice.EXTRA_DEVICE) ?: return
+                val name = runCatching { device.name }.getOrNull()?.takeIf { it.isNotBlank() } ?: return
+                found[device.address] = NearbyDevice(name, device.address, device.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED)
+            }
+        }
+        return try {
+            adapter.bondedDevices.orEmpty().forEach { found[it.address] = NearbyDevice(it.name ?: it.address, it.address, true) }
+            context.registerReceiver(receiver, android.content.IntentFilter(android.bluetooth.BluetoothDevice.ACTION_FOUND))
+            adapter.startDiscovery()
+            kotlinx.coroutines.delay(seconds * 1000L)
+            found.values.sortedWith(compareBy({ !it.paired }, { it.name.lowercase() }))
+        } catch (e: SecurityException) {
+            emptyList()
+        } finally {
+            runCatching { adapter.cancelDiscovery() }
+            runCatching { context.unregisterReceiver(receiver) }
+        }
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    actual suspend fun pairBluetooth(address: String): String? = try {
+        val device = adapter()?.getRemoteDevice(address) ?: return "This device has no Bluetooth."
+        if (device.bondState != android.bluetooth.BluetoothDevice.BOND_BONDED) {
+            device.createBond()
+            var waited = 0
+            while (device.bondState != android.bluetooth.BluetoothDevice.BOND_BONDED && waited < 30_000) {
+                kotlinx.coroutines.delay(500)
+                waited += 500
+            }
+        }
+        if (device.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) null
+        else "Couldn't pair with it. Put it in pairing mode, keep it close and try again."
+    } catch (e: SecurityException) {
+        "Let this device use Bluetooth first."
+    }
+
+    // USB devices plugged into this tablet (a card terminal by cable), by their names.
+    actual fun cablePorts(): List<BluetoothPrinter> = runCatching {
+        val usb = com.saporini.mobile_desktop.core.session.TokenPersistence.appContext.getSystemService(android.content.Context.USB_SERVICE)
+            as android.hardware.usb.UsbManager
+        usb.deviceList.values.map { device ->
+            val name = listOfNotNull(device.manufacturerName, device.productName).joinToString(" ").ifBlank { device.deviceName }
+            BluetoothPrinter(name, device.deviceName)
+        }.sortedBy { it.name.lowercase() }
+    }.getOrDefault(emptyList())
 }
