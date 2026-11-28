@@ -63,7 +63,8 @@ data class PrintPrinter(
 }
 
 @Serializable
-data class StationPrinters(val stationId: String, val stationName: String = "", val printers: List<PrintPrinter> = emptyList())
+data class StationPrinters(val stationId: String, val stationName: String = "", val printers: List<PrintPrinter> = emptyList(),
+                           val textSize: String = "NORMAL", val notesRed: Boolean = false)
 
 /** What this device prints where, and when things print by themselves (`GET /restaurants/{r}/print-setup`). */
 @Serializable
@@ -217,7 +218,8 @@ class Printing(
         val newest = fired.maxOrNull() ?: return
         val from = newest - 20.seconds
         tickets.forEach { ticket ->
-            val printers = setup.kitchen.firstOrNull { it.stationId == ticket.stationId }?.printers?.filter { it.usable }.orEmpty()
+            val station = setup.kitchen.firstOrNull { it.stationId == ticket.stationId }
+            val printers = station?.printers?.filter { it.usable }.orEmpty()
             if (printers.isEmpty()) return@forEach
             val items = ticket.items.filter { item ->
                 item.id !in printedItems && item.status != "CANCELLED" &&
@@ -225,7 +227,8 @@ class Printing(
             }
             if (items.isEmpty()) return@forEach
             val paper = printers.first()
-            if (sendFirstThatPrints(printers, kitchenTicket(ticket, items, paper.paperWidthMm, paper.autoCut, RestaurantTime.zone))) {
+            if (sendFirstThatPrints(printers, kitchenTicket(ticket, items, paper.paperWidthMm, paper.autoCut, RestaurantTime.zone,
+                    station?.textSize ?: "NORMAL", station?.notesRed == true))) {
                 printedItems += items.map { it.id }
             }
         }
@@ -235,14 +238,16 @@ class Printing(
     fun reprint(ticket: KdsTicket) {
         scope.launch {
             val setup = setup() ?: return@launch
-            val printers = setup.kitchen.firstOrNull { it.stationId == ticket.stationId }?.printers?.filter { it.usable }.orEmpty()
+            val station = setup.kitchen.firstOrNull { it.stationId == ticket.stationId }
+            val printers = station?.printers?.filter { it.usable }.orEmpty()
             if (printers.isEmpty()) {
-                _notice.value = PrintNotice(problem = true, text = "${ticket.stationName ?: "This station"} has no printer. Choose one in Settings → Devices & printing.")
+                _notice.value = PrintNotice(problem = true, text = "${ticket.stationName ?: "This station"} has no printer. Choose it on a printer's page in Devices.")
                 return@launch
             }
             val items = ticket.items.filter { it.status != "CANCELLED" }
             val paper = printers.first()
-            if (sendFirstThatPrints(printers, kitchenTicket(ticket, items, paper.paperWidthMm, paper.autoCut, RestaurantTime.zone))) {
+            if (sendFirstThatPrints(printers, kitchenTicket(ticket, items, paper.paperWidthMm, paper.autoCut, RestaurantTime.zone,
+                    station?.textSize ?: "NORMAL", station?.notesRed == true))) {
                 _notice.value = PrintNotice(problem = false, text = "Printed.")
             }
         }
@@ -317,7 +322,7 @@ class Printing(
             ?: ReceiptLook()
         val design = look.of(kind)
         // The logo and pictures, fetched before the receipt is put together.
-        val urls = listOfNotNull(data.logoUrl) + design.blocks.mapNotNull { it.imageUrl }
+        val urls = listOfNotNull(data.logoUrl) + design.blocks.mapNotNull { it.imageUrl } + design.backdrops.map { it.imageUrl }
         urls.distinct().forEach { url -> if (url !in pictures) pictures[url] = loadPicture(url) }
         val paper = printers.first()
         val bytes = receipt(design, kind, data, paper.paperWidthMm, paper.autoCut, openDrawer && paper.cashDrawerKick, RestaurantTime.zone) { url, width, opacity ->

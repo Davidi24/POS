@@ -5,7 +5,7 @@ package com.saporini.mobile_desktop.core.printing
  * alignment, lines, QR codes, barcodes, the cut and the cash drawer. A 58 mm paper fits 32 characters a line, 80 mm 48.
  * Text goes as Windows-1252 (code page 16), which has the letters of the four languages (ë, ç, ñ, à…) and €.
  */
-class EscPos(paperWidthMm: Int) {
+class EscPos(paperWidthMm: Int) : ReceiptSink {
 
     enum class Align(val code: Int) { LEFT(0), CENTER(1), RIGHT(2) }
 
@@ -21,14 +21,17 @@ class EscPos(paperWidthMm: Int) {
     }
 
     /** Characters a line holds now (half when letters are double wide). */
-    val columnsNow: Int get() = columns / widthScale
+    override val columnsNow: Int get() = columns / widthScale
 
-    fun align(align: Align) = apply { raw(0x1B, 0x61, align.code) }
+    override fun align(align: Align) = apply { raw(0x1B, 0x61, align.code) }
 
-    fun bold(on: Boolean) = apply { raw(0x1B, 0x45, if (on) 1 else 0) }
+    override fun bold(on: Boolean) = apply { raw(0x1B, 0x45, if (on) 1 else 0) }
+
+    /** The second colour (red on two-colour printers; others print black). */
+    fun red(on: Boolean) = apply { raw(0x1B, 0x72, if (on) 1 else 0) }
 
     /** Letter size, 1 to 4 times as wide and as tall. */
-    fun size(width: Int = 1, height: Int = 1) = apply {
+    override fun size(width: Int, height: Int) = apply {
         val w = width.coerceIn(1, 4)
         val h = height.coerceIn(1, 4)
         widthScale = w
@@ -38,15 +41,15 @@ class EscPos(paperWidthMm: Int) {
     fun text(text: String) = apply { out.add(encode(text)) }
 
     /** One line; longer text wraps at word breaks. */
-    fun line(text: String = "") = apply {
+    override fun line(text: String) = apply {
         if (text.isEmpty()) raw(0x0A) else wrap(text, columnsNow).forEach { text(it); raw(0x0A) }
     }
 
     /** A line across the paper made of [char] (dashes, dots, stars…). */
-    fun rule(char: Char = '-') = apply { line(char.toString().repeat(columnsNow)) }
+    override fun rule(char: Char) = apply { line(char.toString().repeat(columnsNow)) }
 
     /** [left] at the left and [right] at the right of one line ("2 x Pizza ......... 18.00"). */
-    fun columns(left: String, right: String) = apply {
+    override fun columns(left: String, right: String) = apply {
         val room = columnsNow - right.length - 1
         if (room < 4) { line(left); align(Align.RIGHT).line(right).align(Align.LEFT); return@apply }
         val lines = wrap(left, room)
@@ -55,7 +58,7 @@ class EscPos(paperWidthMm: Int) {
         }
     }
 
-    fun feed(lines: Int) = apply { raw(0x1B, 0x64, lines.coerceIn(0, 255)) }
+    override fun feed(lines: Int) = apply { raw(0x1B, 0x64, lines.coerceIn(0, 255)) }
 
     /** Feeds the paper out and cuts it (a printer without a cutter just feeds). */
     fun cut() = apply { feed(4); raw(0x1D, 0x56, 66, 0) }
@@ -64,7 +67,7 @@ class EscPos(paperWidthMm: Int) {
     fun openDrawer() = apply { raw(0x1B, 0x70, 0, 25, 250) }
 
     /** A QR code of [data], its dots [module] wide (1–16). */
-    fun qr(data: String, module: Int = 6) = apply {
+    override fun qr(data: String, module: Int) = apply {
         val bytes = data.encodeToByteArray()
         raw(0x1D, 0x28, 0x6B, 4, 0, 0x31, 0x41, 0x32, 0)              // model 2
         raw(0x1D, 0x28, 0x6B, 3, 0, 0x31, 0x43, module.coerceIn(1, 16)) // size
@@ -76,7 +79,7 @@ class EscPos(paperWidthMm: Int) {
     }
 
     /** A Code 128 barcode with its digits under it. */
-    fun barcode(data: String) = apply {
+    override fun barcode(data: String) = apply {
         val clean = data.filter { it.code in 32..126 }.take(40)
         if (clean.isEmpty()) return@apply
         raw(0x1D, 0x68, 80)   // height
@@ -89,7 +92,7 @@ class EscPos(paperWidthMm: Int) {
     }
 
     /** A black-and-white picture ([image]), printed as dots, in bands the printers take. */
-    fun image(image: MonoImage) = apply {
+    override fun image(image: MonoImage) = apply {
         val widthBytes = (image.width + 7) / 8
         var top = 0
         while (top < image.height) {
@@ -105,7 +108,7 @@ class EscPos(paperWidthMm: Int) {
     }
 
     /** Dots across the paper: 384 on 58 mm, 576 on 80 mm. */
-    val dots: Int = if (paperWidthMm in 1..60) 384 else 576
+    override val dots: Int = if (paperWidthMm in 1..60) 384 else 576
 
     fun bytes(): ByteArray = out.toByteArray()
 

@@ -114,7 +114,7 @@ fun App() {
         idle.touch()
         while (true) {
             kotlinx.coroutines.delay(1_000)
-            val limit = idle.level.seconds
+            val limit = idle.secondsFor(idle.level)
             if (limit < 0) { idle.touch(); continue }
             if (idle.idleSeconds() >= limit) {
                 sessionManager.signOut("IDLE")

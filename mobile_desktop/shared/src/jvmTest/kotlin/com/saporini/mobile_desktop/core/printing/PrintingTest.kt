@@ -112,6 +112,43 @@ class PrintingTest {
     }
 
     @Test
+    fun aReceiptWithAPictureBehindPrintsAsOnePicture() {
+        val data = ReceiptDto(restaurantName = "Bistroo", orderNumber = "1041", currency = "EUR", tableNumber = "T05",
+            lines = listOf(ReceiptDto.Line(name = "Pizza", quantity = 2, unitPrice = OrderDecimal("9.00"), lineTotal = OrderDecimal("18.00"))),
+            subtotal = OrderDecimal("18.00"), total = OrderDecimal("18.00"))
+        val look = ReceiptLook()
+        val plain = look.of(ReceiptKind.PRELIMINARY)
+        val withPicture = plain.copy(backdrops = listOf(com.saporini.mobile_desktop.platform.Backdrop("b1", "/leaf.png", width = 0.6f, opacity = 0.3f)))
+        // A grey square as the picture behind.
+        val grey = MonoImage.of(IntArray(50 * 50) { 0xFF888888.toInt() }, 50, 50, 300, 0.3f)
+        val bytes = receipt(withPicture, ReceiptKind.PRELIMINARY, data, 80, autoCut = true, openDrawer = false, zone = TimeZone.UTC) { _, _, _ -> grey }
+        val codes = bytes.map { it.toInt() and 0xFF }
+        assertTrue(codes.windowed(3).any { it == listOf(0x1D, 0x76, 0x30) }, "sent as a picture")
+        assertTrue("Pizza" !in textOf(bytes), "no letters of the printer's own")
+        // Without a picture behind it stays the printer's own letters.
+        assertContains(textOf(receipt(plain, ReceiptKind.PRELIMINARY, data, 80, autoCut = true, openDrawer = false, zone = TimeZone.UTC)), "Pizza")
+        // A look at it: build/reports/receipt-picture.png
+        val picture = ReceiptPicture(80).apply { line("Bistroo"); size(2, 2).line("TOTAL"); size(1, 1).columns("2 x Pizza", "€18.00"); qr("https://example.com", 5) }
+            .render(withPicture.backdrops) { _, _, _ -> grey }
+        val image = java.awt.image.BufferedImage(picture.width, picture.height, java.awt.image.BufferedImage.TYPE_BYTE_GRAY)
+        for (y in 0 until picture.height) for (x in 0 until picture.width) image.setRGB(x, y, if (picture.black(x, y)) 0 else 0xFFFFFF)
+        java.io.File("build/reports").mkdirs()
+        javax.imageio.ImageIO.write(image, "png", java.io.File("build/reports/receipt-picture.png"))
+    }
+
+    @Test
+    fun aStationsTicketLookPrintsBigWithNotesInRed() {
+        val ticket = KdsTicket(id = "t1", restaurantId = "r", branchId = "b", stationId = "s", orderId = "o", orderNumber = "1041", stationName = "Grill",
+            notes = "No salt")
+        val items = listOf(KdsTicketItem(id = "i1", itemNameSnapshot = "Burger", quantity = 2, notes = "Allergy: nuts"))
+        val big = kitchenTicket(ticket, items, 80, autoCut = true, zone = TimeZone.UTC, textSize = "BIG", notesRed = true).map { it.toInt() and 0xFF }
+        assertTrue(big.windowed(3).any { it == listOf(0x1D, 0x21, 0x11) }, "dishes twice as wide and tall")
+        assertTrue(big.windowed(3).any { it == listOf(0x1B, 0x72, 1) }, "notes in red")
+        val normal = kitchenTicket(ticket, items, 80, autoCut = true, zone = TimeZone.UTC).map { it.toInt() and 0xFF }
+        assertTrue(normal.windowed(3).none { it == listOf(0x1B, 0x72, 1) }, "black notes by default")
+    }
+
+    @Test
     fun linesFitThePaper() {
         val p58 = EscPos(58)
         val p80 = EscPos(80)

@@ -42,7 +42,14 @@ fun testPage(printerName: String, paperWidthMm: Int, restaurant: String?, autoCu
  * A kitchen ticket for [items] of [ticket]: the station big, where it goes (table and guests, or takeaway and the name), the
  * order and the time, then each dish big with its choices and notes, the ticket's note and Rush / VIP.
  */
-fun kitchenTicket(ticket: KdsTicket, items: List<KdsTicketItem>, paperWidthMm: Int, autoCut: Boolean, zone: TimeZone): ByteArray {
+fun kitchenTicket(ticket: KdsTicket, items: List<KdsTicketItem>, paperWidthMm: Int, autoCut: Boolean, zone: TimeZone,
+                  // The station's look (decided 2026-11-28): the dishes' letter size, and notes in red on two-colour printers.
+                  textSize: String = "NORMAL", notesRed: Boolean = false): ByteArray {
+    fun dishSize(p: EscPos) = when (textSize) {
+        "HUGE" -> p.size(2, 3)
+        "BIG" -> p.size(2, 2)
+        else -> p.size(1, 2)
+    }
     val p = EscPos(paperWidthMm)
     p.align(EscPos.Align.CENTER).size(2, 2).bold(true).line((ticket.stationName ?: tr("Kitchen")).uppercase()).size().bold(false)
     when {
@@ -62,15 +69,15 @@ fun kitchenTicket(ticket: KdsTicket, items: List<KdsTicketItem>, paperWidthMm: I
     p.align(EscPos.Align.LEFT)
     items.forEach { item ->
         val name = listOfNotNull(item.itemNameSnapshot, item.variantNameSnapshot?.takeIf { it.isNotBlank() }).joinToString(" · ")
-        p.size(1, 2).bold(true).line("${item.quantity} x $name").size().bold(false)
+        dishSize(p).bold(true).line("${item.quantity} x $name").size().bold(false)
         item.seatLabel?.takeIf { it.isNotBlank() }?.let { p.line("   " + tr("Seat $it")) }
         item.modifiers.forEach { modifier ->
             p.line("   + " + (if (modifier.quantity > 1) "${modifier.quantity} x " else "") + modifier.name)
             modifier.notes?.takeIf { it.isNotBlank() }?.let { p.line("     $it") }
         }
-        item.notes?.takeIf { it.isNotBlank() }?.let { p.bold(true).line("   ! $it").bold(false) }
+        item.notes?.takeIf { it.isNotBlank() }?.let { p.red(notesRed).bold(true).line("   ! $it").bold(false).red(false) }
     }
-    ticket.notes?.takeIf { it.isNotBlank() }?.let { p.rule().bold(true).line(it).bold(false) }
+    ticket.notes?.takeIf { it.isNotBlank() }?.let { p.rule().red(notesRed).bold(true).line(it).bold(false).red(false) }
     ticket.occasion?.takeIf { it.isNotBlank() }?.let { p.rule().line(it) }
     if (autoCut) p.cut() else p.feed(4)
     return p.bytes()
@@ -83,7 +90,8 @@ fun kitchenTicket(ticket: KdsTicket, items: List<KdsTicketItem>, paperWidthMm: I
  */
 fun receipt(design: ReceiptDesign, kind: ReceiptKind, data: ReceiptDto, paperWidthMm: Int, autoCut: Boolean, openDrawer: Boolean, zone: TimeZone,
             pictures: (url: String, width: Int, opacity: Float) -> MonoImage? = { _, _, _ -> null }): ByteArray {
-    val p = EscPos(paperWidthMm)
+    // Pictures behind the words: the whole receipt is drawn as one picture (decided 2026-11-28); else the printer's own letters.
+    val p: ReceiptSink = if (design.backdrops.isEmpty()) EscPos(paperWidthMm) else ReceiptPicture(paperWidthMm)
     val currency = data.currency
     fun money(value: com.saporini.mobile_desktop.pos.orders.domain.model.OrderDecimal): String =
         value.centsOrNull()?.let { moneyText(it, currency) } ?: value.value
@@ -172,9 +180,14 @@ fun receipt(design: ReceiptDesign, kind: ReceiptKind, data: ReceiptDto, paperWid
         }
         p.size().bold(false)
     }
-    if (openDrawer) p.openDrawer()
-    if (autoCut) p.cut() else p.feed(4)
-    return p.bytes()
+    val out = when (p) {
+        is EscPos -> p
+        is ReceiptPicture -> EscPos(paperWidthMm).align(EscPos.Align.CENTER).image(p.render(design.backdrops, pictures))
+        else -> EscPos(paperWidthMm)
+    }
+    if (openDrawer) out.openDrawer()
+    if (autoCut) out.cut() else out.feed(4)
+    return out.bytes()
 }
 
 private fun BlockAlign.esc(): EscPos.Align = when (this) {
@@ -183,7 +196,7 @@ private fun BlockAlign.esc(): EscPos.Align = when (this) {
     BlockAlign.RIGHT -> EscPos.Align.RIGHT
 }
 
-private fun TextSize.apply(p: EscPos) {
+private fun TextSize.apply(p: ReceiptSink) {
     when (this) {
         TextSize.SMALL, TextSize.NORMAL -> p.size(1, 1)
         TextSize.LARGE -> p.size(1, 2)

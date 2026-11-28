@@ -9,7 +9,8 @@ import kotlin.time.Clock
 /**
  * How long a connected till may sit untouched before it locks (back to the PIN screen; user, 2026-11-18): 3 minutes while
  * someone is in the middle of something important (taking an order, a payment, seating guests, making or changing a
- * booking), 30 seconds anywhere else, and never on the kitchen display. MOCK: fixed here; they become Admin Hub settings.
+ * booking), 30 seconds anywhere else, and never on the kitchen display. The restaurant changes the two times in Admin Hub →
+ * Settings → Devices & printing (since 2026-11-28); they come with each heartbeat ([IdleLock.useTimes]), these are the defaults.
  */
 enum class IdleLevel(val seconds: Int) { NORMAL(30), IMPORTANT(180), NEVER(-1) }
 
@@ -22,6 +23,22 @@ object IdleLock {
     /** Someone touched the screen, clicked or typed. */
     fun touch() {
         lastInput.value = Clock.System.now().toEpochMilliseconds()
+    }
+
+    private var normalSeconds = IdleLevel.NORMAL.seconds
+    private var importantSeconds = IdleLevel.IMPORTANT.seconds
+
+    /** The restaurant's lock times, from the heartbeat (null keeps what's there). */
+    fun useTimes(normal: Int?, important: Int?) {
+        normal?.takeIf { it > 0 }?.let { normalSeconds = it }
+        important?.takeIf { it > 0 }?.let { importantSeconds = it }
+    }
+
+    /** How long [level] waits before locking, in seconds (never: -1). */
+    fun secondsFor(level: IdleLevel): Int = when (level) {
+        IdleLevel.NORMAL -> normalSeconds
+        IdleLevel.IMPORTANT -> importantSeconds
+        IdleLevel.NEVER -> -1
     }
 
     /** Seconds since the last touch. */
