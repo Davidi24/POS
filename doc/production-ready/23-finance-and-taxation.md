@@ -37,7 +37,7 @@ restaurant doesn't need to hire someone; the app helps doing it"). It comes righ
   user's own; downloads and sending say "comes with the production pass".
 
 ## Decisions to take
-- [x] Where this step goes: step 23, right before Web (user, 2026-11-23).
+- [x] Where this step goes: step 23, right before Web (user, 2026-11-23). Since 2026-11-28 the devices' second look (step 24) sits between it and Web (step 25).
 - [ ] Which countries first: Albania (the demo restaurants) and its rules checked by an accountant; others later.
 - [ ] Filing: the app prepares everything and the person types it into e-Filing (now), or the app sends it to the tax office
   itself (needs the tax office's connection and certification; much later).

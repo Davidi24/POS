@@ -55,7 +55,7 @@ internal fun FraudWorkspace(tab: FraudTab, onTab: (FraudTab) -> Unit, modifier: 
     remember(model) { model.tab(tab); true }
     BindToLifecycle(model::setActive, model::onDispose)
     LaunchedEffect(tab) { model.tab(tab) }
-    // Alerts of the branch looked at, or across every branch (step 25).
+    // Alerts of the branch looked at, or across every branch (step 26).
     com.saporini.mobile_desktop.workspace.ui.FollowBranchScope(com.saporini.mobile_desktop.core.session.Workspace.FRAUD_DETECTION) { model.branch(it) }
     val state by model.state.collectAsState()
     FraudContent(state, model, onTab, modifier)

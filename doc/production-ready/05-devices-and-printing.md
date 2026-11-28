@@ -1,6 +1,7 @@
 # 5. Devices & printing
 
-Status: Not started (Not started → Screens → Development → Hard testing list ready → Done)
+Status: Hard testing list ready; pull request to `develop` on 2026-11-28; the user looks at it again in step 24, before Web
+(Not started → Screens → Development → Hard testing list ready → Done)
 
 ## Where it is
 - App: Admin Hub → Devices (kind cards, kind page, device page, add and confirm), Settings → Devices & printing.
@@ -15,7 +16,11 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 - [x] The printer test page prints (2026-11-27); a cash drawer opens through its receipt printer on cash payments.
 - [x] Nothing printed (2026-11-27: kitchen tickets, bills, receipts, test pages and the drawer print now; the logo and pictures too since the second round).
 - [x] Settings → Devices & printing is an empty page (2026-11-27: the restaurant's network, Where things print, When things print).
-- [ ] Pictures behind (the designer's backdrops) don't print: a thermal printer can't print words over a picture unless the whole receipt is sent as one picture. **(your call)**
+- [x] Pictures behind (the designer's backdrops) don't print (user, 2026-11-28: "print it as one picture"): a receipt with a picture behind is now sent as one image (`ReceiptPicture`).
+- [x] The last in-memory leftovers (2026-11-28, user: "make sure devices use real data, not mock data"): `DeviceExtras` and the
+  old add dialog for scanners and drawers are gone; every device shown comes from the server (scanners need nothing kept).
+- Waiting on outside things (not mock data of ours): card payments ask how the card went until a payment provider is connected;
+  the fiscal invoice prints DGII test numbers until DGII is connected (steps 15 and 23).
 
 ## Order (user, 2026-11-24)
 - Tills, tablets and screens first; printers, cash drawers and scanners after.
@@ -25,8 +30,12 @@ Status: Not started (Not started → Screens → Development → Hard testing li
   sign-in on a till work only from the restaurant's network; owners connect from anywhere; the first till saves the network by
   itself and switches the rule on; a switch per branch in Settings → Devices & printing. Built 2026-11-24 (see Done).
 - [x] What Settings → Devices & printing holds (user, 2026-11-27): the network rule and "When things print". What a printer prints is chosen on the printer itself (user: "you configure a printer and you say what it should print, that's all"), one printer per till and per station.
-- [ ] The till lock (30 s, 3 min in important work) and the PIN pause (5 wrong PINs pause a till 15 min) become settings on
-  that page? Suggestion: yes (decide-later step 1 #2; moved here from Settings on 2026-11-24). **(your call)**
+- [x] The till lock and the PIN pause become settings (user, 2026-11-28: "make them settings"): Settings → Devices & printing →
+  Till lock (locks after, during important work, wrong PINs before a pause, pause), V149.
+- [x] Kitchen ticket look per station (user, 2026-11-28: "yes, per station"): letter size and notes in red, in the station's editor.
+- [x] PIN or password for devices (user, 2026-11-28: "keep it"): every change to devices needs the password; daily work stays on PIN.
+- [x] A till leaving the network and telling the owner (user, 2026-11-28): leave the signed-in till; the owner's notification is
+  in step 6 (Notifications).
 - [x] "Connect devices" (user, 2026-11-25: "do it"): its own permission, Owner, Co-Owner and Admin by default, can be given to
   a Manager; connects tills, tablets and screens, on the restaurant's network unless an owner. "Manage devices" stays the
   owner's. Built 2026-11-25 (see Done).
@@ -47,16 +56,16 @@ Status: Not started (Not started → Screens → Development → Hard testing li
 ## PIN or password (check here)
 Rule (user, 2026-11-25): a PIN does the job, a password changes the system (server `security/rbac/PinSignIn.PASSWORD_ONLY`,
 a PIN sign-in gets its permissions without those). Now for this step: everything about devices needs the password (connecting, adding, removing, moving, who can sign in, the network rules); a till still signs in by PIN.
-- [ ] Going through this step's screens: check each action, PIN or password, and change the list if needed.
+- [x] Going through this step's screens: check each action, PIN or password, and change the list if needed (user, 2026-11-28: keep it as it is).
 
 ## 1. Screens
-- [ ] Agree the screens with the user when this step starts (mock data where the server isn't ready).
+- [x] Gone through with the user, one screen at a time (2026-11-24 – 28). A second look is step 24.
 
 ## 2. Development (the feature complete, no tests)
-- [ ] The feature complete, after the user approves the screens.
+- [x] The feature complete, server and app wired (2026-11-24 – 28).
 
 ## 3. Hard testing list (run later, when the user says)
-- [ ] Written once development is done.
+- [x] Written (below).
 - The restaurant's network (written 2026-11-24, to add to when the step's list is written):
   - The first till, tablet or screen connected at a branch saves its network and switches the rule on; a card terminal or a
     printer never does; a branch that already has a rule row (even switched off, even with no networks) never learns again.
@@ -186,6 +195,20 @@ a PIN sign-in gets its permissions without those). Now for this step: everything
   stock access sees "You can't see stock items"; signed out nothing happens; Devices → Barcode scanners: Try it reads a scan.
   Codes: Enter a code is only on the Tills and Tablets & screens pages; a till's code in Tablets & screens (and the other
   way) says "This code doesn't work here…" and connects nothing; in its own kind it waits for its maker as before.
+- Connecting and adding (written 2026-11-28): a card terminal not connected reads "Not connected yet" (never In use) on its
+  page, its card and the Card terminals card, In use is greyed in State and the server refuses it; Connect opens only the tills
+  and tablets with Bluetooth | Cable, Connect saves and Disconnect takes it out of use; removing its till does too. Add a
+  printer: Search for it lists the network's printers, this computer's and (tablet) the paired ones, Search again, a pick opens
+  Name it with the connection shown; Connect it by hand works for each way; How it's reached → Change changes only the
+  connection. Add a card terminal: searching off a till says to search on it; on the till Bluetooth lists the paired devices
+  (Android asks Nearby devices first), Cable the ports or USB devices. Add a drawer starts on its printer; Change on its page
+  picks another. Every state change asks "Are you sure?" first, Block and Retire in red.
+- Decisions of 2026-11-28 (written then): Settings → Devices & printing → Till lock: each + / − saves a moment later; a till
+  locks after the new time within a minute (its next heartbeat), the important-work time can't go below the usual one; 3 wrong
+  PINs (when set) pause a till for the set minutes; a waiter can't change it. A kitchen station set to Big letters prints its
+  dishes twice as big, Very big bigger, notes in red on a two-colour printer (black on others), Normal again prints as before.
+  A receipt with a picture behind prints as one picture with everything in place (slower), one without stays the printer's
+  letters.
 - Eight code boxes: typing, pasting "k7p4-9qxm" or "K7P49QXM", Backspace, Enter, the 8th character sends it; a wrong code
   turns the boxes red until typed again; on a phone the keyboard shows capitals and Done.
 - A till doesn't lock for 3 minutes on a device's page, in Enter a code and in the agree window.

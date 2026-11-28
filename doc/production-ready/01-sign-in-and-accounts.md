@@ -137,7 +137,7 @@ Items marked **(your call)** wait for the user's decision.
 
 **Open a restaurant / Check an application**
 - [x] Out of the app: "Don't have an account? Click here" on sign in opens the web (2026-11-17).
-- [x] The web page itself (the application form and the status check by code): moved to step 24, Web (user, 2026-11-18: "we will do it in the end").
+- [x] The web page itself (the application form and the status check by code): moved to step 25, Web (user, 2026-11-18: "we will do it in the end").
 - [ ] Already finished in October; only check its emails reach the real email server. **(your call)**: add a "not a robot" check? → [decide-later.md](decide-later.md) #6
 
 ### Decisions (fill in as the user answers)

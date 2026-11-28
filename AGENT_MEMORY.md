@@ -1,3 +1,35 @@
+## 2026-11-28 — Step 5 pushed for merge; devices get a second look as step 24 (Claude, `devices-and-printing-production`)
+- User: "I still want to recheck these devices, put it again after the 23 one, before the web; we'll start with notifications;
+  commit, push, make the PR, don't merge; make sure devices use real data, not mock data".
+- Real data: `admin/devices/DeviceExtras.kt` and `ExtraDeviceDialog` removed (the last in-memory devices); every `isExtra`
+  branch in DevicesScreen/DevicePage gone; the scanner card says "Nothing to set up" instead of "sample". What's left is
+  outside things, not our mock data: card payments ask how the card went until a payment provider exists; DGII test numbers.
+- Steps: new `doc/production-ready/24-devices-second-look.md`; `24-web.md` → `25-web.md`, `25-branches-and-whole-restaurant.md`
+  → `26-…`; "step 24/25" in docs and code comments moved on by one (AGENT_MEMORY's old entries keep the old numbers).
+  README: step 5 built (merge waiting), now step 6 Notifications. Step 5's file: Status "Hard testing list ready".
+- Pushed: last night's six commits (`27e1fc9`..`4cf174d`, on top of `ea42e0b`, which #109 merged) plus four today: backend (V148/V149, till lock, station look), Devices screens (add in steps, Bluetooth pairing),
+  app printing/till lock, then docs. Full backend suite run in a clean copy before pushing; PR to `develop`, not merged.
+- Next: step 6 Notifications on `notifications-production` from `develop` after the user merges; start by explaining the
+  step's first item and waiting for a yes.
+
+## 2026-11-28 — Step 5's five decisions built; a nicer Pair button (Claude, `devices-and-printing-production`, uncommitted)
+- User decided: till lock + PIN pause as settings; receipts with pictures behind print as one picture; ticket look per kitchen station; PIN rule kept; signed-in till left alone, owner told in step 6. Also "the pair button looks ugly".
+- Server: V149; `UpdateSettingsTillLockRequest` + `PATCH /settings/till-lock`; PIN pause from the restaurant's settings; heartbeat carries the lock times; `KdsStation.ticketTextSize/ticketNotesRed` (request, response, mapper, command service); `print-setup` kitchen entries carry them.
+- App: `TillLockSettings` card; `IdleLock.useTimes/secondsFor` fed by `TillHeartbeat`; `ReceiptSink`/`ReceiptPicture`/`textDots` (jvm + android) and `receipt()` choosing; `EscPos.red`, `kitchenTicket(textSize, notesRed)`; station editor "Printed tickets"; the Pair button is a green button and Paired a green tick; reprint message points to the printer's page.
+- Docs: step 5 decisions ticked, step 6 has the owner notification, decide-later updated, AGENTS.md (V149, next V150).
+- Checked: app compiles; `PrintingTest` 8/8 (picture receipt saved to `shared/build/reports/receipt-picture.png`); 2 KdsScreenModelTest failures are the old menu-availability ones (MENUS_SOLD_OUT, part of the 58). ITs: Printing, PinSignInLimits, CardTerminalAndDrawer, DeviceConnectRequest, 19 tests, all pass. Backend rebuilt (V149 applied locally), live check: `PATCH /settings/till-lock` saves, important < usual is 400; desktop jars and `:androidApp:compileDebugKotlin` build; app restarted. Not committed, not pushed.
+
+## 2026-11-28 — Tills and tablets with pictures in Connect; Bluetooth search pairs like a keyboard; terminal search works off a till (Claude, `devices-and-printing-production`, uncommitted)
+- User: "put the icons of the till or tablet here" (the by-hand terminal step's dropdown); "make it like allow this device to use Bluetooth"; "in the card terminal, search for it, find it, connect it; when I click search you say connect by hand, what is this?"
+- App: `HostPicks` (pictures, shared by the by-hand step, the Connect window and the new HOST step); `BluetoothFinder`/`BluetoothAsk` in `AddDevice.kt`; `PrinterLink.canScanBluetooth/bluetoothPower/turnOnBluetooth/scanBluetooth/pairBluetooth` (jvm via bluetoothctl, android discovery + createBond); `BluetoothAccess(allowed, ask, turnOn)`; manifest BLUETOOTH_SCAN (neverForLocation) + ACCESS_FINE_LOCATION ≤ 30; printer search ways per platform; card search off a till asks which till. 18 translations.
+- This computer has a powered Bluetooth controller (bluetoothctl), so the Bluetooth tab really scans here. Compiles for desktop and the Android app; app restarted. Not tried on screen by me. Not committed.
+
+## 2026-11-28 — Devices screens fixed: Connect picks only the till, "In use" only when connected, add by searching or by hand in steps, "Are you sure?" on states (Claude, `devices-and-printing-production`, uncommitted)
+- User (screenshots of Edit Card terminal 2 and Card terminal 1 "In use" while not connected): "when you say connect, only choose one of the tills or tablets, not edit the info"; "how can it be in use when it's not connected; in use means everything has passed"; "when you want to change something like in repair, ask are you sure"; "when you add a new one, scan for devices, choose by cable or Bluetooth, if it reads any it lists them, then the things to fill, like connecting a keyboard; or connect it by hand; separate, not all in one form".
+- Server: V148, `DeviceSettingsService.notReady` (status PATCH refuses ACTIVE for an unconnected terminal/drawer; clearing a link, deleting its till or printer set PROVISIONING); `CardTerminalAndDrawerIntegrationTest` extended (25 device/printing ITs pass).
+- App: `TerminalConnectDialog` + `connectTerminal`; `notReadyReason`/`shownLook` everywhere a state shows; State card asks first (`stateQuestion`); `AddDevice.kt` (`AddDeviceDialog`, `FindPanel`, `ManualPrinter`, `Details`, `usesAddSteps`) + `editConnection`/`draftPart`; `PrinterLink.pairedDevices/cablePorts` (jvm + android); the editor lost its connection sections, `NetworkPrinterFinder` removed. 50 + 10 translations.
+- Local demo: both card terminals are PROVISIONING now (V148). Backend and app rebuilt and restarted; compiles for desktop and Android. Not tried on screen by me. Not committed.
+
 ## 2026-11-27 (night) — Five commits; card terminals through a till, cash drawers on the server, scanners with nothing to set up, codes typed inside their kind (Claude, `devices-and-printing-production`, not pushed)
 - User (going to sleep): "do 4–5 commits first, test the backend, then: card terminals work only if connected with a till or tablet, Bluetooth and cable; connect the devices screen with the backend; enter a code inside its category (a till's code in Tills, elsewhere it says the code doesn't work); one more commit; don't push; don't ask."
 - Commits (no Claude lines, not pushed): 27e1fc9 backend tills/sign-in, 300891c backend printing, ef12713 app printing core, 10c4658 Devices screens, 720b7e2 translations + docs. The whole backend suite passed on that state (1,373 unit, 434 ITs); 27e1fc9 compiles on its own.

@@ -161,7 +161,7 @@ object FinanceBook {
     var setup: TaxSetup by mutableStateOf(TaxSetup())
 
     /**
-     * The branch looked at (step 25: "Finance & taxation: branch financial records, consolidated reporting"), or null for every
+     * The branch looked at (step 26: "Finance & taxation: branch financial records, consolidated reporting"), or null for every
      * branch together. MOCK: a branch's records are its share of the made-up restaurant's, its people a share of them.
      */
     var branchId: String? by mutableStateOf(null)

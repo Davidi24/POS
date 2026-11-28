@@ -15,7 +15,7 @@ Read the step's file before working on it, keep its sections and "Done" up to da
 
 ## Where we are
 
-**Now: step 5 ([Devices & printing](05-devices-and-printing.md)): its decisions first. Every branch together comes after the first launch (step 25).** Keep this list up to date as each part is finished (user, 2026-11-18:
+**Now: step 6 ([Notifications](06-notifications.md)). Step 5 (Devices & printing) is built and its pull request waits for your merge; you look at devices again in step 24, before Web. Every branch together comes after the first launch (step 26).** Keep this list up to date as each part is finished (user, 2026-11-18:
 "check boxes so I know what I have left and where I am").
 
 - [x] 1. [Sign-in & accounts](01-sign-in-and-accounts.md): built and merged (#100, #101); its hard testing list is written.
@@ -49,14 +49,16 @@ Read the step's file before working on it, keep its sections and "Done" up to da
   - [x] Restaurant info (opening hours and the restaurant's page) looked at together (2026-11-22 – 23)
   - [x] Second PR merged (PR #105, 2026-11-23: Restaurant info round, receipt designer, Finance first screens, branch choice)
   - [ ] Hard testing (later, when you say)
-- [ ] 5. [Devices & printing](05-devices-and-printing.md) ← **now**
-  - [ ] Decisions
-  - [ ] Screens
-  - [ ] Development
-  - [ ] Hard testing list written
-  - [ ] Merged
+- [ ] 5. [Devices & printing](05-devices-and-printing.md): built, on real server data; its hard testing list is written
+  - [x] Decisions (the last five on 2026-11-28)
+  - [x] Screens (gone through with you, 2026-11-24 – 28)
+  - [x] Development
+  - [x] Hard testing list written
+  - [ ] Merged (pull request waiting for you, 2026-11-28)
+  - [ ] Second look at the devices (step 24, before Web)
+  - [ ] Waiting on outside things: a card payment provider (card terminals ask "how did the card go?" until then), DGII for real fiscal numbers on receipts
   - [ ] Hard testing (later, when you say)
-- [ ] 6. [Notifications](06-notifications.md)
+- [ ] 6. [Notifications](06-notifications.md) ← **now**
   - [ ] Decisions
   - [ ] Screens
   - [ ] Development
@@ -86,8 +88,9 @@ Read the step's file before working on it, keep its sections and "Done" up to da
   - [ ] Hard testing list written
   - [ ] Merged
   - [ ] Hard testing (later, when you say)
-- [ ] 24. [Web](24-web.md): last before the first launch, once the app is finished (user, 2026-11-23)
-- [ ] 25. [Branches and the whole restaurant](25-branches-and-whole-restaurant.md): after the first launch (user, 2026-11-23: "right now we work as if there is one branch; after the first launch we update it for multiple branches"); choosing the branch to work in is on (the restaurant's home, the switcher); every branch together is "Coming soon" (`ALL_BRANCHES_ON`)
+- [ ] 24. [Devices & printing, second look](24-devices-second-look.md): added 2026-11-28 (user: "I still want to recheck the devices; put it again after 23, before the web")
+- [ ] 25. [Web](25-web.md): last before the first launch, once the app is finished (user, 2026-11-23)
+- [ ] 26. [Branches and the whole restaurant](26-branches-and-whole-restaurant.md): after the first launch (user, 2026-11-23: "right now we work as if there is one branch; after the first launch we update it for multiple branches"); choosing the branch to work in is on (the restaurant's home, the switcher); every branch together is "Coming soon" (`ALL_BRANCHES_ON`)
   - [ ] Decisions
   - [x] Screens (first round, for you to check)
   - [ ] Development
@@ -108,6 +111,10 @@ Changed 2026-11-24 (user: "is it better to leave settings for later, since I'll 
 have?"): Settings moved from step 5 to step 21, after Fraud & audit log and before Onboarding. Each step decides its own
 settings while its screens are looked at; step 21 is the last pass over all of them. Steps 6–21 moved up by one (Devices &
 printing is now 5, Notifications 6, …, Fraud & audit log 20).
+
+Changed 2026-11-28 (user: "I still want to recheck these devices, so put it again after the 23 one, before the web; we'll
+start with notifications"): a second look at Devices & printing is step 24, after Finance & taxation; Web is now step 25 and
+Branches and the whole restaurant step 26.
 
 Rules for every step
 - Settings: check that the step's own settings are actually used.

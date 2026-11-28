@@ -5,7 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.saporini.mobile_desktop.auth.data.dto.CurrentUserResponse
 
-// Branch level and the whole restaurant (user, 2026-11-23, step 25: "now we work as if we had one branch, which is perfect;
+// Branch level and the whole restaurant (user, 2026-11-23, step 26: "now we work as if we had one branch, which is perfect;
 // with more we need this"). Every workspace works at a branch (the one the person is in) and, where it makes sense, for
 // all branches together:
 // Reasoned with the user the same day ("only the ones reasonable to show for all"): what's done at a place stays at the
@@ -27,7 +27,7 @@ const val BRANCH_CHOICE_ON = true
 /**
  * Every branch together (the whole restaurant: combined inventory, statistics, finance, fraud, users and branches): "coming
  * soon", after the first launch (user, 2026-11-23: "not the gathered ones like inventory, make them coming soon"). The views are
- * built; true brings them back. The plan is step 25, `doc/production-ready/25-branches-and-whole-restaurant.md`.
+ * built; true brings them back. The plan is step 26, `doc/production-ready/26-branches-and-whole-restaurant.md`.
  */
 const val ALL_BRANCHES_ON = false
 

@@ -103,7 +103,7 @@ internal class Fx(val currency: String?, val size: ScreenSize, val wide: Boolean
 @Composable
 internal fun FinanceWorkspace(tab: FinanceTab, onTab: (FinanceTab) -> Unit, modifier: Modifier = Modifier) {
     var notice by remember { mutableStateOf<String?>(null) }
-    // A branch's own records, or every branch together (step 25).
+    // A branch's own records, or every branch together (step 26).
     com.saporini.mobile_desktop.workspace.ui.FollowBranchScope(com.saporini.mobile_desktop.core.session.Workspace.FINANCE) { FinanceBook.branchId = it }
     BoxWithConstraints(modifier.fillMaxSize().background(Color.White)) {
         val size = screenSizeFor(maxWidth)
@@ -444,7 +444,7 @@ internal fun Section(title: String, icon: ImageVector, modifier: Modifier = Modi
 }
 
 /**
- * At a branch (step 25): these are its records, but the returns are filed once, for the whole restaurant (one company, one
+ * At a branch (step 26): these are its records, but the returns are filed once, for the whole restaurant (one company, one
  * tax number).
  */
 @Composable
@@ -458,7 +458,7 @@ internal fun BranchPartNote() {
     }
 }
 
-/** Every branch side by side (consolidated reporting, step 25): what each adds to the month's taxes; a click opens its records. */
+/** Every branch side by side (consolidated reporting, step 26): what each adds to the month's taxes; a click opens its records. */
 @Composable
 private fun EveryBranch(fx: Fx) {
     val session = org.koin.compose.koinInject<com.saporini.mobile_desktop.core.session.SessionManager>()

@@ -16,7 +16,7 @@ enum class AdminSection(val label: String, val permission: String, val alsoWith:
     // The restaurant's own details the owner keeps up to date (phone, addresses, logo, receipt texts), and each branch's
     // opening hours: someone with only "Change opening hours" (a manager) sees just those.
     RESTAURANT_INFO("Restaurant info", "RESTAURANTS_UPDATE", "HOURS_UPDATE"),
-    // The restaurant's branches as cards, each with its own page: only when looking at every branch (step 25).
+    // The restaurant's branches as cards, each with its own page: only when looking at every branch (step 26).
     BRANCHES("Branches", "RESTAURANTS_READ");
 
     companion object {
@@ -26,7 +26,7 @@ enum class AdminSection(val label: String, val permission: String, val alsoWith:
         fun allowed(permissions: Collection<String>): List<AdminSection> = BarOrder.filter { it.permission in permissions || (it.alsoWith != null && it.alsoWith in permissions) }
 
         /**
-         * The places shown (user, 2026-11-23, step 25): at a branch its staff, devices and shifts (with settings, the audit
+         * The places shown (user, 2026-11-23, step 26): at a branch its staff, devices and shifts (with settings, the audit
          * log and restaurant info); for every branch the users and roles, the branches, settings, the audit log and the
          * restaurant. Without the branch switcher ([scoped] false) everything as before.
          */

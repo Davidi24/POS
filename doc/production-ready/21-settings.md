@@ -21,7 +21,7 @@ over all of them, after Fraud & audit log and before Onboarding.
   Settings page). The password lock, the 30-day sign-in and 5 devices per person stay fixed for everyone (safety).
 - Telling someone when an account locks or a till pauses, and the Notifications settings page: step 6, Notifications.
 - Breakfast / lunch / dinner hours for Statistics: step 19, Statistics.
-- Online booking's page: step 24, Web.
+- Online booking's page: step 25, Web.
 - Every other page (Tables, Reservations, Orders & kitchen, Payments & receipts, Shifts, Inventory, Fraud checks): in the step
   of that feature.
 

@@ -697,7 +697,7 @@ private fun ItemPicture(state: InventoryState, itemId: String?) {
 private fun cents(value: OrderDecimal): Long = (value.asDouble() * 100).roundToLong()
 
 /**
- * Every branch's stock side by side (Inventory looking at all branches, step 25): its places, items, what it's worth and
+ * Every branch's stock side by side (Inventory looking at all branches, step 26): its places, items, what it's worth and
  * what's running low; a click works in that branch. Places that belong to no branch (a central warehouse) come last.
  */
 @Composable

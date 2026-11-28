@@ -52,7 +52,7 @@ import com.saporini.mobile_desktop.core.theme.Inter
 import org.koin.compose.koinInject
 
 /**
- * Where a workspace is looking (user, 2026-11-23, step 25): the branch the person is in, another branch, or all of them
+ * Where a workspace is looking (user, 2026-11-23, step 26): the branch the person is in, another branch, or all of them
  * where the workspace has a level for the whole restaurant. In every workspace's bar, for those who may see more than their
  * own branch, once the restaurant has two or more.
  */

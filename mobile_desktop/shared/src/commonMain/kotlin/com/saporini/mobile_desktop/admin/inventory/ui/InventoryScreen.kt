@@ -140,7 +140,7 @@ internal fun InventoryScreen(modifier: Modifier = Modifier) {
         model.newItemWithBarcode(code)
     }
     val recipeState by recipes.state.collectAsState()
-    // Branch level or every branch (step 25): at a branch, only its places and what's in them; for every branch, all of it
+    // Branch level or every branch (step 26): at a branch, only its places and what's in them; for every branch, all of it
     // with each branch side by side on the overview.
     val branchId = com.saporini.mobile_desktop.workspace.ui.scopedBranchId(com.saporini.mobile_desktop.core.session.Workspace.INVENTORY)
     val everyBranch = com.saporini.mobile_desktop.workspace.ui.usesBranchScope() &&

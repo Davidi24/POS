@@ -241,7 +241,7 @@ internal fun RestaurantInfoScreen(modifier: Modifier = Modifier, global: Boolean
     RestaurantDetailsContent(state, model, state.tab, model::tab, showTabs = true, modifier = modifier, global = global)
 }
 
-/** Admin Hub → Branches (looking at every branch, step 25): the branch cards, each opening its own page. */
+/** Admin Hub → Branches (looking at every branch, step 26): the branch cards, each opening its own page. */
 @Composable
 internal fun RestaurantBranchesScreen(modifier: Modifier = Modifier) {
     val model = koinInject<RestaurantDetailsScreenModel>()
@@ -263,7 +263,7 @@ internal fun RestaurantDetailsContent(
     onTab: (RestaurantTab) -> Unit,
     showTabs: Boolean,
     modifier: Modifier = Modifier,
-    // Admin Hub looking at every branch (step 25): the restaurant only, no branch's own parts; branches have their own place.
+    // Admin Hub looking at every branch (step 26): the restaurant only, no branch's own parts; branches have their own place.
     global: Boolean = false
 ) {
     // Admin Hub is entered inside a branch (user, 2026-11-23): that branch's hours and contacts show here and there's no

@@ -17,6 +17,9 @@ Status: Not started (Not started → Screens → Development → Hard testing li
   answer; told when it's solved), and the support admin told when a ticket is given to them (decide-later step 4 #2, #3).
 
 ## Decisions to take
+- [ ] Tell the owner when a till, tablet or screen is turned away for being on another network ("Bar till tried from another
+  network"), so they can allow the new network at once (decided in step 5 on 2026-11-28: "tell the owner in step 6"). Today it
+  shows only in Settings → Devices & printing → "Tried from other networks" and in the Audit log.
 - [ ] Phone notifications (push) or only inside the app? **(your call)**
 - [ ] What Settings → Notifications holds (an empty page today). **(your call)**
 - [ ] Tell the chosen roles when an account locks after 8 wrong passwords, and when a till pauses after 5 wrong PINs, with a
