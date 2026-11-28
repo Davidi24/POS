@@ -49,7 +49,7 @@ public class DeviceSettingsController {
     }
 
     @PostMapping("/restaurants/{restaurantId}/settings/printers")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Create restaurant printer settings")
     public ResponseEntity<DeviceResponse> createPrinter(
             @PathVariable UUID restaurantId,
@@ -61,7 +61,7 @@ public class DeviceSettingsController {
     }
 
     @PutMapping("/restaurants/{restaurantId}/settings/printers/{printerId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Replace restaurant printer settings")
     public ResponseEntity<DeviceResponse> updatePrinter(
             @PathVariable UUID restaurantId,
@@ -73,7 +73,7 @@ public class DeviceSettingsController {
     }
 
     @DeleteMapping("/restaurants/{restaurantId}/settings/printers/{printerId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Delete restaurant printer settings")
     public ResponseEntity<Void> deletePrinter(
             @PathVariable UUID restaurantId,
@@ -96,7 +96,7 @@ public class DeviceSettingsController {
     }
 
     @PutMapping("/restaurants/{restaurantId}/branches/{branchId}/printer-routes")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Replace branch printer routes")
     public ResponseEntity<PrinterRouteResponse> updatePrinterRoutes(
             @PathVariable UUID restaurantId,
@@ -108,7 +108,7 @@ public class DeviceSettingsController {
     }
 
     @PostMapping("/restaurants/{restaurantId}/branches/{branchId}/printer-routes/test")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Generate a test printer-route payload")
     public ResponseEntity<PrinterRouteTestResponse> testPrinterRoutes(
             @PathVariable UUID restaurantId,
@@ -119,7 +119,7 @@ public class DeviceSettingsController {
     }
 
     @GetMapping("/restaurants/{restaurantId}/branches/{branchId}/devices")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'DEVICES_CONNECT', 'DEVICES_MANAGE')")
     @Operation(summary = "List branch devices")
     public ResponseEntity<List<DeviceResponse>> getDevices(
             @PathVariable UUID restaurantId,
@@ -130,7 +130,7 @@ public class DeviceSettingsController {
     }
 
     @PostMapping("/restaurants/{restaurantId}/branches/{branchId}/devices")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Create a branch device")
     public ResponseEntity<DeviceResponse> createDevice(
             @PathVariable UUID restaurantId,
@@ -143,7 +143,7 @@ public class DeviceSettingsController {
     }
 
     @PutMapping("/restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Replace a branch device")
     public ResponseEntity<DeviceResponse> updateDevice(
             @PathVariable UUID restaurantId,
@@ -156,7 +156,7 @@ public class DeviceSettingsController {
     }
 
     @PatchMapping("/restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}/status")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Update a branch device status")
     public ResponseEntity<DeviceResponse> updateDeviceStatus(
             @PathVariable UUID restaurantId,
@@ -168,8 +168,25 @@ public class DeviceSettingsController {
         return ResponseEntity.ok(deviceSettingsService.updateDeviceStatus(authentication, restaurantId, branchId, deviceId, request));
     }
 
+    /** Moves a device to another branch of the restaurant (user, 2026-11-25: a device works in the branch chosen for it). */
+    @PatchMapping("/restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}/branch")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
+    @Operation(summary = "Move a device to another branch")
+    public ResponseEntity<DeviceResponse> moveDevice(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            @PathVariable UUID deviceId,
+            @Valid @RequestBody MoveDeviceRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(deviceSettingsService.moveDevice(authentication, restaurantId, branchId, deviceId, request.branchId()));
+    }
+
+    public record MoveDeviceRequest(@jakarta.validation.constraints.NotNull UUID branchId) {
+    }
+
     @DeleteMapping("/restaurants/{restaurantId}/branches/{branchId}/devices/{deviceId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
     @Operation(summary = "Delete a branch device")
     public ResponseEntity<Void> deleteDevice(
             @PathVariable UUID restaurantId,

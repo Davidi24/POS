@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.auth.dto.ChangePasswordRequest;
 import pos.pos.auth.dto.ForgotPasswordRequest;
+import pos.pos.auth.dto.PasswordLinkCheckRequest;
+import pos.pos.auth.dto.PasswordLinkView;
 import pos.pos.auth.dto.ResetPasswordRequest;
 import pos.pos.auth.dto.ResetPasswordWithCodeRequest;
 import pos.pos.auth.service.ChangePasswordService;
@@ -33,12 +35,19 @@ public class PasswordController {
     private final PasswordResetService passwordResetService;
     private final ChangePasswordService changePasswordService;
     private final JwtService jwtService;
+    private final pos.pos.security.util.ClientInfoExtractor clientInfoExtractor;
 
     @PostMapping("/forgot-password")
     @Operation(summary = "Request a password reset by email link or SMS code")
-    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        passwordResetService.requestReset(request);
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest httpRequest) {
+        passwordResetService.requestReset(request, clientInfoExtractor.extract(httpRequest).ipAddress());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/password-link")
+    @Operation(summary = "Check an emailed password link: what it's for, whose it is and whether it still works")
+    public PasswordLinkView checkPasswordLink(@Valid @RequestBody PasswordLinkCheckRequest request) {
+        return passwordResetService.checkLink(request.getToken());
     }
 
     @PostMapping("/reset-password")
@@ -61,6 +70,7 @@ public class PasswordController {
             @Valid @RequestBody ChangePasswordRequest request,
             Authentication authentication,
             HttpServletRequest httpRequest) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         UUID tokenId = extractTokenId(httpRequest);
         changePasswordService.changePassword(currentUser(authentication).getId(), tokenId, request);
         return ResponseEntity.noContent().build();

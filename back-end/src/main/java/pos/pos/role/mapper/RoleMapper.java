@@ -18,6 +18,7 @@ public class RoleMapper {
                 .isActive(role.isActive())
                 .isAssignable(role.isAssignable())
                 .isProtected(role.isProtectedRole())
+                .picture(role.getPicture())
                 .build();
     }
 

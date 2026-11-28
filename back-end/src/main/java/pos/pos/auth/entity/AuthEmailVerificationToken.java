@@ -47,6 +47,10 @@ public class AuthEmailVerificationToken {
     @Column(name = "used_at", columnDefinition = "timestamptz")
     private OffsetDateTime usedAt;
 
+    // Profile → change email: the address that replaces the person's email once this link is used (null = just confirm).
+    @Column(name = "new_email", length = 150)
+    private String newEmail;
+
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamptz")
     private OffsetDateTime createdAt;
 

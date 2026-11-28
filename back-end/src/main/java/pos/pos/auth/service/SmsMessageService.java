@@ -54,8 +54,9 @@ public class SmsMessageService {
             throw new AuthException("SMS delivery is currently unavailable", HttpStatus.SERVICE_UNAVAILABLE);
         }
 
-        // FUTURE PROVIDER: replace LOG_ONLY delivery with a real SMS gateway such as Twilio, MessageBird, or AWS SNS.
-        logger.info("SMS delivery [{}] -> {}\n{}", smsAuthProperties.getDeliveryMode(), phoneNumber, body);
+        // FUTURE PROVIDER: replace LOG_ONLY delivery with a real SMS gateway. Never write OTPs,
+        // message bodies, or phone numbers to application logs.
+        logger.info("SMS delivery [{}] requested; recipient and body omitted from logs", smsAuthProperties.getDeliveryMode());
     }
 
     private String normalizeName(String firstName) {

@@ -25,13 +25,13 @@ class RestaurantRepositoryTest extends AbstractTestProfilePostgresTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("should reject active restaurants without an owner")
-    void shouldRejectActiveRestaurantsWithoutAnOwner() {
-        assertThatThrownBy(() -> jdbcTemplate.update(
+    @DisplayName("should allow an active restaurant while owner setup is pending")
+    void shouldAllowActiveRestaurantsWithoutAnOwner() {
+        assertThat(jdbcTemplate.update(
                 """
                 INSERT INTO restaurants (
-                    id, name, legal_name, code, slug, currency, timezone, is_active, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
+                    id, name, legal_name, code, slug, currency, timezone, is_active, status, display_order, version, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, now(), now())
                 """,
                 UUID.randomUUID(),
                 "Ownerless Restaurant",
@@ -42,7 +42,7 @@ class RestaurantRepositoryTest extends AbstractTestProfilePostgresTest {
                 "Europe/Berlin",
                 true,
                 "ACTIVE"
-        )).isInstanceOf(DataIntegrityViolationException.class);
+        )).isEqualTo(1);
     }
 
     @Test
@@ -51,8 +51,8 @@ class RestaurantRepositoryTest extends AbstractTestProfilePostgresTest {
         int inserted = jdbcTemplate.update(
                 """
                 INSERT INTO restaurants (
-                    id, name, legal_name, code, slug, currency, timezone, is_active, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())
+                    id, name, legal_name, code, slug, currency, timezone, is_active, status, display_order, version, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, now(), now())
                 """,
                 UUID.randomUUID(),
                 "Pending Restaurant",

@@ -63,18 +63,22 @@ public class UpsertDeviceRequest {
     @NotNull(message = "online is required")
     private Boolean online;
 
+    @Size(max = 45, message = "ipAddress must be at most 45 characters")
     private String ipAddress;
 
     @Size(max = 50, message = "macAddress must be at most 50 characters")
     private String macAddress;
 
+    @Size(max = 2000, message = "notes must be at most 2000 characters")
     private String notes;
 
     private PrinterConnectionType printerConnectionType;
 
     @Min(value = 1, message = "paperWidthMm must be greater than 0")
+    @Max(value = 500, message = "paperWidthMm must be at most 500")
     private Integer paperWidthMm;
 
+    @Size(max = 45, message = "printerIp must be at most 45 characters")
     private String printerIp;
 
     @Min(value = 1, message = "printerPort must be between 1 and 65535")
@@ -84,4 +88,22 @@ public class UpsertDeviceRequest {
     private Boolean autoCut;
 
     private Boolean cashDrawerKickEnabled;
+
+    // A printer installed on a computer: its name there, and the till it's plugged into (2026-11-27).
+    @Size(max = 200, message = "systemPrinterName must be at most 200 characters")
+    private String systemPrinterName;
+
+    private java.util.UUID hostDeviceId;
+
+    @jakarta.validation.constraints.Pattern(regexp = "RECEIPT|KITCHEN|BAR|SMALL|DOCUMENT|OTHER", message = "Choose what kind of printer it is")
+    private String printerRole;
+
+    // A card terminal: the till or tablet it's connected to and how (USB, BLUETOOTH); a cash drawer: its printer (PRINTER).
+    private UUID linkedDeviceId;
+
+    @jakarta.validation.constraints.Pattern(regexp = "USB|BLUETOOTH|PRINTER", message = "Choose how it's connected")
+    private String linkType;
+
+    @Size(max = 200)
+    private String linkAddress;
 }

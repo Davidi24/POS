@@ -6,5 +6,6 @@ public enum DeviceType {
     KDS,
     PRINTER,
     CUSTOMER_DISPLAY,
-    PAYMENT_TERMINAL
+    PAYMENT_TERMINAL,
+    CASH_DRAWER
 }

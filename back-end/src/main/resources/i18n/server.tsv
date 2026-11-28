@@ -1,0 +1,923 @@
+en	it	es	sq
+{} takes care of you now.	Ora {} si occupa di voi.	Ahora {} se encarga de ustedes.	Tani {} kujdeset për ju.
+Email confirmed	Email confermata	Correo confirmado	Email-i u konfirmua
+You can close this page.	Puoi chiudere questa pagina.	Puedes cerrar esta página.	Mund ta mbyllësh këtë faqe.
+there	a te	a ti	mik
+Hi {}, your POS account will use {} instead of {}.	Ciao {}, il tuo account POS userà {} invece di {}.	Hola {}, tu cuenta de POS usará {} en lugar de {}.	Përshëndetje {}, llogaria jote POS do të përdorë {} në vend të {}.
+Hi {}, confirm {} for your POS account.	Ciao {}, conferma {} per il tuo account POS.	Hola {}, confirma {} para tu cuenta de POS.	Përshëndetje {}, konfirmo {} për llogarinë tënde POS.
+Not changed	Non cambiato	Sin cambios	Nuk u ndryshua
+This link has expired	Questo link è scaduto	Este enlace expiró	Kjo lidhje ka skaduar
+This link was already used	Questo link è già stato usato	Este enlace ya se usó	Kjo lidhje është përdorur tashmë
+This link doesn't work	Questo link non funziona	Este enlace no funciona	Kjo lidhje nuk punon
+Ask for a new one: in the POS app, Profile, or ask your manager.	Chiedine uno nuovo: nell'app POS, in Profilo, o chiedi al tuo responsabile.	Pide uno nuevo: en la app POS, en Perfil, o pídelo a tu gerente.	Kërko një të re: në aplikacionin POS, te Profili, ose pyet menaxherin.
+Your email is already confirmed.	La tua email è già confermata.	Tu correo ya está confirmado.	Emaili yt është konfirmuar tashmë.
+Check that you copied the whole link from the email.	Controlla di aver copiato tutto il link dall'email.	Revisa que hayas copiado el enlace completo del correo.	Kontrollo që e kopjove të gjithë lidhjen nga emaili.
+Open the POS app and sign in with your username or email and your new password.	Apri l'app POS e accedi con il tuo nome utente o la tua email e la nuova password.	Abre la app POS e inicia sesión con tu usuario o correo y tu nueva contraseña.	Hap aplikacionin POS dhe hyr me emrin e përdoruesit ose emailin dhe fjalëkalimin e ri.
+For your safety, you were signed out on your other devices.	Per sicurezza, sei stato disconnesso dagli altri dispositivi.	Por tu seguridad, se cerró tu sesión en tus otros dispositivos.	Për sigurinë tënde, dole nga pajisjet e tjera.
+The two passwords aren't the same.	Le due password non coincidono.	Las dos contraseñas no coinciden.	Dy fjalëkalimet nuk përputhen.
+{} or {}	{} o {}	{} o {}	{} ose {}
+Hi {}, choose a new password for your POS account.	Ciao {}, scegli una nuova password per il tuo account POS.	Hola {}, elige una nueva contraseña para tu cuenta de POS.	Përshëndetje {}, zgjidh një fjalëkalim të ri për llogarinë tënde POS.
+Hi {}, your POS account is ready. Choose the password you'll use to sign in.	Ciao {}, il tuo account POS è pronto. Scegli la password che userai per accedere.	Hola {}, tu cuenta de POS está lista. Elige la contraseña que usarás para iniciar sesión.	Përshëndetje {}, llogaria jote POS është gati. Zgjidh fjalëkalimin që do të përdorësh për të hyrë.
+Hi {}, you're the owner of {} on POS. Choose the password you'll use to sign in.	Ciao {}, sei il titolare di {} su POS. Scegli la password che userai per accedere.	Hola {}, eres el propietario de {} en POS. Elige la contraseña que usarás para iniciar sesión.	Përshëndetje {}, je pronari i {} në POS. Zgjidh fjalëkalimin që do të përdorësh për të hyrë.
+You'll sign in as {}.	Accederai come {}.	Iniciarás sesión como {}.	Do të hysh si {}.
+New password	Nuova password	Nueva contraseña	Fjalëkalimi i ri
+Type it again	Scrivila di nuovo	Escríbela otra vez	Shkruaje përsëri
+Show the password	Mostra la password	Mostrar la contraseña	Shfaq fjalëkalimin
+At least 8 characters	Almeno 8 caratteri	Al menos 8 caracteres	Të paktën 8 shkronja
+An uppercase letter	Una lettera maiuscola	Una letra mayúscula	Një shkronjë e madhe
+A number	Un numero	Un número	Një numër
+A special character, like ! or #	Un carattere speciale, come ! o #	Un carácter especial, como ! o #	Një shenjë e veçantë, si ! ose #
+Both passwords are the same	Le due password coincidono	Las dos contraseñas coinciden	Të dy fjalëkalimet janë të njëjta
+For your safety, you'll be signed out on all your devices.	Per sicurezza, sarai disconnesso da tutti i tuoi dispositivi.	Por tu seguridad, se cerrará tu sesión en todos tus dispositivos.	Për sigurinë tënde, do të dalësh nga të gjitha pajisjet.
+This link works once and expires in {}.	Questo link funziona una volta e scade tra {}.	Este enlace funciona una vez y expira en {}.	Kjo lidhje punon një herë dhe skadon pas {}.
+There's a newer email	C'è un'email più recente	Hay un correo más reciente	Ka një email më të ri
+This account is switched off	Questo account è spento	Esta cuenta está desactivada	Kjo llogari është e fikur
+Set up your POS owner account	Configura il tuo account di titolare POS	Configura tu cuenta de propietario en POS	Konfiguro llogarinë tënde të pronarit në POS
+Reset your POS password	Reimposta la tua password POS	Restablece tu contraseña de POS	Rivendos fjalëkalimin e POS
+Hello {},\n\nVerify your email address for your POS account using this link:\n{}\n\nThis link expires in {}.\n\nIf you did not create this account, you can ignore this email.\n	Ciao {},\n\nverifica il tuo indirizzo email per l'account POS con questo link:\n{}\n\nIl link scade tra {}.\n\nSe non hai creato questo account, puoi ignorare questa email.\n	Hola {}:\n\nVerifica tu correo electrónico para tu cuenta de POS con este enlace:\n{}\n\nEste enlace expira en {}.\n\nSi no creaste esta cuenta, puedes ignorar este correo.\n	Përshëndetje {},\n\nVerifiko adresën e emailit për llogarinë tënde POS me këtë lidhje:\n{}\n\nKjo lidhje skadon pas {}.\n\nNëse nuk e krijove këtë llogari, mund ta injorosh këtë email.\n
+Verify your POS email	Verifica la tua email POS	Verifica tu correo de POS	Verifiko emailin e POS
+Hello {},\n\nYour POS password was changed successfully.\n\nIf you did not make this change, contact support immediately.\n	Ciao {},\n\nla tua password POS è stata cambiata.\n\nSe non sei stato tu, contatta subito l'assistenza.\n	Hola {}:\n\nTu contraseña de POS se cambió correctamente.\n\nSi no hiciste este cambio, contacta al soporte de inmediato.\n	Përshëndetje {},\n\nFjalëkalimi yt i POS u ndryshua me sukses.\n\nNëse nuk e bëre ti këtë ndryshim, kontakto menjëherë mbështetjen.\n
+Your POS password was changed	La tua password POS è stata cambiata	Tu contraseña de POS se cambió	Fjalëkalimi yt i POS u ndryshua
+Hello {},\n\nYou asked to use this email for your POS account. Confirm it here:\n{}\n\nThis link works once and expires in {}. Until then your old email stays.\n\nIf you didn't ask for this, ignore this email: nothing changes.\n	Ciao {},\n\nhai chiesto di usare questa email per il tuo account POS. Confermala qui:\n{}\n\nIl link funziona una volta e scade tra {}. Fino ad allora resta la vecchia email.\n\nSe non l'hai chiesto tu, ignora questa email: non cambia niente.\n	Hola {}:\n\nPediste usar este correo para tu cuenta de POS. Confírmalo aquí:\n{}\n\nEste enlace funciona una vez y expira en {}. Hasta entonces se mantiene tu correo anterior.\n\nSi no lo pediste, ignora este correo: no cambia nada.\n	Përshëndetje {},\n\nKërkove ta përdorësh këtë email për llogarinë tënde POS. Konfirmoje këtu:\n{}\n\nKjo lidhje punon një herë dhe skadon pas {}. Deri atëherë mbetet emaili i vjetër.\n\nNëse nuk e kërkove ti, injoroje këtë email: asgjë nuk ndryshon.\n
+Confirm your new email	Conferma la tua nuova email	Confirma tu nuevo correo	Konfirmo emailin e ri
+Hello {},\n\nYour POS username was changed from "{}" to "{}". Sign in with the new one from now on.\n\nIf this wasn't you, change your password and tell your manager.\n	Ciao {},\n\nil tuo nome utente POS è stato cambiato da "{}" a "{}". Da ora accedi con quello nuovo.\n\nSe non sei stato tu, cambia la password e avvisa il tuo responsabile.\n	Hola {}:\n\nTu usuario de POS cambió de "{}" a "{}". Desde ahora inicia sesión con el nuevo.\n\nSi no fuiste tú, cambia tu contraseña y avisa a tu gerente.\n	Përshëndetje {},\n\nEmri yt i përdoruesit në POS u ndryshua nga "{}" në "{}". Nga tani hyr me të riun.\n\nNëse nuk ishe ti, ndrysho fjalëkalimin dhe njofto menaxherin.\n
+Your POS username was changed	Il tuo nome utente POS è stato cambiato	Tu usuario de POS cambió	Emri yt i përdoruesit në POS u ndryshua
+Hello {},\n\nSomeone asked to change the email of your POS account to {}. It changes only when the link sent there is used.\n\nIf this wasn't you, change your password and tell your manager.\n	Ciao {},\n\nqualcuno ha chiesto di cambiare l'email del tuo account POS in {}. Cambia solo quando viene usato il link inviato lì.\n\nSe non sei stato tu, cambia la password e avvisa il tuo responsabile.\n	Hola {}:\n\nAlguien pidió cambiar el correo de tu cuenta de POS a {}. Solo cambia cuando se use el enlace enviado allí.\n\nSi no fuiste tú, cambia tu contraseña y avisa a tu gerente.\n	Përshëndetje {},\n\nDikush kërkoi të ndryshojë emailin e llogarisë tënde POS në {}. Ndryshon vetëm kur përdoret lidhja e dërguar atje.\n\nNëse nuk ishe ti, ndrysho fjalëkalimin dhe njofto menaxherin.\n
+Your POS email is being changed	L'email del tuo account POS sta per cambiare	El correo de tu cuenta de POS está por cambiar	Emaili yt i POS po ndryshohet
+Hello {},\n\nWe were asked {} times today to send you a link to choose a new POS password. That's the most we send in a day, so no more links will come today.\n\nIf you asked for them, use the newest link we sent. If it has expired, try again tomorrow.\n\nIf you didn't ask for them, you can ignore this email: your password hasn't changed.\n	Ciao {},\n\noggi ci è stato chiesto {} volte di inviarti un link per scegliere una nuova password POS. È il massimo che inviamo in un giorno, quindi oggi non arriveranno altri link.\n\nSe li hai chiesti tu, usa il link più recente che ti abbiamo inviato. Se è scaduto, riprova domani.\n\nSe non li hai chiesti, puoi ignorare questa email: la tua password non è cambiata.\n	Hola {}:\n\nHoy nos pidieron {} veces enviarte un enlace para elegir una nueva contraseña de POS. Es lo máximo que enviamos en un día, así que hoy no llegarán más enlaces.\n\nSi los pediste tú, usa el enlace más reciente que te enviamos. Si expiró, inténtalo mañana.\n\nSi no los pediste, puedes ignorar este correo: tu contraseña no cambió.\n	Përshëndetje {},\n\nSot na u kërkua {} herë të të dërgojmë një lidhje për të zgjedhur një fjalëkalim të ri POS. Kjo është sa më shumë që dërgojmë në një ditë, ndaj sot nuk do të vijnë më lidhje.\n\nNëse i kërkove ti, përdor lidhjen më të re që të dërguam. Nëse ka skaduar, provo nesër.\n\nNëse nuk i kërkove, mund ta injorosh këtë email: fjalëkalimi yt nuk ka ndryshuar.\n
+No more password links today	Niente più link per la password oggi	No hay más enlaces de contraseña hoy	S'ka më lidhje fjalëkalimi sot
+Hello {},\n\nYour POS password was changed {} times today. That's the most allowed in a day, so it can't be changed again until tomorrow.\n\nIf you didn't make these changes, someone may be using your account. Use "Forgot password?" in the POS app to choose a new password, and tell your manager.\n	Ciao {},\n\noggi la tua password POS è stata cambiata {} volte. È il massimo consentito in un giorno, quindi non si può cambiare di nuovo fino a domani.\n\nSe non hai fatto tu queste modifiche, qualcuno potrebbe usare il tuo account. Usa "Password dimenticata?" nell'app POS per scegliere una nuova password e avvisa il tuo responsabile.\n	Hola {}:\n\nHoy tu contraseña de POS se cambió {} veces. Es lo máximo permitido en un día, así que no se puede volver a cambiar hasta mañana.\n\nSi no hiciste estos cambios, alguien podría estar usando tu cuenta. Usa "¿Olvidaste tu contraseña?" en la app POS para elegir una nueva y avisa a tu gerente.\n	Përshëndetje {},\n\nSot fjalëkalimi yt i POS u ndryshua {} herë. Kjo është sa më shumë e lejuar në një ditë, ndaj nuk mund të ndryshohet përsëri deri nesër.\n\nNëse nuk i bëre ti këto ndryshime, dikush mund të jetë duke përdorur llogarinë tënde. Përdor "Harrove fjalëkalimin?" në aplikacionin POS për të zgjedhur një fjalëkalim të ri dhe njofto menaxherin.\n
+Your POS password was changed many times today	La tua password POS è stata cambiata molte volte oggi	Tu contraseña de POS se cambió muchas veces hoy	Fjalëkalimi yt i POS u ndryshua shumë herë sot
+Hello {},\n\nWe received a request to reset your POS password.\n\nChoose a new password using this link:\n{}\n\nThis link works once and expires in {}.\n\nIf you did not request this, you can ignore this email.\n	Ciao {},\n\nabbiamo ricevuto una richiesta di reimpostare la tua password POS.\n\nScegli una nuova password con questo link:\n{}\n\nIl link funziona una volta e scade tra {}.\n\nSe non l'hai chiesto tu, puoi ignorare questa email.\n	Hola {}:\n\nRecibimos una solicitud para restablecer tu contraseña de POS.\n\nElige una nueva contraseña con este enlace:\n{}\n\nEste enlace funciona una vez y expira en {}.\n\nSi no lo pediste, puedes ignorar este correo.\n	Përshëndetje {},\n\nMorëm një kërkesë për të rivendosur fjalëkalimin tënd të POS.\n\nZgjidh një fjalëkalim të ri me këtë lidhje:\n{}\n\nKjo lidhje punon një herë dhe skadon pas {}.\n\nNëse nuk e kërkove ti, mund ta injorosh këtë email.\n
+Then sign in to the POS app with this email address ({}).	Poi accedi all'app POS con questo indirizzo email ({}).	Luego inicia sesión en la app POS con este correo ({}).	Pastaj hyr në aplikacionin POS me këtë adresë emaili ({}).
+Then sign in to the POS app with your username "{}" or this email address.	Poi accedi all'app POS con il tuo nome utente "{}" o con questo indirizzo email.	Luego inicia sesión en la app POS con tu usuario "{}" o con este correo.	Pastaj hyr në aplikacionin POS me emrin e përdoruesit "{}" ose me këtë adresë emaili.
+Hello {},\n\nYou're the owner of {} on POS, and your account is ready.\n\nChoose your password here:\n{}\n\n{}\n\nThis link works once and expires in {}. If it expires, ask for a new invitation.\n\nIf you were not expecting this invitation, you can ignore this email.\n	Ciao {},\n\nsei il titolare di {} su POS e il tuo account è pronto.\n\nScegli la tua password qui:\n{}\n\n{}\n\nIl link funziona una volta e scade tra {}. Se scade, chiedi un nuovo invito.\n\nSe non aspettavi questo invito, puoi ignorare questa email.\n	Hola {}:\n\nEres el propietario de {} en POS y tu cuenta está lista.\n\nElige tu contraseña aquí:\n{}\n\n{}\n\nEste enlace funciona una vez y expira en {}. Si expira, pide una nueva invitación.\n\nSi no esperabas esta invitación, puedes ignorar este correo.\n	Përshëndetje {},\n\nJe pronari i {} në POS dhe llogaria jote është gati.\n\nZgjidh fjalëkalimin këtu:\n{}\n\n{}\n\nKjo lidhje punon një herë dhe skadon pas {}. Nëse skadon, kërko një ftesë të re.\n\nNëse nuk e prisje këtë ftesë, mund ta injorosh këtë email.\n
+1 minute	1 minuto	1 minuto	1 minutë
+{} minutes	{} minuti	{} minutos	{} minuta
+{} hours	{} ore	{} horas	{} orë
+{} days	{} giorni	{} días	{} ditë
+your restaurant	il tuo ristorante	tu restaurante	restoranti yt
+This invitation link has expired. Ask for a new invitation, or use "Forgot password?" in the POS app with your email to get a new link.	Questo link di invito è scaduto. Chiedi un nuovo invito, oppure usa "Password dimenticata?" nell'app POS con la tua email per ricevere un nuovo link.	Este enlace de invitación expiró. Pide una nueva invitación o usa "¿Olvidaste tu contraseña?" en la app POS con tu correo para recibir un enlace nuevo.	Kjo lidhje ftese ka skaduar. Kërko një ftesë të re, ose përdor "Harrove fjalëkalimin?" në aplikacionin POS me emailin tënd për të marrë një lidhje të re.
+This link has expired. Use "Forgot password?" in the POS app to get a new one.	Questo link è scaduto. Usa "Password dimenticata?" nell'app POS per riceverne uno nuovo.	Este enlace expiró. Usa "¿Olvidaste tu contraseña?" en la app POS para recibir uno nuevo.	Kjo lidhje ka skaduar. Përdor "Harrove fjalëkalimin?" në aplikacionin POS për të marrë një të re.
+This link was already used, so your password is set. Sign in with it, or use "Forgot password?" if you don't remember it.	Questo link è già stato usato, quindi la tua password è impostata. Accedi con quella, oppure usa "Password dimenticata?" se non la ricordi.	Este enlace ya se usó, así que tu contraseña está configurada. Inicia sesión con ella o usa "¿Olvidaste tu contraseña?" si no la recuerdas.	Kjo lidhje është përdorur tashmë, ndaj fjalëkalimi yt është vendosur. Hyr me të, ose përdor "Harrove fjalëkalimin?" nëse nuk e mban mend.
+A newer invitation replaced this link. Use the link in the most recent email.	Un invito più recente ha sostituito questo link. Usa il link dell'email più recente.	Una invitación más reciente reemplazó este enlace. Usa el enlace del correo más reciente.	Një ftesë më e re e zëvendësoi këtë lidhje. Përdor lidhjen në emailin më të fundit.
+A newer email replaced this link. Use the link in the most recent email.	Un'email più recente ha sostituito questo link. Usa il link dell'email più recente.	Un correo más reciente reemplazó este enlace. Usa el enlace del correo más reciente.	Një email më i ri e zëvendësoi këtë lidhje. Përdor lidhjen në emailin më të fundit.
+This account has been switched off. Contact whoever set it up for you.	Questo account è stato spento. Contatta chi l'ha configurato per te.	Esta cuenta se desactivó. Contacta a quien la configuró para ti.	Kjo llogari është fikur. Kontakto atë që ta konfiguroi.
+This link isn't valid. Check that you copied the whole link from the email.	Questo link non è valido. Controlla di aver copiato tutto il link dall'email.	Este enlace no es válido. Revisa que hayas copiado el enlace completo del correo.	Kjo lidhje nuk është e vlefshme. Kontrollo që e kopjove të gjithë lidhjen nga emaili.
+Use at least 8 characters.	Usa almeno 8 caratteri.	Usa al menos 8 caracteres.	Përdor të paktën 8 karaktere.
+Use at most 100 characters.	Usa al massimo 100 caratteri.	Usa como máximo 100 caracteres.	Përdor deri në 100 karaktere.
+The password can't start or end with a space.	La password non può iniziare o finire con uno spazio.	La contraseña no puede empezar ni terminar con un espacio.	Fjalëkalimi nuk mund të fillojë ose mbarojë me hapësirë.
+Add an uppercase letter.	Aggiungi una lettera maiuscola.	Agrega una letra mayúscula.	Shto një shkronjë të madhe.
+Add a number.	Aggiungi un numero.	Agrega un número.	Shto një numër.
+Add a special character, like ! or #.	Aggiungi un carattere speciale, come ! o #.	Agrega un carácter especial, como ! o #.	Shto një karakter të veçantë, si ! ose #.
+closed	chiuso	cerrado	mbyllur
+Write your name	Scrivi il tuo nome	Escribe tu nombre	Shkruaj emrin tënd
+Write a valid email, so we can confirm the booking	Scrivi un'email valida, così possiamo confermare la prenotazione	Escribe un correo válido para que podamos confirmar la reserva	Shkruaj një email të vlefshëm, që të konfirmojmë rezervimin
+Say how many guests	Indica quanti ospiti	Indica cuántos comensales	Thuaj sa mysafirë
+Not found	Non trovato	No encontrado	Nuk u gjet
+This restaurant doesn't take bookings online.	Questo ristorante non accetta prenotazioni online.	Este restaurante no acepta reservas en línea.	Ky restorant nuk pranon rezervime online.
+Check the day and time	Controlla giorno e ora	Revisa el día y la hora	Kontrollo ditën dhe orën
+Cancel your booking?	Annullare la prenotazione?	¿Cancelar tu reserva?	Ta anulosh rezervimin?
+Cancelling is free.	Annullare è gratuito.	Cancelar es gratis.	Anulimi është falas.
+What happens to what you paid:	Cosa succede a quanto hai pagato:	Qué pasa con lo que pagaste:	Çfarë ndodh me atë që pagove:
+Cancel booking	Annulla prenotazione	Cancelar reserva	Anulo rezervimin
+Keep my booking	Tieni la mia prenotazione	Mantener mi reserva	Mbaje rezervimin tim
+Booking not found	Prenotazione non trovata	Reserva no encontrada	Rezervimi nuk u gjet
+Check the link in your email.	Controlla il link nella tua email.	Revisa el enlace de tu correo.	Kontrollo lidhjen në emailin tënd.
+None	Nessuno	Ninguno	Asnjë
+Book a table	Prenota un tavolo	Reservar una mesa	Rezervo një tavolinë
+Day	Giorno	Día	Dita
+Time	Ora	Hora	Ora
+Closed that day.	Chiuso quel giorno.	Cerrado ese día.	E mbyllur atë ditë.
+Guests	Ospiti	Comensales	Mysafirët
+Name	Nome	Nombre	Emri
+Email	Email	Correo	Email
+Phone (optional)	Telefono (facoltativo)	Teléfono (opcional)	Telefoni (opsional)
+Occasion (optional)	Occasione (facoltativa)	Ocasión (opcional)	Rasti (opsional)
+Note (optional)	Nota (facoltativa)	Nota (opcional)	Shënim (opsional)
+Book	Prenota	Reservar	Rezervo
+If no table is free we send your request to the restaurant and email you their answer. Cancelling is always free.	Se nessun tavolo è libero inviamo la tua richiesta al ristorante e ti mandiamo la risposta via email. Annullare è sempre gratuito.	Si no hay mesa libre enviamos tu solicitud al restaurante y te mandamos su respuesta por correo. Cancelar siempre es gratis.	Nëse nuk ka tavolinë të lirë, ia dërgojmë kërkesën restorantit dhe të dërgojmë përgjigjen me email. Anulimi është gjithmonë falas.
+Next open: {}	Prossima apertura: {}	Próxima apertura: {}	Hapet sërish: {}
+1 guest	1 ospite	1 comensal	1 mysafir
+{} guests	{} ospiti	{} comensales	{} mysafirë
+Booking code {}	Codice prenotazione {}	Código de reserva {}	Kodi i rezervimit {}
+I'm coming ✓	Vengo ✓	Voy ✓	Vij ✓
+✓ You confirmed you're coming	✓ Hai confermato che vieni	✓ Confirmaste que vienes	✓ Konfirmove që vjen
+Running late? We'll keep your table a little longer (your booking still ends at {}).	In ritardo? Ti teniamo il tavolo un po' di più (la prenotazione finisce comunque alle {}).	¿Llegas tarde? Te guardamos la mesa un poco más (tu reserva igual termina a las {}).	Po vonohesh? Ta mbajmë tavolinën pak më gjatë (rezervimi yt mbaron gjithsesi në {}).
++{} min	+{} min	+{} min	+{} min
+Payments	Pagamenti	Pagos	Pagesat
+Pay {}	Paga {}	Pagar a {}	Paguaj {}
+Test mode: no card is charged.	Modalità di prova: nessuna carta viene addebitata.	Modo de prueba: no se cobra ninguna tarjeta.	Modalitet prove: asnjë kartë nuk tarifohet.
+Opening hours: {}	Orari di apertura: {}	Horario: {}	Orari i hapjes: {}
+Call {}	Chiama {}	Llama al {}	Telefono {}
+Write to {}	Scrivi a {}	Escribe a {}	Shkruaj te {}
+Questions? {}	Domande? {}	¿Preguntas? {}	Pyetje? {}
+Thank you! We've emailed you the details.	Grazie! Ti abbiamo inviato i dettagli via email.	¡Gracias! Te enviamos los detalles por correo.	Faleminderit! Të dërguam detajet me email.
+Thanks for confirming. See you soon!	Grazie per la conferma. A presto!	Gracias por confirmar. ¡Hasta pronto!	Faleminderit për konfirmimin. Shihemi së shpejti!
+Thanks for letting us know. We'll keep your table a little longer.	Grazie per avercelo detto. Ti teniamo il tavolo un po' di più.	Gracias por avisarnos. Te guardamos la mesa un poco más.	Faleminderit që na njoftove. Ta mbajmë tavolinën pak më gjatë.
+Payment received. Thank you!	Pagamento ricevuto. Grazie!	Pago recibido. ¡Gracias!	Pagesa u mor. Faleminderit!
+Your booking is cancelled.	La tua prenotazione è annullata.	Tu reserva está cancelada.	Rezervimi yt u anulua.
+{} at {}	{} alle {}	{} a las {}	{} në {}
+Deposit for {} guests	Caparra per {} ospiti	Depósito para {} comensales	Depozitë për {} mysafirë
+Food pre-order	Preordine del cibo	Prepedido de comida	Paraporosi ushqimi
+Waiting for payment	In attesa di pagamento	Esperando el pago	Në pritje të pagesës
+Waiting for payment, order before {}	In attesa di pagamento, ordina entro {}	Esperando el pago, pide antes de {}	Në pritje të pagesës, porosit para {}
+{} refunded	{} rimborsati	{} reembolsados	{} të rimbursuara
+Kept by the restaurant ({} given back)	Trattenuto dal ristorante ({} restituiti)	Retenido por el restaurante ({} devueltos)	Mbajtur nga restoranti ({} të kthyera)
+Kept by the restaurant	Trattenuto dal ristorante	Retenido por el restaurante	Mbajtur nga restoranti
+Not needed anymore	Non più necessario	Ya no es necesario	Nuk nevojitet më
+{} back if cancelled now: {} {} minus the card fee ({})	{} restituiti se annulli ora: {} {} meno la commissione della carta ({})	{} de vuelta si cancelas ahora: {} {} menos la comisión de la tarjeta ({})	{} kthehen nëse anulon tani: {} {} minus komisionin e kartës ({})
+No refund if cancelled now: {} (the deadline was {})	Nessun rimborso se annulli ora: {} (la scadenza era {})	Sin reembolso si cancelas ahora: {} (el plazo era {})	Pa rimbursim nëse anulon tani: {} (afati ishte {})
+the booking time	l'ora della prenotazione	la hora de la reserva	ora e rezervimit
+Request sent: we'll let you know soon	Richiesta inviata: ti faremo sapere presto	Solicitud enviada: te avisaremos pronto	Kërkesa u dërgua: do të të njoftojmë së shpejti
+Confirmed ✓ · you confirmed you're coming	Confermata ✓ · hai confermato che vieni	Confirmada ✓ · confirmaste que vienes	E konfirmuar ✓ · konfirmove që vjen
+Confirmed ✓	Confermata ✓	Confirmada ✓	E konfirmuar ✓
+You're here. Enjoy!	Sei qui. Buon appetito!	Ya estás aquí. ¡Disfruta!	Je këtu. Të bëftë mirë!
+Thank you for your visit	Grazie per la visita	Gracias por tu visita	Faleminderit për vizitën
+Sorry, we couldn't take this booking	Ci dispiace, non abbiamo potuto accettare questa prenotazione	Lo sentimos, no pudimos aceptar esta reserva	Na vjen keq, nuk mundëm ta pranonim këtë rezervim
+Cancelled	Annullato	Cancelado	I anuluar
+Missed	Saltato	No hecho	I humbur
+Sorry, we couldn't confirm this request	Ci dispiace, non abbiamo potuto confermare questa richiesta	Lo sentimos, no pudimos confirmar esta solicitud	Na vjen keq, nuk mundëm ta konfirmonim këtë kërkesë
+Please contact us about this booking	Contattaci per questa prenotazione	Contáctanos sobre esta reserva	Na kontakto për këtë rezervim
+Please let us know you're coming, or cancel if your plans changed (it's free):	Facci sapere che vieni, o annulla se hai cambiato programma (è gratuito):	Avísanos que vienes, o cancela si cambiaron tus planes (es gratis):	Na trego që vjen, ose anulo nëse ndryshuan planet (është falas):
+We'll send a reminder before your visit. Need to change or cancel? It's free:	Ti invieremo un promemoria prima della visita. Devi cambiare o annullare? È gratuito:	Te enviaremos un recordatorio antes de tu visita. ¿Necesitas cambiar o cancelar? Es gratis:	Do të të dërgojmë një kujtesë para vizitës. Duhet të ndryshosh ose anulosh? Është falas:
+Reservation request received	Richiesta di prenotazione ricevuta	Solicitud de reserva recibida	Kërkesa për rezervim u mor
+Your reservation request has been sent. We'll let you know as soon as we can confirm it.	La tua richiesta di prenotazione è stata inviata. Ti faremo sapere appena possiamo confermarla.	Tu solicitud de reserva se envió. Te avisaremos en cuanto podamos confirmarla.	Kërkesa jote për rezervim u dërgua. Do të të njoftojmë sapo ta konfirmojmë.
+Your request: {}	La tua richiesta: {}	Tu solicitud: {}	Kërkesa jote: {}
+Sorry, we're full	Ci dispiace, siamo al completo	Lo sentimos, estamos llenos	Na vjen keq, jemi plot
+Sorry, we can't take your booking for {}: we're full.	Ci dispiace, non possiamo accettare la tua prenotazione per {}: siamo al completo.	Lo sentimos, no podemos aceptar tu reserva para el {}: estamos llenos.	Na vjen keq, nuk mund ta pranojmë rezervimin tënd për {}: jemi plot.
+We couldn't confirm your request	Non abbiamo potuto confermare la tua richiesta	No pudimos confirmar tu solicitud	Nuk mundëm ta konfirmonim kërkesën tënde
+Sorry, we couldn't confirm your request for {}.	Ci dispiace, non abbiamo potuto confermare la tua richiesta per {}.	Lo sentimos, no pudimos confirmar tu solicitud para el {}.	Na vjen keq, nuk mundëm ta konfirmonim kërkesën tënde për {}.
+Booking cancelled	Prenotazione annullata	Reserva cancelada	Rezervimi u anulua
+Your booking for {} is cancelled.	La tua prenotazione per {} è annullata.	Tu reserva para el {} está cancelada.	Rezervimi yt për {} u anulua.
+See you soon? Please confirm	A presto? Conferma per favore	¿Nos vemos pronto? Confirma por favor	Shihemi së shpejti? Të lutem konfirmo
+See you soon? Your table is booked for {} ({}).	A presto? Il tuo tavolo è prenotato per {} ({}).	¿Nos vemos pronto? Tu mesa está reservada para el {} ({}).	Shihemi së shpejti? Tavolina jote është e rezervuar për {} ({}).
+Please confirm you're still coming, tell us if you're running late, or cancel for free:	Conferma che vieni ancora, dicci se sei in ritardo o annulla gratuitamente:	Confirma que sigues viniendo, avísanos si llegas tarde o cancela gratis:	Konfirmo që vjen ende, na trego nëse po vonohesh, ose anulo falas:
+Still coming today? Please confirm	Vieni ancora oggi? Conferma per favore	¿Sigues viniendo hoy? Confirma por favor	Vjen ende sot? Të lutem konfirmo
+We haven't heard from you yet. Your table is booked for {} ({}).	Non abbiamo ancora tue notizie. Il tuo tavolo è prenotato per {} ({}).	Aún no sabemos de ti. Tu mesa está reservada para el {} ({}).	Ende nuk kemi dëgjuar nga ti. Tavolina jote është e rezervuar për {} ({}).
+Please confirm you're still coming, or cancel for free:	Conferma che vieni ancora, o annulla gratuitamente:	Confirma que sigues viniendo, o cancela gratis:	Konfirmo që vjen ende, ose anulo falas:
+Payment for your booking	Pagamento per la tua prenotazione	Pago de tu reserva	Pagesa për rezervimin tënd
+For your booking on {}:	Per la tua prenotazione del {}:	Para tu reserva del {}:	Për rezervimin tënd më {}:
+Pay here: {}	Paga qui: {}	Paga aquí: {}	Paguaj këtu: {}
+To pay:	Da pagare:	Por pagar:	Për të paguar:
+If you cancel in time you get it back minus the card fee. After the deadline, or if you don't come, there's no refund.	Se annulli in tempo ti viene restituito meno la commissione della carta. Dopo la scadenza, o se non vieni, non c'è rimborso.	Si cancelas a tiempo te lo devolvemos menos la comisión de la tarjeta. Después del plazo, o si no vienes, no hay reembolso.	Nëse anulon në kohë, të kthehet minus komisionin e kartës. Pas afatit, ose nëse nuk vjen, nuk ka rimbursim.
+refunded {}	rimborsati {}	reembolsado {}	rimbursuar {}
+no refund (after the deadline)	nessun rimborso (dopo la scadenza)	sin reembolso (después del plazo)	pa rimbursim (pas afatit)
+nothing was charged	non è stato addebitato nulla	no se cobró nada	asgjë nuk u tarifua
+Hello {},	Ciao {},	Hola {}:	Përshëndetje {},
+the restaurant	il ristorante	el restaurante	restoranti
+See you soon,	A presto,	Hasta pronto,	Shihemi së shpejti,
+Phone: {}	Telefono: {}	Teléfono: {}	Telefoni: {}
+Email: {}	Email: {}	Correo: {}	Email: {}
+{} was removed from the staff and signed out everywhere	{} è stato rimosso dal personale e disconnesso ovunque	{} fue eliminado del personal y se cerró su sesión en todas partes	{} u hoq nga stafi dhe doli nga të gjitha pajisjet
+{} (removed)	{} (rimosso)	{} (eliminado)	{} (i hequr)
+Choose a restaurant.	Scegli un ristorante.	Elige un restaurante.	Zgjidh një restorant.
+Choose what you ask for	Scegli cosa chiedi	Elige lo que pides	Zgjidh çfarë kërkon
+Invalid schema	Invalid schema	Invalid schema	Invalid schema
+Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}	Permission not found during role seeding: {}
+SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding	SUPER_ADMIN role not found after seeding
+Super admin username is already used by another account: {}	Super admin username is already used by another account: {}	Super admin username is already used by another account: {}	Super admin username is already used by another account: {}
+Type the new email	Scrivi la nuova email	Escribe el nuevo correo	Shkruaj emailin e ri
+That doesn't look like an email address	Non sembra un indirizzo email	Eso no parece un correo electrónico	Kjo nuk duket si adresë emaili
+Email must be at most 150 characters	L'email può avere al massimo 150 caratteri	El correo puede tener como máximo 150 caracteres	Emaili mund të ketë deri në 150 karaktere
+Type your current password	Scrivi la tua password attuale	Escribe tu contraseña actual	Shkruaj fjalëkalimin aktual
+Password must be at most 100 characters	La password può avere al massimo 100 caratteri	La contraseña puede tener como máximo 100 caracteres	Fjalëkalimi mund të ketë deri në 100 karaktere
+Type the new username	Scrivi il nuovo nome utente	Escribe el nuevo usuario	Shkruaj emrin e ri të përdoruesit
+Username must be at most 50 characters	Il nome utente può avere al massimo 50 caratteri	El usuario puede tener como máximo 50 caracteres	Emri i përdoruesit mund të ketë deri në 50 karaktere
+Phone must be at most 50 characters	Il telefono può avere al massimo 50 caratteri	El teléfono puede tener como máximo 50 caracteres	Telefoni mund të ketë deri në 50 karaktere
+Identifier is required	Serve un identificativo	Se requiere un identificador	Identifikuesi kërkohet
+Identifier must be at most 150 characters	L'identificativo può avere al massimo 150 caratteri	El identificador puede tener como máximo 150 caracteres	Identifikuesi mund të ketë deri në 150 karaktere
+Password is required	Serve la password	Se requiere la contraseña	Fjalëkalimi kërkohet
+Password must be between 8 and 100 characters	La password deve avere tra 8 e 100 caratteri	La contraseña debe tener entre 8 y 100 caracteres	Fjalëkalimi duhet të ketë 8 deri në 100 karaktere
+Invalid email format	Formato email non valido	Formato de correo no válido	Format emaili i pavlefshëm
+Email is required	Serve l'email	Se requiere el correo	Emaili kërkohet
+Username is required	Serve il nome utente	Se requiere el usuario	Emri i përdoruesit kërkohet
+Username must be between 3 and 50 characters	Il nome utente deve avere tra 3 e 50 caratteri	El usuario debe tener entre 3 y 50 caracteres	Emri i përdoruesit duhet të ketë 3 deri në 50 karaktere
+Username may only contain letters, numbers, dots, underscores, and hyphens	Il nome utente può contenere solo lettere, numeri, punti, trattini bassi e trattini	El usuario solo puede tener letras, números, puntos, guiones bajos y guiones	Emri i përdoruesit mund të ketë vetëm shkronja, numra, pika, nënvija dhe viza
+First name is required	Serve il nome	Se requiere el nombre	Emri kërkohet
+First name must be at most 50 characters	Il nome può avere al massimo 50 caratteri	El nombre puede tener como máximo 50 caracteres	Emri mund të ketë deri në 50 karaktere
+Last name is required	Serve il cognome	Se requiere el apellido	Mbiemri kërkohet
+Last name must be at most 50 characters	Il cognome può avere al massimo 50 caratteri	El apellido puede tener como máximo 50 caracteres	Mbiemri mund të ketë deri në 50 karaktere
+Your first name is needed	Serve il tuo nome	Se necesita tu nombre	Duhet emri yt
+First name must be at most 100 characters	Il nome può avere al massimo 100 caratteri	El nombre puede tener como máximo 100 caracteres	Emri mund të ketë deri në 100 karaktere
+Your last name is needed	Serve il tuo cognome	Se necesita tu apellido	Duhet mbiemri yt
+Last name must be at most 100 characters	Il cognome può avere al massimo 100 caratteri	El apellido puede tener como máximo 100 caracteres	Mbiemri mund të ketë deri në 100 karaktere
+The invitation could not be sent. Try again.	Impossibile inviare l'invito. Riprova.	No se pudo enviar la invitación. Inténtalo de nuevo.	Ftesa nuk u dërgua. Provo përsëri.
+Add the restaurant's owner first.	Aggiungi prima il proprietario del ristorante.	Agrega primero al dueño del restaurante.	Shto fillimisht pronarin e restorantit.
+Restaurant not found	Ristorante non trovato	Restaurante no encontrado	Restoranti nuk u gjet
+Only staff of a restaurant can add people to it	Solo il personale di un ristorante può aggiungervi persone	Solo el personal de un restaurante puede agregarle personas	Vetëm stafi i një restoranti mund të shtojë njerëz në të
+You can only add people to your own restaurant	Puoi aggiungere persone solo al tuo ristorante	Solo puedes agregar personas a tu propio restaurante	Mund të shtosh njerëz vetëm në restorantin tënd
+A restaurant is required for a branch	Una sede ha bisogno di un ristorante	Una sucursal necesita un restaurante	Një pikë ka nevojë për një restorant
+Current password is incorrect	La password attuale non è corretta	La contraseña actual es incorrecta	Fjalëkalimi aktual është i pasaktë
+That email is now used by another account.	Quell'email ora è usata da un altro account.	Ese correo ahora lo usa otra cuenta.	Ai email tani përdoret nga një llogari tjetër.
+That phone number is used by another account.	Quel numero di telefono è usato da un altro account.	Ese número de teléfono lo usa otra cuenta.	Ai numër telefoni përdoret nga një llogari tjetër.
+That's already your email.	È già la tua email.	Ese ya es tu correo.	Ky është tashmë emaili yt.
+That email is used by another account.	Quell'email è usata da un altro account.	Ese correo lo usa otra cuenta.	Ai email përdoret nga një llogari tjetër.
+An email was just sent. Wait a few minutes before asking again.	È appena stata inviata un'email. Aspetta qualche minuto prima di chiedere di nuovo.	Se acaba de enviar un correo. Espera unos minutos antes de volver a pedirlo.	Sapo u dërgua një email. Prit disa minuta para se ta kërkosh përsëri.
+Use 3–30 letters, numbers, dots, dashes or underscores, with at least one letter.	Usa 3–30 lettere, numeri, punti, trattini o trattini bassi, con almeno una lettera.	Usa de 3 a 30 letras, números, puntos, guiones o guiones bajos, con al menos una letra.	Përdor 3–30 shkronja, numra, pika, viza ose nënvija, me të paktën një shkronjë.
+That's already your username.	È già il tuo nome utente.	Ese ya es tu usuario.	Ky është tashmë emri yt i përdoruesit.
+That username can't be used. Choose another one.	Quel nome utente non si può usare. Scegline un altro.	Ese usuario no se puede usar. Elige otro.	Ai emër përdoruesi nuk mund të përdoret. Zgjidh një tjetër.
+That username is taken.	Quel nome utente è già preso.	Ese usuario ya está en uso.	Ai emër përdoruesi është i zënë.
+You can change your username 3 times in 30 days. Next on {}.	Puoi cambiare il nome utente 3 volte in 30 giorni. Prossima volta il {}.	Puedes cambiar tu usuario 3 veces en 30 días. La próxima vez el {}.	Mund ta ndryshosh emrin e përdoruesit 3 herë në 30 ditë. Herën tjetër më {}.
+Choose English, Italiano, Español or Shqip.	Scegli English, Italiano, Español o Shqip.	Elige English, Italiano, Español o Shqip.	Zgjidh English, Italiano, Español ose Shqip.
+Failed to hash one-time code	Failed to hash one-time code	Failed to hash one-time code	Failed to hash one-time code
+Code length must be between 4 and 8 digits	Il codice deve avere tra 4 e 8 cifre	El código debe tener entre 4 y 8 dígitos	Kodi duhet të ketë 4 deri në 8 shifra
+Your password was changed {} times today. Try again tomorrow.	La tua password è stata cambiata {} volte oggi. Riprova domani.	Tu contraseña se cambió {} veces hoy. Inténtalo mañana.	Fjalëkalimi yt u ndryshua {} herë sot. Provo nesër.
+User account must be active before sending an onboarding email	L'account deve essere attivo prima di inviare un'email di benvenuto	La cuenta debe estar activa antes de enviar un correo de bienvenida	Llogaria duhet të jetë aktive para se të dërgohet një email mirëseardhjeje
+User account must be active before sending a password reset email	L'account deve essere attivo prima di inviare un'email di reimpostazione password	La cuenta debe estar activa antes de enviar un correo para restablecer la contraseña	Llogaria duhet të jetë aktive para se të dërgohet një email për rivendosjen e fjalëkalimit
+User must have a verified email before sending a password reset email	L'utente deve avere un'email verificata prima di inviare un'email di reimpostazione password	El usuario debe tener un correo verificado antes de enviar un correo para restablecer la contraseña	Përdoruesi duhet të ketë email të verifikuar para se të dërgohet një email për rivendosjen e fjalëkalimit
+User account must be active before sending an SMS password reset	L'account deve essere attivo prima di inviare un SMS di reimpostazione password	La cuenta debe estar activa antes de enviar un SMS para restablecer la contraseña	Llogaria duhet të jetë aktive para se të dërgohet një SMS për rivendosjen e fjalëkalimit
+User must have a verified phone before sending an SMS password reset	L'utente deve avere un telefono verificato prima di inviare un SMS di reimpostazione password	El usuario debe tener un teléfono verificado antes de enviar un SMS para restablecer la contraseña	Përdoruesi duhet të ketë telefon të verifikuar para se të dërgohet një SMS për rivendosjen e fjalëkalimit
+User is not eligible for SMS password reset	L'utente non può reimpostare la password via SMS	El usuario no puede restablecer la contraseña por SMS	Përdoruesi nuk mund ta rivendosë fjalëkalimin me SMS
+Email is required for email password reset	Serve l'email per reimpostare la password via email	Se requiere el correo para restablecer la contraseña por correo	Emaili kërkohet për rivendosjen e fjalëkalimit me email
+Phone is required for SMS password reset	Serve il telefono per reimpostare la password via SMS	Se requiere el teléfono para restablecer la contraseña por SMS	Telefoni kërkohet për rivendosjen e fjalëkalimit me SMS
+A phone number is required before it can be verified	Serve un numero di telefono prima di poterlo verificare	Se necesita un número de teléfono antes de poder verificarlo	Duhet një numër telefoni para se të verifikohet
+You've had 10 PIN suggestions today. Try again tomorrow.	Hai già avuto 10 PIN suggeriti oggi. Riprova domani.	Ya tuviste 10 sugerencias de PIN hoy. Inténtalo mañana.	Ke marrë 10 PIN të sugjeruar sot. Provo nesër.
+No PIN could be found right now. Try again.	Al momento non è stato trovato nessun PIN. Riprova.	No se encontró ningún PIN ahora. Inténtalo de nuevo.	Nuk u gjet asnjë PIN tani. Provo përsëri.
+Generate a PIN first.	Prima genera un PIN.	Primero genera un PIN.	Krijo së pari një PIN.
+You can change your PIN 3 times a day. Try again tomorrow.	Puoi cambiare il PIN 3 volte al giorno. Riprova domani.	Puedes cambiar tu PIN 3 veces al día. Inténtalo mañana.	Mund ta ndryshosh PIN-in 3 herë në ditë. Provo nesër.
+That PIN was just taken. Generate another one.	Quel PIN è appena stato preso. Generane un altro.	Ese PIN acaba de ser tomado. Genera otro.	Ai PIN sapo u mor. Krijo një tjetër.
+PIN hashing failed	PIN hashing failed	PIN hashing failed	PIN hashing failed
+A PIN is for a restaurant's staff.	Il PIN è per il personale di un ristorante.	Un PIN es para el personal de un restaurante.	PIN-i është për stafin e një restoranti.
+SMS delivery is currently unavailable	L'invio di SMS al momento non è disponibile	El envío de SMS no está disponible por ahora	Dërgimi i SMS-ve nuk është i disponueshëm tani
+Customer code already exists in this restaurant	Il codice cliente esiste già in questo ristorante	El código de cliente ya existe en este restaurante	Kodi i klientit ekziston tashmë në këtë restorant
+Customer update violates a data constraint	L'aggiornamento del cliente viola un vincolo dei dati	La actualización del cliente infringe una regla de datos	Përditësimi i klientit shkel një rregull të të dhënave
+This code doesn't work. It may be used, ended, or typed wrong.	Questo codice non funziona. Forse è già usato, scaduto o scritto male.	Este código no funciona. Puede que ya se haya usado, haya vencido o esté mal escrito.	Ky kod nuk punon. Mund të jetë përdorur, të ketë mbaruar ose të jetë shkruar gabim.
+This code doesn't work any more. Ask for a new one.	Questo codice non funziona più. Chiedine uno nuovo.	Este código ya no funciona. Pide uno nuevo.	Ky kod nuk funksionon më. Kërko një të ri.
+This code doesn't work here.	Questo codice non funziona qui.	Este código no funciona aquí.	Ky kod nuk punon këtu.
+This code doesn't work here. It's for a tablet or screen: enter it in Tablets & screens.	Questo codice non funziona qui. È per un tablet o uno schermo: inseriscilo in Tablet e schermi.	Este código no funciona aquí. Es para una tableta o pantalla: ingrésalo en Tabletas y pantallas.	Ky kod nuk punon këtu. Është për një tablet ose ekran: fute te Tabletë dhe ekrane.
+This code doesn't work here. It's for a till: enter it in Tills.	Questo codice non funziona qui. È per una cassa: inseriscilo in Casse.	Este código no funciona aquí. Es para una caja: ingrésalo en Cajas.	Ky kod nuk punon këtu. Është për një arkë: fute te Arkat.
+That device is in use. Disconnect it first, then make a new code.	Quel dispositivo è in uso. Scollegalo prima, poi crea un nuovo codice.	Ese dispositivo está en uso. Desconéctalo primero y luego crea un código nuevo.	Ajo pajisje është në përdorim. Shkëpute fillimisht, pastaj krijo një kod të ri.
+Someone else is waiting with this code. Try again in a few minutes.	Qualcun altro è in attesa con questo codice. Riprova tra qualche minuto.	Otra persona está esperando con este código. Inténtalo de nuevo en unos minutos.	Dikush tjetër po pret me këtë kod. Provo përsëri pas pak minutash.
+Not agreed yet.	Non ancora accettato.	Aún no aceptado.	Ende nuk është pranuar.
+This device is already connected.	Questo dispositivo è già collegato.	Este dispositivo ya está conectado.	Kjo pajisje është lidhur tashmë.
+The person who made the code refused it.	La persona che ha creato il codice l'ha rifiutato.	La persona que creó el código lo rechazó.	Personi që krijoi kodin e refuzoi.
+This request has ended. Ask for a new code.	Questa richiesta è terminata. Chiedi un nuovo codice.	Esta solicitud terminó. Pide un código nuevo.	Kjo kërkesë ka mbaruar. Kërko një kod të ri.
+Only the person who made the code answers this.	Solo la persona che ha creato il codice può rispondere.	Solo la persona que creó el código puede responder.	Vetëm personi që krijoi kodin mund të përgjigjet.
+This request isn't waiting any more.	Questa richiesta non è più in attesa.	Esta solicitud ya no está esperando.	Kjo kërkesë nuk është më në pritje.
+This request isn't there any more.	Questa richiesta non c'è più.	Esta solicitud ya no existe.	Kjo kërkesë nuk ekziston më.
+Save the restaurant's network first.	Salva prima la rete del ristorante.	Primero guarda la red del restaurante.	Ruaj më parë rrjetin e restorantit.
+Couldn't tell which network you're on.	Impossibile capire su quale rete sei.	No se pudo saber en qué red estás.	Nuk u kuptua në cilin rrjet je.
+Only a network a device tried from can be allowed from here.	Da qui puoi consentire solo una rete da cui ha provato un dispositivo.	Desde aquí solo puedes permitir una red desde la que intentó un dispositivo.	Nga këtu mund të lejosh vetëm një rrjet nga i cili provoi një pajisje.
+A branch keeps {} networks at most. Remove one first.	Una sede tiene al massimo {} reti. Rimuovine prima una.	Una sucursal guarda {} redes como máximo. Quita una primero.	Një pikë mban të shumtën {} rrjete. Hiq njërin më parë.
+That network isn't saved any more.	Quella rete non è più salvata.	Esa red ya no está guardada.	Ai rrjet nuk është më i ruajtur.
+Connect this device from the restaurant's Wi-Fi.	Collega questo dispositivo dal Wi-Fi del ristorante.	Conecta este dispositivo desde el Wi-Fi del restaurante.	Lidhe këtë pajisje nga Wi-Fi-i i restorantit.
+A document printer prints documents only. Choose it when you print a report.	Una stampante documenti stampa solo documenti. Sceglila quando stampi un report.	Una impresora de documentos solo imprime documentos. Elígela cuando imprimas un informe.	Një printer dokumentesh printon vetëm dokumente. Zgjidhe kur printon një raport.
+A till you chose isn't one of this restaurant's.	Una cassa che hai scelto non è di questo ristorante.	Una caja que elegiste no es de este restaurante.	Një arkë që zgjodhe nuk është e këtij restoranti.
+A kitchen station you chose isn't one of this restaurant's.	Una postazione di cucina che hai scelto non è di questo ristorante.	Una estación de cocina que elegiste no es de este restaurante.	Një stacion kuzhine që zgjodhe nuk është i këtij restoranti.
+That isn't something to print.	Questo non è qualcosa da stampare.	Eso no es algo para imprimir.	Kjo nuk është diçka për t'u printuar.
+That print isn't there any more.	Quella stampa non c'è più.	Esa impresión ya no está.	Ai printim nuk është më.
+Device authentication failed	Autenticazione del dispositivo non riuscita	Falló la autenticación del dispositivo	Vërtetimi i pajisjes dështoi
+Unsupported assignmentType	Unsupported assignmentType	Unsupported assignmentType	Unsupported assignmentType
+Device assignment not found	Assegnazione del dispositivo non trovata	Asignación del dispositivo no encontrada	Caktimi i pajisjes nuk u gjet
+Only someone who manages devices can connect this one.	Solo chi gestisce i dispositivi può collegare questo.	Solo quien administra los dispositivos puede conectar este.	Vetëm dikush që menaxhon pajisjet mund ta lidhë këtë.
+Only active or provisioning devices can be paired	Solo i dispositivi attivi o in configurazione possono essere associati	Solo se pueden vincular dispositivos activos o en configuración	Vetëm pajisjet aktive ose në konfigurim mund të lidhen
+Device pairing token not found	Codice di associazione del dispositivo non trovato	Código de vinculación del dispositivo no encontrado	Kodi i lidhjes së pajisjes nuk u gjet
+Only someone who manages devices can disconnect this one.	Solo chi gestisce i dispositivi può scollegare questo.	Solo quien gestiona los dispositivos puede desconectar este.	Vetëm ai që menaxhon pajisjet mund ta shkëpusë këtë.
+Assigned user must belong to the same restaurant as the device	L'utente assegnato deve appartenere allo stesso ristorante del dispositivo	El usuario asignado debe pertenecer al mismo restaurante que el dispositivo	Përdoruesi i caktuar duhet t'i përkasë të njëjtit restorant si pajisja
+Device assignment update violates a data constraint	L'aggiornamento dell'assegnazione viola un vincolo dei dati	La actualización de la asignación infringe una regla de datos	Përditësimi i caktimit shkel një rregull të të dhënave
+Device pairing token update violates a data constraint	L'aggiornamento del codice di associazione viola un vincolo dei dati	La actualización del código de vinculación infringe una regla de datos	Përditësimi i kodit të lidhjes shkel një rregull të të dhënave
+This code waits for the person who made it to agree: open Devices and press “Enter a code”.	Questo codice aspetta che chi l'ha creato sia d'accordo: apri Dispositivi e premi “Inserisci un codice”.	Este código espera que quien lo creó esté de acuerdo: abre Dispositivos y pulsa “Ingresa un código”.	Ky kod pret që ai që e krijoi të pajtohet: hap Pajisjet dhe shtyp “Fut një kod”.
+Pairing token is invalid or expired	Il codice di associazione non è valido o è scaduto	El código de vinculación no es válido o expiró	Kodi i lidhjes është i pavlefshëm ose ka skaduar
+At most 50 roles	Al massimo 50 ruoli	Como máximo 50 roles	Më së shumti 50 role
+At most 200 people	Al massimo 200 persone	Como máximo 200 personas	Më së shumti 200 persona
+One of those roles can't be chosen here.	Uno di quei ruoli non si può scegliere qui.	Uno de esos roles no se puede elegir aquí.	Një nga ato role nuk mund të zgjidhet këtu.
+One of those people doesn't work here.	Una di quelle persone non lavora qui.	Una de esas personas no trabaja aquí.	Një nga ata persona nuk punon këtu.
+Only tills, tablets and screens have people who sign in.	Solo casse, tablet e schermi hanno persone che accedono.	Solo las cajas, tabletas y pantallas tienen personas que inician sesión.	Vetëm arkat, tabletat dhe ekranet kanë persona që hyjnë.
+Some of those days already have special hours	Alcuni di quei giorni hanno già un orario speciale	Algunos de esos días ya tienen un horario especial	Disa nga ato ditë kanë tashmë orar të veçantë
+Special day not found	Giorno speciale non trovato	Día especial no encontrado	Dita e veçantë nuk u gjet
+The branch is closed now. Someone who can open it outside the hours can open it.	La sede ora è chiusa. Può aprirla chi può aprire fuori orario.	La sucursal está cerrada ahora. Puede abrirla quien tenga permiso para abrir fuera de horario.	Pika tani është e mbyllur. Mund ta hapë kush ka leje ta hapë jashtë orarit.
+Give the place a name	Dai un nome al luogo	Ponle un nombre al lugar	Jepi një emër vendit
+Write the supplier's name	Scrivi il nome del fornitore	Escribe el nombre del proveedor	Shkruaj emrin e furnitorit
+A sale stock source requires its restaurant, branch, item, and location	Una fonte di magazzino per la vendita richiede ristorante, sede, articolo e luogo	Una fuente de inventario de venta necesita su restaurante, sucursal, artículo y lugar	Një burim stoku për shitje kërkon restorantin, pikën, artikullin dhe vendin
+A sale stock source must use records from one restaurant	Una fonte di magazzino per la vendita deve usare dati di un solo ristorante	Una fuente de inventario de venta debe usar datos de un solo restaurante	Një burim stoku për shitje duhet të përdorë të dhëna nga një restorant
+A branch sale stock source cannot use another branch's location	La fonte di magazzino di una sede non può usare il luogo di un'altra sede	La fuente de inventario de una sucursal no puede usar el lugar de otra sucursal	Burimi i stokut të një pike nuk mund të përdorë vendin e një pike tjetër
+Restaurant settings were not found	Impostazioni del ristorante non trovate	No se encontró la configuración del restaurante	Cilësimet e restorantit nuk u gjetën
+Count must be DRAFT to start (currently {})	L'inventario deve essere in bozza per iniziare (ora {})	El conteo debe estar en borrador para empezar (ahora {})	Numërimi duhet të jetë draft për të filluar (tani {})
+Count line not found	Riga d'inventario non trovata	Línea de conteo no encontrada	Rreshti i numërimit nuk u gjet
+Count must be IN_PROGRESS to complete (currently {})	L'inventario deve essere in corso per completarlo (ora {})	El conteo debe estar en curso para completarlo (ahora {})	Numërimi duhet të jetë në vazhdim për t'u përfunduar (tani {})
+Count must be COMPLETED to approve (currently {})	L'inventario deve essere completato per approvarlo (ora {})	El conteo debe estar completado para aprobarlo (ahora {})	Numërimi duhet të jetë i përfunduar për t'u miratuar (tani {})
+An approved count cannot be cancelled	Un inventario approvato non può essere annullato	Un conteo aprobado no se puede cancelar	Një numërim i miratuar nuk mund të anulohet
+Count lines can only be changed while the count is DRAFT or IN_PROGRESS (currently {})	Le righe dell'inventario si possono cambiare solo in bozza o in corso (ora {})	Las líneas del conteo solo se pueden cambiar en borrador o en curso (ahora {})	Rreshtat e numërimit mund të ndryshohen vetëm kur është draft ose në vazhdim (tani {})
+Inventory counts cannot be performed at an inactive location	Non si possono fare inventari in un luogo non attivo	No se pueden hacer conteos en un lugar inactivo	Numërimet nuk mund të bëhen në një vend joaktiv
+This count number is already used in this restaurant	Questo numero d'inventario è già usato in questo ristorante	Este número de conteo ya se usa en este restaurante	Ky numër numërimi përdoret tashmë në këtë restorant
+Inventory count update violates a data constraint	L'aggiornamento dell'inventario viola un vincolo dei dati	La actualización del conteo infringe una regla de datos	Përditësimi i numërimit shkel një rregull të të dhënave
+Remove this item's sale stock sources before deactivating inventory tracking	Togli le fonti di magazzino per la vendita di questo articolo prima di disattivarne il monitoraggio	Quita las fuentes de inventario de venta de este artículo antes de desactivar su seguimiento	Hiq burimet e stokut për shitje të këtij artikulli para se të çaktivizosh ndjekjen e stokut
+Remove this item's sale stock sources before deactivating it	Togli le fonti di magazzino per la vendita di questo articolo prima di disattivarlo	Quita las fuentes de inventario de venta de este artículo antes de desactivarlo	Hiq burimet e stokut për shitje të këtij artikulli para se ta çaktivizosh
+This barcode is already registered to {}	Questo codice a barre è già registrato su {}	Este código de barras ya está registrado en {}	Ky barkod është tashmë i regjistruar te {}
+This code is already used by {} in this restaurant	Questo codice è già usato da {} in questo ristorante	Este código ya lo usa {} en este restaurante	Ky kod përdoret tashmë nga {} në këtë restorant
+This code is already used in this restaurant	Questo codice è già usato in questo ristorante	Este código ya se usa en este restaurante	Ky kod përdoret tashmë në këtë restorant
+This barcode is already registered in this restaurant	Questo codice a barre è già registrato in questo ristorante	Este código de barras ya está registrado en este restaurante	Ky barkod është tashmë i regjistruar në këtë restorant
+Inventory item update violates a data constraint	L'aggiornamento dell'articolo viola un vincolo dei dati	La actualización del artículo infringe una regla de datos	Përditësimi i artikullit shkel një rregull të të dhënave
+There's already a kind called {}	Esiste già un tipo chiamato {}	Ya existe un tipo llamado {}	Ekziston tashmë një lloj me emrin {}
+Uncategorized stays: it's where things go when their kind is removed	Senza categoria resta: è dove vanno le cose quando il loro tipo viene rimosso	Sin categoría se queda: es adonde van las cosas cuando se quita su tipo	Pa kategori mbetet: aty shkojnë gjërat kur hiqet lloji i tyre
+There's no such kind	Questo tipo non esiste	Ese tipo no existe	Ky lloj nuk ekziston
+Choose which of your kinds it is	Scegli quale dei tuoi tipi è	Elige cuál de tus tipos es	Zgjidh cili nga llojet e tua është
+That kind was removed. Choose another one	Quel tipo è stato rimosso. Scegline un altro	Ese tipo se quitó. Elige otro	Ai lloj u hoq. Zgjidh një tjetër
+Stock balance cannot go below zero	La giacenza non può scendere sotto zero	El saldo de inventario no puede ser menor que cero	Gjendja e stokut nuk mund të shkojë nën zero
+Remove this location's sale stock sources before changing its branch or deactivating it	Togli le fonti di magazzino per la vendita di questo luogo prima di cambiarne la sede o disattivarlo	Quita las fuentes de inventario de venta de este lugar antes de cambiar su sucursal o desactivarlo	Hiq burimet e stokut për shitje të këtij vendi para se t'i ndryshosh pikën ose ta çaktivizosh
+Remove this location's sale stock sources before deactivating it	Togli le fonti di magazzino per la vendita di questo luogo prima di disattivarlo	Quita las fuentes de inventario de venta de este lugar antes de desactivarlo	Hiq burimet e stokut për shitje të këtij vendi para se ta çaktivizosh
+Uncategorized can't keep its own stock. Move it to another place first, or delete it with the place.	Senza categoria non può tenere merce propria. Spostala prima in un altro luogo, o eliminala con il luogo.	Sin categoría no puede tener inventario propio. Muévelo primero a otro lugar o elimínalo con el lugar.	Pa kategori nuk mund të mbajë stok të vetin. Zhvendose së pari në një vend tjetër, ose fshije bashkë me vendin.
+This code is already used by another location in this restaurant	Questo codice è già usato da un altro luogo in questo ristorante	Este código ya lo usa otro lugar de este restaurante	Ky kod përdoret tashmë nga një vend tjetër në këtë restorant
+Inventory location update violates a data constraint	L'aggiornamento del luogo viola un vincolo dei dati	La actualización del lugar infringe una regla de datos	Përditësimi i vendit shkel një rregull të të dhënave
+Inventory movements cannot be recorded at an inactive location	Non si possono registrare movimenti in un luogo non attivo	No se pueden registrar movimientos en un lugar inactivo	Lëvizjet nuk mund të regjistrohen në një vend joaktiv
+Inventory movement violates a data constraint	Il movimento di magazzino viola un vincolo dei dati	El movimiento de inventario infringe una regla de datos	Lëvizja e stokut shkel një rregull të të dhënave
+A branch is required to consume sale inventory	Serve una sede per scalare la merce venduta	Se necesita una sucursal para descontar el inventario vendido	Duhet një pikë për të zbritur stokun e shitur
+A selected modifier's inventory recipe is no longer active	La ricetta di magazzino di una variante scelta non è più attiva	La receta de inventario de un modificador elegido ya no está activa	Receta e stokut e një modifikuesi të zgjedhur nuk është më aktive
+Configure a sale stock location for {} at this branch	Configura un luogo di magazzino per la vendita di {} in questa sede	Configura un lugar de inventario de venta para {} en esta sucursal	Konfiguro një vend stoku për shitjen e {} në këtë pikë
+The configured sale stock location is no longer valid	Il luogo di magazzino per la vendita configurato non è più valido	El lugar de inventario de venta configurado ya no es válido	Vendi i konfiguruar i stokut për shitje nuk është më i vlefshëm
+A recipe cycle prevents sale inventory calculation	Un ciclo tra ricette impedisce il calcolo della merce venduta	Un ciclo de recetas impide calcular el inventario vendido	Një cikël recetash pengon llogaritjen e stokut të shitur
+A recipe ingredient is inactive: {}	Un ingrediente della ricetta non è attivo: {}	Un ingrediente de la receta está inactivo: {}	Një përbërës i recetës është joaktiv: {}
+A recipe ingredient has an invalid yield loss	Un ingrediente della ricetta ha uno scarto non valido	Un ingrediente de la receta tiene una merma no válida	Një përbërës i recetës ka humbje të pavlefshme
+Branch not found	Sede non trovata	Sucursal no encontrada	Pika nuk u gjet
+Inactive branches cannot be configured for sale stock	Le sedi non attive non si possono configurare per il magazzino di vendita	Las sucursales inactivas no se pueden configurar para inventario de venta	Pikat joaktive nuk mund të konfigurohen për stokun e shitjes
+Sale stock items must be active and track inventory	Gli articoli per la vendita devono essere attivi e con magazzino monitorato	Los artículos de venta deben estar activos y con seguimiento de inventario	Artikujt e shitjes duhet të jenë aktivë dhe me ndjekje stoku
+An inactive location cannot supply sale stock	Un luogo non attivo non può fornire merce per la vendita	Un lugar inactivo no puede suministrar inventario de venta	Një vend joaktiv nuk mund të furnizojë stok për shitje
+The location must belong to this branch or be restaurant-wide	Il luogo deve appartenere a questa sede o a tutto il ristorante	El lugar debe pertenecer a esta sucursal o a todo el restaurante	Vendi duhet t'i përkasë kësaj pike ose gjithë restorantit
+A sale stock source for this branch and item already exists	Esiste già una fonte di magazzino per questa sede e questo articolo	Ya existe una fuente de inventario para esta sucursal y este artículo	Ekziston tashmë një burim stoku për këtë pikë dhe artikull
+Cannot convert {} to {}	Impossibile convertire {} in {}	No se puede convertir {} a {}	Nuk mund të konvertohet {} në {}
+This supplier was already added	Questo fornitore è già stato aggiunto	Este proveedor ya se agregó	Ky furnitor është shtuar tashmë
+That place isn't one of this supplier's	Quel luogo non è di questo fornitore	Ese lugar no es de este proveedor	Ai vend nuk është i këtij furnitori
+This place was already added	Questo luogo è già stato aggiunto	Este lugar ya se agregó	Ky vend është shtuar tashmë
+Choose one of your suppliers	Scegli uno dei tuoi fornitori	Elige uno de tus proveedores	Zgjidh një nga furnitorët e tu
+There's already a supplier called {}	Esiste già un fornitore chiamato {}	Ya existe un proveedor llamado {}	Ekziston tashmë një furnitor me emrin {}
+Supplier not found	Fornitore non trovato	Proveedor no encontrado	Furnitori nuk u gjet
+Choose the letter size	Scegli la dimensione delle lettere	Elige el tamaño de letra	Zgjidh madhësinë e shkronjave
+KDS station code already exists for this branch	Il codice della postazione KDS esiste già per questa sede	El código de estación KDS ya existe en esta sucursal	Kodi i stacionit KDS ekziston tashmë për këtë pikë
+A menu item can only be actively routed to one KDS station in the same branch	Un piatto può essere inviato a una sola postazione KDS nella stessa sede	Un plato solo puede enviarse a una estación KDS en la misma sucursal	Një pjatë mund të dërgohet vetëm në një stacion KDS në të njëjtën pikë
+Selected KDS device is not active	Il dispositivo KDS scelto non è attivo	El dispositivo KDS elegido no está activo	Pajisja KDS e zgjedhur nuk është aktive
+KDS ticket number could not be generated	Impossibile generare il numero della comanda KDS	No se pudo generar el número de comanda KDS	Numri i biletës KDS nuk u krijua
+KDS station update violates a data constraint	L'aggiornamento della postazione KDS viola un vincolo dei dati	La actualización de la estación KDS infringe una regla de datos	Përditësimi i stacionit KDS shkel një rregull të të dhënave
+KDS ticket update violates a data constraint	L'aggiornamento della comanda KDS viola un vincolo dei dati	La actualización de la comanda KDS infringe una regla de datos	Përditësimi i biletës KDS shkel një rregull të të dhënave
+No KDS station is assigned to the selected device	Nessuna postazione KDS è assegnata al dispositivo scelto	No hay ninguna estación KDS asignada al dispositivo elegido	Asnjë stacion KDS nuk i është caktuar pajisjes së zgjedhur
+The mail server didn't accept the email: {}	Il server di posta non ha accettato l'email: {}	El servidor de correo no aceptó el correo: {}	Serveri i postës nuk e pranoi emailin: {}
+Missing option group seed named {}	Missing option group seed named {}	Missing option group seed named {}	Missing option group seed named {}
+SKU must be at most 80 characters	Lo SKU può avere al massimo 80 caratteri	El SKU puede tener como máximo 80 caracteres	SKU mund të ketë deri në 80 karaktere
+Name is required	Serve il nome	Se requiere el nombre	Emri kërkohet
+Name must be at most 150 characters	Il nome può avere al massimo 150 caratteri	El nombre puede tener como máximo 150 caracteres	Emri mund të ketë deri në 150 karaktere
+Code must be at most 50 characters	Il codice può avere al massimo 50 caratteri	El código puede tener como máximo 50 caracteres	Kodi mund të ketë deri në 50 karaktere
+Color must be at most 20 characters	Il colore può avere al massimo 20 caratteri	El color puede tener como máximo 20 caracteres	Ngjyra mund të ketë deri në 20 karaktere
+Name must be at most 120 characters	Il nome può avere al massimo 120 caratteri	El nombre puede tener como máximo 120 caracteres	Emri mund të ketë deri në 120 karaktere
+Not a menu photo key	Not a menu photo key	Not a menu photo key	Not a menu photo key
+Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set	Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set	Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set	Menu photos are set to R2, but R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET aren't all set
+Changing prices needs “Change prices”.	Per cambiare i prezzi serve “Modificare i prezzi”.	Para cambiar precios se necesita “Cambiar precios”.	Për të ndryshuar çmimet duhet “Ndrysho çmimet”.
+This dish's recipe is used inside {}. Remove it there first (Admin Hub → Inventory → Preparations).	La ricetta di questo piatto è usata in {}. Prima toglila da lì (Admin Hub → Magazzino → Preparazioni).	La receta de este plato se usa en {}. Quítala de ahí primero (Admin Hub → Inventario → Preparaciones).	Receta e kësaj pjate përdoret te {}. Hiqe së pari prej andej (Admin Hub → Stoku → Përgatitjet).
+Choose a stock item or a preparation for each ingredient	Scegli un articolo di magazzino o un semilavorato per ogni ingrediente	Elige un artículo de inventario o una preparación para cada ingrediente	Zgjidh një artikull stoku ose një përgatitje për çdo përbërës
+One of the ingredients is no longer a stock item. Refresh and try again.	Uno degli ingredienti non è più un articolo di magazzino. Aggiorna e riprova.	Uno de los ingredientes ya no es un artículo de inventario. Actualiza e inténtalo de nuevo.	Një nga përbërësit nuk është më artikull stoku. Rifresko dhe provo përsëri.
+One of the preparations is no longer active. Refresh and try again.	Uno dei semilavorati non è più attivo. Aggiorna e riprova.	Una de las preparaciones ya no está activa. Actualiza e inténtalo de nuevo.	Një nga përgatitjet nuk është më aktive. Rifresko dhe provo përsëri.
+The dish's ingredients couldn't be saved. Refresh and try again.	Impossibile salvare gli ingredienti del piatto. Aggiorna e riprova.	No se pudieron guardar los ingredientes del plato. Actualiza e inténtalo de nuevo.	Përbërësit e pjatës nuk u ruajtën. Rifresko dhe provo përsëri.
+Archived restaurants cannot be modified	I ristoranti archiviati non si possono modificare	Los restaurantes archivados no se pueden modificar	Restorantet e arkivuara nuk mund të ndryshohen
+Some of these items no longer exist	Alcuni di questi articoli non esistono più	Algunos de estos artículos ya no existen	Disa nga këta artikuj nuk ekzistojnë më
+Items can only be imported from this restaurant's menus	Gli articoli si possono importare solo dai menù di questo ristorante	Los artículos solo se pueden importar de los menús de este restaurante	Artikujt mund të importohen vetëm nga menutë e këtij restoranti
+At least one menu must show in POS	Almeno un menù deve essere visibile nel POS	Al menos un menú debe mostrarse en el POS	Të paktën një menu duhet të shfaqet në POS
+Choose this restaurant's menus	Scegli i menù di questo ristorante	Elige los menús de este restaurante	Zgjidh menutë e këtij restoranti
+Choose the event this menu is for	Scegli l'evento per cui è questo menù	Elige el evento de este menú	Zgjidh eventin për të cilin është kjo menu
+Code is required	Serve il codice	Se requiere el código	Kodi kërkohet
+Invalid sort direction	Direzione di ordinamento non valida	Dirección de orden no válida	Drejtim renditjeje i pavlefshëm
+Invalid sortBy value	Valore sortBy non valido	Valor sortBy no válido	Vlerë sortBy e pavlefshme
+Pick at least one active menu for waiters	Scegli almeno un menù attivo per i camerieri	Elige al menos un menú activo para los meseros	Zgjidh të paktën një menu aktive për kamarierët
+Online section not found	Sezione online non trovata	Sección en línea no encontrada	Seksioni online nuk u gjet
+Choose an online section for this dish	Scegli una sezione online per questo piatto	Elige una sección en línea para este plato	Zgjidh një seksion online për këtë pjatë
+The online menu already has a section called {}	Il menù online ha già una sezione chiamata {}	El menú en línea ya tiene una sección llamada {}	Menuja online ka tashmë një seksion me emrin {}
+Move its dishes to another online section or take them offline first	Sposta prima i suoi piatti in un'altra sezione online o mettili offline	Mueve primero sus platos a otra sección en línea o desconéctalos	Zhvendos së pari pjatat e tij në një seksion tjetër online ose hiqi offline
+A modifier must reference a prep-batch or sub-recipe	Una variante deve fare riferimento a un semilavorato	Un modificador debe referirse a una preparación o subreceta	Një modifikues duhet t'i referohet një përgatitjeje ose nënrecete
+A modifier inventory recipe must be active	La ricetta di magazzino di una variante deve essere attiva	La receta de inventario de un modificador debe estar activa	Receta e stokut e një modifikuesi duhet të jetë aktive
+Choose one of this restaurant's events	Scegli uno degli eventi di questo ristorante	Elige uno de los eventos de este restaurante	Zgjidh një nga eventet e këtij restoranti
+Authenticated user not found	Utente non trovato	Usuario no encontrado	Përdoruesi nuk u gjet
+Preferences must not be empty	Le preferenze non possono essere vuote	Las preferencias no pueden estar vacías	Preferencat nuk mund të jenë bosh
+Notification not found	Notifica non trovata	Notificación no encontrada	Njoftimi nuk u gjet
+Only personal notifications can be marked as read	Solo le notifiche personali possono essere segnate come lette	Solo las notificaciones personales se pueden marcar como leídas	Vetëm njoftimet personale mund të shënohen si të lexuara
+Notification cannot be marked as read before it is delivered	La notifica non può essere segnata come letta prima di essere consegnata	La notificación no se puede marcar como leída antes de entregarse	Njoftimi nuk mund të shënohet si i lexuar para se të dorëzohet
+Delivery for {} is not configured; choose IN_APP	La consegna per {} non è configurata; scegli IN_APP	La entrega para {} no está configurada; elige IN_APP	Dërgesa për {} nuk është konfiguruar; zgjidh IN_APP
+Recipient user not found	Destinatario non trovato	Destinatario no encontrado	Marrësi nuk u gjet
+Recipient user must belong to the same restaurant	Il destinatario deve appartenere allo stesso ristorante	El destinatario debe pertenecer al mismo restaurante	Marrësi duhet t'i përkasë të njëjtit restorant
+Unable to open notification stream	Impossibile aprire il flusso delle notifiche	No se pudo abrir el flujo de notificaciones	Rrjedha e njoftimeve nuk u hap
+Notification template not found	Modello di notifica non trovato	Plantilla de notificación no encontrada	Shablloni i njoftimit nuk u gjet
+Notification template update violates a data constraint	L'aggiornamento del modello di notifica viola un vincolo dei dati	La actualización de la plantilla infringe una regla de datos	Përditësimi i shabllonit shkel një rregull të të dhënave
+Order number, currency and opening time are assigned by the server	Numero d'ordine, valuta e ora di apertura sono assegnati dal server	El número de pedido, la moneda y la hora de apertura los asigna el servidor	Numri i porosisë, monedha dhe ora e hapjes caktohen nga serveri
+Use the dedicated order workflow action to change status	Usa l'azione dedicata dell'ordine per cambiarne lo stato	Usa la acción dedicada del pedido para cambiar el estado	Përdor veprimin e posaçëm të porosisë për të ndryshuar gjendjen
+This order can no longer be modified in its current state	Questo ordine non può più essere modificato nel suo stato attuale	Este pedido ya no se puede modificar en su estado actual	Kjo porosi nuk mund të ndryshohet më në gjendjen aktuale
+This order is open only to take its payment	Questo ordine è aperto solo per incassarne il pagamento	Este pedido está abierto solo para cobrarlo	Kjo porosi është e hapur vetëm për të marrë pagesën
+A paged order disappeared while building its response	A paged order disappeared while building its response	A paged order disappeared while building its response	A paged order disappeared while building its response
+Use the void endpoint for VOIDED item status changes	Use the void endpoint for VOIDED item status changes	Use the void endpoint for VOIDED item status changes	Use the void endpoint for VOIDED item status changes
+Voiding order items is disabled for this restaurant	Lo storno degli articoli è disattivato per questo ristorante	La anulación de artículos está desactivada en este restaurante	Stornimi i artikujve është çaktivizuar për këtë restorant
+This item was already removed	Questo articolo è già stato tolto	Este artículo ya se quitó	Ky artikull është hequr tashmë
+This order can no longer be modified	Questo ordine non può più essere modificato	Este pedido ya no se puede modificar	Kjo porosi nuk mund të ndryshohet më
+This item's ingredients were already consumed and it can no longer be changed	Gli ingredienti di questo articolo sono già stati scalati e non può più essere modificato	Los ingredientes de este artículo ya se descontaron y ya no se puede cambiar	Përbërësit e këtij artikulli janë zbritur tashmë dhe nuk mund të ndryshohet më
+Orders with consumed inventory cannot be {}	Gli ordini con merce già scalata non possono essere {}	Los pedidos con inventario descontado no pueden ser {}	Porositë me stok të zbritur nuk mund të jenë {}
+Order not found	Ordine non trovato	Pedido no encontrado	Porosia nuk u gjet
+Branch not available for QR ordering	Sede non disponibile per gli ordini via QR	Sucursal no disponible para pedidos por QR	Pika nuk është e disponueshme për porosi me QR
+Table not available for QR ordering	Tavolo non disponibile per gli ordini via QR	Mesa no disponible para pedidos por QR	Tavolina nuk është e disponueshme për porosi me QR
+Table not found	Tavolo non trovato	Mesa no encontrada	Tavolina nuk u gjet
+Selected menu item is not available	Il piatto scelto non è disponibile	El plato elegido no está disponible	Pjata e zgjedhur nuk është e disponueshme
+Selected menu variant is not active	La variante scelta non è attiva	La variante elegida no está activa	Varianti i zgjedhur nuk është aktiv
+Selected option item is not linked to the selected menu item	L'opzione scelta non è collegata al piatto scelto	La opción elegida no está vinculada al plato elegido	Opsioni i zgjedhur nuk është i lidhur me pjatën e zgjedhur
+Selected option item is not available	L'opzione scelta non è disponibile	La opción elegida no está disponible	Opsioni i zgjedhur nuk është i disponueshëm
+QR ordering is not enabled for this restaurant	Gli ordini via QR non sono attivi per questo ristorante	Los pedidos por QR no están activos en este restaurante	Porositë me QR nuk janë aktive për këtë restorant
+Takeaway orders are disabled for this restaurant	Gli ordini da asporto sono disattivati per questo ristorante	Los pedidos para llevar están desactivados en este restaurante	Porositë për të marrë janë çaktivizuar për këtë restorant
+Delivery orders are disabled for this restaurant	Gli ordini a domicilio sono disattivati per questo ristorante	Los pedidos a domicilio están desactivados en este restaurante	Porositë me dërgesë janë çaktivizuar për këtë restorant
+Backdated orders are disabled for this restaurant	Gli ordini con data passata sono disattivati per questo ristorante	Los pedidos con fecha pasada están desactivados en este restaurante	Porositë me datë të kaluar janë çaktivizuar për këtë restorant
+An inactive table cannot receive an order	Un tavolo non attivo non può ricevere ordini	Una mesa inactiva no puede recibir pedidos	Një tavolinë joaktive nuk mund të marrë porosi
+A merged table cannot receive a new order	Un tavolo unito non può ricevere un nuovo ordine	Una mesa unida no puede recibir un nuevo pedido	Një tavolinë e bashkuar nuk mund të marrë porosi të re
+This table is not available for a new order	Questo tavolo non è disponibile per un nuovo ordine	Esta mesa no está disponible para un nuevo pedido	Kjo tavolinë nuk është e disponueshme për porosi të re
+Order number could not be generated	Impossibile generare il numero d'ordine	No se pudo generar el número de pedido	Numri i porosisë nuk u krijua
+Order update violates a data constraint	L'aggiornamento dell'ordine viola un vincolo dei dati	La actualización del pedido infringe una regla de datos	Përditësimi i porosisë shkel një rregull të të dhënave
+Option group is inactive	Il gruppo di opzioni non è attivo	El grupo de opciones está inactivo	Grupi i opsioneve është joaktiv
+Check option selections for {} (minimum {}, maximum {})	Controlla le opzioni scelte per {} (minimo {}, massimo {})	Revisa las opciones elegidas para {} (mínimo {}, máximo {})	Kontrollo opsionet e zgjedhura për {} (minimumi {}, maksimumi {})
+A reason is required for order discounts	Serve un motivo per gli sconti sull'ordine	Se requiere un motivo para los descuentos del pedido	Duhet një arsye për zbritjet e porosisë
+A percentage discount can be at most 100%	Uno sconto in percentuale può essere al massimo del 100%	Un descuento porcentual puede ser como máximo del 100%	Një zbritje në përqindje mund të jetë deri në 100%
+A manager has to give discounts at this restaurant	In questo ristorante gli sconti li fa un responsabile	En este restaurante los descuentos los da un gerente	Në këtë restorant zbritjet i jep një menaxher
+A reason is required for void operations	Serve un motivo per gli storni	Se requiere un motivo para las anulaciones	Duhet një arsye për stornimet
+Only draft orders can be opened	Solo gli ordini in bozza possono essere aperti	Solo se pueden abrir pedidos en borrador	Vetëm porositë draft mund të hapen
+Only an open order can be closed as unpaid	Solo un ordine aperto può essere chiuso come non pagato	Solo un pedido abierto se puede cerrar sin pagar	Vetëm një porosi e hapur mund të mbyllet si e papaguar
+Nothing is owed on this order. Close it instead	Non c'è niente da pagare su questo ordine. Chiudilo invece	No se debe nada en este pedido. Mejor ciérralo	Asgjë nuk detyrohet në këtë porosi. Mbylle më mirë
+Only an order closed as unpaid can be reopened for payment	Solo un ordine chiuso come non pagato può essere riaperto per il pagamento	Solo un pedido cerrado sin pagar se puede reabrir para cobrarlo	Vetëm një porosi e mbyllur si e papaguar mund të rihapet për pagesë
+Only open orders can be closed	Solo gli ordini aperti possono essere chiusi	Solo se pueden cerrar pedidos abiertos	Vetëm porositë e hapura mund të mbyllen
+This restaurant requires the order to be settled before closing	Questo ristorante richiede che l'ordine sia saldato prima di chiuderlo	Este restaurante exige pagar el pedido antes de cerrarlo	Ky restorant kërkon që porosia të shlyhet para mbylljes
+Only closed orders can be reopened	Solo gli ordini chiusi possono essere riaperti	Solo se pueden reabrir pedidos cerrados	Vetëm porositë e mbyllura mund të rihapen
+Reopening closed orders is disabled for this restaurant	La riapertura degli ordini chiusi è disattivata per questo ristorante	Reabrir pedidos cerrados está desactivado en este restaurante	Rihapja e porosive të mbyllura është çaktivizuar për këtë restorant
+This order was already {}	Questo ordine era già {}	Este pedido ya estaba {}	Kjo porosi ishte tashmë {}
+Closed orders must be reopened before they can be cancelled	Gli ordini chiusi vanno riaperti prima di poterli annullare	Los pedidos cerrados deben reabrirse antes de cancelarlos	Porositë e mbyllura duhet të rihapen para se të anulohen
+Paid orders cannot be cancelled	Gli ordini pagati non si possono annullare	Los pedidos pagados no se pueden cancelar	Porositë e paguara nuk mund të anulohen
+Closed orders must be reopened before they can be voided	Gli ordini chiusi vanno riaperti prima di poterli stornare	Los pedidos cerrados deben reabrirse antes de anularlos	Porositë e mbyllura duhet të rihapen para se të stornohen
+Refund or void the payments on this order first	Prima rimborsa o storna i pagamenti di questo ordine	Primero reembolsa o anula los pagos de este pedido	Rimburso ose storno së pari pagesat e kësaj porosie
+Orders must belong to the same branch to be merged	Gli ordini devono appartenere alla stessa sede per essere uniti	Los pedidos deben ser de la misma sucursal para unirse	Porositë duhet t'i përkasin të njëjtës pikë për t'u bashkuar
+Orders with different currencies or tax policies cannot be merged	Gli ordini con valute o regole fiscali diverse non si possono unire	Los pedidos con monedas o políticas fiscales distintas no se pueden unir	Porositë me monedha ose rregulla tatimore të ndryshme nuk mund të bashkohen
+Order merging is disabled for this restaurant	L'unione degli ordini è disattivata per questo ristorante	Unir pedidos está desactivado en este restaurante	Bashkimi i porosive është çaktivizuar për këtë restorant
+Order transfers are disabled for this restaurant	Il trasferimento degli ordini è disattivato per questo ristorante	Transferir pedidos está desactivado en este restaurante	Transferimi i porosive është çaktivizuar për këtë restorant
+Split bills are disabled for this restaurant	I conti separati sono disattivati per questo ristorante	Las cuentas divididas están desactivadas en este restaurante	Faturat e ndara janë çaktivizuar për këtë restorant
+At least one active line item must remain on the source order	Almeno un articolo attivo deve restare sull'ordine di partenza	Al menos un artículo activo debe quedar en el pedido de origen	Të paktën një artikull aktiv duhet të mbetet në porosinë e burimit
+Invalid database schema	Invalid database schema	Invalid database schema	Invalid database schema
+Only cash payments are available until a trusted live payment provider is connected	Sono disponibili solo pagamenti in contanti finché non viene collegato un fornitore di pagamenti affidabile	Solo hay pagos en efectivo hasta que se conecte un proveedor de pagos confiable	Vetëm pagesat me para në dorë janë të disponueshme derisa të lidhet një ofrues pagesash i besueshëm
+You can only see the payments you took	Puoi vedere solo i pagamenti che hai preso tu	Solo puedes ver los pagos que cobraste	Mund të shohësh vetëm pagesat që more ti
+Payment not found	Pagamento non trovato	Pago no encontrado	Pagesa nuk u gjet
+The bill changed. Check the dishes and try again.	Il conto è cambiato. Controlla i piatti e riprova.	La cuenta cambió. Revisa los platos e inténtalo de nuevo.	Fatura ndryshoi. Kontrollo pjatat dhe provo përsëri.
+Could not create a payment reference, try again	Impossibile creare un riferimento di pagamento, riprova	No se pudo crear una referencia de pago, inténtalo de nuevo	Referenca e pagesës nuk u krijua, provo përsëri
+Invalid saved receipt identity	Invalid saved receipt identity	Invalid saved receipt identity	Invalid saved receipt identity
+This reservation has a pre-order, so it can't be deleted. Cancel it instead.	Questa prenotazione ha un preordine, quindi non può essere eliminata. Annullala invece.	Esta reserva tiene un pedido anticipado, así que no se puede eliminar. Mejor cancélala.	Ky rezervim ka një porosi paraprake, ndaj nuk mund të fshihet. Anuloje më mirë.
+This pre-order was already sent to the kitchen	Questo preordine è già stato inviato in cucina	Este pedido anticipado ya se envió a cocina	Kjo porosi paraprake është dërguar tashmë në kuzhinë
+The reservation is {}, so its pre-order can't be sent	La prenotazione è {}, quindi il suo preordine non può essere inviato	La reserva está {}, así que su pedido anticipado no se puede enviar	Rezervimi është {}, ndaj porosia paraprake nuk mund të dërgohet
+Pre-orders are not available for this restaurant	I preordini non sono disponibili per questo ristorante	Los pedidos anticipados no están disponibles en este restaurante	Porositë paraprake nuk janë të disponueshme për këtë restorant
+Pre-orders can only be placed for pending or confirmed reservations	I preordini si possono fare solo per prenotazioni in attesa o confermate	Los pedidos anticipados solo se pueden hacer para reservas pendientes o confirmadas	Porositë paraprake mund të bëhen vetëm për rezervime në pritje ose të konfirmuara
+This pre-order is already in the kitchen and can no longer be changed	Questo preordine è già in cucina e non può più essere modificato	Este pedido anticipado ya está en cocina y no se puede cambiar	Kjo porosi paraprake është tashmë në kuzhinë dhe nuk mund të ndryshohet më
+It's too late to pre-order for this reservation; please order at the table	È troppo tardi per preordinare per questa prenotazione; ordina al tavolo	Es demasiado tarde para pedir por anticipado en esta reserva; pide en la mesa	Është tepër vonë për porosi paraprake për këtë rezervim; porosit në tavolinë
+The kitchen has started on this pre-order, so it can no longer be cancelled	La cucina ha iniziato questo preordine, quindi non può più essere annullato	La cocina ya empezó este pedido anticipado, así que no se puede cancelar	Kuzhina e ka filluar këtë porosi paraprake, ndaj nuk mund të anulohet më
+This reservation has no active pre-order	Questa prenotazione non ha un preordine attivo	Esta reserva no tiene un pedido anticipado activo	Ky rezervim nuk ka porosi paraprake aktive
+This reservation has no pre-order	Questa prenotazione non ha un preordine	Esta reserva no tiene pedido anticipado	Ky rezervim nuk ka porosi paraprake
+A sub-recipe that makes an item can't become a dish's recipe	Un semilavorato che produce un articolo non può diventare la ricetta di un piatto	Una subreceta que produce un artículo no puede ser la receta de un plato	Një nënrecetë që prodhon një artikull nuk mund të bëhet receta e një pjate
+Exactly one of inventoryItemId or childRecipeId must be supplied, not both or neither	Exactly one of inventoryItemId or childRecipeId must be supplied, not both or neither	Exactly one of inventoryItemId or childRecipeId must be supplied, not both or neither	Exactly one of inventoryItemId or childRecipeId must be supplied, not both or neither
+Recipe unit {} cannot be converted to inventory base unit {}	L'unità della ricetta {} non si può convertire nell'unità di magazzino {}	La unidad de receta {} no se puede convertir a la unidad base de inventario {}	Njësia e recetës {} nuk mund të konvertohet në njësinë bazë të stokut {}
+A recipe cannot reference itself as a sub-recipe component	Una ricetta non può usare sé stessa come semilavorato	Una receta no puede usarse a sí misma como subreceta	Një recetë nuk mund të përdorë veten si nënrecetë
+Recipe component unit {} cannot be converted to sub-recipe yield unit {}	L'unità del componente {} non si può convertire nell'unità di resa del semilavorato {}	La unidad del componente {} no se puede convertir a la unidad de rendimiento de la subreceta {}	Njësia e përbërësit {} nuk mund të konvertohet në njësinë e rendimentit të nënrecetës {}
+Recipe component not found	Componente della ricetta non trovato	Componente de la receta no encontrado	Përbërësi i recetës nuk u gjet
+Cycle detected in recipe components: "{}" is reachable from one of its own sub-recipes	Ciclo trovato tra i componenti della ricetta: "{}" si raggiunge da uno dei suoi semilavorati	Ciclo detectado en los componentes de la receta: "{}" se alcanza desde una de sus propias subrecetas	U gjet një cikël në përbërësit e recetës: "{}" arrihet nga një nga nënrecetat e veta
+Recipe update violates a data constraint	L'aggiornamento della ricetta viola un vincolo dei dati	La actualización de la receta infringe una regla de datos	Përditësimi i recetës shkel një rregull të të dhënave
+Choose a stock item or a sub-recipe for each ingredient	Scegli un articolo di magazzino o un semilavorato per ogni ingrediente	Elige un artículo de inventario o una subreceta para cada ingrediente	Zgjidh një artikull stoku ose një nënrecetë për çdo përbërës
+One of the sub-recipes no longer exists. Refresh and try again.	Uno dei semilavorati non esiste più. Aggiorna e riprova.	Una de las subrecetas ya no existe. Actualiza e inténtalo de nuevo.	Një nga nënrecetat nuk ekziston më. Rifresko dhe provo përsëri.
+The sub-recipe's item couldn't be saved. Refresh and try again.	Impossibile salvare l'articolo del semilavorato. Aggiorna e riprova.	No se pudo guardar el artículo de la subreceta. Actualiza e inténtalo de nuevo.	Artikulli i nënrecetës nuk u ruajt. Rifresko dhe provo përsëri.
+The sub-recipe couldn't be saved. Refresh and try again.	Impossibile salvare il semilavorato. Aggiorna e riprova.	No se pudo guardar la subreceta. Actualiza e inténtalo de nuevo.	Nënreceta nuk u ruajt. Rifresko dhe provo përsëri.
+Invalid reporting schema	Invalid reporting schema	Invalid reporting schema	Invalid reporting schema
+Unknown report: {}	Report sconosciuto: {}	Informe desconocido: {}	Raport i panjohur: {}
+Give a reason for the goodwill refund	Indica un motivo per il rimborso di cortesia	Da un motivo para el reembolso de cortesía	Jep një arsye për rimbursimin e mirëkuptimit
+At least 1 guest	Almeno 1 ospite	Al menos 1 comensal	Të paktën 1 mysafir
+At most 500 guests	Al massimo 500 ospiti	Como máximo 500 comensales	Deri në 500 mysafirë
+Pick a day and time	Scegli giorno e ora	Elige día y hora	Zgjidh ditën dhe orën
+The name is too long	Il nome è troppo lungo	El nombre es demasiado largo	Emri është shumë i gjatë
+The phone number is too long	Il numero di telefono è troppo lungo	El número de teléfono es demasiado largo	Numri i telefonit është shumë i gjatë
+The phone number may contain only digits, spaces, + ( ) . / -	Il numero di telefono può contenere solo cifre, spazi, + ( ) . / -	El número de teléfono solo puede tener dígitos, espacios, + ( ) . / -	Numri i telefonit mund të ketë vetëm shifra, hapësira, + ( ) . / -
+Write your email, so we can confirm the booking	Scrivi la tua email, così possiamo confermare la prenotazione	Escribe tu correo para que podamos confirmar la reserva	Shkruaj emailin tënd, që të konfirmojmë rezervimin
+The email is too long	L'email è troppo lunga	El correo es demasiado largo	Emaili është shumë i gjatë
+Write a valid email	Scrivi un'email valida	Escribe un correo válido	Shkruaj një email të vlefshëm
+The note is too long	La nota è troppo lunga	La nota es demasiado larga	Shënimi është shumë i gjatë
+The occasion note is too long	La nota sull'occasione è troppo lunga	La nota de la ocasión es demasiado larga	Shënimi i rastit është shumë i gjatë
+The event must end on or after its first day	L'evento deve finire il primo giorno o dopo	El evento debe terminar el mismo día de inicio o después	Eventi duhet të mbarojë në ditën e parë ose më vonë
+Add the guest's email first	Prima aggiungi l'email dell'ospite	Primero agrega el correo del comensal	Shto së pari emailin e mysafirit
+This payment isn't on the booking	Questo pagamento non è sulla prenotazione	Este pago no está en la reserva	Kjo pagesë nuk është në rezervim
+Only an unpaid extra can be removed	Si può togliere solo un extra non pagato	Solo se puede quitar un extra no pagado	Mund të hiqet vetëm një shtesë e papaguar
+Online booking isn't available. Please call the restaurant	La prenotazione online non è disponibile. Chiama il ristorante	La reserva en línea no está disponible. Llama al restaurante	Rezervimi online nuk është i disponueshëm. Telefono restorantin
+Payments go through the card provider	I pagamenti passano dal circuito delle carte	Los pagos pasan por el proveedor de tarjetas	Pagesat kalojnë përmes ofruesit të kartave
+Give a reason for clearing the warning	Indica un motivo per togliere l'avviso	Da un motivo para quitar la advertencia	Jep një arsye për heqjen e paralajmërimit
+This booking has no guest details to clear a warning for	Questa prenotazione non ha dati dell'ospite per cui togliere un avviso	Esta reserva no tiene datos del comensal para quitar una advertencia	Ky rezervim nuk ka të dhëna mysafiri për të hequr një paralajmërim
+Selected tables overlap with another reservation in the requested window	I tavoli scelti si sovrappongono a un'altra prenotazione nell'orario richiesto	Las mesas elegidas se cruzan con otra reserva en el horario pedido	Tavolinat e zgjedhura mbivendosen me një rezervim tjetër në orarin e kërkuar
+Selected tables do not provide enough capacity for this reservation	I tavoli scelti non hanno abbastanza posti per questa prenotazione	Las mesas elegidas no tienen capacidad suficiente para esta reserva	Tavolinat e zgjedhura nuk kanë vende të mjaftueshme për këtë rezervim
+Merged child tables cannot be assigned directly	I tavoli uniti a un altro non si possono assegnare direttamente	Las mesas unidas a otra no se pueden asignar directamente	Tavolinat e bashkuara me një tjetër nuk mund të caktohen drejtpërdrejt
+Inactive tables cannot be assigned	I tavoli non attivi non si possono assegnare	Las mesas inactivas no se pueden asignar	Tavolinat joaktive nuk mund të caktohen
+Only AVAILABLE tables can be assigned	Si possono assegnare solo tavoli liberi	Solo se pueden asignar mesas libres	Mund të caktohen vetëm tavolina të lira
+This booking is from an earlier day. Only a manager can change it now	Questa prenotazione è di un giorno precedente. Ora solo un responsabile può modificarla	Esta reserva es de un día anterior. Ahora solo un gerente puede cambiarla	Ky rezervim është nga një ditë më parë. Tani vetëm një menaxher mund ta ndryshojë
+Deposit can only be refunded after payment	La caparra può essere rimborsata solo dopo il pagamento	El depósito solo se puede reembolsar después del pago	Depozita mund të rimbursohet vetëm pas pagesës
+This booking has orders on it. A manager has to move or cancel them before seating can be undone	Questa prenotazione ha degli ordini. Un responsabile deve spostarli o annullarli prima di poter annullare l'accomodamento	Esta reserva tiene pedidos. Un gerente debe moverlos o cancelarlos antes de deshacer la asignación de mesa	Ky rezervim ka porosi. Një menaxher duhet t'i zhvendosë ose anulojë para se të kthehet ulja
+Two occasions can't have the same name	Due occasioni non possono avere lo stesso nome	Dos ocasiones no pueden tener el mismo nombre	Dy raste nuk mund të kenë të njëjtin emër
+This occasion isn't available	Questa occasione non è disponibile	Esta ocasión no está disponible	Ky rast nuk është i disponueshëm
+Pick options offered for {}	Scegli opzioni offerte per {}	Elige opciones ofrecidas para {}	Zgjidh opsione të ofruara për {}
+Reservation not found	Prenotazione non trovata	Reserva no encontrada	Rezervimi nuk u gjet
+This booking can't be cancelled online anymore	Questa prenotazione non può più essere annullata online	Esta reserva ya no se puede cancelar en línea	Ky rezervim nuk mund të anulohet më online
+Branch not available for public booking	Sede non disponibile per le prenotazioni pubbliche	Sucursal no disponible para reservas públicas	Pika nuk është e disponueshme për rezervime publike
+Reservation update violates a data constraint	L'aggiornamento della prenotazione viola un vincolo dei dati	La actualización de la reserva infringe una regla de datos	Përditësimi i rezervimit shkel një rregull të të dhënave
+Reservation note violates a data constraint	La nota della prenotazione viola un vincolo dei dati	La nota de la reserva infringe una regla de datos	Shënimi i rezervimit shkel një rregull të të dhënave
+A reservation can last at most {} hours	Una prenotazione può durare al massimo {} ore	Una reserva puede durar como máximo {} horas	Një rezervim mund të zgjasë deri në {} orë
+Reservation does not require a deposit	La prenotazione non richiede una caparra	La reserva no requiere depósito	Rezervimi nuk kërkon depozitë
+Reservation code could not be generated	Impossibile generare il codice della prenotazione	No se pudo generar el código de la reserva	Kodi i rezervimit nuk u krijua
+Table is already assigned to this reservation	Il tavolo è già assegnato a questa prenotazione	La mesa ya está asignada a esta reserva	Tavolina i është caktuar tashmë këtij rezervimi
+Table assignment could not be created	Impossibile assegnare il tavolo	No se pudo asignar la mesa	Caktimi i tavolinës nuk u krijua
+Table is not assigned to this reservation	Il tavolo non è assegnato a questa prenotazione	La mesa no está asignada a esta reserva	Tavolina nuk i është caktuar këtij rezervimi
+No available table combination can be auto-assigned	Nessuna combinazione di tavoli liberi può essere assegnata in automatico	No hay ninguna combinación de mesas libres que se pueda asignar automáticamente	Asnjë kombinim tavolinash të lira nuk mund të caktohet automatikisht
+Event not found	Evento non trovato	Evento no encontrado	Eventi nuk u gjet
+Another event is on those days already	C'è già un altro evento in quei giorni	Ya hay otro evento esos días	Ka tashmë një event tjetër në ato ditë
+Choose one of this restaurant's menus	Scegli uno dei menù di questo ristorante	Elige uno de los menús de este restaurante	Zgjidh një nga menutë e këtij restoranti
+Choose an active table that isn't joined to another	Scegli un tavolo attivo non unito a un altro	Elige una mesa activa que no esté unida a otra	Zgjidh një tavolinë aktive që nuk është e bashkuar me një tjetër
+Table {} isn't free	Il tavolo {} non è libero	La mesa {} no está libre	Tavolina {} nuk është e lirë
+Waitlist entry not found	Voce della lista d'attesa non trovata	Entrada de la lista de espera no encontrada	Hyrja në listën e pritjes nuk u gjet
+This group isn't waiting anymore	Questo gruppo non è più in attesa	Este grupo ya no está esperando	Ky grup nuk po pret më
+Settle these first: {}	Prima risolvi questi: {}	Resuelve esto primero: {}	Zgjidh së pari këto: {}
+A correction was supplied more than once	Una correzione è stata inviata più di una volta	Se envió una corrección más de una vez	Një korrigjim u dërgua më shumë se një herë
+Something changed since the preview ({}). Look at the preview again.	Qualcosa è cambiato dall'anteprima ({}). Guarda di nuovo l'anteprima.	Algo cambió desde la vista previa ({}). Mira la vista previa otra vez.	Diçka ndryshoi që nga parapamja ({}). Shiko përsëri parapamjen.
+Unknown currency {}. Use a 3-letter code such as EUR, ALL or USD.	Valuta sconosciuta {}. Usa un codice di 3 lettere come EUR, ALL o USD.	Moneda desconocida {}. Usa un código de 3 letras como EUR, ALL o USD.	Monedhë e panjohur {}. Përdor një kod me 3 shkronja si EUR, ALL ose USD.
+The restaurant already uses {}	Il ristorante usa già {}	El restaurante ya usa {}	Restoranti përdor tashmë {}
+Choose a rounding step that fits {} ({} decimal places)	Scegli un passo di arrotondamento adatto a {} ({} decimali)	Elige un paso de redondeo que encaje con {} ({} decimales)	Zgjidh një hap rrumbullakimi që i përshtatet {} ({} shifra dhjetore)
+The receipt's design must be an object	Il disegno dello scontrino deve essere un oggetto	El diseño del recibo debe ser un objeto	Dizajni i faturës duhet të jetë një objekt
+The receipt's design is too big	Il disegno dello scontrino è troppo grande	El diseño del recibo es demasiado grande	Dizajni i faturës është shumë i madh
+The receipt was changed meanwhile. Reload it and try again.	Lo scontrino è stato cambiato nel frattempo. Ricaricalo e riprova.	El recibo se cambió mientras tanto. Recárgalo e inténtalo de nuevo.	Fatura u ndryshua ndërkohë. Ringarkoje dhe provo sërish.
+The receipt's design couldn't be read	Non è stato possibile leggere il disegno dello scontrino	No se pudo leer el diseño del recibo	Dizajni i faturës nuk mund të lexohej
+Only the Super Admin can change a branch's {}	Solo il Super Admin può cambiare {} di una sede	Solo el Super Admin puede cambiar {} de una sucursal	Vetëm Super Admini mund të ndryshojë {} e një pike
+These details have changed, or the edit version is missing. Refresh and review your changes before saving.	Questi dati sono cambiati o manca la versione della modifica. Aggiorna e rivedi le modifiche prima di salvare.	Estos datos cambiaron o falta la versión de edición. Actualiza y revisa tus cambios antes de guardar.	Këto të dhëna kanë ndryshuar ose mungon versioni i ndryshimit. Rifresko dhe rishiko ndryshimet para ruajtjes.
+This branch is still in use: {}. Move or finish these first, or close the branch instead.	Questa sede è ancora in uso: {}. Prima sposta o concludi questi, oppure chiudi la sede.	Esta sucursal aún está en uso: {}. Mueve o termina esto primero, o mejor cierra la sucursal.	Kjo pikë është ende në përdorim: {}. Zhvendosi ose përfundoji këto së pari, ose mbyll pikën.
+Invalid status value	Invalid status value	Invalid status value	Invalid status value
+The branch or its staff changed. Review the removal options again.	La sede o il suo personale sono cambiati. Rivedi di nuovo le opzioni di rimozione.	La sucursal o su personal cambió. Revisa de nuevo las opciones de eliminación.	Pika ose stafi i saj ndryshoi. Rishiko përsëri opsionet e heqjes.
+Type the branch name to confirm removal	Scrivi il nome della sede per confermare la rimozione	Escribe el nombre de la sucursal para confirmar la eliminación	Shkruaj emrin e pikës për të konfirmuar heqjen
+Finish or move these first: {}	Prima concludi o sposta questi: {}	Termina o mueve esto primero: {}	Përfundo ose zhvendos së pari këto: {}
+You do not have permission to deactivate these staff accounts	Non hai il permesso di disattivare questi account del personale	No tienes permiso para desactivar estas cuentas del personal	Nuk ke leje për të çaktivizuar këto llogari të stafit
+Archived branches cannot be modified	Le sedi archiviate non si possono modificare	Las sucursales archivadas no se pueden modificar	Pikat e arkivuara nuk mund të ndryshohen
+Non-active branch statuses must have isActive=false	Non-active branch statuses must have isActive=false	Non-active branch statuses must have isActive=false	Non-active branch statuses must have isActive=false
+ACTIVE branches must have isActive=true	ACTIVE branches must have isActive=true	ACTIVE branches must have isActive=true	ACTIVE branches must have isActive=true
+Manager user must be active	Il responsabile deve essere attivo	El gerente debe estar activo	Menaxheri duhet të jetë aktiv
+Manager user must belong to the same restaurant	Il responsabile deve appartenere allo stesso ristorante	El gerente debe pertenecer al mismo restaurante	Menaxheri duhet t'i përkasë të njëjtit restorant
+This code belonged to a removed branch and stays reserved. Choose another code.	Questo codice apparteneva a una sede rimossa e resta riservato. Scegli un altro codice.	Este código era de una sucursal eliminada y sigue reservado. Elige otro código.	Ky kod i përkiste një pike të hequr dhe mbetet i rezervuar. Zgjidh një kod tjetër.
+Use Transfer ownership to give the restaurant to someone else, or Add owner when it has none.	Usa Trasferisci la proprietà per dare il ristorante a qualcun altro, o Aggiungi titolare se non ne ha.	Usa Transferir la propiedad para dar el restaurante a otra persona, o Agregar propietario si no tiene.	Përdor Transfero pronësinë për t'ia dhënë restorantin dikujt tjetër, ose Shto pronar kur nuk ka.
+The restaurant needs an email and a phone number	Il ristorante ha bisogno di un'email e di un numero di telefono	El restaurante necesita un correo y un número de teléfono	Restoranti ka nevojë për një email dhe një numër telefoni
+Use “Change currency” to change the currency, so prices are converted with it	Usa “Cambia valuta” per cambiare la valuta, così i prezzi vengono convertiti	Usa “Cambiar moneda” para cambiar la moneda, así los precios se convierten con ella	Përdor “Ndrysho monedhën” për të ndryshuar monedhën, që çmimet të konvertohen me të
+Use “Change time zone” to change the time zone, so you see what moves first	Usa “Cambia fuso orario” per cambiare il fuso orario, così vedi prima cosa si sposta	Usa “Cambiar zona horaria” para cambiar la zona horaria, así ves primero qué se mueve	Përdor “Ndrysho zonën kohore” për të ndryshuar zonën kohore, që të shohësh së pari çfarë lëviz
+Only the Super Admin can change the restaurant's {}	Solo il Super Admin può cambiare {} del ristorante	Solo el Super Admin puede cambiar {} del restaurante	Vetëm Super Admini mund të ndryshojë {} e restorantit
+The restaurant application code pepper must be at least 16 characters	The restaurant application code pepper must be at least 16 characters	The restaurant application code pepper must be at least 16 characters	The restaurant application code pepper must be at least 16 characters
+Failed to hash application code	Failed to hash application code	Failed to hash application code	Failed to hash application code
+Could not fingerprint restaurant change	Could not fingerprint restaurant change	Could not fingerprint restaurant change	Could not fingerprint restaurant change
+The restaurant or its data changed. Refresh the preview and confirm again.	Il ristorante o i suoi dati sono cambiati. Aggiorna l'anteprima e conferma di nuovo.	El restaurante o sus datos cambiaron. Actualiza la vista previa y confirma de nuevo.	Restoranti ose të dhënat e tij ndryshuan. Rifresko parapamjen dhe konfirmo përsëri.
+This preview was already applied with different choices. Refresh it before trying again.	Questa anteprima è già stata applicata con scelte diverse. Aggiornala prima di riprovare.	Esta vista previa ya se aplicó con otras opciones. Actualízala antes de volver a intentarlo.	Kjo parapamje është zbatuar tashmë me zgjedhje të tjera. Rifreskoje para se të provosh përsëri.
+Could not read completed change	Could not read completed change	Could not read completed change	Could not read completed change
+Open a branch before reopening the restaurant	Apri una sede prima di riaprire il ristorante	Abre una sucursal antes de reabrir el restaurante	Hap një pikë para se të rihapësh restorantin
+Finish or move these before closing: {}	Concludi o sposta questi prima di chiudere: {}	Termina o mueve esto antes de cerrar: {}	Përfundo ose zhvendos këto para mbylljes: {}
+This branch is closed. Reopen it before starting new work.	Questa sede è chiusa. Riaprila prima di iniziare nuovo lavoro.	Esta sucursal está cerrada. Reábrela antes de empezar trabajo nuevo.	Kjo pikë është e mbyllur. Rihape para se të fillosh punë të re.
+Pending owner details are missing for this restaurant registration	Pending owner details are missing for this restaurant registration	Pending owner details are missing for this restaurant registration	Pending owner details are missing for this restaurant registration
+Only the Super Admin can transfer a restaurant's ownership	Solo il Super Admin può trasferire la proprietà di un ristorante	Solo el Super Admin puede transferir la propiedad de un restaurante	Vetëm Super Admini mund të transferojë pronësinë e një restoranti
+Choose either someone already in the POS or a new person to invite	Scegli qualcuno già nel POS o una nuova persona da invitare	Elige a alguien que ya esté en el POS o a una persona nueva para invitar	Zgjidh dikë që është tashmë në POS ose një person të ri për ta ftuar
+Review the application first; a restaurant that isn't approved has no owner to transfer	Prima rivedi la richiesta; un ristorante non approvato non ha un titolare da trasferire	Primero revisa la solicitud; un restaurante no aprobado no tiene propietario que transferir	Rishiko së pari aplikimin; një restorant i pamiratuar nuk ka pronar për t'u transferuar
+The restaurant changed since you opened it. Review the owner again before transferring.	Il ristorante è cambiato da quando l'hai aperto. Rivedi il titolare prima di trasferire.	El restaurante cambió desde que lo abriste. Revisa de nuevo el propietario antes de transferir.	Restoranti ndryshoi që kur e hape. Rishiko pronarin para transferimit.
+This restaurant has no owner yet. Use Add owner instead.	Questo ristorante non ha ancora un titolare. Usa invece Aggiungi titolare.	Este restaurante aún no tiene propietario. Usa Agregar propietario.	Ky restorant nuk ka ende pronar. Përdor Shto pronar.
+This person already owns the restaurant	Questa persona è già titolare del ristorante	Esta persona ya es propietaria del restaurante	Ky person është tashmë pronari i restorantit
+Choose an active person in the POS	Scegli una persona attiva nel POS	Elige a una persona activa en el POS	Zgjidh një person aktiv në POS
+A Super Admin or Co-Super-Admin can't own a restaurant	Un Super Admin o Co-Super-Admin non può essere titolare di un ristorante	Un Super Admin o Co-Super-Admin no puede ser propietario de un restaurante	Një Super Admin ose Co-Super-Admin nuk mund të jetë pronar restoranti
+This person works at another restaurant. Choose someone from this restaurant or invite a new person.	Questa persona lavora in un altro ristorante. Scegli qualcuno di questo ristorante o invita una nuova persona.	Esta persona trabaja en otro restaurante. Elige a alguien de este restaurante o invita a una persona nueva.	Ky person punon në një restorant tjetër. Zgjidh dikë nga ky restorant ose fto një person të ri.
+This person already owns another restaurant	Questa persona è già titolare di un altro ristorante	Esta persona ya es propietaria de otro restaurante	Ky person është tashmë pronar i një restoranti tjetër
+Only the Super Admin sees every restaurant	Solo il Super Admin vede tutti i ristoranti	Solo el Super Admin ve todos los restaurantes	Vetëm Super Admini i sheh të gjithë restorantet
+Only the Super Admin can change the order of the restaurants	Solo il Super Admin può cambiare l'ordine dei ristoranti	Solo el Super Admin puede cambiar el orden de los restaurantes	Vetëm Super Admini mund të ndryshojë rendin e restoranteve
+This restaurant already has an owner	Questo ristorante ha già un titolare	Este restaurante ya tiene propietario	Ky restorant ka tashmë pronar
+This restaurant has no owner yet	Questo ristorante non ha ancora un titolare	Este restaurante aún no tiene propietario	Ky restorant nuk ka ende pronar
+The owner has already set up their account, so only they can change their email	Il titolare ha già configurato il suo account, quindi solo lui può cambiare la sua email	El propietario ya configuró su cuenta, así que solo él puede cambiar su correo	Pronari e ka konfiguruar tashmë llogarinë, ndaj vetëm ai mund ta ndryshojë emailin
+Someone already uses this email	Qualcuno usa già questa email	Alguien ya usa este correo	Dikush e përdor tashmë këtë email
+Someone already uses this phone number	Qualcuno usa già questo numero di telefono	Alguien ya usa este número de teléfono	Dikush e përdor tashmë këtë numër telefoni
+The owner's account was removed	L'account del titolare è stato rimosso	La cuenta del propietario se eliminó	Llogaria e pronarit u hoq
+The owner has already set their password. They can reset it from the sign-in screen.	Il titolare ha già impostato la password. Può reimpostarla dalla schermata di accesso.	El propietario ya configuró su contraseña. Puede restablecerla desde la pantalla de inicio de sesión.	Pronari e ka vendosur tashmë fjalëkalimin. Mund ta rivendosë nga ekrani i hyrjes.
+An application with this email is already waiting for review. Check it with your application code.	Una richiesta con questa email è già in attesa di revisione. Controllala con il tuo codice di richiesta.	Una solicitud con este correo ya está esperando revisión. Consúltala con tu código de solicitud.	Një aplikim me këtë email po pret tashmë shqyrtim. Kontrolloje me kodin e aplikimit.
+An application with this username is already waiting for review. Choose another username.	Una richiesta con questo nome utente è già in attesa di revisione. Scegli un altro nome utente.	Una solicitud con este usuario ya está esperando revisión. Elige otro usuario.	Një aplikim me këtë emër përdoruesi po pret tashmë shqyrtim. Zgjidh një emër tjetër.
+Give the applicant a reason for the rejection	Indica al richiedente un motivo per il rifiuto	Da al solicitante un motivo del rechazo	Jepi aplikantit një arsye për refuzimin
+Only a rejected application can go back to waiting	Solo una richiesta rifiutata può tornare in attesa	Solo una solicitud rechazada puede volver a espera	Vetëm një aplikim i refuzuar mund të kthehet në pritje
+Another application with this owner's email is already waiting	Un'altra richiesta con l'email di questo titolare è già in attesa	Ya hay otra solicitud en espera con el correo de este dueño	Një aplikim tjetër me email-in e këtij pronari është tashmë në pritje
+Another application with this owner's username is already waiting	Un'altra richiesta con il nome utente di questo titolare è già in attesa	Ya hay otra solicitud en espera con el usuario de este dueño	Një aplikim tjetër me emrin e përdoruesit të këtij pronari është tashmë në pritje
+Restaurant applications are closed. Ask us to set up your restaurant.	Le richieste di nuovi ristoranti sono chiuse. Chiedici di configurare il tuo ristorante.	Las solicitudes de restaurantes están cerradas. Pídenos que configuremos tu restaurante.	Aplikimet për restorante janë mbyllur. Na kërko të konfigurojmë restorantin tënd.
+Only the Super Admin and Co-Super-Admins review restaurant applications	Solo il Super Admin e i Co-Super-Admin esaminano le richieste dei ristoranti	Solo el Super Admin y los Co-Super-Admins revisan las solicitudes de restaurantes	Vetëm Super Admini dhe Co-Super-Adminët shqyrtojnë aplikimet e restoranteve
+Finish active orders, shifts and seated or arrived bookings before changing the time zone.	Concludi ordini attivi, turni e prenotazioni accomodate o arrivate prima di cambiare fuso orario.	Termina los pedidos activos, turnos y reservas sentadas o llegadas antes de cambiar la zona horaria.	Përfundo porositë aktive, turnet dhe rezervimet e ulura ose të ardhura para se të ndryshosh zonën kohore.
+Review and confirm the upcoming bookings first.	Prima rivedi e conferma le prenotazioni in arrivo.	Primero revisa y confirma las próximas reservas.	Rishiko dhe konfirmo së pari rezervimet e ardhshme.
+Resolve booking payments, deposits and pre-orders before moving their agreed times, or keep the exact moment.	Risolvi pagamenti, caparre e preordini delle prenotazioni prima di spostarne gli orari concordati, oppure mantieni l'istante esatto.	Resuelve pagos, depósitos y pedidos anticipados de las reservas antes de mover sus horas acordadas, o mantén el momento exacto.	Zgjidh pagesat, depozitat dhe porositë paraprake të rezervimeve para se t'u lëvizësh oraret e rëna dakord, ose mbaj momentin e saktë.
+A booking would move into the past or have an invalid duration. Resolve it first.	Una prenotazione finirebbe nel passato o avrebbe una durata non valida. Risolvila prima.	Una reserva quedaría en el pasado o tendría una duración no válida. Resuélvela primero.	Një rezervim do të kalonte në të shkuarën ose do të kishte kohëzgjatje të pavlefshme. Zgjidhe së pari.
+Choose a time zone from the list (for example Europe/Tirane)	Scegli un fuso orario dall'elenco (per esempio Europe/Tirane)	Elige una zona horaria de la lista (por ejemplo Europe/Tirane)	Zgjidh një zonë kohore nga lista (për shembull Europe/Tirane)
+Unable to generate a unique restaurant identifier	Unable to generate a unique restaurant identifier	Unable to generate a unique restaurant identifier	Unable to generate a unique restaurant identifier
+Non-active restaurant statuses must have isActive=false	Non-active restaurant statuses must have isActive=false	Non-active restaurant statuses must have isActive=false	Non-active restaurant statuses must have isActive=false
+ACTIVE restaurants must have isActive=true	ACTIVE restaurants must have isActive=true	ACTIVE restaurants must have isActive=true	ACTIVE restaurants must have isActive=true
+PENDING and REJECTED statuses are reserved for registration review	PENDING and REJECTED statuses are reserved for registration review	PENDING and REJECTED statuses are reserved for registration review	PENDING and REJECTED statuses are reserved for registration review
+Owner user must be active	Il titolare deve essere attivo	El propietario debe estar activo	Pronari duhet të jetë aktiv
+Owner user is already assigned to another restaurant	Il titolare è già assegnato a un altro ristorante	El propietario ya está asignado a otro restaurante	Pronari është caktuar tashmë në një restorant tjetër
+This code belonged to a removed restaurant and stays reserved. Choose another code.	Questo codice apparteneva a un ristorante rimosso e resta riservato. Scegli un altro codice.	Este código era de un restaurante eliminado y sigue reservado. Elige otro código.	Ky kod i përkiste një restoranti të hequr dhe mbetet i rezervuar. Zgjidh një kod tjetër.
+This web address belonged to a removed restaurant and stays reserved. Choose another one.	Questo indirizzo web apparteneva a un ristorante rimosso e resta riservato. Scegline un altro.	Esta dirección web era de un restaurante eliminado y sigue reservada. Elige otra.	Kjo adresë web i përkiste një restoranti të hequr dhe mbetet e rezervuar. Zgjidh një tjetër.
+The booking time {} is missing or repeated in {} because of daylight saving. Keep the exact moment, or resolve this booking before changing the time zone.	L'ora della prenotazione {} manca o si ripete in {} per l'ora legale. Mantieni l'istante esatto o risolvi questa prenotazione prima di cambiare fuso orario.	La hora de la reserva {} falta o se repite en {} por el horario de verano. Mantén el momento exacto o resuelve esta reserva antes de cambiar la zona horaria.	Ora e rezervimit {} mungon ose përsëritet në {} për shkak të orës verore. Mbaj momentin e saktë ose zgjidhe këtë rezervim para se të ndryshosh zonën kohore.
+A booking would fall outside the branch's opening hours. Resolve it before changing the time zone.	Una prenotazione cadrebbe fuori dagli orari di apertura della sede. Risolvila prima di cambiare fuso orario.	Una reserva quedaría fuera del horario de la sucursal. Resuélvela antes de cambiar la zona horaria.	Një rezervim do të binte jashtë orarit të hapjes së pikës. Zgjidhe para se të ndryshosh zonën kohore.
+Use a supported currency with at most two decimal places (for example EUR, ALL, USD or JPY).	Usa una valuta supportata con al massimo due decimali (per esempio EUR, ALL, USD o JPY).	Usa una moneda admitida con como máximo dos decimales (por ejemplo EUR, ALL, USD o JPY).	Përdor një monedhë të mbështetur me deri në dy shifra dhjetore (për shembull EUR, ALL, USD ose JPY).
+Role name is required	Serve il nome del ruolo	Se requiere el nombre del rol	Emri i rolit kërkohet
+Role name must be at most 100 characters	Il nome del ruolo può avere al massimo 100 caratteri	El nombre del rol puede tener como máximo 100 caracteres	Emri i rolit mund të ketë deri në 100 karaktere
+Description must be at most 1000 characters	La descrizione può avere al massimo 1000 caratteri	La descripción puede tener como máximo 1000 caracteres	Përshkrimi mund të ketë deri në 1000 karaktere
+Choose a picture	Scegli un'immagine	Elige una imagen	Zgjidh një foto
+Choose a Salary team	Scegli un team degli stipendi	Elige un equipo de salarios	Zgjidh një ekip rrogash
+Permission code is required	Permission code is required	Permission code is required	Permission code is required
+Permission id is required	Permission id is required	Permission id is required	Permission id is required
+Say whether the role is paid	Indica se il ruolo è pagato	Indica si el rol se paga	Thuaj nëse roli paguhet
+Open this restaurant first	Apri prima questo ristorante	Abre primero este restaurante	Hap fillimisht këtë restorant
+Role not found	Ruolo non trovato	Rol no encontrado	Roli nuk u gjet
+Open a restaurant first	Prima apri un ristorante	Primero abre un restaurante	Hap së pari një restorant
+Person not found	Persona non trovata	Persona no encontrada	Personi nuk u gjet
+This person works in no restaurant	Questa persona non lavora in nessun ristorante	Esta persona no trabaja en ningún restaurante	Ky person nuk punon në asnjë restorant
+This permission is given for everything	Questo permesso vale per tutto	Este permiso se da para todo	Kjo leje jepet për gjithçka
+Too many choices	Troppe scelte	Demasiadas opciones	Shumë zgjedhje
+Choose from the restaurant's own floors and roles	Scegli tra i piani e i ruoli del ristorante	Elige entre los pisos y roles del restaurante	Zgjidh nga katet dhe rolet e restorantit
+Only the Super Admin can change a Co-Super-Admin's permissions	Solo il Super Admin può cambiare i permessi di un Co-Super-Admin	Solo el Super Admin puede cambiar los permisos de un Co-Super-Admin	Vetëm Super Admini mund të ndryshojë lejet e një Co-Super-Admini
+This person is not a Co-Super-Admin	Questa persona non è un Co-Super-Admin	Esta persona no es Co-Super-Admin	Ky person nuk është Co-Super-Admin
+System roles cannot be modified	I ruoli di sistema non si possono modificare	Los roles del sistema no se pueden modificar	Rolet e sistemit nuk mund të ndryshohen
+You can only see your own sales	Puoi vedere solo le tue vendite	Solo puedes ver tus propias ventas	Mund të shikosh vetëm shitjet e tua
+Staff member belongs to another branch	Il membro del personale appartiene a un'altra sede	El miembro del personal pertenece a otra sucursal	Anëtari i stafit i përket një pike tjetër
+Shift does not belong to this staff member and branch	Il turno non appartiene a questo membro del personale e a questa sede	El turno no pertenece a este miembro del personal y sucursal	Turni nuk i përket këtij anëtari të stafit dhe kësaj pike
+You do not have permission to view these sales	Non hai il permesso di vedere queste vendite	No tienes permiso para ver estas ventas	Nuk ke leje për të parë këto shitje
+See tables	Vedere i tavoli	Ver las mesas	Shiko tavolinat
+The floor plan, on the floors chosen for them	La pianta, sui piani scelti per lui	El plano, en los pisos elegidos para esa persona	Plani, në katet e zgjedhura për të
+Change tables	Modificare i tavoli	Cambiar mesas	Ndrysho tavolinat
+Seat guests, set tables free or out of use, move guests and join tables	Far accomodare gli ospiti, liberare i tavoli o metterli fuori uso, spostare gli ospiti e unire i tavoli	Sentar comensales, liberar mesas o dejarlas fuera de uso, mover comensales y unir mesas	Ul mysafirët, liro tavolinat ose nxirri jashtë përdorimit, lëviz mysafirët dhe bashko tavolinat
+Take payments	Incassare	Cobrar	Merr pagesa
+Request the bill and take the payment from a table	Chiedere il conto e incassare da un tavolo	Pedir la cuenta y cobrar desde una mesa	Kërko faturën dhe merr pagesën nga një tavolinë
+Edit the floor plan	Modificare la pianta	Editar el plano	Ndrysho planin
+Add, move and remove tables, floors and places	Aggiungere, spostare e togliere tavoli, piani e zone	Agregar, mover y quitar mesas, pisos y zonas	Shto, lëviz dhe hiq tavolina, kate dhe zona
+Open the branch for now while it's closed: a late group, an event	Apri la sede per ora mentre è chiusa: un gruppo in ritardo, un evento	Abrir la sucursal por ahora mientras está cerrada: un grupo tarde, un evento	Hap pikën për tani kur është e mbyllur: një grup i vonuar, një event
+See orders	Vedere gli ordini	Ver los pedidos	Shiko porositë
+The open orders and what's on them	Gli ordini aperti e cosa contengono	Los pedidos abiertos y lo que llevan	Porositë e hapura dhe çfarë kanë
+Edit orders	Modificare gli ordini	Editar pedidos	Ndrysho porositë
+Start orders, add and remove dishes, notes, send to the kitchen, serve, cancel unpaid-for orders	Aprire ordini, aggiungere e togliere piatti, note, inviare in cucina, servire, annullare ordini non pagati	Abrir pedidos, agregar y quitar platos, notas, enviar a cocina, servir, cancelar pedidos sin pagar	Hap porosi, shto dhe hiq pjata, shënime, dërgo në kuzhinë, shërbe, anulo porosi të papaguara
+Start orders	Aprire ordini	Abrir pedidos	Hap porosi
+Start an order on a table or without one	Aprire un ordine su un tavolo o senza tavolo	Abrir un pedido en una mesa o sin mesa	Hap një porosi në një tavolinë ose pa tavolinë
+Cancel orders	Annullare ordini	Cancelar pedidos	Anulo porosi
+Cancel an order nothing was paid on	Annullare un ordine su cui non è stato pagato niente	Cancelar un pedido en el que no se pagó nada	Anulo një porosi për të cilën s'është paguar asgjë
+Request the bill and take the payment for an order	Chiedere il conto e incassare un ordine	Pedir la cuenta y cobrar un pedido	Kërko faturën dhe merr pagesën e një porosie
+Close an order whose guests left without paying	Chiudere un ordine i cui ospiti sono andati via senza pagare	Cerrar un pedido cuyos comensales se fueron sin pagar	Mbyll një porosi mysafirët e së cilës ikën pa paguar
+Void what was sent	Stornare ciò che è stato inviato	Anular lo enviado	Storno atë që u dërgua
+Void orders or dishes the kitchen already has	Stornare ordini o piatti che la cucina ha già	Anular pedidos o platos que la cocina ya tiene	Storno porosi ose pjata që i ka kuzhina
+Move orders to another table	Spostare ordini su un altro tavolo	Mover pedidos a otra mesa	Lëviz porositë në një tavolinë tjetër
+Move an order to another table	Spostare un ordine su un altro tavolo	Mover un pedido a otra mesa	Lëviz një porosi në një tavolinë tjetër
+Give discounts	Fare sconti	Dar descuentos	Bëj zbritje
+Take money off a dish or a whole order	Togliere soldi da un piatto o da tutto l'ordine	Descontar dinero de un plato o de todo el pedido	Ul çmimin e një pjate ose të gjithë porosisë
+See an order's kitchen status	Vedere lo stato in cucina di un ordine	Ver el estado en cocina de un pedido	Shiko gjendjen në kuzhinë të një porosie
+The food status of an order and of its dishes	Lo stato del cibo di un ordine e dei suoi piatti	El estado de la comida de un pedido y de sus platos	Gjendja e ushqimit të një porosie dhe e pjatave të saj
+See reservations	Vedere le prenotazioni	Ver las reservas	Shiko rezervimet
+Bookings, the overview and free tables for walk-ins	Prenotazioni, panoramica e tavoli liberi per chi arriva senza prenotazione	Reservas, el resumen y mesas libres para clientes sin reserva	Rezervime, përmbledhja dhe tavolina të lira për ata pa rezervim
+Make and change bookings	Fare e modificare prenotazioni	Hacer y cambiar reservas	Bëj dhe ndrysho rezervime
+Book, change time, guests, notes and table, confirm attendance, check in and seat	Prenotare, cambiare ora, ospiti, note e tavolo, confermare la presenza, registrare l'arrivo e far accomodare	Reservar, cambiar hora, comensales, notas y mesa, confirmar asistencia, registrar llegada y sentar	Rezervo, ndrysho orën, mysafirët, shënimet dhe tavolinën, konfirmo ardhjen, regjistro hyrjen dhe ul
+Cancel bookings	Annullare prenotazioni	Cancelar reservas	Anulo rezervime
+Cancel a booking or mark a no-show	Annullare una prenotazione o segnare una mancata presentazione	Cancelar una reserva o marcar que no se presentó	Anulo një rezervim ose shëno mosparaqitje
+Approve bookings	Approvare prenotazioni	Aprobar reservas	Mirato rezervime
+Accept or decline booking requests and move bookings to other tables	Accettare o rifiutare richieste di prenotazione e spostare prenotazioni su altri tavoli	Aceptar o rechazar solicitudes de reserva y mover reservas a otras mesas	Prano ose refuzo kërkesat për rezervim dhe lëviz rezervimet në tavolina të tjera
+Fix past bookings	Correggere prenotazioni passate	Corregir reservas pasadas	Korrigjo rezervime të kaluara
+Correct bookings after the time limits or from an earlier day, with a reason	Correggere prenotazioni oltre i limiti di tempo o di un giorno precedente, con un motivo	Corregir reservas pasado el tiempo límite o de un día anterior, con un motivo	Korrigjo rezervime pas afateve ose nga një ditë më parë, me një arsye
+Give goodwill refunds	Fare rimborsi di cortesia	Dar reembolsos de cortesía	Bëj rimbursime mirëbesimi
+Give back part of money the restaurant kept, like a late cancel's deposit	Restituire parte dei soldi trattenuti dal ristorante, come il deposito di una disdetta tardiva	Devolver parte del dinero que se quedó el restaurante, como el depósito de una cancelación tardía	Kthe një pjesë të parave që mbajti restoranti, si depozitën e një anulimi të vonë
+See the menu	Vedere il menù	Ver el menú	Shiko menunë
+Menus, sections, dishes and their prices	Menù, sezioni, piatti e prezzi	Menús, secciones, platos y sus precios	Menu, seksione, pjata dhe çmimet e tyre
+Mark sold out	Segnare esaurito	Marcar agotado	Shëno të mbaruar
+Mark a dish or an option sold out and available again	Segnare un piatto o un'opzione come esaurito e di nuovo disponibile	Marcar un plato o una opción como agotado y disponible de nuevo	Shëno një pjatë ose opsion si të mbaruar dhe sërish në dispozicion
+Add dishes and menus	Aggiungere piatti e menù	Agregar platos y menús	Shto pjata dhe menu
+Add menus, sections, dishes, variants and options	Aggiungere menù, sezioni, piatti, varianti e opzioni	Agregar menús, secciones, platos, variantes y opciones	Shto menu, seksione, pjata, variante dhe opsione
+Change dishes and menus	Modificare piatti e menù	Cambiar platos y menús	Ndrysho pjata dhe menu
+Change dishes, photos, ingredients, the order and what waiters see, not prices	Modificare piatti, foto, ingredienti, l'ordine e cosa vedono i camerieri, non i prezzi	Cambiar platos, fotos, ingredientes, el orden y lo que ven los meseros, no los precios	Ndrysho pjatat, fotot, përbërësit, renditjen dhe çfarë shohin kamarierët, jo çmimet
+Change prices	Modificare i prezzi	Cambiar precios	Ndrysho çmimet
+Change the price of dishes, variants and options	Modificare il prezzo di piatti, varianti e opzioni	Cambiar el precio de platos, variantes y opciones	Ndrysho çmimin e pjatave, varianteve dhe opsioneve
+Delete dishes and menus	Eliminare piatti e menù	Eliminar platos y menús	Fshi pjata dhe menu
+Delete menus, sections, dishes, variants and options	Eliminare menù, sezioni, piatti, varianti e opzioni	Eliminar menús, secciones, platos, variantes y opciones	Fshi menu, seksione, pjata, variante dhe opsione
+See Kitchen Status	Vedere Stato cucina	Ver Estado de cocina	Shiko Gjendjen e kuzhinës
+The whole kitchen board: where every order is	Tutta la bacheca della cucina: a che punto è ogni ordine	Todo el tablero de cocina: en qué punto está cada pedido	E gjithë tabela e kuzhinës: ku është çdo porosi
+See My Sales	Vedere Le mie vendite	Ver Mis ventas	Shiko Shitjet e mia
+Their own sales and tips	Le proprie vendite e mance	Sus propias ventas y propinas	Shitjet dhe bakshishet e veta
+See history	Vedere lo storico	Ver el historial	Shiko historikun
+Closed, cancelled and unpaid orders, their bills, printed again	Ordini chiusi, annullati e non pagati, i loro conti, ristampati	Pedidos cerrados, cancelados y no pagados, sus cuentas, impresas de nuevo	Porosi të mbyllura, të anuluara dhe të papaguara, faturat e tyre, të printuara sërish
+Reopen an unpaid order to take its payment	Riaprire un ordine non pagato per incassarlo	Reabrir un pedido no pagado para cobrarlo	Rihap një porosi të papaguar për ta paguar
+Reopen orders	Riaprire ordini	Reabrir pedidos	Rihap porosi
+Reopen a closed order	Riaprire un ordine chiuso	Reabrir un pedido cerrado	Rihap një porosi të mbyllur
+Refund payments	Rimborsare pagamenti	Reembolsar pagos	Rimburso pagesa
+Give money back on a paid order, with a reason	Restituire denaro su un ordine pagato, con un motivo	Devolver dinero de un pedido pagado, con un motivo	Kthe para për një porosi të paguar, me një arsye
+See what changed on orders	Vedere cosa è cambiato negli ordini	Ver qué cambió en los pedidos	Shiko çfarë ndryshoi në porosi
+Every change made to an order, by whom and when	Ogni modifica a un ordine, chi l'ha fatta e quando	Cada cambio en un pedido, quién lo hizo y cuándo	Çdo ndryshim në një porosi, kush e bëri dhe kur
+Their own shifts: clock in and out, take breaks	I propri turni: timbrare entrata e uscita, fare pause	Sus propios turnos: fichar entrada y salida, tomar descansos	Turnet e veta: shëno hyrjen dhe daljen, bëj pushime
+See their pay	Vedere la propria paga	Ver su pago	Shiko pagën e vet
+Their hours, wage or salary and tips	Le proprie ore, paga oraria o stipendio e mance	Sus horas, pago por hora o salario y propinas	Orët, paga për orë ose rroga dhe bakshishet e veta
+See others' shifts	Vedere i turni degli altri	Ver los turnos de otros	Shiko turnet e të tjerëve
+Who works when, for the roles chosen for them	Chi lavora quando, per i ruoli scelti per lui	Quién trabaja cuándo, para los roles elegidos para esa persona	Kush punon kur, për rolet e zgjedhura për të
+See tickets	Vedere le comande	Ver las comandas	Shiko porositë e kuzhinës
+The tickets on the kitchen board	Le comande sulla bacheca della cucina	Las comandas en el tablero de cocina	Porositë në tabelën e kuzhinës
+Move tickets	Spostare le comande	Mover comandas	Lëviz porositë e kuzhinës
+Start dishes, mark them ready and send tickets back	Iniziare i piatti, segnarli pronti e rimandare indietro le comande	Empezar platos, marcarlos listos y devolver comandas	Fillo pjatat, shënoji gati dhe kthe mbrapa porositë
+See Upcoming	Vedere In arrivo	Ver Próximos	Shiko Në ardhje
+Food ordered ahead for bookings and timed orders	Cibo ordinato in anticipo per prenotazioni e ordini programmati	Comida pedida por adelantado para reservas y pedidos programados	Ushqim i porositur paraprakisht për rezervime dhe porosi me orar
+The menu, as the POS shows it	Il menù, come lo mostra il POS	El menú, como lo muestra el POS	Menuja, siç e tregon POS
+Tickets that went out	Comande uscite	Comandas que salieron	Porositë e kuzhinës që dolën
+See the overview	Vedere la panoramica	Ver el resumen	Shiko përmbledhjen
+Stock health, value and the stock in and out chart	Stato del magazzino, valore e grafico di entrate e uscite	Estado del inventario, valor y el gráfico de entradas y salidas	Gjendja e stokut, vlera dhe grafiku i hyrjeve dhe daljeve
+See stock	Vedere il magazzino	Ver el inventario	Shiko stokun
+What's in stock, where, and what's running low	Cosa c'è in magazzino, dove, e cosa sta finendo	Qué hay en inventario, dónde, y qué se está acabando	Çfarë ka në stok, ku, dhe çfarë po mbaron
+Receive deliveries	Ricevere consegne	Recibir entregas	Prit dërgesat
+Put deliveries in stock	Mettere le consegne in magazzino	Poner las entregas en el inventario	Fut dërgesat në stok
+Take out what was thrown away	Togliere ciò che è stato buttato	Sacar lo que se tiró	Hiq atë që u hodh
+Move stock from one place to another	Spostare merce da un posto all'altro	Mover inventario de un lugar a otro	Lëviz stokun nga një vend në tjetrin
+Correct amounts and send things back to suppliers	Correggere quantità e rimandare merce ai fornitori	Corregir cantidades y devolver cosas a los proveedores	Korrigjo sasitë dhe kthe gjëra te furnitorët
+Add, change and delete places and where dishes take stock from	Aggiungere, modificare ed eliminare posti e da dove i piatti prendono la merce	Agregar, cambiar y eliminar lugares y de dónde toman inventario los platos	Shto, ndrysho dhe fshi vende dhe nga ku marrin stok pjatat
+See items	Vedere gli articoli	Ver los artículos	Shiko artikujt
+Every item and sub-recipe with its cost, supplier and levels	Ogni articolo e semilavorato con costo, fornitore e livelli	Cada artículo y subreceta con su costo, proveedor y niveles	Çdo artikull dhe nënrecetë me koston, furnitorin dhe nivelet
+Add items	Aggiungere articoli	Agregar artículos	Shto artikuj
+Add items and sub-recipes	Aggiungere articoli e semilavorati	Agregar artículos y subrecetas	Shto artikuj dhe nënreceta
+Change items	Modificare articoli	Cambiar artículos	Ndrysho artikuj
+Change items, their levels, photos and kinds, and sub-recipes	Modificare articoli, livelli, foto e tipi, e semilavorati	Cambiar artículos, sus niveles, fotos y tipos, y subrecetas	Ndrysho artikujt, nivelet, fotot dhe llojet e tyre, dhe nënrecetat
+Delete items	Eliminare articoli	Eliminar artículos	Fshi artikuj
+Delete items; what's left in stock is written off	Eliminare articoli; ciò che resta in magazzino viene scaricato	Eliminar artículos; lo que queda en inventario se da de baja	Fshi artikuj; ajo që mbetet në stok shlyhet
+See counts	Vedere gli inventari	Ver los conteos	Shiko numërimet
+Stock counts and their differences	Inventari e loro differenze	Conteos de inventario y sus diferencias	Numërimet e stokut dhe diferencat e tyre
+Count stock	Fare l'inventario	Contar inventario	Numëro stokun
+Start counts, write what was counted and finish them	Iniziare inventari, scrivere cosa è stato contato e concluderli	Empezar conteos, anotar lo contado y terminarlos	Fillo numërime, shkruaj çfarë u numërua dhe përfundoji
+Approve counts	Approvare inventari	Aprobar conteos	Mirato numërimet
+Approve a count, which changes the stock to what was counted	Approvare un inventario, che porta il magazzino a quanto contato	Aprobar un conteo, que cambia el inventario a lo contado	Mirato një numërim, që e kthen stokun në atë që u numërua
+Every stock change and what happened to items	Ogni movimento di magazzino e cosa è successo agli articoli	Cada cambio de inventario y lo que pasó con los artículos	Çdo ndryshim stoku dhe çfarë ndodhi me artikujt
+See suppliers	Vedere i fornitori	Ver los proveedores	Shiko furnitorët
+Suppliers, their places, the items bought from them and orders	Fornitori, loro sedi, articoli acquistati da loro e ordini	Proveedores, sus lugares, los artículos que se les compran y pedidos	Furnitorët, vendet e tyre, artikujt e blerë prej tyre dhe porositë
+Change suppliers	Modificare fornitori	Cambiar proveedores	Ndrysho furnitorët
+Add and change suppliers, their items and prices, and make orders	Aggiungere e modificare fornitori, articoli e prezzi, e fare ordini	Agregar y cambiar proveedores, sus artículos y precios, y hacer pedidos	Shto dhe ndrysho furnitorë, artikujt dhe çmimet e tyre, dhe bëj porosi
+See shifts	Vedere i turni	Ver los turnos	Shiko turnet
+Who works when, and who's clocked in	Chi lavora quando, e chi ha timbrato	Quién trabaja cuándo, y quién fichó	Kush punon kur, dhe kush ka shënuar hyrjen
+Plan shifts, put people on them and fix clock-ins	Pianificare turni, assegnare le persone e correggere le timbrature	Planificar turnos, asignar personas y corregir fichajes	Planifiko turne, vendos njerëz në to dhe korrigjo hyrjet
+See wages and tips, set how people are paid and record payouts	Vedere paghe e mance, impostare come vengono pagate le persone e registrare i pagamenti	Ver sueldos y propinas, definir cómo se paga a cada persona y registrar pagos	Shiko pagat dhe bakshishet, cakto si paguhen njerëzit dhe regjistro pagesat
+See people	Vedere le persone	Ver a las personas	Shiko njerëzit
+The people working here and their roles	Le persone che lavorano qui e i loro ruoli	Las personas que trabajan aquí y sus roles	Njerëzit që punojnë këtu dhe rolet e tyre
+Add people	Aggiungere persone	Agregar personas	Shto njerëz
+Add people and choose their roles	Aggiungere persone e scegliere i loro ruoli	Agregar personas y elegir sus roles	Shto njerëz dhe zgjidh rolet e tyre
+Change people	Modificare le persone	Cambiar personas	Ndrysho njerëzit
+Change details, roles, permissions and PINs, and reset passwords	Modificare dati, ruoli, permessi e PIN, e reimpostare password	Cambiar datos, roles, permisos y PIN, y restablecer contraseñas	Ndrysho të dhënat, rolet, lejet dhe PIN-et, dhe rivendos fjalëkalime
+Remove people	Rimuovere persone	Quitar personas	Hiq njerëz
+Remove people from the staff	Rimuovere persone dal personale	Quitar personas del personal	Hiq njerëz nga stafi
+Sign people out	Disconnettere le persone	Cerrar la sesión de otras personas	Nxirr njerëzit nga llogaria
+See where people are signed in and sign them out	Vedere dove le persone hanno effettuato l'accesso e disconnetterle	Ver dónde iniciaron sesión las personas y cerrarla	Shiko ku kanë hyrë njerëzit dhe nxirri
+See roles	Vedere i ruoli	Ver los roles	Shiko rolet
+The roles and what each can do	I ruoli e cosa può fare ciascuno	Los roles y lo que puede hacer cada uno	Rolet dhe çfarë mund të bëjë secili
+Make roles	Creare ruoli	Crear roles	Krijo role
+Make the restaurant's own roles	Creare i ruoli del ristorante	Crear los roles propios del restaurante	Krijo rolet e vetë restorantit
+Change roles	Modificare ruoli	Cambiar roles	Ndrysho role
+Rename roles, change their pay and switch them off	Rinominare ruoli, cambiarne la paga e disattivarli	Renombrar roles, cambiar su pago y desactivarlos	Riemërto role, ndrysho pagën e tyre dhe çaktivizoji
+Delete roles	Eliminare ruoli	Eliminar roles	Fshi role
+Delete the restaurant's own roles	Eliminare i ruoli del ristorante	Eliminar los roles propios del restaurante	Fshi rolet e vetë restorantit
+Change what roles can do	Cambiare cosa possono fare i ruoli	Cambiar lo que pueden hacer los roles	Ndrysho çfarë mund të bëjnë rolet
+Switch a role's permissions on and off	Attivare e disattivare i permessi di un ruolo	Activar y desactivar los permisos de un rol	Aktivizo dhe çaktivizo lejet e një roli
+See settings	Vedere le impostazioni	Ver la configuración	Shiko cilësimet
+How the restaurant is set up	Come è impostato il ristorante	Cómo está configurado el restaurante	Si është konfiguruar restoranti
+Change settings	Modificare le impostazioni	Cambiar la configuración	Ndrysho cilësimet
+Bookings, tables, orders, shifts, inventory and other settings	Prenotazioni, tavoli, ordini, turni, magazzino e altre impostazioni	Reservas, mesas, pedidos, turnos, inventario y otras configuraciones	Rezervime, tavolina, porosi, turne, stok dhe cilësime të tjera
+Change payment and fraud settings	Modificare le impostazioni di pagamento e frodi	Cambiar la configuración de pagos y fraude	Ndrysho cilësimet e pagesave dhe të mashtrimit
+Tax, service charge, paying, receipts and fraud checks	Tasse, servizio, pagamenti, scontrini e controlli antifrode	Impuestos, cargo por servicio, pagos, recibos y controles de fraude	Taksat, tarifa e shërbimit, pagesat, faturat dhe kontrollet e mashtrimit
+See the audit log	Vedere il registro attività	Ver el registro de actividad	Shiko regjistrin e veprimeve
+Every change made, by whom and when	Ogni modifica, chi l'ha fatta e quando	Cada cambio, quién lo hizo y cuándo	Çdo ndryshim, kush e bëri dhe kur
+Connect devices	Collegare i dispositivi	Conectar dispositivos	Lidh pajisjet
+Connect tills, tablets and screens, on the device itself or with a code	Collegare casse, tablet e schermi, sul dispositivo stesso o con un codice	Conectar cajas, tabletas y pantallas, en el mismo dispositivo o con un código	Lidh arka, tableta dhe ekrane, në vetë pajisjen ose me kod
+Manage devices	Gestire i dispositivi	Gestionar dispositivos	Menaxho pajisjet
+Add, change and remove tills, tablets, printers and other devices, and the restaurant's network	Aggiungere, modificare e rimuovere casse, tablet, stampanti e altri dispositivi, e la rete del ristorante	Agregar, cambiar y quitar cajas, tabletas, impresoras y otros dispositivos, y la red del restaurante	Shto, ndrysho dhe hiq arka, tableta, printera dhe pajisje të tjera, dhe rrjetin e restorantit
+See restaurant info	Vedere le informazioni del ristorante	Ver la información del restaurante	Shiko informacionin e restorantit
+The restaurant's details, branches, logo and currency	Dati del ristorante, sedi, logo e valuta	Los datos del restaurante, sucursales, logo y moneda	Të dhënat e restorantit, pikat, logoja dhe monedha
+Change restaurant info	Modificare le informazioni del ristorante	Cambiar la información del restaurante	Ndrysho informacionin e restorantit
+Description, phone, email, addresses, logo, colours and receipt texts	Descrizione, telefono, email, indirizzi, logo, colori e testi dello scontrino	Descripción, teléfono, correo, direcciones, logo, colores y textos del recibo	Përshkrimi, telefoni, email-i, adresat, logoja, ngjyrat dhe tekstet e faturës
+Change opening hours	Modificare l'orario di apertura	Cambiar el horario	Ndrysho orarin e hapjes
+Each branch's week and its special days	La settimana di ogni sede e i suoi giorni speciali	La semana de cada sucursal y sus días especiales	Java e çdo pike dhe ditët e saj të veçanta
+Work in every branch	Lavora in ogni sede	Trabaja en todas las sucursales	Puno në çdo pikë
+Choose the branch to work in and switch between the restaurant's branches	Scegli la sede in cui lavorare e passa da una sede all'altra	Elige la sucursal donde trabajar y cambia entre las sucursales del restaurante	Zgjidh pikën ku punon dhe kalo nga një pikë te tjetra
+Sales, orders and guests at a glance	Vendite, ordini e ospiti in sintesi	Ventas, pedidos y comensales de un vistazo	Shitje, porosi dhe mysafirë me një shikim
+See Sales	Vedere Vendite	Ver Ventas	Shiko Shitjet
+Sales by day, hour, service and floor	Vendite per giorno, ora, servizio e piano	Ventas por día, hora, servicio y piso	Shitjet sipas ditës, orës, shërbimit dhe katit
+See Finance	Vedere Finanza	Ver Finanzas	Shiko Financat
+Money in and out, wages, refunds, tips and tax	Entrate e uscite, paghe, rimborsi, mance e tasse	Entradas y salidas de dinero, salarios, reembolsos, propinas e impuestos	Paratë që hyjnë e dalin, pagat, rimbursimet, bakshishet dhe taksat
+See Orders	Vedere Ordini	Ver Pedidos	Shiko Porositë
+How many orders, of what kind, and when	Quanti ordini, di che tipo e quando	Cuántos pedidos, de qué tipo y cuándo	Sa porosi, të çfarë lloji dhe kur
+See Dishes	Vedere Piatti	Ver Platos	Shiko Pjatat
+Every dish sold, its cost and margin	Ogni piatto venduto, il suo costo e il margine	Cada plato vendido, su costo y margen	Çdo pjatë e shitur, kostoja dhe marzhi i saj
+See Stock	Vedere Magazzino	Ver Inventario	Shiko Stokun
+Stock in and out, food cost and waste	Entrate e uscite di magazzino, costo del cibo e sprechi	Entradas y salidas de inventario, costo de alimentos y desperdicio	Hyrjet dhe daljet e stokut, kostoja e ushqimit dhe humbjet
+See Tables	Vedere Tavoli	Ver Mesas	Shiko Tavolinat
+Bookings, guests and how tables were used	Prenotazioni, ospiti e come sono stati usati i tavoli	Reservas, comensales y cómo se usaron las mesas	Rezervime, mysafirë dhe si u përdorën tavolinat
+See Team	Vedere Squadra	Ver Equipo	Shiko Ekipin
+Sales, hours and tips by person	Vendite, ore e mance per persona	Ventas, horas y propinas por persona	Shitje, orë dhe bakshishe për person
+See alerts	Vedere gli avvisi	Ver las alertas	Shiko sinjalizimet
+Flagged discounts, refunds, removals and other risky actions	Sconti, rimborsi, rimozioni segnalati e altre azioni a rischio	Descuentos, reembolsos, eliminaciones marcadas y otras acciones de riesgo	Zbritje, rimbursime, heqje të shënuara dhe veprime të tjera me rrezik
+Review alerts	Esaminare gli avvisi	Revisar alertas	Shqyrto sinjalizimet
+Mark flagged actions as checked, dismissed or confirmed	Segnare le azioni segnalate come verificate, archiviate o confermate	Marcar las acciones señaladas como revisadas, descartadas o confirmadas	Shëno veprimet e sinjalizuara si të kontrolluara, të hedhura poshtë ose të konfirmuara
+Open POS	Apri POS	Abrir POS	Hap POS-in
+Open the POS workspace	Aprire lo spazio di lavoro POS	Abrir el espacio de trabajo POS	Hap hapësirën e punës POS
+Open Kitchen Display	Apri schermo cucina	Abrir pantalla de cocina	Hap ekranin e kuzhinës
+Open the kitchen display workspace	Aprire lo schermo della cucina	Abrir la pantalla de cocina	Hap ekranin e kuzhinës
+Open Admin Hub	Apri Admin Hub	Abrir Admin Hub	Hap Admin Hub-in
+Open the admin hub workspace	Aprire l'Admin Hub	Abrir el Admin Hub	Hap Admin Hub-in
+Open Statistics	Apri statistiche	Abrir estadísticas	Hap statistikat
+Open the statistics workspace	Aprire le statistiche	Abrir las estadísticas	Hap statistikat
+Open Inventory	Apri inventario	Abrir inventario	Hap inventarin
+Open the inventory workspace	Aprire l'inventario	Abrir el inventario	Hap inventarin
+Open Fraud Detection	Apri rilevamento frodi	Abrir detección de fraude	Hap zbulimin e mashtrimit
+Open the fraud detection workspace	Aprire il rilevamento frodi	Abrir la detección de fraude	Hap zbulimin e mashtrimit
+Create restaurants	Creare ristoranti	Crear restaurantes	Krijo restorante
+Add restaurants and review applications	Aggiungere ristoranti ed esaminare le richieste	Agregar restaurantes y revisar solicitudes	Shto restorante dhe shqyrto aplikimet
+Delete restaurants	Eliminare ristoranti	Eliminar restaurantes	Fshi restorante
+Remove restaurants	Rimuovere ristoranti	Quitar restaurantes	Hiq restorante
+Export settings	Esportare impostazioni	Exportar configuración	Eksporto cilësimet
+Export a restaurant's settings	Esportare le impostazioni di un ristorante	Exportar la configuración de un restaurante	Eksporto cilësimet e një restoranti
+Import settings	Importare impostazioni	Importar configuración	Importo cilësimet
+Import a restaurant's settings	Importare le impostazioni di un ristorante	Importar la configuración de un restaurante	Importo cilësimet e një restoranti
+Manage settings templates	Gestire modelli di impostazioni	Gestionar plantillas de configuración	Menaxho modelet e cilësimeve
+Create, change and delete settings templates	Creare, modificare ed eliminare modelli di impostazioni	Crear, cambiar y eliminar plantillas de configuración	Krijo, ndrysho dhe fshi modele cilësimesh
+Apply settings templates	Applicare modelli di impostazioni	Aplicar plantillas de configuración	Zbato modelet e cilësimeve
+Apply settings templates to restaurants	Applicare modelli di impostazioni ai ristoranti	Aplicar plantillas de ajustes a los restaurantes	Zbato shabllone cilësimesh te restorantet
+Assign requests	Assegnare le richieste	Asignar solicitudes	Caktimi i kërkesave
+See every request, give it to an admin (or themselves) and take it back	Vedere ogni richiesta, darla a un admin (o a sé) e riprenderla	Ver cada solicitud, dársela a un admin (o a sí mismo) y retirarla	Shikon çdo kërkesë, ia jep një admini (ose vetes) dhe e merr mbrapsht
+Super Admin	Super Admin	Super Admin	Super Admin
+System-level control across all tenants	Controllo di tutto il sistema, per ogni cliente	Control de todo el sistema, para cada cliente	Kontroll i gjithë sistemit, për çdo klient
+Takes care of the restaurants the Super Admin gives them	Si occupa dei ristoranti che gli assegna il Super Admin	Se encarga de los restaurantes que le asigna el Super Admin	Kujdeset për restorantet që i jep Super Admini
+Business owner - full control over the restaurant	Titolare: pieno controllo del ristorante	Dueño del negocio: control total del restaurante	Pronari i biznesit: kontroll i plotë mbi restorantin
+Shares ownership with limited restrictions	Condivide la proprietà con poche restrizioni	Comparte la propiedad con pocas restricciones	Ndan pronësinë me pak kufizime
+Store administrator - manages staff, inventory, settings and reports	Amministratore: gestisce personale, inventario, impostazioni e report	Administrador: gestiona personal, inventario, ajustes e informes	Administrator: menaxhon stafin, inventarin, cilësimet dhe raportet
+Store manager - oversees operations and staff	Responsabile: segue il lavoro e il personale	Encargado: supervisa la operación y el personal	Menaxher: mbikëqyr punën dhe stafin
+Handles orders and customer service	Gestisce ordini e servizio ai clienti	Atiende pedidos y el servicio a clientes	Merret me porositë dhe shërbimin ndaj klientëve
+Read-only access - sees POS, kitchen display and admin hub without changing anything	Solo lettura: vede POS, schermo cucina e Admin Hub senza modificare nulla	Solo lectura: ve el POS, la pantalla de cocina y el Admin Hub sin cambiar nada	Vetëm lexim: sheh POS-in, ekranin e kuzhinës dhe Admin Hub-in pa ndryshuar asgjë
+Kitchen staff - views and updates kitchen display tickets	Personale di cucina: vede e fa avanzare le comande	Personal de cocina: ve y avanza las comandas	Stafi i kuzhinës: sheh dhe ecën përpara me porositë
+Keeps the restaurant clean - tables, floors, kitchen and toilets	Tiene pulito il ristorante: tavoli, pavimenti, cucina e bagni	Mantiene limpio el restaurante: mesas, pisos, cocina y baños	Mban pastër restorantin: tavolinat, dyshemetë, kuzhinën dhe tualetet
+Temporary help for busy nights and events, paid for the hours they come in	Aiuto temporaneo per serate piene ed eventi, pagato per le ore in cui viene	Ayuda temporal para noches llenas y eventos, pagada por las horas que viene	Ndihmë e përkohshme për mbrëmje të ngarkuara dhe evente, e paguar për orët që vjen
+Sign in with your password to change your account.	Accedi con la tua password per modificare il tuo account.	Inicia sesión con tu contraseña para cambiar tu cuenta.	Hyr me fjalëkalimin tënd për të ndryshuar llogarinë.
+Sign in with your password to download reports.	Accedi con la tua password per scaricare i report.	Inicia sesión con tu contraseña para descargar informes.	Hyr me fjalëkalimin tënd për të shkarkuar raportet.
+Sign in with your password to do this.	Accedi con la tua password per farlo.	Inicia sesión con tu contraseña para hacer esto.	Hyr me fjalëkalimin tënd për ta bërë këtë.
+Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id	Failed to compute JWT key id
+Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token	Failed to hash opaque token
+The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters	The public rate-limit pepper must be at least 16 characters
+Rate limits need a positive limit and window	Rate limits need a positive limit and window	Rate limits need a positive limit and window	Rate limits need a positive limit and window
+Failed to hash rate-limit key	Failed to hash rate-limit key	Failed to hash rate-limit key	Failed to hash rate-limit key
+Refresh rate-limit attempt limits must be positive	Refresh rate-limit attempt limits must be positive	Refresh rate-limit attempt limits must be positive	Refresh rate-limit attempt limits must be positive
+Refresh rate-limit window must be positive and representable	Refresh rate-limit window must be positive and representable	Refresh rate-limit window must be positive and representable	Refresh rate-limit window must be positive and representable
+Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key
+Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token
+A till locks after 10 seconds at the least	Una cassa si blocca dopo almeno 10 secondi	Una caja se bloquea después de 10 segundos como mínimo	Një arkë kyçet pas të paktën 10 sekondash
+A till locks after 30 minutes at the most	Una cassa si blocca dopo 30 minuti al massimo	Una caja se bloquea después de 30 minutos como máximo	Një arkë kyçet pas 30 minutash e shumta
+During important work a till locks after 30 seconds at the least	Durante un lavoro importante una cassa si blocca dopo almeno 30 secondi	Durante un trabajo importante una caja se bloquea después de 30 segundos como mínimo	Gjatë një pune të rëndësishme një arkë kyçet pas të paktën 30 sekondash
+During important work a till locks after an hour at the most	Durante un lavoro importante una cassa si blocca dopo un'ora al massimo	Durante un trabajo importante una caja se bloquea después de una hora como máximo	Gjatë një pune të rëndësishme një arkë kyçet pas një ore e shumta
+At least 3 wrong PINs before a pause	Almeno 3 PIN sbagliati prima di una pausa	Al menos 3 PIN incorrectos antes de una pausa	Të paktën 3 PIN të gabuar para një pauze
+At most 50 wrong PINs before a pause	Al massimo 50 PIN sbagliati prima di una pausa	Como máximo 50 PIN incorrectos antes de una pausa	E shumta 50 PIN të gabuar para një pauze
+A pause lasts at least 1 minute	Una pausa dura almeno 1 minuto	Una pausa dura al menos 1 minuto	Një pauzë zgjat të paktën 1 minutë
+A pause lasts at most 120 minutes	Una pausa dura al massimo 120 minuti	Una pausa dura como máximo 120 minutos	Një pauzë zgjat e shumta 120 minuta
+Choose what kind of printer it is	Scegli che tipo di stampante è	Elige qué tipo de impresora es	Zgjidh çfarë lloj printeri është
+Choose how it's connected	Scegli come è collegato	Elige cómo está conectado	Zgjidh si është lidhur
+Only someone who works in every branch moves a device to another one.	Solo chi lavora in tutte le sedi sposta un dispositivo in un'altra.	Solo quien trabaja en todas las sucursales mueve un dispositivo a otra.	Vetëm ai që punon në të gjitha degët e zhvendos një pajisje në një tjetër.
+Only card terminals and cash drawers are connected to another device.	Solo i terminali di pagamento e i cassetti si collegano a un altro dispositivo.	Solo los terminales de pago y los cajones se conectan a otro dispositivo.	Vetëm terminalet e kartave dhe sirtarët lidhen me një pajisje tjetër.
+Choose one of this restaurant's devices.	Scegli uno dei dispositivi di questo ristorante.	Elige uno de los dispositivos de este restaurante.	Zgjidh një nga pajisjet e këtij restoranti.
+A card terminal is connected to a till or a tablet.	Un terminale di pagamento si collega a una cassa o a un tablet.	Un terminal de pago se conecta a una caja o una tableta.	Një terminal kartash lidhet me një arkë ose tablet.
+Choose Bluetooth or cable.	Scegli Bluetooth o cavo.	Elige Bluetooth o cable.	Zgjidh Bluetooth ose kabllo.
+Choose the paired card terminal.	Scegli il terminale di pagamento associato.	Elige el terminal de pago vinculado.	Zgjidh terminalin e kartave të çiftuar.
+A cash drawer is plugged into a printer.	Un cassetto si collega a una stampante.	Un cajón se conecta a una impresora.	Një sirtar lidhet me një printer.
+Invalid deviceType	Invalid deviceType	Invalid deviceType	Invalid deviceType
+Invalid status	Invalid status	Invalid status	Invalid status
+Reservation rule update violates a data constraint	L'aggiornamento della regola di prenotazione viola un vincolo dei dati	La actualización de la regla de reservas infringe una regla de datos	Përditësimi i rregullit të rezervimit shkel një rregull të të dhënave
+Each dayOfWeek must appear only once	Each dayOfWeek must appear only once	Each dayOfWeek must appear only once	Each dayOfWeek must appear only once
+Business hours update violates a data constraint	L'aggiornamento degli orari di apertura viola un vincolo dei dati	La actualización del horario infringe una regla de datos	Përditësimi i orarit të punës shkel një rregull të të dhënave
+Special hours update violates a data constraint	L'aggiornamento degli orari speciali viola un vincolo dei dati	La actualización de horarios especiales infringe una regla de datos	Përditësimi i orareve të veçanta shkel një rregull të të dhënave
+Settings update violates a data constraint	L'aggiornamento delle impostazioni viola un vincolo dei dati	La actualización de la configuración infringe una regla de datos	Përditësimi i cilësimeve shkel një rregull të të dhënave
+Only the Owner or a Co-Owner can change staff permissions	Solo il Titolare o un Contitolare può cambiare i permessi del personale	Solo el Propietario o un Copropietario puede cambiar los permisos del personal	Vetëm Pronari ose një Bashkëpronar mund të ndryshojë lejet e stafit
+The hold warning must come before the hold ends	L'avviso di tenuta deve arrivare prima della fine della tenuta	La advertencia de espera debe llegar antes de que termine la espera	Paralajmërimi i mbajtjes duhet të vijë para se të mbarojë mbajtja
+A guest must count as late before the hold ends	Un ospite deve risultare in ritardo prima della fine della tenuta	Un comensal debe contar como tarde antes de que termine la espera	Një mysafir duhet të llogaritet me vonesë para se të mbarojë mbajtja
+Weekly inventory counts must be between 1 and 7	Gli inventari settimanali devono essere tra 1 e 7	Los conteos semanales deben ser entre 1 y 7	Numërimet javore duhet të jenë ndërmjet 1 dhe 7
+During important work a till can't lock sooner than usual	Durante un lavoro importante una cassa non può bloccarsi prima del solito	Durante un trabajo importante una caja no puede bloquearse antes de lo habitual	Gjatë një pune të rëndësishme një arkë nuk mund të kyçet më shpejt se zakonisht
+The most guests can't be below the normal number	Il massimo di ospiti non può essere sotto il numero normale	El máximo de comensales no puede ser menor que el número normal	Numri më i madh i mysafirëve nuk mund të jetë nën numrin normal
+Suggested tips must be between 1 and 100%	Le mance suggerite devono essere tra 1 e 100%	Las propinas sugeridas deben estar entre 1 y 100%	Bakshishet e sugjeruara duhet të jenë ndërmjet 1 dhe 100%
+A suggested tip can't be above the biggest tip allowed	Una mancia suggerita non può superare la mancia massima consentita	Una propina sugerida no puede superar la propina máxima permitida	Një bakshish i sugjeruar nuk mund të jetë mbi bakshishin më të madh të lejuar
+Unknown fraud rule: {}	Regola antifrode sconosciuta: {}	Regla de fraude desconocida: {}	Rregull mashtrimi i panjohur: {}
+Choose an icon	Scegli un'icona	Elige un ícono	Zgjidh një ikonë
+Choose days, weeks or months	Scegli giorni, settimane o mesi	Elige días, semanas o meses	Zgjidh ditë, javë ose muaj
+Choose the tables to unmerge	Scegli i tavoli da separare	Elige las mesas a separar	Zgjidh tavolinat për t'u ndarë
+At most 50 tables	Al massimo 50 tavoli	Como máximo 50 mesas	Deri në 50 tavolina
+A layout already exists for this floor	Esiste già una disposizione per questo piano	Ya existe una distribución para este piso	Ekziston tashmë një planimetri për këtë kat
+Cannot delete a table that already has reservation assignments	Non si può eliminare un tavolo che ha già prenotazioni assegnate	No se puede eliminar una mesa que ya tiene reservas asignadas	Nuk mund të fshihet një tavolinë që ka tashmë rezervime të caktuara
+Cannot delete a table while it is merged into another table	Non si può eliminare un tavolo mentre è unito a un altro	No se puede eliminar una mesa mientras está unida a otra	Nuk mund të fshihet një tavolinë ndërsa është e bashkuar me një tjetër
+Cannot delete a table while other tables are merged into it	Non si può eliminare un tavolo mentre altri tavoli sono uniti a esso	No se puede eliminar una mesa mientras otras están unidas a ella	Nuk mund të fshihet një tavolinë ndërsa tavolina të tjera janë të bashkuara me të
+These tables aren't merged	Questi tavoli non sono uniti	Estas mesas no están unidas	Këto tavolina nuk janë të bashkuara
+Only tables of this group can be unmerged	Si possono separare solo i tavoli di questo gruppo	Solo se pueden separar las mesas de este grupo	Mund të ndahen vetëm tavolinat e këtij grupi
+Keep at least one table for the guests	Tieni almeno un tavolo per gli ospiti	Deja al menos una mesa para los comensales	Mbaj të paktën një tavolinë për mysafirët
+The table that keeps the order must stay	Il tavolo che tiene l'ordine deve restare	La mesa que se queda con el pedido debe quedarse	Tavolina që mban porosinë duhet të mbetet
+Cannot merge an inactive table	Non si può unire un tavolo non attivo	No se puede unir una mesa inactiva	Nuk mund të bashkohet një tavolinë joaktive
+Payment has started for {}. Finish or cancel payment before merging.	Il pagamento è iniziato per {}. Concludi o annulla il pagamento prima di unire.	El pago ya empezó para {}. Termina o cancela el pago antes de unir.	Pagesa ka filluar për {}. Përfundo ose anulo pagesën para bashkimit.
+Table update violates a data constraint	L'aggiornamento del tavolo viola un vincolo dei dati	La actualización de la mesa infringe una regla de datos	Përditësimi i tavolinës shkel një rregull të të dhënave
+Floor '{}' does not exist in this branch	Il piano '{}' non esiste in questa sede	El piso '{}' no existe en esta sucursal	Kati '{}' nuk ekziston në këtë pikë
+Floor renames must not contain duplicate source values	La rinomina dei piani non può contenere valori duplicati	El cambio de nombre de pisos no puede tener valores repetidos	Riemërtimi i kateve nuk mund të ketë vlera të përsëritura
+Cannot delete a table category that is still assigned to tables	Non si può eliminare una zona ancora assegnata a dei tavoli	No se puede eliminar una zona que aún está asignada a mesas	Nuk mund të fshihet një zonë që është ende e caktuar te tavolina
+Table category update violates a data constraint	L'aggiornamento della zona viola un vincolo dei dati	La actualización de la zona infringe una regla de datos	Përditësimi i zonës shkel një rregull të të dhënave
+Merged tables need at least {} guests. Unmerge them for fewer.	I tavoli uniti hanno bisogno di almeno {} ospiti. Separali per meno persone.	Las mesas unidas necesitan al menos {} comensales. Sepáralas para menos.	Tavolinat e bashkuara kanë nevojë për të paktën {} mysafirë. Ndaji për më pak.
+This table has no booking coming	Questo tavolo non ha prenotazioni in arrivo	Esta mesa no tiene reservas próximas	Kjo tavolinë nuk ka rezervim në ardhje
+This action no longer exists	Questa azione non esiste più	Esta acción ya no existe	Ky veprim nuk ekziston më
+This was already returned	È già stato rimesso	Esto ya se devolvió	Kjo është kthyer tashmë
+Reopen this order from History	Riapri questo ordine dallo storico	Reabre este pedido desde el historial	Rihape këtë porosi nga historiku
+There's nothing to return here	Qui non c'è niente da rimettere	Aquí no hay nada que devolver	S'ka asgjë për t'u kthyer këtu
+This booking no longer exists	Questa prenotazione non esiste più	Esta reserva ya no existe	Ky rezervim nuk ekziston më
+Temporary password is required	Serve una password temporanea	Se requiere una contraseña temporal	Fjalëkalimi i përkohshëm kërkohet
+Temporary password must be between 8 and 100 characters	La password temporanea deve avere tra 8 e 100 caratteri	La contraseña temporal debe tener entre 8 y 100 caracteres	Fjalëkalimi i përkohshëm duhet të ketë 8 deri në 100 karaktere
+Phone must be at most 30 characters	Il telefono può avere al massimo 30 caratteri	El teléfono puede tener como máximo 30 caracteres	Telefoni mund të ketë deri në 30 karaktere
+Role id is required	Serve l'id del ruolo	Se requiere el id del rol	Id-ja e rolit kërkohet
+At least one role id is required	Serve almeno un id di ruolo	Se requiere al menos un id de rol	Kërkohet të paktën një id roli
+User email is already verified	L'email dell'utente è già verificata	El correo del usuario ya está verificado	Emaili i përdoruesit është verifikuar tashmë
+User phone is already verified	Il telefono dell'utente è già verificato	El teléfono del usuario ya está verificado	Telefoni i përdoruesit është verifikuar tashmë
+You can only remove people you added	Puoi rimuovere solo le persone che hai aggiunto tu	Solo puedes quitar a las personas que agregaste	Mund të heqësh vetëm njerëzit që shtove ti
+The Super Admin hasn't allowed you to remove owners or co-owners.	Il Super Admin non ti ha permesso di rimuovere proprietari o comproprietari.	El Super Admin no te permitió quitar dueños o codueños.	Super Admini nuk të ka lejuar të heqësh pronarë ose bashkëpronarë.
+An owner can't remove another owner. Ask the Super Admin from their menu.	Un proprietario non può rimuovere un altro proprietario. Chiedilo al Super Admin dal suo menu.	Un dueño no puede quitar a otro dueño. Pídeselo al Super Admin desde su menú.	Një pronar nuk mund të heqë një pronar tjetër. Kërkoja Super Adminit nga menyja e tij.

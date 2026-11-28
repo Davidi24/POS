@@ -21,6 +21,7 @@ public class RestaurantMapper {
 
         return RestaurantResponse.builder()
                 .id(restaurant.getId())
+                .version(restaurant.getVersion())
                 .name(restaurant.getName())
                 .legalName(restaurant.getLegalName())
                 .code(restaurant.getCode())
@@ -29,6 +30,12 @@ public class RestaurantMapper {
                 .email(restaurant.getEmail())
                 .phone(restaurant.getPhone())
                 .website(restaurant.getWebsite())
+                .instagram(restaurant.getInstagram())
+                .facebook(restaurant.getFacebook())
+                .tiktok(restaurant.getTiktok())
+                .whatsapp(restaurant.getWhatsapp())
+                .mapsLink(restaurant.getMapsLink())
+                .coverUrl(restaurant.getCoverUrl())
                 .currency(restaurant.getCurrency())
                 .timezone(restaurant.getTimezone())
                 .isActive(restaurant.isActive())
@@ -123,7 +130,17 @@ public class RestaurantMapper {
         restaurant.setOwnerId(ownerUserId);
         restaurant.setActive(request.getIsActive());
         restaurant.setStatus(request.getStatus());
+        // Social links: left out keeps them (older apps), "" takes one off.
+        if (request.getInstagram() != null) restaurant.setInstagram(blankToNull(request.getInstagram()));
+        if (request.getFacebook() != null) restaurant.setFacebook(blankToNull(request.getFacebook()));
+        if (request.getTiktok() != null) restaurant.setTiktok(blankToNull(request.getTiktok()));
+        if (request.getWhatsapp() != null) restaurant.setWhatsapp(blankToNull(request.getWhatsapp()));
+        if (request.getMapsLink() != null) restaurant.setMapsLink(blankToNull(request.getMapsLink()));
         restaurant.setUpdatedBy(actorId);
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     public void updateStatus(Restaurant restaurant, boolean isActive, RestaurantStatus status, UUID actorId) {

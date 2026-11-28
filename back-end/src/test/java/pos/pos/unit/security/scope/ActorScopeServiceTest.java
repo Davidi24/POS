@@ -50,7 +50,7 @@ class ActorScopeServiceTest {
         User actor = actor();
 
         given(roleHierarchyService.currentUserId(authentication)).willReturn(USER_ID);
-        given(roleHierarchyService.isSuperAdmin(authentication)).willReturn(false);
+        given(roleHierarchyService.isPlatformAdmin(authentication)).willReturn(false);
         given(userRepository.findByIdAndDeletedAtIsNull(USER_ID)).willReturn(Optional.of(actor));
 
         ActorScope scope = actorScopeService.resolve(authentication);

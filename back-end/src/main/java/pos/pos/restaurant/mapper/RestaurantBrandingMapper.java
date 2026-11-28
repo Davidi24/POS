@@ -19,8 +19,6 @@ public class RestaurantBrandingMapper {
         return RestaurantBrandingResponse.builder()
                 .id(branding.getId())
                 .logoUrl(branding.getLogoUrl())
-                .primaryColor(branding.getPrimaryColor())
-                .secondaryColor(branding.getSecondaryColor())
                 .receiptHeader(branding.getReceiptHeader())
                 .receiptFooter(branding.getReceiptFooter())
                 .createdAt(branding.getCreatedAt())
@@ -43,9 +41,10 @@ public class RestaurantBrandingMapper {
     }
 
     private void applyFields(RestaurantBranding branding, UpsertRestaurantBrandingRequest request) {
-        branding.setLogoUrl(request.getLogoUrl());
-        branding.setPrimaryColor(request.getPrimaryColor());
-        branding.setSecondaryColor(request.getSecondaryColor());
+        // The logo is uploaded on its own (RestaurantLogoService); left out here it stays, and "" removes the link.
+        if (request.getLogoUrl() != null) {
+            branding.setLogoUrl(request.getLogoUrl().isBlank() ? null : request.getLogoUrl().trim());
+        }
         branding.setReceiptHeader(request.getReceiptHeader());
         branding.setReceiptFooter(request.getReceiptFooter());
     }

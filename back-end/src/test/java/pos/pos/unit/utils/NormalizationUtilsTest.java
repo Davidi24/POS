@@ -154,6 +154,14 @@ class NormalizationUtilsTest {
         void shouldReturnNullForBlank() {
             assertNull(NormalizationUtils.normalizeLowerLike("   "));
         }
+
+        @Test
+        @DisplayName("escapes the LIKE wildcards someone types, so they match themselves")
+        void shouldEscapeWildcards() {
+            assertEquals("%100\\%%", NormalizationUtils.normalizeLowerLike("100%"));
+            assertEquals("%main\\_1%", NormalizationUtils.normalizeLowerLike("MAIN_1"));
+            assertEquals("%a\\\\b%", NormalizationUtils.normalizeLowerLike("a\\b"));
+        }
     }
 
     /*

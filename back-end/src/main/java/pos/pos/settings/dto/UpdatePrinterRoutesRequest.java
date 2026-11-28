@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,5 +19,6 @@ import java.util.UUID;
 public class UpdatePrinterRoutesRequest {
 
     @NotNull(message = "printerIds is required")
-    private List<UUID> printerIds;
+    @Size(max = 100, message = "printerIds can have at most 100 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UUID> printerIds;
 }

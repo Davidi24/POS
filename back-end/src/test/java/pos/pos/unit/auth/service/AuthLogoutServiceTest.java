@@ -42,6 +42,9 @@ class AuthLogoutServiceTest {
     @Mock
     private RefreshTokenSecurityService refreshTokenSecurityService;
 
+    @Mock
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     @InjectMocks
     private AuthLogoutService authLogoutService;
 

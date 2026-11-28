@@ -114,20 +114,20 @@ class RestaurantResourceControllersTest {
                 .willReturn(RestaurantBrandingResponse.builder()
                         .id(UUID.fromString("00000000-0000-0000-0000-000000000020"))
                         .logoUrl("https://cdn.pos.local/logo.png")
-                        .primaryColor("#112233")
+                        .receiptHeader("Welcome")
                         .build());
 
         mockMvc.perform(get("/restaurants/{restaurantId}/branding", RESTAURANT_ID)
                         .principal(authentication))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.primaryColor").value("#112233"));
+                .andExpect(jsonPath("$.receiptHeader").value("Welcome"));
     }
 
     @Test
-    @DisplayName("PUT branding should validate hex colors")
+    @DisplayName("PUT branding should refuse a receipt text that's too long")
     void shouldValidateBrandingColor() throws Exception {
         UpsertRestaurantBrandingRequest request = UpsertRestaurantBrandingRequest.builder()
-                .primaryColor("blue")
+                .receiptHeader("x".repeat(2001))
                 .build();
 
         mockMvc.perform(put("/restaurants/{restaurantId}/branding", RESTAURANT_ID)
@@ -135,7 +135,7 @@ class RestaurantResourceControllersTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("primaryColor: primaryColor must be a valid hex color"));
+                .andExpect(jsonPath("$.message").value("receiptHeader: receiptHeader must be at most 2000 characters"));
 
         verifyNoInteractions(restaurantBrandingService);
     }

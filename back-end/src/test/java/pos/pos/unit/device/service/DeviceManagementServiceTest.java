@@ -1,5 +1,6 @@
 package pos.pos.unit.device.service;
 
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,9 @@ class DeviceManagementServiceTest {
     private DeviceRepository deviceRepository;
 
     @Mock
+    private EntityManager entityManager;
+
+    @Mock
     private DeviceAssignmentRepository deviceAssignmentRepository;
 
     @Mock
@@ -66,19 +70,24 @@ class DeviceManagementServiceTest {
     @Mock
     private OpaqueTokenService opaqueTokenService;
 
+    @Mock
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     private DeviceManagementService deviceManagementService;
 
     @BeforeEach
     void setUp() {
         deviceManagementService = new DeviceManagementService(
                 deviceRepository,
+                entityManager,
                 deviceAssignmentRepository,
                 devicePairingTokenRepository,
                 userRepository,
                 settingsDomainSupport,
                 settingsAuditService,
                 devicePairingProperties,
-                opaqueTokenService
+                opaqueTokenService,
+                accountAudit
         );
     }
 
@@ -108,6 +117,7 @@ class DeviceManagementServiceTest {
         when(settingsDomainSupport.requireManageableRestaurant(authentication, RESTAURANT_ID)).thenReturn(new Restaurant());
         when(settingsDomainSupport.currentActorId(authentication)).thenReturn(ACTOR_ID);
         when(deviceRepository.findRestaurantNonPrinterById(DEVICE_ID, RESTAURANT_ID)).thenReturn(Optional.of(device));
+        when(deviceRepository.findForUpdateByIdAndRestaurantId(DEVICE_ID, RESTAURANT_ID)).thenReturn(Optional.of(device));
         when(devicePairingTokenRepository.findByIdAndDevice_Id(PAIRING_TOKEN_ID, DEVICE_ID)).thenReturn(Optional.of(token));
         when(devicePairingTokenRepository.saveAndFlush(token)).thenReturn(token);
 

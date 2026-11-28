@@ -22,6 +22,7 @@ import pos.pos.tables.dto.ReorderTableCategoriesRequest;
 import pos.pos.tables.dto.TableCategoryRequest;
 import pos.pos.tables.dto.TableCategoryResponse;
 import pos.pos.tables.dto.UpdateTableCategoryStatusRequest;
+import pos.pos.tables.dto.UpdateTableCategoryTablesRequest;
 import pos.pos.tables.service.TableCategoryService;
 
 import java.util.List;
@@ -37,7 +38,7 @@ public class TableCategoryController {
     private final TableCategoryService tableCategoryService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'TABLES_READ', 'RESERVATION_READ')")
     @Operation(summary = "List branch table categories")
     public ResponseEntity<List<TableCategoryResponse>> getTableCategories(
             @PathVariable UUID restaurantId,
@@ -48,7 +49,7 @@ public class TableCategoryController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Create a branch table category")
     public ResponseEntity<TableCategoryResponse> createTableCategory(
             @PathVariable UUID restaurantId,
@@ -61,7 +62,7 @@ public class TableCategoryController {
     }
 
     @GetMapping("/{categoryId}")
-    @PreAuthorize("hasAuthority('SETTINGS_READ')")
+    @PreAuthorize("hasAnyAuthority('SETTINGS_READ', 'TABLES_READ', 'RESERVATION_READ')")
     @Operation(summary = "Get one branch table category")
     public ResponseEntity<TableCategoryResponse> getTableCategory(
             @PathVariable UUID restaurantId,
@@ -73,7 +74,7 @@ public class TableCategoryController {
     }
 
     @PutMapping("/{categoryId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Replace a branch table category")
     public ResponseEntity<TableCategoryResponse> updateTableCategory(
             @PathVariable UUID restaurantId,
@@ -86,7 +87,7 @@ public class TableCategoryController {
     }
 
     @PatchMapping("/{categoryId}/status")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Update branch table category active status")
     public ResponseEntity<TableCategoryResponse> updateTableCategoryStatus(
             @PathVariable UUID restaurantId,
@@ -99,7 +100,7 @@ public class TableCategoryController {
     }
 
     @PatchMapping("/reorder")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Replace branch table category order")
     public ResponseEntity<List<TableCategoryResponse>> reorderTableCategories(
             @PathVariable UUID restaurantId,
@@ -110,8 +111,21 @@ public class TableCategoryController {
         return ResponseEntity.ok(tableCategoryService.reorderTableCategories(authentication, restaurantId, branchId, request));
     }
 
+    @PutMapping("/{categoryId}/tables")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
+    @Operation(summary = "Replace the tables assigned to a branch table category")
+    public ResponseEntity<TableCategoryResponse> replaceTableCategoryTables(
+            @PathVariable UUID restaurantId,
+            @PathVariable UUID branchId,
+            @PathVariable UUID categoryId,
+            @Valid @RequestBody UpdateTableCategoryTablesRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(tableCategoryService.replaceTableCategoryTables(authentication, restaurantId, branchId, categoryId, request));
+    }
+
     @DeleteMapping("/{categoryId}")
-    @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
+    @PreAuthorize("hasAuthority('TABLES_LAYOUT')")
     @Operation(summary = "Delete a branch table category")
     public ResponseEntity<Void> deleteTableCategory(
             @PathVariable UUID restaurantId,

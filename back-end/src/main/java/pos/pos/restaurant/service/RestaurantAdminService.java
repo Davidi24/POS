@@ -15,7 +15,9 @@ import pos.pos.restaurant.dto.CreateRestaurantRequest;
 import pos.pos.restaurant.dto.RestaurantResponse;
 import pos.pos.restaurant.dto.UpdateRestaurantRequest;
 import pos.pos.restaurant.dto.UpdateRestaurantStatusRequest;
+import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
+import pos.pos.restaurant.enums.BranchStatus;
 import pos.pos.restaurant.enums.RestaurantStatus;
 import pos.pos.restaurant.repository.BranchRepository;
 import pos.pos.restaurant.mapper.RestaurantMapper;
@@ -30,6 +32,9 @@ import pos.pos.utils.PageableUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 //checked
@@ -49,6 +54,10 @@ public class RestaurantAdminService {
     private final RestaurantValidationService restaurantValidationService;
     private final RestaurantOwnerProvisioningService restaurantOwnerProvisioningService;
     private final RestaurantScopeService restaurantScopeService;
+    private final RestaurantClosureGuard closureGuard;
+    private final pos.pos.restaurant.repository.RestaurantCardRepository restaurantCardRepository;
+    private final RestaurantDeviceRetirement deviceRetirement;
+    private final pos.pos.settings.service.SettingsAuditService auditService;
 
     @Transactional(readOnly = true)
     public PageResponse<RestaurantResponse> getRestaurants(
@@ -89,6 +98,7 @@ public class RestaurantAdminService {
     @Transactional
     public RestaurantResponse createRestaurant(Authentication authentication, CreateRestaurantRequest request) {
         restaurantScopeService.assertCanCreateRestaurant(authentication);
+        requireKnownCurrency(request.getCurrency());
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         var normalizedFields = restaurantValidationService.normalizeAndValidateFields(
@@ -112,16 +122,48 @@ public class RestaurantAdminService {
             restaurant.setId(UuidCreator.getTimeOrdered());
         }
 
-        User owner = restaurantOwnerProvisioningService.createAndInviteOwner(
-                request.getOwner(),
-                restaurant.getId(),
-                actorId,
-                restaurant.getName()
-        );
-        restaurant.setOwnerId(owner.getId());
-        restaurantRepository.save(restaurant);
+        if (request.getOwner() != null) {
+            User owner = restaurantOwnerProvisioningService.createAndInviteOwner(
+                    request.getOwner(),
+                    restaurant.getId(),
+                    actorId,
+                    restaurant.getName()
+            );
+            restaurant.setOwnerId(owner.getId());
+        }
+        // A new restaurant goes to the end of the restaurant list. The lock makes restaurants created at the same
+        // moment wait for each other, so each gets its own position.
+        restaurantCardRepository.lockDisplayOrder();
+        restaurant.setDisplayOrder(restaurantCardRepository.nextDisplayOrder());
+        // The id is set up front (the owner needs it), so save() merges and hands back the managed copy.
+        Restaurant saved = restaurantRepository.save(restaurant);
+        Restaurant managed = saved != null ? saved : restaurant;
+        branchRepository.save(firstBranch(managed, request.getFirstBranchName(), actorId));
 
-        return restaurantMapper.toResponse(restaurant);
+        return restaurantMapper.toResponse(managed);
+    }
+
+    private Branch firstBranch(Restaurant restaurant, String requestedName, UUID actorId) {
+        String name = NormalizationUtils.normalize(requestedName);
+        Branch branch = new Branch();
+        branch.setRestaurant(restaurant);
+        branch.setName(name == null ? "Main" : name);
+        branch.setCode("MAIN");
+        branch.setActive(true);
+        branch.setStatus(BranchStatus.ACTIVE);
+        branch.setCreatedBy(actorId);
+        branch.setUpdatedBy(actorId);
+        return branch;
+    }
+
+    // ISO 4217 codes only (EUR, ALL, USD...), so prices and receipts always show a real currency.
+    private void requireKnownCurrency(String currency) {
+        String code = NormalizationUtils.normalizeUpper(currency);
+        try {
+            pos.pos.restaurant.util.RestaurantCurrencyPrecision.scale(code);
+        } catch (RuntimeException ex) {
+            throw new AuthException("currency must be a 3-letter ISO code such as EUR, ALL or USD", HttpStatus.BAD_REQUEST);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -147,10 +189,16 @@ public class RestaurantAdminService {
     ) {
         ActorScope scope = actorScopeService.resolve(authentication);
         Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(scope, restaurantId);
+        assertAllowedChanges(scope, restaurant, request);
 
         restaurantValidationService.validateStatusTransition(restaurant.getStatus(), request.getStatus());
         restaurantPolicy.assertCanChangeOwner(scope, restaurant, request.getOwnerUserId());
+        if (!Objects.equals(restaurant.getOwnerId(), request.getOwnerUserId())) {
+            throw new AuthException("Use Transfer ownership to give the restaurant to someone else, or Add owner when it has none.", HttpStatus.CONFLICT);
+        }
+        requireContactDetails(request.getEmail(), request.getPhone());
         validateStatusFields(request.getIsActive(), request.getStatus());
+        closureGuard.restaurant(restaurantId,request.getStatus());
         UUID ownerUserId = restaurantValidationService.validateOwnerUser(
                 request.getOwnerUserId(),
                 restaurant.getId(),
@@ -164,6 +212,9 @@ public class RestaurantAdminService {
                 restaurant.getId()
         );
 
+        if (request.getExpectedVersion() == null || request.getExpectedVersion() != restaurant.getVersion()) {
+            throw new AuthException("These details have changed, or the edit version is missing. Refresh and review your changes before saving.", HttpStatus.CONFLICT);
+        }
         restaurantMapper.updateEntity(
                 restaurant,
                 request,
@@ -173,7 +224,8 @@ public class RestaurantAdminService {
                 restaurantScopeService.currentUserId(authentication)
         );
 
-        restaurantRepository.save(restaurant);
+        restaurantRepository.saveAndFlush(restaurant);
+        retireDevicesIfArchived(restaurant, request.getStatus(), restaurantScopeService.currentUserId(authentication));
         return restaurantMapper.toResponse(restaurant);
     }
 
@@ -183,9 +235,11 @@ public class RestaurantAdminService {
             UUID restaurantId,
             UpdateRestaurantStatusRequest request
     ) {
-        Restaurant restaurant = restaurantScopeService.requireManageableRestaurant(authentication, restaurantId);
+        Restaurant restaurant = restaurantScopeService.requirePlatformManagedRestaurant(authentication, restaurantId,
+                "Only the Super Admin can open, suspend or close a restaurant");
         restaurantValidationService.validateStatusTransition(restaurant.getStatus(), request.getStatus());
         validateStatusFields(request.getIsActive(), request.getStatus());
+        closureGuard.restaurant(restaurantId,request.getStatus());
 
         restaurantMapper.updateStatus(
                 restaurant,
@@ -195,6 +249,7 @@ public class RestaurantAdminService {
         );
 
         restaurantRepository.save(restaurant);
+        retireDevicesIfArchived(restaurant, request.getStatus(), restaurantScopeService.currentUserId(authentication));
         return restaurantMapper.toResponse(restaurant);
     }
 
@@ -202,14 +257,63 @@ public class RestaurantAdminService {
     public void deleteRestaurant(Authentication authentication, UUID restaurantId) {
         restaurantScopeService.assertCanDeleteRestaurant(authentication);
         Restaurant restaurant = restaurantScopeService.requireExistingRestaurant(restaurantId);
+        closureGuard.restaurant(restaurantId,RestaurantStatus.ARCHIVED);
 
         UUID actorId = restaurantScopeService.currentUserId(authentication);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
+        // Devices go first: their assignments point at the branches archived next.
+        int devices = deviceRetirement.retireRestaurant(restaurantId, actorId, now);
         branchRepository.softDeleteAllByRestaurantId(restaurantId, now, actorId);
 
         restaurantMapper.markDeleted(restaurant, actorId, now);
         restaurantRepository.save(restaurant);
+        auditService.log(restaurant, null, "RESTAURANT", restaurantId, "ARCHIVE",
+                "Archived the restaurant; devices retired=" + devices + ". Sales, payments and other history retained.", actorId);
+    }
+
+    // A restaurant closed for good (ARCHIVED) keeps no device that can still sign in.
+    private void retireDevicesIfArchived(Restaurant restaurant, RestaurantStatus status, UUID actorId) {
+        if (status != RestaurantStatus.ARCHIVED) {
+            return;
+        }
+        int devices = deviceRetirement.retireRestaurant(restaurant.getId(), actorId, OffsetDateTime.now(ZoneOffset.UTC));
+        auditService.log(restaurant, null, "RESTAURANT", restaurant.getId(), "ARCHIVE",
+                "Closed the restaurant for good; devices retired=" + devices + ".", actorId);
+    }
+
+    // Guests see both on the booking pages and in their emails, so an update may never leave either empty.
+    private void requireContactDetails(String email, String phone) {
+        if (NormalizationUtils.normalize(email) == null || NormalizationUtils.normalize(phone) == null) {
+            throw new AuthException("The restaurant needs an email and a phone number", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Owners keep their restaurant's details for guests up to date (description, email, phone, website). Who it is
+     * (name, code, legal name), whether it's open and who owns it are for super admins. Currency and time zone change
+     * only through their own steps (Change currency, Change time zone), which take care of what depends on them.
+     */
+    private void assertAllowedChanges(ActorScope scope, Restaurant restaurant, UpdateRestaurantRequest request) {
+        if (!Objects.equals(NormalizationUtils.normalizeUpper(request.getCurrency()), NormalizationUtils.normalizeUpper(restaurant.getCurrency()))) {
+            throw new AuthException("Use “Change currency” to change the currency, so prices are converted with it", HttpStatus.BAD_REQUEST);
+        }
+        if (!Objects.equals(RestaurantFieldNormalizer.normalizeTimezone(request.getTimezone()), restaurant.getTimezone())) {
+            throw new AuthException("Use “Change time zone” to change the time zone, so you see what moves first", HttpStatus.BAD_REQUEST);
+        }
+        if (scope.superAdmin()) {
+            return;
+        }
+        List<String> changed = new ArrayList<>();
+        if (!Objects.equals(NormalizationUtils.normalize(request.getName()), restaurant.getName())) changed.add("name");
+        if (!Objects.equals(NormalizationUtils.normalize(request.getLegalName()), restaurant.getLegalName())) changed.add("legal name");
+        if (!Objects.equals(RestaurantFieldNormalizer.normalizeCodeOrFallback(request.getCode(), request.getName()), restaurant.getCode())) changed.add("code");
+        if (!Objects.equals(RestaurantFieldNormalizer.normalizeSlugOrFallback(request.getSlug(), request.getName()), restaurant.getSlug())) changed.add("web address");
+        if (request.getStatus() != restaurant.getStatus() || !Objects.equals(request.getIsActive(), restaurant.isActive())) changed.add("status");
+        if (!Objects.equals(request.getOwnerUserId(), restaurant.getOwnerId())) changed.add("owner");
+        if (!changed.isEmpty()) {
+            throw new AuthException("Only the Super Admin can change the restaurant's " + String.join(", ", changed), HttpStatus.FORBIDDEN);
+        }
     }
 
     // rejects terminal statuses (e.g. ARCHIVED) and inconsistent isActive/status pairs

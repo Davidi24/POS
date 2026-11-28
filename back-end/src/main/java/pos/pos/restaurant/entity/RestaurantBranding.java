@@ -14,7 +14,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.Check;
 import pos.pos.common.entity.AbstractAuditedSoftDeleteEntity;
 import pos.pos.utils.NormalizationUtils;
 
@@ -31,10 +30,6 @@ import pos.pos.utils.NormalizationUtils;
                 @Index(name = "idx_restaurant_branding_deleted_at", columnList = "deleted_at")
         }
 )
-@Check(constraints = """
-        (primary_color IS NULL OR char_length(btrim(primary_color)) > 0)
-        AND (secondary_color IS NULL OR char_length(btrim(secondary_color)) > 0)
-        """)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -54,12 +49,6 @@ public class RestaurantBranding extends AbstractAuditedSoftDeleteEntity {
     @Column(name = "logo_url", columnDefinition = "text")
     private String logoUrl;
 
-    @Column(name = "primary_color", length = 20)
-    private String primaryColor;
-
-    @Column(name = "secondary_color", length = 20)
-    private String secondaryColor;
-
     @Column(name = "receipt_header", columnDefinition = "text")
     private String receiptHeader;
 
@@ -69,8 +58,6 @@ public class RestaurantBranding extends AbstractAuditedSoftDeleteEntity {
     @Override
     protected void normalizeFields() {
         logoUrl = NormalizationUtils.normalize(logoUrl);
-        primaryColor = NormalizationUtils.normalize(primaryColor);
-        secondaryColor = NormalizationUtils.normalize(secondaryColor);
         receiptHeader = NormalizationUtils.normalize(receiptHeader);
         receiptFooter = NormalizationUtils.normalize(receiptFooter);
     }

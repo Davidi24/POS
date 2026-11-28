@@ -38,6 +38,7 @@ public class SessionController {
     public ResponseEntity<List<UserSessionResponse>> getMyActiveSessions(
             Authentication authentication,
             HttpServletRequest request) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         UUID userId = currentUser(authentication).getId();
         UUID tokenId = extractTokenId(request);
         return ResponseEntity.ok(sessionService.getMyActiveSessions(userId, tokenId));
@@ -58,6 +59,7 @@ public class SessionController {
     public ResponseEntity<Void> revokeSession(
             @PathVariable UUID sessionId,
             Authentication authentication) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         UUID userId = currentUser(authentication).getId();
         sessionService.revokeSession(sessionId, userId);
         return ResponseEntity.noContent().build();
@@ -68,6 +70,7 @@ public class SessionController {
     public ResponseEntity<Void> revokeOtherSessions(
             Authentication authentication,
             HttpServletRequest request) {
+        pos.pos.security.rbac.PinSignIn.refuse(pos.pos.security.rbac.PinSignIn.YOUR_ACCOUNT);
         UUID userId = currentUser(authentication).getId();
         UUID tokenId = extractTokenId(request);
         sessionService.revokeOtherSessions(userId, tokenId);

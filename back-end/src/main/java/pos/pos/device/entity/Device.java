@@ -11,13 +11,16 @@ import org.hibernate.type.SqlTypes;
 import pos.pos.common.entity.AbstractAuditedEntity;
 import pos.pos.device.enums.DeviceStatus;
 import pos.pos.device.enums.DeviceType;
+import pos.pos.kds.entity.KdsStation;
 import pos.pos.restaurant.entity.Branch;
 import pos.pos.restaurant.entity.Restaurant;
+import pos.pos.shift.entity.Shift;
 import pos.pos.utils.NormalizationUtils;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.Objects;
 
 @Entity
@@ -116,6 +119,13 @@ public class Device extends AbstractAuditedEntity {
     @Column(name = "auth_secret_rotated_at", columnDefinition = "timestamptz")
     private OffsetDateTime authSecretRotatedAt;
 
+    // Which device it's connected on now, as that device said when connecting (user, 2026-11-27: "make it say who has it").
+    @Column(name = "connected_device_name", length = 150)
+    private String connectedDeviceName;
+
+    @Column(name = "connected_device_system", length = 80)
+    private String connectedDeviceSystem;
+
     // Last time the device contacted the backend.
     @Column(name = "last_seen_at", columnDefinition = "timestamptz")
     private OffsetDateTime lastSeenAt;
@@ -130,11 +140,28 @@ public class Device extends AbstractAuditedEntity {
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
 
+    // A card terminal's till or tablet (USB, BLUETOOTH), or a cash drawer's printer (PRINTER), with the Bluetooth address or
+    // the cable's port (user, 2026-11-27).
+    @Column(name = "linked_device_id", columnDefinition = "uuid")
+    private UUID linkedDeviceId;
+
+    @Column(name = "link_type", length = 20)
+    private String linkType;
+
+    @Column(name = "link_address", length = 200)
+    private String linkAddress;
+
     @OneToMany(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DeviceAssignment> assignments = new ArrayList<>();
 
     @OneToOne(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private DevicePrinterProfile printerProfile;
+
+    @OneToOne(mappedBy = "device", fetch = FetchType.LAZY)
+    private KdsStation kdsStation;
+
+    @OneToMany(mappedBy = "device")
+    private List<Shift> shifts = new ArrayList<>();
 
     // add or remove one DeviceAssignment from the list
     public void addAssignment(DeviceAssignment assignment) {
@@ -178,6 +205,11 @@ public class Device extends AbstractAuditedEntity {
         osVersion = NormalizationUtils.normalize(osVersion);
         appVersion = NormalizationUtils.normalize(appVersion);
         authSecretHash = NormalizationUtils.normalize(authSecretHash);
+        // No connection, nobody has it.
+        if (authSecretHash == null) {
+            connectedDeviceName = null;
+            connectedDeviceSystem = null;
+        }
         ipAddress = NormalizationUtils.normalize(ipAddress);
         macAddress = normalizeMacAddress(macAddress);
         notes = NormalizationUtils.normalize(notes);

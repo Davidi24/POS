@@ -19,6 +19,12 @@ public interface AuthEmailVerificationTokenRepository extends JpaRepository<Auth
 
     boolean existsByUserIdAndCreatedAtAfter(UUID userId, OffsetDateTime cutoff);
 
+    /** The person's waiting email change (a new address whose link hasn't been used and still works). */
+    Optional<AuthEmailVerificationToken> findTopByUserIdAndNewEmailIsNotNullAndUsedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(UUID userId, OffsetDateTime now);
+
+    /** A link by its key, used or not, so its page can say what it is. */
+    Optional<AuthEmailVerificationToken> findByTokenHash(String tokenHash);
+
     @Modifying
     void deleteByUserId(UUID userId);
 

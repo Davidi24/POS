@@ -16,13 +16,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import pos.pos.customer.dto.CustomerRequest;
 import pos.pos.customer.dto.CustomerResponse;
 import pos.pos.customer.service.CustomerService;
+import pos.pos.common.dto.PageResponse;
 import pos.pos.reservation.dto.ReservationResponse;
 
-import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Customers")
@@ -37,11 +38,13 @@ public class CustomerController {
     @GetMapping
     @PreAuthorize("hasAuthority('SETTINGS_READ')")
     @Operation(summary = "List restaurant customers")
-    public ResponseEntity<List<CustomerResponse>> getCustomers(
+    public ResponseEntity<PageResponse<CustomerResponse>> getCustomers(
             @PathVariable UUID restaurantId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(customerService.getCustomers(authentication, restaurantId));
+        return ResponseEntity.ok(customerService.getCustomers(authentication, restaurantId, page, size));
     }
 
     @PostMapping
@@ -82,12 +85,14 @@ public class CustomerController {
     @GetMapping("/{customerId}/reservations")
     @PreAuthorize("hasAuthority('SETTINGS_READ')")
     @Operation(summary = "List reservations for one customer")
-    public ResponseEntity<List<ReservationResponse>> getCustomerReservations(
+    public ResponseEntity<PageResponse<ReservationResponse>> getCustomerReservations(
             @PathVariable UUID restaurantId,
             @PathVariable UUID customerId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(customerService.getCustomerReservations(authentication, restaurantId, customerId));
+        return ResponseEntity.ok(customerService.getCustomerReservations(authentication, restaurantId, customerId, page, size));
     }
 
     @DeleteMapping("/{customerId}")

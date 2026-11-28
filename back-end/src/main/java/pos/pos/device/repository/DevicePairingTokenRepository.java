@@ -16,5 +16,7 @@ public interface DevicePairingTokenRepository extends JpaRepository<DevicePairin
     @EntityGraph(attributePaths = "createdByUser")
     Optional<DevicePairingToken> findByIdAndDevice_Id(UUID pairingTokenId, UUID deviceId);
 
+    Optional<DevicePairingToken> findByTokenHash(String tokenHash);
+
     List<DevicePairingToken> findAllByDevice_IdAndUsedAtIsNullAndRevokedAtIsNull(UUID deviceId);
 }

@@ -26,6 +26,8 @@ public class BranchAddressMapper {
                 .streetLine1(address.getStreetLine1())
                 .streetLine2(address.getStreetLine2())
                 .isPrimary(address.isPrimary())
+                .latitude(address.getLatitude())
+                .longitude(address.getLongitude())
                 .createdAt(address.getCreatedAt())
                 .updatedAt(address.getUpdatedAt())
                 .build();
@@ -64,5 +66,7 @@ public class BranchAddressMapper {
         address.setPostalCode(request.getPostalCode());
         address.setStreetLine1(request.getStreetLine1());
         address.setStreetLine2(request.getStreetLine2());
+        address.setLatitude(request.getLatitude() == null ? null : request.getLatitude().setScale(6, java.math.RoundingMode.HALF_UP));
+        address.setLongitude(request.getLongitude() == null ? null : request.getLongitude().setScale(6, java.math.RoundingMode.HALF_UP));
     }
 }

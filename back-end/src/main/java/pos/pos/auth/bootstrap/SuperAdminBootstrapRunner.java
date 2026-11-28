@@ -57,6 +57,16 @@ public class SuperAdminBootstrapRunner implements CommandLineRunner {
     private void seedPermissions() {
         for (AppPermission perm : AppPermission.values()) {
             permissionRepository.findByCode(perm.name())
+                    .map(existing -> {
+                        // Names and descriptions follow AppPermission (renamed by part on 2026-11-19).
+                        if (!perm.displayName().equals(existing.getName())
+                                || !java.util.Objects.equals(perm.description(), existing.getDescription())) {
+                            existing.setName(perm.displayName());
+                            existing.setDescription(perm.description());
+                            return permissionRepository.save(existing);
+                        }
+                        return existing;
+                    })
                     .orElseGet(() -> {
                         logger.info("Seeding permission: {}", perm.name());
                         return permissionRepository.save(

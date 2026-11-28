@@ -41,13 +41,27 @@ public class AppAuthController {
             HttpServletRequest httpRequest
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
-        AuthenticationResponse authResult = authLoginService.login(request, clientInfo);
+        // The app's own id for this device (the per-device sign-in limit, user 2026-11-17).
+        // and its name, for the person's list of signed-in devices (user 2026-11-18).
+        AuthenticationResponse authResult = authLoginService.login(request,
+                clientInfo.withDevice(httpRequest.getHeader("X-Device-Id"), httpRequest.getHeader("X-Device-Name")));
         return ResponseEntity.ok(authResult);
+    }
+
+    /** Sign in with a PIN on one of the restaurant's connected tills (its id and secret from pairing). */
+    public record PinLoginRequest(java.util.UUID deviceId,
+                                  @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 200) String deviceSecret,
+                                  @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 10) String pin) {
+    }
+
+    @PostMapping("/pin-login")
+    public ResponseEntity<AuthenticationResponse> pinLogin(@Valid @RequestBody PinLoginRequest request, HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(authLoginService.pinLogin(request.deviceId(), request.deviceSecret(), request.pin(), clientInfoExtractor.extract(httpRequest)));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<AuthenticationResponse> refresh(
-            @RequestBody(required = false) RefreshRequest request,
+            @Valid @RequestBody(required = false) RefreshRequest request,
             HttpServletRequest httpRequest
     ) {
         ClientInfo clientInfo = clientInfoExtractor.extract(httpRequest);
@@ -58,18 +72,18 @@ public class AppAuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestBody(required = false) RefreshRequest request) {
+    public ResponseEntity<Void> logout(@Valid @RequestBody(required = false) RefreshRequest request) {
         String refreshToken = extractOptionalRefreshTokenFromRequest(request);
         if (refreshToken == null) {
             return ResponseEntity.noContent().build();
         }
 
-        authLogoutService.logout(refreshToken);
+        authLogoutService.logout(refreshToken, request == null ? null : request.getReason());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout-all")
-    public ResponseEntity<Void> logoutAll(@RequestBody(required = false) RefreshRequest request) {
+    public ResponseEntity<Void> logoutAll(@Valid @RequestBody(required = false) RefreshRequest request) {
         String refreshToken = extractRefreshTokenFromRequest(request);
         authLogoutService.logoutAll(refreshToken);
         return ResponseEntity.noContent().build();

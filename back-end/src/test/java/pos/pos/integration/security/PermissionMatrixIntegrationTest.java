@@ -30,6 +30,7 @@ import pos.pos.role.repository.PermissionRepository;
 import pos.pos.role.repository.RolePermissionRepository;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.service.PasswordService;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.entity.UserRole;
@@ -63,7 +64,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PermissionMatrixIntegrationTest {
 
     private static final String SCHEMA = "permission_matrix_" + UUID.randomUUID().toString().replace("-", "");
-    private static final String COOKIE_NAME = "refreshToken";
+    private static final String ACCESS_COOKIE_NAME = "access-token";
+    private static final String REFRESH_COOKIE_NAME = "refreshToken";
     private static final String SUPER_ADMIN_EMAIL = "permission.matrix.admin@pos.example";
     private static final String SUPER_ADMIN_USERNAME = "permissionmatrixadmin";
     private static final String SUPER_ADMIN_PASSWORD = "StrongPass123!";
@@ -72,7 +74,7 @@ class PermissionMatrixIntegrationTest {
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "permission-matrix-test-secret-key-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "permission-matrix-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "permission-matrix-password-reset-pepper");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "permission-matrix-email-verification-pepper");
@@ -258,7 +260,7 @@ class PermissionMatrixIntegrationTest {
     @Test
     @DisplayName("SEC-004 Normal admin cannot manage protected roles or higher-rank users")
     void sec004NormalAdminCannotManageProtectedRolesOrHigherRankUsers() throws Exception {
-        User admin = createUser("sec004-admin", role("ADMIN"));
+        User admin = adminManagingRoles("sec004-admin");
         Role protectedRole = createRole("sec004-protected", 5_000L, true, true, true);
         Role higherRankRole = createRole("sec004-higher-rank", 35_000L, true, true, false);
         User higherRankUser = createUser("sec004-target", higherRankRole);
@@ -373,7 +375,7 @@ class PermissionMatrixIntegrationTest {
         assertThat(asTextList(refreshBody.path("user").path("permissions"))).isEmpty();
 
         mockMvc.perform(get("/users")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(refreshBody.get("accessToken").asText())))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(extractCookieValue(refreshResult, ACCESS_COOKIE_NAME))))
                 .andExpect(status().isForbidden());
     }
 
@@ -439,6 +441,21 @@ class PermissionMatrixIntegrationTest {
         roleRepository.save(role);
     }
 
+    @Autowired
+    private pos.pos.role.repository.UserPermissionGrantRepository userPermissionGrantRepository;
+
+    /** An admin who may also change roles (owner-level since 2026-11-19); the test is about the rules at Admin's rank. */
+    private User adminManagingRoles(String label) {
+        User user = createUser(label, role("ADMIN"));
+        for (String code : java.util.List.of("ROLES_CREATE", "ROLES_UPDATE", "ROLES_DELETE", "ROLES_ASSIGN_PERMISSIONS")) {
+            pos.pos.role.entity.UserPermissionGrant grant = new pos.pos.role.entity.UserPermissionGrant();
+            grant.setUserId(user.getId());
+            grant.setPermissionCode(code);
+            userPermissionGrantRepository.save(grant);
+        }
+        return user;
+    }
+
     private User createUser(String label, Role... roles) {
         int sequence = userSequence.getAndIncrement();
         String suffix = label + "-" + sequence;
@@ -497,8 +514,8 @@ class PermissionMatrixIntegrationTest {
 
         JsonNode body = result.getResponse().getContentAsString().isBlank() ? null : bodyOf(result);
         return new LoginTokens(
-                body == null || body.get("accessToken") == null ? null : body.get("accessToken").asText(),
-                extractCookieValue(result.getResponse().getHeader(HttpHeaders.SET_COOKIE)),
+                extractCookieValue(result, ACCESS_COOKIE_NAME),
+                extractCookieValue(result, REFRESH_COOKIE_NAME),
                 ip,
                 result
         );
@@ -552,26 +569,20 @@ class PermissionMatrixIntegrationTest {
     }
 
     private MockCookie refreshCookie(String refreshToken) {
-        return new MockCookie(COOKIE_NAME, refreshToken);
+        return new MockCookie(REFRESH_COOKIE_NAME, refreshToken);
     }
 
-    private String extractCookieValue(String setCookieHeader) {
-        if (setCookieHeader == null || setCookieHeader.isBlank()) {
-            return null;
-        }
-
-        String prefix = COOKIE_NAME + "=";
-        int start = setCookieHeader.indexOf(prefix);
-        if (start < 0) {
-            return null;
-        }
-
-        int end = setCookieHeader.indexOf(';', start);
-        if (end < 0) {
-            end = setCookieHeader.length();
-        }
-
-        return setCookieHeader.substring(start + prefix.length(), end);
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElse(null);
     }
 
     private String bearer(String accessToken) {

@@ -50,6 +50,12 @@ class ChangePasswordServiceTest {
     @Mock
     private AuthMailService authMailService;
 
+    @Mock
+    private pos.pos.auth.service.PasswordDailyLimits passwordDailyLimits;
+
+    @Mock
+    private pos.pos.auth.service.AccountAudit accountAudit;
+
     @InjectMocks
     private ChangePasswordService changePasswordService;
 
@@ -98,7 +104,7 @@ class ChangePasswordServiceTest {
                     any(),
                     eq(SessionRevocationReason.PASSWORD_CHANGED.name())
             );
-            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
+            verify(authMailService).sendPasswordChangedNotificationEmail(null, "cashier@pos.local", "Casey");
         }
 
         @Test
@@ -128,7 +134,7 @@ class ChangePasswordServiceTest {
                     any(),
                     eq(SessionRevocationReason.PASSWORD_CHANGED.name())
             );
-            verify(authMailService).sendPasswordChangedNotificationEmail("cashier@pos.local", "Casey");
+            verify(authMailService).sendPasswordChangedNotificationEmail(null, "cashier@pos.local", "Casey");
         }
 
         @Test

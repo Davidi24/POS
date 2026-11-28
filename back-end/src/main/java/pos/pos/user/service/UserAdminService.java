@@ -21,6 +21,7 @@ import pos.pos.role.entity.Role;
 import pos.pos.role.mapper.RoleMapper;
 import pos.pos.role.repository.RoleRepository;
 import pos.pos.security.rbac.RoleHierarchyService;
+import pos.pos.notification.service.NotificationService;
 import pos.pos.user.dto.ReplaceUserRolesRequest;
 import pos.pos.user.dto.UpdateUserRequest;
 import pos.pos.user.dto.UserResponse;
@@ -38,6 +39,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -47,6 +49,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class UserAdminService {
+
+    // How many people a forgiving search looks through (everyone a person can see in one restaurant).
+    private static final int SEARCH_LIMIT = 2000;
 
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final String STATUS_ACTIVE = "ACTIVE";
@@ -61,6 +66,17 @@ public class UserAdminService {
     private final UserMapper userMapper;
     private final RoleHierarchyService roleHierarchyService;
     private final UserSessionRepository userSessionRepository;
+    private final NotificationService notificationService;
+    private final pos.pos.restaurant.repository.BranchRepository branchRepository;
+    private final pos.pos.role.repository.UserPermissionGrantRepository grantRepository;
+    private final pos.pos.role.repository.UserPermissionDenialRepository denialRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
+    private final pos.pos.auth.service.AccountAudit accountAudit;
+
+    private pos.pos.user.repository.UsernameChangeRepository usernameChanges;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setUsernameChanges(pos.pos.user.repository.UsernameChangeRepository usernameChanges) { this.usernameChanges = usernameChanges; }
 
     public PageResponse<UserResponse> getUsers(
             Authentication authentication,
@@ -73,24 +89,43 @@ public class UserAdminService {
             String direction
     ) {
         Pageable pageable = PageableUtils.create(page, size, direction, resolveSortProperty(sortBy), DEFAULT_PAGE_SIZE);
-        String searchLike = NormalizationUtils.normalizeLowerLike(search);
-        String normalizedPhoneLike = NormalizationUtils.normalizePhoneLike(search);
         String normalizedRoleCode = NormalizationUtils.normalizeUpper(roleCode);
+        boolean platformAdmin = roleHierarchyService.isSuperAdmin(authentication) || roleHierarchyService.isCoSuperAdmin(authentication);
 
-        Page<User> usersPage = userRepository.searchVisibleUsers(
-                active,
-                searchLike,
-                normalizedPhoneLike,
-                normalizedRoleCode,
-                roleHierarchyService.isSuperAdmin(authentication),
-                roleHierarchyService.actorRank(authentication),
-                pageable
-        );
+        Page<User> usersPage;
+        if (search == null || search.isBlank()) {
+            usersPage = userRepository.searchVisibleUsers(active, null, null, normalizedRoleCode, platformAdmin,
+                    roleHierarchyService.actorRank(authentication), roleHierarchyService.currentUserId(authentication),
+                    roleHierarchyService.actorRestaurantId(authentication), pageable);
+        } else {
+            // A search is forgiving (accents, whole names, small typos; StaffSearch), so it looks through everyone this
+            // person can see (a restaurant's staff, a few hundred at most) and pages the closest first.
+            List<User> visible = userRepository.searchVisibleUsers(active, null, null, normalizedRoleCode, platformAdmin,
+                    roleHierarchyService.actorRank(authentication), roleHierarchyService.currentUserId(authentication),
+                    roleHierarchyService.actorRestaurantId(authentication),
+                    org.springframework.data.domain.PageRequest.of(0, SEARCH_LIMIT, pageable.getSort())).getContent();
+            List<User> found = visible.stream()
+                    .map(user -> Map.entry(user, StaffSearch.score(user, search)))
+                    .filter(entry -> entry.getValue() > 0)
+                    .sorted(Map.Entry.<User, Integer>comparingByValue().reversed())
+                    .map(Map.Entry::getKey)
+                    .toList();
+            int from = (int) Math.min(pageable.getOffset(), found.size());
+            int to = Math.min(from + pageable.getPageSize(), found.size());
+            usersPage = new PageImpl<>(found.subList(from, to), pageable, found.size());
+        }
 
         Map<UUID, List<String>> roleCodesByUserId = loadActiveRoleCodes(usersPage.getContent());
         List<UserResponse> items = usersPage.getContent().stream()
                 .map(user -> userMapper.toUserResponse(user, roleCodesByUserId.getOrDefault(user.getId(), List.of())))
                 .toList();
+        // "was …" for people who changed their own username in the last 30 days (user, 2026-11-18).
+        if (usernameChanges != null && !items.isEmpty()) {
+            Map<UUID, String> previous = new java.util.HashMap<>();
+            usernameChanges.findByUserIdInAndChangedAtAfterOrderByChangedAtDesc(items.stream().map(UserResponse::getId).toList(),
+                    java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).minusDays(30)).forEach(c -> previous.putIfAbsent(c.getUserId(), c.getOldUsername()));
+            items.forEach(item -> item.setPreviousUsername(previous.get(item.getId())));
+        }
 
         return PageResponse.from(new PageImpl<>(items, pageable, usersPage.getTotalElements()));
     }
@@ -112,6 +147,7 @@ public class UserAdminService {
     @Transactional
     public UserResponse updateUser(Authentication authentication, UUID userId, UpdateUserRequest request) {
         User user = findExistingUser(userId);
+        if (Boolean.FALSE.equals(request.getIsActive())) assertMayRemove(authentication, userId);
         roleHierarchyService.assertCanManageUser(authentication, userId);
 
         String newNormalizedPhone = NormalizationUtils.normalizePhone(request.getPhone());
@@ -125,6 +161,13 @@ public class UserAdminService {
         boolean phoneChanged = !java.util.Objects.equals(currentNormalizedPhone, newNormalizedPhone);
         boolean wasActive = user.isActive();
 
+        if (request.getDefaultBranchId() != null) {
+            if (user.getRestaurantId() == null) throw new AuthException("A restaurant is required for a branch", org.springframework.http.HttpStatus.BAD_REQUEST);
+            var branch = branchRepository.findForAssignment(request.getDefaultBranchId(), user.getRestaurantId()).orElseThrow(() ->
+                    new AuthException("defaultBranchId must be a branch of the person's restaurant", org.springframework.http.HttpStatus.BAD_REQUEST));
+            pos.pos.restaurant.service.RestaurantOperations.requireOpen(branch);
+            user.setDefaultBranchId(request.getDefaultBranchId());
+        }
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setPhone(request.getPhone());
@@ -198,7 +241,19 @@ public class UserAdminService {
             userRoleRepository.saveAll(assignmentsToAdd);
         }
 
+        // A new role starts from what it gives (user, 2026-11-19): what was switched on or off for them alone is cleared.
+        // Not for platform roles, whose holders' limits are set one by one by the Super Admin.
+        boolean rolesChanged = !assignmentsToRemove.isEmpty() || !assignmentsToAdd.isEmpty();
+        boolean platform = requestedRoles.stream().anyMatch(role -> "SUPER_ADMIN".equals(role.getCode()) || "CO_SUPER_ADMIN".equals(role.getCode()));
+        if (rolesChanged && !platform) {
+            grantRepository.deleteAllByUserId(userId);
+            denialRepository.deleteAllByUserId(userId);
+        }
+
         User user = findExistingUser(userId);
+        if (user.getRestaurantId() != null) {
+            notificationService.publishUserRoleChange(user.getRestaurantId(), userId, actorId);
+        }
         return userMapper.toUserResponse(
                 user,
                 requestedRoles.stream().map(Role::getCode).toList()
@@ -208,16 +263,58 @@ public class UserAdminService {
     @Transactional
     public void deleteUser(Authentication authentication, UUID userId) {
         User user = findExistingUser(userId);
+        assertMayRemove(authentication, userId);
         roleHierarchyService.assertCanManageUser(authentication, userId);
+        // A Co-Super-Admin only removes people they added themselves.
+        if (roleHierarchyService.isCoSuperAdmin(authentication) && !roleHierarchyService.isSuperAdmin(authentication)
+                && !Objects.equals(user.getCreatedBy(), roleHierarchyService.currentUserId(authentication))) {
+            throw new AuthException("You can only remove people you added", HttpStatus.FORBIDDEN);
+        }
 
+        remove(user, roleHierarchyService.currentUserId(authentication));
+    }
+
+    /** The Super Admin approved a restaurant's request to remove one of its owners (user, 2026-11-19). */
+    @Transactional
+    public void removeApprovedBySuperAdmin(UUID userId, UUID superAdminId) {
+        remove(findExistingUser(userId), superAdminId);
+    }
+
+    private void remove(User user, UUID actorId) {
+        UUID userId = user.getId();
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         user.setActive(false);
         user.setStatus(STATUS_DELETED);
         user.setDeletedAt(now);
-        user.setUpdatedBy(roleHierarchyService.currentUserId(authentication));
+        user.setUpdatedBy(actorId);
         userRepository.save(user);
 
-        revokeAllActiveSessions(userId);
+        // Signed out of every device at once (they see "Account switched off"); their planned shifts go with them, and what
+        // they did (orders, worked shifts, pay) stays (user, 2026-11-19).
+        userSessionRepository.revokeAllActiveSessionsByUserId(userId, now, SessionRevocationReason.USER_NOT_ALLOWED.name());
+        events.publishEvent(new pos.pos.user.event.UserRemovedEvent(userId, user.getRestaurantId(), actorId));
+        accountAudit.about(user, actorId, "USER_REMOVED",
+                pos.pos.i18n.Words.en("{} was removed from the staff and signed out everywhere", pos.pos.auth.service.AccountAudit.nameOf(user)));
+    }
+
+    /**
+     * Owners never remove each other (user, 2026-11-19): only the Super Admin removes an owner, after the restaurant asks.
+     * Co-owners are removed by owners. A support admin removes neither unless the Super Admin allowed it.
+     */
+    private void assertMayRemove(Authentication authentication, UUID targetUserId) {
+        Set<String> roles = roleRepository.findActiveRolesByUserId(targetUserId).stream().map(Role::getCode).collect(Collectors.toSet());
+        boolean owner = roles.contains("OWNER");
+        if (!owner && !roles.contains("CO_OWNER")) return;
+        if (roleHierarchyService.isSuperAdmin(authentication)) return;
+        if (roleHierarchyService.isCoSuperAdmin(authentication)) {
+            boolean allowed = userRepository.findById(roleHierarchyService.currentUserId(authentication))
+                    .map(User::isAdminMayRemoveOwners).orElse(false);
+            if (allowed) return;
+            throw new AuthException("The Super Admin hasn't allowed you to remove owners or co-owners.", HttpStatus.FORBIDDEN);
+        }
+        if (owner) {
+            throw new AuthException("An owner can't remove another owner. Ask the Super Admin from their menu.", HttpStatus.FORBIDDEN);
+        }
     }
 
     private User findExistingUser(UUID userId) {

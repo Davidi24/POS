@@ -6,6 +6,10 @@ import pos.pos.exception.auth.AuthException;
 public class RestaurantCodeAlreadyExistsException extends AuthException {
 
     public RestaurantCodeAlreadyExistsException() {
-        super("Restaurant code already in use", HttpStatus.BAD_REQUEST);
+        this("Restaurant code already in use");
+    }
+
+    public RestaurantCodeAlreadyExistsException(String message) {
+        super(message, HttpStatus.CONFLICT);
     }
 }

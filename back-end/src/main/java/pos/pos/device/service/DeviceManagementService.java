@@ -1,5 +1,7 @@
 package pos.pos.device.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -16,6 +18,7 @@ import pos.pos.device.entity.Device;
 import pos.pos.device.entity.DeviceAssignment;
 import pos.pos.device.entity.DevicePairingToken;
 import pos.pos.device.enums.DeviceAssignmentType;
+import pos.pos.device.enums.DeviceStatus;
 import pos.pos.device.repository.DeviceAssignmentRepository;
 import pos.pos.device.repository.DevicePairingTokenRepository;
 import pos.pos.device.repository.DeviceRepository;
@@ -40,6 +43,7 @@ import java.util.UUID;
 public class DeviceManagementService {
 
     private final DeviceRepository deviceRepository;
+    private final EntityManager entityManager;
     private final DeviceAssignmentRepository deviceAssignmentRepository;
     private final DevicePairingTokenRepository devicePairingTokenRepository;
     private final UserRepository userRepository;
@@ -47,6 +51,7 @@ public class DeviceManagementService {
     private final SettingsAuditService settingsAuditService;
     private final DevicePairingProperties devicePairingProperties;
     private final OpaqueTokenService opaqueTokenService;
+    private final pos.pos.auth.service.AccountAudit accountAudit;
 
     @Transactional(readOnly = true)
     public List<DeviceAssignmentResponse> getAssignments(
@@ -171,6 +176,18 @@ public class DeviceManagementService {
         // Pairing token is the technical side of onboarding the device.
         // The device/app uses this short-lived token to complete pairing with the backend.
         Device device = requireManageableDevice(authentication, restaurantId, deviceId);
+        // "Connect devices" alone (user, 2026-11-25): tills, tablets and screens; card terminals and the rest need "Manage devices".
+        if (!hasAuthority(authentication, "DEVICES_MANAGE") && !pos.pos.device.network.DeviceNetworkService.RULED.contains(device.getDeviceType())) {
+            throw new AuthException("Only someone who manages devices can connect this one.", HttpStatus.FORBIDDEN);
+        }
+        if (!device.isActive() || (device.getStatus() != DeviceStatus.PROVISIONING && device.getStatus() != DeviceStatus.ACTIVE)) {
+            throw new AuthException("Only active or provisioning devices can be paired", HttpStatus.CONFLICT);
+        }
+        // A device in use is disconnected first (user, 2026-11-25: "when it's connected you can't generate a code; you
+        // disconnect it first, otherwise it's confusing").
+        if (StringUtils.hasText(device.getAuthSecretHash())) {
+            throw new AuthException(device.getName() + " is in use. Disconnect it first to make a code.", HttpStatus.CONFLICT);
+        }
         UUID actorId = settingsDomainSupport.currentActorId(authentication);
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
@@ -184,8 +201,11 @@ public class DeviceManagementService {
             devicePairingTokenRepository.saveAllAndFlush(openTokens);
         }
 
-        // Persist only the hash; return the raw token once in the response for the caller/device.
-        OpaqueTokenService.IssuedToken issuedToken = opaqueTokenService.issue(devicePairingProperties.getTokenPepper());
+        // Persist only the hash; return the code once in the response for the caller/device. A short code to type on the
+        // device (user, 2026-11-25), shown as "K7P4-9QXM".
+        String code = PairingCodes.newCode();
+        OpaqueTokenService.IssuedToken issuedToken = new OpaqueTokenService.IssuedToken(
+                PairingCodes.shown(code), opaqueTokenService.hash(code, devicePairingProperties.getTokenPepper()));
         DevicePairingToken token = new DevicePairingToken();
         token.setDevice(device);
         token.setTokenHash(issuedToken.tokenHash());
@@ -247,9 +267,48 @@ public class DeviceManagementService {
         return requireDeviceInRestaurant(restaurantId, deviceId);
     }
 
+    /**
+     * Disconnect (user, 2026-11-25): the device stops being connected. Its secret goes, so the device that had it stops
+     * working at once (its heartbeat and PIN sign-ins are refused and the app there says so), and its open codes end. The
+     * device stays in the list; a new code or "Use this device" connects it again. Like making a code: "Connect devices" for
+     * tills, tablets and screens, "Manage devices" for the rest.
+     */
+    @Transactional
+    public void disconnect(Authentication authentication, UUID restaurantId, UUID deviceId) {
+        Device device = requireManageableDevice(authentication, restaurantId, deviceId);
+        if (!hasAuthority(authentication, "DEVICES_MANAGE") && !pos.pos.device.network.DeviceNetworkService.RULED.contains(device.getDeviceType())) {
+            throw new AuthException("Only someone who manages devices can disconnect this one.", HttpStatus.FORBIDDEN);
+        }
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        List<DevicePairingToken> openTokens = devicePairingTokenRepository.findAllByDevice_IdAndUsedAtIsNullAndRevokedAtIsNull(device.getId());
+        for (DevicePairingToken openToken : openTokens) openToken.revokeAt(now);
+        if (!openTokens.isEmpty()) devicePairingTokenRepository.saveAllAndFlush(openTokens);
+        boolean wasConnected = StringUtils.hasText(device.getAuthSecretHash());
+        device.setAuthSecretHash(null);
+        device.setAuthSecretRotatedAt(null);
+        device.setOnline(false);
+        deviceRepository.saveAndFlush(device);
+        if (wasConnected) {
+            UUID actorId = settingsDomainSupport.currentActorId(authentication);
+            String who = userRepository.findById(actorId).map(pos.pos.auth.service.AccountAudit::nameOf).orElse("Someone");
+            accountAudit.inRestaurant(restaurantId, device.getId(), actorId, "DEVICE_DISCONNECTED", who + " disconnected " + device.getName());
+        }
+    }
+
+    private static boolean hasAuthority(Authentication authentication, String code) {
+        return authentication != null && authentication.getAuthorities().stream().anyMatch(a -> code.equals(a.getAuthority()));
+    }
+
     private Device requireManageableDevice(Authentication authentication, UUID restaurantId, UUID deviceId) {
         settingsDomainSupport.requireManageableRestaurant(authentication, restaurantId);
-        return requireDeviceInRestaurant(restaurantId, deviceId);
+        Device device = requireDeviceInRestaurant(restaurantId, deviceId);
+        Device lockedDevice = deviceRepository.findForUpdateByIdAndRestaurantId(device.getId(), restaurantId)
+                .orElseThrow(DeviceNotFoundException::new);
+        // The scoped lookup above may already have placed this row in the persistence
+        // context before the lock waited. Refresh so lifecycle checks see the winner's
+        // committed state after acquiring the lock.
+        entityManager.refresh(lockedDevice, LockModeType.PESSIMISTIC_WRITE);
+        return lockedDevice;
     }
 
     private Device requireDeviceInRestaurant(UUID restaurantId, UUID deviceId) {

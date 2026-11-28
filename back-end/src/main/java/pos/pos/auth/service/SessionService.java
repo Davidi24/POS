@@ -26,16 +26,21 @@ public class SessionService {
     private final UserSessionRepository userSessionRepository;
     private final UserSessionMapper userSessionMapper;
     private final RoleHierarchyService roleHierarchyService;
+    private final AccountAudit accountAudit;
 
     public List<UserSessionResponse> getMyActiveSessions(UUID userId, UUID currentTokenId) {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        return userSessionRepository.findActiveSessionsByUserId(userId, now)
-                .stream()
-                .map(s -> userSessionMapper.toSessionResponse(
-                        s,
-                        currentTokenId != null && currentTokenId.equals(s.getTokenId())
-                ))
+        List<pos.pos.auth.entity.UserSession> sessions = userSessionRepository.findActiveSessionsByUserId(userId, now);
+        // Which ones are on this device's network (the current session's address).
+        String here = sessions.stream().filter(s -> currentTokenId != null && currentTokenId.equals(s.getTokenId()))
+                .map(s -> pos.pos.device.network.NetworkAddress.of(s.getIpAddress())).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+        return sessions.stream()
+                .map(s -> {
+                    UserSessionResponse response = userSessionMapper.toSessionResponse(s, currentTokenId != null && currentTokenId.equals(s.getTokenId()));
+                    response.setSameNetwork(here != null && here.equals(pos.pos.device.network.NetworkAddress.of(s.getIpAddress())));
+                    return response;
+                })
                 .toList();
     }
 
@@ -62,6 +67,7 @@ public class SessionService {
         session.setRevokedAt(now);
         session.setRevokedReason(SessionRevocationReason.SESSION_REVOKED.name());
         userSessionRepository.save(session);
+        accountAudit.about(userId, userId, "SIGNED_OUT", name -> name + " signed out " + AccountAudit.deviceOf(session.getDeviceName()) + " from their profile");
     }
 
     // it revokes all other session except the one taken as argument
@@ -80,6 +86,7 @@ public class SessionService {
                 now,
                 SessionRevocationReason.SESSION_REVOKED.name()
         );
+        accountAudit.about(userId, userId, "SIGNED_OUT", name -> name + " signed out all their other devices");
     }
 
     public List<UserSessionResponse> getUserActiveSessions(Authentication authentication, UUID userId) {
@@ -102,6 +109,7 @@ public class SessionService {
                 now,
                 SessionRevocationReason.SESSION_REVOKED.name()
         );
+        accountAudit.about(userId, actorId(authentication), "SIGNED_OUT", name -> "Signed out " + name + " on every device");
     }
 
     @Transactional
@@ -117,5 +125,11 @@ public class SessionService {
         session.setRevokedAt(now);
         session.setRevokedReason(SessionRevocationReason.SESSION_REVOKED.name());
         userSessionRepository.save(session);
+        accountAudit.about(userId, actorId(authentication), "SIGNED_OUT",
+                name -> "Signed out " + name + " on " + AccountAudit.deviceOf(session.getDeviceName()));
+    }
+
+    private static UUID actorId(Authentication authentication) {
+        return authentication != null && authentication.getPrincipal() instanceof pos.pos.security.principal.AuthenticatedUser user ? user.getId() : null;
     }
 }

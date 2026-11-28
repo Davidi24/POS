@@ -70,9 +70,34 @@ public class DevicePrinterProfile extends AbstractTimestampedEntity {
     @Column(name = "cash_drawer_kick_enabled", nullable = false)
     private boolean cashDrawerKickEnabled = false;
 
+    // A printer installed on a computer: its name in that computer's printer list, and the till it's plugged into.
+    @Column(name = "system_printer_name", length = 200)
+    private String systemPrinterName;
+
+    @Column(name = "host_device_id", columnDefinition = "uuid")
+    private java.util.UUID hostDeviceId;
+
+    // What kind of printer it is (2026-11-27): RECEIPT, KITCHEN, BAR, SMALL (58 mm receipts), DOCUMENT (A4, reports), OTHER.
+    @Column(name = "printer_role", nullable = false, length = 20)
+    private String printerRole = "OTHER";
+
+    // When a till last reached it, last checked it, which till did, and what was wrong (user, 2026-11-27).
+    @Column(name = "reached_at")
+    private java.time.OffsetDateTime reachedAt;
+
+    @Column(name = "checked_at")
+    private java.time.OffsetDateTime checkedAt;
+
+    @Column(name = "checked_by", columnDefinition = "uuid")
+    private java.util.UUID checkedBy;
+
+    @Column(name = "check_problem", length = 300)
+    private String checkProblem;
+
     @Override
     protected void normalizeFields() {
         printerIp = NormalizationUtils.normalize(printerIp);
+        systemPrinterName = NormalizationUtils.normalize(systemPrinterName);
     }
 
     @Override

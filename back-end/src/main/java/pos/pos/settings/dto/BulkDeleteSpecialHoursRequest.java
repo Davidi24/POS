@@ -1,5 +1,6 @@
 package pos.pos.settings.dto;
 
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,5 +19,6 @@ import java.util.UUID;
 public class BulkDeleteSpecialHoursRequest {
 
     @NotEmpty(message = "specialHourIds is required")
-    private List<UUID> specialHourIds;
+    @Size(max = 1000, message = "specialHourIds can have at most 1000 values")
+    private List<@jakarta.validation.constraints.NotNull(message = "must not contain empty values") UUID> specialHourIds;
 }

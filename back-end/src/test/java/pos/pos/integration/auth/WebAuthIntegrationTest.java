@@ -24,6 +24,7 @@ import pos.pos.auth.entity.UserSession;
 import pos.pos.auth.repository.AuthLoginAttemptRepository;
 import pos.pos.auth.repository.UserSessionRepository;
 import pos.pos.security.service.PasswordService;
+import pos.pos.support.TestJwtKeySupport;
 import pos.pos.support.TestPostgresContainerSupport;
 import pos.pos.user.entity.User;
 import pos.pos.user.repository.UserRepository;
@@ -49,17 +50,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WebAuthIntegrationTest {
 
     private static final String SCHEMA = "web_auth_" + UUID.randomUUID().toString().replace("-", "");
-    private static final String COOKIE_NAME = "refreshToken";
+    private static final String ACCESS_COOKIE_NAME = "access-token";
+    private static final String REFRESH_COOKIE_NAME = "refreshToken";
     private static final String DEFAULT_PASSWORD = "StrongPass123!";
     private static final String WRONG_PASSWORD = "WrongPass123!";
-    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid username/email or password";
+    private static final String INVALID_CREDENTIALS_MESSAGE = "Wrong username or password.";
+    private static final String LOCKED_MESSAGE = "Too many wrong passwords.";
+    private static final String NETWORK_PAUSED_MESSAGE = "Many wrong tries on this network.";
+    private static final String ACCOUNT_OFF_MESSAGE = "Your account is switched off. Ask your manager.";
+    private static final String EMAIL_NOT_CONFIRMED_MESSAGE = "Your email isn't confirmed yet. Use the link in the email we sent you, or ask your manager.";
     private static final String INVALID_REFRESH_TOKEN_MESSAGE = "Invalid refresh token";
-    private static final String TOO_MANY_LOGIN_ATTEMPTS_MESSAGE = "Too many login attempts. Try again later.";
 
     @DynamicPropertySource
     static void registerProdProperties(DynamicPropertyRegistry registry) {
         TestPostgresContainerSupport.registerProdDatabaseProperties(registry, SCHEMA);
-        registry.add("JWT_SECRET", () -> "web-auth-test-secret-key-for-hs256-123456");
+        TestJwtKeySupport.registerJwtProperties(registry);
         registry.add("REFRESH_TOKEN_PEPPER", () -> "web-auth-refresh-token-pepper-0123456789");
         registry.add("PASSWORD_RESET_TOKEN_PEPPER", () -> "web-auth-password-reset-pepper-value");
         registry.add("EMAIL_VERIFICATION_TOKEN_PEPPER", () -> "web-auth-email-verification-pepper");
@@ -122,10 +127,11 @@ class WebAuthIntegrationTest {
         MvcResult result = webLogin(user.getEmail(), DEFAULT_PASSWORD, ip, "AUTH-001", status().isOk());
 
         JsonNode body = bodyOf(result);
-        assertThat(body.get("accessToken").asText()).isNotBlank();
+        assertThat(body.get("accessToken")).isNull();
         assertThat(body.get("tokenType").asText()).isEqualTo("Bearer");
         assertThat(body.get("user").get("email").asText()).isEqualTo(user.getEmail());
-        assertRefreshCookieIssued(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieIssued(result);
+        assertRefreshCookieIssued(result);
         assertThat(activeSessionsFor(user)).hasSize(1);
     }
 
@@ -138,10 +144,11 @@ class WebAuthIntegrationTest {
         MvcResult result = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-002", status().isOk());
 
         JsonNode body = bodyOf(result);
-        assertThat(body.get("accessToken").asText()).isNotBlank();
+        assertThat(body.get("accessToken")).isNull();
         assertThat(body.get("tokenType").asText()).isEqualTo("Bearer");
         assertThat(body.get("user").get("username").asText()).isEqualTo(user.getUsername());
-        assertRefreshCookieIssued(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieIssued(result);
+        assertRefreshCookieIssued(result);
         assertThat(activeSessionsFor(user)).hasSize(1);
     }
 
@@ -154,24 +161,26 @@ class WebAuthIntegrationTest {
         MvcResult result = webLogin(user.getUsername(), WRONG_PASSWORD, ip, "AUTH-003", status().isUnauthorized());
 
         assertThat(bodyOf(result).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
+        assertThat(bodyOf(result).get("code").asText()).isEqualTo("WRONG_CREDENTIALS");
         User reloaded = userRepository.findById(user.getId()).orElseThrow();
         assertThat(reloaded.getFailedLoginAttempts()).isEqualTo(1);
         assertThat(activeSessionsFor(user)).isEmpty();
     }
 
     @Test
-    @DisplayName("AUTH-004 POST /auth/web/login rejects inactive or deleted user")
+    @DisplayName("AUTH-004 POST /auth/web/login tells a switched-off account only after the right password; a deleted one is unknown")
     void auth004RejectsInactiveOrDeletedUser() throws Exception {
         User inactiveUser = createUser("auth004-inactive", false, true, null, "INACTIVE");
         User deletedUser = createUser("auth004-deleted", true, true, OffsetDateTime.now(ZoneOffset.UTC), "ACTIVE");
         String ip = nextIp();
 
+        MvcResult inactiveWrong = webLogin(inactiveUser.getUsername(), WRONG_PASSWORD, ip, "AUTH-004-inactive-wrong", status().isUnauthorized());
         MvcResult inactiveResult = webLogin(
                 inactiveUser.getUsername(),
                 DEFAULT_PASSWORD,
                 ip,
                 "AUTH-004-inactive",
-                status().isUnauthorized()
+                status().isForbidden()
         );
         MvcResult deletedResult = webLogin(
                 deletedUser.getEmail(),
@@ -181,91 +190,90 @@ class WebAuthIntegrationTest {
                 status().isUnauthorized()
         );
 
-        assertThat(bodyOf(inactiveResult).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
+        assertThat(bodyOf(inactiveWrong).get("code").asText()).isEqualTo("WRONG_CREDENTIALS");
+        assertThat(bodyOf(inactiveResult).get("message").asText()).isEqualTo(ACCOUNT_OFF_MESSAGE);
+        assertThat(bodyOf(inactiveResult).get("code").asText()).isEqualTo("ACCOUNT_OFF");
         assertThat(bodyOf(deletedResult).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
         assertThat(activeSessionsFor(inactiveUser)).isEmpty();
         assertThat(activeSessionsFor(deletedUser)).isEmpty();
     }
 
     @Test
-    @DisplayName("AUTH-005 POST /auth/web/login rejects user with unverified email")
+    @DisplayName("AUTH-005 POST /auth/web/login tells an unconfirmed email only after the right password")
     void auth005RejectsUserWithUnverifiedEmail() throws Exception {
         User user = createUser("auth005", true, false, null, "ACTIVE");
         String ip = nextIp();
 
-        MvcResult result = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-005", status().isUnauthorized());
+        MvcResult result = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-005", status().isForbidden());
 
-        assertThat(bodyOf(result).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
+        assertThat(bodyOf(result).get("message").asText()).isEqualTo(EMAIL_NOT_CONFIRMED_MESSAGE);
+        assertThat(bodyOf(result).get("code").asText()).isEqualTo("EMAIL_NOT_CONFIRMED");
         assertThat(activeSessionsFor(user)).isEmpty();
     }
 
     @Test
-    @DisplayName("AUTH-006 POST /auth/web/login locks account after max failed attempts")
+    @DisplayName("AUTH-006 POST /auth/web/login locks the account on the 8th wrong password and keeps it locked for the right one")
     void auth006LocksAccountAfterMaxFailedAttempts() throws Exception {
         User user = createVerifiedUser("auth006");
         String ip = nextIp();
 
-        for (int attempt = 0; attempt < 5; attempt++) {
+        for (int attempt = 0; attempt < 7; attempt++) {
             webLogin(user.getUsername(), WRONG_PASSWORD, ip, "AUTH-006", status().isUnauthorized());
         }
+        MvcResult lockingResult = webLogin(user.getUsername(), WRONG_PASSWORD, ip, "AUTH-006", status().isLocked());
+        assertThat(bodyOf(lockingResult).get("code").asText()).isEqualTo("ACCOUNT_LOCKED");
+        assertThat(bodyOf(lockingResult).hasNonNull("lockedUntil")).isTrue();
 
         User lockedUser = userRepository.findById(user.getId()).orElseThrow();
-        assertThat(lockedUser.getFailedLoginAttempts()).isEqualTo(5);
+        assertThat(lockedUser.getFailedLoginAttempts()).isEqualTo(8);
         assertThat(lockedUser.getLockedUntil()).isNotNull();
         assertThat(lockedUser.getLockedUntil()).isAfter(OffsetDateTime.now(ZoneOffset.UTC));
-
-        authLoginAttemptRepository.deleteAllInBatch();
 
         MvcResult lockedResult = webLogin(
                 user.getUsername(),
                 DEFAULT_PASSWORD,
                 ip,
                 "AUTH-006-locked",
-                status().isUnauthorized()
+                status().isLocked()
         );
 
-        assertThat(bodyOf(lockedResult).get("message").asText()).isEqualTo(INVALID_CREDENTIALS_MESSAGE);
+        assertThat(bodyOf(lockedResult).get("message").asText()).isEqualTo(LOCKED_MESSAGE);
         assertThat(activeSessionsFor(user)).isEmpty();
     }
 
     @Test
-    @DisplayName("AUTH-007 POST /auth/web/login rate-limits by identifier")
+    @DisplayName("AUTH-007 POST /auth/web/login locks a username nobody has exactly like a real one")
     void auth007RateLimitsByIdentifier() throws Exception {
-        User user = createVerifiedUser("auth007");
         String ip = nextIp();
+        String nobody = "nobody-" + UUID.randomUUID().toString().substring(0, 8);
 
-        for (int attempt = 0; attempt < 5; attempt++) {
-            webLogin(user.getEmail(), WRONG_PASSWORD, ip, "AUTH-007", status().isUnauthorized());
+        for (int attempt = 0; attempt < 7; attempt++) {
+            webLogin(nobody, WRONG_PASSWORD, ip, "AUTH-007", status().isUnauthorized());
         }
+        MvcResult lockedResult = webLogin(nobody, WRONG_PASSWORD, ip, "AUTH-007-lock", status().isLocked());
 
-        MvcResult rateLimitedResult = webLogin(
-                user.getEmail(),
-                DEFAULT_PASSWORD,
-                ip,
-                "AUTH-007-rate-limit",
-                status().isTooManyRequests()
-        );
-
-        assertThat(bodyOf(rateLimitedResult).get("message").asText()).isEqualTo(TOO_MANY_LOGIN_ATTEMPTS_MESSAGE);
-        assertThat(activeSessionsFor(user)).isEmpty();
+        assertThat(bodyOf(lockedResult).get("message").asText()).isEqualTo(LOCKED_MESSAGE);
+        assertThat(bodyOf(lockedResult).get("code").asText()).isEqualTo("ACCOUNT_LOCKED");
     }
 
     @Test
-    @DisplayName("AUTH-008 POST /auth/web/login rate-limits by IP")
+    @DisplayName("AUTH-008 POST /auth/web/login pauses a network address after 200 wrong passwords within 15 minutes")
     void auth008RateLimitsByIp() throws Exception {
         String ip = nextIp();
-
-        for (int attempt = 0; attempt < 20; attempt++) {
-            webLogin(
-                    "missing-" + attempt + "@pos.example",
-                    WRONG_PASSWORD,
-                    ip,
-                    "AUTH-008",
-                    status().isUnauthorized()
-            );
+        OffsetDateTime minuteAgo = OffsetDateTime.now(ZoneOffset.UTC).minusMinutes(1);
+        List<pos.pos.auth.entity.AuthLoginAttempt> wrongTries = new java.util.ArrayList<>();
+        for (int attempt = 0; attempt < 200; attempt++) {
+            wrongTries.add(pos.pos.auth.entity.AuthLoginAttempt.builder()
+                    .identifier("missing-" + attempt + "@pos.example")
+                    .ipAddress(ip)
+                    .success(false)
+                    .failureReason(pos.pos.auth.enums.LoginFailureReason.INVALID_CREDENTIALS)
+                    .attemptedAt(minuteAgo)
+                    .build());
         }
+        authLoginAttemptRepository.saveAll(wrongTries);
 
-        MvcResult rateLimitedResult = webLogin(
+        MvcResult pausedResult = webLogin(
                 "missing-final@pos.example",
                 WRONG_PASSWORD,
                 ip,
@@ -273,30 +281,53 @@ class WebAuthIntegrationTest {
                 status().isTooManyRequests()
         );
 
-        assertThat(bodyOf(rateLimitedResult).get("message").asText()).isEqualTo(TOO_MANY_LOGIN_ATTEMPTS_MESSAGE);
+        assertThat(bodyOf(pausedResult).get("message").asText()).isEqualTo(NETWORK_PAUSED_MESSAGE);
+        assertThat(bodyOf(pausedResult).get("code").asText()).isEqualTo("NETWORK_PAUSED");
+
+        // Another address is not affected.
+        webLogin("missing-other@pos.example", WRONG_PASSWORD, nextIp(), "AUTH-008-other", status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("AUTH-009 POST /auth/web/login revokes oldest session when session limit is reached")
-    void auth009RevokesOldestSessionWhenSessionLimitIsReached() throws Exception {
+    @DisplayName("AUTH-009 at 5 devices sign-in asks which one to sign out, then signs it out and signs in")
+    void auth009AsksWhichDeviceToSignOutAtTheSessionLimit() throws Exception {
         User user = createVerifiedUser("auth009");
         String ip = nextIp();
 
         String firstRefreshToken = loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-1");
-        Thread.sleep(20);
-        loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-2");
-        Thread.sleep(20);
-        loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-3");
-        Thread.sleep(20);
-        String fourthRefreshToken = loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-4");
+        String latestRefreshToken = null;
+        for (int i = 2; i <= 5; i++) {
+            Thread.sleep(20);
+            latestRefreshToken = loginAndExtractRefreshToken(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-" + i);
+        }
+        assertThat(activeSessionsFor(user)).hasSize(5);
 
-        List<UserSession> allSessions = sessionsFor(user);
-        assertThat(allSessions).hasSize(4);
-        assertThat(activeSessionsFor(user)).hasSize(3);
-        assertThat(allSessions)
+        // The 6th: refused with the devices, the one unused longest first; nothing is signed out yet.
+        MvcResult refused = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-009-6", status().isConflict());
+        com.fasterxml.jackson.databind.JsonNode answer = objectMapper.readTree(refused.getResponse().getContentAsString());
+        assertThat(answer.path("code").asText()).isEqualTo("TOO_MANY_DEVICES");
+        assertThat(answer.path("devices")).hasSize(5);
+        assertThat(activeSessionsFor(user)).hasSize(5);
+        String oldestId = answer.path("devices").get(0).path("id").asText();
+
+        // Again with the oldest chosen: it's signed out (SESSION_LIMIT) and the sign-in goes through.
+        mockMvc.perform(post("/auth/web/login")
+                        .with(client(ip, "AUTH-009-6b"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "identifier", user.getUsername(),
+                                "password", DEFAULT_PASSWORD,
+                                "signOutSessionId", oldestId
+                        ))))
+                .andExpect(status().isOk());
+        assertThat(activeSessionsFor(user)).hasSize(5);
+        assertThat(sessionsFor(user))
                 .filteredOn(UserSession::isRevoked)
                 .singleElement()
-                .satisfies(session -> assertThat(session.getRevokedReason()).isEqualTo("SESSION_LIMIT"));
+                .satisfies(session -> {
+                    assertThat(session.getId().toString()).isEqualTo(oldestId);
+                    assertThat(session.getRevokedReason()).isEqualTo("SESSION_LIMIT");
+                });
 
         MvcResult revokedRefreshResult = webRefresh(
                 firstRefreshToken,
@@ -304,16 +335,18 @@ class WebAuthIntegrationTest {
                 "AUTH-009-refresh-oldest",
                 status().isUnauthorized()
         );
-        assertRefreshCookieCleared(revokedRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(revokedRefreshResult);
+        assertRefreshCookieCleared(revokedRefreshResult);
 
         MvcResult latestRefreshResult = webRefresh(
-                fourthRefreshToken,
+                latestRefreshToken,
                 ip,
                 "AUTH-009-refresh-current",
                 status().isOk()
         );
-        assertThat(bodyOf(latestRefreshResult).get("accessToken").asText()).isNotBlank();
-        assertRefreshCookieIssued(latestRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertThat(extractCookieValue(latestRefreshResult, ACCESS_COOKIE_NAME)).isNotBlank();
+        assertAccessCookieIssued(latestRefreshResult);
+        assertRefreshCookieIssued(latestRefreshResult);
     }
 
     @Test
@@ -323,15 +356,19 @@ class WebAuthIntegrationTest {
         String ip = nextIp();
 
         MvcResult loginResult = webLogin(user.getEmail(), DEFAULT_PASSWORD, ip, "AUTH-010-login", status().isOk());
-        String firstAccessToken = bodyOf(loginResult).get("accessToken").asText();
-        String firstRefreshToken = extractCookieValue(loginResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String firstAccessToken = extractCookieValue(loginResult, ACCESS_COOKIE_NAME);
+        String firstRefreshToken = extractCookieValue(loginResult, REFRESH_COOKIE_NAME);
 
         MvcResult refreshResult = webRefresh(firstRefreshToken, ip, "AUTH-010-refresh", status().isOk());
 
         JsonNode body = bodyOf(refreshResult);
-        String rotatedRefreshToken = extractCookieValue(refreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
-        assertThat(body.get("accessToken").asText()).isNotEqualTo(firstAccessToken);
+        String rotatedAccessToken = extractCookieValue(refreshResult, ACCESS_COOKIE_NAME);
+        String rotatedRefreshToken = extractCookieValue(refreshResult, REFRESH_COOKIE_NAME);
+        assertThat(body.get("accessToken")).isNull();
+        assertThat(rotatedAccessToken).isNotEqualTo(firstAccessToken);
         assertThat(rotatedRefreshToken).isNotEqualTo(firstRefreshToken);
+        assertAccessCookieIssued(refreshResult);
+        assertRefreshCookieIssued(refreshResult);
         assertThat(activeSessionsFor(user)).hasSize(1);
     }
 
@@ -343,7 +380,8 @@ class WebAuthIntegrationTest {
         MvcResult result = webRefresh(null, ip, "AUTH-011", status().isUnauthorized());
 
         assertThat(bodyOf(result).get("message").asText()).isEqualTo(INVALID_REFRESH_TOKEN_MESSAGE);
-        assertRefreshCookieCleared(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(result);
+        assertRefreshCookieCleared(result);
     }
 
     @Test
@@ -354,7 +392,8 @@ class WebAuthIntegrationTest {
         MvcResult result = webRefresh("not-a-refresh-token", ip, "AUTH-012-invalid", status().isUnauthorized());
 
         assertThat(bodyOf(result).get("message").asText()).isEqualTo(INVALID_REFRESH_TOKEN_MESSAGE);
-        assertRefreshCookieCleared(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(result);
+        assertRefreshCookieCleared(result);
     }
 
     @Test
@@ -364,7 +403,7 @@ class WebAuthIntegrationTest {
         String ip = nextIp();
 
         MvcResult loginResult = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-012-reused-login", status().isOk());
-        String firstRefreshToken = extractCookieValue(loginResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String firstRefreshToken = extractCookieValue(loginResult, REFRESH_COOKIE_NAME);
 
         MvcResult rotatedResult = webRefresh(
                 firstRefreshToken,
@@ -372,7 +411,7 @@ class WebAuthIntegrationTest {
                 "AUTH-012-reused-refresh",
                 status().isOk()
         );
-        String rotatedRefreshToken = extractCookieValue(rotatedResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String rotatedRefreshToken = extractCookieValue(rotatedResult, REFRESH_COOKIE_NAME);
 
         MvcResult reusedResult = webRefresh(
                 firstRefreshToken,
@@ -382,7 +421,8 @@ class WebAuthIntegrationTest {
         );
 
         assertThat(bodyOf(reusedResult).get("message").asText()).isEqualTo(INVALID_REFRESH_TOKEN_MESSAGE);
-        assertRefreshCookieCleared(reusedResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(reusedResult);
+        assertRefreshCookieCleared(reusedResult);
         assertThat(rotatedRefreshToken).isNotEqualTo(firstRefreshToken);
     }
 
@@ -393,7 +433,7 @@ class WebAuthIntegrationTest {
         String ip = nextIp();
 
         MvcResult loginResult = webLogin(user.getUsername(), DEFAULT_PASSWORD, ip, "AUTH-012-expired-login", status().isOk());
-        String refreshToken = extractCookieValue(loginResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String refreshToken = extractCookieValue(loginResult, REFRESH_COOKIE_NAME);
 
         UserSession session = sessionsFor(user).getFirst();
         session.setExpiresAt(OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(1));
@@ -402,7 +442,8 @@ class WebAuthIntegrationTest {
         MvcResult expiredResult = webRefresh(refreshToken, ip, "AUTH-012-expired-refresh", status().isUnauthorized());
 
         assertThat(bodyOf(expiredResult).get("message").asText()).isEqualTo(INVALID_REFRESH_TOKEN_MESSAGE);
-        assertRefreshCookieCleared(expiredResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(expiredResult);
+        assertRefreshCookieCleared(expiredResult);
         UserSession expiredSession = userSessionRepository.findById(session.getId()).orElseThrow();
         assertThat(expiredSession.isRevoked()).isTrue();
         assertThat(expiredSession.getRevokedReason()).isEqualTo("EXPIRED");
@@ -415,12 +456,13 @@ class WebAuthIntegrationTest {
         String ip = nextIp();
 
         MvcResult loginResult = webLogin(user.getEmail(), DEFAULT_PASSWORD, ip, "AUTH-013-login", status().isOk());
-        String refreshToken = extractCookieValue(loginResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        String refreshToken = extractCookieValue(loginResult, REFRESH_COOKIE_NAME);
         UserSession session = sessionsFor(user).getFirst();
 
         MvcResult logoutResult = webLogout(refreshToken, ip, "AUTH-013-logout", status().isNoContent());
 
-        assertRefreshCookieCleared(logoutResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(logoutResult);
+        assertRefreshCookieCleared(logoutResult);
         UserSession revokedSession = userSessionRepository.findById(session.getId()).orElseThrow();
         assertThat(revokedSession.isRevoked()).isTrue();
         assertThat(revokedSession.getRevokedReason()).isEqualTo("LOGOUT");
@@ -431,7 +473,8 @@ class WebAuthIntegrationTest {
                 "AUTH-013-refresh-after-logout",
                 status().isUnauthorized()
         );
-        assertRefreshCookieCleared(refreshAfterLogout.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(refreshAfterLogout);
+        assertRefreshCookieCleared(refreshAfterLogout);
     }
 
     @Test
@@ -442,8 +485,10 @@ class WebAuthIntegrationTest {
         MvcResult missingCookieResult = webLogout(null, ip, "AUTH-014-missing", status().isNoContent());
         MvcResult invalidCookieResult = webLogout("not-a-refresh-token", ip, "AUTH-014-invalid", status().isNoContent());
 
-        assertRefreshCookieCleared(missingCookieResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
-        assertRefreshCookieCleared(invalidCookieResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(missingCookieResult);
+        assertRefreshCookieCleared(missingCookieResult);
+        assertAccessCookieCleared(invalidCookieResult);
+        assertRefreshCookieCleared(invalidCookieResult);
     }
 
     @Test
@@ -458,7 +503,8 @@ class WebAuthIntegrationTest {
 
         MvcResult logoutAllResult = webLogoutAll(secondRefreshToken, ip, "AUTH-015-logout-all", status().isNoContent());
 
-        assertRefreshCookieCleared(logoutAllResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(logoutAllResult);
+        assertRefreshCookieCleared(logoutAllResult);
         assertThat(activeSessionsFor(user)).isEmpty();
         assertThat(sessionsFor(user))
                 .allSatisfy(session -> {
@@ -485,9 +531,12 @@ class WebAuthIntegrationTest {
                 status().isUnauthorized()
         );
 
-        assertRefreshCookieCleared(firstRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
-        assertRefreshCookieCleared(secondRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
-        assertRefreshCookieCleared(thirdRefreshResult.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        assertAccessCookieCleared(firstRefreshResult);
+        assertRefreshCookieCleared(firstRefreshResult);
+        assertAccessCookieCleared(secondRefreshResult);
+        assertRefreshCookieCleared(secondRefreshResult);
+        assertAccessCookieCleared(thirdRefreshResult);
+        assertRefreshCookieCleared(thirdRefreshResult);
     }
 
     private User createVerifiedUser(String label) {
@@ -521,7 +570,7 @@ class WebAuthIntegrationTest {
     private String loginAndExtractRefreshToken(String identifier, String password, String ip, String userAgent)
             throws Exception {
         MvcResult result = webLogin(identifier, password, ip, userAgent, status().isOk());
-        return extractCookieValue(result.getResponse().getHeader(HttpHeaders.SET_COOKIE));
+        return extractCookieValue(result, REFRESH_COOKIE_NAME);
     }
 
     private MvcResult webLogin(
@@ -610,34 +659,58 @@ class WebAuthIntegrationTest {
     }
 
     private MockCookie refreshCookie(String refreshToken) {
-        return new MockCookie(COOKIE_NAME, refreshToken);
+        return new MockCookie(REFRESH_COOKIE_NAME, refreshToken);
     }
 
-    private String extractCookieValue(String setCookieHeader) {
-        assertThat(setCookieHeader).isNotBlank();
-        String prefix = COOKIE_NAME + "=";
-        int start = setCookieHeader.indexOf(prefix);
-        int end = setCookieHeader.indexOf(';', start);
-        return setCookieHeader.substring(start + prefix.length(), end);
+    private String extractCookieValue(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .map(header -> {
+                    int start = header.indexOf(prefix) + prefix.length();
+                    int end = header.indexOf(';', start);
+                    return end >= 0 ? header.substring(start, end) : header.substring(start);
+                })
+                .orElseThrow();
     }
 
-    private void assertRefreshCookieIssued(String setCookieHeader) {
-        assertThat(setCookieHeader).contains(COOKIE_NAME + "=");
-        assertThat(setCookieHeader).contains("Path=/auth/web");
-        assertThat(setCookieHeader).contains("HttpOnly");
-        assertThat(setCookieHeader).contains("Secure");
-        assertThat(setCookieHeader).contains("SameSite=Strict");
-        assertThat(setCookieHeader).contains("Domain=pos.example");
+    private void assertAccessCookieIssued(MvcResult result) {
+        assertCookie(result, ACCESS_COOKIE_NAME, "/", false);
     }
 
-    private void assertRefreshCookieCleared(String setCookieHeader) {
-        assertThat(setCookieHeader).contains(COOKIE_NAME + "=");
-        assertThat(setCookieHeader).contains("Max-Age=0");
-        assertThat(setCookieHeader).contains("Path=/auth/web");
-        assertThat(setCookieHeader).contains("HttpOnly");
-        assertThat(setCookieHeader).contains("Secure");
-        assertThat(setCookieHeader).contains("SameSite=Strict");
-        assertThat(setCookieHeader).contains("Domain=pos.example");
+    private void assertAccessCookieCleared(MvcResult result) {
+        assertCookie(result, ACCESS_COOKIE_NAME, "/", true);
+    }
+
+    private void assertRefreshCookieIssued(MvcResult result) {
+        assertCookie(result, REFRESH_COOKIE_NAME, "/auth/web", false);
+    }
+
+    private void assertRefreshCookieCleared(MvcResult result) {
+        assertCookie(result, REFRESH_COOKIE_NAME, "/auth/web", true);
+    }
+
+    private void assertCookie(MvcResult result, String cookieName, String path, boolean cleared) {
+        String cookieHeader = extractCookieHeader(result, cookieName);
+        assertThat(cookieHeader).contains(cookieName + "=");
+        assertThat(cookieHeader).contains("Path=" + path);
+        assertThat(cookieHeader).contains("HttpOnly");
+        assertThat(cookieHeader).contains("Secure");
+        assertThat(cookieHeader).contains("SameSite=Strict");
+        assertThat(cookieHeader).contains("Domain=pos.example");
+
+        if (cleared) {
+            assertThat(cookieHeader).contains("Max-Age=0");
+        }
+    }
+
+    private String extractCookieHeader(MvcResult result, String cookieName) {
+        String prefix = cookieName + "=";
+        return result.getResponse().getHeaders(HttpHeaders.SET_COOKIE).stream()
+                .filter(header -> header.contains(prefix))
+                .findFirst()
+                .orElseThrow();
     }
 
     private List<UserSession> sessionsFor(User user) {

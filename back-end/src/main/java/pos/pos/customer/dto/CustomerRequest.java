@@ -24,11 +24,13 @@ public class CustomerRequest {
     private String lastName;
 
     @Size(max = 150, message = "email must be at most 150 characters")
+    @jakarta.validation.constraints.Email(message = "email must be a valid email address")
     private String email;
 
     @Size(max = 50, message = "phone must be at most 50 characters")
     private String phone;
 
+    @Size(max = 2000, message = "notes must be at most 2000 characters")
     private String notes;
 
     private Boolean active;

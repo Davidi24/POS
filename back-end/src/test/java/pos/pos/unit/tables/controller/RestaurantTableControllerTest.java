@@ -20,6 +20,7 @@ import pos.pos.tables.dto.TableAvailabilityResponse;
 import pos.pos.tables.dto.TableRequest;
 import pos.pos.tables.dto.TableResponse;
 import pos.pos.tables.enums.TableStatus;
+import pos.pos.tables.realtime.TableLayoutChangeNotifier;
 import pos.pos.tables.service.RestaurantTableService;
 
 import java.util.List;
@@ -45,6 +46,9 @@ class RestaurantTableControllerTest {
     @Mock
     private RestaurantTableService restaurantTableService;
 
+    @Mock
+    private TableLayoutChangeNotifier layoutChangeNotifier;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
     private Authentication authentication;
@@ -56,7 +60,12 @@ class RestaurantTableControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new RestaurantTableController(restaurantTableService))
+        mockMvc = MockMvcBuilders.standaloneSetup(
+                        new RestaurantTableController(
+                                restaurantTableService,
+                                layoutChangeNotifier
+                        )
+                )
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();

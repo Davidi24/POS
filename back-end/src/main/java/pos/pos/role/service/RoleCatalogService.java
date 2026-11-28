@@ -19,6 +19,7 @@ import pos.pos.security.rbac.RoleHierarchyService;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -33,15 +34,18 @@ public class RoleCatalogService {
     private final PermissionRepository permissionRepository;
     private final RolePermissionRepository rolePermissionRepository;
     private final RoleHierarchyService roleHierarchyService;
+    private final RolePayService rolePayService;
 
-    public List<RoleResponse> getRoles() {
-        return roleRepository.findByIsActiveTrueOrderByRankDescNameAsc().stream()
-                .map(RoleMapper::toResponse)
-                .toList();
+    // Roles carry whether their people get paid in the restaurant being worked in.
+    public List<RoleResponse> getRoles(Authentication authentication) {
+        // Switched-off roles are listed too (dimmed in the app), so they can be switched back on.
+        return rolePayService.responses(roleRepository.findByDeletedAtIsNullOrderByRankDescNameAsc().stream()
+                .filter(role -> roleHierarchyService.visibleTo(authentication, role))
+                .toList(), roleHierarchyService.actorRestaurantId(authentication));
     }
 
-    public RoleResponse getRole(UUID roleId) {
-        return RoleMapper.toResponse(findExistingRole(roleId));
+    public RoleResponse getRole(Authentication authentication, UUID roleId) {
+        return rolePayService.response(findVisibleRole(authentication, roleId), roleHierarchyService.actorRestaurantId(authentication));
     }
 
     public List<PermissionResponse> getPermissions() {
@@ -50,8 +54,17 @@ public class RoleCatalogService {
                 .toList();
     }
 
-    public List<PermissionResponse> getRolePermissions(UUID roleId) {
-        findExistingRole(roleId);
+    public List<PermissionResponse> getRolePermissions(Authentication authentication, UUID roleId) {
+        Role role = findVisibleRole(authentication, roleId);
+        // A built-in role inside a restaurant: as that restaurant has it (its own changes on top of the defaults).
+        UUID restaurantId = roleHierarchyService.actorRestaurantId(authentication);
+        if (role.isSystem() && restaurantId != null) {
+            Set<String> codes = EffectivePermissions.forRoles(permissionRepository, restaurantId, List.of(roleId));
+            return permissionRepository.findAll(PERMISSION_SORT).stream()
+                    .filter(permission -> codes.contains(permission.getCode()))
+                    .map(PermissionMapper::toResponse)
+                    .toList();
+        }
 
         List<RolePermission> assignments = rolePermissionRepository.findByRoleId(roleId);
         if (assignments.isEmpty()) {
@@ -72,10 +85,11 @@ public class RoleCatalogService {
     }
 
     public List<RoleResponse> getAssignableRoles(Authentication authentication) {
-        return roleHierarchyService.getAssignableRoles(authentication)
-                .stream()
-                .map(RoleMapper::toResponse)
-                .toList();
+        // A role switched off here can't be handed out.
+        UUID restaurantId = roleHierarchyService.actorRestaurantId(authentication);
+        java.util.Set<UUID> off = rolePayService.switchedOff(restaurantId);
+        return rolePayService.responses(roleHierarchyService.getAssignableRoles(authentication).stream()
+                .filter(role -> role.isActive() && !off.contains(role.getId())).toList(), restaurantId);
     }
 
     public List<RoleResponse> getSystemRoles() {
@@ -84,8 +98,10 @@ public class RoleCatalogService {
                 .toList();
     }
 
-    private Role findExistingRole(UUID roleId) {
+    // Another restaurant's custom role is reported as not found, not as forbidden.
+    private Role findVisibleRole(Authentication authentication, UUID roleId) {
         return roleRepository.findByIdAndDeletedAtIsNull(roleId)
+                .filter(role -> roleHierarchyService.visibleTo(authentication, role))
                 .orElseThrow(RoleNotFoundException::new);
     }
 }
