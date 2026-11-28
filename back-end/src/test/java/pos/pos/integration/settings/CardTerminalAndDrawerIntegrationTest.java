@@ -50,6 +50,11 @@ class CardTerminalAndDrawerIntegrationTest extends AbstractPosApiIntegrationTest
         // Not connected: saved, but no till uses it.
         UUID loose = device(world, "Spare terminal", "PAYMENT_TERMINAL", null, null, null);
         assertThat(listed(world, loose).get("linkedDeviceId").isNull()).isTrue();
+        // In use means it's ready: not connected, it waits to be confirmed, and it can't be put in use.
+        assertThat(listed(world, loose).get("status").asText()).isEqualTo("PROVISIONING");
+        patch("/restaurants/{r}/branches/{b}/devices/{d}/status", r, world.branchId(), loose).as(owner)
+                .body(Map.of("status", "ACTIVE", "active", true, "online", false)).expect(400);
+        assertThat(listed(world, bluetooth).get("status").asText()).isEqualTo("ACTIVE");
 
         // Only a till or tablet, by Bluetooth (with the paired terminal) or cable, of this restaurant.
         expectRefused(world, "To a printer", "PAYMENT_TERMINAL", printer, "USB", null);
@@ -63,6 +68,7 @@ class CardTerminalAndDrawerIntegrationTest extends AbstractPosApiIntegrationTest
         // Removing the till lets go of the terminal.
         delete("/restaurants/{r}/branches/{b}/devices/{d}", r, world.branchId(), barTill).as(owner).expect(204);
         assertThat(listed(world, bluetooth).get("linkedDeviceId").isNull()).isTrue();
+        assertThat(listed(world, bluetooth).get("status").asText()).isEqualTo("PROVISIONING");
     }
 
     @Test
@@ -82,6 +88,10 @@ class CardTerminalAndDrawerIntegrationTest extends AbstractPosApiIntegrationTest
         expectRefused(world, "Into a till", "CASH_DRAWER", till, "PRINTER", null);
         delete("/restaurants/{r}/branches/{b}/devices/{d}", r, world.branchId(), drawer).as(world.ownerToken()).expect(204);
         assertThat(setupPrinter(world, printer).get("cashDrawerKick").asBoolean()).isFalse();
+        // Removing its printer takes a drawer out of use.
+        UUID another = device(world, "Bar cash drawer", "CASH_DRAWER", printer, "PRINTER", null);
+        delete("/restaurants/{r}/settings/printers/{p}", r, printer).as(world.ownerToken()).expect(204);
+        assertThat(listed(world, another).get("status").asText()).isEqualTo("PROVISIONING");
     }
 
     @Test

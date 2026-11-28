@@ -103,6 +103,9 @@ public class DeviceSettingsService {
         settingsDomainSupport.requireAccessibleRestaurant(authentication, restaurantId);
 
         Device device = requirePrinter(restaurantId, printerId);
+        // A cash drawer plugged into it isn't in use any more (it waits for another printer).
+        entityManager.createNativeQuery("update {h-schema}devices set status = 'PROVISIONING' where linked_device_id = :id and status = 'ACTIVE'")
+                .setParameter("id", device.getId()).executeUpdate();
 
         deleteAndAudit(authentication, device, "DEVICE_PRINTER", "DELETE", "Deleted printer settings");
     }
@@ -285,6 +288,9 @@ public class DeviceSettingsService {
         // with pairing so a token cannot remain usable after the device is disabled.
         Device device = requireBranchDeviceForUpdate(authentication, restaurantId, branchId, deviceId);
 
+        if (request.getStatus() == DeviceStatus.ACTIVE && notReady(device) != null) {
+            throw new AuthException(notReady(device), HttpStatus.BAD_REQUEST);
+        }
         if (request.getStatus() != null) {
             device.setStatus(request.getStatus());
         }
@@ -328,7 +334,9 @@ public class DeviceSettingsService {
                 "delete from {h-schema}\"device-pairing-tokens\" where device_id = :id",
                 "delete from {h-schema}\"device-assignments\" where device_id = :id",
                 "update {h-schema}kds_stations set device_id = null where device_id = :id",
-                "update {h-schema}shifts set device_id = null where device_id = :id")) {
+                "update {h-schema}shifts set device_id = null where device_id = :id",
+                // A card terminal connected to it isn't in use any more (it waits for another till or tablet).
+                "update {h-schema}devices set status = 'PROVISIONING' where linked_device_id = :id and status = 'ACTIVE'")) {
             entityManager.createNativeQuery(sql).setParameter("id", device.getId()).executeUpdate();
         }
 
@@ -401,6 +409,8 @@ public class DeviceSettingsService {
         }
         if (linked == null) {
             clearLink(device);
+            // Not connected: not in use (it waits to be confirmed once it's connected again).
+            if (device.getStatus() == DeviceStatus.ACTIVE) device.setStatus(DeviceStatus.PROVISIONING);
             return;
         }
         Device target = deviceRepository.findById(linked)
@@ -426,6 +436,17 @@ public class DeviceSettingsService {
         }
         device.setLinkedDeviceId(target.getId());
         device.setLinkAddress(StringUtils.hasText(request.getLinkAddress()) ? request.getLinkAddress().trim() : null);
+    }
+
+    /**
+     * Why a card terminal or a cash drawer can't be in use yet, or null (user, 2026-11-28: "in use means everything has passed,
+     * so it's ready"): a terminal needs its till or tablet, a drawer its printer.
+     */
+    private static String notReady(Device device) {
+        if (device.getLinkedDeviceId() != null) return null;
+        if (device.getDeviceType() == DeviceType.PAYMENT_TERMINAL) return "Connect it to a till or tablet first.";
+        if (device.getDeviceType() == DeviceType.CASH_DRAWER) return "Plug it into a printer first.";
+        return null;
     }
 
     private static void clearLink(Device device) {

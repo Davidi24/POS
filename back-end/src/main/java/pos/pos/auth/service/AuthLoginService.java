@@ -92,6 +92,10 @@ public class AuthLoginService {
     @Value("${app.security.login.max-wrong-pins-per-till:10}")
     private int maxWrongPinsPerTill = 10;
 
+    // The restaurant's own PIN pause (Admin Hub → Settings → Devices & printing, since 2026-11-28); the defaults above without one.
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pos.pos.settings.repository.SettingsRepository settingsRepository;
+
     @Value("${app.security.login.max-wrong-per-device:50}")
     private int maxWrongPerDevice;
 
@@ -187,8 +191,11 @@ public class AuthLoginService {
         ClientInfo base = ClientInfoNormalizer.normalize(clientInfo);
         ClientInfo info = new ClientInfo(base == null ? null : base.ipAddress(), base == null ? null : base.userAgent(), tillKey, device.name(),
                 base == null ? null : base.deviceSystem());
-        java.time.Duration pause = java.time.Duration.ofMinutes(lockDurationMinutes);
-        OffsetDateTime pausedUntil = pausedUntil(authLoginAttemptRepository.wrongPinTimesForDevice(tillKey, now.minus(pause.multipliedBy(2))), maxWrongPinsPerTill, pause, now);
+        pos.pos.settings.entity.Settings rules = settingsRepository == null ? null : settingsRepository.findByRestaurant_Id(device.restaurantId()).orElse(null);
+        int pinsBeforePause = rules == null ? maxWrongPinsPerTill : rules.getPinPauseAfter();
+        long pauseMinutes = rules == null ? lockDurationMinutes : rules.getPinPauseMinutes();
+        java.time.Duration pause = java.time.Duration.ofMinutes(pauseMinutes);
+        OffsetDateTime pausedUntil = pausedUntil(authLoginAttemptRepository.wrongPinTimesForDevice(tillKey, now.minus(pause.multipliedBy(2))), pinsBeforePause, pause, now);
         if (pausedUntil != null) {
             saveLoginAttempt(null, "pin", info, false, LoginFailureReason.PIN_PAUSED, now);
             accountAudit.inRestaurant(device.restaurantId(), device.deviceId(), null, "WRONG_PIN",
@@ -203,10 +210,10 @@ public class AuthLoginService {
         if (user == null) {
             saveLoginAttempt(null, "pin", info, false, LoginFailureReason.INVALID_PIN, now);
             accountAudit.inRestaurant(device.restaurantId(), device.deviceId(), null, "WRONG_PIN", "Wrong PIN on " + AccountAudit.deviceOf(device.name()));
-            OffsetDateTime nowPaused = pausedUntil(authLoginAttemptRepository.wrongPinTimesForDevice(tillKey, now.minus(pause.multipliedBy(2))), maxWrongPinsPerTill, pause, now);
+            OffsetDateTime nowPaused = pausedUntil(authLoginAttemptRepository.wrongPinTimesForDevice(tillKey, now.minus(pause.multipliedBy(2))), pinsBeforePause, pause, now);
             if (nowPaused != null) {
                 accountAudit.inRestaurant(device.restaurantId(), device.deviceId(), null, "TILL_PAUSED",
-                        AccountAudit.deviceOf(device.name()) + " stopped PIN sign-in for " + lockDurationMinutes + " minutes after " + maxWrongPinsPerTill + " wrong PINs");
+                        AccountAudit.deviceOf(device.name()) + " stopped PIN sign-in for " + pauseMinutes + " minutes after " + pinsBeforePause + " wrong PINs");
                 throw new LoginRefusedException(LoginRefusedException.Reason.PIN_PAUSED, "Too many wrong PINs on this till.", HttpStatus.TOO_MANY_REQUESTS, nowPaused);
             }
             throw new LoginRefusedException(LoginRefusedException.Reason.WRONG_PIN, "Wrong PIN.", HttpStatus.UNAUTHORIZED, null);

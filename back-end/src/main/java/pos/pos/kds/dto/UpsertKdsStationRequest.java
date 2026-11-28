@@ -39,6 +39,11 @@ public class UpsertKdsStationRequest {
 
     private Boolean acceptsScheduledOrders;
 
+    @jakarta.validation.constraints.Pattern(regexp = "NORMAL|BIG|HUGE", message = "Choose the letter size")
+    private String ticketTextSize;
+
+    private Boolean ticketNotesRed;
+
     @Size(max = 80, message = "screenLabel must be at most 80 characters")
     private String screenLabel;
 

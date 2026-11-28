@@ -342,6 +342,7 @@ This place was already added	Questo luogo è già stato aggiunto	Este lugar ya s
 Choose one of your suppliers	Scegli uno dei tuoi fornitori	Elige uno de tus proveedores	Zgjidh një nga furnitorët e tu
 There's already a supplier called {}	Esiste già un fornitore chiamato {}	Ya existe un proveedor llamado {}	Ekziston tashmë një furnitor me emrin {}
 Supplier not found	Fornitore non trovato	Proveedor no encontrado	Furnitori nuk u gjet
+Choose the letter size	Scegli la dimensione delle lettere	Elige el tamaño de letra	Zgjidh madhësinë e shkronjave
 KDS station code already exists for this branch	Il codice della postazione KDS esiste già per questa sede	El código de estación KDS ya existe en esta sucursal	Kodi i stacionit KDS ekziston tashmë për këtë pikë
 A menu item can only be actively routed to one KDS station in the same branch	Un piatto può essere inviato a una sola postazione KDS nella stessa sede	Un plato solo puede enviarse a una estación KDS en la misma sucursal	Një pjatë mund të dërgohet vetëm në një stacion KDS në të njëjtën pikë
 Selected KDS device is not active	Il dispositivo KDS scelto non è attivo	El dispositivo KDS elegido no está activo	Pajisja KDS e zgjedhur nuk është aktive
@@ -851,6 +852,14 @@ Refresh rate-limit attempt limits must be positive	Refresh rate-limit attempt li
 Refresh rate-limit window must be positive and representable	Refresh rate-limit window must be positive and representable	Refresh rate-limit window must be positive and representable	Refresh rate-limit window must be positive and representable
 Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key	Failed to hash refresh rate-limit key
 Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token	Failed to hash refresh token
+A till locks after 10 seconds at the least	Una cassa si blocca dopo almeno 10 secondi	Una caja se bloquea después de 10 segundos como mínimo	Një arkë kyçet pas të paktën 10 sekondash
+A till locks after 30 minutes at the most	Una cassa si blocca dopo 30 minuti al massimo	Una caja se bloquea después de 30 minutos como máximo	Një arkë kyçet pas 30 minutash e shumta
+During important work a till locks after 30 seconds at the least	Durante un lavoro importante una cassa si blocca dopo almeno 30 secondi	Durante un trabajo importante una caja se bloquea después de 30 segundos como mínimo	Gjatë një pune të rëndësishme një arkë kyçet pas të paktën 30 sekondash
+During important work a till locks after an hour at the most	Durante un lavoro importante una cassa si blocca dopo un'ora al massimo	Durante un trabajo importante una caja se bloquea después de una hora como máximo	Gjatë një pune të rëndësishme një arkë kyçet pas një ore e shumta
+At least 3 wrong PINs before a pause	Almeno 3 PIN sbagliati prima di una pausa	Al menos 3 PIN incorrectos antes de una pausa	Të paktën 3 PIN të gabuar para një pauze
+At most 50 wrong PINs before a pause	Al massimo 50 PIN sbagliati prima di una pausa	Como máximo 50 PIN incorrectos antes de una pausa	E shumta 50 PIN të gabuar para një pauze
+A pause lasts at least 1 minute	Una pausa dura almeno 1 minuto	Una pausa dura al menos 1 minuto	Një pauzë zgjat të paktën 1 minutë
+A pause lasts at most 120 minutes	Una pausa dura al massimo 120 minuti	Una pausa dura como máximo 120 minutos	Një pauzë zgjat e shumta 120 minuta
 Choose what kind of printer it is	Scegli che tipo di stampante è	Elige qué tipo de impresora es	Zgjidh çfarë lloj printeri është
 Choose how it's connected	Scegli come è collegato	Elige cómo está conectado	Zgjidh si është lidhur
 Only someone who works in every branch moves a device to another one.	Solo chi lavora in tutte le sedi sposta un dispositivo in un'altra.	Solo quien trabaja en todas las sucursales mueve un dispositivo a otra.	Vetëm ai që punon në të gjitha degët e zhvendos një pajisje në një tjetër.
@@ -871,6 +880,7 @@ Only the Owner or a Co-Owner can change staff permissions	Solo il Titolare o un 
 The hold warning must come before the hold ends	L'avviso di tenuta deve arrivare prima della fine della tenuta	La advertencia de espera debe llegar antes de que termine la espera	Paralajmërimi i mbajtjes duhet të vijë para se të mbarojë mbajtja
 A guest must count as late before the hold ends	Un ospite deve risultare in ritardo prima della fine della tenuta	Un comensal debe contar como tarde antes de que termine la espera	Një mysafir duhet të llogaritet me vonesë para se të mbarojë mbajtja
 Weekly inventory counts must be between 1 and 7	Gli inventari settimanali devono essere tra 1 e 7	Los conteos semanales deben ser entre 1 y 7	Numërimet javore duhet të jenë ndërmjet 1 dhe 7
+During important work a till can't lock sooner than usual	Durante un lavoro importante una cassa non può bloccarsi prima del solito	Durante un trabajo importante una caja no puede bloquearse antes de lo habitual	Gjatë një pune të rëndësishme një arkë nuk mund të kyçet më shpejt se zakonisht
 The most guests can't be below the normal number	Il massimo di ospiti non può essere sotto il numero normale	El máximo de comensales no puede ser menor que el número normal	Numri më i madh i mysafirëve nuk mund të jetë nën numrin normal
 Suggested tips must be between 1 and 100%	Le mance suggerite devono essere tra 1 e 100%	Las propinas sugeridas deben estar entre 1 y 100%	Bakshishet e sugjeruara duhet të jenë ndërmjet 1 dhe 100%
 A suggested tip can't be above the biggest tip allowed	Una mancia suggerita non può superare la mancia massima consentita	Una propina sugerida no puede superar la propina máxima permitida	Një bakshish i sugjeruar nuk mund të jetë mbi bakshishin më të madh të lejuar

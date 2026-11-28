@@ -32,7 +32,8 @@ public final class PrintingDtos {
                                         @NotNull @Size(max = 200) List<@NotNull UUID> kitchenStationIds) {
     }
 
-    public record StationPrinters(UUID stationId, String stationName, List<Printer> printers) {
+    // How the station's tickets print: letter size NORMAL / BIG / HUGE, notes in red (decided 2026-11-28).
+    public record StationPrinters(UUID stationId, String stationName, List<Printer> printers, String textSize, boolean notesRed) {
     }
 
     /**

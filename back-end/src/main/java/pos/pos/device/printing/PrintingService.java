@@ -118,7 +118,8 @@ public class PrintingService {
         for (Object[] station : stationsOf(restaurantId)) {
             List<PrintingDtos.Printer> list = jobs.stream().filter(job -> KITCHEN.equals(job[0]) && station[0].equals(job[2]))
                     .map(job -> printers.get((UUID) job[3])).filter(Objects::nonNull).toList();
-            if (!list.isEmpty()) kitchen.add(new PrintingDtos.StationPrinters((UUID) station[0], (String) station[1], list));
+            if (!list.isEmpty()) kitchen.add(new PrintingDtos.StationPrinters((UUID) station[0], (String) station[1], list,
+                    station.length > 3 && station[3] != null ? String.valueOf(station[3]) : "NORMAL", station.length > 4 && Boolean.TRUE.equals(station[4])));
         }
         Settings settings = settingsRepository.findByRestaurant_Id(restaurantId).orElseGet(Settings::new);
         return new PrintingDtos.Setup(deviceId, receipt, kitchen, List.copyOf(printers.values()),
@@ -309,9 +310,9 @@ public class PrintingService {
                 + " order by b.name, d.name").setParameter("restaurant", restaurantId).getResultList());
     }
 
-    /** The restaurant's active kitchen stations: [id, name, branch name]. */
+    /** The restaurant's active kitchen stations: [id, name, branch name, ticket letter size, notes in red]. */
     private List<Object[]> stationsOf(UUID restaurantId) {
-        return idRows(entityManager.createNativeQuery("select cast(s.id as varchar), s.name, b.name from {h-schema}kds_stations s"
+        return idRows(entityManager.createNativeQuery("select cast(s.id as varchar), s.name, b.name, s.ticket_text_size, s.ticket_notes_red from {h-schema}kds_stations s"
                 + " left join {h-schema}branches b on b.id = s.branch_id"
                 + " where s.restaurant_id = :restaurant and s.is_active order by b.name, s.display_order, s.name")
                 .setParameter("restaurant", restaurantId).getResultList());

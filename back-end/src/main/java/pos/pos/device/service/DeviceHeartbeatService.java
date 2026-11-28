@@ -30,6 +30,9 @@ public class DeviceHeartbeatService {
     private final DevicePairingProperties pairingProperties;
     private final OpaqueTokenService opaqueTokenService;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private pos.pos.settings.repository.SettingsRepository settingsRepository;
+
     /** Authenticate a paired device and record its latest successful contact. */
     @Transactional
     public DeviceHeartbeatResponse heartbeat(UUID deviceId, String rawDeviceSecret, String remoteAddress) {
@@ -70,7 +73,10 @@ public class DeviceHeartbeatService {
             if (StringUtils.hasText(about.appVersion())) device.setAppVersion(about.appVersion().trim());
         }
         deviceRepository.saveAndFlush(device);
-        return new DeviceHeartbeatResponse(device.getId(), true, now);
+        pos.pos.settings.entity.Settings rules = settingsRepository == null || device.getRestaurant() == null ? null
+                : settingsRepository.findByRestaurant_Id(device.getRestaurant().getId()).orElse(null);
+        return new DeviceHeartbeatResponse(device.getId(), true, now,
+                rules == null ? null : rules.getTillLockSeconds(), rules == null ? null : rules.getTillLockImportantSeconds());
     }
 
     private AuthException unauthorized() {

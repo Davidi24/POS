@@ -75,6 +75,10 @@ public class SettingsResponse {
     private Boolean printKitchenOnSend;
     private Boolean printBillOnRequest;
     private String printReceiptAfterPayment;
+    private Integer tillLockSeconds;
+    private Integer tillLockImportantSeconds;
+    private Integer pinPauseAfter;
+    private Integer pinPauseMinutes;
     private Integer inventoryCountFrequency;
     private pos.pos.settings.enums.InventoryCountPeriod inventoryCountPeriod;
     private OffsetDateTime inventoryCountScheduleStartedAt;

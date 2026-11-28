@@ -173,6 +173,17 @@ public class SettingsController {
         return ResponseEntity.ok(settingsService.updateTables(authentication, restaurantId, request));
     }
 
+    @PatchMapping("/till-lock")
+    @PreAuthorize("hasAuthority('DEVICES_MANAGE')")
+    @Operation(summary = "When a till locks, and how many wrong PINs pause it for how long")
+    public ResponseEntity<SettingsResponse> updateTillLock(
+            @PathVariable UUID restaurantId,
+            @Valid @RequestBody pos.pos.settings.dto.UpdateSettingsTillLockRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(settingsService.updateTillLock(authentication, restaurantId, request));
+    }
+
     @PatchMapping("/printing")
     @PreAuthorize("hasAuthority('SETTINGS_UPDATE')")
     @Operation(summary = "When kitchen tickets, bills and receipts print by themselves")

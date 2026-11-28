@@ -189,6 +189,41 @@ class PinSignInLimitsIntegrationTest extends AbstractPosApiIntegrationTest {
                 .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", pin)).expect(429).get("code").asText()).isEqualTo("PIN_PAUSED");
     }
 
+    @Test
+    void theRestaurantChoosesTheTillLockAndThePinPause() throws Exception {
+        World world = newWorld("till lock");
+        UUID r = world.restaurantId();
+        UUID device = till(world, "Lock till");
+        String code = post("/restaurants/{r}/devices/{d}/pairing-tokens", r, device).as(world.ownerToken())
+                .body(Map.of("ttlMinutes", 10)).expect(201).get("pairingToken").asText();
+        String secret = post("/restaurants/{r}/device-pairing/redeem", r).as(world.ownerToken())
+                .body(Map.of("pairingToken", code)).expect(200).get("deviceSecret").asText();
+        // Saved in Settings → Devices & printing; refused out of range, or the important time below the usual one; not by a waiter.
+        JsonNode saved = patch("/restaurants/{r}/settings/till-lock", r).as(world.ownerToken())
+                .body(Map.of("tillLockSeconds", 60, "tillLockImportantSeconds", 300, "pinPauseAfter", 3, "pinPauseMinutes", 5)).expect(200);
+        assertThat(saved.get("tillLockSeconds").asInt()).isEqualTo(60);
+        assertThat(saved.get("pinPauseAfter").asInt()).isEqualTo(3);
+        patch("/restaurants/{r}/settings/till-lock", r).as(world.ownerToken())
+                .body(Map.of("tillLockSeconds", 5, "tillLockImportantSeconds", 300, "pinPauseAfter", 3, "pinPauseMinutes", 5)).expect(400);
+        patch("/restaurants/{r}/settings/till-lock", r).as(world.ownerToken())
+                .body(Map.of("tillLockSeconds", 300, "tillLockImportantSeconds", 60, "pinPauseAfter", 3, "pinPauseMinutes", 5)).expect(400);
+        patch("/restaurants/{r}/settings/till-lock", r).as(token(staff(world, "waiter", "WAITER")))
+                .body(Map.of("tillLockSeconds", 60, "tillLockImportantSeconds", 300, "pinPauseAfter", 3, "pinPauseMinutes", 5)).expect(403);
+        // The till gets its lock times with each heartbeat.
+        JsonNode beat = post("/public/devices/{d}/heartbeat", device).header("X-Device-Secret", secret).body(Map.of("platform", "Linux")).expect(200);
+        assertThat(beat.get("tillLockSeconds").asInt()).isEqualTo(60);
+        assertThat(beat.get("tillLockImportantSeconds").asInt()).isEqualTo(300);
+        // 3 wrong PINs now pause it.
+        String pin = givePin(world.ownerToken());
+        String wrong = String.format("%05d", (Integer.parseInt(pin) + 1) % 100_000);
+        for (int i = 1; i <= 2; i++) {
+            assertThat(post("/auth/device/pin-login").header("X-Device-Id", "lock-" + i)
+                    .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", wrong)).expect(401).get("code").asText()).isEqualTo("WRONG_PIN");
+        }
+        assertThat(post("/auth/device/pin-login").header("X-Device-Id", "lock-3")
+                .body(Map.of("deviceId", device, "deviceSecret", secret, "pin", wrong)).expect(429).get("code").asText()).isEqualTo("PIN_PAUSED");
+    }
+
     /** A PIN for the person signed in with [passwordToken]: suggested, then kept. */
     private String givePin(String passwordToken) throws Exception {
         String pin = post("/auth/me/pin/suggestion").as(passwordToken).expect(200).get("pin").asText();

@@ -339,6 +339,20 @@ public class SettingsService {
     }
 
     @Transactional
+    public SettingsResponse updateTillLock(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsTillLockRequest request) {
+        if (request.getTillLockImportantSeconds() < request.getTillLockSeconds()) {
+            throw new AuthException("During important work a till can't lock sooner than usual", HttpStatus.BAD_REQUEST);
+        }
+        SettingsContext context = loadSettingsContext(authentication, restaurantId);
+        Settings settings = context.settings();
+        settings.setTillLockSeconds(request.getTillLockSeconds());
+        settings.setTillLockImportantSeconds(request.getTillLockImportantSeconds());
+        settings.setPinPauseAfter(request.getPinPauseAfter());
+        settings.setPinPauseMinutes(request.getPinPauseMinutes());
+        return saveSettingsAndAudit(context, settings, null, "UPDATE_TILL_LOCK", "Updated the till lock and the PIN pause");
+    }
+
+    @Transactional
     public SettingsResponse updateTables(Authentication authentication, UUID restaurantId, pos.pos.settings.dto.UpdateSettingsTablesRequest request) {
         if (request.getSeatingMostExtraGuests() < request.getSeatingExtraGuests()) {
             throw new AuthException("The most guests can't be below the normal number", HttpStatus.BAD_REQUEST);

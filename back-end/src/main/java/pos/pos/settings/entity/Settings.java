@@ -268,6 +268,19 @@ public class Settings extends AbstractAuditedEntity {
     @Column(name = "print_receipt_after_payment", nullable = false, length = 10)
     private String printReceiptAfterPayment = "ASK";
 
+    // The till lock and the PIN pause (decided 2026-11-28; Admin Hub → Settings → Devices & printing).
+    @Column(name = "till_lock_seconds", nullable = false)
+    private int tillLockSeconds = 30;
+
+    @Column(name = "till_lock_important_seconds", nullable = false)
+    private int tillLockImportantSeconds = 180;
+
+    @Column(name = "pin_pause_after", nullable = false)
+    private int pinPauseAfter = 10;
+
+    @Column(name = "pin_pause_minutes", nullable = false)
+    private int pinPauseMinutes = 15;
+
     // Inventory → Overview: stock worth at least this much (at cost) counts as valuable.
     @Column(name = "valuable_stock_from", nullable = false, precision = 12, scale = 2)
     private java.math.BigDecimal valuableStockFrom = new java.math.BigDecimal("100.00");

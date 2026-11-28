@@ -64,6 +64,15 @@ class PrintingIntegrationTest extends AbstractPosApiIntegrationTest {
         assertThat(setup.get("receiptPrinters").get(0).get("name").asText()).isEqualTo("Back printer");
         assertThat(setup.get("receiptPrinters").get(0).get("role").asText()).isEqualTo("SMALL");
         assertThat(setup.get("kitchen").get(0).get("printers")).hasSize(1);
+        assertThat(setup.get("kitchen").get(0).get("textSize").asText()).isEqualTo("NORMAL");
+        // Each station picks its tickets' look (decided 2026-11-28): big letters, notes in red.
+        put("/restaurants/{r}/branches/{b}/kds/stations/{s}", r, world.branchId(), grill).as(owner)
+                .body(Map.of("name", "Grill", "stationType", "GRILL", "ticketTextSize", "BIG", "ticketNotesRed", true)).expect(200);
+        JsonNode looked = get("/restaurants/{r}/print-setup", r).as(waiter).param("deviceId", barTill).expect(200);
+        assertThat(looked.get("kitchen").get(0).get("textSize").asText()).isEqualTo("BIG");
+        assertThat(looked.get("kitchen").get(0).get("notesRed").asBoolean()).isTrue();
+        put("/restaurants/{r}/branches/{b}/kds/stations/{s}", r, world.branchId(), grill).as(owner)
+                .body(Map.of("name", "Grill", "stationType", "GRILL", "ticketTextSize", "SMALL")).expect(400);
         assertThat(setup.get("kitchen").get(0).get("printers").get(0).get("name").asText()).isEqualTo("Front printer");
         assertThat(setup.get("printKitchenOnSend").asBoolean()).isTrue();
 

@@ -39,6 +39,8 @@ public class KdsMapper {
                 .displayOrder(station.getDisplayOrder())
                 .active(station.isActive())
                 .acceptsScheduledOrders(station.isAcceptsScheduledOrders())
+                .ticketTextSize(station.getTicketTextSize())
+                .ticketNotesRed(station.isTicketNotesRed())
                 .screenLabel(station.getScreenLabel())
                 .notes(station.getNotes())
                 .createdAt(station.getCreatedAt())
